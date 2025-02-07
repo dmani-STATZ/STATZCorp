@@ -1,0 +1,87 @@
+{% extends "users/base_template.html" %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation -->
+    <header class="bg-white shadow-sm">
+        <nav class="px-4 py-3">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <a href="{% url 'index' %}" class="text-xl font-semibold text-gray-800">STATZ Corporation</a>
+                
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-8">
+                    {% if user.is_authenticated %}
+                    <div class="flex space-x-4">
+                        <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md">Home</a>
+                        <a href="/about" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md">About</a>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Auth Links -->
+                    <div class="flex items-center space-x-4">
+                        {% if user.is_authenticated %}
+                            <span class="text-gray-600">{{ user.username }}</span>
+                            <form id="logout-form" method="post" action="{% url 'logout' %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md">
+                                    Sign Out
+                                </button>
+                            </form>
+                        {% else %}
+                            <a href="#" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md">Sign In</a>
+                            <a href="{% url 'register' %}" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md">Sign Up</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="flex">
+            <!-- Main Content Area -->
+            <div class="flex-1">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="mb-4 p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700{% elif message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                {% block content %}{% endblock content %}
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="hidden lg:block w-80 ml-8">
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Our Sidebar</h3>
+                    <p class="text-gray-600 mb-4">You can put any information here you'd like.</p>
+                    <ul class="space-y-2">
+                        <li class="p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">Space 1</li>
+                        <li class="p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">Space 2</li>
+                        <li class="p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">etc</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+<script>
+    // Remove Bootstrap script since we're not using it anymore
+    document.addEventListener('DOMContentLoaded', function() {
+        const mobileMenuButton = document.querySelector('[onclick="document.getElementById(\'mobileMenu\').classList.toggle(\'hidden\')"]');
+        const mobileMenu = document.getElementById('mobileMenu');
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!mobileMenuButton.contains(event.target) && !mobileMenu.contains(event.target)) {
+                mobileMenu.classList.add('hidden');
+            }
+        });
+    });
+</script>
+{% endblock %}
