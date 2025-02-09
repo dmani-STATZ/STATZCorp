@@ -2,15 +2,81 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-<div class="content-section">
-    <h2>Check In Visitor</h2>
-    <form method="POST">
+<div class="bg-white shadow rounded-lg p-6 max-w-2xl mx-auto">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Check In Visitor</h2>
+    <form method="POST" class="space-y-6">
         {% csrf_token %}
-        {{ form|crispy }}
-        <div class="d-flex gap-2 mt-3">
-            <button type="submit" class="btn btn-primary">Check In</button>
-            <a href="{% url 'visitor_log' %}" class="btn btn-secondary">Cancel</a>
+        <div class="mb-6 flex items-center gap-4">
+            <label for="visitor_history" class="text-gray-700 w-1/4 text-right">Previous Visitors</label>
+            <select id="visitor_history" name="visitor_history" 
+                    class="w-3/4 p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    onchange="fillVisitorInfo(this)">
+                {% for value, label in form.visitor_history.field.choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="grid grid-cols-1 gap-6">
+            {% for field in form %}
+            {% if field.name != 'visitor_history' %}
+            <div class="form-group flex items-center gap-4">
+                <label for="{{ field.id_for_label }}" class="text-gray-700 w-1/4 text-right">
+                    {{ field.label }}
+                </label>
+                {% if field.name == 'is_us_citizen' %}
+                <input type="checkbox" 
+                       name="{{ field.name }}" 
+                       id="{{ field.id_for_label }}"
+                       class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                       {% if field.value %}checked{% endif %}
+                >
+                {% else %}
+                <input type="{{ field.field.widget.input_type }}" 
+                       name="{{ field.name }}" 
+                       id="{{ field.id_for_label }}"
+                       {% if field.field.required %}required{% endif %}
+                       class="w-3/4 p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200"
+                       {% if field.value %}value="{{ field.value }}"{% endif %}
+                >
+                {% endif %}
+                {% if field.errors %}
+                    <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="flex gap-4 mt-6 justify-center">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                Check In
+            </button>
+            <a href="{% url 'visitor_log' %}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                Cancel
+            </a>
         </div>
     </form>
 </div>
+
+<script>
+function fillVisitorInfo(select) {
+    if (select.value && select.value !== '') {
+        const visitorName = select.value;
+        
+        // Get the last visit info for this visitor
+        fetch(`/accesslog/visitor-info/?name=${encodeURIComponent(visitorName)}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('id_visitor_name').value = data.name;
+                document.getElementById('id_visitor_company').value = data.company;
+                document.getElementById('id_is_us_citizen').checked = data.is_us_citizen;
+            });
+    } else {
+        // Clear the form if no visitor is selected
+        document.getElementById('id_visitor_name').value = '';
+        document.getElementById('id_visitor_company').value = '';
+        document.getElementById('id_reason_for_visit').value = '';
+        document.getElementById('id_is_us_citizen').checked = false;
+    }
+}
+</script>
 {% endblock %} 

@@ -6,7 +6,7 @@ class Visitor(models.Model):
     visitor_name = models.CharField(max_length=100)
     visitor_company = models.CharField(max_length=100)
     reason_for_visit = models.CharField(max_length=200)
-    id_confirm = models.CharField(max_length=50, blank=True)
+    is_us_citizen = models.BooleanField(default=False)
     time_in = models.TimeField()
     time_out = models.TimeField(null=True, blank=True)
     departed = models.BooleanField(default=False)

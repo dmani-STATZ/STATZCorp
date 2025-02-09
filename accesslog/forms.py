@@ -2,15 +2,29 @@ from django import forms
 from .models import Visitor
 from django.utils import timezone
 
+class VisitorHistoryField(forms.ChoiceField):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Get unique visitor names
+        visitors = Visitor.objects.values('visitor_name').distinct().order_by('visitor_name')
+        choices = [('', '-- Select Previous Visitor --')]
+        choices.extend([(v['visitor_name'], v['visitor_name']) for v in visitors])
+        self.choices = choices
+
 class VisitorCheckInForm(forms.ModelForm):
+    visitor_history = VisitorHistoryField(required=False)
+    
     class Meta:
         model = Visitor
-        fields = ['visitor_name', 'visitor_company', 'reason_for_visit', 'id_confirm']
+        fields = ['visitor_name', 'visitor_company', 'reason_for_visit', 'is_us_citizen']
         widgets = {
             'visitor_name': forms.TextInput(attrs={'class': 'form-control'}),
             'visitor_company': forms.TextInput(attrs={'class': 'form-control'}),
             'reason_for_visit': forms.TextInput(attrs={'class': 'form-control'}),
-            'id_confirm': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_us_citizen': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'is_us_citizen': 'US Citizen'
         }
 
 class MonthYearForm(forms.Form):

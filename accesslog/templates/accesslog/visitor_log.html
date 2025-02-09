@@ -2,57 +2,84 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Visitors Log</h2>
-    <div class="d-flex gap-2">
-        <a href="{% url 'check_in' %}" class="btn btn-success">Check In Visitor</a>
-        <form method="post" action="{% url 'generate_report' %}" class="d-flex gap-2">
-            {% csrf_token %}
-            {{ month_year_form|crispy }}
-            <button type="submit" class="btn btn-primary">View Report</button>
-        </form>
+<div class="bg-white shadow rounded-lg p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Visitors Log</h2>
+        <div class="flex gap-4">
+            <a href="{% url 'check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+                Check In Visitor
+            </a>
+            <form method="post" action="{% url 'generate_report' %}" class="flex gap-2">
+                {% csrf_token %}
+                <div class="flex gap-2">
+                    {{ month_year_form.month|as_crispy_field }}
+                    {{ month_year_form.year|as_crispy_field }}
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                    Generate Report
+                </button>
+            </form>
+        </div>
     </div>
-</div>
 
-<div class="table-responsive">
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Date Of Visit</th>
-                <th>Visitor Name</th>
-                <th>Visitor Company</th>
-                <th>Reason For Visit</th>
-                <th>ID Confirm</th>
-                <th>Time In</th>
-                <th>Time Out</th>
-                <th>Departed</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for visitor in visitors %}
-            <tr>
-                <td>{{ visitor.date_of_visit|date:"m/d/Y" }}</td>
-                <td>{{ visitor.visitor_name }}</td>
-                <td>{{ visitor.visitor_company }}</td>
-                <td>{{ visitor.reason_for_visit }}</td>
-                <td>{{ visitor.id_confirm }}</td>
-                <td>{{ visitor.time_in|time:"g:i A" }}</td>
-                <td>{{ visitor.time_out|time:"g:i A"|default:"" }}</td>
-                <td>
-                    <input type="checkbox" {% if visitor.departed %}checked{% endif %} disabled>
-                </td>
-                <td>
-                    {% if not visitor.departed %}
-                    <form method="post" action="{% url 'check_out' visitor.id %}" class="d-inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-warning">Check Out</button>
-                    </form>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">US Citizen</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for visitor in visitors %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.date_of_visit|date:"m/d/Y" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.visitor_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.visitor_company }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.reason_for_visit }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {% if visitor.is_us_citizen %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Yes
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            No
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.time_in|time:"g:i A" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.time_out|time:"g:i A"|default:"" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {% if visitor.departed %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Departed
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            Present
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {% if not visitor.departed %}
+                        <form method="post" action="{% url 'check_out' visitor.id %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-yellow-600 hover:text-yellow-900">Check Out</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %} 

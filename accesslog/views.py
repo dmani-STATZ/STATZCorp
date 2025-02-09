@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from .models import Visitor
 from .forms import VisitorCheckInForm, MonthYearForm
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -138,3 +138,19 @@ def generate_report(request):
             return response
     
     return redirect('visitor_log')
+
+@login_required
+def get_visitor_info(request):
+    name = request.GET.get('name')
+    
+    visitor = Visitor.objects.filter(
+        visitor_name=name
+    ).order_by('-date_of_visit').first()
+    
+    if visitor:
+        return JsonResponse({
+            'name': visitor.visitor_name,
+            'company': visitor.visitor_company,
+            'is_us_citizen': visitor.is_us_citizen,
+        })
+    return JsonResponse({})
