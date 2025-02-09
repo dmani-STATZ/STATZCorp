@@ -1,8 +1,95 @@
 {% extends 'users/base.html' %}
 
 {% block content %}
-<div class="bg-white rounded-lg shadow-sm p-6">
-    <h1 class="text-3xl font-light text-gray-900 mb-4">Home Page</h1>
-    <p class="text-gray-600">This is the home page</p>
+<div class="bg-white rounded-lg p-6">
+    <h1 class="text-2xl font-semibold mb-6">Welcome to STATZ Corporation Portal</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- HR Documents Section -->
+        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow">
+            <h2 class="text-xl font-medium mb-4 text-gray-800">HR Resources</h2>
+            <ul class="space-y-2">
+                <li>
+                    <a href="\\SERVER\HR\employee_handbook.pdf" 
+                       class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                        </svg>
+                        Employee Handbook
+                    </a>
+                </li>
+                <li>
+                    <a href="\\SERVER\HR\benefits_guide.pdf" 
+                       class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                        </svg>
+                        Benefits Information
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Common Forms Section -->
+        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow">
+            <h2 class="text-xl font-medium mb-4 text-gray-800">Common Forms</h2>
+            <ul class="space-y-2">
+                <li>
+                    <a href="\\SERVER\Forms\expense_report.xlsx" 
+                       class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                        </svg>
+                        Expense Report Template
+                    </a>
+                </li>
+                <li>
+                    <a href="\\SERVER\Forms\time_off_request.docx" 
+                       class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                        </svg>
+                        Time Off Request Form
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- IT Support Section -->
+        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow">
+            <h2 class="text-xl font-medium mb-4 text-gray-800">IT Support</h2>
+            <ul class="space-y-2">
+                <li>
+                    <a href="\\SERVER\IT\helpdesk_ticket.pdf" 
+                       class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                        </svg>
+                        Submit Help Desk Ticket
+                    </a>
+                </li>
+                <li>
+                    <a href="\\SERVER\IT\vpn_setup.pdf" 
+                       class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                        </svg>
+                        VPN Setup Guide
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Announcements Section -->
+    <div class="mt-8 p-4 border rounded-lg">
+        <h2 class="text-xl font-medium mb-4 text-gray-800">Recent Announcements</h2>
+        <div class="space-y-4">
+            <div class="p-3 bg-blue-50 rounded">
+                <p class="text-blue-800">Welcome to the new employee portal! Please update your bookmarks.</p>
+                <span class="text-sm text-blue-600">Posted: Today</span>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock content %}

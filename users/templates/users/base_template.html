@@ -15,44 +15,36 @@
 </head>
 <body class="bg-white">
     <header class="site-header">
-        <nav class="navbar navbar-expand-lg bg-light">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="{% url 'index' %}">STATZ Corporation</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarToggle"
-                        aria-controls="navbarToggle" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+        <nav class="bg-[#990000] p-4">
+            <div class="container mx-auto flex flex-wrap items-center justify-between">
+                <a class="navbar-brand text-white text-2xl font-bold pl-4" href="{% url 'index' %}">STATZ Corporation</a>
+                
+                <!-- Mobile menu button -->
+                <button class="md:hidden text-white" type="button" onclick="document.getElementById('navbarToggle').classList.toggle('hidden')">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+                    </svg>
                 </button>
-                <div class="collapse navbar-collapse justify-content-end" id="navbarToggle">
+
+                <!-- Navigation Links -->
+                <div id="navbarToggle" class="hidden w-full md:flex md:w-auto md:items-center">
                     {% if user.is_authenticated %}
-                    <div class="navbar-nav mr-auto">
-                        <a class="nav-item nav-link" href="/">Home</a>
-                        <a class="nav-item nav-link" href="/about">About</a>
-                        <a class="nav-item nav-link" href="/accesslog">Access Log</a>
+                    <div class="flex flex-col md:flex-row md:ml-auto">
+                        <a class="nav-item nav-link text-white hover:text-gray-200 px-3 py-2" href="/">Home</a>
+                        <a class="nav-item nav-link text-white hover:text-gray-200 px-3 py-2" href="/about">About</a>
+                        <a class="nav-item nav-link text-white hover:text-gray-200 px-3 py-2" href="/accesslog">Access Log</a>
+                        <span class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</span>
+                        <form id="logout-form" method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="flex flex-col md:flex-row md:ml-auto">
+                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'login' %}">Sign In</a>
+                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'register' %}">Sign Up</a>
                     </div>
                     {% endif %}
-                    <!-- Navbar Right Side -->
-                    <div class="navbar-nav">
-                        <ul class="navbar-nav">
-                            {% if user.is_authenticated %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="#">{{ user.username }}</a>
-                            </li>
-                            <li class="nav-item">
-                                <form id="logout-form" method="post" action="{% url 'logout' %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="nav-link">Sign Out</button>
-                                </form>
-                            </li>
-                            {% else %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="#">Sign In</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'register' %}">Sign Up</a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </div>
                 </div>
             </div>
         </nav>
