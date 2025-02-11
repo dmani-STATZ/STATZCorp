@@ -7,4 +7,5 @@ urlpatterns = [
     path('check-out/<int:visitor_id>/', views.check_out_visitor, name='check_out'),
     path('generate-report/', views.generate_report, name='generate_report'),
     path('visitor-info/', views.get_visitor_info, name='visitor_info'),
+    path('staged-info/<int:staged_id>/', views.get_staged_info, name='staged_info'),
 ] 

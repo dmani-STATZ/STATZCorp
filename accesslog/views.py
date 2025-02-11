@@ -1,7 +1,7 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from .models import Visitor
+from .models import Visitor, Staged
 from .forms import VisitorCheckInForm, MonthYearForm
 from django.http import HttpResponse, JsonResponse
 from reportlab.pdfgen import canvas
@@ -10,6 +10,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 import io
 from datetime import datetime
+from django.contrib import messages
 
 # Create your views here.
 
@@ -28,10 +29,29 @@ def visitor_log(request):
 def check_in_visitor(request):
     if request.method == 'POST':
         form = VisitorCheckInForm(request.POST)
+        action = request.POST.get('action', 'check_in')
+        
         if form.is_valid():
-            visitor = form.save(commit=False)
-            visitor.time_in = timezone.now().time()
-            visitor.save()
+            if action == 'stage':
+                # Save to staged table
+                Staged.objects.create(
+                    visitor_name=form.cleaned_data['visitor_name'],
+                    visitor_company=form.cleaned_data['visitor_company'],
+                    reason_for_visit=form.cleaned_data['reason_for_visit']
+                )
+                messages.success(request, 'Visitor has been staged for later check-in')
+            else:
+                # Check if this was a staged visitor
+                staged_id = request.POST.get('visitor_history', '').split('_')[1] if request.POST.get('visitor_history', '').startswith('staged_') else None
+                
+                visitor = form.save(commit=False)
+                visitor.time_in = timezone.now().time()
+                visitor.save()
+                
+                # If this was a staged visitor, remove them from staged
+                if staged_id:
+                    Staged.objects.filter(id=staged_id).delete()
+                
             return redirect('visitor_log')
     else:
         form = VisitorCheckInForm()
@@ -50,8 +70,8 @@ def generate_report(request):
     if request.method == 'POST':
         form = MonthYearForm(request.POST)
         if form.is_valid():
-            month = int(form.cleaned_data['month'])
-            year = form.cleaned_data['year']
+            month_year = form.cleaned_data['month_year']
+            year, month = map(int, month_year.split('-'))
             
             # Get visitors for selected month/year
             visitors = Visitor.objects.filter(
@@ -70,7 +90,8 @@ def generate_report(request):
             p.setFont("Helvetica-Bold", 24)
             p.drawString(50, height - 50, "STATZ Corporation")
             p.setFont("Helvetica", 16)
-            p.drawString(50, height - 80, f"Visitor Log - {form.cleaned_data['month_display']} {year}")
+            month_name = visitors.first().date_of_visit.strftime('%B %Y') if visitors.exists() else month_year
+            p.drawString(50, height - 80, f"Visitor Log - {month_name}")
             
             # Add table headers
             p.setFont("Helvetica-Bold", 12)
@@ -154,3 +175,12 @@ def get_visitor_info(request):
             'is_us_citizen': visitor.is_us_citizen,
         })
     return JsonResponse({})
+
+@login_required
+def get_staged_info(request, staged_id):
+    staged = get_object_or_404(Staged, id=staged_id)
+    return JsonResponse({
+        'name': staged.visitor_name,
+        'company': staged.visitor_company,
+        'reason': staged.reason_for_visit,
+    })

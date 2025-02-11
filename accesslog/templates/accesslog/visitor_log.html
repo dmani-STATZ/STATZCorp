@@ -4,16 +4,15 @@
 {% block content %}
 <div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-800">Visitors Log</h2>
+        <a href="{% url 'check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+            Check In Visitor
+        </a>
+        <h2 class="text-3xl font-bold text-gray-800">Visitors Log</h2>
         <div class="flex gap-4">
-            <a href="{% url 'check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
-                Check In Visitor
-            </a>
             <form method="post" action="{% url 'generate_report' %}" class="flex gap-2">
                 {% csrf_token %}
                 <div class="flex gap-2">
-                    {{ month_year_form.month|as_crispy_field }}
-                    {{ month_year_form.year|as_crispy_field }}
+                    {{ month_year_form.month_year|as_crispy_field }}
                 </div>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
                     Generate Report

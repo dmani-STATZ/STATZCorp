@@ -1,14 +1,26 @@
 from django import forms
-from .models import Visitor
+from .models import Visitor, Staged
 from django.utils import timezone
+from django.db.models import DateTimeField
+from django.db.models.functions import TruncMonth
 
 class VisitorHistoryField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Get unique visitor names
-        visitors = Visitor.objects.values('visitor_name').distinct().order_by('visitor_name')
+        # Get unique visitor names from both Visitor and Staged models
+        visitors = Visitor.objects.values('visitor_name').distinct()
+        staged = Staged.objects.values('visitor_name').distinct()
+        
+        # Combine and deduplicate visitor names
+        all_names = set()
+        for v in visitors:
+            all_names.add(v['visitor_name'])
+        for s in staged:
+            all_names.add(s['visitor_name'])
+        
+        # Create choices list
         choices = [('', '-- Select Previous Visitor --')]
-        choices.extend([(v['visitor_name'], v['visitor_name']) for v in visitors])
+        choices.extend([(name, name) for name in sorted(all_names)])
         self.choices = choices
 
 class VisitorCheckInForm(forms.ModelForm):
@@ -28,11 +40,22 @@ class VisitorCheckInForm(forms.ModelForm):
         }
 
 class MonthYearForm(forms.Form):
-    MONTH_CHOICES = [
-        (1, 'January'), (2, 'February'), (3, 'March'),
-        (4, 'April'), (5, 'May'), (6, 'June'),
-        (7, 'July'), (8, 'August'), (9, 'September'),
-        (10, 'October'), (11, 'November'), (12, 'December'),
-    ]
-    month = forms.ChoiceField(choices=MONTH_CHOICES)
-    year = forms.IntegerField(min_value=2000, max_value=2100) 
+    month_year = forms.ChoiceField(
+        choices=[],
+        label='Select Month'
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Get unique months from visitor log
+        dates = (Visitor.objects
+                .annotate(month=TruncMonth('date_of_visit'))
+                .values('month')
+                .distinct()
+                .order_by('-month'))
+        
+        self.fields['month_year'].choices = [
+            (d['month'].strftime('%Y-%m'), d['month'].strftime('%B %Y'))
+            for d in dates
+        ] 
+

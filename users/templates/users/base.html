@@ -23,17 +23,43 @@
 
 {% block extra_scripts %}
 <script>
-    // Remove Bootstrap script since we're not using it anymore
-    document.addEventListener('DOMContentLoaded', function() {
-        const mobileMenuButton = document.querySelector('[onclick="document.getElementById(\'mobileMenu\').classList.toggle(\'hidden\')"]');
-        const mobileMenu = document.getElementById('mobileMenu');
+    let idleTime = 0;
+    const maxIdleTime = 10 * 60 * 1000; // 30 minutes in milliseconds
 
-        // Close mobile menu when clicking outside
-        document.addEventListener('click', function(event) {
-            if (!mobileMenuButton.contains(event.target) && !mobileMenu.contains(event.target)) {
-                mobileMenu.classList.add('hidden');
+    function resetIdleTimer() {
+        idleTime = 0;
+    }
+
+    function checkIdleTime() {
+        idleTime += 1000; // Increment idle time by 1 second
+        if (idleTime >= maxIdleTime) {
+            logoutUser(); // Call the logout function
+        }
+    }
+
+    function logoutUser() {
+        fetch("{% url 'logout' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}', // Include CSRF token
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+        }).then(response => {
+            if (response.ok) {
+                window.location.href = "{% url 'login' %}"; // Redirect to login page
             }
-        });
-    });
+        }).catch(error => console.error('Error logging out:', error));
+    }
+
+    // Reset the idle timer on any of these events
+    window.onload = resetIdleTimer;
+    window.onmousemove = resetIdleTimer;
+    window.onmousedown = resetIdleTimer; // Catch touchpad/mouse events
+    window.ontouchstart = resetIdleTimer;
+    window.onclick = resetIdleTimer;     // Catch touch events
+    window.onkeypress = resetIdleTimer;  // Catch keyboard events
+
+    // Check idle time every second
+    setInterval(checkIdleTime, 1000);
 </script>
 {% endblock %}
