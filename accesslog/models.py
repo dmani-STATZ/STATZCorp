@@ -8,8 +8,8 @@ class Visitor(models.Model):
     visitor_company = models.CharField(max_length=100)
     reason_for_visit = models.CharField(max_length=200)
     is_us_citizen = models.BooleanField(default=False)
-    time_in = models.TimeField()
-    time_out = models.TimeField(null=True, blank=True)
+    time_in = models.DateTimeField(default=timezone.now)
+    time_out = models.DateTimeField(null=True, blank=True)
     departed = models.BooleanField(default=False)
 
     class Meta:

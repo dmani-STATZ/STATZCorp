@@ -44,7 +44,8 @@ def check_in_visitor(request):
             else:
                 # Create the visitor record
                 visitor = form.save(commit=False)
-                visitor.time_in = timezone.now().time()
+                visitor.time_in = timezone.now()  # Use full datetime
+                visitor.date_of_visit = timezone.now().date()  # Set date from timezone-aware time
                 visitor.save()
                 
                 # Check if this was a staged visitor and delete if it was
@@ -72,7 +73,7 @@ def check_in_visitor(request):
 @login_required
 def check_out_visitor(request, visitor_id):
     visitor = Visitor.objects.get(id=visitor_id)
-    visitor.time_out = timezone.now().time()
+    visitor.time_out = timezone.now()  # Use full datetime
     visitor.departed = True
     visitor.save()
     return redirect('visitor_log')

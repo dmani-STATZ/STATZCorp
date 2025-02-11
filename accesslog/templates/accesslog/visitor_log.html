@@ -54,8 +54,8 @@
                         </span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.time_in|time:"g:i A" }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.time_out|time:"g:i A"|default:"" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.time_in|date:"g:i A" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ visitor.time_out|date:"g:i A"|default:"" }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {% if visitor.departed %}
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
