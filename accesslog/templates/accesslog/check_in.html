@@ -73,7 +73,7 @@ function fillVisitorInfo(select) {
         if (!isNaN(select.value) && parseInt(select.value) > 0) {
             // This is a staged visitor
             const stagedId = select.value;
-            document.getElementById('staged_id').value = stagedId;
+            document.getElementById('staged_id').value = stagedId;  // Set the staged_id
             
             fetch(`/accesslog/staged-info/${stagedId}/`)
                 .then(response => response.json())
@@ -81,6 +81,7 @@ function fillVisitorInfo(select) {
                     document.getElementById('id_visitor_name').value = data.name;
                     document.getElementById('id_visitor_company').value = data.company;
                     document.getElementById('id_reason_for_visit').value = data.reason;
+                    // Don't clear the staged_id that we just set
                 });
         } else if (select.value !== '' && !select.value.startsWith('--')) {
             // This is a previous visitor

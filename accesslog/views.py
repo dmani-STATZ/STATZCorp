@@ -49,12 +49,14 @@ def check_in_visitor(request):
                 
                 # Check if this was a staged visitor and delete if it was
                 staged_id = request.POST.get('staged_id')
+                print(f"Staged ID: {staged_id}")  # Debug line
                 if staged_id and staged_id != '0':
                     try:
                         staged = Staged.objects.get(id=staged_id)
                         staged.delete()
                         messages.success(request, f'{visitor.visitor_name} has been checked in and removed from staged visitors')
                     except Staged.DoesNotExist:
+                        print(f"No staged visitor found with ID: {staged_id}")  # Debug line
                         pass
                 else:
                     messages.success(request, f'{visitor.visitor_name} has been checked in')
