@@ -7,21 +7,33 @@ from django.db.models.functions import TruncMonth
 class VisitorHistoryField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.populate_choices()
+
+    def populate_choices(self):
         # Get unique visitor names from both Visitor and Staged models
-        visitors = Visitor.objects.values('visitor_name').distinct()
-        staged = Staged.objects.values('visitor_name').distinct()
-        
-        # Combine and deduplicate visitor names
-        all_names = set()
-        for v in visitors:
-            all_names.add(v['visitor_name'])
-        for s in staged:
-            all_names.add(s['visitor_name'])
-        
-        # Create choices list
-        choices = [('', '-- Select Previous Visitor --')]
-        choices.extend([(name, name) for name in sorted(all_names)])
+        staged = Staged.objects.values('id', 'visitor_name', 'visitor_company').distinct()
+        visitors = Visitor.objects.values('visitor_name', 'visitor_company').distinct()
+
+        # Add Staged Visitors section only if there are staged visitors
+        choices = []
+        if staged.exists():
+            choices.append(('', '-- Staged Visitors --'))
+            choices.extend([
+                (str(item['id']), f"{item['visitor_name']} - {item['visitor_company']}")
+                for item in sorted(staged, key=lambda x: x['visitor_name'])
+            ])
+
+        # Add separator and previous visitors section if there are previous visitors
+        if visitors.exists():
+            choices.append(('', '-- Select Previous Visitor --'))
+            choices.extend([
+                (name, f"{name} - {company}")
+                for name, company in sorted(set((v['visitor_name'], v['visitor_company']) for v in visitors))
+            ])
+
         self.choices = choices
+
+
 
 class VisitorCheckInForm(forms.ModelForm):
     visitor_history = VisitorHistoryField(required=False)

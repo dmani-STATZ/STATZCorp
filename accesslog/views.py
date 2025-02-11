@@ -29,32 +29,42 @@ def visitor_log(request):
 def check_in_visitor(request):
     if request.method == 'POST':
         form = VisitorCheckInForm(request.POST)
-        action = request.POST.get('action', 'check_in')
-        
         if form.is_valid():
+            action = request.POST.get('action', 'check_in')
+            
             if action == 'stage':
                 # Save to staged table
                 Staged.objects.create(
                     visitor_name=form.cleaned_data['visitor_name'],
                     visitor_company=form.cleaned_data['visitor_company'],
-                    reason_for_visit=form.cleaned_data['reason_for_visit']
+                    reason_for_visit=form.cleaned_data['reason_for_visit'],
+                    is_us_citizen=form.cleaned_data['is_us_citizen']
                 )
                 messages.success(request, 'Visitor has been staged for later check-in')
             else:
-                # Check if this was a staged visitor
-                staged_id = request.POST.get('visitor_history', '').split('_')[1] if request.POST.get('visitor_history', '').startswith('staged_') else None
-                
+                # Create the visitor record
                 visitor = form.save(commit=False)
                 visitor.time_in = timezone.now().time()
                 visitor.save()
                 
-                # If this was a staged visitor, remove them from staged
-                if staged_id:
-                    Staged.objects.filter(id=staged_id).delete()
+                # Check if this was a staged visitor and delete if it was
+                staged_id = request.POST.get('staged_id')
+                if staged_id and staged_id != '0':
+                    try:
+                        staged = Staged.objects.get(id=staged_id)
+                        staged.delete()
+                        messages.success(request, f'{visitor.visitor_name} has been checked in and removed from staged visitors')
+                    except Staged.DoesNotExist:
+                        pass
+                else:
+                    messages.success(request, f'{visitor.visitor_name} has been checked in')
                 
             return redirect('visitor_log')
     else:
+        # Create a fresh form with updated choices
         form = VisitorCheckInForm()
+        form.fields['visitor_history'].populate_choices()
+    
     return render(request, 'accesslog/check_in.html', {'form': form, 'title': 'Check In Visitor'})
 
 @login_required

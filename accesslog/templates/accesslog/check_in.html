@@ -46,6 +46,7 @@
             {% endif %}
             {% endfor %}
         </div>
+        <input type="hidden" name="staged_id" id="staged_id" value="0">
         <div class="flex gap-4 mt-6 justify-center">
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
                 Check In
@@ -63,9 +64,17 @@
 
 <script>
 function fillVisitorInfo(select) {
+    console.log('Selected value:', select.value); // Debug line
+    
     if (select.value && select.value !== '') {
-        if (select.value.startsWith('staged_')) {
-            const stagedId = select.value.split('_')[1];
+        // Reset staged_id
+        document.getElementById('staged_id').value = '0';
+        
+        if (!isNaN(select.value) && parseInt(select.value) > 0) {
+            // This is a staged visitor
+            const stagedId = select.value;
+            document.getElementById('staged_id').value = stagedId;
+            
             fetch(`/accesslog/staged-info/${stagedId}/`)
                 .then(response => response.json())
                 .then(data => {
@@ -73,15 +82,22 @@ function fillVisitorInfo(select) {
                     document.getElementById('id_visitor_company').value = data.company;
                     document.getElementById('id_reason_for_visit').value = data.reason;
                 });
-        } else {
-            const visitorName = select.value;
+        } else if (select.value !== '' && !select.value.startsWith('--')) {
+            // This is a previous visitor
+            const [visitorName] = select.value.split(' - '); // Split on hyphen and take first part
+            console.log('Fetching info for:', visitorName); // Debug line
+            
             fetch(`/accesslog/visitor-info/?name=${encodeURIComponent(visitorName)}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Received data:', data); // Debug line
                     document.getElementById('id_visitor_name').value = data.name;
                     document.getElementById('id_visitor_company').value = data.company;
                     document.getElementById('id_is_us_citizen').checked = data.is_us_citizen;
                 });
+        } else {
+            // This is a separator or empty option
+            clearForm();
         }
     } else {
         clearForm();
@@ -93,6 +109,7 @@ function clearForm() {
     document.getElementById('id_visitor_company').value = '';
     document.getElementById('id_reason_for_visit').value = '';
     document.getElementById('id_is_us_citizen').checked = false;
+    document.getElementById('staged_id').value = '0';
 }
 
 function stageVisitor() {
