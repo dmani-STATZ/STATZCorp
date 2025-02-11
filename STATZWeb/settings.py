@@ -36,6 +36,7 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'users.apps.UsersConfig',
+    'inventory.apps.InventoryConfig',
     'crispy_forms',
     'crispy_bootstrap5',
     'django.contrib.admin',
@@ -44,6 +45,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_browser_reload',
+    'tailwind',
+    'theme_tw',
     'accesslog.apps.AccesslogConfig',
 ]
 
@@ -55,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
 
 ROOT_URLCONF = 'STATZWeb.urls'
@@ -164,3 +169,11 @@ LOGIN_REDIRECT_URL = 'index'  # Where to redirect after successful login
 LOGIN_URL = 'login'  # Where to redirect if login is required
 
 LOGOUT_REDIRECT_URL = 'login'
+
+TAILWIND_APP_NAME = 'theme_tw'
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
+
+NPM_BIN_PATH = "C:\\Program Files\\nodejs\\npm.cmd"

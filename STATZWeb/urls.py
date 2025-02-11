@@ -19,10 +19,12 @@ from django.urls import path, include
 from users import views as user_views
 
 urlpatterns = [
+    path("__reload__/", include("django_browser_reload.urls")),
     path('', user_views.landing_page, name='landing'),
     path('home/', user_views.index, name='index'),
     path('about/', user_views.about, name='about'),
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
     path('accesslog/', include('accesslog.urls')),
+    path('inventory/', include('inventory.urls')),
 ]
