@@ -1,13 +1,11 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import UserRegisterForm
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
-from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from .models import Announcement
-from .forms import AnnouncementForm
-from django.http import JsonResponse
+from django.contrib.auth import logout
 
 
 def register(request):
@@ -23,10 +21,6 @@ def register(request):
     else:
         form = UserRegisterForm()
     return render(request, 'users/register.html', {'form': form})
-
-
-
-
 
 
 def login_view(request):
@@ -50,4 +44,7 @@ def on_user_logged_out(sender, request, **kwargs):
     messages.success(request, 'You have been successfully logged out.')
 
 
+def logout_view(request):
+    logout(request)
+    return redirect('users/login.html')
 

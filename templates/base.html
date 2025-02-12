@@ -1,5 +1,38 @@
 {% extends "base_template.html" %}
 
+{% block extra_head %}
+<script>
+    // Set session storage flag on login
+    function setSessionFlag() {
+        sessionStorage.setItem('isLoggedIn', 'true');
+    }
+
+    // Clear session storage flag on logout
+    function clearSessionFlag() {
+        sessionStorage.removeItem('isLoggedIn');
+    }
+
+    // Check session storage flag on page load
+    window.onload = function() {
+        if (!sessionStorage.getItem('isLoggedIn')) {
+            // Redirect to logout URL if not logged in
+            window.location.href = "{% url 'logout' %}";
+        }
+    }
+
+    // Set session flag when the user logs in
+    document.addEventListener('DOMContentLoaded', function() {
+        setSessionFlag();
+    });
+
+    // Clear session flag when the user logs out
+    document.addEventListener('beforeunload', function() {
+        clearSessionFlag();
+    });
+</script>
+
+{% endblock %}
+
 {% block body %}
 <div class="min-h-screen bg-gray-50">
     <!-- Main Content -->
@@ -24,7 +57,7 @@
 {% block extra_scripts %}
 <script>
     let idleTime = 0;
-    const maxIdleTime = 10 * 60 * 1000; // 30 minutes in milliseconds
+    const maxIdleTime = 1 * 60 * 1000; // 10 minutes in milliseconds
 
     function resetIdleTimer() {
         idleTime = 0;

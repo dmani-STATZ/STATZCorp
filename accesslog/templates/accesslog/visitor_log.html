@@ -1,25 +1,31 @@
-{% extends "users/base.html" %}
+{% extends "base.html" %}
 {% load crispy_forms_tags %}
 {% block content %}
 <div class="bg-white shadow rounded-lg p-6">
-    <div class="flex justify-between items-center mb-6">
-        <a href="{% url 'check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
-            Check In Visitor
-        </a>
-        <h2 class="text-3xl font-bold text-gray-800">Visitors Log</h2>
-        <div class="flex gap-4">
-            <form method="post" action="{% url 'generate_report' %}" class="flex gap-2">
-                {% csrf_token %}
-                <div class="flex gap-2">
-                    {{ month_year_form.month_year|as_crispy_field }}
-                </div>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-1 py-1 rounded">
-                    Generate Report
-                </button>
-            </form>
+    <div>
+        <div class="flex justify-between items-center mb-6">
+            <!-- Left Section: Check In Visitor Link -->
+            <div class="flex items-center">
+                <a href="{% url 'check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded h-11 flex items-center">
+                    Check In Visitor
+                </a>
+            </div>
+            <!-- Center Section: Visitors Log Heading -->
+            <div class="flex-1 text-center">
+                <h2 class="text-3xl font-bold text-gray-800">Visitors Log</h2>
+            </div>
+            <!-- Right Section: Form and Button -->
+            <div class="flex items-center gap-4">
+                <form method="post" action="{% url 'generate_report' %}" class="flex gap-2">
+                    {% csrf_token %}
+                        {{ month_year_form.month_year|as_crispy_field }}
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded h-11 flex items-center">
+                            Generate Report
+                        </button>
+                </form>
+            </div>
         </div>
     </div>
-
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">

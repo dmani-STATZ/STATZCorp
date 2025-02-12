@@ -15,15 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import path
-from . import views
+from . import views as Inventoryviews
 
 urlpatterns = [
-    path('delete-item-ajax/<int:pk>/', views.delete_item_ajax, name='delete_item_ajax'),
-    path('autocomplete/nsn/', views.autocomplete_nsn, name='autocomplete_nsn'),
-    path('autocomplete/description/', views.autocomplete_description, name='autocomplete_description'),
-    path('autocomplete/manufacturer/', views.autocomplete_manufacturer, name='autocomplete_manufacturer'),
-    path('', views.dashboard, name='dashboard'),
-    path('add-item/', views.add_item, name='add_item'),
-    path('edit-item/<int:pk>/', views.edit_item, name='edit_item'),
-    path('delete-item/<int:pk>/', views.delete_item, name='delete_item'),
+    path('delete-item-ajax/<int:pk>/', Inventoryviews.delete_item_ajax, name='delete_item_ajax'),
+    path('autocomplete/nsn/', Inventoryviews.autocomplete_nsn, name='autocomplete_nsn'),
+    path('autocomplete/description/', Inventoryviews.autocomplete_description, name='autocomplete_description'),
+    path('autocomplete/manufacturer/', Inventoryviews.autocomplete_manufacturer, name='autocomplete_manufacturer'),
+    path('', Inventoryviews.dashboard, name='dashboard'),
+    path('add-item/', Inventoryviews.add_item, name='add_item'),
+    path('edit-item/<int:pk>/', Inventoryviews.edit_item, name='edit_item'),
+    path('delete-item/<int:pk>/', Inventoryviews.delete_item, name='delete_item'),
 ]

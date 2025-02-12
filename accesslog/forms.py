@@ -62,7 +62,7 @@ class VisitorCheckInForm(forms.ModelForm):
 class MonthYearForm(forms.Form):
     month_year = forms.ChoiceField(
         choices=[],
-        label='Select Month'
+        label=''
     )
 
     def __init__(self, *args, **kwargs):
@@ -74,7 +74,7 @@ class MonthYearForm(forms.Form):
                 .distinct()
                 .order_by('-month'))
         
-        self.fields['month_year'].choices = [
+        self.fields['month_year'].choices = [('', 'Select Month')] + [
             (d['month'].strftime('%Y-%m'), d['month'].strftime('%B %Y'))
             for d in dates
         ] 
