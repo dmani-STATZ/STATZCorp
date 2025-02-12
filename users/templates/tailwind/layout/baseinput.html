@@ -1,0 +1,5 @@
+<input type="{{ input.field.widget.input_type }}" 
+       name="{% if input.name %}{{ input.name }}{% else %}{{ input.field.name }}{% endif %}"
+       value="{{ input.field.value|default:'' }}"
+       class="w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200"
+       {{ input.flat_attrs|safe }}> 

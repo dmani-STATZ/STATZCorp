@@ -1,0 +1,7 @@
+{% if form.form_html %}
+    {{ form.form_html }}
+{% else %}
+    {% for field in form %}
+        {% include "tailwind/field.html" %}
+    {% endfor %}
+{% endif %} 

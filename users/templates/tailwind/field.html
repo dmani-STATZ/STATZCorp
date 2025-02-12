@@ -1,0 +1,19 @@
+{% load tailwind_filters %}
+
+<div class="mb-4">
+    {% if field.label %}
+        {{ field|tailwind_label }}
+    {% endif %}
+    
+    {{ field|tailwind_field }}
+    
+    {% if field.help_text %}
+        <p class="mt-1 text-sm text-gray-500">{{ field.help_text }}</p>
+    {% endif %}
+    
+    {% if field.errors %}
+        {% for error in field.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+        {% endfor %}
+    {% endif %}
+</div> 

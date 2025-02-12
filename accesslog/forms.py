@@ -42,10 +42,18 @@ class VisitorCheckInForm(forms.ModelForm):
         model = Visitor
         fields = ['visitor_name', 'visitor_company', 'reason_for_visit', 'is_us_citizen']
         widgets = {
-            'visitor_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'visitor_company': forms.TextInput(attrs={'class': 'form-control'}),
-            'reason_for_visit': forms.TextInput(attrs={'class': 'form-control'}),
-            'is_us_citizen': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'visitor_name': forms.TextInput(attrs={
+                'class': 'w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200'
+            }),
+            'visitor_company': forms.TextInput(attrs={
+                'class': 'w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200'
+            }),
+            'reason_for_visit': forms.TextInput(attrs={
+                'class': 'w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200'
+            }),
+            'is_us_citizen': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
+            }),
         }
         labels = {
             'is_us_citizen': 'US Citizen'
