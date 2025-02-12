@@ -1,0 +1,13 @@
+{% load crispy_forms_field %}
+
+<td id="div_{{ field.auto_id }}" class="{% if field.errors %}has-error{% endif %}">
+    {% if form_show_labels %}
+        <label for="{{ field.id_for_label }}" class="sr-only">{{ field.label }}</label>
+    {% endif %}
+    {% crispy_field field %}
+    {% if field.errors %}
+        {% for error in field.errors %}
+            <p class="text-sm text-red-600">{{ error }}</p>
+        {% endfor %}
+    {% endif %}
+</td> 

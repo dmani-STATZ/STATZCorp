@@ -1,0 +1,6 @@
+<input type="{{ input.input_type }}"
+       name="{% if input.name %}{{ input.name }}{% endif %}"
+       {% if input.value %}value="{{ input.value }}"{% endif %}
+       {% if input.id %}id="{{ input.id }}"{% endif %}
+       class="w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200"
+       {{ input.flat_attrs|safe }}> 

@@ -1,0 +1,15 @@
+{% load crispy_forms_field %}
+
+<div class="flex">
+    {% if crispy_prepended_text %}
+        <span class="inline-flex items-center px-3 border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+            {{ crispy_prepended_text }}
+        </span>
+    {% endif %}
+    {% crispy_field field %}
+    {% if crispy_appended_text %}
+        <span class="inline-flex items-center px-3 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+            {{ crispy_appended_text }}
+        </span>
+    {% endif %}
+</div> 

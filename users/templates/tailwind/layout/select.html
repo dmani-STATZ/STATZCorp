@@ -1,0 +1,13 @@
+{% load crispy_forms_field %}
+
+<select name="{{ field.html_name }}" 
+        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md"
+        {% if field.is_required %}required{% endif %}
+        id="{{ field.auto_id }}">
+    {% for choice in field.field.choices %}
+        <option value="{{ choice.0 }}"
+                {% if choice.0 == field.value|stringformat:"s" %}selected="selected"{% endif %}>
+            {{ choice.1 }}
+        </option>
+    {% endfor %}
+</select> 
