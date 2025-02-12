@@ -29,7 +29,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1%a(rwepqwcb3)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1","localhost"]
 
 
 # Application definition
@@ -66,9 +66,7 @@ ROOT_URLCONF = 'STATZWeb.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [
-            BASE_DIR / 'users/templates',
-        ],
+        'DIRS': ['templates'], 
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -142,11 +140,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+
 STATIC_URL = 'static/'
+MEDIA_URL = 'media/'
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / 'static'
 ]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+
 
 
 # Default primary key field type
@@ -174,7 +178,7 @@ LOGOUT_REDIRECT_URL = 'login'
 TAILWIND_APP_NAME = 'theme_tw'
 
 INTERNAL_IPS = [
-    "127.0.0.1",
+    "127.0.0.1","localhost"
 ]
 
 NPM_BIN_PATH = "C:\\Program Files\\nodejs\\npm.cmd"

@@ -25,22 +25,8 @@ def register(request):
     return render(request, 'users/register.html', {'form': form})
 
 
-@login_required
-def index(request):
-    announcements = Announcement.objects.all().order_by('-posted_at')
-    return render(request, 'users/index.html', {'announcements': announcements})
 
 
-def about(request):
-    if not request.user.is_authenticated:
-        return redirect('landing')  # redirect to main page if already logged in    
-    return render(request, 'users/about.html', {'title': 'About'})
-
-
-def landing_page(request):
-    if request.user.is_authenticated:
-        return redirect('index')  # redirect to main page if already logged in
-    return render(request, 'users/landing.html')
 
 
 def login_view(request):
@@ -64,23 +50,4 @@ def on_user_logged_out(sender, request, **kwargs):
     messages.success(request, 'You have been successfully logged out.')
 
 
-@permission_required('users.add_announcement', raise_exception=True)
-def add_announcement(request):
-    if request.method == 'POST':
-        content = request.POST.get('content')
-        if content:
-            announcement = Announcement.objects.create(
-                content=content,
-                posted_by=request.user
-            )
-            return JsonResponse({'status': 'success'})
-    return JsonResponse({'status': 'error'}, status=400)
 
-
-@permission_required('users.delete_announcement', raise_exception=True)
-def delete_announcement(request, announcement_id):
-    announcement = get_object_or_404(Announcement, id=announcement_id)
-    if request.method == 'POST':
-        announcement.delete()
-        return redirect('index')
-    return render(request, 'users/delete_announcement.html', {'announcement': announcement})
