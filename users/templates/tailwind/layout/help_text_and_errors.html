@@ -1,0 +1,9 @@
+{% if help_text %}
+    <div class="mt-1 text-sm text-gray-500">{{ help_text|safe }}</div>
+{% endif %}
+
+{% if errors %}
+    {% for error in errors %}
+        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+    {% endfor %}
+{% endif %} 

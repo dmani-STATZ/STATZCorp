@@ -1,0 +1,17 @@
+{% load crispy_forms_field %}
+
+<div id="div_{{ field.auto_id }}" class="inline-block mr-4 {% if field.errors %}has-error{% endif %}">
+    {% if field.label %}
+        <label for="{{ field.auto_id }}" class="mr-2">
+            {{ field.label }}{% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+        </label>
+    {% endif %}
+
+    {% crispy_field field %}
+
+    {% if field.errors %}
+        {% for error in field.errors %}
+            <p class="text-sm text-red-600">{{ error }}</p>
+        {% endfor %}
+    {% endif %}
+</div> 

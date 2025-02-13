@@ -1,0 +1,4 @@
+<div {% if div.css_id %}id="{{ div.css_id }}"{% endif %} 
+     class="{% if div.css_class %}{{ div.css_class }}{% endif %}">
+    {{ fields_output|safe }}
+</div> 

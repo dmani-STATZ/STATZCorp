@@ -29,21 +29,24 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1%a(rwepqwcb3)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1","localhost"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'users.apps.UsersConfig',
+    'inventory.apps.InventoryConfig',
     'crispy_forms',
-    'crispy_bootstrap5',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_browser_reload',
+    'tailwind',
+    'theme_tw',
     'accesslog.apps.AccesslogConfig',
 ]
 
@@ -55,6 +58,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
 
 ROOT_URLCONF = 'STATZWeb.urls'
@@ -62,7 +66,7 @@ ROOT_URLCONF = 'STATZWeb.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['templates'], 
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -84,22 +88,22 @@ WSGI_APPLICATION = 'STATZWeb.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': os.environ.get('DB_NAME', 'STATZWeb'),
-        'USER': os.environ.get('DB_USER', 'statz'),
+        'NAME': os.environ.get('DB_NAME', ''),
+        'USER': os.environ.get('DB_USER', ''),
         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', '10.103.10.220'),
+        'HOST': os.environ.get('DB_HOST', ''),
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
         },
     }
 }
 
-#DATABASES = {
+# DATABASES = {
 #    'default': {
 #        'ENGINE': 'django.db.backends.sqlite3',
 #        'NAME': BASE_DIR / 'db.sqlite3',
 #    }
-#}
+# }
 
 
 # Password validation
@@ -136,11 +140,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+
 STATIC_URL = 'static/'
+MEDIA_URL = 'media/'
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / 'static'
 ]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+
 
 
 # Default primary key field type
@@ -148,8 +158,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
-CRISPY_TEMPLATE_PACK = "bootstrap5"
+CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
+CRISPY_TEMPLATE_PACK = "tailwind"
 
 # Email settings for password reset
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -159,8 +169,35 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 
-# Login redirect settings
-LOGIN_REDIRECT_URL = 'index'  # Where to redirect after successful login
-LOGIN_URL = 'login'  # Where to redirect if login is required
+# Authentication settings
+LOGIN_REDIRECT_URL = 'index'  # Where to redirect after login
+LOGOUT_REDIRECT_URL = 'landing'  # Where to redirect after logout
+LOGIN_URL = 'users:login'  # The login page URL
 
-LOGOUT_REDIRECT_URL = 'login'
+TAILWIND_APP_NAME = 'theme_tw'
+
+INTERNAL_IPS = [
+    "127.0.0.1","localhost"
+]
+
+NPM_BIN_PATH = "C:\\Program Files\\nodejs\\npm.cmd"
+
+if not DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'file': {
+                'level': 'ERROR',
+                'class': 'logging.FileHandler',
+                'filename': BASE_DIR / 'logs/django_errors.log',
+            },
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['file'],
+                'level': 'ERROR',
+                'propagate': True,
+            },
+        },
+    }

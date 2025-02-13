@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<style>
+    /* Style for form inputs */
+    .form-control {
+        color: rgb(3, 3, 3) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border: 2px solid rgb(46, 46, 46) !important;
+        border-radius: 0.375rem !important;
+        width: 50% !important;  /* Reduced width to make room for label */
+        margin-bottom: 1rem !important;
+        display: inline-block !important;
+		padding-left: 0.5rem !important;
+    }
+    /* Style for form labels */
+    label {
+        color: rgb(0, 0, 0) !important;
+        display: inline-block !important;
+        width: 25% !important;  /* Fixed width for labels */
+        text-align: right !important;
+        padding-right: 1rem !important;
+    }
+    /* Style for input focus state */
+    .form-control:focus {
+        border-color: rgb(253, 253, 253) !important;
+        box-shadow: 0 0 0 1px rgb(3, 81, 170) !important;
+    }
+    /* Remove crispy-forms default spacing */
+    .form-group {
+        margin-bottom: 1rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-primary my-3 mx-4">Go Back</a>
+
+	<div  class="overflow-x-auto">
+		<div class="bg-white shadow rounded-lg p-6">
+			<h1 class="text-3xl font-bold text-gray-800 text-center">Enter New Item</h1>
+			<br/>
+			<form method="POST">
+				{% csrf_token %}
+				{{ form|crispy }}
+				<div class="mt-3 text-center">
+					<button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Save Item</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+    <script>
+        $(function() {
+            $(".autocomplete-nsn").autocomplete({
+                source: "{% url 'autocomplete_nsn' %}"
+            });
+            $(".autocomplete-description").autocomplete({
+                source: "{% url 'autocomplete_description' %}"
+            });
+            $(".autocomplete-manufacturer").autocomplete({
+                source: "{% url 'autocomplete_manufacturer' %}"
+            });
+        });
+    </script>
+{% endblock %}

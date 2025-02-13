@@ -7,15 +7,18 @@ from django.db.models.functions import TruncMonth
 class VisitorHistoryField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.populate_choices()
+        # Initialize with empty choices instead of querying DB
+        self.choices = [('', '-- Select Visitor --')]
 
     def populate_choices(self):
+        """Populate choices when needed, not at import time"""
         # Get unique visitor names from both Visitor and Staged models
         staged = Staged.objects.values('id', 'visitor_name', 'visitor_company').distinct()
         visitors = Visitor.objects.values('visitor_name', 'visitor_company').distinct()
 
+        choices = [('', '-- Select Visitor --')]
+        
         # Add Staged Visitors section only if there are staged visitors
-        choices = []
         if staged.exists():
             choices.append(('', '-- Staged Visitors --'))
             choices.extend([
@@ -25,7 +28,7 @@ class VisitorHistoryField(forms.ChoiceField):
 
         # Add separator and previous visitors section if there are previous visitors
         if visitors.exists():
-            choices.append(('', '-- Select Previous Visitor --'))
+            choices.append(('', '-- Previous Visitors --'))
             choices.extend([
                 (name, f"{name} - {company}")
                 for name, company in sorted(set((v['visitor_name'], v['visitor_company']) for v in visitors))
@@ -33,19 +36,30 @@ class VisitorHistoryField(forms.ChoiceField):
 
         self.choices = choices
 
-
-
 class VisitorCheckInForm(forms.ModelForm):
     visitor_history = VisitorHistoryField(required=False)
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Populate choices when the form is instantiated
+        self.fields['visitor_history'].populate_choices()
     
     class Meta:
         model = Visitor
         fields = ['visitor_name', 'visitor_company', 'reason_for_visit', 'is_us_citizen']
         widgets = {
-            'visitor_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'visitor_company': forms.TextInput(attrs={'class': 'form-control'}),
-            'reason_for_visit': forms.TextInput(attrs={'class': 'form-control'}),
-            'is_us_citizen': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'visitor_name': forms.TextInput(attrs={
+                'class': 'w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200'
+            }),
+            'visitor_company': forms.TextInput(attrs={
+                'class': 'w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200'
+            }),
+            'reason_for_visit': forms.TextInput(attrs={
+                'class': 'w-full p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200'
+            }),
+            'is_us_citizen': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
+            }),
         }
         labels = {
             'is_us_citizen': 'US Citizen'
@@ -54,7 +68,7 @@ class VisitorCheckInForm(forms.ModelForm):
 class MonthYearForm(forms.Form):
     month_year = forms.ChoiceField(
         choices=[],
-        label='Select Month'
+        label=''
     )
 
     def __init__(self, *args, **kwargs):
@@ -66,7 +80,7 @@ class MonthYearForm(forms.Form):
                 .distinct()
                 .order_by('-month'))
         
-        self.fields['month_year'].choices = [
+        self.fields['month_year'].choices = [('', 'Select Month')] + [
             (d['month'].strftime('%Y-%m'), d['month'].strftime('%B %Y'))
             for d in dates
         ] 

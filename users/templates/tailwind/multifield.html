@@ -1,0 +1,10 @@
+{% load crispy_forms_field %}
+
+<div class="mb-4">
+    {% if field_label %}
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ field_label }}</label>
+    {% endif %}
+    <div class="flex gap-4">
+        {{ field_html|safe }}
+    </div>
+</div> 

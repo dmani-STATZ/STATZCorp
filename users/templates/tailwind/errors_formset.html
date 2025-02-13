@@ -1,0 +1,7 @@
+{% if formset.non_form_errors %}
+    <div class="alert p-4 mb-4 rounded-lg bg-red-100 text-red-700">
+        {% for error in formset.non_form_errors %}
+            <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+{% endif %} 

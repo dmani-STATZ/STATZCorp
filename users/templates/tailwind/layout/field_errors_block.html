@@ -1,0 +1,7 @@
+{% if form_show_errors and field.errors %}
+    <div class="alert p-4 mb-4 rounded-lg bg-red-100 text-red-700">
+        {% for error in field.errors %}
+            <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+{% endif %} 
