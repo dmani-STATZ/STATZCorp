@@ -71,7 +71,7 @@
     }
 
     function logoutUser() {
-        fetch("{% url 'logout' %}", {
+        fetch("{% url 'users:logout' %}", {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}', // Include CSRF token

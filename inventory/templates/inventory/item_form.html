@@ -34,7 +34,7 @@
         align-items: center !important;
     }
 </style>
-    <a href="{% url 'dashboard' %}" class="btn btn-outline-primary my-3 mx-4">Go Back</a>
+    <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-primary my-3 mx-4">Go Back</a>
 
 	<div  class="overflow-x-auto">
 		<div class="bg-white shadow rounded-lg p-6">
@@ -53,13 +53,13 @@
     <script>
         $(function() {
             $(".autocomplete-nsn").autocomplete({
-                source: "{% url 'autocomplete_nsn' %}"
+                source: "{% url 'inventory:autocomplete_nsn' %}"
             });
             $(".autocomplete-description").autocomplete({
-                source: "{% url 'autocomplete_description' %}"
+                source: "{% url 'inventory:autocomplete_description' %}"
             });
             $(".autocomplete-manufacturer").autocomplete({
-                source: "{% url 'autocomplete_manufacturer' %}"
+                source: "{% url 'inventory:autocomplete_manufacturer' %}"
             });
         });
     </script>
