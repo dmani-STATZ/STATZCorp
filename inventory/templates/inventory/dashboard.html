@@ -123,16 +123,27 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}'
-                }
+                },
+                credentials: 'same-origin'
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     location.reload();  // Reload the page to reflect the changes
                 } else {
                     alert('Failed to delete the item.');
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete the item.');
             });
+            closeModal();
         }
     }
 </script>

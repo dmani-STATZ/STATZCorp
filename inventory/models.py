@@ -9,8 +9,8 @@ class InventoryItem(models.Model):
     manufacturer = models.CharField(db_column='Manufacturer', max_length=50, blank=True, null=True)  # Field name made lowercase.
     itemlocation = models.CharField(db_column='ItemLocation', max_length=50, blank=True, null=True)  # Field name made lowercase.
     quantity = models.IntegerField(db_column='Quantity', blank=True, null=True)  # Field name made lowercase.
-    purchaseprice = models.DecimalField(db_column='PurchasePrice', max_digits=19, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
-    totalcost = models.DecimalField(db_column='TotalCost', max_digits=19, decimal_places=2, blank=True, null=True, editable=False)  # Field name made lowercase.
+    purchaseprice = models.FloatField(db_column='PurchasePrice', blank=True, null=True)  # Field name made lowercase.
+    totalcost = models.FloatField(db_column='TotalCost', blank=True, null=True, editable=False)  # Field name made lowercase.
 
     class Meta:
         db_table = 'STATZ_WAREHOUSE_INVENTORY_TBL'

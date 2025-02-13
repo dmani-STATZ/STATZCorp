@@ -37,7 +37,7 @@ def autocomplete_manufacturer(request):
 @login_required
 def dashboard(request):
     items = InventoryItem.objects.all()
-    return render(request, 'inventory/dashboard.html', {'items': items})
+    return render(request, 'inventory/dashboard.html', {'items': items}) 
 
 @login_required
 def add_item(request):
@@ -45,7 +45,7 @@ def add_item(request):
         form = InventoryItemForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('dashboard')
+            return redirect('inventory:dashboard')
     else:
         form = InventoryItemForm()
     return render(request, 'inventory/item_form.html', {'form': form})
@@ -57,18 +57,21 @@ def edit_item(request, pk):
         form = InventoryItemForm(request.POST, instance=item)
         if form.is_valid():
             form.save()
-            return redirect('dashboard')
+            return redirect('inventory:dashboard')
     else:
         form = InventoryItemForm(instance=item)
     return render(request, 'inventory/item_form.html', {'form': form})
 
 @login_required
-def delete_item(request, pk):
-    item = get_object_or_404(InventoryItem, pk=pk)
+def delete_item(request, item_id):
     if request.method == 'POST':
-        item.delete()
-        return redirect('dashboard')
-    return render(request, 'inventory/delete_form.html', {'item': item})
+        try:
+            item = InventoryItem.objects.get(pk=item_id)
+            item.delete()
+            return JsonResponse({'success': True})
+        except InventoryItem.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Item not found'})
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 def delete_item_ajax(request, pk):
     item = get_object_or_404(InventoryItem, pk=pk)
