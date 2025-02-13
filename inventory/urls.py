@@ -17,6 +17,8 @@ Including another URLconf
 from django.urls import path
 from . import views as Inventoryviews
 
+app_name = 'inventory'
+
 urlpatterns = [
     path('delete-item-ajax/<int:pk>/', Inventoryviews.delete_item_ajax, name='delete_item_ajax'),
     path('autocomplete/nsn/', Inventoryviews.autocomplete_nsn, name='autocomplete_nsn'),

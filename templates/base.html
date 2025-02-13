@@ -16,7 +16,7 @@
     window.onload = function() {
         if (!sessionStorage.getItem('isLoggedIn')) {
             // Redirect to logout URL if not logged in
-            window.location.href = "{% url 'logout' %}";
+            window.location.href = "{% url 'users:logout' %}";
         }
     }
 
@@ -79,7 +79,7 @@
             },
         }).then(response => {
             if (response.ok) {
-                window.location.href = "{% url 'login' %}"; // Redirect to login page
+                window.location.href = "{% url 'users:login' %}"; // Redirect to login page
             }
         }).catch(error => console.error('Error logging out:', error));
     }

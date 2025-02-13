@@ -4,13 +4,11 @@ from .forms import UserRegisterForm
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
-from django.contrib.auth import logout
 
 
 def register(request):
     if request.user.is_authenticated:
-        return redirect('home')  # redirect to main page if already logged in
+        return redirect('index')  # redirect to main page if already logged in
     if request.method == "POST":
         form = UserRegisterForm(request.POST)
         if form.is_valid():
@@ -23,17 +21,6 @@ def register(request):
     return render(request, 'users/register.html', {'form': form})
 
 
-def login_view(request):
-    if request.user.is_authenticated:
-        return redirect('home')  # redirect to main page if already logged in
-    return render(request, 'users/login.html')
-
-
-@login_required
-def home(request):  # your authenticated home page
-    return render(request, 'users/index.html')
-
-
 @login_required
 def profile(request):
     return render(request, 'users/profile.html')
@@ -42,9 +29,4 @@ def profile(request):
 @receiver(user_logged_out)
 def on_user_logged_out(sender, request, **kwargs):
     messages.success(request, 'You have been successfully logged out.')
-
-
-def logout_view(request):
-    logout(request)
-    return redirect('users/login.html')
 

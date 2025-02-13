@@ -1,4 +1,14 @@
 {% extends "base_template.html" %}
+{% load static tailwind_tags %}
+{% load static %}
+
+{% block extra_head %}
+
+<script>
+    document.body.style.backgroundImage = "url('{% static 'images/gears-metal-stainless-technology.jpg' %}')";
+</script>
+
+{% endblock extra_head %}
 
 {% block body %}
 <main role="main" class="container d-flex justify-content-center" style="min-height: 100vh;">

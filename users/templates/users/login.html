@@ -33,11 +33,6 @@
         padding-left: 13rem !important;
     }
 
-    /* Style for background color */
-    .bg-gray-800 {
-        background-color: rgb(54, 54, 54) /* #1f2937 */;
-        box-shadow: 0px 0px 20px 20px rgb(54, 54, 54);
-    }
 </style>
 
 <div class="min-h-screen flex items-start justify-center py-12 px-4 sm:px-6 lg:px-8 pt-8">
@@ -51,7 +46,7 @@
                 </div>
                 <div class="flex items-center justify-between">
                     <div class="text-sm">
-                        <a href="{% url 'password_reset' %}" class="font-medium text-blue-400 hover:text-blue-300">
+                        <a href="{% url 'users:password_reset' %}" class="font-medium text-blue-400 hover:text-blue-300">
                             Forgot your password?
                         </a>
                     </div>
@@ -65,7 +60,7 @@
             <div class="text-center mt-6">
                 <p class="text-sm text-gray-300">
                     Need an account? 
-                    <a href="{% url 'register' %}" class="font-medium text-blue-400 hover:text-blue-300">
+                    <a href="{% url 'users:register' %}" class="font-medium text-blue-400 hover:text-blue-300">
                         Sign up now
                     </a>
                 </p>

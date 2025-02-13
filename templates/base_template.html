@@ -26,26 +26,31 @@
                 <div class="flex items-center">
                     <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
                     <!-- App Links -->
-                    <a href="/home" class="text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                    <a href="/about" class="text-white px-3 py-2 rounded-md text-sm font-medium">About</a>
-                    <a href="/accesslog" class="text-white px-3 py-2 rounded-md text-sm font-medium">Access Log</a>
-                    <a href="/inventory" class="text-white px-3 py-2 rounded-md text-sm font-medium">Inventory</a> 
+                    <a href="{% url 'index' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                    <a href="{% url 'about' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">About</a>
+                    <a href="{% url 'accesslog:visitor_log' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Access Log</a>
+                    <a href="{% url 'inventory:dashboard' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Inventory</a> 
                     <a href="https://www.salespatriot.com/" class="text-white px-3 py-2 rounded-md text-sm font-medium">Sales Patriot</a>
                 </div>
                 <!-- Right Section: Username and Sign Out -->
                 <div class="flex items-center">
                     {% if user.is_authenticated %}
                     <div class="flex flex-col md:flex-row md:ml-auto">
-                        <span class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</span>
-                        <form id="logout-form" method="post" action="{% url 'logout' %}" class="inline">
+                        {% if user.is_superuser %}
+                            <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                        {% else %}
+                            <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                        {% endif %}
+                        
+                        <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
                             {% csrf_token %}
                             <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
                         </form>
                     </div>
                     {% else %}
                     <div class="flex flex-col md:flex-row md:ml-auto">
-                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'login' %}">Sign In</a>
-                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'register' %}">Sign Up</a>
+                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
+                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
                     </div>
                     {% endif %}
                 </div>

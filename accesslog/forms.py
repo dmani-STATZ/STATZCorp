@@ -7,15 +7,18 @@ from django.db.models.functions import TruncMonth
 class VisitorHistoryField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.populate_choices()
+        # Initialize with empty choices instead of querying DB
+        self.choices = [('', '-- Select Visitor --')]
 
     def populate_choices(self):
+        """Populate choices when needed, not at import time"""
         # Get unique visitor names from both Visitor and Staged models
         staged = Staged.objects.values('id', 'visitor_name', 'visitor_company').distinct()
         visitors = Visitor.objects.values('visitor_name', 'visitor_company').distinct()
 
+        choices = [('', '-- Select Visitor --')]
+        
         # Add Staged Visitors section only if there are staged visitors
-        choices = []
         if staged.exists():
             choices.append(('', '-- Staged Visitors --'))
             choices.extend([
@@ -25,7 +28,7 @@ class VisitorHistoryField(forms.ChoiceField):
 
         # Add separator and previous visitors section if there are previous visitors
         if visitors.exists():
-            choices.append(('', '-- Select Previous Visitor --'))
+            choices.append(('', '-- Previous Visitors --'))
             choices.extend([
                 (name, f"{name} - {company}")
                 for name, company in sorted(set((v['visitor_name'], v['visitor_company']) for v in visitors))
@@ -33,10 +36,13 @@ class VisitorHistoryField(forms.ChoiceField):
 
         self.choices = choices
 
-
-
 class VisitorCheckInForm(forms.ModelForm):
     visitor_history = VisitorHistoryField(required=False)
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Populate choices when the form is instantiated
+        self.fields['visitor_history'].populate_choices()
     
     class Meta:
         model = Visitor

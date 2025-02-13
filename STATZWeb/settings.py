@@ -88,22 +88,22 @@ WSGI_APPLICATION = 'STATZWeb.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': os.environ.get('DB_NAME', 'STATZWeb'),
-        'USER': os.environ.get('DB_USER', 'statz'),
+        'NAME': os.environ.get('DB_NAME', ''),
+        'USER': os.environ.get('DB_USER', ''),
         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', '10.103.10.220'),
+        'HOST': os.environ.get('DB_HOST', ''),
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
         },
     }
 }
 
-#DATABASES = {
+# DATABASES = {
 #    'default': {
 #        'ENGINE': 'django.db.backends.sqlite3',
 #        'NAME': BASE_DIR / 'db.sqlite3',
 #    }
-#}
+# }
 
 
 # Password validation
@@ -169,11 +169,10 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 
-# Login redirect settings
-LOGIN_REDIRECT_URL = 'index'  # Where to redirect after successful login
-LOGIN_URL = 'login'  # Where to redirect if login is required
-
-LOGOUT_REDIRECT_URL = 'login'
+# Authentication settings
+LOGIN_REDIRECT_URL = 'index'  # Where to redirect after login
+LOGOUT_REDIRECT_URL = 'landing'  # Where to redirect after logout
+LOGIN_URL = 'users:login'  # The login page URL
 
 TAILWIND_APP_NAME = 'theme_tw'
 
@@ -182,3 +181,23 @@ INTERNAL_IPS = [
 ]
 
 NPM_BIN_PATH = "C:\\Program Files\\nodejs\\npm.cmd"
+
+if not DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'file': {
+                'level': 'ERROR',
+                'class': 'logging.FileHandler',
+                'filename': BASE_DIR / 'logs/django_errors.log',
+            },
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['file'],
+                'level': 'ERROR',
+                'propagate': True,
+            },
+        },
+    }
