@@ -137,7 +137,7 @@
                     <input type="{% if field.label == 'Purchaseprice' %}number{% else %}{{ field.field.widget.input_type }}{% endif %}" 
                            name="{{ field.name }}" 
                            id="{{ field.id_for_label }}" 
-                           class="input-field"
+                           class="input-field {% if field.name == 'nsn' %}autocomplete-nsn{% elif field.name == 'description' %}autocomplete-description{% elif field.name == 'manufacturer' %}autocomplete-manufacturer{% endif %}"
                            {% if field.label == 'Purchaseprice' %}step="0.01"{% endif %}
                            {% if field.value %}value="{{ field.value }}"{% endif %}>
                 </div>
@@ -155,17 +155,22 @@
     </div>
 </div>
 
-    <script>
-        $(function() {
-            $(".autocomplete-nsn").autocomplete({
-                source: "{% url 'inventory:autocomplete_nsn' %}"
-            });
-            $(".autocomplete-description").autocomplete({
-                source: "{% url 'inventory:autocomplete_description' %}"
-            });
-            $(".autocomplete-manufacturer").autocomplete({
-                source: "{% url 'inventory:autocomplete_manufacturer' %}"
-            });
+<script>
+    $(document).ready(function() {
+        $(".autocomplete-nsn").autocomplete({
+            source: "{% url 'inventory:autocomplete_nsn' %}",
+            minLength: 1
         });
-    </script>
+        
+        $(".autocomplete-description").autocomplete({
+            source: "{% url 'inventory:autocomplete_description' %}",
+            minLength: 1
+        });
+        
+        $(".autocomplete-manufacturer").autocomplete({
+            source: "{% url 'inventory:autocomplete_manufacturer' %}",
+            minLength: 1
+        });
+    });
+</script>
 {% endblock %}

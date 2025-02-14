@@ -5,9 +5,15 @@
 {% block content %}
 <div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-6 w-full">
-        <div class="w-[45%] flex justify-start"><a href="{% url 'inventory:add_item' %}" class="btn btn-primary text-2xl">+</a></div>
+        <div class="w-[45%] flex justify-start">
+            <a href="{% url 'inventory:add_item' %}" class="btn btn-primary text-2xl">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </a>
+        </div>
         <div class="w-[10%] flex justify-center"><h2 class="text-3xl font-bold text-black">Inventory</h2></div>
-        <div class="w-[45%] flex justify-end"><p class="text-2xl">Total Inventory Value:<p class="text-2xl text-red-500">{{ total_inventory_value|custom_currency }}</p></div>
+        <div class="w-[45%] flex justify-end"><p class="text-2xl">Total Inventory Value: <p class="text-2xl text-red-500"> {{ total_inventory_value|custom_currency }}</p></div>
     </div>
 
     <div class="overflow-x-auto">
@@ -18,7 +24,6 @@
         <table class="min-w-full divide-y divide-gray-200">
             <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">ID</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">NSN</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Description</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Part Number</th>
@@ -44,14 +49,12 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
                 </tr>
                 {% endif %}
 
                 {% for item in items %}
                     <tr class="hover:bg-gray-50">
-                        <th scope="row" class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.id }}</th>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.nsn }}</td>
+                        <th scope="row" class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.nsn }}</th>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.description }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.partnumber }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.manufacturer }}</td>

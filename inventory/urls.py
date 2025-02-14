@@ -25,7 +25,8 @@ urlpatterns = [
     path('autocomplete/description/', Inventoryviews.autocomplete_description, name='autocomplete_description'),
     path('autocomplete/manufacturer/', Inventoryviews.autocomplete_manufacturer, name='autocomplete_manufacturer'),
     path('', Inventoryviews.dashboard, name='dashboard'),
-    path('add-item/', Inventoryviews.add_item, name='add_item'),
-    path('edit-item/<int:pk>/', Inventoryviews.edit_item, name='edit_item'),
+    path('dashboard', Inventoryviews.dashboard, name='dashboard'),
+    path('add/', Inventoryviews.add_item, name='add_item'),
+    path('edit/<int:pk>/', Inventoryviews.edit_item, name='edit_item'),
     path('delete-item/<int:pk>/', Inventoryviews.delete_item, name='delete_item'),
 ]
