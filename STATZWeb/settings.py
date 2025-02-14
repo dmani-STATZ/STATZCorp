@@ -88,6 +88,8 @@ WSGI_APPLICATION = 'STATZWeb.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+DATABASE_ROUTERS = ['STATZWeb.db_router.MyAppRouter']
+
 if os.environ.get('DJANGO_HOSTNAME', 'WORK_PC') == 'WORK_PC':
     DATABASES = {
         'default': {
@@ -102,7 +104,7 @@ if os.environ.get('DJANGO_HOSTNAME', 'WORK_PC') == 'WORK_PC':
         },
         'ContractLog_Dev': {
             'ENGINE': 'mssql',
-            'NAME': 'ContractLog_Dev',
+            'NAME': 'ContractLog_Web',
             'USER': os.environ.get('DB_USER', ''),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
             'HOST': os.environ.get('DB_HOST', ''),
@@ -117,7 +119,7 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         },
-        'ContractLog_Dev': {
+        'ContractLog_Web': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.ContractLog_Dev',
         }
