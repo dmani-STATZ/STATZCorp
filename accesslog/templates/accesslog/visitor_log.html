@@ -6,7 +6,7 @@
         <div class="flex justify-between items-center mb-6">
             <!-- Left Section: Check In Visitor Link -->
             <div class="flex items-center">
-                <a href="{% url 'check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded h-11 flex items-center">
+                <a href="{% url 'accesslog:check_in' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded h-11 flex items-center">
                     Check In Visitor
                 </a>
             </div>
@@ -16,7 +16,7 @@
             </div>
             <!-- Right Section: Form and Button -->
             <div class="flex items-center gap-4">
-                <form method="post" action="{% url 'generate_report' %}" class="flex gap-2">
+                <form method="post" action="{% url 'accesslog:generate_report' %}" class="flex gap-2">
                     {% csrf_token %}
                         {{ month_year_form.month_year|as_crispy_field }}
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded h-11 flex items-center">
@@ -74,7 +74,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {% if not visitor.departed %}
-                        <form method="post" action="{% url 'check_out' visitor.id %}" class="inline">
+                        <form method="post" action="{% url 'accesslog:check_out' visitor.id %}" class="inline">
                             {% csrf_token %}
                             <button type="submit" class="text-yellow-600 hover:text-yellow-900">Check Out</button>
                         </form>

@@ -37,7 +37,8 @@ def autocomplete_manufacturer(request):
 @login_required
 def dashboard(request):
     items = InventoryItem.objects.all()
-    return render(request, 'inventory/dashboard.html', {'items': items}) 
+    total_inventory_value = sum((item.quantity * item.purchaseprice) for item in items)
+    return render(request, 'inventory/dashboard.html', {'items': items, 'total_inventory_value': total_inventory_value}) 
 
 @login_required
 def add_item(request):

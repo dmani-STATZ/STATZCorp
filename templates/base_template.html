@@ -1,6 +1,7 @@
 <!doctype html>
 {% load static tailwind_tags %}
 {% load static %}
+{% load custom_tags %}
 
 <html lang="en">
 <head>
@@ -12,52 +13,83 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     {% if title %}
-    <title>STATZ Corporation - {{ title }}</title>
+        <title>STATZ Corporation - {{ title }}</title>
     {% else %}
-    <title>STATZ Corporation</title>
+        <title>STATZ Corporation</title>
     {% endif %}
     {% block extra_head %}{% endblock %}
-</head>
-<body class="bg-white">
-    <header class="site-header">
-        <nav class="bg-gray-800 p-4">
-            <div class="container mx-auto flex items-center justify-between">
-                <!-- Left Section: Logo/Image -->
-                <div class="flex items-center">
-                    <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
-                    <!-- App Links -->
-                    <a href="{% url 'index' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                    <a href="{% url 'about' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">About</a>
-                    <a href="{% url 'accesslog:visitor_log' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Access Log</a>
-                    <a href="{% url 'inventory:dashboard' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Inventory</a> 
-                    <a href="https://www.salespatriot.com/" class="text-white px-3 py-2 rounded-md text-sm font-medium">Sales Patriot</a>
-                </div>
-                <!-- Right Section: Username and Sign Out -->
-                <div class="flex items-center">
-                    {% if user.is_authenticated %}
-                    <div class="flex flex-col md:flex-row md:ml-auto">
-                        {% if user.is_superuser %}
-                            <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
-                        {% else %}
-                            <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
-                        {% endif %}
-                        
-                        <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
-                        </form>
-                    </div>
-                    {% else %}
-                    <div class="flex flex-col md:flex-row md:ml-auto">
-                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
-                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
-                    </div>
-                    {% endif %}
-                </div>
+    <style>
+        .sidebar {
+            transition: transform 0.3s;
+        }
+        .sidebar.active {
+            transform: translateX(0);
+        }
+        .sidebar.inactive {
+            transform: translateX(-100%);
+        }
+        .content {
+            transition: margin-left 0.3s;
+        }
+        .content.active {
+            margin-left: 0px;
+        }
+        .content.inactive {
+            margin-left: 0px;
+        }
+    </style>
+</head><body class="flex flex-col">
+    <header class="bg-gray-800 text-white w-full p-4 flex justify-between items-center">
+        <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
+        <button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleSidebar()">☰ Menu</button>
+        <div class="flex flex-col md:flex-row md:ml-auto justify-center items-center">
+            {% is_development as dev_mode %}
+            {% if dev_mode %}
+                <p class="text-yellow-300 mr-4 font-medium">Development Environment</p>
+            {% endif %}
+            {% if user.is_authenticated %}
+            <div class="flex flex-col md:flex-row md:ml-auto">
+                {% if user.is_superuser %}
+                    <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                {% else %}
+                    <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                {% endif %}
+                
+                <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
+                </form>
             </div>
-        </nav>
-    </header>   
-    {% block body %}{% endblock %}
-    {% block extra_scripts %}{% endblock %}
+            {% else %}
+            <div class="flex flex-col md:flex-row md:ml-auto">
+                <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
+                <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+    <div class="sidebar bg-gray-800 text-white w-64 h-screen fixed top-0 left-0 inactive" id="sidebar">
+        <button class="bg-gray-700 text-white py-2 px-4 w-full text-right" onclick="toggleSidebar()">✖</button>
+        <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corp" class="h-12 w-18 m-8">
+        <ul class="mt-10">
+            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'index' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Home</a></li>
+            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'about' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">About</a></li>
+            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'accesslog:visitor_log' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Access Log</a></li>
+            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'inventory:dashboard' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Inventory</a></li> 
+            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="https://www.salespatriot.com/" class="text-white px-3 py-2 rounded-md text-sm font-medium">Sales Patriot</a></li>
+        </ul>
+    </div>
+    <div class="content flex-1 p-10 inactive" id="content">
+        {% block body %}{% endblock %}
+        {% block extra_scripts %}{% endblock %}
+    </div>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebar').classList.toggle('inactive');
+            document.getElementById('content').classList.toggle('active');
+            document.getElementById('content').classList.toggle('inactive');
+        }
+    </script>
 </body>
 </html> 
