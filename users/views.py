@@ -3,7 +3,7 @@ from django.contrib import messages
 from .forms import UserRegisterForm
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
-from django.contrib.auth.decorators import login_required
+from STATZWeb.decorators import login_required
 
 
 def register(request):

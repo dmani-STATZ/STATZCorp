@@ -3,16 +3,14 @@ from users.models import Announcement
 from django.contrib.auth.decorators import permission_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-
+from STATZWeb.decorators import conditional_login_required
 
 def index(request):
     announcements = Announcement.objects.all().order_by('-posted_at')
     return render(request, 'index.html', {'announcements': announcements})
 
-
+@conditional_login_required
 def about(request):
-    if not request.user.is_authenticated:
-        return redirect('landing')  # redirect to main page if already logged in    
     return render(request, 'about.html', {'title': 'About'})
 
 

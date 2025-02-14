@@ -11,4 +11,8 @@ def get_database_name():
 @register.simple_tag
 def is_development():
     db_name = os.environ.get('DB_NAME', '')
-    return db_name != 'STATZWeb' 
+    return db_name != 'STATZWeb'
+
+@register.simple_tag
+def get_require_login():
+    return getattr(settings, 'REQUIRE_LOGIN', False) 

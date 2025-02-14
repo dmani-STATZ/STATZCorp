@@ -1,4 +1,4 @@
-from django.contrib.auth.decorators import login_required
+from STATZWeb.decorators import conditional_login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from inventory.forms import InventoryItemForm
@@ -22,13 +22,13 @@ def autocomplete_manufacturer(request):
     return JsonResponse(list(items), safe=False)
 
 
-@login_required
+@conditional_login_required
 def dashboard(request):
     items = InventoryItem.objects.all()
     total_inventory_value = sum((item.quantity * item.purchaseprice) for item in items)
     return render(request, 'inventory/dashboard.html', {'items': items, 'total_inventory_value': total_inventory_value}) 
 
-@login_required
+@conditional_login_required
 def add_item(request):
     if request.method == 'POST':
         form = InventoryItemForm(request.POST)
@@ -39,7 +39,7 @@ def add_item(request):
         form = InventoryItemForm()
     return render(request, 'inventory/item_form.html', {'form': form})
 
-@login_required
+@conditional_login_required
 def edit_item(request, pk):
     item = get_object_or_404(InventoryItem, pk=pk)
     if request.method == 'POST':
@@ -51,7 +51,7 @@ def edit_item(request, pk):
         form = InventoryItemForm(instance=item)
     return render(request, 'inventory/item_form.html', {'form': form})
 
-@login_required
+@conditional_login_required
 def delete_item(request, pk):
     if request.method == 'POST':
         item = get_object_or_404(InventoryItem, pk=pk)

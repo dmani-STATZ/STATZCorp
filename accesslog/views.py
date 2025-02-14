@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from STATZWeb.decorators import conditional_login_required
 from django.utils import timezone
 from .models import Visitor, Staged
 from .forms import VisitorCheckInForm, MonthYearForm
@@ -14,7 +14,7 @@ from django.contrib import messages
 
 # Create your views here.
 
-@login_required
+@conditional_login_required
 def visitor_log(request):
     visitors = Visitor.objects.all().order_by('-date_of_visit', '-time_in')
     month_year_form = MonthYearForm()
@@ -25,7 +25,7 @@ def visitor_log(request):
     }
     return render(request, 'accesslog/visitor_log.html', context)
 
-@login_required
+@conditional_login_required
 def check_in_visitor(request):
     if request.method == 'POST':
         form = VisitorCheckInForm(request.POST)
@@ -70,7 +70,7 @@ def check_in_visitor(request):
     
     return render(request, 'accesslog/check_in.html', {'form': form, 'title': 'Check In Visitor'})
 
-@login_required
+@conditional_login_required
 def check_out_visitor(request, visitor_id):
     visitor = Visitor.objects.get(id=visitor_id)
     visitor.time_out = timezone.now()  # Use full datetime
@@ -78,7 +78,7 @@ def check_out_visitor(request, visitor_id):
     visitor.save()
     return redirect('accesslog:visitor_log')
 
-@login_required
+@conditional_login_required
 def generate_report(request):
     if request.method == 'POST':
         form = MonthYearForm(request.POST)
@@ -173,7 +173,7 @@ def generate_report(request):
     
     return redirect('accesslog:visitor_log')
 
-@login_required
+@conditional_login_required
 def get_visitor_info(request):
     name = request.GET.get('name')
     
@@ -189,7 +189,7 @@ def get_visitor_info(request):
         })
     return JsonResponse({})
 
-@login_required
+@conditional_login_required
 def get_staged_info(request, staged_id):
     staged = get_object_or_404(Staged, id=staged_id)
     return JsonResponse({

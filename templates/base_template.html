@@ -19,8 +19,32 @@
         <title>STATZ Corporation</title>
     {% endif %}
     <style>
+        body {
+            padding-top: 40px;
+
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #fff; /* Optional: Set a background color */
+            z-index: 1000; /* Ensure the header is above other content */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+            background-color: rgb(31, 41, 55);
+            color: rgb(255, 255, 255);
+            width: 100%;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
         .sidebar {
             transition: transform 0.3s;
+            z-index: 1100;
         }
         .sidebar.active {
             transform: translateX(0);
@@ -39,9 +63,9 @@
         }
     </style>
 </head>
-<body class="flex flex-col">
-    <header class="bg-gray-800 text-white w-full p-4 flex justify-between items-center">
-        <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
+<body>
+    <header id="header">
+        <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4"></a>
         <button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleSidebar()">☰ Menu</button>
         <div class="flex flex-col md:flex-row md:ml-auto justify-center items-center">
             {% is_development as dev_mode %}
@@ -71,13 +95,26 @@
     <div class="sidebar bg-gray-500 text-white w-64 h-screen fixed top-0 left-0 inactive rounded-tr-full rounded-br-full border-r-2 border-b-2 border-t-2 border-red-600" id="sidebar">
         <button class="text-red-600 py-2 px-4 w-full text-right" onclick="toggleSidebar()">❌</button>
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corp" class="h-12 w-18 m-8">
-        <ul class="mt-10">
-            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'index' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Home</a></li>
-            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'about' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">About</a></li>
-            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'accesslog:visitor_log' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Access Log</a></li>
-            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'inventory:dashboard' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Inventory</a></li> 
-            <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="https://www.salespatriot.com/" class="text-white px-3 py-2 rounded-md text-sm font-medium">Sales Patriot</a></li>
-        </ul>
+
+        <div class="px-4 pb-8 "> 
+            <ul class="mt-10 space-y-1">
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="{% url 'index' %}" class="px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                </li>
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="{% url 'about' %}" class= "px-3 py-2 rounded-md text-sm font-medium">About</a>
+                </li>
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="{% url 'accesslog:visitor_log' %}" class="px-3 py-2 rounded-md text-sm font-medium">Access Log</a>
+                </li>
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Inventory</a>
+                </li> 
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="https://www.salespatriot.com/" class="px-3 py-2 rounded-md text-sm font-medium">Sales Patriot</a>
+                </li>
+            </ul>
+        </div>
     </div>
     <div class="content flex-1 p-10 inactive" id="content">
         {% block body %}{% endblock %}

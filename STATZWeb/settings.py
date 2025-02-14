@@ -60,6 +60,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_browser_reload.middleware.BrowserReloadMiddleware',
+    'STATZWeb.middleware.LoginRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'STATZWeb.urls'
@@ -172,9 +173,12 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 
 # Authentication settings
-LOGIN_REDIRECT_URL = 'index'  # Where to redirect after login
-LOGOUT_REDIRECT_URL = 'landing'  # Where to redirect after logout
-LOGIN_URL = 'users:login'  # The login page URL
+LOGIN_REDIRECT_URL = 'index'
+LOGOUT_REDIRECT_URL = 'landing'
+LOGIN_URL = 'users:login'
+
+# Custom authentication toggle
+REQUIRE_LOGIN = True  # Set to True to require login for all pages
 
 TAILWIND_APP_NAME = 'theme_tw'
 
