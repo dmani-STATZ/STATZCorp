@@ -37,6 +37,7 @@ ALLOWED_HOSTS = ["127.0.0.1","localhost"]
 INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'inventory.apps.InventoryConfig',
+    'contracts.apps.ContractsConfig',
     'crispy_forms',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -91,20 +92,34 @@ if os.environ.get('DJANGO_HOSTNAME', 'WORK_PC') == 'WORK_PC':
     DATABASES = {
         'default': {
             'ENGINE': 'mssql',
-        'NAME': os.environ.get('DB_NAME', ''),
-        'USER': os.environ.get('DB_USER', ''),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', ''),
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
+            'NAME': os.environ.get('DB_NAME', ''),
+            'USER': os.environ.get('DB_USER', ''),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', ''),
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+            },
+        },
+        'ContractLog_Dev': {
+            'ENGINE': 'mssql',
+            'NAME': 'ContractLog_Dev',
+            'USER': os.environ.get('DB_USER', ''),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', ''),
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+            },
         },
     }
-}
 else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+        },
+        'ContractLog_Dev': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.ContractLog_Dev',
         }
  }
 
@@ -178,7 +193,7 @@ LOGOUT_REDIRECT_URL = 'landing'
 LOGIN_URL = 'users:login'
 
 # Custom authentication toggle
-REQUIRE_LOGIN = True  # Set to True to require login for all pages
+REQUIRE_LOGIN = os.environ.get('REQUIRE_LOGIN', 'True')  # Set to True to require login for all pages
 
 TAILWIND_APP_NAME = 'theme_tw'
 
