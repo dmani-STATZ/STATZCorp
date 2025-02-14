@@ -102,7 +102,7 @@ if os.environ.get('DJANGO_HOSTNAME', 'WORK_PC') == 'WORK_PC':
                 'driver': 'ODBC Driver 17 for SQL Server',
             },
         },
-        'ContractLog_Dev': {
+        'ContractLog': {
             'ENGINE': 'mssql',
             'NAME': 'ContractLog_Web',
             'USER': os.environ.get('DB_USER', ''),
@@ -119,9 +119,9 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         },
-        'ContractLog_Web': {
+        'ContractLog': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.ContractLog_Dev',
+            'NAME': BASE_DIR / 'db.ContractLog_Web',
         }
  }
 

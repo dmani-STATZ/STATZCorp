@@ -9,7 +9,7 @@ class MyAppRouter:
         # Attempts to read contracts models go to ContractLog_Dev.
         # """
         if model._meta.app_label == 'contracts':
-            return 'ContractLog_Dev'
+            return 'ContractLog'
         return None
 
     def db_for_write(self, model, **hints):
@@ -17,7 +17,7 @@ class MyAppRouter:
         # Attempts to write contracts models go to ContractLog_Dev.
         # """
         if model._meta.app_label == 'contracts':
-            return 'ContractLog_Dev'
+            return 'ContractLog'
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -34,5 +34,5 @@ class MyAppRouter:
         # database.
         # """
         if app_label == 'contracts':
-            return db == 'ContractLog_Dev'
+            return db == 'ContractLog'
         return None

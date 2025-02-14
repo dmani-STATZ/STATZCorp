@@ -330,17 +330,17 @@ class StatzContractsTbl(models.Model):
     tabnum = models.CharField(db_column='TabNum', max_length=10, blank=True, null=True)  # Field name made lowercase.
     ponumber = models.CharField(db_column='PONumber', max_length=10, blank=True, null=True)  # Field name made lowercase.
     contractnum = models.CharField(db_column='ContractNum', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    buyer_id = models.SmallIntegerField(db_column='Buyer_ID', blank=True, null=True)  # Field name made lowercase.
-    type_id = models.IntegerField(db_column='Type_ID', blank=True, null=True)  # Field name made lowercase.
+    buyer_id = models.SmallIntegerField(db_column='Buyer_ID', blank=True, null=True)  # Field name made lowercase.  Foreign Key to Buyer.ID
+    type_id = models.IntegerField(db_column='Type_ID', blank=True, null=True)  # Field name made lowercase.  Foreign Key to ContractType.ID
     award_date = models.DateTimeField(db_column='Award Date', blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
     contractduedate = models.DateTimeField(db_column='ContractDueDate', blank=True, null=True)  # Field name made lowercase.
     lateshipcdd = models.BooleanField(db_column='LateShipCDD')  # Field name made lowercase.
     datecancelled = models.DateTimeField(db_column='DateCancelled', blank=True, null=True)  # Field name made lowercase.
     reasoncancelled = models.IntegerField(db_column='ReasonCancelled', blank=True, null=True)  # Field name made lowercase.
     dateclosed = models.DateTimeField(db_column='DateClosed', blank=True, null=True)  # Field name made lowercase.
-    salesclass = models.IntegerField(db_column='SalesClass', blank=True, null=True)  # Field name made lowercase.
+    salesclass = models.IntegerField(db_column='SalesClass', blank=True, null=True)  # Field name made lowercase.  Foreign Key to SalesClass.ID
     surveydate = models.DateField(db_column='SurveyDate', blank=True, null=True)  # Field name made lowercase.
-    surveytype = models.CharField(db_column='SurveyType', max_length=10, blank=True, null=True)  # Field name made lowercase.
+    surveytype = models.CharField(db_column='SurveyType', max_length=10, blank=True, null=True)  # Field name made lowercase.  Foreign Key to SurveyType.ID
     assigneduser = models.CharField(db_column='AssignedUser', max_length=20, blank=True, null=True)  # Field name made lowercase.
     assigneddate = models.DateTimeField(db_column='AssignedDate', blank=True, null=True)  # Field name made lowercase.
     nist = models.BooleanField(db_column='NIST', blank=True, null=True)  # Field name made lowercase.
