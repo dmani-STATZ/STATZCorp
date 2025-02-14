@@ -12,12 +12,12 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+    {% block extra_head %}{% endblock %}
     {% if title %}
         <title>STATZ Corporation - {{ title }}</title>
     {% else %}
         <title>STATZ Corporation</title>
     {% endif %}
-    {% block extra_head %}{% endblock %}
     <style>
         .sidebar {
             transition: transform 0.3s;
@@ -38,7 +38,8 @@
             margin-left: 0px;
         }
     </style>
-</head><body class="flex flex-col">
+</head>
+<body class="flex flex-col">
     <header class="bg-gray-800 text-white w-full p-4 flex justify-between items-center">
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
         <button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleSidebar()">☰ Menu</button>
@@ -66,10 +67,9 @@
                 <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
             </div>
             {% endif %}
-        </div>
     </header>
-    <div class="sidebar bg-gray-800 text-white w-64 h-screen fixed top-0 left-0 inactive" id="sidebar">
-        <button class="bg-gray-700 text-white py-2 px-4 w-full text-right" onclick="toggleSidebar()">✖</button>
+    <div class="sidebar bg-gray-500 text-white w-64 h-screen fixed top-0 left-0 inactive rounded-tr-full rounded-br-full border-r-2 border-b-2 border-t-2 border-red-600" id="sidebar">
+        <button class="text-red-600 py-2 px-4 w-full text-right" onclick="toggleSidebar()">❌</button>
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corp" class="h-12 w-18 m-8">
         <ul class="mt-10">
             <li class="py-3 px-6 hover:bg-gray-700 cursor-pointer"><a href="{% url 'index' %}" class="text-white px-3 py-2 rounded-md text-sm font-medium">Home</a></li>
