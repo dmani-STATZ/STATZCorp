@@ -62,6 +62,9 @@ class VisitorCheckInForm(forms.ModelForm):
             }),
         }
         labels = {
+            'visitor_name': 'Visitor Name',
+            'visitor_company': 'Visitor Company',
+            'reason_for_visit': 'Reason for Visit',
             'is_us_citizen': 'US Citizen'
         }
 

@@ -62,7 +62,7 @@ def check_in_visitor(request):
                 else:
                     messages.success(request, f'{visitor.visitor_name} has been checked in')
                 
-            return redirect('visitor_log')
+            return redirect('accesslog:visitor_log')
     else:
         # Create a fresh form with updated choices
         form = VisitorCheckInForm()
@@ -76,7 +76,7 @@ def check_out_visitor(request, visitor_id):
     visitor.time_out = timezone.now()  # Use full datetime
     visitor.departed = True
     visitor.save()
-    return redirect('visitor_log')
+    return redirect('accesslog:visitor_log')
 
 @login_required
 def generate_report(request):
@@ -171,7 +171,7 @@ def generate_report(request):
             
             return response
     
-    return redirect('visitor_log')
+    return redirect('accesslog:visitor_log')
 
 @login_required
 def get_visitor_info(request):
