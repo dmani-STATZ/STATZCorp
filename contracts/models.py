@@ -1,40 +1,208 @@
 from django.db import models
 
-# Create your models here.
-class StatzContractsTbl(models.Model):
-    id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    contractopen = models.BooleanField(db_column='ContractOpen')  # Field name made lowercase.
-    contractcancelled = models.BooleanField(db_column='ContractCancelled')  # Field name made lowercase.
-    tabnum = models.CharField(db_column='TabNum', max_length=10, blank=True, null=True)  # Field name made lowercase.
-    ponumber = models.CharField(db_column='PONumber', max_length=10, blank=True, null=True)  # Field name made lowercase.
-    contractnum = models.CharField(db_column='ContractNum', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    buyer_id = models.SmallIntegerField(db_column='Buyer_ID', blank=True, null=True)  # Field name made lowercase.  Foreign Key to Buyer.ID
-    type_id = models.IntegerField(db_column='Type_ID', blank=True, null=True)  # Field name made lowercase.  Foreign Key to ContractType.ID
-    award_date = models.DateTimeField(db_column='Award Date', blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    contractduedate = models.DateTimeField(db_column='ContractDueDate', blank=True, null=True)  # Field name made lowercase.
-    lateshipcdd = models.BooleanField(db_column='LateShipCDD')  # Field name made lowercase.
-    datecancelled = models.DateTimeField(db_column='DateCancelled', blank=True, null=True)  # Field name made lowercase.
-    reasoncancelled = models.IntegerField(db_column='ReasonCancelled', blank=True, null=True)  # Field name made lowercase.
-    dateclosed = models.DateTimeField(db_column='DateClosed', blank=True, null=True)  # Field name made lowercase.
-    salesclass = models.IntegerField(db_column='SalesClass', blank=True, null=True)  # Field name made lowercase.  Foreign Key to SalesClass.ID
-    surveydate = models.DateField(db_column='SurveyDate', blank=True, null=True)  # Field name made lowercase.
-    surveytype = models.CharField(db_column='SurveyType', max_length=10, blank=True, null=True)  # Field name made lowercase.  Foreign Key to SurveyType.ID
-    assigneduser = models.CharField(db_column='AssignedUser', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    assigneddate = models.DateTimeField(db_column='AssignedDate', blank=True, null=True)  # Field name made lowercase.
-    nist = models.BooleanField(db_column='NIST', blank=True, null=True)  # Field name made lowercase.
-    url = models.CharField(db_column='URL', max_length=200, blank=True, null=True)  # Field name made lowercase.
-    url_review = models.BooleanField(db_column='URL_Review', blank=True, null=True)  # Field name made lowercase.
-    url_found = models.BooleanField(db_column='URL_Found', blank=True, null=True)  # Field name made lowercase.
-    createdby = models.CharField(db_column='CreatedBy', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    createdon = models.DateTimeField(db_column='CreatedOn', blank=True, null=True)  # Field name made lowercase.
-    modifiedby = models.CharField(db_column='ModifiedBy', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    modifiedon = models.DateTimeField(db_column='ModifiedOn', blank=True, null=True)  # Field name made lowercase.
-    reviewed = models.BooleanField(db_column='Reviewed')  # Field name made lowercase.
-    reviewedby = models.CharField(db_column='ReviewedBy', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    reviewedon = models.DateTimeField(db_column='ReviewedOn', blank=True, null=True)  # Field name made lowercase.
-    sysstarttime = models.DateTimeField(db_column='SysStartTime')  # Field name made lowercase.
-    sysendtime = models.DateTimeField(db_column='SysEndTime')  # Field name made lowercase.
+class Contract(models.Model):
+    contract_number = models.CharField(max_length=25)
+    open = models.BooleanField()
+    date_closed = models.DateTimeField(null=True, blank=True)
+    cancelled = models.BooleanField()
+    date_canceled = models.DateTimeField(null=True, blank=True)
+    canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE)
+    po_number = models.CharField(max_length=10)
+    tab_num = models.CharField(max_length=10)
+    buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE)
+    contract_type = models.ForeignKey('ContractType', on_delete=models.CASCADE)
+    award_date = models.DateTimeField()
+    due_date = models.DateTimeField()
+    due_date_late = models.BooleanField()
+    sales_class = models.ForeignKey('SalesClass', on_delete=models.CASCADE)
+    survey_date = models.DateField()
+    survey_type = models.CharField(max_length=10)
+    assigned_user = models.CharField(max_length=20)
+    assigned_date = models.DateTimeField()
+    nist = models.BooleanField()
+    files_url = models.CharField(max_length=200)
+    reviewed = models.BooleanField()
+    reviewed_by = models.CharField(max_length=20, null=True, blank=True)
+    reviewed_on = models.DateTimeField(null=True, blank=True)
 
-    class Meta:
-        managed = False
-        db_table = 'STATZ_CONTRACTS_TBL'
+    def __str__(self):
+        return f"Contract {self.contract_number}"
+
+class Clin(models.Model):
+    clin_finance = models.OneToOneField('ClinFinance', on_delete=models.CASCADE)
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
+    sub_contract = models.CharField(max_length=20, null=True, blank=True)
+    po_num_ext = models.CharField(max_length=5, null=True, blank=True)
+    tab_num = models.CharField(max_length=10, null=True, blank=True)
+    clin_po_num = models.CharField(max_length=10, null=True, blank=True)
+    po_number = models.CharField(max_length=10, null=True, blank=True)
+    clin_type = models.ForeignKey('ClinType', on_delete=models.CASCADE)
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
+    nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE)
+    ia = models.CharField(max_length=5, null=True, blank=True)
+    fob = models.CharField(max_length=5, null=True, blank=True)
+    order_qty = models.FloatField()
+    ship_qty = models.FloatField()
+    due_date = models.DateField()
+    due_date_late = models.BooleanField()
+    supplier_due_date = models.DateField(null=True, blank=True)
+    supplier_due_date_late = models.BooleanField()
+    ship_date = models.DateField(null=True, blank=True)
+    ship_date_late = models.BooleanField()
+
+    def __str__(self):
+        return f"CLIN {self.id} for Contract {self.contract.contract_number}"
+
+class IdiqContract(models.Model):
+    contract_number = models.CharField(max_length=50)
+    buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE)
+    award_date = models.DateTimeField()
+    term_length = models.IntegerField()
+    option_length = models.IntegerField()
+    closed = models.BooleanField()
+
+    def __str__(self):
+        return f"IDIQ Contract {self.contract_number}"
+
+class IdiqContractToContract(models.Model):
+    idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"IDIQ Contract {self.idiq_contract.contract_number} to Contract {self.contract.contract_number}"
+
+class IdiqContractDetails(models.Model):
+    idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
+    nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE)
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Details for IDIQ Contract {self.idiq_contract.contract_number}"
+
+class ClinFinance(models.Model):
+    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE)
+    special_payment_terms_paid = models.BooleanField()
+    contract_value = models.DecimalField(max_digits=19, decimal_places=4)
+    po_amount = models.DecimalField(max_digits=19, decimal_places=4)
+    paid_amount = models.DecimalField(max_digits=19, decimal_places=4)
+    paid_date = models.DateTimeField(null=True, blank=True)
+    wawf_payment = models.DecimalField(max_digits=19, decimal_places=4)
+    wawf_recieved = models.DateTimeField(null=True, blank=True)
+    wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
+    plan_gross = models.DecimalField(max_digits=19, decimal_places=4)
+    planned_split = models.CharField(max_length=50, null=True, blank=True)
+
+    def __str__(self):
+        return f"Finance for CLIN {self.id}"
+
+class SpecialPaymentTerms(models.Model):
+    terms = models.CharField(max_length=30)
+
+    def __str__(self):
+        return self.terms
+
+class Nsn(models.Model):
+    nsn_code = models.IntegerField()
+    description = models.TextField()
+
+    def __str__(self):
+        return f"NSN {self.nsn_code}"
+
+class Supplier(models.Model):
+    name = models.TextField()
+    cage_code = models.IntegerField()
+    supplier_type = models.ForeignKey('SupplierType', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+
+class SupplierType(models.Model):
+    description = models.TextField()
+
+    def __str__(self):
+        return self.description
+
+class Buyer(models.Model):
+    description = models.TextField()
+
+    def __str__(self):
+        return self.description
+
+class ContractType(models.Model):
+    description = models.TextField()
+
+    def __str__(self):
+        return self.description
+
+class ClinType(models.Model):
+    description = models.TextField()
+
+    def __str__(self):
+        return self.description
+
+class CanceledReason(models.Model):
+    description = models.TextField()
+
+    def __str__(self):
+        return self.description
+
+class SalesClass(models.Model):
+    sales_team = models.TextField()
+
+    def __str__(self):
+        return self.sales_team
+
+class ContractNote(models.Model):
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
+    note = models.TextField()
+    created_by = models.TextField()
+    created_on = models.DateTimeField()
+
+    def __str__(self):
+        return f"Note for Contract {self.contract.contract_number}"
+
+class ClinNote(models.Model):
+    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
+    note = models.TextField()
+    created_by = models.TextField()
+    created_on = models.DateTimeField()
+
+    def __str__(self):
+        return f"Note for CLIN {self.clin.id}"
+
+class AcknowledgementLetter(models.Model):
+    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
+    letter_date = models.DateTimeField()
+    salutation = models.TextField()
+    addr_fname = models.TextField()
+    addr_lname = models.TextField()
+    supplier = models.TextField()
+    st_address = models.TextField()
+    city = models.TextField()
+    state = models.TextField()
+    zip = models.IntegerField()
+    po = models.IntegerField()
+    po_ext = models.IntegerField()
+    contract_num = models.IntegerField()
+    fat_plt_due_date = models.DateTimeField()
+    supplier_due_date = models.DateTimeField()
+    dpas_priority = models.IntegerField()
+    statz_contact = models.TextField()
+    statz_contact_title = models.TextField()
+    statz_contact_phone = models.IntegerField()
+    statz_contact_email = models.EmailField()
+
+    def __str__(self):
+        return f"Acknowledgement Letter for CLIN {self.clin.id}"
+
+class ClinAcknowledgment(models.Model):
+    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
+    po_to_supplier_bool = models.BooleanField()
+    po_to_supplier_date = models.DateTimeField()
+    po_to_supplier_user = models.TextField()
+    clin_reply_bool = models.BooleanField()
+    clin_reply_date = models.DateTimeField()
+    clin_reply_user = models.TextField()
+
+    def __str__(self):
+        return f"Acknowledgment for CLIN {self.clin.id}"
