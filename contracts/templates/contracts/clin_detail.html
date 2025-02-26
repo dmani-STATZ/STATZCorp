@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">CLIN Details</h1>
+                <p class="text-gray-600">Contract: 
+                    <a href="{% url 'contracts:contract_detail' clin.contract.id %}" class="text-blue-600 hover:text-blue-800">
+                        {{ clin.contract.contract_number }}
+                    </a>
+                </p>
+            </div>
+            <div class="flex space-x-4 items-center">
+                <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
+                   class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                    </svg>
+                    Back to Contract
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIN Information -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">CLIN Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <p class="text-sm text-gray-600">CLIN Type</p>
+                <p class="font-medium">{{ clin.clin_type.description|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Supplier</p>
+                <p class="font-medium relative group">
+                    <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}" 
+                       class="text-blue-600 hover:text-blue-800">
+                        {{ clin.supplier.name|default:"N/A" }}
+                    </a>
+                    {% if clin.supplier %}
+                        <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
+                            CAGE: {{ clin.supplier.cage_code|default:"N/A" }}
+                        </span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">NSN</p>
+                <p class="font-medium relative group">
+                    <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}" 
+                       class="text-blue-600 hover:text-blue-800">
+                        {{ clin.nsn.nsn_code|default:"N/A" }}
+                    </a>
+                    {% if clin.nsn %}
+                        <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
+                            {{ clin.nsn.description|default:"No description available" }}
+                        </span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Order Quantity</p>
+                <p class="font-medium">{{ clin.order_qty|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Ship Quantity</p>
+                <p class="font-medium">{{ clin.ship_qty|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Due Date</p>
+                <p class="font-medium {% if clin.due_date_late %}text-red-600{% endif %}">
+                    {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Ship Date</p>
+                <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
+                    {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">I&A</p>
+                <p class="font-medium">{{ clin.ia|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">FOB</p>
+                <p class="font-medium">{{ clin.fob|default:"N/A" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIN Finance Information -->
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">Finance Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <p class="text-sm text-gray-600">Contract Value</p>
+                <p class="font-medium">${{ clin.clin_finance.contract_value|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">PO Amount</p>
+                <p class="font-medium">${{ clin.clin_finance.po_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Paid Amount</p>
+                <p class="font-medium">${{ clin.clin_finance.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Payment Terms</p>
+                <p class="font-medium">{{ clin.clin_finance.special_payment_terms.terms|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Payment Status</p>
+                <p class="font-medium">
+                    {% if clin.clin_finance.special_payment_terms_paid %}
+                        <span class="text-green-600">Paid</span>
+                    {% else %}
+                        <span class="text-red-600">Unpaid</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Paid Date</p>
+                <p class="font-medium">{{ clin.clin_finance.paid_date|date:"M d, Y"|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">WAWF Payment</p>
+                <p class="font-medium">${{ clin.clin_finance.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">WAWF Invoice</p>
+                <p class="font-medium">{{ clin.clin_finance.wawf_invoice|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">WAWF Received</p>
+                <p class="font-medium">{{ clin.clin_finance.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

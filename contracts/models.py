@@ -139,7 +139,7 @@ class Nsn(AuditModel):
 
 
 class Supplier(AuditModel):
-    name = models.TextField(null=True, blank=True)
+    name = models.CharField(max_length=100, null=True, blank=True)
     cage_code = models.CharField(max_length=10, null=True, blank=True)
     supplier_type = models.ForeignKey('SupplierType', on_delete=models.CASCADE, null=True, blank=True)
     billing_address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True, related_name='supplier_billing')

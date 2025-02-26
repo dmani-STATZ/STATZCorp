@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Contract Header -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
+            <div class="flex space-x-4 items-center">
+                {% if contract.cancelled %}
+                    <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                {% elif not contract.open %}
+                    <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                {% else %}
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
+                {% endif %}
+                <a href="{% url 'contracts:contracts_dashboard' %}" 
+                class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                 </svg>
+                 Back to Dashboard
+             </a>
+            </div>
+        </div>
+        
+        <!-- Contract Details Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <p class="text-sm text-gray-600">PO Number</p>
+                <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Tab Number</p>
+                <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Buyer</p>
+                <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Award Date</p>
+                <p class="font-medium">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Due Date</p>
+                <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
+                    {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Sales Class</p>
+                <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLINs Section -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
+            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                Add CLIN
+            </button>
+        </div>
+        
+        <!-- CLINs Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            CLIN Type
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Supplier
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            NSN
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Order Qty
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Due Date
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for clin in contract.clin_set.all %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800">
+                                {{ clin.clin_type.description|default:"N/A" }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ clin.supplier.name|default:"N/A" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ clin.nsn.nsn_code|default:"N/A" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ clin.order_qty|default:"N/A" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm {% if clin.due_date_late %}text-red-600{% endif %}">
+                            {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
+                            <button class="text-red-600 hover:text-red-800">Delete</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No CLINs found for this contract
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Notes Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Contract Notes -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Contract Notes</h2>
+                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Add Note
+                </button>
+            </div>
+            <div class="space-y-4">
+                {% for note in contract.contractnote_set.all %}
+                <div class="border-l-4 border-blue-500 pl-4 py-2">
+                    <p class="text-gray-700">{{ note.note }}</p>
+                    <div class="mt-2 text-sm text-gray-500">
+                        Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-center">No notes found for this contract</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- CLIN Notes -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">CLIN Notes</h2>
+                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Add Note
+                </button>
+            </div>
+            <div class="space-y-4">
+                {% for clin in contract.clin_set.all %}
+                    {% for note in clin.clinnote_set.all %}
+                    <div class="border-l-4 border-green-500 pl-4 py-2">
+                        <p class="text-sm text-gray-600 mb-1">CLIN: {{ clin.clin_po_num }}</p>
+                        <p class="text-gray-700">{{ note.note }}</p>
+                        <div class="mt-2 text-sm text-gray-500">
+                            Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% empty %}
+                <p class="text-gray-500 text-center">No CLIN notes found for this contract</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

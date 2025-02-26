@@ -1,11 +1,13 @@
-from django.shortcuts import render
-from django.views.generic import TemplateView
+from django.shortcuts import render, get_object_or_404
+from django.views.generic import TemplateView, DetailView, UpdateView
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from django.utils.safestring import mark_safe
+from django.http import JsonResponse
 from datetime import timedelta, datetime
 import calendar
-from .models import Contract, Clin, ClinFinance, Supplier
+from .models import Contract, Clin, ClinFinance, Supplier, Nsn
+from django.urls import reverse_lazy
 
 # Create your views here.
 
@@ -29,6 +31,7 @@ class ContractsDashboardView(TemplateView):
             main_clin = contract.clin_set.filter(clin_type_id=1).first()
             if main_clin and main_clin.clin_finance and main_clin.supplier:
                 contracts_data.append({
+                    'id': contract.id,
                     'contract_number': contract.contract_number,
                     'supplier_name': main_clin.supplier.name,
                     'contract_value': main_clin.clin_finance.contract_value,
@@ -118,3 +121,70 @@ class ContractsDashboardView(TemplateView):
         context['contracts'] = self.get_contracts()
         context['periods'] = periods
         return context
+
+class ContractDetailView(DetailView):
+    model = Contract
+    template_name = 'contracts/contract_detail.html'
+    context_object_name = 'contract'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.get_object()
+        context['clins'] = contract.clin_set.all().select_related(
+            'clin_type', 'supplier', 'nsn'
+        )
+        return context
+
+class ClinDetailView(DetailView):
+    model = Clin
+    template_name = 'contracts/clin_detail.html'
+    context_object_name = 'clin'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'contract',
+            'clin_type',
+            'supplier',
+            'nsn',
+            'clin_finance',
+            'clin_finance__special_payment_terms'
+        )
+
+def contract_search(request):
+    query = request.GET.get('q', '')
+    if len(query) < 3:
+        return JsonResponse([], safe=False)
+
+    # Search by full contract number or last 6 characters
+    contracts = Contract.objects.filter(
+        Q(contract_number__icontains=query) |
+        Q(contract_number__iendswith=query[-6:]) if len(query) >= 6 else Q()
+    ).values(
+        'id', 
+        'contract_number'
+    ).order_by('contract_number')[:10]
+
+    return JsonResponse(list(contracts), safe=False)
+
+class NsnUpdateView(UpdateView):
+    model = Nsn
+    template_name = 'contracts/nsn_edit.html'
+    context_object_name = 'nsn'
+    fields = ['nsn_code', 'description', 'part_number', 'revision', 'notes', 'directory_url']
+    
+    def get_success_url(self):
+        return self.request.META.get('HTTP_REFERER', reverse_lazy('contracts:contracts_dashboard'))
+
+class SupplierUpdateView(UpdateView):
+    model = Supplier
+    template_name = 'contracts/supplier_edit.html'
+    context_object_name = 'supplier'
+    fields = [
+        'name', 'cage_code', 'supplier_type', 'billing_address', 'shipping_address',
+        'physical_address', 'business_phone', 'business_fax', 'business_email',
+        'contact', 'probation', 'conditional', 'special_terms', 'prime', 'ppi',
+        'iso', 'notes', 'is_packhouse', 'packhouse', 'allows_gsi'
+    ]
+    
+    def get_success_url(self):
+        return self.request.META.get('HTTP_REFERER', reverse_lazy('contracts:contracts_dashboard'))
