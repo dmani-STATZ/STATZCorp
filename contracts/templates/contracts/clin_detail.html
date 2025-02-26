@@ -38,7 +38,7 @@
             <div>
                 <p class="text-sm text-gray-600">Supplier</p>
                 <p class="font-medium relative group">
-                    <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}" 
+                    <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
                        class="text-blue-600 hover:text-blue-800">
                         {{ clin.supplier.name|default:"N/A" }}
                     </a>
@@ -52,7 +52,7 @@
             <div>
                 <p class="text-sm text-gray-600">NSN</p>
                 <p class="font-medium relative group">
-                    <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}" 
+                    <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}?next={{ request.path|urlencode }}" 
                        class="text-blue-600 hover:text-blue-800">
                         {{ clin.nsn.nsn_code|default:"N/A" }}
                     </a>

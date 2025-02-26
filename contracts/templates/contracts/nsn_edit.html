@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <div class="max-w-3xl mx-auto">
+    <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
             <div class="flex justify-between items-center mb-6">
@@ -19,7 +19,7 @@
         </div>
 
         <!-- Form -->
-        <div class="bg-white shadow-lg rounded-lg p-6">
+        <div class="bg-gray-50 shadow-lg rounded-lg p-6">
             <form method="post" class="space-y-6">
                 {% csrf_token %}
                 {% for field in form %}
@@ -56,11 +56,16 @@
 {% block extra_css %}
 <style>
     /* Style form inputs */
-    input[type="text"], 
-    input[type="email"], 
+    input[type="text"],
+    input[type="email"],
     input[type="url"],
-    textarea {
-        @apply w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    textarea,
+    select,
+    .textinput,
+    .urlinput,
+    .textarea {
+        @apply w-full rounded-md border-2 border-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+        padding: 0.5rem;
     }
     
     /* Style form errors */

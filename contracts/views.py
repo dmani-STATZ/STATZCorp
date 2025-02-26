@@ -8,6 +8,7 @@ from datetime import timedelta, datetime
 import calendar
 from .models import Contract, Clin, ClinFinance, Supplier, Nsn
 from django.urls import reverse_lazy
+from .forms import NsnForm, SupplierForm
 
 # Create your views here.
 
@@ -130,9 +131,19 @@ class ContractDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contract = self.get_object()
-        context['clins'] = contract.clin_set.all().select_related(
+        clins = contract.clin_set.all().select_related(
             'clin_type', 'supplier', 'nsn'
         )
+        context['clins'] = clins
+        context['contract_notes'] = contract.contractnote_set.all().order_by('-created_on')
+        
+        # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
+        context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
+        if context['selected_clin']:
+            context['clin_notes'] = context['selected_clin'].clinnote_set.all().order_by('-created_on')
+        else:
+            context['clin_notes'] = []
+            
         return context
 
 class ClinDetailView(DetailView):
@@ -170,21 +181,32 @@ class NsnUpdateView(UpdateView):
     model = Nsn
     template_name = 'contracts/nsn_edit.html'
     context_object_name = 'nsn'
-    fields = ['nsn_code', 'description', 'part_number', 'revision', 'notes', 'directory_url']
+    form_class = NsnForm
     
     def get_success_url(self):
-        return self.request.META.get('HTTP_REFERER', reverse_lazy('contracts:contracts_dashboard'))
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        return reverse_lazy('contracts:contracts_dashboard')
 
 class SupplierUpdateView(UpdateView):
     model = Supplier
     template_name = 'contracts/supplier_edit.html'
     context_object_name = 'supplier'
-    fields = [
-        'name', 'cage_code', 'supplier_type', 'billing_address', 'shipping_address',
-        'physical_address', 'business_phone', 'business_fax', 'business_email',
-        'contact', 'probation', 'conditional', 'special_terms', 'prime', 'ppi',
-        'iso', 'notes', 'is_packhouse', 'packhouse', 'allows_gsi'
-    ]
+    form_class = SupplierForm
     
     def get_success_url(self):
-        return self.request.META.get('HTTP_REFERER', reverse_lazy('contracts:contracts_dashboard'))
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        return reverse_lazy('contracts:contracts_dashboard')
+
+def get_clin_notes(request, clin_id):
+    clin = get_object_or_404(Clin, id=clin_id)
+    notes = clin.clinnote_set.all().order_by('-created_on')
+    notes_data = [{
+        'note': note.note,
+        'created_by': str(note.created_by),
+        'created_on': note.created_on.strftime("%b %d, %Y %H:%M")
+    } for note in notes]
+    return JsonResponse({'notes': notes_data})

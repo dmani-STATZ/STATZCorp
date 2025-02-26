@@ -10,4 +10,5 @@ urlpatterns = [
     path('nsn/<int:pk>/edit/', views.NsnUpdateView.as_view(), name='nsn_edit'),
     path('supplier/<int:pk>/edit/', views.SupplierUpdateView.as_view(), name='supplier_edit'),
     path('search/', views.contract_search, name='contract_search'),
+    path('clin/<int:clin_id>/notes/', views.get_clin_notes, name='get_clin_notes'),
 ] 

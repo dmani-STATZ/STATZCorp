@@ -167,7 +167,7 @@ class Supplier(AuditModel):
     allows_gsi = models.BooleanField(null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name.upper()} - {self.cage_code}"
 
 
 class SupplierType(models.Model):
@@ -274,7 +274,16 @@ class Address(models.Model):
     zip = models.CharField(max_length=15, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.address_line_1} {self.address_line_2} {self.city} {self.state} {self.zip}"
+        # Create a list of address components, filtering out None values
+        address_parts = [
+            self.address_line_1 or '',
+            self.address_line_2 or '',
+            self.city or '',
+            self.state or '',
+            self.zip or ''
+        ]
+        # Join non-empty parts with spaces
+        return ' '.join(part for part in address_parts if part)
 
 class Contact(models.Model):
     SALUTATION_CHOICES = [

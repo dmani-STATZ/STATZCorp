@@ -91,10 +91,12 @@
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    {% for clin in contract.clin_set.all %}
-                    <tr>
+                    {% for clin in clins %}
+                    <tr id="clin-row-{{ clin.id }}" 
+                        onclick="selectClin({{ clin.id }})"
+                        class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800">
+                            <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
                                 {{ clin.clin_type.description|default:"N/A" }}
                             </a>
                         </td>
@@ -111,8 +113,8 @@
                             {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
-                            <button class="text-red-600 hover:text-red-800">Delete</button>
+                            <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="event.stopPropagation();">Edit</button>
+                            <button class="text-red-600 hover:text-red-800" onclick="event.stopPropagation();">Delete</button>
                         </td>
                     </tr>
                     {% empty %}
@@ -138,7 +140,7 @@
                 </button>
             </div>
             <div class="space-y-4">
-                {% for note in contract.contractnote_set.all %}
+                {% for note in contract_notes %}
                 <div class="border-l-4 border-blue-500 pl-4 py-2">
                     <p class="text-gray-700">{{ note.note }}</p>
                     <div class="mt-2 text-sm text-gray-500">
@@ -159,22 +161,73 @@
                     Add Note
                 </button>
             </div>
-            <div class="space-y-4">
-                {% for clin in contract.clin_set.all %}
-                    {% for note in clin.clinnote_set.all %}
-                    <div class="border-l-4 border-green-500 pl-4 py-2">
-                        <p class="text-sm text-gray-600 mb-1">CLIN: {{ clin.clin_po_num }}</p>
-                        <p class="text-gray-700">{{ note.note }}</p>
-                        <div class="mt-2 text-sm text-gray-500">
-                            Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
-                        </div>
+            <div id="clin-notes" class="space-y-4">
+                {% for note in clin_notes %}
+                <div class="border-l-4 border-green-500 pl-4 py-2">
+                    <p class="text-gray-700">{{ note.note }}</p>
+                    <div class="mt-2 text-sm text-gray-500">
+                        Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
                     </div>
-                    {% endfor %}
+                </div>
                 {% empty %}
-                <p class="text-gray-500 text-center">No CLIN notes found for this contract</p>
+                <p class="text-gray-500 text-center">No CLIN notes found</p>
                 {% endfor %}
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .selected-row {
+        outline: 3px solid #39ff14;  /* Neon green color */
+        outline-offset: -3px;
+        position: relative;
+        z-index: 10;
+    }
+</style>
+
+<script>
+function selectClin(clinId) {
+    // Remove highlight from all rows
+    document.querySelectorAll('tr[id^="clin-row-"]').forEach(row => {
+        row.classList.remove('selected-row');
+    });
+    
+    // Add highlight to selected row
+    const selectedRow = document.getElementById(`clin-row-${clinId}`);
+    if (selectedRow) {
+        selectedRow.classList.add('selected-row');
+    }
+    
+    // Fetch and update CLIN notes
+    fetch(`/contracts/clin/${clinId}/notes/`)
+        .then(response => response.json())
+        .then(data => {
+            const clinNotesDiv = document.getElementById('clin-notes');
+            if (data.notes.length > 0) {
+                clinNotesDiv.innerHTML = data.notes.map(note => `
+                    <div class="border-l-4 border-green-500 pl-4 py-2">
+                        <p class="text-gray-700">${note.note}</p>
+                        <div class="mt-2 text-sm text-gray-500">
+                            Added by ${note.created_by} on ${note.created_on}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center">No CLIN notes found</p>';
+            }
+        })
+        .catch(error => console.error('Error fetching CLIN notes:', error));
+}
+
+// Select the default CLIN on page load
+{% if selected_clin %}
+document.addEventListener('DOMContentLoaded', function() {
+    const defaultClinRow = document.getElementById('clin-row-{{ selected_clin.id }}');
+    if (defaultClinRow) {
+        defaultClinRow.classList.add('selected-row');
+    }
+});
+{% endif %}
+</script>
 {% endblock %} 
