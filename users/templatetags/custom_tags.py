@@ -16,7 +16,3 @@ def is_development():
 @register.simple_tag
 def get_require_login():
     return getattr(settings, 'REQUIRE_LOGIN', False) 
-
-@register.simple_tag
-def get_require_login():
-    return getattr(settings, 'REQUIRE_LOGIN', False) 

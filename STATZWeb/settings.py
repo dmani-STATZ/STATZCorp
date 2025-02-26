@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1%a(rwepqwcb3)76hxfr*ino^y84977usbdg36h(f--o-s3s(=')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') != 'True'
 
 ALLOWED_HOSTS = ["127.0.0.1","localhost"]
 
@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'inventory.apps.InventoryConfig',
     'contracts.apps.ContractsConfig',
+    'accesslog.apps.AccesslogConfig',
     'crispy_forms',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -49,7 +50,6 @@ INSTALLED_APPS = [
     'django_browser_reload',
     'tailwind',
     'theme_tw',
-    'accesslog.apps.AccesslogConfig',
 ]
 
 MIDDLEWARE = [
@@ -88,23 +88,12 @@ WSGI_APPLICATION = 'STATZWeb.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASE_ROUTERS = ['STATZWeb.db_router.MyAppRouter']
 
 if os.environ.get('DJANGO_HOSTNAME', 'WORK_PC') == 'WORK_PC':
     DATABASES = {
         'default': {
             'ENGINE': 'mssql',
-            'NAME': os.environ.get('DB_NAME', ''),
-            'USER': os.environ.get('DB_USER', ''),
-            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-            'HOST': os.environ.get('DB_HOST', ''),
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-            },
-        },
-        'ContractLog': {
-            'ENGINE': 'mssql',
-            'NAME': 'ContractLog_Web',
+            'NAME': 'STATZWeb_Dev',
             'USER': os.environ.get('DB_USER', ''),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
             'HOST': os.environ.get('DB_HOST', ''),
@@ -119,10 +108,6 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         },
-        'ContractLog': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.ContractLog_Web',
-        }
  }
 
 
@@ -195,7 +180,7 @@ LOGOUT_REDIRECT_URL = 'landing'
 LOGIN_URL = 'users:login'
 
 # Custom authentication toggle
-REQUIRE_LOGIN = os.environ.get('REQUIRE_LOGIN', 'True')  # Set to True to require login for all pages
+REQUIRE_LOGIN = os.getenv('REQUIRE_LOGIN', 'False').lower() == 'true'
 
 TAILWIND_APP_NAME = 'theme_tw'
 

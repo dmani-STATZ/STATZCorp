@@ -1,68 +1,88 @@
 from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
 
-class Contract(models.Model):
-    contract_number = models.CharField(max_length=25)
-    open = models.BooleanField()
+class AuditModel(models.Model):
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
+    created_on = models.DateTimeField(default=timezone.now)
+    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_modified')
+    modified_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created_on = timezone.now()
+        self.modified_on = timezone.now()
+        super().save(*args, **kwargs)
+
+class Contract(AuditModel):
+    contract_number = models.CharField(max_length=25, null=True, blank=True)
+    open = models.BooleanField(null=True, blank=True)
     date_closed = models.DateTimeField(null=True, blank=True)
-    cancelled = models.BooleanField()
+    cancelled = models.BooleanField(null=True, blank=True)
     date_canceled = models.DateTimeField(null=True, blank=True)
-    canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE)
-    po_number = models.CharField(max_length=10)
-    tab_num = models.CharField(max_length=10)
-    buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE)
-    contract_type = models.ForeignKey('ContractType', on_delete=models.CASCADE)
-    award_date = models.DateTimeField()
-    due_date = models.DateTimeField()
-    due_date_late = models.BooleanField()
-    sales_class = models.ForeignKey('SalesClass', on_delete=models.CASCADE)
-    survey_date = models.DateField()
-    survey_type = models.CharField(max_length=10)
-    assigned_user = models.CharField(max_length=20)
-    assigned_date = models.DateTimeField()
-    nist = models.BooleanField()
-    files_url = models.CharField(max_length=200)
-    reviewed = models.BooleanField()
+    canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE, null=True, blank=True)
+    po_number = models.CharField(max_length=10, null=True, blank=True)
+    tab_num = models.CharField(max_length=10, null=True, blank=True)
+    buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
+    contract_type = models.ForeignKey('ContractType', on_delete=models.CASCADE, null=True, blank=True)
+    award_date = models.DateTimeField(null=True, blank=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    due_date_late = models.BooleanField(null=True, blank=True)
+    sales_class = models.ForeignKey('SalesClass', on_delete=models.CASCADE, null=True, blank=True)
+    survey_date = models.DateField(null=True, blank=True)
+    survey_type = models.CharField(max_length=10, null=True, blank=True)
+    assigned_user = models.CharField(max_length=20, null=True, blank=True)
+    assigned_date = models.DateTimeField(null=True, blank=True)
+    nist = models.BooleanField(null=True, blank=True)
+    files_url = models.CharField(max_length=200, null=True, blank=True)
+    reviewed = models.BooleanField(null=True, blank=True)
     reviewed_by = models.CharField(max_length=20, null=True, blank=True)
     reviewed_on = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Contract {self.contract_number}"
 
-class Clin(models.Model):
-    clin_finance = models.OneToOneField('ClinFinance', on_delete=models.CASCADE)
-    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
+class Clin(AuditModel):
+    clin_finance = models.OneToOneField('ClinFinance', on_delete=models.CASCADE, null=True, blank=True)
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, null=True, blank=True)
     sub_contract = models.CharField(max_length=20, null=True, blank=True)
     po_num_ext = models.CharField(max_length=5, null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     clin_po_num = models.CharField(max_length=10, null=True, blank=True)
     po_number = models.CharField(max_length=10, null=True, blank=True)
-    clin_type = models.ForeignKey('ClinType', on_delete=models.CASCADE)
-    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
-    nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE)
+    clin_type = models.ForeignKey('ClinType', on_delete=models.CASCADE, null=True, blank=True)
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True)
+    nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE, null=True, blank=True)
     ia = models.CharField(max_length=5, null=True, blank=True)
     fob = models.CharField(max_length=5, null=True, blank=True)
-    order_qty = models.FloatField()
-    ship_qty = models.FloatField()
-    due_date = models.DateField()
-    due_date_late = models.BooleanField()
+    order_qty = models.FloatField(null=True, blank=True)
+    ship_qty = models.FloatField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    due_date_late = models.BooleanField(null=True, blank=True)
     supplier_due_date = models.DateField(null=True, blank=True)
-    supplier_due_date_late = models.BooleanField()
+    supplier_due_date_late = models.BooleanField(null=True, blank=True)
     ship_date = models.DateField(null=True, blank=True)
-    ship_date_late = models.BooleanField()
+    ship_date_late = models.BooleanField(null=True, blank=True)
 
     def __str__(self):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
 
-class IdiqContract(models.Model):
-    contract_number = models.CharField(max_length=50)
-    buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE)
-    award_date = models.DateTimeField()
-    term_length = models.IntegerField()
-    option_length = models.IntegerField()
-    closed = models.BooleanField()
+
+class IdiqContract(AuditModel):
+    contract_number = models.CharField(max_length=50, null=True, blank=True)
+    buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
+    award_date = models.DateTimeField(null=True, blank=True)
+    term_length = models.IntegerField(null=True, blank=True)
+    option_length = models.IntegerField(null=True, blank=True)
+    closed = models.BooleanField(null=True, blank=True)
+    tab_num = models.CharField(max_length=10, null=True, blank=True)
 
     def __str__(self):
         return f"IDIQ Contract {self.contract_number}"
+
 
 class IdiqContractToContract(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
@@ -70,6 +90,7 @@ class IdiqContractToContract(models.Model):
 
     def __str__(self):
         return f"IDIQ Contract {self.idiq_contract.contract_number} to Contract {self.contract.contract_number}"
+
 
 class IdiqContractDetails(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
@@ -79,130 +100,244 @@ class IdiqContractDetails(models.Model):
     def __str__(self):
         return f"Details for IDIQ Contract {self.idiq_contract.contract_number}"
 
-class ClinFinance(models.Model):
-    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE)
-    special_payment_terms_paid = models.BooleanField()
-    contract_value = models.DecimalField(max_digits=19, decimal_places=4)
-    po_amount = models.DecimalField(max_digits=19, decimal_places=4)
-    paid_amount = models.DecimalField(max_digits=19, decimal_places=4)
+
+class ClinFinance(AuditModel):
+    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
+    special_payment_terms_paid = models.BooleanField(null=True, blank=True)
+    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     paid_date = models.DateTimeField(null=True, blank=True)
-    wawf_payment = models.DecimalField(max_digits=19, decimal_places=4)
+    wawf_payment = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     wawf_recieved = models.DateTimeField(null=True, blank=True)
     wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
-    plan_gross = models.DecimalField(max_digits=19, decimal_places=4)
+    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f"Finance for CLIN {self.id}"
 
+
 class SpecialPaymentTerms(models.Model):
+    code = models.CharField(max_length=5, null=True, blank=True)
     terms = models.CharField(max_length=30)
 
     def __str__(self):
         return self.terms
 
-class Nsn(models.Model):
-    nsn_code = models.IntegerField()
-    description = models.TextField()
+
+class Nsn(AuditModel):
+    nsn_code = models.CharField(max_length=20, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    part_number = models.CharField(max_length=25, null=True, blank=True)
+    revision = models.CharField(max_length=25, null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    directory_url = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return f"NSN {self.nsn_code}"
 
-class Supplier(models.Model):
-    name = models.TextField()
-    cage_code = models.IntegerField()
-    supplier_type = models.ForeignKey('SupplierType', on_delete=models.CASCADE)
+
+class Supplier(AuditModel):
+    name = models.TextField(null=True, blank=True)
+    cage_code = models.CharField(max_length=10, null=True, blank=True)
+    supplier_type = models.ForeignKey('SupplierType', on_delete=models.CASCADE, null=True, blank=True)
+    billing_address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True, related_name='supplier_billing')
+    shipping_address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True, related_name='supplier_shipping')
+    physical_address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True, related_name='supplier_physical')
+    business_phone = models.CharField(max_length=25, null=True, blank=True)
+    business_fax = models.CharField(max_length=25, null=True, blank=True)
+    business_email = models.EmailField(null=True, blank=True)
+    contact = models.ForeignKey('Contact', on_delete=models.CASCADE, null=True, blank=True)
+    probation = models.BooleanField(null=True, blank=True)
+    probation_on = models.DateTimeField(null=True, blank=True)
+    probation_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='supplier_probation')
+    conditional = models.BooleanField(null=True, blank=True)
+    conditional_on = models.DateTimeField(null=True, blank=True)
+    conditional_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='supplier_conditional')
+    special_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
+    special_terms_on = models.DateTimeField(null=True, blank=True)
+    prime = models.IntegerField(null=True, blank=True)
+    ppi = models.BooleanField(null=True, blank=True)
+    iso = models.BooleanField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    is_packhouse = models.BooleanField(null=True, blank=True)
+    packhouse = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True)
+    files_url = models.CharField(max_length=200, null=True, blank=True)
+    allows_gsi = models.BooleanField(null=True, blank=True)
 
     def __str__(self):
         return self.name
 
+
 class SupplierType(models.Model):
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.description
 
+
 class Buyer(models.Model):
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
+    address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.description
 
 class ContractType(models.Model):
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.description
 
 class ClinType(models.Model):
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.description
 
 class CanceledReason(models.Model):
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.description
 
 class SalesClass(models.Model):
-    sales_team = models.TextField()
+    sales_team = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.sales_team
 
 class ContractNote(models.Model):
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
-    note = models.TextField()
-    created_by = models.TextField()
-    created_on = models.DateTimeField()
+    note = models.TextField(null=True, blank=True)
+    created_by = models.TextField(null=True, blank=True)
+    created_on = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Note for Contract {self.contract.contract_number}"
 
 class ClinNote(models.Model):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-    note = models.TextField()
-    created_by = models.TextField()
-    created_on = models.DateTimeField()
+    note = models.TextField(null=True, blank=True)
+    created_by = models.TextField(null=True, blank=True)
+    created_on = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Note for CLIN {self.clin.id}"
 
-class AcknowledgementLetter(models.Model):
+class AcknowledgementLetter(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-    letter_date = models.DateTimeField()
-    salutation = models.TextField()
-    addr_fname = models.TextField()
-    addr_lname = models.TextField()
-    supplier = models.TextField()
-    st_address = models.TextField()
-    city = models.TextField()
-    state = models.TextField()
-    zip = models.IntegerField()
-    po = models.IntegerField()
-    po_ext = models.IntegerField()
-    contract_num = models.IntegerField()
-    fat_plt_due_date = models.DateTimeField()
-    supplier_due_date = models.DateTimeField()
-    dpas_priority = models.IntegerField()
-    statz_contact = models.TextField()
-    statz_contact_title = models.TextField()
-    statz_contact_phone = models.IntegerField()
-    statz_contact_email = models.EmailField()
+    letter_date = models.DateTimeField(null=True, blank=True)
+    salutation = models.TextField(null=True, blank=True)
+    addr_fname = models.TextField(null=True, blank=True)
+    addr_lname = models.TextField(null=True, blank=True)
+    supplier = models.TextField(null=True, blank=True)
+    st_address = models.TextField(null=True, blank=True)
+    city = models.TextField(null=True, blank=True)
+    state = models.TextField(null=True, blank=True)
+    zip = models.CharField(max_length=10, null=True, blank=True)
+    po = models.CharField(max_length=10, null=True, blank=True)
+    po_ext = models.CharField(max_length=5, null=True, blank=True)
+    contract_num = models.CharField(max_length=25, null=True, blank=True)
+    fat_plt_due_date = models.DateTimeField(null=True, blank=True)
+    supplier_due_date = models.DateTimeField(null=True, blank=True)
+    dpas_priority = models.CharField(max_length=50, null=True, blank=True)
+    statz_contact = models.TextField(null=True, blank=True)
+    statz_contact_title = models.TextField(null=True, blank=True)
+    statz_contact_phone = models.CharField(max_length=25, null=True, blank=True)
+    statz_contact_email = models.EmailField(null=True, blank=True)
 
     def __str__(self):
         return f"Acknowledgement Letter for CLIN {self.clin.id}"
 
-class ClinAcknowledgment(models.Model):
+class ClinAcknowledgment(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-    po_to_supplier_bool = models.BooleanField()
-    po_to_supplier_date = models.DateTimeField()
-    po_to_supplier_user = models.TextField()
-    clin_reply_bool = models.BooleanField()
-    clin_reply_date = models.DateTimeField()
-    clin_reply_user = models.TextField()
+    po_to_supplier_bool = models.BooleanField(null=True, blank=True)
+    po_to_supplier_date = models.DateTimeField(null=True, blank=True)
+    po_to_supplier_user = models.TextField(null=True, blank=True)
+    clin_reply_bool = models.BooleanField(null=True, blank=True)
+    clin_reply_date = models.DateTimeField(null=True, blank=True)
+    clin_reply_user = models.TextField(null=True, blank=True)
+    po_to_qar_bool = models.BooleanField(null=True, blank=True)
+    po_to_qar_date = models.DateTimeField(null=True, blank=True)
+    po_to_qar_user = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"Acknowledgment for CLIN {self.clin.id}"
+
+class Address(models.Model):
+    address_line_1 = models.TextField(null=True, blank=True)
+    address_line_2 = models.TextField(null=True, blank=True)
+    city = models.TextField(null=True, blank=True)
+    state = models.TextField(null=True, blank=True)
+    zip = models.CharField(max_length=15, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.address_line_1} {self.address_line_2} {self.city} {self.state} {self.zip}"
+
+class Contact(models.Model):
+    SALUTATION_CHOICES = [
+        ('Mr.', 'Mr.'),
+        ('Mrs.', 'Mrs.'),
+        ('Ms.', 'Ms.'),
+        ('Dr.', 'Dr.'),
+        ('Prof.', 'Prof.'),
+        ('', 'None'),
+    ]
+    
+    salutation = models.CharField(max_length=5, choices=SALUTATION_CHOICES, blank=True, default='')
+    name = models.TextField()
+    company = models.TextField(null=True, blank=True)
+    title = models.TextField(null=True, blank=True)
+    phone = models.CharField(max_length=25, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class SupplierCertification(models.Model):
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
+    certification_type = models.ForeignKey('CertificationType', on_delete=models.CASCADE)
+    certification_date = models.DateTimeField(null=True, blank=True)
+    certification_expiration = models.DateTimeField(null=True, blank=True)
+    compliance_status = models.ForeignKey('CertificationStatus', on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.supplier.name} - {self.certification_type.name}"
+
+
+class CertificationType(models.Model):
+    code = models.CharField(max_length=25, null=True, blank=True)
+    name = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+    
+
+class CertificationStatus(models.Model):
+    code = models.CharField(max_length=25, null=True, blank=True)
+    name = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+    
+
+class SupplierClassification(models.Model):
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
+    classification_type = models.ForeignKey('ClassificationType', on_delete=models.CASCADE)
+    classification_date = models.DateTimeField(null=True, blank=True)
+    classification_expiration = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.supplier.name} - {self.classification_type.name}"
+
+class ClassificationType(models.Model):
+    name = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+    
