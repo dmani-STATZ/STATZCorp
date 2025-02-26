@@ -2,84 +2,132 @@
 {% load humanize %}
 
 {% block content %}
-<div class="p-4">
-    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-        <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Contracts Dashboard</h3>
-        </div>
-        <div class="border-t border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Week</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Week</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Month</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Month</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Quarter</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Quarter</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Year</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Year</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Contracts Due</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_week.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_week.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_month.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_month.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_quarter.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_quarter.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_year.contracts_due }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_year.contracts_due }}</td>
-                    </tr>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Contracts Due Late</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.this_week.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.last_week.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.this_month.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.last_month.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.this_quarter.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.last_quarter.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.this_year.contracts_due_late }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">{{ periods.last_year.contracts_due_late }}</td>
-                    </tr>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Contracts Due OnTime</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.this_week.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.last_week.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.this_month.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.last_month.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.this_quarter.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.last_quarter.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.this_year.contracts_due_ontime }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500">{{ periods.last_year.contracts_due_ontime }}</td>
-                    </tr>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">New Contract Value</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</td>
-                    </tr>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">New Contracts</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_week.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_week.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_month.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_month.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_quarter.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_quarter.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.this_year.new_contracts }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ periods.last_year.new_contracts }}</td>
-                    </tr>
-                </tbody>
-            </table>
+<div class="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Main Dashboard Card -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+                <h1 class="text-xl font-semibold text-white">Contracts Dashboard</h1>
+            </div>
+
+            <!-- Stats Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100">Category</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Week</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Week</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Month</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Month</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Quarter</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Quarter</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Year</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Year</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Date Range</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.date_range }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.date_range }}</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.contracts_due }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.contracts_due }}</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due Late</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_week.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_week.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_month.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_month.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_quarter.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_quarter.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_year.contracts_due_late }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_year.contracts_due_late }}</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due OnTime</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_week.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_week.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_month.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_month.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_quarter.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_quarter.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_year.contracts_due_ontime }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_year.contracts_due_ontime }}</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contract Value</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contracts</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.new_contracts }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.new_contracts }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Recent Contracts Section -->
+            <div class="mt-8 border-t border-gray-200">
+                <div class="px-6 py-4 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-900">Recent Contracts</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contract Number</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contract Value</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Award Date</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Due Date</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for contract in contracts %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{{ contract.contract_number }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ contract.supplier_name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ contract.contract_value|floatformat:2|intcomma }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ contract.award_date }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ contract.due_date }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
