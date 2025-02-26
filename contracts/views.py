@@ -6,9 +6,11 @@ from django.utils.safestring import mark_safe
 from django.http import JsonResponse
 from datetime import timedelta, datetime
 import calendar
-from .models import Contract, Clin, ClinFinance, Supplier, Nsn
+from .models import Contract, Clin, ClinFinance, Supplier, Nsn, ClinAcknowledgment
 from django.urls import reverse_lazy
 from .forms import NsnForm, SupplierForm
+from django.views.decorators.http import require_http_methods
+import json
 
 # Create your views here.
 
@@ -141,8 +143,13 @@ class ContractDetailView(DetailView):
         context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
         if context['selected_clin']:
             context['clin_notes'] = context['selected_clin'].clinnote_set.all().order_by('-created_on')
+            try:
+                context['acknowledgment'] = context['selected_clin'].clinacknowledgment_set.first()
+            except:
+                context['acknowledgment'] = None
         else:
             context['clin_notes'] = []
+            context['acknowledgment'] = None
             
         return context
 
@@ -210,3 +217,41 @@ def get_clin_notes(request, clin_id):
         'created_on': note.created_on.strftime("%b %d, %Y %H:%M")
     } for note in notes]
     return JsonResponse({'notes': notes_data})
+
+@require_http_methods(["POST"])
+def toggle_clin_acknowledgment(request, clin_id):
+    try:
+        clin = Clin.objects.get(id=clin_id)
+        data = json.loads(request.body)
+        field = data.get('field')
+        
+        # Get or create acknowledgment
+        acknowledgment, created = ClinAcknowledgment.objects.get_or_create(clin=clin)
+        
+        # Toggle the field
+        current_value = getattr(acknowledgment, field)
+        new_value = not current_value
+        
+        # Update the boolean field
+        setattr(acknowledgment, field, new_value)
+        
+        # Update the corresponding date and user fields
+        field_base = field.replace('_bool', '')
+        date_field = f"{field_base}_date"
+        user_field = f"{field_base}_user"
+        
+        if new_value:
+            setattr(acknowledgment, date_field, timezone.now())
+            setattr(acknowledgment, user_field, request.user.username)
+        else:
+            setattr(acknowledgment, date_field, None)
+            setattr(acknowledgment, user_field, None)
+        
+        acknowledgment.save()
+        
+        return JsonResponse({
+            'status': new_value,
+            'date': getattr(acknowledgment, date_field).isoformat() if new_value else None
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

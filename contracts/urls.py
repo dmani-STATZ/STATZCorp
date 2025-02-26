@@ -11,4 +11,5 @@ urlpatterns = [
     path('supplier/<int:pk>/edit/', views.SupplierUpdateView.as_view(), name='supplier_edit'),
     path('search/', views.contract_search, name='contract_search'),
     path('clin/<int:clin_id>/notes/', views.get_clin_notes, name='get_clin_notes'),
+    path('clin/<int:clin_id>/toggle-acknowledgment/', views.toggle_clin_acknowledgment, name='toggle_clin_acknowledgment'),
 ] 
