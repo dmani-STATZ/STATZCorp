@@ -92,9 +92,9 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for clin in clins %}
-                    <tr id="clin-row-{{ clin.id }}" 
-                        onclick="selectClin({{ clin.id }})"
-                        class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
+                    <tr id="clin-row-{{ clin.id }}"
+                        data-clin-id="{{ clin.id }}"
+                        class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
                                 {{ clin.clin_type.description|default:"N/A" }}
@@ -187,9 +187,25 @@
 </style>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click handlers to all CLIN rows
+    document.querySelectorAll('.clin-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const clinId = this.dataset.clinId;
+            selectClin(clinId);
+        });
+    });
+
+    // Select default CLIN if it exists
+    const defaultClinId = '{{ selected_clin.id|default:"" }}';
+    if (defaultClinId) {
+        selectClin(defaultClinId);
+    }
+});
+
 function selectClin(clinId) {
     // Remove highlight from all rows
-    document.querySelectorAll('tr[id^="clin-row-"]').forEach(row => {
+    document.querySelectorAll('.clin-row').forEach(row => {
         row.classList.remove('selected-row');
     });
     
@@ -219,15 +235,5 @@ function selectClin(clinId) {
         })
         .catch(error => console.error('Error fetching CLIN notes:', error));
 }
-
-// Select the default CLIN on page load
-{% if selected_clin %}
-document.addEventListener('DOMContentLoaded', function() {
-    const defaultClinRow = document.getElementById('clin-row-{{ selected_clin.id }}');
-    if (defaultClinRow) {
-        defaultClinRow.classList.add('selected-row');
-    }
-});
-{% endif %}
 </script>
 {% endblock %} 
