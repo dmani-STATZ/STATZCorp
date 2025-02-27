@@ -1,0 +1,68 @@
+{% extends "base_template.html" %}
+{% load static %}
+{% block extra_head %}
+    <style>
+        .reminderbar {
+            transition: transform 0.3s;
+            z-index: 1100;
+        }
+        .reminderbar.active {
+            transform: translateX(0);
+            /* display: block; */
+        }
+        .reminderbar.inactive {
+            transform: translateX(100%);
+            /* display: none; */
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+
+<div class="min-h-screen bg-gray-50">
+    <!-- Main Content -->
+    <main>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="w-[93%] mx-auto mb-4">
+                    <div class="p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700{% elif message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                        {{ message }}
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <!-- Default width container that all pages will inherit -->
+        <div class="w-[75%] mx-auto">
+            {% block content %}{% endblock content %}
+        </div>
+    </main>
+</div>
+
+<!-- Reminders Menu -->
+<button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleReminderbar()"><img src="{% static 'images/float.png' %}" alt="Reminders Image" class="floating-image" id="reminderbar-toggle"></button>
+<div class="reminderbar bg-white text-white w-64 h-4/6 fixed top-40 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 border-green-600" id="reminderbar">
+    <button class="text-green-600 py-2 px-2 w-full text-left" onclick="toggleReminderbar()">❌</button>
+    <div class="px-4 pb-8 "> 
+        <!-- Load all reminders here or 10 and have pagination-->
+        {% if reminders %}
+        {% for reminder in reminders %}
+            <div class="reminder-item">
+                {{ reminder.reminder_text }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    </div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+<script>
+    function toggleReminderbar() {
+        document.getElementById('reminderbar-toggle').classList.toggle('active');
+        document.getElementById('reminderbar-toggle').classList.toggle('inactive');
+        document.getElementById('reminderbar').classList.toggle('active');
+        document.getElementById('reminderbar').classList.toggle('inactive');
+    }
+</script>
+{% endblock %}
