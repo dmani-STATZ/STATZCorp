@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from . import views
+from users import views as user_views
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -26,6 +27,7 @@ urlpatterns = [
     path('', views.landing_page, name='landing'),
     path('home/', views.index, name='index'),
     path('about/', views.about, name='about'),
+    path('permission_denied/', user_views.permission_denied, name='permission_denied'),
     path('add-announcement/', views.add_announcement, name='add_announcement'),
     path('delete-announcement/<int:announcement_id>/', views.delete_announcement, name='delete_announcement'),
     path('users/', include('users.urls')),

@@ -20,4 +20,7 @@ urlpatterns = [
     path('password-reset-complete/', 
          auth_views.PasswordResetCompleteView.as_view(template_name='users/password_reset_complete.html'), 
          name='password_reset_complete'),
+    path('permission-denied/', views.permission_denied, name='permission_denied'),
+    path('test-app-name/', views.test_app_name, name='test_app_name'),
+    path('debug/permissions/', views.debug_app_permissions, name='debug_permissions'),
 ] 

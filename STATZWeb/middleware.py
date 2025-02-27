@@ -1,28 +1,119 @@
+# STATZWeb/middleware.py
 from django.shortcuts import redirect
 from django.conf import settings
-from django.urls import reverse
-from django.contrib.auth.decorators import login_required
+from django.urls import reverse, resolve
+from users.models import AppPermission, AppRegistry
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LoginRequiredMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        # URLs that should always be accessible
         self.public_urls = [
             reverse('users:login'),
             reverse('users:register'),
             reverse('users:logout'),
             reverse('landing'),
-            '/admin/',  # Admin pages
-            '/static/',  # Static files
-            '/media/',  # Media files
+            '/admin/',
+            '/static/',
+            '/media/',
+            '/logout/',
         ]
+        logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 
     def __call__(self, request):
+        logger.info(f"Middleware processing request: {request.path_info}")
+        
         if settings.REQUIRE_LOGIN:
+            logger.debug(f"REQUIRE_LOGIN is enabled")
+            
             if not request.user.is_authenticated:
                 path = request.path_info
-                if not any(url in path for url in self.public_urls):
+                logger.debug(f"User not authenticated, checking if path {path} is public")
+                if not self.is_public_url(path):
+                    logger.info(f"Redirecting unauthenticated user from {path} to login")
                     return redirect(settings.LOGIN_URL)
-        
+
+            if request.user.is_authenticated and not request.user.is_superuser:
+                path = request.path_info
+                logger.debug(f"User {request.user.username} (ID: {request.user.id}) is authenticated but not superuser")
+                
+                # Check if path is in public URLs
+                is_public = self.is_public_url(path)
+                logger.debug(f"Path {path} is {'public' if is_public else 'not public'}")
+                
+                if not is_public:
+                    try:
+                        resolved = resolve(request.path_info)
+                        # Extract app_name from the namespace if available
+                        app_name = resolved.namespace.split(':')[0] if resolved.namespace else resolved.app_name
+                        
+                        logger.info(f"Request to: {request.path_info}, resolved namespace: '{resolved.namespace}', app_name: '{app_name}'")
+                        
+                        if app_name and app_name != 'admin' and app_name != 'users':
+                            logger.info(f"Checking permissions for app: {app_name}")
+                            
+                            # First, find the AppRegistry entry for this app_name
+                            try:
+                                app_registry = AppRegistry.objects.get(app_name=app_name)
+                                logger.info(f"Found AppRegistry entry for {app_name}: {app_registry.app_name} (ID: {app_registry.id})")
+                                
+                                # Then check if the user has permission for this app
+                                try:
+                                    permission = AppPermission.objects.get(
+                                        user=request.user, 
+                                        app_name=app_registry
+                                    )
+                                    logger.info(f"Permission found for user {request.user.username} and app {app_name}: has_access={permission.has_access}")
+                                    
+                                    if not permission.has_access:
+                                        logger.info(f"Permission denied for: {request.path_info}")
+                                        return redirect('permission_denied')
+                                    else:
+                                        logger.info(f"Permission granted for: {request.path_info}")
+                                        
+                                except AppPermission.DoesNotExist:
+                                    # If no permission record exists, deny access
+                                    logger.info(f"No permission record for user {request.user.username} and app {app_name}")
+                                    return redirect('permission_denied')
+                                    
+                            except AppRegistry.DoesNotExist:
+                                # If the app isn't registered, log it but allow access
+                                logger.warning(f"App {app_name} not found in AppRegistry")
+                                pass
+                        else:
+                            logger.info(f"App {app_name} is exempt from permission checks")
+                                
+                    except Exception as e:
+                        logger.error(f"Error in middleware: {e}", exc_info=True)
+                        # Consider whether to deny access on errors
+                        # return redirect('permission_denied')
+                        pass
+                else:
+                    logger.info(f"Path {path} is in public_urls, skipping permission check")
+
         response = self.get_response(request)
-        return response 
+        logger.debug(f"Middleware completed for {request.path_info}")
+        return response
+        
+    def is_public_url(self, path):
+        """
+        Check if a path is in the public URLs list.
+        Uses exact matching for exact paths and prefix matching for paths ending with '/'.
+        """
+        # Exact match
+        if path in self.public_urls:
+            return True
+            
+        # Prefix match for admin, static, media paths
+        for url in self.public_urls:
+            # If the URL ends with '/', it's a prefix
+            if url.endswith('/') and url != '/' and path.startswith(url):
+                return True
+                
+        # Special case for root URL '/'
+        if '/' in self.public_urls and path == '/':
+            return True
+                
+        return False

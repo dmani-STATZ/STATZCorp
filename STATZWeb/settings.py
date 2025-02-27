@@ -190,22 +190,44 @@ INTERNAL_IPS = [
 
 NPM_BIN_PATH = "C:\\Program Files\\nodejs\\npm.cmd"
 
-if not DEBUG:
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'file': {
-                'level': 'ERROR',
-                'class': 'logging.FileHandler',
-                'filename': BASE_DIR / 'logs/django_errors.log',
-            },
+# Always enable logging, but configure differently for DEBUG vs production
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
         },
-        'loggers': {
-            'django': {
-                'handlers': ['file'],
-                'level': 'ERROR',
-                'propagate': True,
-            },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
-    }
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs/django.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'] if DEBUG else ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'users': {
+            'handlers': ['console', 'file'] if DEBUG else ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'STATZWeb': {
+            'handlers': ['console', 'file'] if DEBUG else ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}

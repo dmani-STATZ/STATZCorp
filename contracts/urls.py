@@ -10,6 +10,7 @@ from .views import (
     get_clin_notes,
     toggle_clin_acknowledgment
 )
+from users.views import test_app_name
 
 app_name = 'contracts'
 
@@ -22,4 +23,5 @@ urlpatterns = [
     path('search/', contract_search, name='contract_search'),
     path('clin/<int:clin_id>/notes/', get_clin_notes, name='get_clin_notes'),
     path('clin/<int:clin_id>/toggle-acknowledgment/', toggle_clin_acknowledgment, name='toggle_clin_acknowledgment'),
+    path('test-app-name/', test_app_name, name='test_app_name'),
 ] 

@@ -1,0 +1,75 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static admin_modify custom_tags %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <script>
+        // Add current admin URL to window for JavaScript access
+        window.adminUrl = "{% url 'admin:index' %}";
+        
+        // Debug helper to check if our JavaScript is running
+        console.log('Template loaded: App Permission change form');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded in template script');
+            // Find and log user select element
+            const userSelect = document.getElementById('id_user');
+            if (userSelect) {
+                console.log('User select found in template:', userSelect.id);
+            } else {
+                console.log('User select NOT found in template');
+                // List all form elements
+                document.querySelectorAll('select, input').forEach(el => {
+                    console.log('Form element:', el.tagName, el.id, el.name);
+                });
+            }
+        });
+    </script>
+{% endblock %}
+
+{% block field_sets %}
+<fieldset class="module aligned">
+  <h2>User</h2>
+  <div class="form-row field-user">
+    {{ adminform.form.user.errors }}
+    <div>
+      <label for="id_user">{{ adminform.form.user.label }}:</label>
+      {{ adminform.form.user }}
+      <p class="help">Select a user to see their current permissions</p>
+    </div>
+  </div>
+</fieldset>
+
+<fieldset class="module aligned">
+  <h2>App Permissions</h2>
+  <div class="description">Select which apps this user can access</div>
+  {% for field_name, field in adminform.form.fields.items %}
+    {% if field_name != 'user' and field_name|slice:":4" == "app_" %}
+      <div class="form-row">
+        {{ adminform.form.errors|get_by_key:field_name }}
+        <div class="checkbox-row">
+          {{ adminform.form|getattribute:field_name }}
+          <label for="id_{{ field_name }}" class="vCheckboxLabel">{{ field.label }}</label>
+          {% if field.help_text %}
+          <div class="help">{{ field.help_text }}</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</fieldset>
+{% endblock %}
+
+{% block after_field_sets %}
+{% endblock %}
+
+{% block inline_field_sets %}
+{% endblock %}
+
+{% block after_related_objects %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+<div class="submit-row">
+  <input type="submit" value="{% trans 'Save' %}" class="default" name="_save">
+</div>
+{% endblock %} 
