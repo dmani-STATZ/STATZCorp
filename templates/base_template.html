@@ -73,10 +73,10 @@
                 <p class="text-yellow-300 mr-4 font-medium">Development Environment</p>
             {% endif %}
             {% get_require_login as require_login %}
-            {% if not require_login %}
+            {% if require_login %}
                 {% if user.is_authenticated %}
-                <div class="flex flex-col md:flex-row md:ml-auto">
-                    {% if user.is_superuser %}
+                    <div class="flex flex-col md:flex-row md:ml-auto">
+                        {% if user.is_superuser %}
                         <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
                     {% else %}
                         <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
@@ -86,12 +86,12 @@
                         {% csrf_token %}
                         <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
                     </form>
-                </div>
+                    </div>
                 {% else %}
-                <div class="flex flex-col md:flex-row md:ml-auto">
-                    <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
-                    <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
-                </div>
+                    <div class="flex flex-col md:flex-row md:ml-auto">
+                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
+                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
+                    </div>
                 {% endif %}
             {% endif %}
     </header>

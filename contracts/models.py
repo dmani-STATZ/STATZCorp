@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -350,3 +351,42 @@ class ClassificationType(models.Model):
     def __str__(self):
         return self.name
     
+class Reminder(models.Model):
+    reminder_title = models.CharField(max_length=50, null=True, blank=True)
+    reminder_text = models.TextField(null=True, blank=True)
+    reminder_date = models.DateTimeField(null=True, blank=True)
+    reminder_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='created_reminders')
+    reminder_completed = models.BooleanField(null=True, blank=True)
+    reminder_completed_date = models.DateTimeField(null=True, blank=True)
+    reminder_completed_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='completed_reminders')
+    clin_note = models.ForeignKey('ClinNote', on_delete=models.CASCADE, null=True, blank=True, related_name='reminders')
+    contract_note = models.ForeignKey('ContractNote', on_delete=models.CASCADE, null=True, blank=True, related_name='reminders')
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(clin_note__isnull=True, contract_note__isnull=True) |  # Neither set
+                    models.Q(clin_note__isnull=False, contract_note__isnull=True) |  # Only clin_note set
+                    models.Q(clin_note__isnull=True, contract_note__isnull=False)    # Only contract_note set
+                ),
+                name='reminder_single_note_constraint'
+            )
+        ]
+
+    def clean(self):
+        if self.clin_note and self.contract_note:
+            raise ValidationError('A reminder can only be linked to either a CLIN note or a contract note, not both.')
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        note_type = "Standalone"
+        if self.clin_note:
+            note_type = f"CLIN Note {self.clin_note.id}"
+        elif self.contract_note:
+            note_type = f"Contract Note {self.contract_note.id}"
+        return f"{self.reminder_title} - {self.reminder_date.strftime('%Y-%m-%d')} ({note_type})"
+

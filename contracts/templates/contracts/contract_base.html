@@ -41,19 +41,32 @@
 
 <!-- Reminders Menu -->
 <button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleReminderbar()"><img src="{% static 'images/float.png' %}" alt="Reminders Image" class="floating-image" id="reminderbar-toggle"></button>
-<div class="reminderbar bg-white text-white w-64 h-4/6 fixed top-40 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 border-green-600" id="reminderbar">
+<div class="reminderbar bg-white text-gray-800 w-64 h-4/6 fixed top-40 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 border-green-600" id="reminderbar">
     <button class="text-green-600 py-2 px-2 w-full text-left" onclick="toggleReminderbar()">❌</button>
     <div class="px-4 pb-8 "> 
         <!-- Load all reminders here or 10 and have pagination-->
         {% if reminders %}
-        {% for reminder in reminders %}
-            <div class="reminder-item">
-                {{ reminder.reminder_text }}
+            {% for reminder in reminders %}
+                <div class="reminder-item" id="reminder-item-{{ reminder.id }}" onclick="toggleReminderContent('{{ reminder.id }}')">
+                    {{ reminder.reminder_text }}
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="reminder-item text-center text-blue-600 cursor-pointer" onclick="toggleReminderContent(0)">
+                No reminders found
             </div>
-        {% endfor %}
-    {% endif %}
+        {% endif %}
     </div>
 </div>
+
+<!-- Reminders Content -->
+<div class="reminder-content bg-white text-gray-800 w-12 h-12 fixed top-center right-center inactive rounded-lg border-2 border-green-600" id="reminder-content">
+    <div class="reminder-item">
+        {{ reminder.reminder_text }}
+    </div>
+</div>
+
+
 {% endblock body %}
 
 {% block extra_scripts %}
@@ -63,6 +76,11 @@
         document.getElementById('reminderbar-toggle').classList.toggle('inactive');
         document.getElementById('reminderbar').classList.toggle('active');
         document.getElementById('reminderbar').classList.toggle('inactive');
+    }
+
+    function toggleReminderContent(reminderId) {
+        document.getElementById('reminder-item-{{ reminder.id }}').classList.toggle('active');
+        document.getElementById('reminder-item-{{ reminder.id }}').classList.toggle('inactive');
     }
 </script>
 {% endblock %}

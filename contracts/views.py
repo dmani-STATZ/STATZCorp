@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from STATZWeb.decorators import conditional_login_required
 from django.views.generic import TemplateView, DetailView, UpdateView
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
@@ -10,10 +11,12 @@ from .models import Contract, Clin, ClinFinance, Supplier, Nsn, ClinAcknowledgme
 from django.urls import reverse_lazy
 from .forms import NsnForm, SupplierForm
 from django.views.decorators.http import require_http_methods
+from django.utils.decorators import method_decorator
 import json
 
 # Create your views here.
 
+@method_decorator(conditional_login_required, name='dispatch')
 class ContractsDashboardView(TemplateView):
     template_name = 'contracts/dashboard.html'
 
@@ -43,7 +46,6 @@ class ContractsDashboardView(TemplateView):
                 })
 
         return contracts_data
-
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -125,6 +127,8 @@ class ContractsDashboardView(TemplateView):
         context['periods'] = periods
         return context
 
+
+@method_decorator(conditional_login_required, name='dispatch')
 class ContractDetailView(DetailView):
     model = Contract
     template_name = 'contracts/contract_detail.html'
@@ -153,6 +157,8 @@ class ContractDetailView(DetailView):
             
         return context
 
+
+@method_decorator(conditional_login_required, name='dispatch')
 class ClinDetailView(DetailView):
     model = Clin
     template_name = 'contracts/clin_detail.html'
@@ -168,6 +174,8 @@ class ClinDetailView(DetailView):
             'clin_finance__special_payment_terms'
         )
 
+
+@conditional_login_required
 def contract_search(request):
     query = request.GET.get('q', '')
     if len(query) < 3:
@@ -184,6 +192,8 @@ def contract_search(request):
 
     return JsonResponse(list(contracts), safe=False)
 
+
+@method_decorator(conditional_login_required, name='dispatch')
 class NsnUpdateView(UpdateView):
     model = Nsn
     template_name = 'contracts/nsn_edit.html'
@@ -196,6 +206,8 @@ class NsnUpdateView(UpdateView):
             return next_url
         return reverse_lazy('contracts:contracts_dashboard')
 
+
+@method_decorator(conditional_login_required, name='dispatch')
 class SupplierUpdateView(UpdateView):
     model = Supplier
     template_name = 'contracts/supplier_edit.html'
@@ -208,6 +220,8 @@ class SupplierUpdateView(UpdateView):
             return next_url
         return reverse_lazy('contracts:contracts_dashboard')
 
+
+@conditional_login_required
 def get_clin_notes(request, clin_id):
     clin = get_object_or_404(Clin, id=clin_id)
     notes = clin.clinnote_set.all().order_by('-created_on')
@@ -218,6 +232,8 @@ def get_clin_notes(request, clin_id):
     } for note in notes]
     return JsonResponse({'notes': notes_data})
 
+
+@conditional_login_required
 @require_http_methods(["POST"])
 def toggle_clin_acknowledgment(request, clin_id):
     try:
