@@ -184,16 +184,33 @@ def contract_search(request):
     if len(query) < 3:
         return JsonResponse([], safe=False)
 
-    # Search by full contract number or last 6 characters
+    # Search by contract number, last 6 characters, or contract's PO number
     contracts = Contract.objects.filter(
         Q(contract_number__icontains=query) |
-        Q(contract_number__iendswith=query[-6:]) if len(query) >= 6 else Q()
+        (Q(contract_number__iendswith=query[-6:]) if len(query) >= 6 else Q()) |
+        Q(po_number__icontains=query)  # Search Contract's po_number field
     ).values(
         'id', 
-        'contract_number'
+        'contract_number',
+        'po_number'  # Include contract's PO number in results
     ).order_by('contract_number')[:10]
-
-    return JsonResponse(list(contracts), safe=False)
+    
+    # Format the results
+    results = []
+    for contract in contracts:
+        contract_data = {
+            'id': contract['id'],
+            'contract_number': contract['contract_number'],
+            'po_numbers': []
+        }
+        
+        # Add contract's PO number if it exists and matches the query
+        if contract['po_number'] and query.lower() in contract['po_number'].lower():
+            contract_data['po_numbers'].append(contract['po_number'])
+        
+        results.append(contract_data)
+    
+    return JsonResponse(results, safe=False)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
