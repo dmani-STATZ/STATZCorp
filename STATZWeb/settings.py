@@ -64,6 +64,14 @@ MIDDLEWARE = [
     'STATZWeb.middleware.LoginRequiredMiddleware',
 ]
 
+# Session settings
+SESSION_COOKIE_AGE = 3600  # seconds
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session expires when browser is closed
+SESSION_SAVE_EVERY_REQUEST = True  # Refresh the session on every request
+#SESSION_COOKIE_SECURE = True # Force HTTPS for session cookies (for production)
+#SESSION_COOKIE_HTTPONLY = True # Prevent JavaScript from accessing the session cookie
+#SESSION_COOKIE_SAMESITE = 'Lax'  # Options: 'Lax', 'Strict', or 'None' # Set the SameSite attribute for the session cookie
+
 ROOT_URLCONF = 'STATZWeb.urls'
 
 TEMPLATES = [

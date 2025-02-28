@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 class AppPermissionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Filter user field to only show active users
+        self.fields['user'].queryset = User.objects.filter(is_active=True)
+        
         # Get all registered apps
         registered_apps = AppRegistry.get_active_apps()
         

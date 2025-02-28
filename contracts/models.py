@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -42,6 +44,7 @@ class Contract(AuditModel):
     reviewed = models.BooleanField(null=True, blank=True)
     reviewed_by = models.CharField(max_length=20, null=True, blank=True)
     reviewed_on = models.DateTimeField(null=True, blank=True)
+    notes = GenericRelation('Note', related_query_name='contract')
 
     def __str__(self):
         return f"Contract {self.contract_number}"
@@ -67,6 +70,7 @@ class Clin(AuditModel):
     supplier_due_date_late = models.BooleanField(null=True, blank=True)
     ship_date = models.DateField(null=True, blank=True)
     ship_date_late = models.BooleanField(null=True, blank=True)
+    notes = GenericRelation('Note', related_query_name='clin')
 
     def __str__(self):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
@@ -209,23 +213,42 @@ class SalesClass(models.Model):
     def __str__(self):
         return self.sales_team
 
-class ContractNote(models.Model):
-    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
+# class ContractNote(models.Model):
+#     contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
+#     note = models.TextField(null=True, blank=True)
+#     created_by = models.TextField(null=True, blank=True)
+#     # created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_notes')
+#     created_on = models.DateTimeField(null=True, blank=True)
+
+#     def __str__(self):
+#         return f"Note for Contract {self.contract.contract_number}"
+
+# class ClinNote(models.Model):
+#     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
+#     note = models.TextField(null=True, blank=True)
+#     created_by = models.TextField(null=True, blank=True)
+#     # created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_notes')
+#     created_on = models.DateTimeField(null=True, blank=True)
+
+#     def __str__(self):
+#         return f"Note for CLIN {self.clin.id}"
+
+
+class Note(AuditModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
     note = models.TextField(null=True, blank=True)
-    created_by = models.TextField(null=True, blank=True)
-    created_on = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
 
     def __str__(self):
-        return f"Note for Contract {self.contract.contract_number}"
+        return f"Note for {self.content_type.name} {self.object_id}"
+    
 
-class ClinNote(models.Model):
-    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-    note = models.TextField(null=True, blank=True)
-    created_by = models.TextField(null=True, blank=True)
-    created_on = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return f"Note for CLIN {self.clin.id}"
 
 class AcknowledgementLetter(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
@@ -256,13 +279,13 @@ class ClinAcknowledgment(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
     po_to_supplier_bool = models.BooleanField(null=True, blank=True)
     po_to_supplier_date = models.DateTimeField(null=True, blank=True)
-    po_to_supplier_user = models.TextField(null=True, blank=True)
+    po_to_supplier_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_acknowledgment_po_to_supplier')
     clin_reply_bool = models.BooleanField(null=True, blank=True)
     clin_reply_date = models.DateTimeField(null=True, blank=True)
-    clin_reply_user = models.TextField(null=True, blank=True)
+    clin_reply_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_acknowledgment_clin_reply')
     po_to_qar_bool = models.BooleanField(null=True, blank=True)
     po_to_qar_date = models.DateTimeField(null=True, blank=True)
-    po_to_qar_user = models.TextField(null=True, blank=True)
+    po_to_qar_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_acknowledgment_po_to_qar')
 
     def __str__(self):
         return f"Acknowledgment for CLIN {self.clin.id}"
@@ -359,34 +382,18 @@ class Reminder(models.Model):
     reminder_completed = models.BooleanField(null=True, blank=True)
     reminder_completed_date = models.DateTimeField(null=True, blank=True)
     reminder_completed_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='completed_reminders')
-    clin_note = models.ForeignKey('ClinNote', on_delete=models.CASCADE, null=True, blank=True, related_name='reminders')
-    contract_note = models.ForeignKey('ContractNote', on_delete=models.CASCADE, null=True, blank=True, related_name='reminders')
-
+    note = models.ForeignKey('Note', on_delete=models.CASCADE, null=True, blank=True, related_name='note_reminders')
+    
     class Meta:
-        constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(clin_note__isnull=True, contract_note__isnull=True) |  # Neither set
-                    models.Q(clin_note__isnull=False, contract_note__isnull=True) |  # Only clin_note set
-                    models.Q(clin_note__isnull=True, contract_note__isnull=False)    # Only contract_note set
-                ),
-                name='reminder_single_note_constraint'
-            )
+        indexes = [
+            models.Index(fields=["note"]),
         ]
-
-    def clean(self):
-        if self.clin_note and self.contract_note:
-            raise ValidationError('A reminder can only be linked to either a CLIN note or a contract note, not both.')
-
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
 
     def __str__(self):
         note_type = "Standalone"
-        if self.clin_note:
-            note_type = f"CLIN Note {self.clin_note.id}"
-        elif self.contract_note:
-            note_type = f"Contract Note {self.contract_note.id}"
-        return f"{self.reminder_title} - {self.reminder_date.strftime('%Y-%m-%d')} ({note_type})"
+        if self.note:
+            content_type = self.note.content_type.model
+            object_id = self.note.object_id
+            note_type = f"Note for {content_type.capitalize()} {object_id}"
+        return f"{self.reminder_title} - {self.reminder_date.strftime('%Y-%m-%d') if self.reminder_date else 'No date'} ({note_type})"
 

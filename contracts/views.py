@@ -141,12 +141,15 @@ class ContractDetailView(DetailView):
             'clin_type', 'supplier', 'nsn'
         )
         context['clins'] = clins
-        context['contract_notes'] = contract.contractnote_set.all().order_by('-created_on')
+        
+        # Use the notes attribute directly instead of note_set
+        context['contract_notes'] = contract.notes.all().order_by('-created_on')
         
         # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
         context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
         if context['selected_clin']:
-            context['clin_notes'] = context['selected_clin'].clinnote_set.all().order_by('-created_on')
+            # Use the notes attribute directly instead of note_set
+            context['clin_notes'] = context['selected_clin'].notes.all().order_by('-created_on')
             try:
                 context['acknowledgment'] = context['selected_clin'].clinacknowledgment_set.first()
             except:
