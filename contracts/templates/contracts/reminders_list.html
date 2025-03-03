@@ -1,0 +1,205 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}My Reminders{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
+        <h1 class="text-2xl font-bold text-gray-800">My Reminders</h1>
+        
+        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+            <a href="{% url 'contracts:add_reminder' %}" class="btn-primary flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                New Reminder
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-6">
+            <div>
+                <h2 class="text-sm font-medium text-gray-700 mb-2">Status</h2>
+                <div class="flex space-x-2">
+                    <a href="{% url 'contracts:reminders_list' %}?status=all{% if date_filter != 'all' %}&date_filter={{ date_filter }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if status == 'all' %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        All ({{ total_count }})
+                    </a>
+                    <a href="{% url 'contracts:reminders_list' %}?status=pending{% if date_filter != 'all' %}&date_filter={{ date_filter }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if status == 'pending' %}bg-yellow-100 text-yellow-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        Pending ({{ pending_count }})
+                    </a>
+                    <a href="{% url 'contracts:reminders_list' %}?status=completed{% if date_filter != 'all' %}&date_filter={{ date_filter }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if status == 'completed' %}bg-green-100 text-green-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        Completed ({{ completed_count }})
+                    </a>
+                </div>
+            </div>
+            
+            <div>
+                <h2 class="text-sm font-medium text-gray-700 mb-2">Time Period</h2>
+                <div class="flex space-x-2">
+                    <a href="{% url 'contracts:reminders_list' %}?date_filter=all{% if status != 'all' %}&status={{ status }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if date_filter == 'all' %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        All Time
+                    </a>
+                    <a href="{% url 'contracts:reminders_list' %}?date_filter=today{% if status != 'all' %}&status={{ status }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if date_filter == 'today' %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        Today
+                    </a>
+                    <a href="{% url 'contracts:reminders_list' %}?date_filter=week{% if status != 'all' %}&status={{ status }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if date_filter == 'week' %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        This Week
+                    </a>
+                    <a href="{% url 'contracts:reminders_list' %}?date_filter=month{% if status != 'all' %}&status={{ status }}{% endif %}" 
+                       class="px-3 py-1 rounded-full text-sm {% if date_filter == 'month' %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                        This Month
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overdue Alert -->
+    {% if overdue_count > 0 and status != 'completed' %}
+    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-red-700">
+                    You have {{ overdue_count }} overdue reminder{{ overdue_count|pluralize }}.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Reminders List -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        {% if reminders %}
+            <ul class="divide-y divide-gray-200">
+                {% for reminder in reminders %}
+                <li class="{% if reminder.reminder_completed %}bg-gray-50{% elif reminder.reminder_date < now %}bg-red-50{% endif %}">
+                    <div class="px-4 py-4 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="mr-4">
+                                    <form method="get" action="{% url 'contracts:toggle_reminder' reminder.id %}">
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="h-6 w-6 rounded-full border-2 flex items-center justify-center
+                                            {% if reminder.reminder_completed %}
+                                                bg-green-500 border-green-500 text-white
+                                            {% else %}
+                                                border-gray-300 hover:border-blue-500
+                                            {% endif %}
+                                        ">
+                                            {% if reminder.reminder_completed %}
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                </div>
+                                <p class="text-sm font-medium text-blue-600 truncate">
+                                    {{ reminder.reminder_title }}
+                                </p>
+                            </div>
+                            <div class="ml-2 flex-shrink-0 flex">
+                                <p class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if reminder.reminder_completed %}
+                                        bg-green-100 text-green-800
+                                    {% elif reminder.reminder_date < now %}
+                                        bg-red-100 text-red-800
+                                    {% else %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% endif %}
+                                ">
+                                    {% if reminder.reminder_completed %}
+                                        Completed
+                                    {% elif reminder.reminder_date < now %}
+                                        Overdue
+                                    {% else %}
+                                        Pending
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-2 sm:flex sm:justify-between">
+                            <div class="sm:flex">
+                                <p class="flex items-center text-sm text-gray-500">
+                                    {{ reminder.reminder_text|linebreaksbr }}
+                                </p>
+                            </div>
+                            <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                                <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                                </svg>
+                                <p>
+                                    {{ reminder.reminder_date|date:"M d, Y g:i A" }}
+                                    ({{ reminder.reminder_date|naturaltime }})
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-2 flex justify-between items-center">
+                            <div>
+                                {% if reminder.note %}
+                                    {% with content_object=reminder.note.content_object content_type=reminder.note.content_type %}
+                                        {% if content_type.model == 'contract' %}
+                                            <a href="{% url 'contracts:contract_detail' content_object.id %}" class="text-sm text-blue-600 hover:text-blue-800">
+                                                View Contract: {{ content_object.contract_number }}
+                                            </a>
+                                        {% elif content_type.model == 'clin' %}
+                                            <a href="{% url 'contracts:clin_detail' content_object.id %}" class="text-sm text-blue-600 hover:text-blue-800">
+                                                View CLIN: {{ content_object.clin_po_num }}
+                                            </a>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="{% url 'contracts:delete_reminder' reminder.id %}?next={{ request.get_full_path|urlencode }}" class="text-sm text-red-600 hover:text-red-800">
+                                    Delete
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="p-8 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No reminders found</h3>
+                <p class="mt-1 text-sm text-gray-500">
+                    {% if status == 'completed' %}
+                        You don't have any completed reminders for the selected time period.
+                    {% elif status == 'pending' %}
+                        You don't have any pending reminders for the selected time period.
+                    {% else %}
+                        You don't have any reminders for the selected time period.
+                    {% endif %}
+                </p>
+                <div class="mt-6">
+                    <a href="{% url 'contracts:add_reminder' %}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        Create a reminder
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

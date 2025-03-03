@@ -5,14 +5,62 @@
         .reminderbar {
             transition: transform 0.3s;
             z-index: 1100;
+            overflow-y: auto;
         }
         .reminderbar.active {
             transform: translateX(0);
-            /* display: block; */
         }
         .reminderbar.inactive {
             transform: translateX(100%);
-            /* display: none; */
+        }
+        .reminder-item {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .reminder-item:hover {
+            background-color: #f3f4f6;
+        }
+        .reminder-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1200;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .reminder-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .reminder-modal-content {
+            background-color: white;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .reminder-status-pending {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+        }
+        .reminder-status-overdue {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+        }
+        .reminder-status-completed {
+            background-color: #d1fae5;
+            border-left: 4px solid #10b981;
         }
     </style>
 {% endblock %}
@@ -40,47 +88,178 @@
 </div>
 
 <!-- Reminders Menu -->
-<button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleReminderbar()"><img src="{% static 'images/float.png' %}" alt="Reminders Image" class="floating-image" id="reminderbar-toggle"></button>
-<div class="reminderbar bg-white text-gray-800 w-64 h-4/6 fixed top-40 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 border-green-600" id="reminderbar">
-    <button class="text-green-600 py-2 px-2 w-full text-left" onclick="toggleReminderbar()">❌</button>
-    <div class="px-4 pb-8 "> 
-        <!-- Load all reminders here or 10 and have pagination-->
+<button class="toggle-btn fixed bottom-4 right-4 bg-green-600 text-white py-2 px-4 rounded-full shadow-lg hover:bg-green-700 transition-colors z-50 flex items-center" onclick="toggleReminderbar()">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    Reminders
+</button>
+
+<div class="reminderbar bg-white text-gray-800 w-80 h-4/5 fixed top-20 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 border-green-600 shadow-xl" id="reminderbar">
+    <div class="flex justify-between items-center p-4 border-b border-gray-200 bg-green-50">
+        <h2 class="text-lg font-semibold text-green-800">My Reminders</h2>
+        <button class="text-gray-600 hover:text-gray-800" onclick="toggleReminderbar()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+    
+    <div class="p-2 border-b border-gray-200 bg-gray-50">
+        <a href="{% url 'contracts:add_reminder' %}" class="flex items-center justify-center w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add New Reminder
+        </a>
+    </div>
+    
+    <div class="overflow-y-auto max-h-[calc(100%-120px)]"> 
         {% if reminders %}
             {% for reminder in reminders %}
-                <div class="reminder-item" id="reminder-item-{{ reminder.id }}" onclick="toggleReminderContent('{{ reminder.id }}')">
-                    {{ reminder.reminder_text }}
+                <div class="reminder-item {% if reminder.reminder_completed %}reminder-status-completed{% elif reminder.reminder_date < now %}reminder-status-overdue{% else %}reminder-status-pending{% endif %}" 
+                     onclick="showReminderModal('{{ reminder.id }}', '{{ reminder.reminder_title|escapejs }}', '{{ reminder.reminder_text|escapejs }}', '{{ reminder.reminder_date|date:'M d, Y g:i A' }}', '{{ reminder.reminder_completed }}', '{{ reminder.reminder_date|date:'c' }}', '{% url 'contracts:toggle_reminder' reminder.id %}?next={{ request.path|urlencode }}')">
+                    <div class="flex items-center">
+                        <div class="mr-3">
+                            <div class="h-4 w-4 rounded-full 
+                                {% if reminder.reminder_completed %}
+                                    bg-green-500 text-white flex items-center justify-center
+                                {% elif reminder.reminder_date < now %}
+                                    bg-red-100 border border-red-500
+                                {% else %}
+                                    bg-yellow-100 border border-yellow-500
+                                {% endif %}
+                            ">
+                                {% if reminder.reminder_completed %}
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="truncate">
+                            <p class="text-sm font-medium {% if reminder.reminder_completed %}text-gray-600{% elif reminder.reminder_date < now %}text-red-700{% else %}text-gray-800{% endif %}">
+                                {{ reminder.reminder_title|truncatechars:25 }}
+                            </p>
+                            <p class="text-xs text-gray-500">{{ reminder.reminder_date|date:"M d, Y" }}</p>
+                        </div>
+                    </div>
                 </div>
             {% endfor %}
         {% else %}
-            <div class="reminder-item text-center text-blue-600 cursor-pointer" onclick="toggleReminderContent(0)">
-                No reminders found
+            <div class="p-8 text-center text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="mt-2">No reminders found</p>
+                <a href="{% url 'contracts:add_reminder' %}" class="mt-4 inline-block text-sm text-blue-600 hover:text-blue-800">Create your first reminder</a>
             </div>
         {% endif %}
     </div>
-</div>
-
-<!-- Reminders Content -->
-<div class="reminder-content bg-white text-gray-800 w-12 h-12 fixed top-center right-center inactive rounded-lg border-2 border-green-600" id="reminder-content">
-    <div class="reminder-item">
-        {{ reminder.reminder_text }}
+    
+    <div class="p-2 border-t border-gray-200 bg-gray-50">
+        <a href="{% url 'contracts:reminders_list' %}" class="flex items-center justify-center w-full py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors text-sm">
+            View All Reminders
+        </a>
     </div>
 </div>
 
+<!-- Reminder Modal -->
+<div class="reminder-modal" id="reminderModal">
+    <div class="reminder-modal-content">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800" id="modalTitle">Reminder Details</h3>
+            <button class="text-gray-600 hover:text-gray-800" onclick="closeReminderModal();">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="mb-4">
+                <div class="flex items-center mb-2">
+                    <div id="modalStatusIndicator" class="h-4 w-4 rounded-full mr-2"></div>
+                    <span id="modalStatus" class="text-sm font-medium"></span>
+                </div>
+                <h4 class="text-xl font-medium text-gray-900 mb-1" id="modalReminderTitle"></h4>
+                <p class="text-sm text-gray-500 mb-4" id="modalDate"></p>
+                <div class="bg-gray-50 p-4 rounded-md">
+                    <p class="text-gray-700 whitespace-pre-line" id="modalText"></p>
+                </div>
+            </div>
+            
+            <div class="flex justify-between mt-6">
+                <a href="#" id="modalToggleLink" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    Mark as Complete
+                </a>
+                <button type="button" onclick="closeReminderModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock body %}
 
 {% block extra_scripts %}
 <script>
     function toggleReminderbar() {
-        document.getElementById('reminderbar-toggle').classList.toggle('active');
-        document.getElementById('reminderbar-toggle').classList.toggle('inactive');
         document.getElementById('reminderbar').classList.toggle('active');
         document.getElementById('reminderbar').classList.toggle('inactive');
     }
 
-    function toggleReminderContent(reminderId) {
-        document.getElementById('reminder-item-{{ reminder.id }}').classList.toggle('active');
-        document.getElementById('reminder-item-{{ reminder.id }}').classList.toggle('inactive');
+    function showReminderModal(id, title, text, dateStr, completed, isoDate, toggleUrl) {
+        const modal = document.getElementById('reminderModal');
+        const modalTitle = document.getElementById('modalReminderTitle');
+        const modalText = document.getElementById('modalText');
+        const modalDate = document.getElementById('modalDate');
+        const modalStatus = document.getElementById('modalStatus');
+        const modalStatusIndicator = document.getElementById('modalStatusIndicator');
+        const modalToggleLink = document.getElementById('modalToggleLink');
+        
+        modalTitle.textContent = title;
+        modalText.textContent = text;
+        modalDate.textContent = dateStr;
+        modalToggleLink.href = toggleUrl;
+        
+        // Check if reminder is overdue
+        const reminderDate = new Date(isoDate);
+        const now = new Date();
+        const isOverdue = reminderDate < now && completed !== 'True';
+        
+        if (completed === 'True') {
+            modalStatus.textContent = 'Completed';
+            modalStatus.className = 'text-sm font-medium text-green-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-green-500';
+            modalToggleLink.textContent = 'Mark as Incomplete';
+            modalToggleLink.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500';
+        } else if (isOverdue) {
+            modalStatus.textContent = 'Overdue';
+            modalStatus.className = 'text-sm font-medium text-red-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-red-100 border border-red-500';
+            modalToggleLink.textContent = 'Mark as Complete';
+            modalToggleLink.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
+        } else {
+            modalStatus.textContent = 'Pending';
+            modalStatus.className = 'text-sm font-medium text-yellow-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-yellow-100 border border-yellow-500';
+            modalToggleLink.textContent = 'Mark as Complete';
+            modalToggleLink.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
+        }
+        
+        modal.classList.add('active');
     }
+    
+    function closeReminderModal() {
+        document.getElementById('reminderModal').classList.remove('active');
+    }
+    
+    // Close modal when clicking outside of it
+    document.getElementById('reminderModal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeReminderModal();
+        }
+    });
 </script>
 {% endblock %}

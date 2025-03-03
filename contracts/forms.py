@@ -1,5 +1,11 @@
 from django import forms
-from .models import Nsn, Supplier
+from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
+from .models import (
+    Nsn, Supplier, Contract, Clin, ClinFinance, Note, Reminder, 
+    ClinAcknowledgment, Address, Contact, CanceledReason, 
+    ContractType, ClinType, Buyer, SalesClass, SpecialPaymentTerms
+)
 
 class NsnForm(forms.ModelForm):
     class Meta:
@@ -127,4 +133,358 @@ class SupplierForm(forms.ModelForm):
         if 'packhouse' in self.fields:
             self.fields['packhouse'].queryset = self.fields['packhouse'].queryset.order_by('name')
         if 'contact' in self.fields:
-            self.fields['contact'].queryset = self.fields['contact'].queryset.order_by('name') 
+            self.fields['contact'].queryset = self.fields['contact'].queryset.order_by('name')
+
+class ContractForm(forms.ModelForm):
+    class Meta:
+        model = Contract
+        fields = [
+            'contract_number', 'open', 'po_number', 'tab_num', 'buyer',
+            'contract_type', 'award_date', 'due_date', 'sales_class',
+            'survey_date', 'survey_type', 'assigned_user', 'nist', 'files_url'
+        ]
+        widgets = {
+            'contract_number': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Contract Number'
+            }),
+            'open': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'po_number': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Number'
+            }),
+            'tab_num': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Tab Number'
+            }),
+            'buyer': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'contract_type': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'award_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'due_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'sales_class': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'survey_date': forms.DateInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'date'
+            }),
+            'survey_type': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Survey Type'
+            }),
+            'assigned_user': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Assigned User'
+            }),
+            'nist': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'files_url': forms.URLInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Files URL'
+            }),
+        }
+
+class ContractCloseForm(forms.ModelForm):
+    class Meta:
+        model = Contract
+        fields = ['open', 'date_closed']
+        widgets = {
+            'open': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'date_closed': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+        }
+
+class ContractCancelForm(forms.ModelForm):
+    class Meta:
+        model = Contract
+        fields = ['cancelled', 'date_canceled', 'canceled_reason']
+        widgets = {
+            'cancelled': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'date_canceled': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'canceled_reason': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+        }
+
+class ClinForm(forms.ModelForm):
+    class Meta:
+        model = Clin
+        fields = [
+            'contract', 'sub_contract', 'po_num_ext', 'tab_num', 
+            'clin_po_num', 'po_number', 'clin_type', 'supplier', 
+            'nsn', 'ia', 'fob', 'order_qty', 'ship_qty', 
+            'due_date', 'supplier_due_date', 'ship_date'
+        ]
+        widgets = {
+            'contract': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'sub_contract': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Sub Contract'
+            }),
+            'po_num_ext': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Number Extension'
+            }),
+            'tab_num': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Tab Number'
+            }),
+            'clin_po_num': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter CLIN PO Number'
+            }),
+            'po_number': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Number'
+            }),
+            'clin_type': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'supplier': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'nsn': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'ia': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter IA'
+            }),
+            'fob': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter FOB'
+            }),
+            'order_qty': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Order Quantity'
+            }),
+            'ship_qty': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Ship Quantity'
+            }),
+            'due_date': forms.DateInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'date'
+            }),
+            'supplier_due_date': forms.DateInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'date'
+            }),
+            'ship_date': forms.DateInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'date'
+            }),
+        }
+
+class ClinFinanceForm(forms.ModelForm):
+    class Meta:
+        model = ClinFinance
+        fields = [
+            'special_payment_terms', 'special_payment_terms_paid', 
+            'contract_value', 'po_amount', 'paid_amount', 
+            'paid_date', 'wawf_payment', 'wawf_recieved', 
+            'wawf_invoice', 'plan_gross', 'planned_split'
+        ]
+        widgets = {
+            'special_payment_terms': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'special_payment_terms_paid': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'contract_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Contract Value',
+                'step': '0.0001'
+            }),
+            'po_amount': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Amount',
+                'step': '0.0001'
+            }),
+            'paid_amount': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Paid Amount',
+                'step': '0.0001'
+            }),
+            'paid_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'wawf_payment': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter WAWF Payment',
+                'step': '0.0001'
+            }),
+            'wawf_recieved': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'wawf_invoice': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter WAWF Invoice'
+            }),
+            'plan_gross': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Plan Gross',
+                'step': '0.0001'
+            }),
+            'planned_split': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Planned Split'
+            }),
+        }
+
+class NoteForm(forms.ModelForm):
+    class Meta:
+        model = Note
+        fields = ['note']
+        widgets = {
+            'note': forms.Textarea(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'rows': 4,
+                'placeholder': 'Enter Note'
+            }),
+        }
+
+class ReminderForm(forms.ModelForm):
+    class Meta:
+        model = Reminder
+        fields = ['reminder_title', 'reminder_text', 'reminder_date']
+        widgets = {
+            'reminder_title': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Reminder Title'
+            }),
+            'reminder_text': forms.Textarea(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'rows': 3,
+                'placeholder': 'Enter Reminder Details'
+            }),
+            'reminder_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+        }
+
+class ClinAcknowledgmentForm(forms.ModelForm):
+    class Meta:
+        model = ClinAcknowledgment
+        fields = [
+            'po_to_supplier_bool', 'po_to_supplier_date',
+            'clin_reply_bool', 'clin_reply_date',
+            'po_to_qar_bool', 'po_to_qar_date'
+        ]
+        widgets = {
+            'po_to_supplier_bool': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'po_to_supplier_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'clin_reply_bool': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'clin_reply_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'po_to_qar_bool': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'po_to_qar_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+        }
+
+class AddressForm(forms.ModelForm):
+    class Meta:
+        model = Address
+        fields = ['address_line_1', 'address_line_2', 'city', 'state', 'zip']
+        widgets = {
+            'address_line_1': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Address Line 1'
+            }),
+            'address_line_2': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Address Line 2'
+            }),
+            'city': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter City'
+            }),
+            'state': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter State'
+            }),
+            'zip': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter ZIP Code'
+            }),
+        }
+
+class ContactForm(forms.ModelForm):
+    class Meta:
+        model = Contact
+        fields = ['salutation', 'name', 'company', 'title', 'phone', 'email', 'address', 'notes']
+        widgets = {
+            'salutation': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'name': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Name'
+            }),
+            'company': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Company'
+            }),
+            'title': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Title'
+            }),
+            'phone': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Phone',
+                'type': 'tel'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Email'
+            }),
+            'address': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'rows': 3,
+                'placeholder': 'Enter Notes'
+            }),
+        } 

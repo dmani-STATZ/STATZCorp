@@ -1,0 +1,208 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Edit Contract{% else %}New Contract{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+            {% if form.instance.pk %}
+                Edit Contract: {{ form.instance.contract_number }}
+            {% else %}
+                Create New Contract
+            {% endif %}
+        </h1>
+        <div>
+            {% if form.instance.pk %}
+                <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn-secondary">
+                    Cancel
+                </a>
+            {% else %}
+                <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                    Cancel
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not form.instance.pk %}
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">Upload DD Form 1155</h2>
+        <p class="text-gray-600 mb-4">Upload a DD Form 1155 to automatically populate the contract form fields.</p>
+        
+        <form id="dd1155-upload-form" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+            <div class="flex items-center space-x-4">
+                <div class="flex-grow">
+                    <label for="dd1155-file" class="block text-sm font-medium text-gray-700 mb-1">Select DD Form 1155 (PDF)</label>
+                    <input type="file" id="dd1155-file" name="dd1155_file" accept=".pdf" 
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                </div>
+                <button type="button" id="extract-dd1155-btn" class="btn-primary mt-6 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                    </svg>
+                    Extract Data
+                </button>
+            </div>
+            <div id="extraction-status" class="hidden mt-4 p-4 rounded-md">
+                <!-- Status message will appear here -->
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <form method="post" class="space-y-6" id="contract-form">
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Contract Identification -->
+                <div class="col-span-1 md:col-span-2 lg:col-span-3">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
+                        Contract Identification
+                    </h2>
+                </div>
+                
+                <div class="space-y-4">
+                    {{ form.contract_number|as_crispy_field }}
+                    {{ form.po_number|as_crispy_field }}
+                    {{ form.tab_num|as_crispy_field }}
+                </div>
+                
+                <div class="space-y-4">
+                    {{ form.contract_type|as_crispy_field }}
+                    {{ form.buyer|as_crispy_field }}
+                    {{ form.sales_class|as_crispy_field }}
+                </div>
+                
+                <div class="space-y-4">
+                    {{ form.open|as_crispy_field }}
+                    {{ form.nist|as_crispy_field }}
+                </div>
+                
+                <!-- Dates -->
+                <div class="col-span-1 md:col-span-2 lg:col-span-3">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
+                        Contract Dates
+                    </h2>
+                </div>
+                
+                <div class="space-y-4">
+                    {{ form.award_date|as_crispy_field }}
+                    {{ form.due_date|as_crispy_field }}
+                </div>
+                
+                <div class="space-y-4">
+                    {{ form.survey_date|as_crispy_field }}
+                    {{ form.survey_type|as_crispy_field }}
+                </div>
+                
+                <!-- Additional Information -->
+                <div class="col-span-1 md:col-span-2 lg:col-span-3">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
+                        Additional Information
+                    </h2>
+                </div>
+                
+                <div class="space-y-4">
+                    {{ form.assigned_user|as_crispy_field }}
+                    {{ form.files_url|as_crispy_field }}
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                {% if form.instance.pk %}
+                    <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn-primary">
+                        Update Contract
+                    </button>
+                {% else %}
+                    <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn-primary">
+                        Create Contract
+                    </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const extractButton = document.getElementById('extract-dd1155-btn');
+        const fileInput = document.getElementById('dd1155-file');
+        const statusMessage = document.getElementById('extraction-status');
+        
+        extractButton.addEventListener('click', function() {
+            if (!fileInput.files.length) {
+                statusMessage.textContent = 'Please select a DD Form 1155 PDF file first.';
+                statusMessage.className = 'text-red-500';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            if (file.type !== 'application/pdf') {
+                statusMessage.textContent = 'Please select a PDF file.';
+                statusMessage.className = 'text-red-500';
+                return;
+            }
+            
+            // Show loading status
+            statusMessage.textContent = 'Extracting data from DD Form 1155...';
+            statusMessage.className = 'text-blue-500';
+            
+            const formData = new FormData();
+            formData.append('dd1155_file', file);
+            
+            fetch('{% url "contracts:extract_dd1155" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Populate form fields with extracted data
+                    if (data.contract_number) document.getElementById('id_contract_number').value = data.contract_number;
+                    if (data.po_number) document.getElementById('id_po_number').value = data.po_number;
+                    if (data.award_date) document.getElementById('id_award_date').value = data.award_date;
+                    if (data.due_date) document.getElementById('id_due_date').value = data.due_date;
+                    if (data.contract_type) {
+                        const contractTypeSelect = document.getElementById('id_contract_type');
+                        for (let i = 0; i < contractTypeSelect.options.length; i++) {
+                            if (contractTypeSelect.options[i].text.toLowerCase().includes(data.contract_type.toLowerCase())) {
+                                contractTypeSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    statusMessage.textContent = 'Data extracted successfully!';
+                    statusMessage.className = 'text-green-500';
+                } else {
+                    statusMessage.textContent = data.error || 'Failed to extract data from the form.';
+                    statusMessage.className = 'text-red-500';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusMessage.textContent = 'An error occurred during extraction.';
+                statusMessage.className = 'text-red-500';
+            });
+        });
+    });
+</script>
+{% endblock %} 

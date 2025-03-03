@@ -1,0 +1,88 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Add Note{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+            Add Note
+            {% if content_object %}
+                {% if content_type_id == 15 %}
+                    to Contract: {{ content_object.contract_number }}
+                {% elif content_type_id == 16 %}
+                    to CLIN: {{ content_object.clin_po_num }}
+                {% endif %}
+            {% endif %}
+        </h1>
+        <div>
+            {% if content_object %}
+                {% if content_type_id == 15 %}
+                    <a href="{% url 'contracts:contract_detail' content_object.id %}" class="btn-secondary">
+                        Cancel
+                    </a>
+                {% elif content_type_id == 16 %}
+                    <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn-secondary">
+                        Cancel
+                    </a>
+                {% else %}
+                    <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                        Cancel
+                    </a>
+                {% endif %}
+            {% else %}
+                <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                    Cancel
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <div class="space-y-4">
+                {{ form.note|as_crispy_field }}
+            </div>
+            
+            <div class="flex justify-between space-x-4 pt-6 border-t border-gray-200">
+                <div>
+                    <a href="{% url 'contracts:add_reminder' %}" class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Create Reminder
+                    </a>
+                </div>
+                <div class="flex space-x-4">
+                    {% if content_object %}
+                        {% if content_type_id == 15 %}
+                            <a href="{% url 'contracts:contract_detail' content_object.id %}" class="btn-secondary">
+                                Cancel
+                            </a>
+                        {% elif content_type_id == 16 %}
+                            <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn-secondary">
+                                Cancel
+                            </a>
+                        {% else %}
+                            <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                                Cancel
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                            Cancel
+                        </a>
+                    {% endif %}
+                    <button type="submit" class="btn-primary">
+                        Save Note
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 
