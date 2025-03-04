@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.views.generic import DetailView, UpdateView, CreateView
 from django.utils import timezone
+from datetime import timedelta
 from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -9,7 +10,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract
+from ..models import Contract, SequenceNumber
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
 
 
@@ -51,6 +52,17 @@ class ContractCreateView(CreateView):
     model = Contract
     form_class = ContractForm
     template_name = 'contracts/contract_form.html'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['po_number'] = SequenceNumber.get_po_number()
+        initial['tab_num'] = SequenceNumber.get_tab_number()
+        initial['sales_class'] = '2'
+        initial['open']=True
+        #initial['nist']=True
+        # initial['award_date'] = timezone.now()
+        # initial['due_date'] = timezone.now() + timedelta(days=60)
+        return initial
     
     def form_valid(self, form):
         form.instance.created_by = self.request.user

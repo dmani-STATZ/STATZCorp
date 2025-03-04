@@ -141,7 +141,7 @@ class ContractForm(forms.ModelForm):
         fields = [
             'contract_number', 'open', 'po_number', 'tab_num', 'buyer',
             'contract_type', 'award_date', 'due_date', 'sales_class',
-            'survey_date', 'survey_type', 'assigned_user', 'nist', 'files_url'
+            'assigned_user', 'nist', 'files_url'
         ]
         widgets = {
             'contract_number': forms.TextInput(attrs={
@@ -149,7 +149,7 @@ class ContractForm(forms.ModelForm):
                 'placeholder': 'Enter Contract Number'
             }),
             'open': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                'class': 'h-4 w-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
             'po_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -165,24 +165,16 @@ class ContractForm(forms.ModelForm):
             'contract_type': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
-            'award_date': forms.DateTimeInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'type': 'datetime-local'
-            }),
-            'due_date': forms.DateTimeInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'type': 'datetime-local'
-            }),
-            'sales_class': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
-            }),
-            'survey_date': forms.DateInput(attrs={
+            'award_date': forms.DateInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'type': 'date'
             }),
-            'survey_type': forms.TextInput(attrs={
+            'due_date': forms.DateInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Survey Type'
+                'type': 'date'
+            }),
+            'sales_class': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
             'assigned_user': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',

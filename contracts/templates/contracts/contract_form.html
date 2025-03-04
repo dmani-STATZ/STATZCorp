@@ -94,16 +94,15 @@
                 
                 <div class="space-y-4">
                     {{ form.award_date|as_crispy_field }}
-                    {{ form.due_date|as_crispy_field }}
+                   
                 </div>
                 
                 <div class="space-y-4">
-                    {{ form.survey_date|as_crispy_field }}
-                    {{ form.survey_type|as_crispy_field }}
+                     {{ form.due_date|as_crispy_field }}
                 </div>
                 
                 <!-- Additional Information -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
+                <!-- <div class="col-span-1 md:col-span-2 lg:col-span-3">
                     <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
                         Additional Information
                     </h2>
@@ -112,7 +111,7 @@
                 <div class="space-y-4">
                     {{ form.assigned_user|as_crispy_field }}
                     {{ form.files_url|as_crispy_field }}
-                </div>
+                </div> -->
             </div>
             
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
@@ -173,28 +172,55 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Populate form fields with extracted data
-                        if (data.contract_number) document.getElementById('id_contract_number').value = data.contract_number;
-                        if (data.po_number) document.getElementById('id_po_number').value = data.po_number;
-                        if (data.award_date) document.getElementById('id_award_date').value = data.award_date;
-                        if (data.due_date) document.getElementById('id_due_date').value = data.due_date;
-                        if (data.buyer) document.getElementById('id_buyer').value = data.buyer;
+                        // Add this right after the data is received
+                        console.log('Raw data received:', JSON.stringify(data, null, 2));
                         
-                        // Handle contract type selection
-                        if (data.contract_type) {
-                            const contractTypeSelect = document.getElementById('id_contract_type');
-                            for (let i = 0; i < contractTypeSelect.options.length; i++) {
-                                if (contractTypeSelect.options[i].text.toLowerCase().includes(data.contract_type.toLowerCase())) {
-                                    contractTypeSelect.selectedIndex = i;
-                                    break;
+                        // Populate form fields with extracted data
+                        const fields = {
+                            'contract_number': 'id_contract_number',
+                            'award_date': 'id_award_date',
+                            'due_date': 'id_due_date',
+                            'buyer': 'id_buyer',
+                            'contract_type': 'id_contract_type'
+                        };
+
+                        // Helper function to safely set field values
+                        const setFieldValue = (fieldId, value) => {
+                            const field = document.getElementById(fieldId);
+                            if (field && value) {
+                                // Format dates if needed (assuming YYYY-MM-DD format is required)
+                                if (fieldId === 'id_award_date' || fieldId === 'id_due_date') {
+                                    console.log(`Processing date field ${fieldId} with value ${value}`);
+                                    try {
+                                        // Ensure date is in YYYY-MM-DD format
+                                        const date = new Date(value);
+                                        const formattedDate = date.toISOString().split('T')[0];
+                                        console.log(`Formatted date: ${formattedDate}`);
+                                        field.value = formattedDate;
+                                    } catch (e) {
+                                        console.error(`Error formatting date for ${fieldId}:`, e);
+                                        field.value = value; // Use original value if formatting fails
+                                    }
+                                } else {
+                                    field.value = value;
                                 }
+                                console.log(`Set ${fieldId} to ${field.value}`);
+                            } else {
+                                console.log(`Could not set ${fieldId}:`, field ? 'value missing' : 'field not found');
                             }
-                        }
+                        };
+
+                        // Populate each field if data exists
+                        Object.entries(fields).forEach(([dataKey, fieldId]) => {
+                            console.log(`Processing ${dataKey} with value:`, data[dataKey]);
+                            if (data[dataKey] !== undefined && data[dataKey] !== null) {
+                                setFieldValue(fieldId, data[dataKey]);
+                            } else {
+                                console.log(`No data for ${dataKey}`);
+                            }
+                        });
                         
                         showStatus('Data extracted successfully! Form fields have been populated.', 'success');
-                        
-                        // Log the extraction results for debugging
-                        console.log('Extraction results:', data);
                     } else {
                         showStatus(data.error || 'Failed to extract data from the form.', 'error');
                     }

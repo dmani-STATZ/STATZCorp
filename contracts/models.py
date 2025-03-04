@@ -405,23 +405,31 @@ class SequenceNumber(models.Model):
     tab_number = models.BigIntegerField(default=10000)  # Starting value
     
     @classmethod
-    def get_next_po_number(cls):
+    def get_po_number(cls):
         """Get the next PO number and increment the stored value"""
         sequence, created = cls.objects.get_or_create(id=1)
         current_po = sequence.po_number
-        sequence.po_number += 1
-        sequence.save()
         return str(current_po)
     
     @classmethod
-    def get_next_tab_number(cls):
+    def get_tab_number(cls):
         """Get the next TAB number and increment the stored value"""
         sequence, created = cls.objects.get_or_create(id=1)
         current_tab = sequence.tab_number
+        return str(current_tab)
+    
+    @classmethod
+    def advance_po_number(cls):
+        sequence, created = cls.objects.get_or_create(id=1)
+        sequence.po_number += 1
+        sequence.save()
+    
+    @classmethod
+    def advance_tab_number(cls):
+        sequence, created = cls.objects.get_or_create(id=1)
         sequence.tab_number += 1
         sequence.save()
-        return str(current_tab)
-
+    
 @receiver(pre_save, sender=Contract)
 def assign_po_tab_numbers(sender, instance, **kwargs):
     """Assign PO and TAB numbers to new contracts if they don't already have them"""
