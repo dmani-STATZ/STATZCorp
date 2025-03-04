@@ -144,65 +144,86 @@
         const fileInput = document.getElementById('dd1155-file');
         const statusMessage = document.getElementById('extraction-status');
         
-        extractButton.addEventListener('click', function() {
-            if (!fileInput.files.length) {
-                statusMessage.textContent = 'Please select a DD Form 1155 PDF file first.';
-                statusMessage.className = 'text-red-500';
-                return;
-            }
-            
-            const file = fileInput.files[0];
-            if (file.type !== 'application/pdf') {
-                statusMessage.textContent = 'Please select a PDF file.';
-                statusMessage.className = 'text-red-500';
-                return;
-            }
-            
-            // Show loading status
-            statusMessage.textContent = 'Extracting data from DD Form 1155...';
-            statusMessage.className = 'text-blue-500';
-            
-            const formData = new FormData();
-            formData.append('dd1155_file', file);
-            
-            fetch('{% url "contracts:extract_dd1155" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        if (extractButton) {
+            extractButton.addEventListener('click', function() {
+                if (!fileInput.files.length) {
+                    showStatus('Please select a DD Form 1155 PDF file first.', 'error');
+                    return;
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Populate form fields with extracted data
-                    if (data.contract_number) document.getElementById('id_contract_number').value = data.contract_number;
-                    if (data.po_number) document.getElementById('id_po_number').value = data.po_number;
-                    if (data.award_date) document.getElementById('id_award_date').value = data.award_date;
-                    if (data.due_date) document.getElementById('id_due_date').value = data.due_date;
-                    if (data.contract_type) {
-                        const contractTypeSelect = document.getElementById('id_contract_type');
-                        for (let i = 0; i < contractTypeSelect.options.length; i++) {
-                            if (contractTypeSelect.options[i].text.toLowerCase().includes(data.contract_type.toLowerCase())) {
-                                contractTypeSelect.selectedIndex = i;
-                                break;
+                
+                const file = fileInput.files[0];
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    showStatus('Please select a PDF file.', 'error');
+                    return;
+                }
+                
+                // Show loading status
+                showStatus('Extracting data from DD Form 1155...', 'info');
+                
+                const formData = new FormData();
+                formData.append('dd1155_file', file);
+                
+                fetch('{% url "contracts:extract_dd1155" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Populate form fields with extracted data
+                        if (data.contract_number) document.getElementById('id_contract_number').value = data.contract_number;
+                        if (data.po_number) document.getElementById('id_po_number').value = data.po_number;
+                        if (data.award_date) document.getElementById('id_award_date').value = data.award_date;
+                        if (data.due_date) document.getElementById('id_due_date').value = data.due_date;
+                        if (data.buyer) document.getElementById('id_buyer').value = data.buyer;
+                        
+                        // Handle contract type selection
+                        if (data.contract_type) {
+                            const contractTypeSelect = document.getElementById('id_contract_type');
+                            for (let i = 0; i < contractTypeSelect.options.length; i++) {
+                                if (contractTypeSelect.options[i].text.toLowerCase().includes(data.contract_type.toLowerCase())) {
+                                    contractTypeSelect.selectedIndex = i;
+                                    break;
+                                }
                             }
                         }
+                        
+                        showStatus('Data extracted successfully! Form fields have been populated.', 'success');
+                        
+                        // Log the extraction results for debugging
+                        console.log('Extraction results:', data);
+                    } else {
+                        showStatus(data.error || 'Failed to extract data from the form.', 'error');
                     }
-                    
-                    statusMessage.textContent = 'Data extracted successfully!';
-                    statusMessage.className = 'text-green-500';
-                } else {
-                    statusMessage.textContent = data.error || 'Failed to extract data from the form.';
-                    statusMessage.className = 'text-red-500';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                statusMessage.textContent = 'An error occurred during extraction.';
-                statusMessage.className = 'text-red-500';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showStatus('An error occurred during extraction.', 'error');
+                });
             });
-        });
+        }
+        
+        function showStatus(message, type) {
+            if (!statusMessage) return;
+            
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden');
+            
+            // Reset classes
+            statusMessage.className = 'mt-4 p-4 rounded-md';
+            
+            // Add appropriate styling based on message type
+            if (type === 'error') {
+                statusMessage.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'success') {
+                statusMessage.classList.add('bg-green-100', 'text-green-700');
+            } else {
+                statusMessage.classList.add('bg-blue-100', 'text-blue-700');
+            }
+        }
     });
 </script>
 {% endblock %} 

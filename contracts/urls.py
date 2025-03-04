@@ -20,6 +20,7 @@ from .views import (
     ReminderListView,
     ContractLifecycleDashboardView,
     AcknowledgementLetterUpdateView,
+    ContractLogView,
 )
 from users.views import test_app_name
 from django.views.generic import TemplateView
@@ -29,6 +30,9 @@ app_name = 'contracts'
 urlpatterns = [
     # Dashboard views
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
+    path('log/', ContractLogView.as_view(), name='contract_log_view'),
+    path('export-log/', views.export_contract_log, name='export_contract_log'),
+    path('open-export-folder/', views.open_export_folder, name='open_export_folder'),
 
     # Contract management
     path('contract/new/', ContractCreateView.as_view(), name='contract_create'),

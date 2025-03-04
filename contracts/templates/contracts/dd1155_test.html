@@ -1,177 +1,184 @@
-{% extends 'contracts/contract_base.html' %}
+{% extends "contracts/contract_base.html" %}
 {% load static %}
 
 {% block title %}DD Form 1155 Extraction Test{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 py-6">
     <h1 class="text-2xl font-bold mb-6">DD Form 1155 Extraction Test</h1>
     
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">Upload DD Form 1155</h2>
         
-        <form id="dd1155-form" enctype="multipart/form-data" class="space-y-4">
-            {% csrf_token %}
-            
-            <div class="mb-4">
-                <label for="dd1155-file" class="block text-sm font-medium text-gray-700 mb-2">
-                    Select DD Form 1155 PDF
-                </label>
-                <input type="file" id="dd1155-file" name="dd1155_file" accept="application/pdf"
-                       class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+        <form id="uploadForm" class="space-y-4">
+            <div class="flex flex-col">
+                <label for="dd1155_file" class="mb-2 font-medium text-gray-700">Select DD Form 1155 PDF</label>
+                <input type="file" id="dd1155_file" name="dd1155_file" accept=".pdf" 
+                       class="border border-gray-300 rounded-md p-2">
             </div>
             
-            <button type="button" id="extract-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                Extract Data
-            </button>
+            <div>
+                <button type="submit" id="extractBtn" 
+                        class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition">
+                    Extract Data
+                </button>
+            </div>
         </form>
         
-        <div id="status-message" class="mt-4 hidden"></div>
+        <div id="statusMessage" class="mt-4 hidden"></div>
     </div>
     
-    <div id="results-container" class="bg-white rounded-lg shadow-md p-6 hidden">
-        <h2 class="text-xl font-semibold mb-4">Extracted Data</h2>
+    <div id="resultsContainer" class="bg-white shadow-md rounded-lg p-6 hidden">
+        <h2 class="text-xl font-semibold mb-4">Extraction Results</h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <h3 class="text-lg font-medium mb-2">Contract Details</h3>
-                <dl class="space-y-2">
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">Contract Number:</dt>
-                        <dd id="result-contract-number" class="text-sm text-gray-900 col-span-2"></dd>
-                    </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">PO Number:</dt>
-                        <dd id="result-po-number" class="text-sm text-gray-900 col-span-2"></dd>
-                    </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">Award Date:</dt>
-                        <dd id="result-award-date" class="text-sm text-gray-900 col-span-2"></dd>
-                    </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">Due Date:</dt>
-                        <dd id="result-due-date" class="text-sm text-gray-900 col-span-2"></dd>
-                    </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">Contract Type:</dt>
-                        <dd id="result-contract-type" class="text-sm text-gray-900 col-span-2"></dd>
-                    </div>
-                </dl>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="space-y-2">
+                <div class="font-medium">Contract Number:</div>
+                <div id="contract_number" class="bg-gray-100 p-2 rounded"></div>
             </div>
             
-            <div>
-                <h3 class="text-lg font-medium mb-2">Additional Information</h3>
-                <dl class="space-y-2">
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">Buyer:</dt>
-                        <dd id="result-buyer" class="text-sm text-gray-900 col-span-2"></dd>
-                    </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <dt class="text-sm font-medium text-gray-500">Raw Text:</dt>
-                        <dd class="col-span-2">
-                            <button id="show-raw-text" class="text-sm text-blue-600 hover:text-blue-800">
-                                Show Raw Text
-                            </button>
-                        </dd>
-                    </div>
-                </dl>
+            <div class="space-y-2">
+                <div class="font-medium">PO Number:</div>
+                <div id="po_number" class="bg-gray-100 p-2 rounded"></div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="font-medium">Award Date:</div>
+                <div id="award_date" class="bg-gray-100 p-2 rounded"></div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="font-medium">Due Date:</div>
+                <div id="due_date" class="bg-gray-100 p-2 rounded"></div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="font-medium">Contract Type:</div>
+                <div id="contract_type" class="bg-gray-100 p-2 rounded"></div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="font-medium">Buyer:</div>
+                <div id="buyer" class="bg-gray-100 p-2 rounded"></div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="font-medium">Contract Amount:</div>
+                <div id="contract_amount" class="bg-gray-100 p-2 rounded"></div>
             </div>
         </div>
         
-        <div id="raw-text-container" class="mt-6 hidden">
-            <h3 class="text-lg font-medium mb-2">Raw Extracted Text</h3>
-            <pre id="raw-text" class="bg-gray-100 p-4 rounded-md text-sm overflow-auto max-h-96"></pre>
+        <div class="mb-6">
+            <h3 class="text-lg font-medium mb-2">Coordinate Results</h3>
+            <div id="coordinate_results" class="bg-gray-100 p-4 rounded overflow-auto max-h-60 font-mono text-sm"></div>
+        </div>
+        
+        <div>
+            <h3 class="text-lg font-medium mb-2">Raw Text</h3>
+            <div id="raw_text" class="bg-gray-100 p-4 rounded overflow-auto max-h-60 font-mono text-sm whitespace-pre-wrap"></div>
         </div>
     </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const extractBtn = document.getElementById('extract-btn');
-        const fileInput = document.getElementById('dd1155-file');
-        const statusMessage = document.getElementById('status-message');
-        const resultsContainer = document.getElementById('results-container');
-        const showRawTextBtn = document.getElementById('show-raw-text');
-        const rawTextContainer = document.getElementById('raw-text-container');
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadForm = document.getElementById('uploadForm');
+    const statusMessage = document.getElementById('statusMessage');
+    const resultsContainer = document.getElementById('resultsContainer');
+    
+    uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
         
-        extractBtn.addEventListener('click', function() {
-            if (!fileInput.files.length) {
-                showStatus('Please select a DD Form 1155 PDF file first.', 'error');
-                return;
-            }
-            
-            const file = fileInput.files[0];
-            if (file.type !== 'application/pdf') {
-                showStatus('Please select a PDF file.', 'error');
-                return;
-            }
-            
-            // Show loading status
-            showStatus('Extracting data from DD Form 1155...', 'info');
-            resultsContainer.classList.add('hidden');
-            
-            const formData = new FormData();
-            formData.append('dd1155_file', file);
-            
-            fetch('{% url "extract_dd1155" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Display extracted data
-                    document.getElementById('result-contract-number').textContent = data.contract_number || 'Not found';
-                    document.getElementById('result-po-number').textContent = data.po_number || 'Not found';
-                    document.getElementById('result-award-date').textContent = data.award_date || 'Not found';
-                    document.getElementById('result-due-date').textContent = data.due_date || 'Not found';
-                    document.getElementById('result-contract-type').textContent = data.contract_type || 'Not found';
-                    document.getElementById('result-buyer').textContent = data.buyer || 'Not found';
-                    
-                    // Store raw text for display
-                    document.getElementById('raw-text').textContent = data.raw_text || 'No raw text available';
-                    
-                    // Show results
-                    resultsContainer.classList.remove('hidden');
-                    showStatus('Data extracted successfully!', 'success');
-                } else {
-                    showStatus(data.error || 'Failed to extract data from the form.', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showStatus('An error occurred during extraction.', 'error');
-            });
-        });
-        
-        showRawTextBtn.addEventListener('click', function() {
-            if (rawTextContainer.classList.contains('hidden')) {
-                rawTextContainer.classList.remove('hidden');
-                showRawTextBtn.textContent = 'Hide Raw Text';
-            } else {
-                rawTextContainer.classList.add('hidden');
-                showRawTextBtn.textContent = 'Show Raw Text';
-            }
-        });
-        
-        function showStatus(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.className = 'mt-4 p-4 rounded-md';
-            
-            // Add appropriate styling based on message type
-            if (type === 'error') {
-                statusMessage.classList.add('bg-red-100', 'text-red-700');
-            } else if (type === 'success') {
-                statusMessage.classList.add('bg-green-100', 'text-green-700');
-            } else {
-                statusMessage.classList.add('bg-blue-100', 'text-blue-700');
-            }
-            
-            statusMessage.classList.remove('hidden');
+        const fileInput = document.getElementById('dd1155_file');
+        if (!fileInput.files.length) {
+            showStatus('Please select a PDF file.', 'error');
+            return;
         }
+        
+        const file = fileInput.files[0];
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            showStatus('Please select a PDF file.', 'error');
+            return;
+        }
+        
+        showStatus('Extracting data from DD Form 1155...', 'info');
+        
+        const formData = new FormData();
+        formData.append('dd1155_file', file);
+        
+        fetch('/contracts/extract-dd1155/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatus('Data extracted successfully!', 'success');
+                displayResults(data);
+            } else {
+                showStatus('Error: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showStatus('Error: ' + error.message, 'error');
+        });
     });
+    
+    function showStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = 'mt-4 p-3 rounded';
+        
+        if (type === 'error') {
+            statusMessage.classList.add('bg-red-100', 'text-red-700');
+        } else if (type === 'success') {
+            statusMessage.classList.add('bg-green-100', 'text-green-700');
+        } else {
+            statusMessage.classList.add('bg-blue-100', 'text-blue-700');
+        }
+        
+        statusMessage.classList.remove('hidden');
+    }
+    
+    function displayResults(data) {
+        // Display each field
+        document.getElementById('contract_number').textContent = data.contract_number || 'Not found';
+        document.getElementById('po_number').textContent = data.po_number || 'Not found';
+        document.getElementById('award_date').textContent = data.award_date || 'Not found';
+        document.getElementById('due_date').textContent = data.due_date || 'Not found';
+        document.getElementById('contract_type').textContent = data.contract_type || 'Not found';
+        document.getElementById('buyer').textContent = data.buyer || 'Not found';
+        document.getElementById('contract_amount').textContent = data.contract_amount || 'Not found';
+        
+        // Display coordinate results
+        if (data.coordinate_results) {
+            document.getElementById('coordinate_results').textContent = JSON.stringify(data.coordinate_results, null, 2);
+        }
+        
+        // Display raw text
+        document.getElementById('raw_text').textContent = data.raw_text || '';
+        
+        // Show results container
+        resultsContainer.classList.remove('hidden');
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
 </script>
 {% endblock %} 

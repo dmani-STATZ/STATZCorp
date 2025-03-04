@@ -1,0 +1,403 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Contract Log View{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Header Section -->
+    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+        <div class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Contract Log View</h1>
+            
+            <div class="flex items-center space-x-4">
+                <!-- Export Button -->
+                <button id="exportBtn" class="btn-primary flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Contracts
+                </button>
+                
+                <!-- Export Size Display -->
+                <div class="text-sm text-gray-600">
+                    <span class="font-medium">Export Folder Size:</span>
+                    <span id="exportSize" class="ml-1">{{ export_size|default:"0 MB" }}</span>
+                    <button id="openExportFolder" class="text-blue-600 hover:text-blue-800 ml-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filter Controls -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label for="filterClass" class="block text-sm font-medium text-gray-700 mb-1">Filter by Class</label>
+                <select id="filterClass" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+                    <option value="">All Classes</option>
+                    {% for class_item in classes %}
+                    <option value="{{ class_item }}">{{ class_item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label for="searchContract" class="block text-sm font-medium text-gray-700 mb-1">Search Contracts</label>
+                <input type="text" id="searchContract" placeholder="Search by contract number, PO, etc." 
+                       class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+            
+            <div class="flex items-end">
+                <button id="applyFilters" class="btn-secondary">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contract Table -->
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Open</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cancelled</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tab Num</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Number</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Num</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Date</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for contract in contracts %}
+                    <tr class="{% if contract.cancelled %}bg-red-50{% elif contract.open %}bg-green-50{% endif %} hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                {% if contract.open %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                {% if contract.cancelled %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                </svg>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ contract.tab_num|default:"-" }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ contract.po_number|default:"-" }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                                <a href="{% url 'contracts:contract_detail' contract.id %}">
+                                    {{ contract.contract_number }}
+                                </a>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ contract.buyer|default:"-" }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ contract.contract_type|default:"-" }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                {% if contract.clins.first.supplier %}
+                                {{ contract.clins.first.supplier.name|default:"-" }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ contract.award_date|date:"m/d/Y"|default:"-" }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  {% if contract.cancelled %}bg-red-100 text-red-800
+                                  {% elif not contract.open %}bg-yellow-100 text-yellow-800
+                                  {% else %}bg-green-100 text-green-800{% endif %}">
+                                {% if contract.cancelled %}Cancelled
+                                {% elif not contract.open %}Closed
+                                {% else %}Open{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                {% if contract.clins.first.nsn %}
+                                {{ contract.clins.first.nsn.nsn|default:"-" }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900 max-w-xs truncate">
+                                {% if contract.clins.first.nsn %}
+                                {{ contract.clins.first.nsn.description|default:"-" }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="12" class="px-6 py-4 text-center text-sm text-gray-500">
+                            No contracts found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if contracts.has_other_pages %}
+    <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-lg shadow-md">
+        <div class="flex-1 flex justify-between sm:hidden">
+            {% if contracts.has_previous %}
+            <a href="?page={{ contracts.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Previous
+            </a>
+            {% endif %}
+            {% if contracts.has_next %}
+            <a href="?page={{ contracts.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Next
+            </a>
+            {% endif %}
+        </div>
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    Showing
+                    <span class="font-medium">{{ contracts.start_index }}</span>
+                    to
+                    <span class="font-medium">{{ contracts.end_index }}</span>
+                    of
+                    <span class="font-medium">{{ contracts.paginator.count }}</span>
+                    results
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    {% if contracts.has_previous %}
+                    <a href="?page={{ contracts.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Previous</span>
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                    
+                    {% for i in contracts.paginator.page_range %}
+                        {% if contracts.number == i %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                            {{ i }}
+                        </span>
+                        {% elif i > contracts.number|add:'-3' and i < contracts.number|add:'3' %}
+                        <a href="?page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            {{ i }}
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if contracts.has_next %}
+                    <a href="?page={{ contracts.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Next</span>
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Export Modal -->
+    <div id="exportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Export Contract Log</h3>
+                <button id="closeExportModal" class="text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="exportForm" class="space-y-4">
+                <div>
+                    <label for="exportFormat" class="block text-sm font-medium text-gray-700 mb-1">Export Format</label>
+                    <select id="exportFormat" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="csv">CSV (.csv)</option>
+                        <option value="pdf">PDF (.pdf)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="exportFileName" class="block text-sm font-medium text-gray-700 mb-1">File Name</label>
+                    <input type="text" id="exportFileName" value="ContractLog_{{ today|date:'Ymd' }}" 
+                           class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancelExport" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        Export
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Export button functionality
+        const exportBtn = document.getElementById('exportBtn');
+        const exportModal = document.getElementById('exportModal');
+        const closeExportModal = document.getElementById('closeExportModal');
+        const cancelExport = document.getElementById('cancelExport');
+        const exportForm = document.getElementById('exportForm');
+        const openExportFolder = document.getElementById('openExportFolder');
+        
+        // Show export modal
+        exportBtn.addEventListener('click', function() {
+            exportModal.classList.remove('hidden');
+        });
+        
+        // Close export modal
+        closeExportModal.addEventListener('click', function() {
+            exportModal.classList.add('hidden');
+        });
+        
+        cancelExport.addEventListener('click', function() {
+            exportModal.classList.add('hidden');
+        });
+        
+        // Handle export form submission
+        exportForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const format = document.getElementById('exportFormat').value;
+            const fileName = document.getElementById('exportFileName').value;
+            
+            // Show loading indicator
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Exporting...';
+            submitBtn.disabled = true;
+            
+            // Make AJAX request to export
+            fetch('/contracts/export-log/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    format: format,
+                    fileName: fileName,
+                    filters: {
+                        class: document.getElementById('filterClass').value,
+                        search: document.getElementById('searchContract').value
+                    }
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update export size
+                    document.getElementById('exportSize').textContent = data.export_size;
+                    
+                    // Close modal
+                    exportModal.classList.add('hidden');
+                    
+                    // Show success message
+                    alert('Export completed successfully! File saved to: ' + data.file_path);
+                    
+                    // Reset button
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                } else {
+                    alert('Export failed: ' + data.error);
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred during export.');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            });
+        });
+        
+        // Open export folder
+        openExportFolder.addEventListener('click', function() {
+            fetch('/contracts/open-export-folder/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+        });
+        
+        // Filter functionality
+        const applyFilters = document.getElementById('applyFilters');
+        
+        applyFilters.addEventListener('click', function() {
+            const classFilter = document.getElementById('filterClass').value;
+            const searchTerm = document.getElementById('searchContract').value;
+            
+            // Build query string
+            let queryParams = [];
+            if (classFilter) {
+                queryParams.push('class=' + encodeURIComponent(classFilter));
+            }
+            if (searchTerm) {
+                queryParams.push('search=' + encodeURIComponent(searchTerm));
+            }
+            
+            // Redirect with filters
+            window.location.href = '{% url "contracts:contract_log_view" %}' + 
+                (queryParams.length ? '?' + queryParams.join('&') : '');
+        });
+        
+        // Double-click on header to minimize ribbon (simulating Access behavior)
+        document.querySelector('h1').addEventListener('dblclick', function() {
+            // This would typically be handled by the browser or application framework
+            console.log('Double-clicked header - would minimize ribbon in Access');
+        });
+    });
+</script>
+{% endblock %} 

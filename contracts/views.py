@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.http import JsonResponse, HttpResponseRedirect
 from datetime import timedelta, datetime
+from pdfminer.high_level import extract_pages, extract_text
 import calendar
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
@@ -22,6 +23,23 @@ from PIL import Image
 import pdf2image
 import io
 import logging
+import fitz  # PyMuPDF
+from django.conf import settings
+import sys
+import subprocess
+import csv
+# Try to import openpyxl, but make it optional
+try:
+    import openpyxl
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+from decimal import Decimal
+from django.db.models import Q, Sum, Count, F, Value, CharField
+from django.db.models.functions import Concat
+from django.contrib.auth.decorators import login_required
+from django.template.loader import render_to_string
+from django.core.exceptions import PermissionDenied
 
 from .models import (
     Contract, Clin, ClinFinance, Supplier, Nsn, ClinAcknowledgment, 
@@ -659,7 +677,7 @@ class ContractLifecycleDashboardView(TemplateView):
             month=min(12, (current_quarter + 1) * 3),
             day=calendar.monthrange(now.year, min(12, (current_quarter + 1) * 3))[1]
         )
-        
+
         if current_quarter == 0:  # If we're in Q1
             last_quarter_start = now.replace(year=now.year - 1, month=10, day=1)
             last_quarter_end = now.replace(year=now.year - 1, month=12, day=31)
@@ -710,8 +728,7 @@ class ContractLifecycleDashboardView(TemplateView):
         context['contracts'] = self.get_contracts()
         # Get all active contracts (not cancelled and not closed)
         active_contracts = Contract.objects.filter(
-            Q(cancelled=False) & (Q(open=True) | Q(open=None))
-        )
+            Q(cancelled=False) & (Q(open=True) | Q(open=None)))
         
         # Contracts by stage
         context['new_contracts'] = active_contracts.filter(
@@ -861,7 +878,7 @@ class AcknowledgementLetterUpdateView(UpdateView):
 @conditional_login_required
 def extract_dd1155_data(request):
     """
-    View to handle DD Form 1155 file upload and data extraction
+    View to handle DD Form 1155 file upload and data extraction using coordinate-based approach
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Only POST requests are allowed'})
@@ -872,7 +889,7 @@ def extract_dd1155_data(request):
     uploaded_file = request.FILES['dd1155_file']
     
     # Check if the file is a PDF
-    if not uploaded_file.name.endswith('.pdf'):
+    if not uploaded_file.name.lower().endswith('.pdf'):
         return JsonResponse({'success': False, 'error': 'Uploaded file must be a PDF'})
     
     # Create a temporary file to store the uploaded PDF
@@ -883,14 +900,21 @@ def extract_dd1155_data(request):
         temp_file.write(uploaded_file.read())
         temp_file.close()
         
-        # Extract text from the PDF
-        extracted_text = extract_text_from_pdf(temp_file.name)
+        # Extract text from the PDF using coordinate-based approach
+        extraction_results = extract_text_from_pdf(temp_file.name)
         
         # Parse the extracted text to get contract data
-        contract_data = parse_dd1155_text(extracted_text)
+        contract_data = parse_dd1155_text(extraction_results)
         
-        # Include the raw text in the response
-        contract_data['raw_text'] = extracted_text
+        # Include the raw extraction results for debugging
+        if isinstance(extraction_results, dict):
+            # Include coordinate results for debugging
+            contract_data['coordinate_results'] = extraction_results.get('coordinate_results', {})
+            # Include the raw text in the response
+            contract_data['raw_text'] = extraction_results.get('full_text', '')
+        else:
+            # Fallback if extraction_results is not a dict
+            contract_data['raw_text'] = str(extraction_results)
         
         return JsonResponse({
             'success': True,
@@ -907,21 +931,83 @@ def extract_dd1155_data(request):
             os.unlink(temp_file.name)
 
 def extract_text_from_pdf(pdf_path):
-    """Extract text from a PDF file using PyPDF2 and OCR if needed."""
-    text = ""
+    """
+    Extract text from a PDF file using PyMuPDF's coordinate-based approach.
+    Falls back to PyPDF2 and OCR if needed.
+    """
+    # Define the box areas for each field as percentages (left, upper, right, lower)
+    coordinates = {
+        'contract_number': (73 / 1224, 141 / 1584, 359 / 1224, 174 / 1584),
+        'award_date': (592 / 1224, 157 / 1584, 760 / 1224, 174 / 1584),
+        'buyer': (73 / 1224, 201 / 1584, 428 / 1224, 283 / 1584),
+        'po_number': (787 / 1224, 141 / 1584, 1002 / 1224, 174 / 1584),
+        'contract_type_purchase': (201 / 1224, 576 / 1584, 228 / 1224, 621 / 1584),
+        'contract_type_delivery': (201 / 1224, 541 / 1584, 228 / 1224, 571 / 1584),
+        'due_date_days': (787 / 1224, 315 / 1584, 1002 / 1224, 334 / 1584),
+        'contract_amount': (1002 / 1224, 1054 / 1584, 1150 / 1224, 1075 / 1584)
+    }
     
-    # First try to extract text directly using PyPDF2
+    # Initialize results dictionary
+    results = {key: 'Not found' for key in coordinates.keys()}
+    
+    # Try to extract text using PyMuPDF's coordinate-based approach
+    try:
+        # Open the PDF document
+        pdf_document = fitz.open(pdf_path)
+        
+        # Extract text from the specific box areas of the first page
+        if pdf_document.page_count > 0:
+            first_page = pdf_document.load_page(0)
+            width, height = first_page.rect.width, first_page.rect.height
+            
+            # Convert percentages to coordinates based on the page size
+            new_coordinates = {key: (
+                left_pct * width,
+                upper_pct * height,
+                right_pct * width,
+                lower_pct * height
+            ) for key, (left_pct, upper_pct, right_pct, lower_pct) in coordinates.items()}
+            
+            # Extract text from each box
+            for key, box in new_coordinates.items():
+                text = first_page.get_textbox(box).strip()
+                results[key] = text if text else 'Not found'
+            
+            # Get full text for fallback
+            full_text = ""
+            for page_num in range(pdf_document.page_count):
+                page = pdf_document.load_page(page_num)
+                full_text += page.get_text()
+            
+            # Close the document
+            pdf_document.close()
+            
+            # Return both the coordinate-based results and the full text
+            return {
+                'coordinate_results': results,
+                'full_text': full_text
+            }
+            
+    except Exception as e:
+        logger.error(f"Error extracting text with PyMuPDF: {str(e)}")
+    
+    # Fallback to PyPDF2 if PyMuPDF fails
+    full_text = ""
     try:
         with open(pdf_path, 'rb') as file:
-            reader = PyPDF2.PdfReader(file)
-            for page_num in range(len(reader.pages)):
-                text += reader.pages[page_num].extract_text() + "\n"
+            reader = PyPDF2.PdfReader(file, strict=False)
+            
+            for page in range(len(reader.pages)):
+                full_text += reader.pages[page].extract_text() + "\n"
     except Exception as e:
         logger.error(f"Error extracting text with PyPDF2: {str(e)}")
     
     # If we got meaningful text, return it
-    if len(text.strip()) > 100:  # Assuming a form should have more than 100 chars of text
-        return text
+    if len(full_text.strip()) > 100:  # Assuming a form should have more than 100 chars of text
+        return {
+            'coordinate_results': {'error': 'PyMuPDF extraction failed'},
+            'full_text': full_text
+        }
     
     # If PyPDF2 didn't extract enough text, try OCR
     try:
@@ -930,23 +1016,146 @@ def extract_text_from_pdf(pdf_path):
             pytesseract.get_tesseract_version()
         except Exception as e:
             logger.error(f"Tesseract OCR not properly configured: {str(e)}")
-            return text  # Return whatever text we got from PyPDF2
+            return {
+                'coordinate_results': {'error': 'PyMuPDF extraction failed'},
+                'full_text': full_text
+            }
         
         # Convert PDF to images
         images = pdf2image.convert_from_path(pdf_path)
         
         # Perform OCR on each image
         for img in images:
-            text += pytesseract.image_to_string(img) + "\n"
+            full_text += pytesseract.image_to_string(img) + "\n"
             
     except Exception as e:
         logger.error(f"Error performing OCR: {str(e)}")
     
-    return text
+    return {
+        'coordinate_results': {'error': 'PyMuPDF extraction failed'},
+        'full_text': full_text
+    }
 
-def parse_dd1155_text(text):
+def parse_dd1155_text(extraction_results):
     """
     Parse text extracted from DD Form 1155 to get contract information
+    using both coordinate-based results and full text extraction
+    """
+    # Initialize data dictionary
+    data = {
+        'contract_number': None,
+        'po_number': None,
+        'award_date': None,
+        'due_date': None,
+        'contract_type': None,
+        'buyer': None,
+        'contract_amount': None
+    }
+    
+    # If we have coordinate results, use them as primary source
+    if isinstance(extraction_results, dict) and 'coordinate_results' in extraction_results:
+        coord_results = extraction_results['coordinate_results']
+        full_text = extraction_results.get('full_text', '')
+        
+        # Process contract number
+        if 'contract_number' in coord_results and coord_results['contract_number'] != 'Not found':
+            data['contract_number'] = coord_results['contract_number'].strip()
+        
+        # Process PO number
+        if 'po_number' in coord_results and coord_results['po_number'] != 'Not found':
+            data['po_number'] = coord_results['po_number'].strip()
+        
+        # Process award date
+        if 'award_date' in coord_results and coord_results['award_date'] != 'Not found':
+            date_str = coord_results['award_date'].strip()
+            try:
+                # Try to parse the date
+                date_formats = ['%m/%d/%Y', '%m-%d-%Y', '%m/%d/%y', '%m-%d-%y']
+                for fmt in date_formats:
+                    try:
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        data['award_date'] = parsed_date.strftime('%Y-%m-%d')
+                        break
+                    except ValueError:
+                        continue
+            except Exception as e:
+                logger.warning(f"Error parsing award date: {e}")
+        
+        # Process due date
+        if 'due_date_days' in coord_results and coord_results['due_date_days'] != 'Not found':
+            due_date_text = coord_results['due_date_days'].strip()
+            try:
+                # Check if it's a number of days
+                if re.search(r'\d+\s*DAYS', due_date_text, re.IGNORECASE):
+                    days_match = re.search(r'(\d+)\s*DAYS', due_date_text, re.IGNORECASE)
+                    if days_match and data['award_date']:
+                        days = int(days_match.group(1))
+                        award_date = datetime.strptime(data['award_date'], '%Y-%m-%d')
+                        due_date = award_date + timedelta(days=days)
+                        data['due_date'] = due_date.strftime('%Y-%m-%d')
+                else:
+                    # Try to parse as a direct date
+                    date_formats = ['%m/%d/%Y', '%m-%d-%Y', '%m/%d/%y', '%m-%d-%y']
+                    for fmt in date_formats:
+                        try:
+                            parsed_date = datetime.strptime(due_date_text, fmt)
+                            data['due_date'] = parsed_date.strftime('%Y-%m-%d')
+                            break
+                        except ValueError:
+                            continue
+            except Exception as e:
+                logger.warning(f"Error parsing due date: {e}")
+        
+        # Process contract type
+        contract_type = None
+        if 'contract_type_purchase' in coord_results and coord_results['contract_type_purchase'] != 'Not found':
+            if 'X' in coord_results['contract_type_purchase']:
+                contract_type = 'Purchase Order'
+        
+        if not contract_type and 'contract_type_delivery' in coord_results and coord_results['contract_type_delivery'] != 'Not found':
+            if 'X' in coord_results['contract_type_delivery']:
+                contract_type = 'Delivery Order'
+        
+        if contract_type:
+            data['contract_type'] = contract_type
+        
+        # Process buyer information
+        if 'buyer' in coord_results and coord_results['buyer'] != 'Not found':
+            data['buyer'] = coord_results['buyer'].strip()
+            # Limit buyer name to reasonable length
+            if len(data['buyer']) > 50:
+                data['buyer'] = data['buyer'][:50]
+        
+        # Process contract amount
+        if 'contract_amount' in coord_results and coord_results['contract_amount'] != 'Not found':
+            amount_str = coord_results['contract_amount'].strip()
+            # Remove any non-numeric characters except decimal point
+            amount_str = re.sub(r'[^\d.]', '', amount_str)
+            try:
+                if amount_str:
+                    data['contract_amount'] = amount_str
+            except Exception as e:
+                logger.warning(f"Error parsing contract amount: {e}")
+        
+        # If we have full text, use it as a fallback for missing data
+        if full_text and (not data['contract_number'] or not data['po_number'] or 
+                          not data['award_date'] or not data['due_date'] or 
+                          not data['contract_type'] or not data['buyer']):
+            fallback_data = parse_full_text(full_text)
+            
+            # Fill in missing data from fallback
+            for key, value in fallback_data.items():
+                if not data[key] and value:
+                    data[key] = value
+    else:
+        # If we don't have coordinate results, treat the input as full text
+        data = parse_full_text(extraction_results)
+    
+    return data
+
+def parse_full_text(text):
+    """
+    Parse full text extracted from DD Form 1155 using regex patterns
     """
     data = {
         'contract_number': None,
@@ -954,11 +1163,13 @@ def parse_dd1155_text(text):
         'award_date': None,
         'due_date': None,
         'contract_type': None,
-        'buyer': None
+        'buyer': None,
+        'contract_amount': None
     }
     
     # Contract Number (usually in format like "N00039-19-F-0001")
     contract_number_patterns = [
+        r'[A-Z0-9]{6}-[0-9]{2}-[A-Z0-9]{1}-[0-9]{4}',
         r'CONTRACT\s*NO\.\s*([\w\-]+)',
         r'CONTRACT\s*NUMBER\s*:\s*([\w\-]+)',
         r'CONTRACT\s*#\s*:\s*([\w\-]+)',
@@ -969,7 +1180,10 @@ def parse_dd1155_text(text):
     for pattern in contract_number_patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            data['contract_number'] = match.group(1).strip()
+            if match.groups():
+                data['contract_number'] = match.group(1).strip()
+            else:
+                data['contract_number'] = match.group(0).strip()
             break
     
     # PO Number
@@ -1070,7 +1284,9 @@ def parse_dd1155_text(text):
         'T&M': 'Time and Materials',
         'TIME AND MATERIALS': 'Time and Materials',
         'IDIQ': 'Indefinite Delivery Indefinite Quantity',
-        'INDEFINITE DELIVERY': 'Indefinite Delivery Indefinite Quantity'
+        'INDEFINITE DELIVERY': 'Indefinite Delivery Indefinite Quantity',
+        'PURCHASE ORDER': 'Purchase Order',
+        'DELIVERY ORDER': 'Delivery Order'
     }
     
     for pattern in contract_type_patterns:
@@ -1107,4 +1323,253 @@ def parse_dd1155_text(text):
                 data['buyer'] = data['buyer'][:50]
             break
     
+    # Contract Amount
+    amount_patterns = [
+        r'TOTAL\s*AMOUNT\s*:\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+        r'TOTAL\s*:\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+        r'AMOUNT\s*:\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
+    ]
+    
+    for pattern in amount_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            amount_str = match.group(1).strip()
+            # Remove commas
+            amount_str = amount_str.replace(',', '')
+            data['contract_amount'] = amount_str
+            break
+    
     return data
+
+@method_decorator(conditional_login_required, name='dispatch')
+class ContractLogView(ListView):
+    model = Contract
+    template_name = 'contracts/contract_log_view.html'
+    context_object_name = 'contracts'
+    paginate_by = 50
+    
+    def get_queryset(self):
+        queryset = Contract.objects.all().order_by('-award_date')
+        
+        # Filter by sales class if provided
+        sales_class = self.request.GET.get('sales_class')
+        if sales_class and sales_class != 'all':
+            queryset = queryset.filter(sales_class=sales_class)
+            
+        # Filter by search term if provided
+        search_term = self.request.GET.get('search')
+        if search_term:
+            queryset = queryset.filter(
+                Q(contract_number__icontains=search_term) |
+                Q(title__icontains=search_term) |
+                Q(customer__icontains=search_term) |
+                Q(sales_class__icontains=search_term)
+            )
+            
+        return queryset
+        
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get unique sales classes for filter dropdown
+        context['sales_classes'] = Contract.objects.values_list(
+            'sales_class', flat=True).distinct().order_by('sales_class')
+        
+        # Add today's date for reference
+        context['today'] = timezone.now().date()
+        
+        # Add export functionality status
+        context['export_available'] = OPENPYXL_AVAILABLE
+        
+        # Get export folder size if available
+        try:
+            export_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+            if not os.path.exists(export_dir):
+                os.makedirs(export_dir)
+            context['export_folder_size'] = len(os.listdir(export_dir))
+        except Exception:
+            context['export_folder_size'] = 0
+            
+        return context
+
+@conditional_login_required
+def export_contract_log(request):
+    if not OPENPYXL_AVAILABLE:
+        messages.error(request, "Export functionality is not available. Please install openpyxl package.")
+        return redirect('contracts:contract_log_view')
+        
+    if request.method != 'POST':
+        messages.error(request, "Invalid request method.")
+        return redirect('contracts:contract_log_view')
+    
+    # Get export format and filename
+    export_format = request.POST.get('export_format', 'excel')
+    filename = request.POST.get('filename', f'contract_log_{timezone.now().strftime("%Y%m%d")}')
+    
+    # Filter contracts based on criteria
+    queryset = Contract.objects.all().order_by('-award_date')
+    
+    sales_class = request.POST.get('sales_class')
+    if sales_class and sales_class != 'all':
+        queryset = queryset.filter(sales_class=sales_class)
+        
+    search_term = request.POST.get('search')
+    if search_term:
+        queryset = queryset.filter(
+            Q(contract_number__icontains=search_term) |
+            Q(title__icontains=search_term) |
+            Q(customer__icontains=search_term) |
+            Q(sales_class__icontains=search_term)
+        )
+    
+    # Create exports directory if it doesn't exist
+    export_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+    if not os.path.exists(export_dir):
+        os.makedirs(export_dir)
+    
+    # Export based on format
+    if export_format == 'excel' and OPENPYXL_AVAILABLE:
+        # Export to Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Contract Log"
+        
+        # Add headers
+        headers = [
+            'Contract Number', 'Title', 'Customer', 'Sales Class', 
+            'Award Date', 'Period of Performance', 'Value', 'Status'
+        ]
+        for col_num, header in enumerate(headers, 1):
+            ws.cell(row=1, column=col_num, value=header)
+        
+        # Add data
+        for row_num, contract in enumerate(queryset, 2):
+            # Determine status
+            if contract.cancelled:
+                status = "Cancelled"
+            elif not contract.open:
+                status = "Closed"
+            else:
+                status = "Open"
+                
+            # Format period of performance
+            pop = f"{contract.pop_start.strftime('%m/%d/%Y')} - {contract.pop_end.strftime('%m/%d/%Y')}" if contract.pop_start and contract.pop_end else "N/A"
+            
+            # Add row data
+            row_data = [
+                contract.contract_number,
+                contract.title,
+                contract.customer,
+                contract.sales_class,
+                contract.award_date.strftime('%m/%d/%Y') if contract.award_date else "N/A",
+                pop,
+                f"${contract.value:,.2f}" if contract.value else "$0.00",
+                status
+            ]
+            
+            for col_num, cell_value in enumerate(row_data, 1):
+                ws.cell(row=row_num, column=col_num, value=cell_value)
+        
+        # Save the workbook
+        file_path = os.path.join(export_dir, f"{filename}.xlsx")
+        wb.save(file_path)
+        
+        messages.success(request, f"Excel export created successfully: {filename}.xlsx")
+        
+    elif export_format == 'csv':
+        # Export to CSV
+        file_path = os.path.join(export_dir, f"{filename}.csv")
+        
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            # Write headers
+            writer.writerow([
+                'Contract Number', 'Title', 'Customer', 'Sales Class', 
+                'Award Date', 'Period of Performance', 'Value', 'Status'
+            ])
+            
+            # Write data
+            for contract in queryset:
+                # Determine status
+                if contract.cancelled:
+                    status = "Cancelled"
+                elif not contract.open:
+                    status = "Closed"
+                else:
+                    status = "Open"
+                    
+                # Format period of performance
+                pop = f"{contract.pop_start.strftime('%m/%d/%Y')} - {contract.pop_end.strftime('%m/%d/%Y')}" if contract.pop_start and contract.pop_end else "N/A"
+                
+                # Write row
+                writer.writerow([
+                    contract.contract_number,
+                    contract.title,
+                    contract.customer,
+                    contract.sales_class,
+                    contract.award_date.strftime('%m/%d/%Y') if contract.award_date else "N/A",
+                    pop,
+                    f"${contract.value:,.2f}" if contract.value else "$0.00",
+                    status
+                ])
+        
+        messages.success(request, f"CSV export created successfully: {filename}.csv")
+        
+    elif export_format == 'pdf':
+        # Simple PDF export (as text file with .pdf extension)
+        file_path = os.path.join(export_dir, f"{filename}.pdf")
+        
+        with open(file_path, 'w') as f:
+            f.write("Contract Log\n\n")
+            
+            # Write headers
+            f.write("Contract Number\tTitle\tCustomer\tSales Class\tAward Date\tPeriod of Performance\tValue\tStatus\n")
+            
+            # Write data
+            for contract in queryset:
+                # Determine status
+                if contract.cancelled:
+                    status = "Cancelled"
+                elif not contract.open:
+                    status = "Closed"
+                else:
+                    status = "Open"
+                    
+                # Format period of performance
+                pop = f"{contract.pop_start.strftime('%m/%d/%Y')} - {contract.pop_end.strftime('%m/%d/%Y')}" if contract.pop_start and contract.pop_end else "N/A"
+                
+                # Write row
+                f.write(f"{contract.contract_number}\t{contract.title}\t{contract.customer}\t{contract.sales_class}\t")
+                f.write(f"{contract.award_date.strftime('%m/%d/%Y') if contract.award_date else 'N/A'}\t{pop}\t")
+                f.write(f"${contract.value:,.2f}" if contract.value else "$0.00")
+                f.write(f"\t{status}\n")
+        
+        messages.success(request, f"PDF export created successfully: {filename}.pdf")
+    
+    else:
+        messages.error(request, f"Unsupported export format: {export_format}")
+    
+    return redirect('contracts:contract_log_view')
+
+@conditional_login_required
+def open_export_folder(request):
+    export_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+    
+    # Create directory if it doesn't exist
+    if not os.path.exists(export_dir):
+        os.makedirs(export_dir)
+    
+    # Open folder based on OS
+    try:
+        if sys.platform == 'win32':
+            os.startfile(export_dir)
+        elif sys.platform == 'darwin':  # macOS
+            subprocess.run(['open', export_dir])
+        else:  # Linux
+            subprocess.run(['xdg-open', export_dir])
+        messages.success(request, "Export folder opened successfully.")
+    except Exception as e:
+        messages.error(request, f"Failed to open export folder: {str(e)}")
+    
+    return redirect('contracts:contract_log_view')
