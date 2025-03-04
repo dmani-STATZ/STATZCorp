@@ -1,29 +1,56 @@
 from django.urls import path
-from . import views
+from django.views.generic import TemplateView
+from users.views import test_app_name
+
+# Import views from the modular structure
 from .views import (
+    # Contract views
     ContractDetailView,
-    ClinDetailView,
-    NsnUpdateView,
-    SupplierUpdateView,
-    contract_search,
-    get_clin_notes,
-    toggle_clin_acknowledgment,
-    # New views
     ContractCreateView,
     ContractUpdateView,
     ContractCloseView,
     ContractCancelView,
+    contract_search,
+    
+    # CLIN views
+    ClinDetailView,
     ClinCreateView,
     ClinUpdateView,
     ClinFinanceUpdateView,
     ClinAcknowledgmentUpdateView,
+    get_clin_notes,
+    toggle_clin_acknowledgment,
+    
+    # NSN and Supplier views
+    NsnUpdateView,
+    SupplierUpdateView,
+    
+    # Note views
+    add_note,
+    delete_note,
+    
+    # Reminder views
     ReminderListView,
-    ContractLifecycleDashboardView,
+    add_reminder,
+    toggle_reminder_completion,
+    delete_reminder,
+    
+    # Acknowledgement letter views
+    generate_acknowledgement_letter,
+    view_acknowledgement_letter,
     AcknowledgementLetterUpdateView,
+    
+    # Dashboard views
+    ContractLifecycleDashboardView,
+    
+    # Contract log views
     ContractLogView,
+    export_contract_log,
+    open_export_folder,
+    
+    # DD1155 views
+    extract_dd1155_data,
 )
-from users.views import test_app_name
-from django.views.generic import TemplateView
 
 app_name = 'contracts'
 
@@ -31,8 +58,8 @@ urlpatterns = [
     # Dashboard views
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
     path('log/', ContractLogView.as_view(), name='contract_log_view'),
-    path('export-log/', views.export_contract_log, name='export_contract_log'),
-    path('open-export-folder/', views.open_export_folder, name='open_export_folder'),
+    path('export-log/', export_contract_log, name='export_contract_log'),
+    path('open-export-folder/', open_export_folder, name='open_export_folder'),
 
     # Contract management
     path('contract/new/', ContractCreateView.as_view(), name='contract_create'),
@@ -42,7 +69,7 @@ urlpatterns = [
     path('contract/<int:pk>/cancel/', ContractCancelView.as_view(), name='contract_cancel'),
     
     # DD Form 1155 processing
-    path('extract-dd1155/', views.extract_dd1155_data, name='extract_dd1155'),
+    path('extract-dd1155/', extract_dd1155_data, name='extract_dd1155'),
     path('dd1155-test/', TemplateView.as_view(template_name='contracts/dd1155_test.html'), name='dd1155_test'),
     
     # CLIN management
@@ -58,19 +85,19 @@ urlpatterns = [
     path('supplier/<int:pk>/edit/', SupplierUpdateView.as_view(), name='supplier_edit'),
     
     # Note management
-    path('note/add/<int:content_type_id>/<int:object_id>/', views.add_note, name='add_note'),
-    path('note/delete/<int:note_id>/', views.delete_note, name='delete_note'),
+    path('note/add/<int:content_type_id>/<int:object_id>/', add_note, name='add_note'),
+    path('note/delete/<int:note_id>/', delete_note, name='delete_note'),
     
     # Reminder management
     path('reminders/', ReminderListView.as_view(), name='reminders_list'),
-    path('reminder/add/', views.add_reminder, name='add_reminder'),
-    path('reminder/add/<int:note_id>/', views.add_reminder, name='add_note_reminder'),
-    path('reminder/<int:reminder_id>/toggle/', views.toggle_reminder_completion, name='toggle_reminder'),
-    path('reminder/<int:reminder_id>/delete/', views.delete_reminder, name='delete_reminder'),
+    path('reminder/add/', add_reminder, name='add_reminder'),
+    path('reminder/add/<int:note_id>/', add_reminder, name='add_note_reminder'),
+    path('reminder/<int:reminder_id>/toggle/', toggle_reminder_completion, name='toggle_reminder'),
+    path('reminder/<int:reminder_id>/delete/', delete_reminder, name='delete_reminder'),
     
     # Acknowledgement letter
-    path('clin/<int:clin_id>/generate-letter/', views.generate_acknowledgement_letter, name='generate_acknowledgement_letter'),
-    path('clin/<int:clin_id>/view-letter/', views.view_acknowledgement_letter, name='view_acknowledgement_letter'),
+    path('clin/<int:clin_id>/generate-letter/', generate_acknowledgement_letter, name='generate_acknowledgement_letter'),
+    path('clin/<int:clin_id>/view-letter/', view_acknowledgement_letter, name='view_acknowledgement_letter'),
     path('letter/<int:pk>/edit/', AcknowledgementLetterUpdateView.as_view(), name='edit_acknowledgement_letter'),
     
     # API endpoints

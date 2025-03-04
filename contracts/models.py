@@ -4,6 +4,8 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -396,4 +398,36 @@ class Reminder(models.Model):
             object_id = self.note.object_id
             note_type = f"Note for {content_type.capitalize()} {object_id}"
         return f"{self.reminder_title} - {self.reminder_date.strftime('%Y-%m-%d') if self.reminder_date else 'No date'} ({note_type})"
+
+class SequenceNumber(models.Model):
+    """Model to store and manage auto-incrementing sequence numbers"""
+    po_number = models.BigIntegerField(default=10000)  # Starting value
+    tab_number = models.BigIntegerField(default=10000)  # Starting value
+    
+    @classmethod
+    def get_next_po_number(cls):
+        """Get the next PO number and increment the stored value"""
+        sequence, created = cls.objects.get_or_create(id=1)
+        current_po = sequence.po_number
+        sequence.po_number += 1
+        sequence.save()
+        return str(current_po)
+    
+    @classmethod
+    def get_next_tab_number(cls):
+        """Get the next TAB number and increment the stored value"""
+        sequence, created = cls.objects.get_or_create(id=1)
+        current_tab = sequence.tab_number
+        sequence.tab_number += 1
+        sequence.save()
+        return str(current_tab)
+
+@receiver(pre_save, sender=Contract)
+def assign_po_tab_numbers(sender, instance, **kwargs):
+    """Assign PO and TAB numbers to new contracts if they don't already have them"""
+    if not instance.pk:  # Only for new contracts
+        if not instance.po_number:
+            instance.po_number = SequenceNumber.get_next_po_number()
+        if not instance.tab_num:
+            instance.tab_num = SequenceNumber.get_next_tab_number()
 
