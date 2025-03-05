@@ -4,6 +4,8 @@ import fitz  # PyMuPDF
 # Path to the PDF file
 pdf_path = 'test_file.PDF'
 
+
+
 # Define the box areas for each field as percentages (left, upper, right, lower)
 Width = 1224
 Height = 1584

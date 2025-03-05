@@ -22,7 +22,7 @@ class ContractLogView(ListView):
     paginate_by = 50
     
     def get_queryset(self):
-        queryset = Contract.objects.all().order_by('-created_at')
+        queryset = Contract.objects.all().order_by('-created_on')
         
         # Apply filters if provided
         search_query = self.request.GET.get('search', '')
@@ -60,7 +60,7 @@ class ContractLogView(ListView):
 @conditional_login_required
 def export_contract_log(request):
     # Get all contracts
-    contracts = Contract.objects.all().order_by('-created_at')
+    contracts = Contract.objects.all().order_by('-created_on')
     
     # Apply filters if provided
     search_query = request.GET.get('search', '')
@@ -121,7 +121,7 @@ def export_contract_log(request):
             contract.title,
             contract.supplier.name if contract.supplier else '',
             contract.status,
-            contract.created_at.strftime('%Y-%m-%d') if contract.created_at else '',
+            contract.created_on.strftime('%Y-%m-%d') if contract.created_on else '',
             contract.created_by.username if contract.created_by else '',
             contract.closed_date.strftime('%Y-%m-%d') if contract.closed_date else '',
             contract.closed_by.username if contract.closed_by else '',

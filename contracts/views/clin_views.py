@@ -41,7 +41,7 @@ class ClinDetailView(DetailView):
         notes = Note.objects.filter(
             content_type=clin_type,
             object_id=clin.id
-        ).order_by('-created_at')
+        ).order_by('-created_on')
         context['notes'] = notes
         
         return context
@@ -143,7 +143,7 @@ def get_clin_notes(request, clin_id):
     notes = Note.objects.filter(
         content_type=clin_type,
         object_id=clin.id
-    ).order_by('-created_at')
+    ).order_by('-created_on')
     
     notes_html = render_to_string('contracts/partials/notes_list.html', {
         'notes': notes,

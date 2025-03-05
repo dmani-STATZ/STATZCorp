@@ -23,7 +23,7 @@ class AuditModel(models.Model):
         super().save(*args, **kwargs)
 
 class Contract(AuditModel):
-    contract_number = models.CharField(max_length=25, null=True, blank=True)
+    contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     open = models.BooleanField(null=True, blank=True)
     date_closed = models.DateTimeField(null=True, blank=True)
     cancelled = models.BooleanField(null=True, blank=True)
@@ -194,11 +194,13 @@ class Buyer(models.Model):
 class ContractType(models.Model):
     description = models.TextField(null=True, blank=True)
 
+
     def __str__(self):
         return self.description
 
 class ClinType(models.Model):
     description = models.TextField(null=True, blank=True)
+    raw_text = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.description
@@ -435,7 +437,9 @@ def assign_po_tab_numbers(sender, instance, **kwargs):
     """Assign PO and TAB numbers to new contracts if they don't already have them"""
     if not instance.pk:  # Only for new contracts
         if not instance.po_number:
-            instance.po_number = SequenceNumber.get_next_po_number()
+            instance.po_number = SequenceNumber.get_po_number()
+            SequenceNumber.advance_po_number()
         if not instance.tab_num:
-            instance.tab_num = SequenceNumber.get_next_tab_number()
+            instance.tab_num = SequenceNumber.get_tab_number()
+            SequenceNumber.advance_tab_number()
 

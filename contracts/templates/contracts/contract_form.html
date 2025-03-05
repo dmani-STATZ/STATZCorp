@@ -48,9 +48,40 @@
                     </svg>
                     Extract Data
                 </button>
+                <button type="button" id="export-dd1155-btn" class="btn-secondary mt-6 flex items-center ml-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Raw Text
+                </button>
             </div>
             <div id="extraction-status" class="hidden mt-4 p-4 rounded-md">
                 <!-- Status message will appear here -->
+            </div>
+            <div id="clin-data-section" class="hidden mt-4">
+                <div id="clin-count" class="text-lg font-semibold text-gray-700 mb-2"></div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN Type</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FOB</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IA</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clin-data-body" class="bg-white divide-y divide-gray-200">
+                            <!-- CLIN data rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </form>
     </div>
@@ -94,24 +125,11 @@
                 
                 <div class="space-y-4">
                     {{ form.award_date|as_crispy_field }}
-                   
                 </div>
                 
                 <div class="space-y-4">
                      {{ form.due_date|as_crispy_field }}
                 </div>
-                
-                <!-- Additional Information -->
-                <!-- <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        Additional Information
-                    </h2>
-                </div>
-                
-                <div class="space-y-4">
-                    {{ form.assigned_user|as_crispy_field }}
-                    {{ form.files_url|as_crispy_field }}
-                </div> -->
             </div>
             
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
@@ -133,15 +151,97 @@
             </div>
         </form>
     </div>
+
+    <!-- CLIN Data Section -->
+    <div id="clin-data-section" class="hidden mt-6">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-700">CLIN Information</h2>
+                <div id="clin-count" class="text-sm font-medium text-gray-600"></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN Type</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FOB</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IA</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clin-data-body" class="bg-white divide-y divide-gray-200">
+                        <!-- CLIN data rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+    function showStatus(message, type) {
+        const statusDiv = document.getElementById('extraction-status');
+        statusDiv.className = `mt-4 p-4 rounded-md ${type === 'error' ? 'bg-red-100 text-red-700' : type === 'success' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`;
+        statusDiv.textContent = message;
+        statusDiv.classList.remove('hidden');
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const extractButton = document.getElementById('extract-dd1155-btn');
+        const exportButton = document.getElementById('export-dd1155-btn');
         const fileInput = document.getElementById('dd1155-file');
         const statusMessage = document.getElementById('extraction-status');
+        const contractForm = document.getElementById('contract-form');
+        const contractNumberInput = document.getElementById('id_contract_number');
+        
+        // Store CLIN data globally for form submission
+        let extractedClinData = [];
+        
+        if (contractNumberInput) {
+            contractNumberInput.addEventListener('change', async function() {
+                const contractNumber = this.value;
+                if (contractNumber) {
+                    try {
+                        const response = await fetch(`/contracts/check-contract-number/?number=${encodeURIComponent(contractNumber)}`);
+                        const data = await response.json();
+                        
+                        if (data.exists) {
+                            // Show error message
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'text-red-500 text-sm mt-1';
+                            errorDiv.id = 'contract-number-error';
+                            errorDiv.textContent = 'A contract with this number already exists.';
+                            
+                            // Remove any existing error message
+                            const existingError = document.getElementById('contract-number-error');
+                            if (existingError) {
+                                existingError.remove();
+                            }
+                            
+                            // Add new error message
+                            this.parentNode.appendChild(errorDiv);
+                        } else {
+                            // Remove error message if it exists
+                            const errorDiv = document.getElementById('contract-number-error');
+                            if (errorDiv) {
+                                errorDiv.remove();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error checking contract number:', error);
+                    }
+                }
+            });
+        }
         
         if (extractButton) {
             extractButton.addEventListener('click', function() {
@@ -172,53 +272,78 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Add this right after the data is received
-                        console.log('Raw data received:', JSON.stringify(data, null, 2));
+                        console.log('Raw data received:', data);
                         
                         // Populate form fields with extracted data
                         const fields = {
-                            'contract_number': 'id_contract_number',
-                            'award_date': 'id_award_date',
-                            'due_date': 'id_due_date',
-                            'buyer': 'id_buyer',
-                            'contract_type': 'id_contract_type'
+                            'contract_number': data.contract_number?.value || data.contract_number,
+                            'award_date': data.award_date?.value || data.award_date,
+                            'due_date': data.due_date?.value || data.due_date,
+                            'buyer': data.buyer?.value || data.buyer,
+                            'contract_type': data.contract_type?.value || data.contract_type,
+                            'nist': data.nist?.value || data.nist
                         };
 
                         // Helper function to safely set field values
                         const setFieldValue = (fieldId, value) => {
                             const field = document.getElementById(fieldId);
                             if (field && value) {
-                                // Format dates if needed (assuming YYYY-MM-DD format is required)
-                                if (fieldId === 'id_award_date' || fieldId === 'id_due_date') {
-                                    console.log(`Processing date field ${fieldId} with value ${value}`);
+                                if (field.type === 'checkbox') {
+                                    field.checked = Boolean(value);
+                                } else if (fieldId === 'id_award_date' || fieldId === 'id_due_date') {
                                     try {
-                                        // Ensure date is in YYYY-MM-DD format
                                         const date = new Date(value);
-                                        const formattedDate = date.toISOString().split('T')[0];
-                                        console.log(`Formatted date: ${formattedDate}`);
-                                        field.value = formattedDate;
+                                        field.value = date.toISOString().split('T')[0];
                                     } catch (e) {
                                         console.error(`Error formatting date for ${fieldId}:`, e);
-                                        field.value = value; // Use original value if formatting fails
+                                        field.value = value;
                                     }
                                 } else {
                                     field.value = value;
                                 }
                                 console.log(`Set ${fieldId} to ${field.value}`);
-                            } else {
-                                console.log(`Could not set ${fieldId}:`, field ? 'value missing' : 'field not found');
                             }
                         };
 
-                        // Populate each field if data exists
-                        Object.entries(fields).forEach(([dataKey, fieldId]) => {
-                            console.log(`Processing ${dataKey} with value:`, data[dataKey]);
-                            if (data[dataKey] !== undefined && data[dataKey] !== null) {
-                                setFieldValue(fieldId, data[dataKey]);
-                            } else {
-                                console.log(`No data for ${dataKey}`);
-                            }
+                        // Populate form fields
+                        Object.entries(fields).forEach(([key, value]) => {
+                            const fieldId = `id_${key}`;
+                            setFieldValue(fieldId, value);
                         });
+
+                        // Handle CLIN data
+                        if (data.clins && Array.isArray(data.clins)) {
+                            extractedClinData = data.clins;
+                            const clinCount = extractedClinData.length;
+                            const clinCountElement = document.getElementById('clin-count');
+                            const clinDataSection = document.getElementById('clin-data-section');
+                            const clinDataBody = document.getElementById('clin-data-body');
+                            
+                            clinCountElement.textContent = `${clinCount} CLIN${clinCount !== 1 ? 's' : ''} Found`;
+                            clinDataSection.classList.remove('hidden');
+                            
+                            // Clear existing table rows
+                            clinDataBody.innerHTML = '';
+                            
+                            // Add rows for each CLIN
+                            extractedClinData.forEach(clin => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.clin_number || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.clin_type || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.nsn_code || ''}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-900">${clin.description || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.order_qty || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.unit || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.unit_price ? '$' + parseFloat(clin.unit_price).toFixed(2) : ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.po_amount ? '$' + parseFloat(clin.po_amount).toFixed(2) : ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.fob === 'O' ? 'Origin' : 'Destination'}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.ia === 'O' ? 'Origin' : 'Destination'}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.due_date || ''}</td>
+                                `;
+                                clinDataBody.appendChild(row);
+                            });
+                        }
                         
                         showStatus('Data extracted successfully! Form fields have been populated.', 'success');
                     } else {
@@ -232,24 +357,117 @@
             });
         }
         
-        function showStatus(message, type) {
-            if (!statusMessage) return;
+        // Form submission handler
+        async function handleFormSubmit(e) {
+            e.preventDefault();
             
-            statusMessage.textContent = message;
-            statusMessage.classList.remove('hidden');
+            // Show loading state
+            const submitButton = contractForm.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Creating Contract...
+            `;
             
-            // Reset classes
-            statusMessage.className = 'mt-4 p-4 rounded-md';
-            
-            // Add appropriate styling based on message type
-            if (type === 'error') {
-                statusMessage.classList.add('bg-red-100', 'text-red-700');
-            } else if (type === 'success') {
-                statusMessage.classList.add('bg-green-100', 'text-green-700');
-            } else {
-                statusMessage.classList.add('bg-blue-100', 'text-blue-700');
+            try {
+                // Create FormData from the form
+                const formData = new FormData(contractForm);
+                
+                // Add CLIN data if available
+                if (extractedClinData && extractedClinData.length > 0) {
+                    formData.append('extracted_clin_data', JSON.stringify(extractedClinData));
+                }
+                
+                // Submit the form
+                const response = await fetch(contractForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('Contract created successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = result.redirect_url;
+                    }, 1500);
+                } else {
+                    showStatus(result.error || 'Failed to create contract.', 'error');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('An error occurred while creating the contract.', 'error');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
             }
         }
+        
+        // Add form submission handler
+        if (contractForm) {
+            contractForm.addEventListener('submit', handleFormSubmit);
+        }
+
+        // Add event listener for export button
+        document.getElementById('export-dd1155-btn').addEventListener('click', function() {
+            console.log('Export button clicked');
+            const fileInput = document.getElementById('dd1155-file');
+            if (!fileInput.files.length) {
+                showStatus('Please select a PDF file first.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('dd1155_file', fileInput.files[0]);
+            console.log('File appended to FormData:', fileInput.files[0].name);
+
+            // Show loading status
+            showStatus('Exporting raw text...', 'info');
+            console.log('Sending export request to server...');
+
+            fetch('/contracts/export-dd1155-text/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => {
+                console.log('Received response:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Received data:', data);
+                if (data.success) {
+                    showStatus('Text exported successfully! Check the exports folder.', 'success');
+                    // Create download link if file path is provided
+                    if (data.file_path) {
+                        const downloadUrl = `/media/exports/${data.file_path}`;
+                        console.log('Creating download link:', downloadUrl);
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = data.file_path;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Export error:', error);
+                showStatus('Error exporting text: ' + error.message, 'error');
+            });
+        });
     });
 </script>
-{% endblock %} 
+{% endblock %}

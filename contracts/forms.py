@@ -189,6 +189,22 @@ class ContractForm(forms.ModelForm):
             }),
         }
 
+    def clean_contract_number(self):
+        contract_number = self.cleaned_data.get('contract_number')
+        if contract_number:
+            # Check if this is an update to an existing contract
+            instance = getattr(self, 'instance', None)
+            if instance and instance.pk:
+                # If updating, exclude the current instance from the check
+                exists = Contract.objects.exclude(pk=instance.pk).filter(contract_number=contract_number).exists()
+            else:
+                # If creating new, check all contracts
+                exists = Contract.objects.filter(contract_number=contract_number).exists()
+            
+            if exists:
+                raise forms.ValidationError('A contract with this number already exists.')
+        return contract_number
+
 class ContractCloseForm(forms.ModelForm):
     class Meta:
         model = Contract

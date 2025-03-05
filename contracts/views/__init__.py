@@ -55,4 +55,5 @@ from .contract_log_views import (
 
 from .dd1155_views import (
     extract_dd1155_data,
+    export_dd1155_text,
 )

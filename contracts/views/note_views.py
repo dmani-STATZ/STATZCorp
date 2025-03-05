@@ -39,7 +39,7 @@ def add_note(request, content_type_id, object_id):
                 notes = Note.objects.filter(
                     content_type=content_type,
                     object_id=object_id
-                ).order_by('-created_at')
+                ).order_by('-created_on')
                 
                 notes_html = render_to_string('contracts/partials/notes_list.html', {
                     'notes': notes,
@@ -87,7 +87,7 @@ def delete_note(request, note_id):
         notes = Note.objects.filter(
             content_type=content_type,
             object_id=object_id
-        ).order_by('-created_at')
+        ).order_by('-created_on')
         
         notes_html = render_to_string('contracts/partials/notes_list.html', {
             'notes': notes,

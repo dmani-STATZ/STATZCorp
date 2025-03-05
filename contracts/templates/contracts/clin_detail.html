@@ -38,28 +38,32 @@
             <div>
                 <p class="text-sm text-gray-600">Supplier</p>
                 <p class="font-medium relative group">
-                    <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
-                       class="text-blue-600 hover:text-blue-800">
-                        {{ clin.supplier.name|default:"N/A" }}
-                    </a>
                     {% if clin.supplier %}
+                        <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
+                           class="text-blue-600 hover:text-blue-800">
+                            {{ clin.supplier.name }}
+                        </a>
                         <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
                             CAGE: {{ clin.supplier.cage_code|default:"N/A" }}
                         </span>
+                    {% else %}
+                        <span class="text-gray-500">N/A</span>
                     {% endif %}
                 </p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">NSN</p>
                 <p class="font-medium relative group">
-                    <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}?next={{ request.path|urlencode }}" 
-                       class="text-blue-600 hover:text-blue-800">
-                        {{ clin.nsn.nsn_code|default:"N/A" }}
-                    </a>
                     {% if clin.nsn %}
+                        <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}?next={{ request.path|urlencode }}" 
+                           class="text-blue-600 hover:text-blue-800">
+                            {{ clin.nsn.nsn_code }}
+                        </a>
                         <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
                             {{ clin.nsn.description|default:"No description available" }}
                         </span>
+                    {% else %}
+                        <span class="text-gray-500">N/A</span>
                     {% endif %}
                 </p>
             </div>

@@ -8,10 +8,14 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.db.models import Q
 from django.http import JsonResponse
+import json
+import logging
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, SequenceNumber
+from ..models import Contract, SequenceNumber, Clin, ClinFinance, Note, ContentType, Nsn
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
+
+logger = logging.getLogger(__name__)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -59,15 +63,80 @@ class ContractCreateView(CreateView):
         initial['tab_num'] = SequenceNumber.get_tab_number()
         initial['sales_class'] = '2'
         initial['open']=True
-        #initial['nist']=True
-        # initial['award_date'] = timezone.now()
-        # initial['due_date'] = timezone.now() + timedelta(days=60)
         return initial
     
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        messages.success(self.request, 'Contract created successfully.')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        
+        # Advance the sequence numbers after successful creation
+        SequenceNumber.advance_po_number()
+        SequenceNumber.advance_tab_number()
+        
+        # Process CLIN data if available
+        extracted_clin_data = self.request.POST.get('extracted_clin_data')
+        if extracted_clin_data:
+            try:
+                clin_data = json.loads(extracted_clin_data)
+                for clin_info in clin_data:
+                    # Create NSN if it doesn't exist
+                    nsn = None
+                    if clin_info.get('nsn_code'):
+                        nsn, _ = Nsn.objects.get_or_create(
+                            nsn_code=clin_info['nsn_code'],
+                            defaults={'description': clin_info.get('description', '')}
+                        )
+                    
+                    # Create CLIN
+                    clin = Clin(
+                        contract=self.object,
+                        po_number=self.object.po_number,  # Use contract's PO number
+                        nsn=nsn,
+                        order_qty=clin_info.get('order_qty'),
+                        ia=clin_info.get('ia'),
+                        fob=clin_info.get('fob'),
+                        due_date=clin_info.get('due_date'),
+                        created_by=self.request.user
+                    )
+                    clin.save()
+                    
+                    # Create ClinFinance
+                    if clin_info.get('unit_price') or clin_info.get('po_amount'):
+                        clin_finance = ClinFinance.objects.create(
+                            clin=clin,
+                            po_amount=clin_info.get('po_amount'),
+                            created_by=self.request.user
+                        )
+                        # Set the reverse relationship
+                        clin.clin_finance = clin_finance
+                        clin.save()
+                
+                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Contract and {len(clin_data)} CLINs created successfully.',
+                        'redirect_url': self.get_success_url()
+                    })
+                
+                messages.success(self.request, f'Contract and {len(clin_data)} CLINs created successfully.')
+            except Exception as e:
+                logger.error(f"Error creating CLINs: {str(e)}")
+                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Contract created but there was an error creating CLINs: {str(e)}'
+                    })
+                messages.warning(self.request, f'Contract created but there was an error creating CLINs: {str(e)}')
+        else:
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Contract created successfully.',
+                    'redirect_url': self.get_success_url()
+                })
+            messages.success(self.request, 'Contract created successfully.')
+        
+        return response
     
     def get_success_url(self):
         return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
@@ -154,4 +223,18 @@ def contract_search(request):
         
         results.append(contract_data)
     
-    return JsonResponse(results, safe=False) 
+    return JsonResponse(results, safe=False)
+
+
+@conditional_login_required
+def check_contract_number(request):
+    contract_number = request.GET.get('number')
+    if contract_number:
+        # If we're editing an existing contract, exclude it from the check
+        current_contract_id = request.GET.get('current_id')
+        if current_contract_id:
+            exists = Contract.objects.exclude(id=current_contract_id).filter(contract_number=contract_number).exists()
+        else:
+            exists = Contract.objects.filter(contract_number=contract_number).exists()
+        return JsonResponse({'exists': exists})
+    return JsonResponse({'exists': False}) 

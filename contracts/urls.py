@@ -50,7 +50,10 @@ from .views import (
     
     # DD1155 views
     extract_dd1155_data,
+    export_dd1155_text,
 )
+
+from .views.contract_views import check_contract_number
 
 app_name = 'contracts'
 
@@ -62,14 +65,15 @@ urlpatterns = [
     path('open-export-folder/', open_export_folder, name='open_export_folder'),
 
     # Contract management
-    path('contract/new/', ContractCreateView.as_view(), name='contract_create'),
-    path('contract/<int:pk>/', ContractDetailView.as_view(), name='contract_detail'),
-    path('contract/<int:pk>/edit/', ContractUpdateView.as_view(), name='contract_update'),
-    path('contract/<int:pk>/close/', ContractCloseView.as_view(), name='contract_close'),
-    path('contract/<int:pk>/cancel/', ContractCancelView.as_view(), name='contract_cancel'),
+    path('create/', ContractCreateView.as_view(), name='contract_create'),
+    path('<int:pk>/', ContractDetailView.as_view(), name='contract_detail'),
+    path('<int:pk>/update/', ContractUpdateView.as_view(), name='contract_update'),
+    path('<int:pk>/close/', ContractCloseView.as_view(), name='contract_close'),
+    path('<int:pk>/cancel/', ContractCancelView.as_view(), name='contract_cancel'),
     
     # DD Form 1155 processing
     path('extract-dd1155/', extract_dd1155_data, name='extract_dd1155'),
+    path('export-dd1155-text/', export_dd1155_text, name='export_dd1155_text'),
     path('dd1155-test/', TemplateView.as_view(template_name='contracts/dd1155_test.html'), name='dd1155_test'),
     
     # CLIN management
@@ -107,4 +111,5 @@ urlpatterns = [
     
     # Test
     path('test-app-name/', test_app_name, name='test_app_name'),
+    path('check-contract-number/', check_contract_number, name='check_contract_number'),
 ] 
