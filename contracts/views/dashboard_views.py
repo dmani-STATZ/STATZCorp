@@ -21,7 +21,6 @@ class ContractLifecycleDashboardView(TemplateView):
                 cancelled=False
             ).prefetch_related(
                 'clin_set',
-                'clin_set__clin_finance',
                 'clin_set__supplier'
             ).order_by('-created_on')[:20]
 
@@ -30,14 +29,14 @@ class ContractLifecycleDashboardView(TemplateView):
         for contract in last_20_contracts:
             # Get the first CLIN with clin_type_id=1 for this contract
             main_clin = contract.clin_set.filter(clin_type_id=1).first()
-            if main_clin and main_clin.clin_finance and main_clin.supplier:
+            if main_clin and main_clin.supplier:
                 contracts_data.append({
                     'id': contract.id,
                     'tab_num': contract.tab_num,
                     'po_number': contract.po_number,
                     'contract_number': contract.contract_number,
                     'supplier_name': main_clin.supplier.name,
-                    'contract_value': main_clin.clin_finance.contract_value,
+                    'contract_value': main_clin.contract_value,
                     'award_date': contract.award_date,
                     'due_date': contract.due_date,
                     'cancelled': contract.cancelled,
@@ -105,7 +104,7 @@ class ContractLifecycleDashboardView(TemplateView):
                 'contracts_due': past_contracts.distinct().count(),
                 'contracts_due_late': past_contracts.filter(due_date_late=True).distinct().count(),
                 'contracts_due_ontime': past_contracts.filter(due_date_late=False).distinct().count(),
-                'new_contract_value': clins.aggregate(total=Sum('clin_finance__contract_value'))['total'] or 0,
+                'new_contract_value': clins.aggregate(total=Sum('contract_value'))['total'] or 0,
                 'new_contracts': contracts.distinct().count(),
                 'date_range': mark_safe(f"{start_date.strftime('%Y/%m/%d')} to<br>{end_date.strftime('%Y/%m/%d')}"),
             }
@@ -151,14 +150,14 @@ class ContractLifecycleDashboardView(TemplateView):
         # Contracts with CLINs that are shipped but not paid
         contracts_shipped_not_paid = Contract.objects.filter(
             clin__ship_date__isnull=False,
-            clin__clin_finance__paid_date=None
+            clin__paid_date=None
         ).distinct().count()
         context['shipped_not_paid'] = contracts_shipped_not_paid
         
         # Contracts with all CLINs paid
         contracts_all_paid = Contract.objects.annotate(
             total_clins=Count('clin'),
-            paid_clins=Count('clin', filter=Q(clin__clin_finance__paid_date__isnull=False))
+            paid_clins=Count('clin', filter=Q(clin__paid_date__isnull=False))
         ).filter(
             total_clins=F('paid_clins'),
             total_clins__gt=0

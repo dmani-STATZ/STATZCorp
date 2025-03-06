@@ -100,21 +100,11 @@ class ContractCreateView(CreateView):
                         ia=clin_info.get('ia'),
                         fob=clin_info.get('fob'),
                         due_date=clin_info.get('due_date'),
+                        po_amount=clin_info.get('po_amount'),
                         created_by=self.request.user
                     )
                     clin.save()
-                    
-                    # Create ClinFinance
-                    if clin_info.get('unit_price') or clin_info.get('po_amount'):
-                        clin_finance = ClinFinance.objects.create(
-                            clin=clin,
-                            po_amount=clin_info.get('po_amount'),
-                            created_by=self.request.user
-                        )
-                        # Set the reverse relationship
-                        clin.clin_finance = clin_finance
-                        clin.save()
-                
+                                    
                 if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
                         'success': True,
