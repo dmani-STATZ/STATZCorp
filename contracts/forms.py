@@ -142,17 +142,40 @@ class ContractForm(forms.ModelForm):
     class Meta:
         model = Contract
         fields = [
-            'contract_number', 'open', 'po_number', 'tab_num', 'buyer',
-            'contract_type', 'award_date', 'due_date', 'sales_class',
-            'assigned_user', 'nist', 'files_url'
+            'idiq_contract', 'contract_number', 'status', 'open', 'date_closed',
+            'cancelled', 'date_canceled', 'canceled_reason', 'po_number', 'tab_num',
+            'buyer', 'contract_type', 'award_date', 'due_date', 'due_date_late',
+            'sales_class', 'survey_date', 'survey_type', 'assigned_user',
+            'assigned_date', 'nist', 'files_url', 'reviewed', 'reviewed_by',
+            'reviewed_on', 'statz_value', 'contract_value'
         ]
         widgets = {
+            'idiq_contract': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
             'contract_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Contract Number'
             }),
+            'status': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
             'open': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'date_closed': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'cancelled': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'date_canceled': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'canceled_reason': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
             'po_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -168,20 +191,35 @@ class ContractForm(forms.ModelForm):
             'contract_type': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
-            'award_date': forms.DateInput(attrs={
+            'award_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'type': 'date'
+                'type': 'datetime-local'
             }),
-            'due_date': forms.DateInput(attrs={
+            'due_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'type': 'date'
+                'type': 'datetime-local'
+            }),
+            'due_date_late': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
             'sales_class': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
+            'survey_date': forms.DateInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'date'
+            }),
+            'survey_type': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Survey Type'
+            }),
             'assigned_user': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Assigned User'
+            }),
+            'assigned_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
             }),
             'nist': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
@@ -189,6 +227,27 @@ class ContractForm(forms.ModelForm):
             'files_url': forms.URLInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Files URL'
+            }),
+            'reviewed': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'reviewed_by': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Reviewer Name'
+            }),
+            'reviewed_on': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'statz_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Value',
+                'step': '0.01'
+            }),
+            'contract_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Contract Value',
+                'step': '0.01'
             }),
         }
 
@@ -246,7 +305,11 @@ class ClinForm(forms.ModelForm):
             'contract', 'sub_contract', 'po_num_ext', 'tab_num', 
             'clin_po_num', 'po_number', 'clin_type', 'supplier', 
             'nsn', 'ia', 'fob', 'order_qty', 'ship_qty', 
-            'due_date', 'supplier_due_date', 'ship_date'
+            'due_date', 'supplier_due_date', 'ship_date',
+            'special_payment_terms', 'special_payment_terms_paid', 
+            'contract_value', 'po_amount', 'paid_amount', 
+            'paid_date', 'wawf_payment', 'wawf_recieved', 
+            'wawf_invoice', 'plan_gross', 'planned_split'
         ]
         widgets = {
             'contract': forms.Select(attrs={
@@ -308,6 +371,53 @@ class ClinForm(forms.ModelForm):
             'ship_date': forms.DateInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'type': 'date'
+            }),
+            'special_payment_terms': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'special_payment_terms_paid': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            }),
+            'contract_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Contract Value',
+                'step': '0.0001'
+            }),
+            'po_amount': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Amount',
+                'step': '0.0001'
+            }),
+            'paid_amount': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Paid Amount',
+                'step': '0.0001'
+            }),
+            'paid_date': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'wawf_payment': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter WAWF Payment',
+                'step': '0.0001'
+            }),
+            'wawf_recieved': forms.DateTimeInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'type': 'datetime-local'
+            }),
+            'wawf_invoice': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter WAWF Invoice'
+            }),
+            'plan_gross': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Plan Gross',
+                'step': '0.0001'
+            }),
+            'planned_split': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Planned Split'
             }),
         }
 
