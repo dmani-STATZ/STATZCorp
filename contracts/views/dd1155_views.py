@@ -15,7 +15,7 @@ import pytesseract
 from pdfminer.high_level import extract_text
 from datetime import datetime, timedelta
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Supplier, Clin, Buyer, ClinType, Nsn, ClinFinance, Note
+from ..models import Contract, Supplier, Clin, Buyer, ClinType, Nsn, Note
 from ..forms import ContractForm
 from django.utils import timezone
 from django.conf import settings
@@ -104,9 +104,9 @@ CLIN_PATTERNS = {
         'delivery_date': r'DELIVERY\s*DATE:\s*(\d{4}\s*[A-Z]{3}\s*\d{2})'
     },
     'variant2': {
-        'indicator': r'CLIN\s+PR\s+P[ER]LT\s+U[IT]\s+QUANTITY\s+UNIT\s+PRICE\s+CURRENCY\s+TOTAL\s+PRICE',
+        'indicator': r'CLIN\s*PR\s*PRLI\s*UI\s*QUANTITY\s*UNIT\sPRICE\s*CURRENCY\s*TOTAL\s*PRICE',
         'clin_line': r'(?:CLIN\.\s*)?(\d{4})\s+(?:PR\.\s*)?(\d+)\s+(?:P[ER]LT\.\s*)?(\d+)\s+(\w+)\s+(\d+\.?\d*)\s+(\d+,?\d*\.?\d*)\s+(?:USD)?\s+(\d+\.?\d*)',
-        'nsn_section': r'SUPPLIES\/SERVICES:\s*\n(\d{10})\s*\n([^\n]+)',
+        'nsn_section': r'SUPPLIES/SERVICES:\s*\n(\d{13})\s*\n([^\n]+)',
         'inspection_point': r'(?:INSPECTION\s*POINT|Inspection Point|INSPECT AT):\s*(ORIGIN|DESTINATION)',
         'fob': r'DELIVER\s+FOB:\s*(ORIGIN|DESTINATION)',
         'delivery_date': r'DELIVER\s+BY:\s*(\d{4}\s+[A-Z]{3}\s+\d{2})'

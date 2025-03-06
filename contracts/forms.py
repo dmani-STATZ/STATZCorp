@@ -2,9 +2,12 @@ from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from .models import (
-    Nsn, Supplier, Contract, Clin, ClinFinance, Note, Reminder, 
-    ClinAcknowledgment, Address, Contact, CanceledReason, 
-    ContractType, ClinType, Buyer, SalesClass, SpecialPaymentTerms
+    Nsn, Supplier, Contract, Clin, Note, Reminder,
+    ClinAcknowledgment, AcknowledgementLetter, Contact, Address,
+    Buyer, ContractType, ClinType, CanceledReason, SalesClass,
+    SpecialPaymentTerms, IdiqContract, IdiqContractDetails, SupplierType, SupplierCertification,
+    CertificationType, CertificationStatus, SupplierClassification,
+    ClassificationType
 )
 
 class NsnForm(forms.ModelForm):
@@ -305,65 +308,6 @@ class ClinForm(forms.ModelForm):
             'ship_date': forms.DateInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'type': 'date'
-            }),
-        }
-
-class ClinFinanceForm(forms.ModelForm):
-    class Meta:
-        model = ClinFinance
-        fields = [
-            'special_payment_terms', 'special_payment_terms_paid', 
-            'contract_value', 'po_amount', 'paid_amount', 
-            'paid_date', 'wawf_payment', 'wawf_recieved', 
-            'wawf_invoice', 'plan_gross', 'planned_split'
-        ]
-        widgets = {
-            'special_payment_terms': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
-            }),
-            'special_payment_terms_paid': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-            }),
-            'contract_value': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Contract Value',
-                'step': '0.0001'
-            }),
-            'po_amount': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter PO Amount',
-                'step': '0.0001'
-            }),
-            'paid_amount': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Paid Amount',
-                'step': '0.0001'
-            }),
-            'paid_date': forms.DateTimeInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'type': 'datetime-local'
-            }),
-            'wawf_payment': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter WAWF Payment',
-                'step': '0.0001'
-            }),
-            'wawf_recieved': forms.DateTimeInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'type': 'datetime-local'
-            }),
-            'wawf_invoice': forms.TextInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter WAWF Invoice'
-            }),
-            'plan_gross': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Plan Gross',
-                'step': '0.0001'
-            }),
-            'planned_split': forms.TextInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Planned Split'
             }),
         }
 

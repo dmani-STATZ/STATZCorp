@@ -113,8 +113,8 @@ def export_contract_log(request):
         pending_clins = total_clins - acknowledged_clins - rejected_clins
         
         from django.db.models import Sum
-        total_obligated = clins.aggregate(Sum('clinfinance__obligated_amt'))['clinfinance__obligated_amt__sum'] or Decimal('0.00')
-        total_invoiced = clins.aggregate(Sum('clinfinance__invoiced_amt'))['clinfinance__invoiced_amt__sum'] or Decimal('0.00')
+        total_obligated = clins.aggregate(Sum('contract_value'))['contract_value__sum'] or Decimal('0.00')
+        total_invoiced = clins.aggregate(Sum('paid_amount'))['paid_amount__sum'] or Decimal('0.00')
         
         writer.writerow([
             contract.contract_num,

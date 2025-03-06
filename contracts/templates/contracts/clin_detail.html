@@ -104,24 +104,24 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
                 <p class="text-sm text-gray-600">Contract Value</p>
-                <p class="font-medium">${{ clin.clin_finance.contract_value|floatformat:2|intcomma|default:"N/A" }}</p>
+                <p class="font-medium">${{ clin.contract_value|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">PO Amount</p>
-                <p class="font-medium">${{ clin.clin_finance.po_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+                <p class="font-medium">${{ clin.po_amount|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Paid Amount</p>
-                <p class="font-medium">${{ clin.clin_finance.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+                <p class="font-medium">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Payment Terms</p>
-                <p class="font-medium">{{ clin.clin_finance.special_payment_terms.terms|default:"N/A" }}</p>
+                <p class="font-medium">{{ clin.special_payment_terms.terms|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Payment Status</p>
                 <p class="font-medium">
-                    {% if clin.clin_finance.special_payment_terms_paid %}
+                    {% if clin.special_payment_terms_paid %}
                         <span class="text-green-600">Paid</span>
                     {% else %}
                         <span class="text-red-600">Unpaid</span>
@@ -130,19 +130,19 @@
             </div>
             <div>
                 <p class="text-sm text-gray-600">Paid Date</p>
-                <p class="font-medium">{{ clin.clin_finance.paid_date|date:"M d, Y"|default:"N/A" }}</p>
+                <p class="font-medium">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">WAWF Payment</p>
-                <p class="font-medium">${{ clin.clin_finance.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
+                <p class="font-medium">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">WAWF Invoice</p>
-                <p class="font-medium">{{ clin.clin_finance.wawf_invoice|default:"N/A" }}</p>
+                <p class="font-medium">{{ clin.wawf_invoice|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-600">WAWF Received</p>
-                <p class="font-medium">{{ clin.clin_finance.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
+                <p class="font-medium">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
             </div>
         </div>
     </div>

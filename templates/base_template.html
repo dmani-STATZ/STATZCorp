@@ -21,7 +21,6 @@
     <style>
         body {
             padding-top: 40px;
-
             display: flex;
             flex-direction: column;
         }
@@ -30,10 +29,24 @@
             top: 0;
             left: 0;
             width: 100%;
-            background-color: #fff; /* Optional: Set a background color */
+            background: repeating-linear-gradient(
+                45deg,
+                #3e3e4150,
+                #3e3e4150 2px,
+                #d0d1d450 4px,
+                #d0d1d450 6px
+                ),
+                repeating-linear-gradient(
+                90deg,
+                #3e3e4150,
+                #3e3e4150 2px,
+                #d0d1d450 4px,
+                #d0d1d450 6px
+                );
+            background-blend-mode: multiply;
+            background-color: #004eb3;
             z-index: 1000; /* Ensure the header is above other content */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
-            background-color: rgb(31, 41, 55);
             color: rgb(255, 255, 255);
             width: 100%;
             padding: 1rem;
@@ -43,8 +56,34 @@
             height: 60px;
         }
         .sidebar {
-            transition: transform 0.3s;
+            background: repeating-linear-gradient(
+                45deg,
+                #3e3e4150,
+                #3e3e4150 2px,
+                #d0d1d450 4px,
+                #d0d1d450 6px
+                ),
+                repeating-linear-gradient(
+                90deg,
+                #3e3e4150,
+                #3e3e4150 2px,
+                #d0d1d450 4px,
+                #d0d1d450 6px
+                );
+            background-blend-mode: multiply;
+            background-color: #e00000;
+            /*background: linear-gradient(145deg, #d1d5db, #ffffff);*/ /* Light gray to white */
+            /*box-shadow: 5px 5px 15px #888888, -5px -5px 15px #ffffff;*/ /*Darker shadows for more contrast*/
+            clip-path: polygon(0% 0%, 75% 5%, 101% 50%, 75% 95%, 0% 100%);
+            border-radius: 15px 50% 50% 15px; /* Adjust for rounded corners */
+            width: 16rem; /* 256px */
+            height: calc(75vh - 60px); /* 75% of viewport height */
+            position: fixed;
+            top: 60px;
+            left: 0;
             z-index: 1100;
+            transition: transform 0.3s;
+            color: #f1f1f1;
         }
         .sidebar.active {
             transform: translateX(0);
@@ -96,7 +135,7 @@
             {% endif %}
     </header>
     <!-- Sidebar -->
-    <div class="sidebar bg-gray-500 text-white w-64 h-screen fixed top-0 left-0 inactive rounded-tr-full rounded-br-full border-r-2 border-b-2 border-t-2 border-red-600" id="sidebar">
+    <div class="sidebar inactive" id="sidebar">
         <button class="text-red-600 py-2 px-4 w-full text-right" onclick="toggleSidebar()">❌</button>
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corp" class="h-12 w-18 m-8">
 

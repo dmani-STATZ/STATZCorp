@@ -1,19 +1,15 @@
 from django.core.management.base import BaseCommand
 from django.db import connection
-from contracts.models import Clin, ClinFinance, SpecialPaymentTerms
+from contracts.models import Clin, SpecialPaymentTerms
 import json
 
 class Command(BaseCommand):
-    help = 'Checks Clin and ClinFinance table structures for migration'
+    help = 'Checks Clin table structure for migration'
 
     def handle(self, *args, **options):
         # Get Clin model fields
         clin_fields = [field.name for field in Clin._meta.get_fields() 
                       if not field.is_relation or field.one_to_one or field.many_to_one]
-        
-        # Get ClinFinance model fields
-        clinfinance_fields = [field.name for field in ClinFinance._meta.get_fields() 
-                             if not field.is_relation or field.one_to_one or field.many_to_one]
         
         # Get SpecialPaymentTerms codes
         special_payment_terms = list(SpecialPaymentTerms.objects.values('id', 'code', 'terms'))
@@ -36,10 +32,6 @@ class Command(BaseCommand):
         for field in clin_fields:
             self.stdout.write(f'  - {field}')
         
-        self.stdout.write('\n' + self.style.SUCCESS('ClinFinance Model Fields:'))
-        for field in clinfinance_fields:
-            self.stdout.write(f'  - {field}')
-        
         self.stdout.write('\n' + self.style.SUCCESS('Special Payment Terms:'))
         for term in special_payment_terms:
             self.stdout.write(f'  - ID: {term["id"]}, Code: {term["code"]}, Terms: {term["terms"]}')
@@ -47,35 +39,10 @@ class Command(BaseCommand):
         # Generate SQL field mappings
         self.stdout.write('\n' + self.style.SUCCESS('Suggested SQL Field Mappings:'))
         
-        # ClinFinance mappings
-        self.stdout.write(self.style.SUCCESS('\nClinFinance Mappings:'))
-        clinfinance_mappings = {
-            'id': 'ID',
-            'special_payment_terms_id': "CASE WHEN SPT = 1 THEN (SELECT TOP 1 id FROM contracts_specialpaymentterms WHERE code = SPT_Type) ELSE NULL END",
-            'special_payment_terms_paid': 'SPT_Paid',
-            'contract_value': 'ContractDol',
-            'po_amount': 'SubPODol',
-            'paid_amount': 'SubPaidDol',
-            'paid_date': 'SubPaidDate',
-            'wawf_payment': 'WAWFPaymentDol',
-            'wawf_recieved': 'DatePayRecv',
-            'wawf_invoice': 'WAWFInvoice',
-            'plan_gross': 'PlanGrossDol',
-            'planned_split': 'PlanSplit_per_PPIbid',
-            'created_by_id': '(SELECT user_id FROM #UserMapping WHERE username = CreatedBy)',
-            'created_on': 'CreatedOn',
-            'modified_by_id': '(SELECT user_id FROM #UserMapping WHERE username = ModifiedBy)',
-            'modified_on': 'ModifiedOn'
-        }
-        
-        for django_field, sql_field in clinfinance_mappings.items():
-            self.stdout.write(f'  - {django_field}: {sql_field}')
-        
         # Clin mappings
         self.stdout.write(self.style.SUCCESS('\nClin Mappings:'))
         clin_mappings = {
             'id': 'ID',
-            'clin_finance_id': 'ID',
             'contract_id': 'Contract_ID',
             'sub_contract': '[Sub-Contract]',
             'po_num_ext': 'PONumExt',
@@ -95,6 +62,17 @@ class Command(BaseCommand):
             'supplier_due_date_late': 'LateShipQDD',
             'ship_date': 'ShipDate',
             'ship_date_late': 'LateShip',
+            'special_payment_terms_id': "CASE WHEN SPT = 1 THEN (SELECT TOP 1 id FROM contracts_specialpaymentterms WHERE code = SPT_Type) ELSE NULL END",
+            'special_payment_terms_paid': 'SPT_Paid',
+            'contract_value': 'ContractDol',
+            'po_amount': 'SubPODol',
+            'paid_amount': 'SubPaidDol',
+            'paid_date': 'SubPaidDate',
+            'wawf_payment': 'WAWFPaymentDol',
+            'wawf_recieved': 'DatePayRecv',
+            'wawf_invoice': 'WAWFInvoice',
+            'plan_gross': 'PlanGrossDol',
+            'planned_split': 'PlanSplit_per_PPIbid',
             'created_by_id': '(SELECT user_id FROM #UserMapping WHERE username = CreatedBy)',
             'created_on': 'CreatedOn',
             'modified_by_id': '(SELECT user_id FROM #UserMapping WHERE username = ModifiedBy)',
@@ -106,7 +84,6 @@ class Command(BaseCommand):
             
         # Output JSON for easy reference
         mappings = {
-            'clinfinance': clinfinance_mappings,
             'clin': clin_mappings
         }
         

@@ -23,14 +23,16 @@ class AuditModel(models.Model):
         super().save(*args, **kwargs)
 
 class Contract(AuditModel):
+    idiq_contract = models.ForeignKey('IdiqContract', on_delete=models.CASCADE, null=True, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
+    status = models.ForeignKey('ContractStatus', on_delete=models.CASCADE, null=True, blank=True)
     open = models.BooleanField(null=True, blank=True)
     date_closed = models.DateTimeField(null=True, blank=True)
     cancelled = models.BooleanField(null=True, blank=True)
     date_canceled = models.DateTimeField(null=True, blank=True)
     canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE, null=True, blank=True)
-    po_number = models.CharField(max_length=10, null=True, blank=True)
-    tab_num = models.CharField(max_length=10, null=True, blank=True)
+    po_number = models.CharField(max_length=10, null=True, blank=True) # maybe part of clin?
+    tab_num = models.CharField(max_length=10, null=True, blank=True)  # maybe part of clin?
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
     contract_type = models.ForeignKey('ContractType', on_delete=models.CASCADE, null=True, blank=True)
     award_date = models.DateTimeField(null=True, blank=True)
@@ -47,22 +49,29 @@ class Contract(AuditModel):
     reviewed_by = models.CharField(max_length=20, null=True, blank=True)
     reviewed_on = models.DateTimeField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='contract')
+    statz_value = models.FloatField(null=True, blank=True, default=0)
+    contract_value = models.FloatField(null=True, blank=True, default=0)
 
     def __str__(self):
         return f"Contract {self.contract_number}"
+    
+class ContractStatus(models.Model):
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.description
 
 class Clin(AuditModel):
-    clin_finance = models.OneToOneField('ClinFinance', on_delete=models.CASCADE, null=True, blank=True)
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE, null=True, blank=True)
-    sub_contract = models.CharField(max_length=20, null=True, blank=True)
-    po_num_ext = models.CharField(max_length=5, null=True, blank=True)
+    sub_contract = models.CharField(max_length=20, null=True, blank=True) # What do we use this for?
+    po_num_ext = models.CharField(max_length=5, null=True, blank=True) # What do we use this for?
     tab_num = models.CharField(max_length=10, null=True, blank=True)
-    clin_po_num = models.CharField(max_length=10, null=True, blank=True)
-    po_number = models.CharField(max_length=10, null=True, blank=True)
+    clin_po_num = models.CharField(max_length=10, null=True, blank=True) # What do we use this for?
+    po_number = models.CharField(max_length=10, null=True, blank=True) # What do we use this for?
     clin_type = models.ForeignKey('ClinType', on_delete=models.CASCADE, null=True, blank=True)
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True)
     nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE, null=True, blank=True)
-    ia = models.CharField(max_length=5, null=True, blank=True)
+    ia = models.CharField(max_length=5, null=True, blank=True) #Should this be two fields?
     fob = models.CharField(max_length=5, null=True, blank=True)
     order_qty = models.FloatField(null=True, blank=True)
     ship_qty = models.FloatField(null=True, blank=True)
@@ -73,6 +82,19 @@ class Clin(AuditModel):
     ship_date = models.DateField(null=True, blank=True)
     ship_date_late = models.BooleanField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='clin')
+
+    # CLIN_Finance
+    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
+    special_payment_terms_paid = models.BooleanField(null=True, blank=True)
+    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to clin_value?
+    paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    paid_date = models.DateTimeField(null=True, blank=True)
+    wawf_payment = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    wawf_recieved = models.DateTimeField(null=True, blank=True)
+    wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
+    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    planned_split = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
@@ -91,14 +113,6 @@ class IdiqContract(AuditModel):
         return f"IDIQ Contract {self.contract_number}"
 
 
-class IdiqContractToContract(models.Model):
-    idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
-    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"IDIQ Contract {self.idiq_contract.contract_number} to Contract {self.contract.contract_number}"
-
-
 class IdiqContractDetails(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
     nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE)
@@ -106,23 +120,6 @@ class IdiqContractDetails(models.Model):
 
     def __str__(self):
         return f"Details for IDIQ Contract {self.idiq_contract.contract_number}"
-
-
-class ClinFinance(AuditModel):
-    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
-    special_payment_terms_paid = models.BooleanField(null=True, blank=True)
-    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    paid_date = models.DateTimeField(null=True, blank=True)
-    wawf_payment = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    wawf_recieved = models.DateTimeField(null=True, blank=True)
-    wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
-    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    planned_split = models.CharField(max_length=50, null=True, blank=True)
-
-    def __str__(self):
-        return f"Finance for CLIN {self.id}"
 
 
 class SpecialPaymentTerms(models.Model):
@@ -216,27 +213,6 @@ class SalesClass(models.Model):
 
     def __str__(self):
         return self.sales_team
-
-# class ContractNote(models.Model):
-#     contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
-#     note = models.TextField(null=True, blank=True)
-#     created_by = models.TextField(null=True, blank=True)
-#     # created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_notes')
-#     created_on = models.DateTimeField(null=True, blank=True)
-
-#     def __str__(self):
-#         return f"Note for Contract {self.contract.contract_number}"
-
-# class ClinNote(models.Model):
-#     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-#     note = models.TextField(null=True, blank=True)
-#     created_by = models.TextField(null=True, blank=True)
-#     # created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_notes')
-#     created_on = models.DateTimeField(null=True, blank=True)
-
-#     def __str__(self):
-#         return f"Note for CLIN {self.clin.id}"
-
 
 class Note(AuditModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

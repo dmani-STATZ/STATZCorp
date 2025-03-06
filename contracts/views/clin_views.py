@@ -10,8 +10,8 @@ from django.utils import timezone
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinFinance, ClinAcknowledgment, Contract
-from ..forms import ClinForm, ClinFinanceForm, ClinAcknowledgmentForm
+from ..models import Clin, ClinAcknowledgment, Contract
+from ..forms import ClinForm, ClinAcknowledgmentForm
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -26,8 +26,7 @@ class ClinDetailView(DetailView):
             'clin_type',
             'supplier',
             'nsn',
-            'clin_finance',
-            'clin_finance__special_payment_terms'
+            'special_payment_terms'
         )
     
     def get_context_data(self, **kwargs):
@@ -64,9 +63,6 @@ class ClinCreateView(CreateView):
         response = super().form_valid(form)
         clin = self.object
         
-        # Create related ClinFinance
-        ClinFinance.objects.create(clin=clin)
-        
         # Create related ClinAcknowledgment
         ClinAcknowledgment.objects.create(clin=clin)
         
@@ -89,20 +85,6 @@ class ClinUpdateView(UpdateView):
     
     def get_success_url(self):
         return reverse('contracts:clin_detail', kwargs={'pk': self.object.pk})
-
-
-@method_decorator(conditional_login_required, name='dispatch')
-class ClinFinanceUpdateView(UpdateView):
-    model = ClinFinance
-    form_class = ClinFinanceForm
-    template_name = 'contracts/clin_finance_form.html'
-    
-    def form_valid(self, form):
-        messages.success(self.request, 'CLIN finance information updated successfully.')
-        return super().form_valid(form)
-    
-    def get_success_url(self):
-        return reverse('contracts:clin_detail', kwargs={'pk': self.object.clin.pk})
 
 
 @method_decorator(conditional_login_required, name='dispatch')

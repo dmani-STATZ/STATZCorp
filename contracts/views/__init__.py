@@ -11,7 +11,6 @@ from .clin_views import (
     ClinDetailView,
     ClinCreateView,
     ClinUpdateView,
-    ClinFinanceUpdateView,
     ClinAcknowledgmentUpdateView,
     get_clin_notes,
     toggle_clin_acknowledgment,
