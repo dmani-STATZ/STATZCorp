@@ -2,6 +2,9 @@
 {% load static %}
 
 {% block content %}
+<form id="csrf-form">
+    {% csrf_token %}
+</form>
 <div class="container mx-auto px-4 py-8">
     <!-- Contract Header -->
     <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
@@ -118,6 +121,13 @@
                                 <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="event.stopPropagation();">Edit</button>
                                 <button class="text-red-600 hover:text-red-800" onclick="event.stopPropagation();">Delete</button>
                             </td> -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <a href="{% url 'contracts:clin_update' clin.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </a>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -135,21 +145,44 @@
         <div class="bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-800">CLIN Notes</h2>
-                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                <button 
+                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                    data-note-action="add"
+                    data-content-type-id="12"
+                    data-object-id="{{ selected_clin.id|default:'' }}"
+                    data-entity-type="CLIN"
+                    {% if not selected_clin %}disabled{% endif %}
+                    onclick="console.log('CLIN Note button clicked', this.dataset)"
+                >
                     Add Note
                 </button>
             </div>
             <div id="clin-notes" class="space-y-4 max-h-[500px] overflow-y-auto">
-                {% for note in clin_notes %}
-                <div class="border-l-4 border-green-500 pl-4 py-2">
-                    <p class="text-gray-700">{{ note.note }}</p>
-                    <div class="mt-2 text-sm text-gray-500">
-                        Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
-                    </div>
-                </div>
-                {% empty %}
-                <p class="text-gray-500 text-center">No CLIN notes found</p>
-                {% endfor %}
+                <table>
+                    {% for note in clin_notes %}
+                    <tr>
+                        <td class="border-l-4 border-green-500 pl-4 py-2">
+                            <p class="text-gray-700">{{ note.note }}</p>
+                            <div class="mt-2 text-sm text-gray-500">
+                                Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <a href="{% url 'contracts:note_update' note.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No CLIN notes found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
             </div>
         </div>
     </div>
@@ -160,20 +193,44 @@
         <div class="bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Notes</h2>
-                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                <button 
+                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                    data-note-action="add"
+                    data-content-type-id="18"
+                    data-object-id="{{ contract.id }}"
+                    data-entity-type="Contract"
+                    onclick="console.log('Contract Note button clicked', this.dataset)"
+                >
                     Add Note
                 </button>
             </div>
-            <div class="space-y-4 max-h-[400px] overflow-y-auto">
+            <div id="notes-container">
                 {% for note in contract_notes %}
-                <div class="border-l-4 border-blue-500 pl-4 py-2">
+                <div class="border-l-4 border-green-500 pl-4 py-2 mb-4">
                     <p class="text-gray-700">{{ note.note }}</p>
-                    <div class="mt-2 text-sm text-gray-500">
-                        Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                    <div class="mt-2 flex justify-between items-center">
+                        <div class="text-sm text-gray-500">
+                            Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                        </div>
+                        <div class="flex space-x-2">
+                            {% if note.note_reminders.exists %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Reminder
+                                </span>
+                            {% endif %}
+                            <a href="{% url 'contracts:note_update' note.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </a>
+                        </div>
                     </div>
                 </div>
                 {% empty %}
-                <p class="text-gray-500 text-center">No notes found for this contract</p>
+                <p class="text-gray-500 text-center">No Contract notes found</p>
                 {% endfor %}
             </div>
         </div>
@@ -243,6 +300,9 @@
     </div>
 </div>
 
+<!-- Include Note Modal -->
+{% include "contracts/partials/note_modal.html" %}
+
 <style>
     .selected-row {
         outline: 3px solid #39ff14;  /* Neon green color */
@@ -251,6 +311,53 @@
         z-index: 10;
     }
 </style>
+
+{% block extra_js %}
+<script src="{% static 'contracts/js/note_modal.js' %}"></script>
+<script>
+// Debug ContentType IDs
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch content types for debugging
+    fetch('/contracts/api/content-types/')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Available ContentTypes:');
+            data.content_types.forEach(ct => {
+                console.log(`ID: ${ct.id}, App: ${ct.app_label}, Model: ${ct.model}`);
+            });
+            
+            // Check if our content type IDs are valid
+            const contractBtn = document.querySelector('[data-entity-type="Contract"]');
+            const clinBtn = document.querySelector('[data-entity-type="CLIN"]');
+            
+            if (contractBtn) {
+                const contractTypeId = contractBtn.dataset.contentTypeId;
+                console.log(`Contract button content type ID: ${contractTypeId}`);
+                const matchingType = data.content_types.find(ct => ct.id == contractTypeId);
+                if (matchingType) {
+                    console.log(`Found matching type: ${matchingType.app_label}.${matchingType.model}`);
+                } else {
+                    console.error(`No matching content type found for ID: ${contractTypeId}`);
+                }
+            }
+            
+            if (clinBtn) {
+                const clinTypeId = clinBtn.dataset.contentTypeId;
+                console.log(`CLIN button content type ID: ${clinTypeId}`);
+                const matchingType = data.content_types.find(ct => ct.id == clinTypeId);
+                if (matchingType) {
+                    console.log(`Found matching type: ${matchingType.app_label}.${matchingType.model}`);
+                } else {
+                    console.error(`No matching content type found for ID: ${clinTypeId}`);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching content types:', error);
+        });
+});
+</script>
+{% endblock %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -281,25 +388,70 @@ function selectClin(clinId) {
         selectedRow.classList.add('selected-row');
     }
     
+    // Update the Add Note button for CLIN
+    const clinNoteBtn = document.querySelector('[data-entity-type="CLIN"]');
+    if (clinNoteBtn) {
+        clinNoteBtn.dataset.objectId = clinId;
+        clinNoteBtn.removeAttribute('disabled');
+    }
+    
     // Fetch and update CLIN notes
     fetch(`/contracts/clin/${clinId}/notes/`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             const clinNotesDiv = document.getElementById('clin-notes');
-            if (data.notes.length > 0) {
-                clinNotesDiv.innerHTML = data.notes.map(note => `
-                    <div class="border-l-4 border-green-500 pl-4 py-2">
-                        <p class="text-gray-700">${note.note}</p>
-                        <div class="mt-2 text-sm text-gray-500">
-                            Added by ${note.created_by} on ${note.created_on}
+            if (data.success) {
+                if (data.notes_html) {
+                    clinNotesDiv.innerHTML = data.notes_html;
+                } else if (data.notes && data.notes.length > 0) {
+                    clinNotesDiv.innerHTML = data.notes.map(note => `
+                        <div class="border-l-4 border-green-500 pl-4 py-2 mb-4">
+                            <p class="text-gray-700">${note.note}</p>
+                            <div class="mt-2 flex justify-between items-center">
+                                <div class="text-sm text-gray-500">
+                                    Added by ${note.created_by} on ${note.created_on}
+                                </div>
+                                <div class="flex space-x-2">
+                                    ${note.has_reminder ? `
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Reminder
+                                        </span>
+                                    ` : ''}
+                                    <a href="/contracts/note/update/${note.id}/" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                    </a>
+                                    <a href="/contracts/note/delete/${note.id}/" class="text-red-600 hover:text-red-900" title="Delete" onclick="return confirm('Are you sure you want to delete this note?');">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `).join('');
+                } else {
+                    clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No CLIN notes found</p>';
+                }
             } else {
-                clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center">No CLIN notes found</p>';
+                clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Error loading notes</p>';
+                console.error('Error loading notes:', data.error);
             }
         })
-        .catch(error => console.error('Error fetching CLIN notes:', error));
+        .catch(error => {
+            console.error('Error fetching CLIN notes:', error);
+            const clinNotesDiv = document.getElementById('clin-notes');
+            clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Error loading notes</p>';
+        });
 }
 
 function toggleAcknowledgment(field) {
@@ -310,7 +462,7 @@ function toggleAcknowledgment(field) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value
         },
         body: JSON.stringify({
             field: field

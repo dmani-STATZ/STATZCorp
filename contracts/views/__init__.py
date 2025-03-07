@@ -27,6 +27,9 @@ from .nsn_views import (
 from .note_views import (
     add_note,
     delete_note,
+    note_update,
+    api_add_note,
+    list_content_types,
 )
 
 from .reminder_views import (
@@ -55,4 +58,5 @@ from .contract_log_views import (
 from .dd1155_views import (
     extract_dd1155_data,
     export_dd1155_text,
+    export_dd1155_png,
 )

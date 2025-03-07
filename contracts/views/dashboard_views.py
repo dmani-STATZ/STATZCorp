@@ -18,29 +18,31 @@ class ContractLifecycleDashboardView(TemplateView):
     def get_contracts(self):
         # Get the last 20 contracts entered that have cancelled=False
         last_20_contracts = Contract.objects.filter(
-                cancelled=False
+                status__description__in=['Open']
             ).prefetch_related(
+                'idiq_contract',
                 'clin_set',
                 'clin_set__supplier'
-            ).order_by('-created_on')[:20]
+            ).order_by('-award_date')[:20]
 
         # Prepare the data for rendering or serialization
         contracts_data = []
         for contract in last_20_contracts:
             # Get the first CLIN with clin_type_id=1 for this contract
-            main_clin = contract.clin_set.filter(clin_type_id=1).first()
-            if main_clin and main_clin.supplier:
+            first_clin = contract.clin_set.filter().first()
+            if first_clin and first_clin.supplier:
                 contracts_data.append({
                     'id': contract.id,
                     'tab_num': contract.tab_num,
                     'po_number': contract.po_number,
+                    'idiq_contract': contract.idiq_contract.contract_number if contract.idiq_contract else 'N/A',
                     'contract_number': contract.contract_number,
-                    'supplier_name': main_clin.supplier.name,
-                    'contract_value': main_clin.contract_value,
+                    'supplier_name': first_clin.supplier.name,
+                    'contract_value': contract.contract_value,
+                    'bid_value': contract.bid_value,
                     'award_date': contract.award_date,
                     'due_date': contract.due_date,
-                    'cancelled': contract.cancelled,
-                    'open': contract.open,
+                    'status': contract.status,
                 })
 
         return contracts_data

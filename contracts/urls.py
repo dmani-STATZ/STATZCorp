@@ -27,6 +27,9 @@ from .views import (
     # Note views
     add_note,
     delete_note,
+    note_update,
+    api_add_note,
+    list_content_types,
     
     # Reminder views
     ReminderListView,
@@ -50,6 +53,7 @@ from .views import (
     # DD1155 views
     extract_dd1155_data,
     export_dd1155_text,
+    export_dd1155_png,
 )
 
 from .views.contract_views import check_contract_number
@@ -73,6 +77,7 @@ urlpatterns = [
     # DD Form 1155 processing
     path('extract-dd1155/', extract_dd1155_data, name='extract_dd1155'),
     path('export-dd1155-text/', export_dd1155_text, name='export_dd1155_text'),
+    path('export-dd1155-png/', export_dd1155_png, name='export_dd1155_png'),
     path('dd1155-test/', TemplateView.as_view(template_name='contracts/dd1155_test.html'), name='dd1155_test'),
     
     # CLIN management
@@ -88,7 +93,10 @@ urlpatterns = [
     
     # Note management
     path('note/add/<int:content_type_id>/<int:object_id>/', add_note, name='add_note'),
+    path('note/update/<int:note_id>/', note_update, name='note_update'),
     path('note/delete/<int:note_id>/', delete_note, name='delete_note'),
+    path('api/add-note/', api_add_note, name='api_add_note'),
+    path('api/content-types/', list_content_types, name='list_content_types'),
     
     # Reminder management
     path('reminders/', ReminderListView.as_view(), name='reminders_list'),

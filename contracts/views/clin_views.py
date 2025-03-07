@@ -116,23 +116,50 @@ class ClinAcknowledgmentUpdateView(UpdateView):
 
 @conditional_login_required
 def get_clin_notes(request, clin_id):
-    clin = get_object_or_404(Clin, id=clin_id)
-    
-    # Get notes for this CLIN
-    from django.contrib.contenttypes.models import ContentType
-    clin_type = ContentType.objects.get_for_model(Clin)
-    from ..models import Note
-    notes = Note.objects.filter(
-        content_type=clin_type,
-        object_id=clin.id
-    ).order_by('-created_on')
-    
-    notes_html = render_to_string('contracts/partials/notes_list.html', {
-        'notes': notes,
-        'content_object': clin
-    })
-    
-    return JsonResponse({'notes_html': notes_html})
+    try:
+        clin = get_object_or_404(Clin, id=clin_id)
+        
+        # Get notes for this CLIN
+        from django.contrib.contenttypes.models import ContentType
+        clin_type = ContentType.objects.get_for_model(Clin)
+        print(f"CLIN ContentType: {clin_type.id} - {clin_type.app_label}.{clin_type.model}")
+        
+        from ..models import Note
+        notes = Note.objects.filter(
+            content_type=clin_type,
+            object_id=clin.id
+        ).order_by('-created_on')
+        
+        # Format notes for JSON response
+        notes_data = []
+        for note in notes:
+            notes_data.append({
+                'id': note.id,
+                'note': note.note,
+                'created_by': note.created_by.username if note.created_by else 'Unknown',
+                'created_on': note.created_on.strftime('%b %d, %Y %H:%M'),
+                'has_reminder': note.note_reminders.exists()
+            })
+        
+        # Also render HTML for direct insertion
+        notes_html = render_to_string('contracts/partials/notes_list.html', {
+            'notes': notes,
+            'content_object': clin
+        })
+        
+        return JsonResponse({
+            'success': True,
+            'notes': notes_data,
+            'notes_html': notes_html
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error in get_clin_notes: {str(e)}")
+        print(traceback.format_exc())
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 
 @conditional_login_required

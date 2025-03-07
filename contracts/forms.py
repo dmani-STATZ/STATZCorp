@@ -147,7 +147,7 @@ class ContractForm(forms.ModelForm):
             'buyer', 'contract_type', 'award_date', 'due_date', 'due_date_late',
             'sales_class', 'survey_date', 'survey_type', 'assigned_user',
             'assigned_date', 'nist', 'files_url', 'reviewed', 'reviewed_by',
-            'reviewed_on', 'statz_value', 'contract_value'
+            'reviewed_on', 'bid_value', 'contract_value'
         ]
         widgets = {
             'idiq_contract': forms.Select(attrs={
@@ -246,7 +246,12 @@ class ContractForm(forms.ModelForm):
             }),
             'contract_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Contract Value',
+                'placeholder': 'Enter 1155 Total Value',
+                'step': '0.01'
+            }),
+            'bid_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Bid Amount',
                 'step': '0.01'
             }),
         }

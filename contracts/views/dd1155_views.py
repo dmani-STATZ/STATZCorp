@@ -1,36 +1,55 @@
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.http import JsonResponse
-from django.db.models import Q
-import tempfile
 import os
 import re
-import io
+import json
+import tempfile
 import logging
-import fitz  # PyMuPDF
 import PyPDF2
-from PIL import Image
-import pdf2image
 import pytesseract
-from pdfminer.high_level import extract_text
+import pdf2image
+import fitz  # PyMuPDF
+from PIL import Image
+import numpy as np
 from datetime import datetime, timedelta
-from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Supplier, Clin, Buyer, ClinType, Nsn, Note
-from ..forms import ContractForm
-from django.utils import timezone
 from django.conf import settings
+from django.shortcuts import render, redirect
+from django.http import JsonResponse, HttpResponse
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.db.models import Q
+from PIL import Image, ImageDraw
+
+
+
+from contracts.models import ClinType, Contract, Clin, ContractType, Buyer, Nsn
+from STATZWeb.decorators import conditional_login_required
 
 # Define the fields we want to extract from DD Form 1155
 DD1155_FIELDS = {
     'contract_number': {
         'coordinates': (73 / 1224, 141 / 1584, 359 / 1224, 174 / 1584),
         'patterns': [
-            r'[A-Z0-9]{6}-[0-9]{2}-[A-Z0-9]{1}-[0-9]{4}',
+            r'([A-Z0-9]{6}-[0-9]{2}-[A-Z0-9]{1}-[0-9]{4})',
             r'CONTRACT\s*NO\.\s*([\w\-]+)',
             r'CONTRACT\s*NUMBER\s*:\s*([\w\-]+)',
             r'CONTRACT\s*#\s*:\s*([\w\-]+)',
             r'ORDER\s*NUMBER\s*:\s*([\w\-]+)',
             r'ORDER\s*NO\.\s*([\w\-]+)'
+        ]
+    },
+    'contract_total': {
+        'coordinates': (992 / 1224,  1054 / 1584, 1152 / 1224, 1074 / 1584),
+        'patterns': [
+            r'TOTAL\s*AMOUNT\s*:\s*\$?\s*([\d,]+\.?\d*)',
+            r'CONTRACT\s*AMOUNT\s*:\s*\$?\s*([\d,]+\.?\d*)',
+            r'ORDER\s*AMOUNT\s*:\s*\$?\s*([\d,]+\.?\d*)',
+            r'AMOUNT\s*:\s*\$?\s*([\d,]+\.?\d*)',
+            r'\$?\s*([\d,]+\.?\d*)\s*(?:TOTAL|AMOUNT)',
+            r'TOTAL\s*:\s*\$?\s*([\d,]+\.?\d*)',
+            r'(\$?\s*[\d,]+\.?\d*)\s*(?:TOTAL|AMOUNT)',
+            r'TOTAL\s*AMOUNT\s*:\s*(\$?\s*[\d,]+\.?\d*)'
         ]
     },
     'award_date': {
@@ -73,14 +92,6 @@ DD1155_FIELDS = {
             r'FOB:\s*[A-Z]*\s*DELIVERY DATE:\s*(\d{4}\s*[A-Z]{3}\s*\d{2})'
         ]
     },
-    'contract_amount': {
-        'coordinates': (1002 / 1224, 1054 / 1584, 1150 / 1224, 1075 / 1584),
-        'patterns': [
-            r'TOTAL\s*AMOUNT\s*:\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'TOTAL\s*:\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'AMOUNT\s*:\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
-        ]
-    },
     'nist': {
         'coordinates': (0 / 1224, 0 / 1584, 0 / 1224, 0 / 1584),
         'patterns': [
@@ -113,6 +124,7 @@ CLIN_PATTERNS = {
     }
 }
 
+# Set up logging
 logger = logging.getLogger(__name__)
 
 @conditional_login_required
@@ -140,14 +152,31 @@ def extract_dd1155_data(request):
         temp_file.write(uploaded_file.read())
         temp_file.close()
         
+        logger.info("Starting extraction process for uploaded PDF")
+        
         # Extract text from the PDF using coordinate-based approach
-        extraction_results = extract_text_from_pdf(temp_file.name)
+        try:
+            extraction_results = extract_text_from_pdf(temp_file.name)
+            logger.info("Text extraction completed successfully")
+        except Exception as e:
+            logger.error(f"Error in extract_text_from_pdf: {str(e)}")
+            return JsonResponse({'success': False, 'error': f'Error extracting text: {str(e)}'})
         
         # Parse the extracted text to get contract data
-        contract_data = parse_dd1155_text(extraction_results)
+        try:
+            contract_data = parse_dd1155_text(extraction_results)
+            logger.info("Text parsing completed successfully")
+        except Exception as e:
+            logger.error(f"Error in parse_dd1155_text: {str(e)}")
+            return JsonResponse({'success': False, 'error': f'Error parsing text: {str(e)}'})
         
         # Extract CLIN data
-        clins = extract_clin_data(extraction_results.get('full_text', ''))
+        try:
+            clins = extract_clin_data(extraction_results.get('full_text', ''))
+            logger.info(f"CLIN extraction completed successfully, found {len(clins)} CLINs")
+        except Exception as e:
+            logger.error(f"Error in extract_clin_data: {str(e)}")
+            return JsonResponse({'success': False, 'error': f'Error extracting CLINs: {str(e)}'})
         
         # Format response data
         response_data = {
@@ -216,6 +245,11 @@ def extract_text_from_pdf(pdf_path):
         if pdf_document.page_count > 0:
             first_page = pdf_document.load_page(0)
             width, height = first_page.rect.width, first_page.rect.height
+
+            # Create an image of the page
+            pix = first_page.get_pixmap()
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            draw = ImageDraw.Draw(img)
             
             # Extract text from each box using coordinates
             for field_name, field_info in DD1155_FIELDS.items():
@@ -229,6 +263,17 @@ def extract_text_from_pdf(pdf_path):
                 text = first_page.get_textbox(box).strip()
                 if text:
                     results[field_name] = {'value': text, 'source': 'coordinates'}
+                    if field_name == 'contract_total':
+                        logger.info(f"Contract total extracted from coordinates: {text}")
+                        logger.info(f"Box coordinates: {box}")
+
+            #     # Draw the rectangle on the image
+                draw.rectangle(box, outline="red", width=2)
+
+            export_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+            output_image_path = os.path.join(export_dir, "output_with_boxes.png")
+            # # Save the image with the drawn boxes
+            img.save(output_image_path)
             
             # Get full text for fallback
             full_text = ""
@@ -238,6 +283,10 @@ def extract_text_from_pdf(pdf_path):
             
             # Close the document
             pdf_document.close()
+            
+            # Log the full text for contract total pattern matching
+            logger.info("Full text for contract total pattern matching:")
+            logger.info(full_text)
             
             # Return both the coordinate-based results and the full text
             return {
@@ -296,109 +345,229 @@ def extract_text_from_pdf(pdf_path):
 
 def parse_dd1155_text(extraction_results):
     """
-    Parse text extracted from DD Form 1155 to get contract information
-    using both coordinate-based results and full text extraction
+    Parse the extracted text and return structured data.
     """
-    # Initialize data dictionary with all fields as None
-    data = {key: None for key in DD1155_FIELDS.keys()}
-    # for key in DD1155_FIELDS.keys():
-    #     print('KEY', key)
+    data = {}
+    coordinate_results = extraction_results.get('coordinate_results', {})
+    full_text = extraction_results.get('full_text', '')
     
-    if isinstance(extraction_results, dict):
-        coord_results = extraction_results.get('coordinate_results', {})
-        full_text = extraction_results.get('full_text', '')
-        
-        # Store raw text for later use
-        data['raw_text'] = full_text
-        
-        # First pass: Use coordinate-based results
-        for field_name in DD1155_FIELDS.keys():
-            if field_name in coord_results:
-                field_data = coord_results[field_name]
-                if field_data['value'] != 'Not found' and field_data['source'] == 'coordinates':
-                    data[field_name] = field_data['value'].strip()
-        
-        # Second pass: Use regex patterns for missing fields
-        for field_name, field_value in data.items():
-            if not field_value and field_name in DD1155_FIELDS and field_name != 'raw_text':
-                field_info = DD1155_FIELDS[field_name]
-                
-                # Try each pattern until we find a match
-                for pattern in field_info['patterns']:
-                    match = re.search(pattern, full_text, re.IGNORECASE)
-                    if match:
-                        if match.groups():
-                            data[field_name] = match.group(1).strip()
-                        else:
-                            data[field_name] = match.group(0).strip()
+    # First try to get values from coordinate-based extraction
+    for field_name, field_info in DD1155_FIELDS.items():
+        if coordinate_results[field_name]['value'] != 'Not found':
+            data[field_name] = coordinate_results[field_name]['value']
+        else:
+            # If not found in coordinates, try pattern matching
+            for pattern in field_info['patterns']:
+                match = re.search(pattern, full_text, re.IGNORECASE)
+                if match:
+                    # Check if the pattern has a capturing group
+                    if match.groups():
+                        data[field_name] = match.group(1)
+                    else:
+                        # If no capturing group, use the entire match
+                        data[field_name] = match.group(0)
+                    
+                    if field_name == 'contract_total':
+                        logger.info(f"Contract total found by pattern matching: {data[field_name]}")
+                        logger.info(f"Pattern used: {pattern}")
+                    break
+    
+    # Process contract amount
+    if data.get('contract_total'):
+        try:
+            # Remove any non-numeric characters except decimal point
+            amount_str = re.sub(r'[^\d.]', '', data['contract_total'])
+            if amount_str:
+                data['contract_total'] = amount_str
+                logger.info(f"Processed contract total: {data['contract_total']}")
+        except Exception as e:
+            logger.warning(f"Error parsing contract amount: {e}")
+    else:
+        logger.warning("No contract total found in data")
+        logger.info("Available fields in data:", data.keys())
+
+    # Process Award Date
+    award_date_str = data.get('award_date', 'Not found')
+    print('award_date_str', award_date_str)
+    if award_date_str and award_date_str != 'Not found':
+        try:
+            # First try to parse with various formats
+            date_formats = ['%m/%d/%Y', '%m-%d-%Y', '%m/%d/%y', '%m-%d-%y', '%Y-%m-%d', '%Y %b %d']
+            parsed_date = None
+            for fmt in date_formats:
+                try:
+                    parsed_date = datetime.strptime(award_date_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            
+            if parsed_date:
+                data['award_date'] = parsed_date.strftime('%Y-%m-%d')
+            else:
+                data['award_date'] = None
+        except Exception as e:
+            logger.warning(f"Error parsing award date: {e}")
+            data['award_date'] = None
+    else:
+        data['award_date'] = None
+
+    # Process Buyer - Return both ID and name for flexibility
+    buyer_name = data.get('buyer', 'Not found')
+    if buyer_name and buyer_name != 'Not found':
+        # Ensure buyer_name is a string
+        if not isinstance(buyer_name, str):
+            buyer_name = str(buyer_name)
+            logger.info(f"Converted buyer to string: {buyer_name}")
+            
+        buyer_name = buyer_name.split('\n')[0]  # Get first line only
+        buyer_name = buyer_name.replace('DLA', '').strip()
+        try:
+            buyer = Buyer.objects.filter(Q(description__icontains=buyer_name)).first()
+            if buyer:
+                data['buyer_id'] = buyer.id
+                data['buyer'] = buyer.id  # Add this for form field
+            else:
+                if data['contract_number'] != 'Not found':
+                    buy_ind = data['contract_number'][4]
+                    if buy_ind == 'A':
+                        data['buyer_id'] = 3
+                        data['buyer'] = 3
+                    elif buy_ind == 'L':
+                        data['buyer_id'] = 4
+                        data['buyer'] = 4
+                    elif buy_ind == 'M':
+                        data['buyer_id'] = 6
+                        data['buyer'] = 6
+                    elif buy_ind == 'E':
+                        data['buyer_id'] = 10
+                        data['buyer'] = 10
+                else:
+                    data['buyer_id'] = None
+                    data['buyer'] = None
+        except Buyer.DoesNotExist:
+            data['buyer_id'] = None
+            data['buyer'] = None
+    else:
+        data['buyer_id'] = None
+        data['buyer'] = None
+
+    # Process Contract Types
+    data['contract_type_purchase'] = data.get('contract_type_purchase', '') == 'X'
+    data['contract_type_delivery'] = data.get('contract_type_delivery', '') == 'X'
+    
+    # Set contract_type based on the type flags
+    if data['contract_type_purchase']:
+        data['contract_type'] = '29'  # or whatever value matches your form's choices
+    elif data['contract_type_delivery']:
+        data['contract_type'] = '16'  # or whatever value matches your form's choices
+
+    # Process Due Date
+    due_date_str = data.get('due_date', 'Not found')
+    raw_text = full_text  # Get the raw text from extraction_results
+    
+    if due_date_str == 'SEE SCHEDULE' and raw_text:
+        # Use the patterns defined in DD1155_FIELDS
+        found_date = None
+        for pattern in DD1155_FIELDS['due_date']['patterns']:
+            fob_match = re.search(pattern, raw_text, re.IGNORECASE)
+            if fob_match:
+                try:
+                    # Extract and parse the date
+                    date_str = fob_match.group(1)
+                    #print(f"Found delivery date using pattern {pattern}: {date_str}")  # Debug print
+                    
+                    # Try different date formats based on the pattern matched
+                    if 'FOB:' in pattern:
+                        parsed_date = datetime.strptime(date_str, '%Y %b %d')
+                    else:
+                        # Try standard date formats for other patterns
+                        date_formats = ['%Y %b %d', '%m/%d/%Y', '%m-%d-%Y', '%Y-%m-%d', '%Y %b %d']
+                        for fmt in date_formats:
+                            try:
+                                parsed_date = datetime.strptime(date_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+                    
+                    if parsed_date:
+                        found_date = parsed_date
                         break
+                except Exception as e:
+                    logger.warning(f"Error parsing date with pattern {pattern}: {e}")
+                    continue
         
-        # Special processing for dates and amounts
-        if data['award_date']:
-            try:
-                # Try to parse the date
-                date_formats = ['%m/%d/%Y', '%m-%d-%Y', '%m/%d/%y', '%m-%d-%y', '%Y-%m-%d', '%Y %b %d']
+        if found_date:
+            data['due_date'] = found_date.strftime('%Y-%m-%d')
+            logger.info(f"Extracted delivery date: {data['due_date']}")
+        else:
+            logger.warning("No valid delivery date found in raw text")
+            data['due_date'] = None
+    
+    elif due_date_str != 'Not found':
+        try:
+            # First check if it's a number of days
+            days_match = re.search(r'(\d+)\s*DAYS', due_date_str, re.IGNORECASE)
+            if days_match and data['award_date']:
+                days = int(days_match.group(1))
+                award_date = datetime.strptime(data['award_date'], '%Y-%m-%d')
+                due_date = award_date + timedelta(days=days)
+                data['due_date'] = due_date.strftime('%Y-%m-%d')
+                logger.info(f"Calculated due date from days: {data['due_date']}")
+            else:
+                # Try to parse as a direct date
+                date_formats = ['%Y %b %d', '%m/%d/%Y', '%m-%d-%Y', '%Y-%m-%d', '%Y %b %d']
                 for fmt in date_formats:
                     try:
-                        parsed_date = datetime.strptime(data['award_date'], fmt)
-                        data['award_date'] = parsed_date.strftime('%Y-%m-%d')
+                        parsed_date = datetime.strptime(due_date_str, fmt)
+                        data['due_date'] = parsed_date.strftime('%Y-%m-%d')
+                        logger.info(f"Parsed direct due date: {data['due_date']}")
                         break
                     except ValueError:
                         continue
-            except Exception as e:
-                logger.warning(f"Error parsing award date: {e}")
-        
-        # Process due date from days
-        if data['due_date'] and data['award_date']:
-            try:
-                days_match = re.search(r'(\d+)\s*DAYS', data['due_date'], re.IGNORECASE)
-                if days_match:
-                    days = int(days_match.group(1))
-                    award_date = datetime.strptime(data['award_date'], '%Y-%m-%d')
-                    due_date = award_date + timedelta(days=days)
-                    data['due_date'] = due_date.strftime('%Y-%m-%d')
-            except Exception as e:
-                logger.warning(f"Error calculating due date: {e}")
-            
-        
-        # Process contract type
-        if data['contract_type_purchase'] and 'X' in data['contract_type_purchase']:
-            data['contract_type'] = 'Purchase Order'
-        elif data['contract_type_delivery'] and 'X' in data['contract_type_delivery']:
-            data['contract_type'] = 'Delivery Order'
-        
+        except Exception as e:
+            logger.warning(f"Error processing due date: {e}")
+            data['due_date'] = None
+    else:
+        data['due_date'] = None
 
-        # Process NIST
-        data['nist'] = False  # Initialize as False
-        if full_text:  # Only search if we have text to search
-            for pattern in DD1155_FIELDS['nist']['patterns']:
-                if re.search(pattern, full_text, re.IGNORECASE):
-                    data['nist'] = True
-                    logger.info("NIST requirement found in document")
-                    break
+    # Process NIST
+    data['nist'] = bool(data.get('nist', False))  # Ensure it's a boolean
+    #logger.info(f"NIST requirement status: {data['nist']}")
 
-        # Process contract amount
-        if data['contract_amount']:
-            try:
-                # Remove any non-numeric characters except decimal point
-                amount_str = re.sub(r'[^\d.]', '', data['contract_amount'])
-                if amount_str:
-                    data['contract_amount'] = amount_str
-            except Exception as e:
-                logger.warning(f"Error parsing contract amount: {e}")
-        
-        # Limit buyer name length if present
-        if data['buyer'] and len(data['buyer']) > 50:
+    # Limit buyer name length if present
+    if data.get('buyer') and not isinstance(data['buyer'], (int, float)):
+        if len(data['buyer']) > 50:
             data['buyer'] = data['buyer'][:50]
+    elif data.get('buyer') and isinstance(data['buyer'], (int, float)):
+        # Convert numeric buyer to string
+        data['buyer'] = str(data['buyer'])
     
+    logger.info(f"Final data before processing: {data}")
     return process_extracted_data(data)
 
 def format_nsn(nsn):
     """Format NSN with proper dashes"""
-    if len(nsn) == 13 and '-' in nsn:  # Already formatted
+    # Log the input value and its type
+    logger.info(f"format_nsn input: {nsn}, type: {type(nsn)}")
+    
+    # Handle None values
+    if nsn is None:
+        logger.warning("NSN is None, returning empty string")
+        return ""
+    
+    # Convert nsn to string if it's not already a string
+    if not isinstance(nsn, str):
+        nsn = str(nsn)
+        logger.info(f"format_nsn after conversion: {nsn}, type: {type(nsn)}")
+    
+    if len(nsn) == 16 and '-' in nsn:  # Already formatted
+        logger.info("NSN already formatted with dashes")
         return nsn
-    if len(nsn) == 10:  # Unformatted 10-digit NSN
-        return f"{nsn[:4]}-{nsn[4:6]}-{nsn[6:9]}-{nsn[9:]}"
+    if len(nsn) == 13 and '-' not in nsn:  # Unformatted 10-digit NSN
+        formatted = f"{nsn[:4]}-{nsn[4:6]}-{nsn[6:9]}-{nsn[9:]}"
+        logger.info(f"Formatted NSN: {formatted}")
+        return formatted
+    logger.info("NSN returned as is")
     return nsn  # Return as is if not matching expected formats
 
 def extract_clin_data(full_text):
@@ -437,7 +606,13 @@ def extract_clin_data(full_text):
             clin_match = re.match(patterns['clin_line'], line.strip())
             if clin_match:
                 clin_num, nsn_code, quantity, unit, unit_price, amount = clin_match.groups()
+                logger.info(f"Found CLIN {clin_num} with NSN {nsn_code}, type: {type(nsn_code)}")
                 print(f"\nProcessing CLIN {clin_num}")  # Debug print
+                
+                # Ensure nsn_code is a string
+                if nsn_code is not None and not isinstance(nsn_code, str):
+                    nsn_code = str(nsn_code)
+                    logger.info(f"Converted NSN code to string: {nsn_code}")
                 
                 # Look for CLIN type in previous lines (up to 5 lines back)
                 clin_type_id = None
@@ -535,6 +710,10 @@ def extract_clin_data(full_text):
             nsn_match = re.search(patterns['nsn_section'], full_text[:clin_match.start()])
             if nsn_match:
                 nsn_raw, description = nsn_match.groups()
+                # Ensure nsn_raw is a string
+                if nsn_raw is not None and not isinstance(nsn_raw, str):
+                    nsn_raw = str(nsn_raw)
+                    logger.info(f"Converted NSN raw to string: {nsn_raw}")
                 nsn_code = format_nsn(nsn_raw)
             
             clin_info = create_clin_info(
@@ -616,7 +795,8 @@ def create_clin_info(variant_type, clin_num, nsn_code, description, quantity, un
 
 def process_extracted_data(extracted_data):
     processed_data = {}
-
+    logger.info(f"Processing extracted data: {extracted_data}")
+    
     # Convert Contract Number to Text
     processed_data['contract_number'] = extracted_data.get('contract_number', 'Not found')
 
@@ -647,10 +827,18 @@ def process_extracted_data(extracted_data):
 
     # Process Buyer - Return both ID and name for flexibility
     buyer_name = extracted_data.get('buyer', 'Not found')
+    logger.info(f"Processing buyer: {buyer_name}, type: {type(buyer_name)}")
+    
+    # Ensure buyer_name is a string
+    if buyer_name is not None and not isinstance(buyer_name, str):
+        buyer_name = str(buyer_name)
+        logger.info(f"Converted buyer to string: {buyer_name}")
+    
     if buyer_name and buyer_name != 'Not found':
-        buyer_name = buyer_name.split('\n')[0]  # Get first line only
-        buyer_name = buyer_name.replace('DLA', '').strip()
         try:
+            buyer_name = buyer_name.split('\n')[0]  # Get first line only
+            buyer_name = buyer_name.replace('DLA', '').strip()
+            logger.info(f"Processed buyer name: {buyer_name}")
             buyer = Buyer.objects.filter(Q(description__icontains=buyer_name)).first()
             if buyer:
                 processed_data['buyer_id'] = buyer.id
@@ -761,18 +949,22 @@ def process_extracted_data(extracted_data):
 
     # Process NIST
     processed_data['nist'] = bool(extracted_data.get('nist', False))  # Ensure it's a boolean
-    logger.info(f"NIST requirement status: {processed_data['nist']}")
+    #logger.info(f"NIST requirement status: {processed_data['nist']}")
 
     # Process Contract Amount
-    contract_amount_str = extracted_data.get('contract_amount', 'Not found')
-    if contract_amount_str and contract_amount_str != 'Not found':
+    contract_total_str = extracted_data.get('contract_total', 'Not found')
+    logger.info(f"Contract total string from extracted data: {contract_total_str}")
+    if contract_total_str and contract_total_str != 'Not found':
         try:
-            amount = float(contract_amount_str.replace('$', '').replace(',', ''))
-            processed_data['contract_amount'] = amount
+            amount = float(contract_total_str.replace('$', '').replace(',', ''))
+            processed_data['contract_total'] = amount
+            logger.info(f"Processed contract total amount: {amount}")
         except ValueError:
-            processed_data['contract_amount'] = None
+            processed_data['contract_total'] = 0.00
+            logger.warning("Failed to convert contract total to float")
     else:
-        processed_data['contract_amount'] = None
+        processed_data['contract_total'] = 0.00
+        logger.warning("No contract total found in extracted data")
 
     # Add CLIN data processing
     if 'raw_text' in extracted_data:
@@ -783,13 +975,22 @@ def process_extracted_data(extracted_data):
             # Try to find or create NSN
             nsn = None
             if clin.get('nsn_code'):
+                nsn_value = clin['nsn_code']
+                logger.info(f"Processing NSN value: {nsn_value}, type: {type(nsn_value)}")
+                # Convert nsn_value to string if it's not already a string
+                nsn_value = str(nsn_value) if nsn_value is not None else ""
+                logger.info(f"NSN value after conversion: {nsn_value}, type: {type(nsn_value)}")
+                if len(nsn_value) == 13:
+                    nsn_value = f"{nsn_value[:4]}-{nsn_value[4:6]}-{nsn_value[6:9]}-{nsn_value[9:]}"
+                    logger.info(f"Formatted NSN value: {nsn_value}")
                 try:
-                    nsn = Nsn.objects.get(nsn_code=clin['nsn_code'])
+                    # Getting the nsn_id if it exists
+                    nsn = Nsn.objects.get(nsn_code=nsn_value) 
                 except Nsn.DoesNotExist:
                     # Create new NSN if it doesn't exist
                     nsn = Nsn.objects.create(
-                        nsn_code=clin['nsn_code'],
-                        description=clin.get('description', '')
+                        nsn_code=nsn_value,
+                        description=clin.get('description', '')  
                     )
             
             # Prepare CLIN data
@@ -965,4 +1166,150 @@ def export_dd1155_text(request):
             print('Cleaning up temporary file:', temp_file.name)
             os.unlink(temp_file.name)
             print('Temporary file cleaned up')
+
+@csrf_exempt
+def export_dd1155_png(request):
+    """
+    View to handle DD Form 1155 file upload and export first page as PNG using PyMuPDF
+    """
+    print('Starting export_dd1155_png function')
+    logger.info('Starting export_dd1155_png function')
+
+    if request.method != 'POST':
+        print('Request method is not POST:', request.method)
+        return JsonResponse({'success': False, 'error': 'Only POST requests are allowed'})
+    
+    print('Request method is POST')
+    print('Files in request:', request.FILES)
+    
+    if 'dd1155_file' not in request.FILES:
+        print('No dd1155_file in request.FILES')
+        return JsonResponse({'success': False, 'error': 'No file was uploaded'})
+    
+    uploaded_file = request.FILES['dd1155_file']
+    print('File uploaded:', uploaded_file.name)
+    
+    # Check if the file is a PDF
+    if not uploaded_file.name.lower().endswith('.pdf'):
+        print('File is not a PDF:', uploaded_file.name)
+        return JsonResponse({'success': False, 'error': 'Uploaded file must be a PDF'})
+    
+    print('File is a valid PDF')
+    
+    # Create a temporary file to store the uploaded PDF
+    temp_file = None
+    try:
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        temp_file.write(uploaded_file.read())
+        temp_file.close()
+        print('Created temporary file:', temp_file.name)
+        
+        # Create exports directory if it doesn't exist
+        export_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+        os.makedirs(export_dir, exist_ok=True)
+        print('Export directory:', export_dir)
+        
+        # Generate timestamp for uniqueness
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Get original filename without extension and create new filename
+        original_name = os.path.splitext(uploaded_file.name)[0]
+        export_filename = f'{original_name}_{timestamp}_page1.png'
+        print('Export filename:', export_filename)
+        
+        # Create the export file path
+        export_file = os.path.join(export_dir, export_filename)
+        print('Full export path:', export_file)
+        
+        # Convert first page to PNG using PyMuPDF
+        print('Converting first page to PNG')
+        try:
+            save_pdf_page_as_image(temp_file.name, 1, export_file)
+            print('PNG file saved successfully')
+            
+            # Verify the file was created
+            if not os.path.exists(export_file):
+                raise Exception("PNG file was not created")
+                
+            # Check file size to ensure it's not empty
+            file_size = os.path.getsize(export_file)
+            if file_size == 0:
+                raise Exception("PNG file is empty (0 bytes)")
+                
+            print(f"PNG file created successfully: {export_file} ({file_size} bytes)")
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'PNG exported successfully',
+                'file_path': export_filename
+            })
+        except Exception as e:
+            error_msg = f'Error converting PDF to PNG: {str(e)}'
+            print(error_msg)
+            logger.error(error_msg)
+            return JsonResponse({
+                'success': False,
+                'error': error_msg
+            })
+    
+    except Exception as e:
+        error_msg = f'Error exporting DD Form 1155 PNG: {str(e)}'
+        print(error_msg)
+        logger.error(error_msg)
+        return JsonResponse({'success': False, 'error': error_msg})
+    
+    finally:
+        # Clean up the temporary file
+        if temp_file and os.path.exists(temp_file.name):
+            print('Cleaning up temporary file:', temp_file.name)
+            os.unlink(temp_file.name)
+            print('Temporary file cleaned up')
+
+def save_pdf_page_as_image(pdf_path, page_number, output_image_path):
+    """
+    Convert a PDF page to an image using PyMuPDF (fitz) with error handling
+    """
+    try:
+        # Open the PDF file
+        pdf_document = fitz.open(pdf_path)
+        
+        # Select the page
+        page = pdf_document.load_page(page_number - 1)  # page_number is 1-based
+        
+        # Set a higher zoom factor for better quality
+        zoom_factor = 2.0  # Adjust as needed
+        mat = fitz.Matrix(zoom_factor, zoom_factor)
+        
+        # Render the page to a pixmap with alpha channel
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        
+        # Method 1: Save directly using pixmap's save method
+        pix.save(output_image_path)
+        
+        # Close the document
+        pdf_document.close()
+        
+        return True
+    except Exception as e:
+        print(f"Error in save_pdf_page_as_image: {str(e)}")
+        
+        # Fallback method if the first method fails
+        try:
+            pdf_document = fitz.open(pdf_path)
+            page = pdf_document.load_page(page_number - 1)
+            
+            # Try with different parameters
+            pix = page.get_pixmap(alpha=False)
+            
+            # Convert to PIL Image using a different approach
+            img_data = pix.samples
+            img = Image.frombytes("RGB", [pix.width, pix.height], img_data)
+            img.save(output_image_path)
+            
+            pdf_document.close()
+            return True
+        except Exception as fallback_error:
+            print(f"Fallback method also failed: {str(fallback_error)}")
+            raise Exception(f"Failed to convert PDF to image: {str(e)}. Fallback error: {str(fallback_error)}")
 

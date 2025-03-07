@@ -49,7 +49,8 @@ class Contract(AuditModel):
     reviewed_by = models.CharField(max_length=20, null=True, blank=True)
     reviewed_on = models.DateTimeField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='contract')
-    statz_value = models.FloatField(null=True, blank=True, default=0)
+    # statz_value = models.FloatField(null=True, blank=True, default=0)
+    bid_value = models.FloatField(null=True, blank=True, default=0)
     contract_value = models.FloatField(null=True, blank=True, default=0)
 
     def __str__(self):
@@ -74,6 +75,7 @@ class Clin(AuditModel):
     ia = models.CharField(max_length=5, null=True, blank=True) #Should this be two fields?
     fob = models.CharField(max_length=5, null=True, blank=True)
     order_qty = models.FloatField(null=True, blank=True)
+    uom = models.CharField(max_length=10, null=True, blank=True)
     ship_qty = models.FloatField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     due_date_late = models.BooleanField(null=True, blank=True)
@@ -87,6 +89,7 @@ class Clin(AuditModel):
     special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
     special_payment_terms_paid = models.BooleanField(null=True, blank=True)
     contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to clin_value?
     paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     paid_date = models.DateTimeField(null=True, blank=True)
@@ -108,6 +111,7 @@ class IdiqContract(AuditModel):
     option_length = models.IntegerField(null=True, blank=True)
     closed = models.BooleanField(null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
+    notes = GenericRelation('Note', related_query_name='idiq_contract')
 
     def __str__(self):
         return f"IDIQ Contract {self.contract_number}"

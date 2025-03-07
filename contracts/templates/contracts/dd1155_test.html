@@ -17,10 +17,18 @@
                        class="border border-gray-300 rounded-md p-2">
             </div>
             
-            <div>
+            <div class="flex space-x-4">
                 <button type="submit" id="extractBtn" 
                         class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition">
                     Extract Data
+                </button>
+                <button type="button" id="exportTextBtn"
+                        class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition">
+                    Export Raw Text
+                </button>
+                <button type="button" id="exportPngBtn"
+                        class="bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition">
+                    Export Page 1 as PNG
                 </button>
             </div>
         </form>
@@ -63,8 +71,38 @@
             </div>
             
             <div class="space-y-2">
-                <div class="font-medium">Contract Amount:</div>
-                <div id="contract_amount" class="bg-gray-100 p-2 rounded"></div>
+                <div class="font-medium">Contract Total:</div>
+                <div id="contract_total" class="bg-gray-100 p-2 rounded"></div>
+            </div>
+        </div>
+        
+        <!-- CLIN Information Section -->
+        <div class="mb-6">
+            <h3 class="text-lg font-medium mb-2">CLIN Information</h3>
+            <div id="clin_container" class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="py-2 px-4 border-b text-left">CLIN #</th>
+                            <th class="py-2 px-4 border-b text-left">Type</th>
+                            <th class="py-2 px-4 border-b text-left">NSN</th>
+                            <th class="py-2 px-4 border-b text-left">Description</th>
+                            <th class="py-2 px-4 border-b text-right">Quantity</th>
+                            <th class="py-2 px-4 border-b text-left">Unit</th>
+                            <th class="py-2 px-4 border-b text-right">Unit Price</th>
+                            <th class="py-2 px-4 border-b text-right">Amount</th>
+                            <th class="py-2 px-4 border-b text-center">FOB</th>
+                            <th class="py-2 px-4 border-b text-center">IA</th>
+                            <th class="py-2 px-4 border-b text-left">Due Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clin_table_body">
+                        <!-- CLIN data will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="no_clins_message" class="hidden bg-yellow-100 p-3 rounded text-yellow-700 mt-2">
+                No CLINs were extracted from this document.
             </div>
         </div>
         
@@ -85,48 +123,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadForm = document.getElementById('uploadForm');
     const statusMessage = document.getElementById('statusMessage');
     const resultsContainer = document.getElementById('resultsContainer');
-    
-    uploadForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const fileInput = document.getElementById('dd1155_file');
-        if (!fileInput.files.length) {
-            showStatus('Please select a PDF file.', 'error');
-            return;
-        }
-        
-        const file = fileInput.files[0];
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
-            showStatus('Please select a PDF file.', 'error');
-            return;
-        }
-        
-        showStatus('Extracting data from DD Form 1155...', 'info');
-        
-        const formData = new FormData();
-        formData.append('dd1155_file', file);
-        
-        fetch('/contracts/extract-dd1155/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showStatus('Data extracted successfully!', 'success');
-                displayResults(data);
-            } else {
-                showStatus('Error: ' + data.error, 'error');
-            }
-        })
-        .catch(error => {
-            showStatus('Error: ' + error.message, 'error');
-        });
-    });
+    const extractBtn = document.getElementById('extractBtn');
+    const exportTextBtn = document.getElementById('exportTextBtn');
+    const exportPngBtn = document.getElementById('exportPngBtn');
     
     function showStatus(message, type) {
         statusMessage.textContent = message;
@@ -143,15 +142,144 @@ document.addEventListener('DOMContentLoaded', function() {
         statusMessage.classList.remove('hidden');
     }
     
+    function validateFile() {
+        const fileInput = document.getElementById('dd1155_file');
+        if (!fileInput.files.length) {
+            showStatus('Please select a PDF file.', 'error');
+            return false;
+        }
+        
+        const file = fileInput.files[0];
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            showStatus('Please select a PDF file.', 'error');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function handleFileUpload(endpoint, successCallback) {
+        if (!validateFile()) return;
+        
+        const formData = new FormData();
+        formData.append('dd1155_file', document.getElementById('dd1155_file').files[0]);
+        
+        fetch(endpoint, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                successCallback(data);
+            } else {
+                showStatus('Error: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showStatus('Error: ' + error.message, 'error');
+        });
+    }
+    
+    // Extract Data Button Handler
+    extractBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        showStatus('Extracting data from DD Form 1155...', 'info');
+        
+        handleFileUpload('/contracts/extract-dd1155/', function(data) {
+            showStatus('Data extracted successfully!', 'success');
+            displayResults(data);
+        });
+    });
+    
+    // Export Text Button Handler
+    exportTextBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        showStatus('Exporting raw text...', 'info');
+        
+        handleFileUpload('/contracts/export-dd1155-text/', function(data) {
+            showStatus('Text exported successfully! Check the exports folder.', 'success');
+            if (data.file_path) {
+                const downloadUrl = `/media/exports/${data.file_path}`;
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = data.file_path;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+    });
+    
+    // Export PNG Button Handler
+    exportPngBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        showStatus('Exporting page 1 as PNG...', 'info');
+        
+        handleFileUpload('/contracts/export-dd1155-png/', function(data) {
+            showStatus('PNG exported successfully!', 'success');
+            if (data.file_path) {
+                const downloadUrl = `/media/exports/${data.file_path}`;
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = data.file_path;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+    });
+    
     function displayResults(data) {
         // Display each field
         document.getElementById('contract_number').textContent = data.contract_number || 'Not found';
-        //document.getElementById('po_number').textContent = data.po_number || 'Not found';
+        document.getElementById('po_number').textContent = data.po_number || 'Not found';
         document.getElementById('award_date').textContent = data.award_date || 'Not found';
         document.getElementById('due_date').textContent = data.due_date || 'Not found';
         document.getElementById('contract_type').textContent = data.contract_type || 'Not found';
         document.getElementById('buyer').textContent = data.buyer || 'Not found';
-        document.getElementById('contract_amount').textContent = data.contract_amount || 'Not found';
+        document.getElementById('contract_total').textContent = data.contract_total || '0.00';
+        
+        // Display CLIN information
+        const clinTableBody = document.getElementById('clin_table_body');
+        const noClinsMessage = document.getElementById('no_clins_message');
+        
+        // Clear previous results
+        clinTableBody.innerHTML = '';
+        
+        if (data.clins && data.clins.length > 0) {
+            // Hide no CLINs message
+            noClinsMessage.classList.add('hidden');
+            
+            // Add each CLIN to the table
+            data.clins.forEach(clin => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="py-2 px-4 border-b">${clin.clin_number || ''}</td>
+                    <td class="py-2 px-4 border-b">${clin.clin_type || ''}</td>
+                    <td class="py-2 px-4 border-b">${clin.nsn_code || ''}</td>
+                    <td class="py-2 px-4 border-b">${clin.description || ''}</td>
+                    <td class="py-2 px-4 border-b text-right">${clin.order_qty || ''}</td>
+                    <td class="py-2 px-4 border-b">${clin.unit || ''}</td>
+                    <td class="py-2 px-4 border-b text-right">${clin.unit_price ? '$' + clin.unit_price : ''}</td>
+                    <td class="py-2 px-4 border-b text-right">${clin.po_amount ? '$' + clin.po_amount : ''}</td>
+                    <td class="py-2 px-4 border-b text-center">${clin.fob || ''}</td>
+                    <td class="py-2 px-4 border-b text-center">${clin.ia || ''}</td>
+                    <td class="py-2 px-4 border-b">${clin.due_date || ''}</td>
+                `;
+                
+                clinTableBody.appendChild(row);
+            });
+        } else {
+            // Show no CLINs message
+            noClinsMessage.classList.remove('hidden');
+        }
         
         // Display coordinate results
         if (data.coordinate_results) {

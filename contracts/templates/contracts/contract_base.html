@@ -117,8 +117,14 @@
     <div class="overflow-y-auto max-h-[calc(100%-120px)]"> 
         {% if reminders %}
             {% for reminder in reminders %}
-                <div class="reminder-item {% if reminder.reminder_completed %}reminder-status-completed{% elif reminder.reminder_date < now %}reminder-status-overdue{% else %}reminder-status-pending{% endif %}" 
-                     onclick="showReminderModal('{{ reminder.id }}', '{{ reminder.reminder_title|escapejs }}', '{{ reminder.reminder_text|escapejs }}', '{{ reminder.reminder_date|date:'M d, Y g:i A' }}', '{{ reminder.reminder_completed }}', '{{ reminder.reminder_date|date:'c' }}', '{% url 'contracts:toggle_reminder' reminder.id %}?next={{ request.path|urlencode }}')">
+                <div class="reminder-item {% if reminder.reminder_completed %}reminder-status-completed{% elif reminder.reminder_date < now %}reminder-status-overdue{% else %}reminder-status-pending{% endif %}"
+                     data-reminder-id="{{ reminder.id }}"
+                     data-reminder-title="{{ reminder.reminder_title|escapejs }}"
+                     data-reminder-text="{{ reminder.reminder_text|escapejs }}"
+                     data-reminder-date="{{ reminder.reminder_date|date:'M d, Y g:i A' }}"
+                     data-reminder-completed="{{ reminder.reminder_completed }}"
+                     data-reminder-iso-date="{{ reminder.reminder_date|date:'c' }}"
+                     data-reminder-toggle-url="{% url 'contracts:toggle_reminder' reminder.id %}?next={{ request.path|urlencode }}">
                     <div class="flex items-center">
                         <div class="mr-3">
                             <div class="h-4 w-4 rounded-full 
@@ -215,6 +221,24 @@
         document.getElementById('reminderbar').classList.toggle('inactive');
     }
 
+    // Add event listeners to reminder items
+    document.addEventListener('DOMContentLoaded', function() {
+        const reminderItems = document.querySelectorAll('.reminder-item');
+        reminderItems.forEach(item => {
+            item.addEventListener('click', function() {
+                const id = this.dataset.reminderId;
+                const title = this.dataset.reminderTitle;
+                const text = this.dataset.reminderText;
+                const dateStr = this.dataset.reminderDate;
+                const completed = this.dataset.reminderCompleted;
+                const isoDate = this.dataset.reminderIsoDate;
+                const toggleUrl = this.dataset.reminderToggleUrl;
+                
+                showReminderModal(id, title, text, dateStr, completed, isoDate, toggleUrl);
+            });
+        });
+    });
+
     function showReminderModal(id, title, text, dateStr, completed, isoDate, toggleUrl) {
         const modal = document.getElementById('reminderModal');
         const modalTitle = document.getElementById('modalReminderTitle');
@@ -256,16 +280,11 @@
         
         modal.classList.add('active');
     }
-    
+
     function closeReminderModal() {
         document.getElementById('reminderModal').classList.remove('active');
     }
-    
-    // Close modal when clicking outside of it
-    document.getElementById('reminderModal').addEventListener('click', function(event) {
-        if (event.target === this) {
-            closeReminderModal();
-        }
-    });
 </script>
+
+{% block extra_js %}{% endblock %}
 {% endblock %}

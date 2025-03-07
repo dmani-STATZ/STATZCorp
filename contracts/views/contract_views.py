@@ -61,15 +61,15 @@ class ContractCreateView(CreateView):
     form_class = ContractForm
     template_name = 'contracts/contract_form.html'
 
-    def get_initial(self):
+    def get_initial(self):   #Page Load
         initial = super().get_initial()
         initial['po_number'] = SequenceNumber.get_po_number()
         initial['tab_num'] = SequenceNumber.get_tab_number()
         initial['sales_class'] = '2'
-        initial['open']=True
+        initial['status'] = '1'
         return initial
     
-    def form_valid(self, form):
+    def form_valid(self, form): # Save
         form.instance.created_by = self.request.user
         response = super().form_valid(form)
         
