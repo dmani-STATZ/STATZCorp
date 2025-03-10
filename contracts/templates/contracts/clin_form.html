@@ -7,6 +7,7 @@
 {% endblock %}
 
 {% block extra_head %}
+{{ block.super }}
 <style>
     .loading-spinner {
         display: inline-block;
@@ -29,75 +30,75 @@
         pointer-events: none;
     }
     
-    /* Custom select2 styling */
-    .select2-container {
-        width: 100% !important;
+    /* NSN Modal Styles */
+    .nsn-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
     }
     
-    .select2-container--default .select2-selection--single {
-        height: 38px;
-        border: 1px solid #d1d5db;
-        border-radius: 0.375rem;
+    .nsn-modal-content {
+        background-color: white;
+        border-radius: 0.5rem;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
     
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
-        line-height: 38px;
-        padding-left: 12px;
-        color: #111827;
-    }
-    
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 36px;
-    }
-    
-    .select2-dropdown {
-        border: 1px solid #d1d5db;
-        border-radius: 0.375rem;
-    }
-    
-    .select2-results__option {
-        padding: 8px 12px;
-    }
-    
-    .select2-container--default .select2-results__option--highlighted[aria-selected] {
-        background-color: #3b82f6;
-    }
-    
-    .select2-search__field {
-        padding: 8px !important;
-        border-radius: 0.25rem !important;
-    }
-    
-    .pagination-controls {
+    .nsn-modal-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 12px;
-        border-top: 1px solid #e5e7eb;
-        background-color: #f9fafb;
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
     }
     
-    .pagination-button {
-        background-color: #f3f4f6;
-        border: 1px solid #d1d5db;
-        border-radius: 0.25rem;
-        padding: 4px 8px;
-        font-size: 0.875rem;
+    .nsn-modal-body {
+        padding: 1rem;
+    }
+    
+    .nsn-modal-footer {
+        padding: 1rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .nsn-search-results {
+        margin-top: 1rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .nsn-result-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e5e7eb;
         cursor: pointer;
     }
     
-    .pagination-button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+    .nsn-result-item:hover {
+        background-color: #f3f4f6;
     }
     
-    .pagination-info {
-        font-size: 0.875rem;
-        color: #6b7280;
+    .nsn-pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        margin-top: 1rem;
     }
 </style>
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-{% endblock %}
+{% endblock extra_head %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
@@ -171,27 +172,37 @@
                 </div>
                 
                 <div class="space-y-4">
-                    <div id="nsn-field-container" class="form-group">
-                        <label for="id_nsn" class="form-label requiredField">
+                    <!-- Simplified NSN Field -->
+                    <div class="form-group">
+                        <label for="nsn_display" class="form-label requiredField">
                             NSN<span class="asteriskField">*</span>
-                            <span id="nsn-field-container-spinner" class="loading-spinner"></span>
                         </label>
-                        <select name="nsn" id="id_nsn" class="select form-control" data-placeholder="Search for NSN by code or description...">
-                            <option value="">---------</option>
-                            {% if form.instance.nsn %}
-                                <option value="{{ form.instance.nsn.id }}" selected>
-                                    {{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}
-                                </option>
-                            {% endif %}
-                        </select>
-                        <div id="nsn-pagination" class="pagination-controls mt-2 hidden">
-                            <button type="button" id="nsn-prev-page" class="pagination-button" disabled>Previous</button>
-                            <span id="nsn-pagination-info" class="pagination-info">Page 1 of 1</span>
-                            <button type="button" id="nsn-next-page" class="pagination-button">Next</button>
+                        <div class="flex">
+                            <input type="text" id="nsn_display" class="form-control flex-grow" 
+                                   value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% endif %}" 
+                                   readonly placeholder="Click to select NSN">
+                            <button type="button" id="select_nsn_btn" class="ml-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Select
+                            </button>
                         </div>
+                        <!-- Hidden input to store the actual NSN ID -->
+                        <input type="hidden" name="nsn" id="id_nsn" value="{% if form.instance.nsn %}{{ form.instance.nsn.id }}{% endif %}">
                     </div>
-                    <div id="supplier-field-container">
-                        {{ form.supplier|as_crispy_field }}
+                    <!-- Simplified Supplier Field -->
+                    <div class="form-group">
+                        <label for="supplier_display" class="form-label requiredField">
+                            Supplier<span class="asteriskField">*</span>
+                        </label>
+                        <div class="flex">
+                            <input type="text" id="supplier_display" class="form-control flex-grow" 
+                                   value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% endif %}" 
+                                   readonly placeholder="Click to select Supplier">
+                            <button type="button" id="select_supplier_btn" class="ml-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Select
+                            </button>
+                        </div>
+                        <!-- Hidden input to store the actual Supplier ID -->
+                        <input type="hidden" name="supplier" id="id_supplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% endif %}">
                     </div>
                 </div>
                 
@@ -276,137 +287,474 @@
     </div>
 </div>
 
-{% block extra_js %}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toggle financial details section
-        const financialToggle = document.getElementById('financial-details-toggle');
-        const financialSection = document.getElementById('financial-details-section');
-        
-        financialToggle.addEventListener('click', function() {
-            financialSection.classList.toggle('hidden');
-            const isHidden = financialSection.classList.contains('hidden');
-            financialToggle.querySelector('span').textContent = isHidden ? '(Click to expand)' : '(Click to collapse)';
-        });
+<!-- NSN Selection Modal -->
+<div id="nsn_modal" class="nsn-modal">
+    <div class="nsn-modal-content">
+        <div class="nsn-modal-header">
+            <h3 class="text-lg font-semibold">Select NSN</h3>
+            <button type="button" id="close_nsn_modal" class="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="nsn-modal-body">
+            <div class="mb-4">
+                <label for="nsn_search" class="block text-sm font-medium text-gray-700 mb-1">Search NSN</label>
+                <div class="flex">
+                    <input type="text" id="nsn_search" class="form-control flex-grow" placeholder="Enter NSN code or description">
+                    <button type="button" id="search_nsn_btn" class="ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Search
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
+            </div>
+            
+            <div id="nsn_search_results" class="nsn-search-results">
+                <!-- Results will be populated here -->
+                <div class="text-center text-gray-500 py-4">
+                    Search for NSN by code or description
+                </div>
+            </div>
+            
+            <div id="nsn_pagination" class="nsn-pagination hidden">
+                <button type="button" id="nsn_prev_page" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50" disabled>
+                    Previous
+                </button>
+                <span id="nsn_page_info">Page 1 of 1</span>
+                <button type="button" id="nsn_next_page" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50" disabled>
+                    Next
+                </button>
+            </div>
+        </div>
+        <div class="nsn-modal-footer">
+            <button type="button" id="cancel_nsn_selection" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
 
-        // Initialize Select2 for NSN field with custom AJAX data source
-        let nsnCurrentPage = 1;
-        let nsnTotalPages = 1;
-        let nsnSearchTerm = '';
+<!-- Supplier Selection Modal -->
+<div id="supplier_modal" class="nsn-modal">
+    <div class="nsn-modal-content">
+        <div class="nsn-modal-header">
+            <h3 class="text-lg font-semibold">Select Supplier</h3>
+            <button type="button" id="close_supplier_modal" class="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="nsn-modal-body">
+            <div class="mb-4">
+                <label for="supplier_search" class="block text-sm font-medium text-gray-700 mb-1">Search Supplier</label>
+                <div class="flex">
+                    <input type="text" id="supplier_search" class="form-control flex-grow" placeholder="Enter supplier name or CAGE code">
+                    <button type="button" id="search_supplier_btn" class="ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Search
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
+            </div>
+            
+            <div id="supplier_search_results" class="nsn-search-results">
+                <!-- Results will be populated here -->
+                <div class="text-center text-gray-500 py-4">
+                    Search for supplier by name or CAGE code
+                </div>
+            </div>
+            
+            <div id="supplier_pagination" class="nsn-pagination hidden">
+                <button type="button" id="supplier_prev_page" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50" disabled>
+                    Previous
+                </button>
+                <span id="supplier_page_info">Page 1 of 1</span>
+                <button type="button" id="supplier_next_page" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50" disabled>
+                    Next
+                </button>
+            </div>
+        </div>
+        <div class="nsn-modal-footer">
+            <button type="button" id="cancel_supplier_selection" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+    // Execute code when the DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM fully loaded");
         
-        $('#id_nsn').select2({
-            placeholder: 'Search for NSN by code or description...',
-            allowClear: true,
-            minimumInputLength: 2,
-            ajax: {
-                url: '/contracts/api/options/nsn/',
-                dataType: 'json',
-                delay: 300,
-                data: function(params) {
-                    nsnSearchTerm = params.term || '';
-                    return {
-                        search: params.term || '',
-                        page: nsnCurrentPage,
-                        page_size: 20
-                    };
-                },
-                processResults: function(data) {
-                    if (data.success) {
-                        // Update pagination info
-                        nsnTotalPages = data.pagination.total_pages;
-                        updateNsnPagination();
-                        
-                        return {
-                            results: data.options.map(function(item) {
-                                return {
-                                    id: item.value,
-                                    text: item.label
-                                };
-                            })
-                        };
-                    } else {
-                        return { results: [] };
-                    }
-                },
-                cache: true
-            }
-        });
+        // Initialize modals immediately - don't wait for setTimeout
+        // NSN Modal Functionality
+        const nsnModal = document.getElementById('nsn_modal');
+        const selectNsnBtn = document.getElementById('select_nsn_btn');
+        const closeNsnModalBtn = document.getElementById('close_nsn_modal');
+        const cancelNsnSelection = document.getElementById('cancel_nsn_selection');
+        const nsnSearch = document.getElementById('nsn_search');
+        const searchNsnBtn = document.getElementById('search_nsn_btn');
+        const nsnSearchResults = document.getElementById('nsn_search_results');
+        const nsnPagination = document.getElementById('nsn_pagination');
+        const nsnPrevPage = document.getElementById('nsn_prev_page');
+        const nsnNextPage = document.getElementById('nsn_next_page');
+        const nsnPageInfo = document.getElementById('nsn_page_info');
+        const nsnDisplay = document.getElementById('nsn_display');
+        const nsnIdInput = document.getElementById('id_nsn');
         
-        // Show pagination controls when select2 is opened
-        $('#id_nsn').on('select2:open', function() {
-            setTimeout(function() {
-                $('#nsn-pagination').removeClass('hidden').appendTo('.select2-results');
-            }, 100);
-        });
+        let currentPage = 1;
+        let totalPages = 1;
+        let searchTerm = '';
         
-        // Handle pagination for NSN
-        function updateNsnPagination() {
-            $('#nsn-pagination-info').text('Page ' + nsnCurrentPage + ' of ' + nsnTotalPages);
-            $('#nsn-prev-page').prop('disabled', nsnCurrentPage <= 1);
-            $('#nsn-next-page').prop('disabled', nsnCurrentPage >= nsnTotalPages);
+        console.log("NSN elements:", {selectNsnBtn, nsnModal, nsnDisplay});
+        
+        // Open NSN modal
+        function openNsnModal() {
+            console.log("Opening NSN modal");
+            nsnModal.style.display = 'flex';
+            nsnSearch.focus();
         }
         
-        $('#nsn-prev-page').on('click', function() {
-            if (nsnCurrentPage > 1) {
-                nsnCurrentPage--;
-                refreshNsnOptions();
-            }
-        });
+        if (selectNsnBtn) {
+            selectNsnBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openNsnModal();
+            });
+        }
         
-        $('#nsn-next-page').on('click', function() {
-            if (nsnCurrentPage < nsnTotalPages) {
-                nsnCurrentPage++;
-                refreshNsnOptions();
-            }
-        });
+        if (nsnDisplay) {
+            nsnDisplay.addEventListener('click', function(e) {
+                e.preventDefault();
+                openNsnModal();
+            });
+        }
         
-        function refreshNsnOptions() {
-            $.ajax({
-                url: '/contracts/api/options/nsn/',
-                data: {
-                    search: nsnSearchTerm,
-                    page: nsnCurrentPage,
-                    page_size: 20
-                },
-                success: function(data) {
-                    if (data.success) {
-                        // Update pagination info
-                        nsnTotalPages = data.pagination.total_pages;
-                        updateNsnPagination();
-                        
-                        // Clear existing options
-                        var $select = $('#id_nsn');
-                        var currentValue = $select.val();
-                        
-                        // Keep the current selection if any
-                        var currentOption = $select.find('option:selected');
-                        var currentOptionHtml = '';
-                        if (currentOption.length && currentOption.val()) {
-                            currentOptionHtml = '<option value="' + currentOption.val() + '" selected>' + currentOption.text() + '</option>';
-                        }
-                        
-                        // Replace options
-                        $select.empty().append('<option></option>' + currentOptionHtml);
-                        
-                        // Add new options
-                        data.options.forEach(function(item) {
-                            $select.append('<option value="' + item.value + '">' + item.label + '</option>');
-                        });
-                        
-                        // Trigger change to refresh Select2
-                        $select.trigger('change');
-                    }
+        // Close NSN modal
+        function closeNsnModal() {
+            nsnModal.style.display = 'none';
+        }
+        
+        if (closeNsnModalBtn) {
+            closeNsnModalBtn.addEventListener('click', closeNsnModal);
+        }
+        
+        if (cancelNsnSelection) {
+            cancelNsnSelection.addEventListener('click', closeNsnModal);
+        }
+        
+        // Close modal when clicking outside
+        if (nsnModal) {
+            nsnModal.addEventListener('click', function(e) {
+                if (e.target === nsnModal) {
+                    closeNsnModal();
                 }
             });
         }
         
+        // Search for NSN
+        function searchNsn() {
+            searchTerm = nsnSearch.value.trim();
+            if (searchTerm.length < 3) {
+                nsnSearchResults.innerHTML = '<div class="text-center text-gray-500 py-4">Enter at least 3 characters to search</div>';
+                nsnPagination.classList.add('hidden');
+                return;
+            }
+            
+            currentPage = 1;
+            fetchNsnResults();
+        }
+        
+        if (searchNsnBtn) {
+            searchNsnBtn.addEventListener('click', searchNsn);
+        }
+        
+        // Search on enter key
+        if (nsnSearch) {
+            nsnSearch.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchNsn();
+                }
+            });
+        }
+        
+        // Pagination
+        if (nsnPrevPage) {
+            nsnPrevPage.addEventListener('click', function() {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchNsnResults();
+                }
+            });
+        }
+        
+        if (nsnNextPage) {
+            nsnNextPage.addEventListener('click', function() {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    fetchNsnResults();
+                }
+            });
+        }
+        
+        // Fetch NSN results from API
+        function fetchNsnResults() {
+            nsnSearchResults.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
+            
+            fetch(`/contracts/api/options/nsn/?search=${encodeURIComponent(searchTerm)}&page=${currentPage}&page_size=10`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update pagination
+                        totalPages = data.pagination.total_pages;
+                        updateNsnPagination();
+                        
+                        // Display results
+                        if (data.options.length > 0) {
+                            let resultsHtml = '';
+                            data.options.forEach(option => {
+                                resultsHtml += `
+                                    <div class="nsn-result-item" data-nsn-id="${option.value}" data-nsn-text="${option.label}">
+                                        <div class="font-medium">${option.label}</div>
+                                    </div>
+                                `;
+                            });
+                            nsnSearchResults.innerHTML = resultsHtml;
+                            
+                            // Add click event to result items
+                            document.querySelectorAll('.nsn-result-item[data-nsn-id]').forEach(item => {
+                                item.addEventListener('click', function() {
+                                    const nsnId = this.getAttribute('data-nsn-id');
+                                    const nsnText = this.getAttribute('data-nsn-text');
+                                    
+                                    // Update the form fields
+                                    nsnIdInput.value = nsnId;
+                                    nsnDisplay.value = nsnText;
+                                    
+                                    // Close the modal
+                                    closeNsnModal();
+                                });
+                            });
+                        } else {
+                            nsnSearchResults.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
+                        }
+                    } else {
+                        nsnSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching NSN data:', error);
+                    nsnSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
+                });
+        }
+        
+        function updateNsnPagination() {
+            if (totalPages > 1) {
+                nsnPagination.classList.remove('hidden');
+                nsnPageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+                nsnPrevPage.disabled = currentPage <= 1;
+                nsnNextPage.disabled = currentPage >= totalPages;
+            } else {
+                nsnPagination.classList.add('hidden');
+            }
+        }
+        
+        // Supplier Modal Functionality
+        const supplierModal = document.getElementById('supplier_modal');
+        const selectSupplierBtn = document.getElementById('select_supplier_btn');
+        const closeSupplierModalBtn = document.getElementById('close_supplier_modal');
+        const cancelSupplierSelection = document.getElementById('cancel_supplier_selection');
+        const supplierSearch = document.getElementById('supplier_search');
+        const searchSupplierBtn = document.getElementById('search_supplier_btn');
+        const supplierSearchResults = document.getElementById('supplier_search_results');
+        const supplierPagination = document.getElementById('supplier_pagination');
+        const supplierPrevPage = document.getElementById('supplier_prev_page');
+        const supplierNextPage = document.getElementById('supplier_next_page');
+        const supplierPageInfo = document.getElementById('supplier_page_info');
+        const supplierDisplay = document.getElementById('supplier_display');
+        const supplierIdInput = document.getElementById('id_supplier');
+        
+        let supplierCurrentPage = 1;
+        let supplierTotalPages = 1;
+        let supplierSearchTerm = '';
+        
+        console.log("Supplier elements:", {selectSupplierBtn, supplierModal, supplierDisplay});
+        
+        // Open Supplier modal
+        function openSupplierModal() {
+            console.log("Opening Supplier modal");
+            supplierModal.style.display = 'flex';
+            supplierSearch.focus();
+        }
+        
+        if (selectSupplierBtn) {
+            selectSupplierBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openSupplierModal();
+            });
+        }
+        
+        if (supplierDisplay) {
+            supplierDisplay.addEventListener('click', function(e) {
+                e.preventDefault();
+                openSupplierModal();
+            });
+        }
+        
+        // Close Supplier modal
+        function closeSupplierModal() {
+            supplierModal.style.display = 'none';
+        }
+        
+        if (closeSupplierModalBtn) {
+            closeSupplierModalBtn.addEventListener('click', closeSupplierModal);
+        }
+        
+        if (cancelSupplierSelection) {
+            cancelSupplierSelection.addEventListener('click', closeSupplierModal);
+        }
+        
+        // Close modal when clicking outside
+        if (supplierModal) {
+            supplierModal.addEventListener('click', function(e) {
+                if (e.target === supplierModal) {
+                    closeSupplierModal();
+                }
+            });
+        }
+        
+        // Search for Supplier
+        function searchSupplier() {
+            supplierSearchTerm = supplierSearch.value.trim();
+            if (supplierSearchTerm.length < 3) {
+                supplierSearchResults.innerHTML = '<div class="text-center text-gray-500 py-4">Enter at least 3 characters to search</div>';
+                supplierPagination.classList.add('hidden');
+                return;
+            }
+            
+            supplierCurrentPage = 1;
+            fetchSupplierResults();
+        }
+        
+        if (searchSupplierBtn) {
+            searchSupplierBtn.addEventListener('click', searchSupplier);
+        }
+        
+        // Search on enter key
+        if (supplierSearch) {
+            supplierSearch.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchSupplier();
+                }
+            });
+        }
+        
+        // Pagination
+        if (supplierPrevPage) {
+            supplierPrevPage.addEventListener('click', function() {
+                if (supplierCurrentPage > 1) {
+                    supplierCurrentPage--;
+                    fetchSupplierResults();
+                }
+            });
+        }
+        
+        if (supplierNextPage) {
+            supplierNextPage.addEventListener('click', function() {
+                if (supplierCurrentPage < supplierTotalPages) {
+                    supplierCurrentPage++;
+                    fetchSupplierResults();
+                }
+            });
+        }
+        
+        // Fetch Supplier results from API
+        function fetchSupplierResults() {
+            supplierSearchResults.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
+            
+            fetch(`/contracts/api/options/supplier/?search=${encodeURIComponent(supplierSearchTerm)}&page=${supplierCurrentPage}&page_size=10`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update pagination
+                        supplierTotalPages = data.pagination.total_pages;
+                        updateSupplierPagination();
+                        
+                        // Display results
+                        if (data.options.length > 0) {
+                            let resultsHtml = '';
+                            data.options.forEach(option => {
+                                resultsHtml += `
+                                    <div class="nsn-result-item" data-supplier-id="${option.value}" data-supplier-text="${option.label}">
+                                        <div class="font-medium">${option.label}</div>
+                                    </div>
+                                `;
+                            });
+                            supplierSearchResults.innerHTML = resultsHtml;
+                            
+                            // Add click event to result items
+                            document.querySelectorAll('.nsn-result-item[data-supplier-id]').forEach(item => {
+                                item.addEventListener('click', function() {
+                                    const supplierId = this.getAttribute('data-supplier-id');
+                                    const supplierText = this.getAttribute('data-supplier-text');
+                                    
+                                    // Update the form fields
+                                    supplierIdInput.value = supplierId;
+                                    supplierDisplay.value = supplierText;
+                                    
+                                    // Close the modal
+                                    closeSupplierModal();
+                                });
+                            });
+                        } else {
+                            supplierSearchResults.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
+                        }
+                    } else {
+                        supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching supplier data:', error);
+                    supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
+                });
+        }
+        
+        function updateSupplierPagination() {
+            if (supplierTotalPages > 1) {
+                supplierPagination.classList.remove('hidden');
+                supplierPageInfo.textContent = `Page ${supplierCurrentPage} of ${supplierTotalPages}`;
+                supplierPrevPage.disabled = supplierCurrentPage <= 1;
+                supplierNextPage.disabled = supplierCurrentPage >= supplierTotalPages;
+            } else {
+                supplierPagination.classList.add('hidden');
+            }
+        }
+
+        // Toggle financial details section
+        const financialToggle = document.getElementById('financial-details-toggle');
+        const financialSection = document.getElementById('financial-details-section');
+        
+        if (financialToggle && financialSection) {
+            financialToggle.addEventListener('click', function() {
+                financialSection.classList.toggle('hidden');
+                const isHidden = financialSection.classList.contains('hidden');
+                const span = financialToggle.querySelector('span');
+                if (span) {
+                    span.textContent = isHidden ? '(Click to expand)' : '(Click to collapse)';
+                }
+            });
+        }
+
         // Add loading indicators to other select fields that will be loaded asynchronously
         const selectContainers = [
             'contract-field-container',
-            'clin-type-field-container', 
-            'supplier-field-container',
+            'clin-type-field-container',
             'special-payment-terms-container'
         ];
         
@@ -440,9 +788,18 @@
         function loadSelectOptions(selectElement, containerId, currentValue) {
             const fieldName = selectElement.name;
             
+            console.log(`Loading options for ${fieldName}, current value: ${currentValue}`);
+            
             fetch(`/contracts/api/options/${fieldName}/`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    console.log(`Received data for ${fieldName}:`, data);
+                    
                     // Remove loading state
                     selectElement.classList.remove('select-loading');
                     const spinner = document.getElementById(`${containerId}-spinner`);
@@ -467,8 +824,31 @@
                         
                         // Restore selected value if it exists
                         if (currentValue) {
+                            console.log(`Setting ${fieldName} value to ${currentValue}`);
                             selectElement.value = currentValue;
+                            
+                            // If the value wasn't set correctly, try to find the option by value
+                            if (selectElement.value !== currentValue) {
+                                console.log(`Value not set correctly, trying to find option with value ${currentValue}`);
+                                const option = Array.from(selectElement.options).find(opt => opt.value == currentValue);
+                                if (option) {
+                                    option.selected = true;
+                                } else {
+                                    console.error(`Could not find option with value ${currentValue} for ${fieldName}`);
+                                    
+                                    // If we can't find the option, add it manually if we have the contract data
+                                    if (fieldName === 'contract' && window.initialContractData) {
+                                        const optionElement = document.createElement('option');
+                                        optionElement.value = window.initialContractData.id;
+                                        optionElement.textContent = window.initialContractData.label;
+                                        selectElement.appendChild(optionElement);
+                                        optionElement.selected = true;
+                                    }
+                                }
+                            }
                         }
+                    } else {
+                        console.error(`Invalid data format for ${fieldName}:`, data);
                     }
                 })
                 .catch(error => {
@@ -479,9 +859,23 @@
                     if (spinner) {
                         spinner.remove();
                     }
+                    
+                    // Add error message
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'text-red-500 text-sm mt-1';
+                    errorMsg.textContent = `Error loading options. Please refresh the page.`;
+                    selectElement.parentNode.appendChild(errorMsg);
                 });
         }
+        
+        // Store initial contract data if available
+        window.initialContractData = null;
+        {% if form.instance.contract %}
+        window.initialContractData = {
+            id: "{{ form.instance.contract.id|escapejs }}",
+            label: "{{ form.instance.contract.contract_number|escapejs }}"
+        };
+        {% endif %}
     });
 </script>
-{% endblock %}
-{% endblock %} 
+{% endblock extra_scripts %}
