@@ -144,7 +144,25 @@
                 
                 <div class="space-y-4">
                     <div id="contract-field-container">
+                        {% if form.instance.pk or form.initial.contract %}
+                        <!-- Display contract as read-only field when editing or when contract is pre-selected -->
+                        <div class="form-group">
+                            <label class="form-label">Contract</label>
+                            <div class="form-control bg-gray-50 py-2">
+                                {% if form.instance.contract %}
+                                    {{ form.instance.contract.contract_number }}
+                                {% elif form.initial.contract %}
+                                    {{ form.initial.contract.contract_number }}
+                                {% endif %}
+                            </div>
+                            <!-- Hidden input to preserve the contract value -->
+                            <input type="hidden" name="contract" id="id_contract" 
+                                value="{% if form.instance.contract %}{{ form.instance.contract.id }}{% elif form.initial.contract %}{{ form.initial.contract }}{% endif %}">
+                        </div>
+                        {% else %}
+                        <!-- Only show dropdown if creating a new CLIN without pre-selected contract -->
                         {{ form.contract|as_crispy_field }}
+                        {% endif %}
                     </div>
                     {{ form.sub_contract|as_crispy_field }}
                     {{ form.clin_po_num|as_crispy_field }}
@@ -753,10 +771,15 @@
 
         // Add loading indicators to other select fields that will be loaded asynchronously
         const selectContainers = [
-            'contract-field-container',
             'clin-type-field-container',
             'special-payment-terms-container'
         ];
+        
+        // Only add contract field container if it has a select element (not read-only)
+        const contractContainer = document.getElementById('contract-field-container');
+        if (contractContainer && contractContainer.querySelector('select')) {
+            selectContainers.push('contract-field-container');
+        }
         
         selectContainers.forEach(containerId => {
             const container = document.getElementById(containerId);
@@ -790,7 +813,22 @@
             
             console.log(`Loading options for ${fieldName}, current value: ${currentValue}`);
             
-            fetch(`/contracts/api/options/${fieldName}/`)
+            // Build the URL with parameters
+            let url = `/contracts/api/options/${fieldName}/`;
+            const params = new URLSearchParams();
+            
+            // Add search parameters if needed
+            if (currentValue && fieldName === 'contract') {
+                // For contracts, include the current ID to ensure it's in the results
+                params.append('include_id', currentValue);
+            }
+            
+            // Add the params to the URL if we have any
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+            
+            fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error ${response.status}`);
@@ -835,15 +873,6 @@
                                     option.selected = true;
                                 } else {
                                     console.error(`Could not find option with value ${currentValue} for ${fieldName}`);
-                                    
-                                    // If we can't find the option, add it manually if we have the contract data
-                                    if (fieldName === 'contract' && window.initialContractData) {
-                                        const optionElement = document.createElement('option');
-                                        optionElement.value = window.initialContractData.id;
-                                        optionElement.textContent = window.initialContractData.label;
-                                        selectElement.appendChild(optionElement);
-                                        optionElement.selected = true;
-                                    }
                                 }
                             }
                         }
@@ -867,15 +896,6 @@
                     selectElement.parentNode.appendChild(errorMsg);
                 });
         }
-        
-        // Store initial contract data if available
-        window.initialContractData = null;
-        {% if form.instance.contract %}
-        window.initialContractData = {
-            id: "{{ form.instance.contract.id|escapejs }}",
-            label: "{{ form.instance.contract.contract_number|escapejs }}"
-        };
-        {% endif %}
     });
 </script>
 {% endblock extra_scripts %}
