@@ -425,6 +425,57 @@ class ClinForm(forms.ModelForm):
                 'placeholder': 'Enter Planned Split'
             }),
         }
+        
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize the form with optimized querysets for foreign key fields.
+        This helps reduce the load time by limiting the initial data loaded.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # For new forms, initialize with empty querysets for foreign key fields
+        # These will be populated asynchronously via JavaScript
+        if not kwargs.get('instance'):
+            # If we have a contract_id in initial data, keep it
+            contract_id = kwargs.get('initial', {}).get('contract')
+            if contract_id:
+                self.fields['contract'].queryset = Contract.objects.filter(id=contract_id)
+            else:
+                self.fields['contract'].queryset = Contract.objects.none()
+                
+            # Initialize other foreign key fields with empty querysets
+            self.fields['clin_type'].queryset = ClinType.objects.none()
+            self.fields['supplier'].queryset = Supplier.objects.none()
+            self.fields['nsn'].queryset = Nsn.objects.none()
+            self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.none()
+        else:
+            # For existing instances, only load the currently selected values
+            instance = kwargs['instance']
+            
+            if instance.contract_id:
+                self.fields['contract'].queryset = Contract.objects.filter(id=instance.contract_id)
+            else:
+                self.fields['contract'].queryset = Contract.objects.none()
+                
+            if instance.clin_type_id:
+                self.fields['clin_type'].queryset = ClinType.objects.filter(id=instance.clin_type_id)
+            else:
+                self.fields['clin_type'].queryset = ClinType.objects.none()
+                
+            if instance.supplier_id:
+                self.fields['supplier'].queryset = Supplier.objects.filter(id=instance.supplier_id)
+            else:
+                self.fields['supplier'].queryset = Supplier.objects.none()
+                
+            if instance.nsn_id:
+                self.fields['nsn'].queryset = Nsn.objects.filter(id=instance.nsn_id)
+            else:
+                self.fields['nsn'].queryset = Nsn.objects.none()
+                
+            if instance.special_payment_terms_id:
+                self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.filter(id=instance.special_payment_terms_id)
+            else:
+                self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.none()
 
 class NoteForm(forms.ModelForm):
     class Meta:

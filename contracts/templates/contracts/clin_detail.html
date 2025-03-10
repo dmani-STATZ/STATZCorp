@@ -71,20 +71,11 @@
                 <p class="text-sm text-gray-600">Order Quantity</p>
                 <p class="font-medium">{{ clin.order_qty|default:"N/A" }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">Ship Quantity</p>
-                <p class="font-medium">{{ clin.ship_qty|default:"N/A" }}</p>
-            </div>
+
             <div>
                 <p class="text-sm text-gray-600">Due Date</p>
                 <p class="font-medium {% if clin.due_date_late %}text-red-600{% endif %}">
                     {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
-                </p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Ship Date</p>
-                <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
-                    {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
                 </p>
             </div>
             <div>
@@ -98,14 +89,27 @@
         </div>
     </div>
 
+    <!-- CLIN SHIP INFORMATION -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">Shipment Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <p class="text-sm text-gray-600">Ship Date</p>
+                <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
+                    {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Ship Quantity</p>
+                <p class="font-medium">{{ clin.ship_qty|default:"N/A" }}</p>
+            </div>
+        </div>
+    </div>
+    
+
     <!-- CLIN Finance Information -->
     <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-xl font-bold text-gray-800 mb-6">Finance Information</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-                <p class="text-sm text-gray-600">Contract Value</p>
-                <p class="font-medium">${{ clin.contract_value|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
             <div>
                 <p class="text-sm text-gray-600">PO Amount</p>
                 <p class="font-medium">${{ clin.po_amount|floatformat:2|intcomma|default:"N/A" }}</p>

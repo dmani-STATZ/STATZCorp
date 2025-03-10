@@ -57,6 +57,7 @@ from .views import (
 )
 
 from .views.contract_views import check_contract_number
+from .views.api_views import get_select_options
 
 app_name = 'contracts'
 
@@ -114,6 +115,7 @@ urlpatterns = [
     path('search/', contract_search, name='contract_search'),
     path('clin/<int:clin_id>/notes/', get_clin_notes, name='get_clin_notes'),
     path('clin/<int:clin_id>/toggle-acknowledgment/', toggle_clin_acknowledgment, name='toggle_clin_acknowledgment'),
+    path('api/options/<str:field_name>/', get_select_options, name='get_select_options'),
     
     # Test
     path('test-app-name/', test_app_name, name='test_app_name'),

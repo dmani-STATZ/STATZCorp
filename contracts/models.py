@@ -53,6 +53,33 @@ class Contract(AuditModel):
     bid_value = models.FloatField(null=True, blank=True, default=0)
     contract_value = models.FloatField(null=True, blank=True, default=0)
 
+    class Meta:
+        indexes = [
+            # Foreign key indexes
+            models.Index(fields=['idiq_contract'], name='contract_idiq_idx'),
+            models.Index(fields=['status'], name='contract_status_idx'),
+            models.Index(fields=['canceled_reason'], name='contract_cancel_reason_idx'),
+            models.Index(fields=['buyer'], name='contract_buyer_idx'),
+            models.Index(fields=['contract_type'], name='contract_type_idx'),
+            models.Index(fields=['sales_class'], name='contract_sales_idx'),
+            
+            # Common search/filter fields
+            models.Index(fields=['contract_number'], name='contract_number_idx'),
+            models.Index(fields=['po_number'], name='contract_po_number_idx'),
+            models.Index(fields=['tab_num'], name='contract_tab_num_idx'),
+            models.Index(fields=['open'], name='contract_open_idx'),
+            models.Index(fields=['cancelled'], name='contract_cancelled_idx'),
+            models.Index(fields=['due_date'], name='contract_due_idx'),
+            models.Index(fields=['award_date'], name='contract_award_idx'),
+            models.Index(fields=['assigned_user'], name='contract_assigned_idx'),
+            
+            # Compound indexes for common query patterns
+            models.Index(fields=['open', 'due_date'], name='contract_open_due_idx'),
+            models.Index(fields=['status', 'due_date'], name='contract_status_due_idx'),
+            models.Index(fields=['due_date_late'], name='contract_due_late_idx'),
+            models.Index(fields=['reviewed'], name='contract_reviewed_idx'),
+        ]
+
     def __str__(self):
         return f"Contract {self.contract_number}"
     
@@ -99,6 +126,30 @@ class Clin(AuditModel):
     plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            # Foreign key indexes
+            models.Index(fields=['contract'], name='clin_contract_idx'),
+            models.Index(fields=['clin_type'], name='clin_type_idx'),
+            models.Index(fields=['supplier'], name='clin_supplier_idx'),
+            models.Index(fields=['nsn'], name='clin_nsn_idx'),
+            models.Index(fields=['special_payment_terms'], name='clin_payment_terms_idx'),
+            
+            # Common search/filter fields
+            models.Index(fields=['po_number'], name='clin_po_number_idx'),
+            models.Index(fields=['tab_num'], name='clin_tab_num_idx'),
+            models.Index(fields=['due_date'], name='clin_due_date_idx'),
+            models.Index(fields=['supplier_due_date'], name='clin_supp_due_date_idx'),
+            models.Index(fields=['ship_date'], name='clin_ship_date_idx'),
+            
+            # Compound indexes for common query patterns
+            models.Index(fields=['contract', 'due_date'], name='clin_contract_due_idx'),
+            models.Index(fields=['supplier', 'due_date'], name='clin_supp_due_idx'),
+            models.Index(fields=['due_date_late'], name='clin_due_late_idx'),
+            models.Index(fields=['supplier_due_date_late'], name='clin_supp_due_late_idx'),
+            models.Index(fields=['ship_date_late'], name='clin_ship_late_idx'),
+        ]
+
     def __str__(self):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
 
@@ -113,6 +164,18 @@ class IdiqContract(AuditModel):
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='idiq_contract')
 
+    class Meta:
+        indexes = [
+            # Foreign key indexes
+            models.Index(fields=['buyer'], name='idiq_buyer_idx'),
+            
+            # Common search/filter fields
+            models.Index(fields=['contract_number'], name='idiq_contract_num_idx'),
+            models.Index(fields=['tab_num'], name='idiq_tab_num_idx'),
+            models.Index(fields=['award_date'], name='idiq_award_idx'),
+            models.Index(fields=['closed'], name='idiq_closed_idx'),
+        ]
+
     def __str__(self):
         return f"IDIQ Contract {self.contract_number}"
 
@@ -121,6 +184,15 @@ class IdiqContractDetails(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
     nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE)
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['idiq_contract'], name='idiq_details_contract_idx'),
+            models.Index(fields=['nsn'], name='idiq_details_nsn_idx'),
+            models.Index(fields=['supplier'], name='idiq_details_supplier_idx'),
+            # Compound index for common query pattern
+            models.Index(fields=['idiq_contract', 'nsn'], name='idiq_details_contract_nsn_idx'),
+        ]
 
     def __str__(self):
         return f"Details for IDIQ Contract {self.idiq_contract.contract_number}"
@@ -422,4 +494,102 @@ def assign_po_tab_numbers(sender, instance, **kwargs):
         if not instance.tab_num:
             instance.tab_num = SequenceNumber.get_tab_number()
             SequenceNumber.advance_tab_number()
+
+class ClinView(models.Model):
+    """
+    A database view model for optimized CLIN data retrieval.
+    This model represents a SQL view that joins CLIN data with related tables
+    to provide faster access to commonly needed CLIN information.
+    
+    Note: This is a read-only model that maps to a database view.
+    """
+    id = models.IntegerField(primary_key=True)
+    contract_id = models.IntegerField(null=True)
+    contract_number = models.CharField(max_length=25, null=True)
+    clin_po_num = models.CharField(max_length=10, null=True)
+    po_number = models.CharField(max_length=10, null=True)
+    po_num_ext = models.CharField(max_length=5, null=True)
+    tab_num = models.CharField(max_length=10, null=True)
+    sub_contract = models.CharField(max_length=20, null=True)
+    
+    clin_type_id = models.IntegerField(null=True)
+    clin_type_description = models.TextField(null=True)
+    
+    supplier_id = models.IntegerField(null=True)
+    supplier_name = models.CharField(max_length=100, null=True)
+    supplier_cage_code = models.CharField(max_length=10, null=True)
+    
+    nsn_id = models.IntegerField(null=True)
+    nsn_code = models.CharField(max_length=20, null=True)
+    nsn_description = models.TextField(null=True)
+    
+    ia = models.CharField(max_length=5, null=True)
+    fob = models.CharField(max_length=5, null=True)
+    order_qty = models.FloatField(null=True)
+    ship_qty = models.FloatField(null=True)
+    
+    due_date = models.DateField(null=True)
+    due_date_late = models.BooleanField(null=True)
+    supplier_due_date = models.DateField(null=True)
+    supplier_due_date_late = models.BooleanField(null=True)
+    ship_date = models.DateField(null=True)
+    ship_date_late = models.BooleanField(null=True)
+    
+    special_payment_terms_id = models.IntegerField(null=True)
+    special_payment_terms_code = models.CharField(max_length=5, null=True)
+    special_payment_terms_description = models.CharField(max_length=30, null=True)
+    special_payment_terms_paid = models.BooleanField(null=True)
+    
+    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True)
+    po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True)
+    paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True)
+    
+    created_by_id = models.IntegerField(null=True)
+    created_by_username = models.CharField(max_length=150, null=True)
+    created_on = models.DateTimeField(null=True)
+    modified_by_id = models.IntegerField(null=True)
+    modified_by_username = models.CharField(max_length=150, null=True)
+    modified_on = models.DateTimeField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'clin_view'
+
+    def __str__(self):
+        return f"CLIN View {self.id} - {self.clin_po_num or 'Unknown'}"
+
+class NsnView(models.Model):
+    """
+    A database view model for optimized NSN data retrieval.
+    This model represents a materialized view that provides faster access to NSN information.
+    
+    Note: This is a read-only model that maps to a database view.
+    """
+    id = models.IntegerField(primary_key=True)
+    nsn_code = models.CharField(max_length=20, null=True)
+    description = models.TextField(null=True)
+    part_number = models.CharField(max_length=25, null=True)
+    revision = models.CharField(max_length=25, null=True)
+    notes = models.TextField(null=True)
+    directory_url = models.CharField(max_length=200, null=True)
+    
+    # Add denormalized fields for related data if needed
+    # For example, count of CLINs using this NSN
+    clin_count = models.IntegerField(null=True)
+    
+    # Add search optimization fields
+    # Note: This field is NVARCHAR(MAX) and cannot be indexed directly
+    # Use LIKE or CONTAINS operators, or set up full-text search for efficient searching
+    search_vector = models.TextField(null=True)  # This will store concatenated searchable text
+    
+    class Meta:
+        managed = False
+        db_table = 'nsn_view'
+        indexes = [
+            models.Index(fields=['nsn_code'], name='nsn_view_code_idx'),
+            # Cannot index search_vector as it's NVARCHAR(MAX)
+        ]
+
+    def __str__(self):
+        return f"NSN View {self.nsn_code}"
 

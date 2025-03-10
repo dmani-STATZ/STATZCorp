@@ -6,6 +6,99 @@
     {% if form.instance.pk %}Edit CLIN{% else %}New CLIN{% endif %}
 {% endblock %}
 
+{% block extra_head %}
+<style>
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top-color: #3b82f6;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .select-loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    /* Custom select2 styling */
+    .select2-container {
+        width: 100% !important;
+    }
+    
+    .select2-container--default .select2-selection--single {
+        height: 38px;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 38px;
+        padding-left: 12px;
+        color: #111827;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+    
+    .select2-dropdown {
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+    }
+    
+    .select2-results__option {
+        padding: 8px 12px;
+    }
+    
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: #3b82f6;
+    }
+    
+    .select2-search__field {
+        padding: 8px !important;
+        border-radius: 0.25rem !important;
+    }
+    
+    .pagination-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-top: 1px solid #e5e7eb;
+        background-color: #f9fafb;
+    }
+    
+    .pagination-button {
+        background-color: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 0.25rem;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+    
+    .pagination-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .pagination-info {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+</style>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
@@ -37,7 +130,7 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-md p-6">
-        <form method="post" class="space-y-6">
+        <form method="post" class="space-y-6" id="clin-form">
             {% csrf_token %}
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -49,7 +142,9 @@
                 </div>
                 
                 <div class="space-y-4">
-                    {{ form.contract|as_crispy_field }}
+                    <div id="contract-field-container">
+                        {{ form.contract|as_crispy_field }}
+                    </div>
                     {{ form.sub_contract|as_crispy_field }}
                     {{ form.clin_po_num|as_crispy_field }}
                 </div>
@@ -61,7 +156,9 @@
                 </div>
                 
                 <div class="space-y-4">
-                    {{ form.clin_type|as_crispy_field }}
+                    <div id="clin-type-field-container">
+                        {{ form.clin_type|as_crispy_field }}
+                    </div>
                     {{ form.ia|as_crispy_field }}
                     {{ form.fob|as_crispy_field }}
                 </div>
@@ -74,8 +171,28 @@
                 </div>
                 
                 <div class="space-y-4">
-                    {{ form.nsn|as_crispy_field }}
-                    {{ form.supplier|as_crispy_field }}
+                    <div id="nsn-field-container" class="form-group">
+                        <label for="id_nsn" class="form-label requiredField">
+                            NSN<span class="asteriskField">*</span>
+                            <span id="nsn-field-container-spinner" class="loading-spinner"></span>
+                        </label>
+                        <select name="nsn" id="id_nsn" class="select form-control" data-placeholder="Search for NSN by code or description...">
+                            <option value="">---------</option>
+                            {% if form.instance.nsn %}
+                                <option value="{{ form.instance.nsn.id }}" selected>
+                                    {{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}
+                                </option>
+                            {% endif %}
+                        </select>
+                        <div id="nsn-pagination" class="pagination-controls mt-2 hidden">
+                            <button type="button" id="nsn-prev-page" class="pagination-button" disabled>Previous</button>
+                            <span id="nsn-pagination-info" class="pagination-info">Page 1 of 1</span>
+                            <button type="button" id="nsn-next-page" class="pagination-button">Next</button>
+                        </div>
+                    </div>
+                    <div id="supplier-field-container">
+                        {{ form.supplier|as_crispy_field }}
+                    </div>
                 </div>
                 
                 <div class="space-y-4">
@@ -94,6 +211,40 @@
                     {{ form.due_date|as_crispy_field }}
                     {{ form.supplier_due_date|as_crispy_field }}
                     {{ form.ship_date|as_crispy_field }}
+                </div>
+
+                <!-- Financial Details (Hidden by default) -->
+                <div class="col-span-1 md:col-span-2 lg:col-span-3">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200 cursor-pointer" 
+                        id="financial-details-toggle">
+                        Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
+                    </h2>
+                </div>
+                
+                <div class="col-span-1 md:col-span-3 lg:col-span-3 hidden" id="financial-details-section">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="space-y-4">
+                            <div id="special-payment-terms-container">
+                                {{ form.special_payment_terms|as_crispy_field }}
+                            </div>
+                            {{ form.special_payment_terms_paid|as_crispy_field }}
+                            {{ form.contract_value|as_crispy_field }}
+                        </div>
+                        
+                        <div class="space-y-4">
+                            {{ form.po_amount|as_crispy_field }}
+                            {{ form.paid_amount|as_crispy_field }}
+                            {{ form.paid_date|as_crispy_field }}
+                        </div>
+                        
+                        <div class="space-y-4">
+                            {{ form.wawf_payment|as_crispy_field }}
+                            {{ form.wawf_recieved|as_crispy_field }}
+                            {{ form.wawf_invoice|as_crispy_field }}
+                            {{ form.plan_gross|as_crispy_field }}
+                            {{ form.planned_split|as_crispy_field }}
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -124,4 +275,213 @@
         </form>
     </div>
 </div>
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle financial details section
+        const financialToggle = document.getElementById('financial-details-toggle');
+        const financialSection = document.getElementById('financial-details-section');
+        
+        financialToggle.addEventListener('click', function() {
+            financialSection.classList.toggle('hidden');
+            const isHidden = financialSection.classList.contains('hidden');
+            financialToggle.querySelector('span').textContent = isHidden ? '(Click to expand)' : '(Click to collapse)';
+        });
+
+        // Initialize Select2 for NSN field with custom AJAX data source
+        let nsnCurrentPage = 1;
+        let nsnTotalPages = 1;
+        let nsnSearchTerm = '';
+        
+        $('#id_nsn').select2({
+            placeholder: 'Search for NSN by code or description...',
+            allowClear: true,
+            minimumInputLength: 2,
+            ajax: {
+                url: '/contracts/api/options/nsn/',
+                dataType: 'json',
+                delay: 300,
+                data: function(params) {
+                    nsnSearchTerm = params.term || '';
+                    return {
+                        search: params.term || '',
+                        page: nsnCurrentPage,
+                        page_size: 20
+                    };
+                },
+                processResults: function(data) {
+                    if (data.success) {
+                        // Update pagination info
+                        nsnTotalPages = data.pagination.total_pages;
+                        updateNsnPagination();
+                        
+                        return {
+                            results: data.options.map(function(item) {
+                                return {
+                                    id: item.value,
+                                    text: item.label
+                                };
+                            })
+                        };
+                    } else {
+                        return { results: [] };
+                    }
+                },
+                cache: true
+            }
+        });
+        
+        // Show pagination controls when select2 is opened
+        $('#id_nsn').on('select2:open', function() {
+            setTimeout(function() {
+                $('#nsn-pagination').removeClass('hidden').appendTo('.select2-results');
+            }, 100);
+        });
+        
+        // Handle pagination for NSN
+        function updateNsnPagination() {
+            $('#nsn-pagination-info').text('Page ' + nsnCurrentPage + ' of ' + nsnTotalPages);
+            $('#nsn-prev-page').prop('disabled', nsnCurrentPage <= 1);
+            $('#nsn-next-page').prop('disabled', nsnCurrentPage >= nsnTotalPages);
+        }
+        
+        $('#nsn-prev-page').on('click', function() {
+            if (nsnCurrentPage > 1) {
+                nsnCurrentPage--;
+                refreshNsnOptions();
+            }
+        });
+        
+        $('#nsn-next-page').on('click', function() {
+            if (nsnCurrentPage < nsnTotalPages) {
+                nsnCurrentPage++;
+                refreshNsnOptions();
+            }
+        });
+        
+        function refreshNsnOptions() {
+            $.ajax({
+                url: '/contracts/api/options/nsn/',
+                data: {
+                    search: nsnSearchTerm,
+                    page: nsnCurrentPage,
+                    page_size: 20
+                },
+                success: function(data) {
+                    if (data.success) {
+                        // Update pagination info
+                        nsnTotalPages = data.pagination.total_pages;
+                        updateNsnPagination();
+                        
+                        // Clear existing options
+                        var $select = $('#id_nsn');
+                        var currentValue = $select.val();
+                        
+                        // Keep the current selection if any
+                        var currentOption = $select.find('option:selected');
+                        var currentOptionHtml = '';
+                        if (currentOption.length && currentOption.val()) {
+                            currentOptionHtml = '<option value="' + currentOption.val() + '" selected>' + currentOption.text() + '</option>';
+                        }
+                        
+                        // Replace options
+                        $select.empty().append('<option></option>' + currentOptionHtml);
+                        
+                        // Add new options
+                        data.options.forEach(function(item) {
+                            $select.append('<option value="' + item.value + '">' + item.label + '</option>');
+                        });
+                        
+                        // Trigger change to refresh Select2
+                        $select.trigger('change');
+                    }
+                }
+            });
+        }
+        
+        // Add loading indicators to other select fields that will be loaded asynchronously
+        const selectContainers = [
+            'contract-field-container',
+            'clin-type-field-container', 
+            'supplier-field-container',
+            'special-payment-terms-container'
+        ];
+        
+        selectContainers.forEach(containerId => {
+            const container = document.getElementById(containerId);
+            if (container) {
+                const select = container.querySelector('select');
+                if (select) {
+                    // Save the current value if any
+                    const currentValue = select.value;
+                    
+                    // Add loading class and spinner
+                    select.classList.add('select-loading');
+                    const label = container.querySelector('label');
+                    if (label) {
+                        const spinner = document.createElement('span');
+                        spinner.className = 'loading-spinner';
+                        spinner.id = `${containerId}-spinner`;
+                        label.appendChild(spinner);
+                    }
+                    
+                    // Load data asynchronously
+                    setTimeout(() => {
+                        loadSelectOptions(select, containerId, currentValue);
+                    }, 100);
+                }
+            }
+        });
+
+        // Function to load select options asynchronously
+        function loadSelectOptions(selectElement, containerId, currentValue) {
+            const fieldName = selectElement.name;
+            
+            fetch(`/contracts/api/options/${fieldName}/`)
+                .then(response => response.json())
+                .then(data => {
+                    // Remove loading state
+                    selectElement.classList.remove('select-loading');
+                    const spinner = document.getElementById(`${containerId}-spinner`);
+                    if (spinner) {
+                        spinner.remove();
+                    }
+                    
+                    // Populate options
+                    if (data.success && data.options) {
+                        // Clear existing options except the first empty one
+                        while (selectElement.options.length > 1) {
+                            selectElement.remove(1);
+                        }
+                        
+                        // Add new options
+                        data.options.forEach(option => {
+                            const optionElement = document.createElement('option');
+                            optionElement.value = option.value;
+                            optionElement.textContent = option.label;
+                            selectElement.appendChild(optionElement);
+                        });
+                        
+                        // Restore selected value if it exists
+                        if (currentValue) {
+                            selectElement.value = currentValue;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error loading options for ${fieldName}:`, error);
+                    // Remove loading state on error
+                    selectElement.classList.remove('select-loading');
+                    const spinner = document.getElementById(`${containerId}-spinner`);
+                    if (spinner) {
+                        spinner.remove();
+                    }
+                });
+        }
+    });
+</script>
+{% endblock %}
 {% endblock %} 
