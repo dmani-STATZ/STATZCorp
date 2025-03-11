@@ -22,6 +22,7 @@ def get_select_options(request, field_name):
         page = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 20))
         search_term = request.GET.get('search', '')
+        include_id = request.GET.get('include_id')
         
         # Calculate offset and limit
         offset = (page - 1) * page_size
@@ -29,29 +30,23 @@ def get_select_options(request, field_name):
         
         if field_name == 'contract':
             # Get contracts, ordered by contract number
-            queryset = Contract.objects.filter(
-                Q(open=True) | Q(open__isnull=True)
-            ).order_by('contract_number')
-            
-            # Check if we need to include a specific contract by ID
-            specific_contract_id = request.GET.get('include_id')
+            queryset = Contract.objects.all().order_by('contract_number')
             
             # Apply search if provided
             if search_term:
                 queryset = queryset.filter(contract_number__icontains=search_term)
             
-            # If we have a specific ID to include (for editing existing records)
+            # Check if we need to include a specific contract
+            specific_contract_id = include_id
             if specific_contract_id:
                 try:
-                    # Try to get the specific contract even if it doesn't match other filters
-                    specific_contract = Contract.objects.filter(id=specific_contract_id).first()
-                    if specific_contract and specific_contract not in queryset:
-                        # Add this contract to our results if it exists but wasn't included
-                        # We'll prepend it to make sure it's included in the first page
-                        queryset = list(queryset)
-                        queryset.insert(0, specific_contract)
+                    specific_contract = Contract.objects.get(id=specific_contract_id)
+                    # Check if the contract is already in the queryset
+                    if not queryset.filter(id=specific_contract_id).exists():
+                        # If not, we'll add it to the results later
+                        pass
                 except Exception as e:
-                    print(f"Error including specific contract: {str(e)}")
+                    print(f"Error getting specific contract: {str(e)}")
             
             try:
                 # Apply pagination
@@ -93,9 +88,25 @@ def get_select_options(request, field_name):
             if search_term:
                 queryset = queryset.filter(description__icontains=search_term)
             
+            # Check if we need to include a specific clin_type
+            if include_id:
+                try:
+                    specific_clin_type = ClinType.objects.get(id=include_id)
+                    # Make sure this specific clin_type is included in the results
+                    if not queryset.filter(id=include_id).exists():
+                        # Create a new queryset with the specific item first
+                        queryset = list(queryset)
+                        queryset.insert(0, specific_clin_type)
+                except Exception as e:
+                    print(f"Error getting specific clin_type: {str(e)}")
+            
             # Apply pagination
-            total_count = queryset.count()
-            queryset = queryset[offset:offset+limit]
+            if isinstance(queryset, list):
+                total_count = len(queryset)
+                queryset = queryset[offset:offset+limit]
+            else:
+                total_count = queryset.count()
+                queryset = queryset[offset:offset+limit]
             
             for item in queryset:
                 options.append({
@@ -114,9 +125,25 @@ def get_select_options(request, field_name):
                     Q(cage_code__icontains=search_term)
                 )
             
+            # Check if we need to include a specific supplier
+            if include_id:
+                try:
+                    specific_supplier = Supplier.objects.get(id=include_id)
+                    # Make sure this specific supplier is included in the results
+                    if not queryset.filter(id=include_id).exists():
+                        # Create a new queryset with the specific item first
+                        queryset = list(queryset)
+                        queryset.insert(0, specific_supplier)
+                except Exception as e:
+                    print(f"Error getting specific supplier: {str(e)}")
+            
             # Apply pagination
-            total_count = queryset.count()
-            queryset = queryset[offset:offset+limit]
+            if isinstance(queryset, list):
+                total_count = len(queryset)
+                queryset = queryset[offset:offset+limit]
+            else:
+                total_count = queryset.count()
+                queryset = queryset[offset:offset+limit]
             
             for item in queryset:
                 options.append({
@@ -125,64 +152,30 @@ def get_select_options(request, field_name):
                 })
                 
         elif field_name == 'nsn':
-            # COMMENTED OUT: NSNView usage for performance testing
-            # Try to use the optimized NsnView model first
-            # try:
-            #     # Use the materialized view for better performance
-            #     if search_term:
-            #         # Use simple LIKE for searching since full-text search is not available
-            #         queryset = NsnView.objects.filter(
-            #             Q(nsn_code__contains=search_term) |
-            #             Q(search_vector__contains=search_term)
-            #         ).order_by('nsn_code')
-            #     else:
-            #         queryset = NsnView.objects.all().order_by('nsn_code')
-            #     
-            #     # Apply pagination
-            #     total_count = queryset.count()
-            #     queryset = queryset[offset:offset+limit]
-            #     
-            #     for item in queryset:
-            #         options.append({
-            #             'value': item.id,
-            #             'label': f"{item.nsn_code or 'Unknown'} - {item.description or 'No description'}"
-            #         })
-            # except Exception as e:
-            #     # Fall back to the regular Nsn model if the view is not available
-            #     print(f"Error using NsnView, falling back to Nsn model: {str(e)}")
-                
-            # USING ONLY: Regular Nsn model for testing
-            # Get NSNs, ordered by code
-            queryset = Nsn.objects.all()
+            # Use the NsnView model for better performance
+            queryset = NsnView.objects.all().order_by('nsn_code')
             
-            # Apply search if provided - this is critical for NSN performance
+            # Apply search if provided
             if search_term:
+                queryset = queryset.filter(
+                    Q(nsn_code__icontains=search_term) | 
+                    Q(description__icontains=search_term)
+                )
+            
+            # Check if we need to include a specific NSN
+            if include_id:
                 try:
-                    # First try with istartswith for better performance
-                    queryset = queryset.filter(
-                        Q(nsn_code__istartswith=search_term) | 
-                        Q(description__icontains=search_term) |
-                        Q(part_number__icontains=search_term)
-                    )
-                    
-                    # Check if we got any results
-                    if queryset.count() == 0:
-                        # If no results, try with a more permissive search
-                        queryset = Nsn.objects.filter(
-                            Q(nsn_code__icontains=search_term) | 
-                            Q(description__icontains=search_term) |
-                            Q(part_number__icontains=search_term)
-                        )
-                    
-                    # Sort results
-                    queryset = queryset.order_by('nsn_code')
+                    specific_nsn = Nsn.objects.get(id=include_id)
+                    # Make sure this specific NSN is included in the results
+                    if not queryset.filter(id=include_id).exists():
+                        # For NSN, we need to handle this differently since we're using NsnView
+                        # We'll add the specific NSN to the options at the end
+                        options.append({
+                            'value': specific_nsn.id,
+                            'label': f"{specific_nsn.nsn_code or 'Unknown'} - {specific_nsn.description or 'No description'}"
+                        })
                 except Exception as e:
-                    print(f"Error in NSN search: {str(e)}")
-                    # Return empty queryset on error
-                    queryset = Nsn.objects.none()
-            else:
-                # If no search term, just return first page ordered by code
-                queryset = queryset.order_by('nsn_code')
+                    print(f"Error getting specific NSN: {str(e)}")
             
             try:
                 # Apply pagination
@@ -207,9 +200,25 @@ def get_select_options(request, field_name):
             if search_term:
                 queryset = queryset.filter(terms__icontains=search_term)
             
+            # Check if we need to include a specific payment term
+            if include_id:
+                try:
+                    specific_term = SpecialPaymentTerms.objects.get(id=include_id)
+                    # Make sure this specific term is included in the results
+                    if not queryset.filter(id=include_id).exists():
+                        # Create a new queryset with the specific item first
+                        queryset = list(queryset)
+                        queryset.insert(0, specific_term)
+                except Exception as e:
+                    print(f"Error getting specific payment term: {str(e)}")
+            
             # Apply pagination
-            total_count = queryset.count()
-            queryset = queryset[offset:offset+limit]
+            if isinstance(queryset, list):
+                total_count = len(queryset)
+                queryset = queryset[offset:offset+limit]
+            else:
+                total_count = queryset.count()
+                queryset = queryset[offset:offset+limit]
             
             for item in queryset:
                 options.append({

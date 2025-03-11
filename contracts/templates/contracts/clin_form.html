@@ -9,27 +9,6 @@
 {% block extra_head %}
 {{ block.super }}
 <style>
-    .loading-spinner {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid rgba(0, 0, 0, 0.1);
-        border-radius: 50%;
-        border-top-color: #3b82f6;
-        animation: spin 1s ease-in-out infinite;
-        margin-left: 8px;
-        vertical-align: middle;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    .select-loading {
-        opacity: 0.6;
-        pointer-events: none;
-    }
-    
     /* NSN Modal Styles */
     .nsn-modal {
         display: none;
@@ -97,6 +76,33 @@
         padding: 0.5rem 0;
         margin-top: 1rem;
     }
+    
+    /* Form label styling */
+    .form-label {
+        text-transform: capitalize;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+        display: block;
+        font-family: inherit;
+    }
+    
+    /* For acronyms that should always be uppercase */
+    .text-uppercase {
+        text-transform: uppercase !important;
+    }
+    
+    /* Section headers */
+    .section-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-family: inherit;
+    }
 </style>
 {% endblock extra_head %}
 
@@ -105,12 +111,12 @@
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold text-gray-800">
             {% if form.instance.pk %}
-                Edit CLIN: {{ form.instance.clin_po_num }}
+                Edit <span class="text-uppercase">CLIN</span>: {{ form.instance.clin_po_num }}
                 {% if form.initial.contract %}
                     for Contract #{{ form.initial.contract_number }}
                 {% endif %}
             {% else %}
-                Create New CLIN
+                Create New <span class="text-uppercase">CLIN</span>
                 {% if form.initial.contract %}
                     for Contract #{{ form.initial.contract_number }}
                 {% endif %}
@@ -137,144 +143,417 @@
         <form method="post" class="space-y-6" id="clin-form">
             {% csrf_token %}
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- CLIN Identification -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        CLIN Identification
-                    </h2>
-                </div>
+            <!-- CLIN Identification -->
+            <div>
+                <h2 class="section-header">
+                    <span class="text-uppercase">CLIN</span> Identification
+                </h2>
                 
-                <div class="space-y-4">
-                    <div id="contract-field-container">
-                        {% if form.instance.pk or form.initial.contract %}
-                        <!-- Display contract as read-only field when editing or when contract is pre-selected -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-4">
+                        <div id="contract-field-container">
+                            {% if form.instance.pk or form.initial.contract %}
+                            <!-- Display contract as read-only field when editing or when contract is pre-selected -->
+                            <div class="form-group">
+                                <label class="form-label">Contract</label>
+                                <div class="form-control bg-gray-50 py-2">
+                                    {% if form.instance.contract %}
+                                        {{ form.instance.contract.contract_number }}
+                                    {% elif form.initial.contract_number %}
+                                        {{ form.initial.contract_number }}
+                                    {% endif %}
+                                </div>
+                                <!-- Hidden input to preserve the contract value -->
+                                <input type="hidden" name="contract" id="id_contract" 
+                                    value="{% if form.instance.contract %}{{ form.instance.contract.id }}{% elif form.initial.contract %}{{ form.initial.contract }}{% endif %}">
+                            </div>
+                            {% else %}
+                            <!-- Only show dropdown if creating a new CLIN without pre-selected contract -->
+                            {{ form.contract|as_crispy_field }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
                         <div class="form-group">
-                            <label class="form-label">Contract</label>
-                            <div class="form-control bg-gray-50 py-2">
-                                {% if form.instance.contract %}
-                                    {{ form.instance.contract.contract_number }}
-                                {% elif form.initial.contract_number %}
-                                    {{ form.initial.contract_number }}
+                            <label for="{{ form.po_number.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">PO</span> Number
+                            </label>
+                            {{ form.po_number }}
+                            {% if form.po_number.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.po_number.errors }}</div>
+                            {% endif %}
+                            {% if form.po_number.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.po_number.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <!-- Empty cell for alignment -->
+                    </div>
+                    
+                    <!-- Row 2 -->
+                    <div class="md:col-span-4">
+                        <div id="clin-type-field-container">
+                            <div class="form-group">
+                                <label for="{{ form.clin_type.id_for_label }}" class="form-label">
+                                    <span class="text-uppercase">CLIN</span> Type
+                                </label>
+                                {{ form.clin_type }}
+                                {% if form.clin_type.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.clin_type.errors }}</div>
+                                {% endif %}
+                                {% if form.clin_type.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.clin_type.help_text }}</div>
                                 {% endif %}
                             </div>
-                            <!-- Hidden input to preserve the contract value -->
-                            <input type="hidden" name="contract" id="id_contract" 
-                                value="{% if form.instance.contract %}{{ form.instance.contract.id }}{% elif form.initial.contract %}{{ form.initial.contract }}{% endif %}">
                         </div>
-                        {% else %}
-                        <!-- Only show dropdown if creating a new CLIN without pre-selected contract -->
-                        {{ form.contract|as_crispy_field }}
-                        {% endif %}
                     </div>
-                    {{ form.sub_contract|as_crispy_field }}
-                    {{ form.clin_po_num|as_crispy_field }}
-                </div>
-                
-                <div class="space-y-4">
-                    {{ form.po_number|as_crispy_field }}
-                    {{ form.po_num_ext|as_crispy_field }}
-                    {{ form.tab_num|as_crispy_field }}
-                </div>
-                
-                <div class="space-y-4">
-                    <div id="clin-type-field-container">
-                        {{ form.clin_type|as_crispy_field }}
-                    </div>
-                    {{ form.ia|as_crispy_field }}
-                    {{ form.fob|as_crispy_field }}
-                </div>
-                
-                <!-- Item Details -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        Item Details
-                    </h2>
-                </div>
-                
-                <div class="space-y-4">
-                    <!-- Simplified NSN Field -->
-                    <div class="form-group">
-                        <label for="nsn_display" class="form-label requiredField">
-                            NSN<span class="asteriskField">*</span>
-                        </label>
-                        <div class="flex">
-                            <input type="text" id="nsn_display" class="form-control flex-grow" 
-                                   value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% endif %}" 
-                                   readonly placeholder="Click to select NSN">
-                            <button type="button" id="select_nsn_btn" class="ml-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                                Select
-                            </button>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.ia.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">IA</span>
+                            </label>
+                            {{ form.ia }}
+                            {% if form.ia.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.ia.errors }}</div>
+                            {% endif %}
+                            {% if form.ia.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.ia.help_text }}</div>
+                            {% endif %}
                         </div>
-                        <!-- Hidden input to store the actual NSN ID -->
-                        <input type="hidden" name="nsn" id="id_nsn" value="{% if form.instance.nsn %}{{ form.instance.nsn.id }}{% endif %}">
                     </div>
-                    <!-- Simplified Supplier Field -->
-                    <div class="form-group">
-                        <label for="supplier_display" class="form-label requiredField">
-                            Supplier<span class="asteriskField">*</span>
-                        </label>
-                        <div class="flex">
-                            <input type="text" id="supplier_display" class="form-control flex-grow" 
-                                   value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% endif %}" 
-                                   readonly placeholder="Click to select Supplier">
-                            <button type="button" id="select_supplier_btn" class="ml-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                                Select
-                            </button>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.fob.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">FOB</span>
+                            </label>
+                            {{ form.fob }}
+                            {% if form.fob.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.fob.errors }}</div>
+                            {% endif %}
+                            {% if form.fob.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.fob.help_text }}</div>
+                            {% endif %}
                         </div>
-                        <!-- Hidden input to store the actual Supplier ID -->
-                        <input type="hidden" name="supplier" id="id_supplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% endif %}">
+                    </div>
+                    
+                    <!-- Row 3 -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.tab_num.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">TAB</span> Number
+                            </label>
+                            {{ form.tab_num }}
+                            {% if form.tab_num.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.tab_num.errors }}</div>
+                            {% endif %}
+                            {% if form.tab_num.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.tab_num.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.po_num_ext.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">PO</span> Number Extension
+                            </label>
+                            {{ form.po_num_ext }}
+                            {% if form.po_num_ext.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.po_num_ext.errors }}</div>
+                            {% endif %}
+                            {% if form.po_num_ext.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.po_num_ext.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <!-- Empty cell for alignment -->
+                    </div>
+                    
+                    <!-- Row 4 -->
+                    <div class="md:col-span-4">
+                        {{ form.sub_contract|as_crispy_field }}
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.clin_po_num.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">CLIN PO</span> Number
+                            </label>
+                            {{ form.clin_po_num }}
+                            {% if form.clin_po_num.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.clin_po_num.errors }}</div>
+                            {% endif %}
+                            {% if form.clin_po_num.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.clin_po_num.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <!-- Empty cell for alignment -->
                     </div>
                 </div>
+            </div>
+            
+            <!-- Item Details -->
+            <div>
+                <h2 class="section-header">
+                    Item Details
+                </h2>
                 
-                <div class="space-y-4">
-                    {{ form.order_qty|as_crispy_field }}
-                    {{ form.ship_qty|as_crispy_field }}
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-6">
+                        <!-- Simplified NSN Field -->
+                        <div class="form-group">
+                            <label for="nsn_display" class="form-label requiredField">
+                                <span class="text-uppercase">NSN</span><span class="asteriskField">*</span>
+                            </label>
+                            <div class="flex">
+                                <input type="text" id="nsn_display" class="form-control flex-grow" 
+                                       value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% endif %}" 
+                                       readonly placeholder="Click to select NSN">
+                                <button type="button" id="select_nsn_btn" class="ml-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    Select
+                                </button>
+                            </div>
+                            <!-- Hidden input to store the actual NSN ID -->
+                            <input type="hidden" name="nsn" id="id_nsn" value="{% if form.instance.nsn %}{{ form.instance.nsn.id }}{% endif %}">
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-6">
+                        <!-- Simplified Supplier Field -->
+                        <div class="form-group">
+                            <label for="supplier_display" class="form-label requiredField">
+                                Supplier<span class="asteriskField">*</span>
+                            </label>
+                            <div class="flex">
+                                <input type="text" id="supplier_display" class="form-control flex-grow" 
+                                       value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% endif %}" 
+                                       readonly placeholder="Click to select Supplier">
+                                <button type="button" id="select_supplier_btn" class="ml-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    Select
+                                </button>
+                            </div>
+                            <!-- Hidden input to store the actual Supplier ID -->
+                            <input type="hidden" name="supplier" id="id_supplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% endif %}">
+                        </div>
+                    </div>
                 </div>
+            </div>
+            
+            <!-- Order Information -->
+            <div>
+                <h2 class="section-header">
+                    Order Information
+                </h2>
                 
-                <!-- Dates -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        Important Dates
-                    </h2>
+                <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-2">
+                        <div class="form-group">
+                            <label for="{{ form.order_qty.id_for_label }}" class="form-label{% if form.order_qty.field.required %} requiredField{% endif %}">
+                                Order Qty{% if form.order_qty.field.required %}<span class="asteriskField">*</span>{% endif %}
+                            </label>
+                            <input type="number" name="{{ form.order_qty.html_name }}" id="{{ form.order_qty.id_for_label }}" 
+                                   class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   placeholder="Enter Order Quantity" 
+                                   value="{% if form.order_qty.value %}{{ form.order_qty.value|floatformat:'0' }}{% endif %}"
+                                   step="any">
+                            {% if form.order_qty.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.order_qty.errors }}</div>
+                            {% endif %}
+                            {% if form.order_qty.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.order_qty.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-1">
+                        <div class="form-group">
+                            <label for="{{ form.uom.id_for_label }}" class="form-label{% if form.uom.field.required %} requiredField{% endif %}">
+                                <span class="text-uppercase">UOM</span>{% if form.uom.field.required %}<span class="asteriskField">*</span>{% endif %}
+                            </label>
+                            <input type="text" name="{{ form.uom.html_name }}" id="{{ form.uom.id_for_label }}" 
+                                   class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   placeholder="EA" 
+                                   value="{{ form.uom.value|default:'EA' }}">
+                            {% if form.uom.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.uom.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-3">
+                        {{ form.due_date|as_crispy_field }}
+                    </div>
+                    
+                    <div class="md:col-span-3">
+                        {{ form.supplier_due_date|as_crispy_field }}
+                    </div>
                 </div>
+            </div>
+            
+            <!-- Shipping Information -->
+            <div>
+                <h2 class="section-header">
+                    Shipping Information
+                </h2>
                 
-                <div class="space-y-4">
-                    {{ form.due_date|as_crispy_field }}
-                    {{ form.supplier_due_date|as_crispy_field }}
-                    {{ form.ship_date|as_crispy_field }}
+                <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-2">
+                        <div class="form-group">
+                            <label for="{{ form.ship_qty.id_for_label }}" class="form-label{% if form.ship_qty.field.required %} requiredField{% endif %}">
+                                Ship Qty{% if form.ship_qty.field.required %}<span class="asteriskField">*</span>{% endif %}
+                            </label>
+                            <input type="number" name="{{ form.ship_qty.html_name }}" id="{{ form.ship_qty.id_for_label }}" 
+                                   class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   placeholder="Enter Ship Quantity" 
+                                   value="{% if form.ship_qty.value %}{{ form.ship_qty.value|floatformat:'0' }}{% endif %}"
+                                   step="any">
+                            {% if form.ship_qty.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.ship_qty.errors }}</div>
+                            {% endif %}
+                            {% if form.ship_qty.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.ship_qty.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-1">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="text-uppercase">UOM</span>
+                            </label>
+                            <input type="text" class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50" 
+                                   value="{{ form.uom.value|default:'EA' }}" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-3">
+                        {{ form.ship_date|as_crispy_field }}
+                    </div>
+                    
+                    <div class="md:col-span-3">
+                        <!-- Empty cell for alignment -->
+                    </div>
                 </div>
+            </div>
 
-                <!-- Financial Details (Hidden by default) -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200 cursor-pointer" 
-                        id="financial-details-toggle">
-                        Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
-                    </h2>
-                </div>
+            <!-- Financial Details (Hidden by default) -->
+            <div>
+                <h2 class="section-header cursor-pointer" id="financial-details-toggle">
+                    Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
+                </h2>
                 
-                <div class="col-span-1 md:col-span-3 lg:col-span-3 hidden" id="financial-details-section">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="space-y-4">
+                <div class="hidden" id="financial-details-section">
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <!-- Row 1 -->
+                        <div class="md:col-span-4">
+                            {{ form.special_payment_terms_paid|as_crispy_field }}
+                        </div>
+                        
+                        <div class="md:col-span-4">
                             <div id="special-payment-terms-container">
                                 {{ form.special_payment_terms|as_crispy_field }}
                             </div>
-                            {{ form.special_payment_terms_paid|as_crispy_field }}
-                            {{ form.contract_value|as_crispy_field }}
                         </div>
                         
-                        <div class="space-y-4">
-                            {{ form.po_amount|as_crispy_field }}
+                        <div class="md:col-span-4">
+                            <!-- Empty cell for alignment -->
+                        </div>
+                        
+                        <!-- Row 2 -->
+                        <div class="md:col-span-4">
+                            <div class="form-group">
+                                <label for="{{ form.po_amount.id_for_label }}" class="form-label">
+                                    <span class="text-uppercase">PO</span> Amount
+                                </label>
+                                {{ form.po_amount }}
+                                {% if form.po_amount.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.po_amount.errors }}</div>
+                                {% endif %}
+                                {% if form.po_amount.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.po_amount.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-4">
                             {{ form.paid_amount|as_crispy_field }}
+                        </div>
+                        
+                        <div class="md:col-span-4">
                             {{ form.paid_date|as_crispy_field }}
                         </div>
                         
-                        <div class="space-y-4">
-                            {{ form.wawf_payment|as_crispy_field }}
-                            {{ form.wawf_recieved|as_crispy_field }}
-                            {{ form.wawf_invoice|as_crispy_field }}
+                        <!-- Row 3 -->
+                        <div class="md:col-span-4">
+                            <div class="form-group">
+                                <label for="{{ form.wawf_payment.id_for_label }}" class="form-label">
+                                    <span class="text-uppercase">WAWF</span> Payment
+                                </label>
+                                {{ form.wawf_payment }}
+                                {% if form.wawf_payment.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.wawf_payment.errors }}</div>
+                                {% endif %}
+                                {% if form.wawf_payment.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.wawf_payment.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-4">
+                            <div class="form-group">
+                                <label for="{{ form.wawf_recieved.id_for_label }}" class="form-label">
+                                    <span class="text-uppercase">WAWF</span> Received
+                                </label>
+                                {{ form.wawf_recieved }}
+                                {% if form.wawf_recieved.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.wawf_recieved.errors }}</div>
+                                {% endif %}
+                                {% if form.wawf_recieved.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.wawf_recieved.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-4">
+                            <div class="form-group">
+                                <label for="{{ form.wawf_invoice.id_for_label }}" class="form-label">
+                                    <span class="text-uppercase">WAWF</span> Invoice
+                                </label>
+                                {{ form.wawf_invoice }}
+                                {% if form.wawf_invoice.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.wawf_invoice.errors }}</div>
+                                {% endif %}
+                                {% if form.wawf_invoice.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.wawf_invoice.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Row 4 -->
+                        <div class="md:col-span-4">
                             {{ form.plan_gross|as_crispy_field }}
+                        </div>
+                        
+                        <div class="md:col-span-4">
                             {{ form.planned_split|as_crispy_field }}
+                        </div>
+                        
+                        <div class="md:col-span-4">
+                            {{ form.contract_value|as_crispy_field }}
                         </div>
                     </div>
                 </div>
@@ -286,21 +565,21 @@
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
-                        Update CLIN
+                        Update <span class="text-uppercase">CLIN</span>
                     </button>
                 {% elif form.initial.contract %} <!-- New CLIN with pre-selected contract -->
                     <a href="{% url 'contracts:contract_detail' form.initial.contract %}" class="btn-secondary">
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
-                        Create CLIN
+                        Create <span class="text-uppercase">CLIN</span>
                     </button>
                 {% else %} <!-- New CLIN without pre-selected contract -->
                     <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
-                        Create CLIN
+                        Create <span class="text-uppercase">CLIN</span>
                     </button>
                 {% endif %}
             </div>
@@ -411,6 +690,25 @@
     // Execute code when the DOM is fully loaded
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
+        
+        // Add form submission handler for debugging
+        const clinForm = document.getElementById('clin-form');
+        if (clinForm) {
+            clinForm.addEventListener('submit', function(e) {
+                // Don't prevent form submission, just log the data
+                console.log("Form submission data:");
+                const formData = new FormData(clinForm);
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}: ${value}`);
+                }
+                
+                // Check if clin_type has a value
+                const clinTypeValue = formData.get('clin_type');
+                if (!clinTypeValue) {
+                    console.warn("Warning: clin_type has no value!");
+                }
+            });
+        }
         
         // Initialize modals immediately - don't wait for setTimeout
         // NSN Modal Functionality
@@ -770,134 +1068,6 @@
                     span.textContent = isHidden ? '(Click to expand)' : '(Click to collapse)';
                 }
             });
-        }
-
-        // Add loading indicators to other select fields that will be loaded asynchronously
-        const selectContainers = [
-            'clin-type-field-container',
-            'special-payment-terms-container'
-        ];
-        
-        // Only add contract field container if it has a select element (not read-only)
-        const contractContainer = document.getElementById('contract-field-container');
-        if (contractContainer && contractContainer.querySelector('select')) {
-            selectContainers.push('contract-field-container');
-        }
-        
-        selectContainers.forEach(containerId => {
-            const container = document.getElementById(containerId);
-            if (container) {
-                const select = container.querySelector('select');
-                if (select) {
-                    // Save the current value if any
-                    const currentValue = select.value;
-                    
-                    // Add loading class and spinner
-                    select.classList.add('select-loading');
-                    const label = container.querySelector('label');
-                    if (label) {
-                        const spinner = document.createElement('span');
-                        spinner.className = 'loading-spinner';
-                        spinner.id = `${containerId}-spinner`;
-                        label.appendChild(spinner);
-                    }
-                    
-                    // Load data asynchronously
-                    setTimeout(() => {
-                        loadSelectOptions(select, containerId, currentValue);
-                    }, 100);
-                }
-            }
-        });
-
-        // Function to load select options asynchronously
-        function loadSelectOptions(selectElement, containerId, currentValue) {
-            const fieldName = selectElement.name;
-            
-            console.log(`Loading options for ${fieldName}, current value: ${currentValue}`);
-            
-            // Build the URL with parameters
-            let url = `/contracts/api/options/${fieldName}/`;
-            const params = new URLSearchParams();
-            
-            // Add search parameters if needed
-            if (currentValue && fieldName === 'contract') {
-                // For contracts, include the current ID to ensure it's in the results
-                params.append('include_id', currentValue);
-            }
-            
-            // Add the params to the URL if we have any
-            if (params.toString()) {
-                url += `?${params.toString()}`;
-            }
-            
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log(`Received data for ${fieldName}:`, data);
-                    
-                    // Remove loading state
-                    selectElement.classList.remove('select-loading');
-                    const spinner = document.getElementById(`${containerId}-spinner`);
-                    if (spinner) {
-                        spinner.remove();
-                    }
-                    
-                    // Populate options
-                    if (data.success && data.options) {
-                        // Clear existing options except the first empty one
-                        while (selectElement.options.length > 1) {
-                            selectElement.remove(1);
-                        }
-                        
-                        // Add new options
-                        data.options.forEach(option => {
-                            const optionElement = document.createElement('option');
-                            optionElement.value = option.value;
-                            optionElement.textContent = option.label;
-                            selectElement.appendChild(optionElement);
-                        });
-                        
-                        // Restore selected value if it exists
-                        if (currentValue) {
-                            console.log(`Setting ${fieldName} value to ${currentValue}`);
-                            selectElement.value = currentValue;
-                            
-                            // If the value wasn't set correctly, try to find the option by value
-                            if (selectElement.value !== currentValue) {
-                                console.log(`Value not set correctly, trying to find option with value ${currentValue}`);
-                                const option = Array.from(selectElement.options).find(opt => opt.value == currentValue);
-                                if (option) {
-                                    option.selected = true;
-                                } else {
-                                    console.error(`Could not find option with value ${currentValue} for ${fieldName}`);
-                                }
-                            }
-                        }
-                    } else {
-                        console.error(`Invalid data format for ${fieldName}:`, data);
-                    }
-                })
-                .catch(error => {
-                    console.error(`Error loading options for ${fieldName}:`, error);
-                    // Remove loading state on error
-                    selectElement.classList.remove('select-loading');
-                    const spinner = document.getElementById(`${containerId}-spinner`);
-                    if (spinner) {
-                        spinner.remove();
-                    }
-                    
-                    // Add error message
-                    const errorMsg = document.createElement('div');
-                    errorMsg.className = 'text-red-500 text-sm mt-1';
-                    errorMsg.textContent = `Error loading options. Please refresh the page.`;
-                    selectElement.parentNode.appendChild(errorMsg);
-                });
         }
     });
 </script>

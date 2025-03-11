@@ -213,9 +213,8 @@ class ContractForm(forms.ModelForm):
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Survey Type'
             }),
-            'assigned_user': forms.TextInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Assigned User'
+            'assigned_user': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
             'assigned_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -231,9 +230,8 @@ class ContractForm(forms.ModelForm):
             'reviewed': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
-            'reviewed_by': forms.TextInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Reviewer Name'
+            'reviewed_by': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
             'reviewed_on': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -421,40 +419,42 @@ class ClinForm(forms.ModelForm):
         
     def __init__(self, *args, **kwargs):
         """
-        Initialize the form with optimized querysets for foreign key fields.
-        This helps reduce the load time by limiting the initial data loaded.
+        Initialize the form with querysets for foreign key fields.
         """
         super().__init__(*args, **kwargs)
         
-        # For new forms, initialize with empty querysets for foreign key fields
-        # These will be populated asynchronously via JavaScript
+        # For new forms, initialize with appropriate querysets
         if not kwargs.get('instance'):
-            # If we have a contract_id in initial data, keep it
+            # If we have a contract_id in initial data, pre-select it
             contract_id = kwargs.get('initial', {}).get('contract')
             if contract_id:
                 self.fields['contract'].queryset = Contract.objects.filter(id=contract_id)
             else:
-                self.fields['contract'].queryset = Contract.objects.none()
+                # Load all contracts
+                self.fields['contract'].queryset = Contract.objects.all().order_by('contract_number')
                 
-            # Initialize other foreign key fields with empty querysets
-            self.fields['clin_type'].queryset = ClinType.objects.none()
+            # Load all options for other foreign key fields
+            self.fields['clin_type'].queryset = ClinType.objects.all().order_by('description')
+            self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.all().order_by('terms')
+            
+            # NSN and Supplier are handled via custom modal UI, so we keep them empty
             self.fields['supplier'].queryset = Supplier.objects.none()
             self.fields['nsn'].queryset = Nsn.objects.none()
-            self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.none()
         else:
-            # For existing instances, only load the currently selected values
+            # For existing instances, load all options but ensure the selected value is included
             instance = kwargs['instance']
             
-            if instance.contract_id:
-                self.fields['contract'].queryset = Contract.objects.filter(id=instance.contract_id)
-            else:
-                self.fields['contract'].queryset = Contract.objects.none()
-                
-            if instance.clin_type_id:
-                self.fields['clin_type'].queryset = ClinType.objects.filter(id=instance.clin_type_id)
-            else:
-                self.fields['clin_type'].queryset = ClinType.objects.none()
-                
+            # Load all contracts
+            self.fields['contract'].queryset = Contract.objects.all().order_by('contract_number')
+            
+            # Load all CLIN types
+            self.fields['clin_type'].queryset = ClinType.objects.all().order_by('description')
+            
+            # Load all special payment terms
+            self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.all().order_by('terms')
+            
+            # NSN and Supplier are handled via custom modal UI
+            # Only include the currently selected value if it exists
             if instance.supplier_id:
                 self.fields['supplier'].queryset = Supplier.objects.filter(id=instance.supplier_id)
             else:
@@ -464,11 +464,6 @@ class ClinForm(forms.ModelForm):
                 self.fields['nsn'].queryset = Nsn.objects.filter(id=instance.nsn_id)
             else:
                 self.fields['nsn'].queryset = Nsn.objects.none()
-                
-            if instance.special_payment_terms_id:
-                self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.filter(id=instance.special_payment_terms_id)
-            else:
-                self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.none()
 
 class NoteForm(forms.ModelForm):
     class Meta:

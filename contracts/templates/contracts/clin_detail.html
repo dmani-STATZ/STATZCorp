@@ -16,6 +16,9 @@
                 </p>
             </div>
             <div class="flex space-x-4 items-center">
+                <a href="{% url 'contracts:clin_update' clin.id %}" class="btn-primary mr-2">
+                    Edit CLIN
+                </a>
                 <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
                    class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -27,32 +30,84 @@
         </div>
     </div>
 
-    <!-- CLIN Information -->
+    <!-- CLIN Identification -->
     <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6">CLIN Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-                <p class="text-sm text-gray-600">CLIN Type</p>
-                <p class="font-medium">{{ clin.clin_type.description|default:"N/A" }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Supplier</p>
-                <p class="font-medium relative group">
-                    {% if clin.supplier %}
-                        <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
-                           class="text-blue-600 hover:text-blue-800">
-                            {{ clin.supplier.name }}
-                        </a>
-                        <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
-                            CAGE: {{ clin.supplier.cage_code|default:"N/A" }}
-                        </span>
-                    {% else %}
-                        <span class="text-gray-500">N/A</span>
-                    {% endif %}
+        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">CLIN Identification</h2>
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <!-- Row 1 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Contract</p>
+                <p class="font-medium">
+                    <a href="{% url 'contracts:contract_detail' clin.contract.id %}" class="text-blue-600 hover:text-blue-800">
+                        {{ clin.contract.contract_number|default:"N/A" }}
+                    </a>
                 </p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">NSN</p>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">PO Number</p>
+                <p class="font-medium">{{ clin.po_number|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <!-- Empty cell for alignment -->
+            </div>
+            
+            <!-- Row 2 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">CLIN Type</p>
+                <p class="font-medium">{{ clin.clin_type.description|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">I&A</p>
+                <p class="font-medium">{{ clin.ia|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">FOB</p>
+                <p class="font-medium">{{ clin.fob|default:"N/A" }}</p>
+            </div>
+            
+            <!-- Row 3 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Tab Number</p>
+                <p class="font-medium">{{ clin.tab_num|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">PO Number Extension</p>
+                <p class="font-medium">{{ clin.po_num_ext|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <!-- Empty cell for alignment -->
+            </div>
+            
+            <!-- Row 4 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Sub Contract</p>
+                <p class="font-medium">{{ clin.sub_contract|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">CLIN PO Number</p>
+                <p class="font-medium">{{ clin.clin_po_num|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <!-- Empty cell for alignment -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Details -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Item Details</h2>
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <!-- Row 1 -->
+            <div class="md:col-span-6">
+                <p class="text-sm text-gray-600 capitalize">NSN</p>
                 <p class="font-medium relative group">
                     {% if clin.nsn %}
                         <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}?next={{ request.path|urlencode }}" 
@@ -67,63 +122,92 @@
                     {% endif %}
                 </p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">Order Quantity</p>
-                <p class="font-medium">{{ clin.order_qty|default:"N/A" }}</p>
+            
+            <div class="md:col-span-6">
+                <p class="text-sm text-gray-600 capitalize">Supplier</p>
+                <p class="font-medium relative group">
+                    {% if clin.supplier %}
+                        <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
+                           class="text-blue-600 hover:text-blue-800">
+                            {{ clin.supplier.name }}
+                        </a>
+                        <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
+                            CAGE: {{ clin.supplier.cage_code|default:"N/A" }}
+                        </span>
+                    {% else %}
+                        <span class="text-gray-500">N/A</span>
+                    {% endif %}
+                </p>
             </div>
+        </div>
+    </div>
 
-            <div>
-                <p class="text-sm text-gray-600">Due Date</p>
+    <!-- Order Information -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Order Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
+            <!-- Row 1 -->
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Order Qty</p>
+                <p class="font-medium">{{ clin.order_qty|floatformat:'0'|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-1">
+                <p class="text-sm text-gray-600 capitalize">UOM</p>
+                <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
+            </div>
+            
+            <div class="md:col-span-3">
+                <p class="text-sm text-gray-600 capitalize">Due Date</p>
                 <p class="font-medium {% if clin.due_date_late %}text-red-600{% endif %}">
                     {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                 </p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">I&A</p>
-                <p class="font-medium">{{ clin.ia|default:"N/A" }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">FOB</p>
-                <p class="font-medium">{{ clin.fob|default:"N/A" }}</p>
+            
+            <div class="md:col-span-3">
+                <p class="text-sm text-gray-600 capitalize">Supplier Due Date</p>
+                <p class="font-medium {% if clin.supplier_due_date_late %}text-red-600{% endif %}">
+                    {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
+                </p>
             </div>
         </div>
     </div>
 
-    <!-- CLIN SHIP INFORMATION -->
+    <!-- Shipping Information -->
     <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6">Shipment Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-                <p class="text-sm text-gray-600">Ship Date</p>
-                <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
-                    {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}</p>
+        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Shipping Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
+            <!-- Row 1 -->
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Ship Qty</p>
+                <p class="font-medium">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">Ship Quantity</p>
-                <p class="font-medium">{{ clin.ship_qty|default:"N/A" }}</p>
+            
+            <div class="md:col-span-1">
+                <p class="text-sm text-gray-600 capitalize">UOM</p>
+                <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
+            </div>
+            
+            <div class="md:col-span-3">
+                <p class="text-sm text-gray-600 capitalize">Ship Date</p>
+                <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
+                    {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
+                </p>
+            </div>
+            
+            <div class="md:col-span-3">
+                <!-- Empty cell for alignment -->
             </div>
         </div>
     </div>
-    
 
-    <!-- CLIN Finance Information -->
+    <!-- Financial Information -->
     <div class="bg-white shadow-lg rounded-lg p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-6">Finance Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-                <p class="text-sm text-gray-600">PO Amount</p>
-                <p class="font-medium">${{ clin.po_amount|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Paid Amount</p>
-                <p class="font-medium">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Payment Terms</p>
-                <p class="font-medium">{{ clin.special_payment_terms.terms|default:"N/A" }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Payment Status</p>
+        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Financial Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <!-- Row 1 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Payment Status</p>
                 <p class="font-medium">
                     {% if clin.special_payment_terms_paid %}
                         <span class="text-green-600">Paid</span>
@@ -132,21 +216,62 @@
                     {% endif %}
                 </p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">Paid Date</p>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Payment Terms</p>
+                <p class="font-medium">{{ clin.special_payment_terms.terms|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <!-- Empty cell for alignment -->
+            </div>
+            
+            <!-- Row 2 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">PO Amount</p>
+                <p class="font-medium">${{ clin.po_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Paid Amount</p>
+                <p class="font-medium">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Paid Date</p>
                 <p class="font-medium">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">WAWF Payment</p>
+            
+            <!-- Row 3 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">WAWF Payment</p>
                 <p class="font-medium">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">WAWF Invoice</p>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">WAWF Received</p>
+                <p class="font-medium">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">WAWF Invoice</p>
                 <p class="font-medium">{{ clin.wawf_invoice|default:"N/A" }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-600">WAWF Received</p>
-                <p class="font-medium">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
+            
+            <!-- Row 4 -->
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Plan Gross</p>
+                <p class="font-medium">${{ clin.plan_gross|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Planned Split</p>
+                <p class="font-medium">{{ clin.planned_split|default:"N/A" }}</p>
+            </div>
+            
+            <div class="md:col-span-4">
+                <p class="text-sm text-gray-600 capitalize">Contract Value</p>
+                <p class="font-medium">${{ clin.contract_value|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
         </div>
     </div>

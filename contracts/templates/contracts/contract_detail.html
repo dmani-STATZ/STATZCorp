@@ -5,39 +5,55 @@
 <form id="csrf-form">
     {% csrf_token %}
 </form>
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 py-6">
     <!-- Contract Header -->
 
 
-    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+    <div class="bg-white shadow-lg rounded-lg p-4 mb-6">
         {% if contract.cancelled %}
-            <div class="bg-red-100 text-red-800flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
-                <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
-                <a href="{% url 'contracts:contracts_dashboard' %}" 
-                class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                 </svg>
-                 Back to Dashboard
-             </a>
+            <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    Contract {{ contract.contract_number }}
+                </h1>
+                <div class="flex items-center space-x-3">
+                    <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                    <a href="{% url 'contracts:contracts_dashboard' %}" 
+                    class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                         <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                     </svg>
+                     Back to Dashboard
+                 </a>
+                </div>
             </div>
         {% elif not contract.open %}
-            <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
-                <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
-                <a href="{% url 'contracts:contracts_dashboard' %}" 
-                class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                 </svg>
-                 Back to Dashboard
-             </a>
+            <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    Contract {{ contract.contract_number }}
+                </h1>
+                <div class="flex items-center space-x-3">
+                    <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                    <a href="{% url 'contracts:contracts_dashboard' %}" 
+                    class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                         <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                     </svg>
+                     Back to Dashboard
+                 </a>
+                </div>
             </div>
         {% else %}
-            <div class="bg-green-100 text-green-800 flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
-                <div class="flex space-x-4 items-center">
+            <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                    Contract {{ contract.contract_number }}
+                    <a href="{% url 'contracts:contract_update' contract.id %}" 
+                       class="ml-3 text-indigo-500 hover:text-indigo-700 transition-colors duration-150">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                    </a>
+                </h1>
+                <div class="flex space-x-3 items-center">
                     <span class="bg-white text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
                     <a href="{% url 'contracts:contracts_dashboard' %}" 
                     class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
@@ -50,52 +66,31 @@
             </div>
         {% endif %}
 
-
-        <!-- <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
-            <div class="flex space-x-4 items-center">
-                {% if contract.cancelled %}
-                    <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
-                {% elif not contract.open %}
-                    <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
-                {% else %}
-                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
-                {% endif %}
-                <a href="{% url 'contracts:contracts_dashboard' %}" 
-                class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                 </svg>
-                 Back to Dashboard
-             </a>
-            </div>
-        </div> -->
-        
         <!-- Contract Details Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="p-2">
                 <p class="text-sm text-gray-600">PO Number</p>
                 <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
             </div>
-            <div>
+            <div class="p-2">
                 <p class="text-sm text-gray-600">Tab Number</p>
                 <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
             </div>
-            <div>
+            <div class="p-2">
                 <p class="text-sm text-gray-600">Buyer</p>
                 <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
             </div>
-            <div>
+            <div class="p-2">
                 <p class="text-sm text-gray-600">Award Date</p>
                 <p class="font-medium">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
             </div>
-            <div>
+            <div class="p-2">
                 <p class="text-sm text-gray-600">Due Date</p>
                 <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
                     {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
                 </p>
             </div>
-            <div>
+            <div class="p-2">
                 <p class="text-sm text-gray-600">Sales Class</p>
                 <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
             </div>
@@ -108,10 +103,12 @@
         <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
-                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg" 
-                onclick="window.location.href='{% url 'contracts:contract_clin_create' contract.id %}'">
-                    Add CLIN 
-                </button>
+                {% if contract.open %}
+                <a href="{% url 'contracts:contract_clin_create' contract.id %}" 
+                   class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Add CLIN
+                </a>
+                {% endif %}
             </div>
             
             <!-- CLINs Table -->
@@ -156,7 +153,7 @@
                                 {{ clin.nsn.nsn_code|default:"N/A" }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ clin.order_qty|default:"N/A" }}
+                                {{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm {% if clin.due_date_late %}text-red-600{% endif %}">
                                 {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
