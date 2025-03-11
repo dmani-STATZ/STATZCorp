@@ -106,19 +106,22 @@
         <h1 class="text-2xl font-bold text-gray-800">
             {% if form.instance.pk %}
                 Edit CLIN: {{ form.instance.clin_po_num }}
+                {% if form.initial.contract %}
+                    for Contract #{{ form.initial.contract_number }}
+                {% endif %}
             {% else %}
                 Create New CLIN
                 {% if form.initial.contract %}
-                    for Contract #{{ form.initial.contract.contract_number }}
+                    for Contract #{{ form.initial.contract_number }}
                 {% endif %}
             {% endif %}
         </h1>
         <div>
-            {% if form.instance.pk %}
-                <a href="{% url 'contracts:clin_detail' form.instance.pk %}" class="btn-secondary">
+            {% if form.instance.pk %} <!-- Edit CLIN -->
+                <a href="{% url 'contracts:contract_detail' form.instance.contract.id %}" class="btn-secondary">
                     Cancel
                 </a>
-            {% elif form.initial.contract %}
+            {% elif form.initial.contract %} <!-- New CLIN with pre-selected contract -->
                 <a href="{% url 'contracts:contract_detail' form.initial.contract %}" class="btn-secondary">
                     Cancel
                 </a>
@@ -151,8 +154,8 @@
                             <div class="form-control bg-gray-50 py-2">
                                 {% if form.instance.contract %}
                                     {{ form.instance.contract.contract_number }}
-                                {% elif form.initial.contract %}
-                                    {{ form.initial.contract.contract_number }}
+                                {% elif form.initial.contract_number %}
+                                    {{ form.initial.contract_number }}
                                 {% endif %}
                             </div>
                             <!-- Hidden input to preserve the contract value -->
@@ -278,21 +281,21 @@
             </div>
             
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-                {% if form.instance.pk %}
-                    <a href="{% url 'contracts:clin_detail' form.instance.pk %}" class="btn-secondary">
+                {% if form.instance.pk %} <!-- Edit CLIN -->
+                    <a href="{% url 'contracts:contract_detail' form.instance.contract.id %}" class="btn-secondary">
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
                         Update CLIN
                     </button>
-                {% elif form.initial.contract %}
+                {% elif form.initial.contract %} <!-- New CLIN with pre-selected contract -->
                     <a href="{% url 'contracts:contract_detail' form.initial.contract %}" class="btn-secondary">
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
                         Create CLIN
                     </button>
-                {% else %}
+                {% else %} <!-- New CLIN without pre-selected contract -->
                     <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
                         Cancel
                     </a>

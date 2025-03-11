@@ -88,6 +88,11 @@ class ContractStatus(models.Model):
         return self.description
 
 class Clin(AuditModel):
+    ORIGIN_DESTINATION_CHOICES = [
+        ('O', 'Origin'),
+        ('D', 'Destination'),
+    ]
+
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE, null=True, blank=True)
     sub_contract = models.CharField(max_length=20, null=True, blank=True) # What do we use this for?
     po_num_ext = models.CharField(max_length=5, null=True, blank=True) # What do we use this for?
@@ -97,8 +102,8 @@ class Clin(AuditModel):
     clin_type = models.ForeignKey('ClinType', on_delete=models.CASCADE, null=True, blank=True)
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True)
     nsn = models.ForeignKey('Nsn', on_delete=models.CASCADE, null=True, blank=True)
-    ia = models.CharField(max_length=5, null=True, blank=True) #Should this be two fields?
-    fob = models.CharField(max_length=5, null=True, blank=True)
+    ia = models.CharField(max_length=5, null=True, blank=True, choices=ORIGIN_DESTINATION_CHOICES) #Should this be two fields?
+    fob = models.CharField(max_length=5, null=True, blank=True, choices=ORIGIN_DESTINATION_CHOICES)
     order_qty = models.FloatField(null=True, blank=True)
     uom = models.CharField(max_length=10, null=True, blank=True)
     ship_qty = models.FloatField(null=True, blank=True)

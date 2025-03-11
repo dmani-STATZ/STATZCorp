@@ -344,13 +344,11 @@ class ClinForm(forms.ModelForm):
             'nsn': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
-            'ia': forms.TextInput(attrs={
+            'ia': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter IA'
             }),
-            'fob': forms.TextInput(attrs={
+            'fob': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter FOB'
             }),
             'order_qty': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',

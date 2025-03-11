@@ -7,8 +7,51 @@
 </form>
 <div class="container mx-auto px-4 py-8">
     <!-- Contract Header -->
+
+
     <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <div class="flex justify-between items-center mb-6">
+        {% if contract.cancelled %}
+            <div class="bg-red-100 text-red-800flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
+                <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                <a href="{% url 'contracts:contracts_dashboard' %}" 
+                class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                 </svg>
+                 Back to Dashboard
+             </a>
+            </div>
+        {% elif not contract.open %}
+            <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
+                <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                <a href="{% url 'contracts:contracts_dashboard' %}" 
+                class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                 </svg>
+                 Back to Dashboard
+             </a>
+            </div>
+        {% else %}
+            <div class="bg-green-100 text-green-800 flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
+                <div class="flex space-x-4 items-center">
+                    <span class="bg-white text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
+                    <a href="{% url 'contracts:contracts_dashboard' %}" 
+                    class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                    </svg>
+                    Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+
+        <!-- <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-bold text-gray-800">Contract {{ contract.contract_number }}</h1>
             <div class="flex space-x-4 items-center">
                 {% if contract.cancelled %}
@@ -26,7 +69,7 @@
                  Back to Dashboard
              </a>
             </div>
-        </div>
+        </div> -->
         
         <!-- Contract Details Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -65,8 +108,9 @@
         <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
-                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                    Add CLIN
+                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg" 
+                onclick="window.location.href='{% url 'contracts:contract_clin_create' contract.id %}'">
+                    Add CLIN 
                 </button>
             </div>
             
