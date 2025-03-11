@@ -39,7 +39,6 @@ class ContractLifecycleDashboardView(TemplateView):
                     'contract_number': contract.contract_number,
                     'supplier_name': first_clin.supplier.name,
                     'contract_value': contract.contract_value,
-                    'bid_value': contract.bid_value,
                     'award_date': contract.award_date,
                     'due_date': contract.due_date,
                     'status': contract.status,

@@ -49,8 +49,6 @@ class Contract(AuditModel):
     reviewed_by = models.CharField(max_length=20, null=True, blank=True)
     reviewed_on = models.DateTimeField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='contract')
-    # statz_value = models.FloatField(null=True, blank=True, default=0)
-    bid_value = models.FloatField(null=True, blank=True, default=0)
     contract_value = models.FloatField(null=True, blank=True, default=0)
 
     class Meta:
