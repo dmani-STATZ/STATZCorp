@@ -32,6 +32,7 @@ from .note_views import (
     note_update,
     api_add_note,
     list_content_types,
+    get_combined_notes,
 )
 
 from .reminder_views import (

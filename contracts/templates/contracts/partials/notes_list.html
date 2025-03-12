@@ -1,7 +1,26 @@
 {% if notes %}
     {% for note in notes %}
-    <div class="border-l-4 border-green-500 pl-4 py-2 mb-4">
-        <p class="text-gray-700">{{ note.note|linebreaksbr }}</p>
+    {% with note_entity_type=note.entity_type|default:entity_type|default:'note' %}
+    {% with note_content_type_id=note.content_type_id|default:content_type_id %}
+    {% with note_object_id=note.object_id|default:object_id|default:"0" %}
+    <div class="border-l-4 {% if note_entity_type|lower == 'contract' %}border-green-500{% elif note_entity_type|lower == 'clin' %}border-blue-500{% else %}border-{{ note_color|default:'green' }}-500{% endif %} pl-4 py-2 mb-4">
+        <!-- Note type indicator -->
+        {% if show_note_type or combined_view %}
+        <div class="flex justify-between items-center mb-1">
+            <div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if note_entity_type|lower == 'contract' %}bg-green-100 text-green-800{% elif note_entity_type|lower == 'clin' %}bg-blue-100 text-blue-800{% else %}bg-{{ note_color|default:'green' }}-100 text-{{ note_color|default:'green' }}-800{% endif %}">
+                    {{ note_entity_type|title }}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+        <!-- Fixed height container with absolute constraint -->
+        <div class="relative" style="max-height: 100px;">
+            <!-- Text content with fixed height and scroll -->
+            <div class="note-content overflow-y-auto" style="max-height: 100px;">
+                <p class="text-gray-700 whitespace-pre-wrap">{{ note.note|linebreaksbr }}</p>
+            </div>
+        </div>
         <div class="mt-2 flex justify-between items-center">
             <div class="text-sm text-gray-500">
                 Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
@@ -15,11 +34,21 @@
                         Reminder
                     </span>
                 {% endif %}
-                <a href="{% url 'contracts:note_update' note.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                <button 
+                    class="text-indigo-600 hover:text-indigo-900 js-edit-note-btn" 
+                    title="Edit"
+                    data-note-action="edit"
+                    data-content-type-id="{{ note_content_type_id }}"
+                    data-object-id="{{ note_object_id }}"
+                    data-note-id="{{ note.id }}"
+                    data-note-text="{{ note.note|escapejs }}"
+                    data-entity-type="{{ note_entity_type }}"
+                    onclick="openEditNoteModal(this); return false;"
+                >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                </a>
+                </button>
                 <a href="{% url 'contracts:delete_note' note.id %}" class="text-red-600 hover:text-red-900" title="Delete" onclick="return confirm('Are you sure you want to delete this note?');">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -28,7 +57,10 @@
             </div>
         </div>
     </div>
+    {% endwith %}
+    {% endwith %}
+    {% endwith %}
     {% endfor %}
 {% else %}
-    <p class="text-gray-500 text-center py-4">No notes found</p>
+    <p class="text-gray-500 text-center py-4">No {{ entity_type|default:'note' }}s found</p>
 {% endif %} 

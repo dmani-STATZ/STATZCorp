@@ -32,6 +32,7 @@ from .views import (
     note_update,
     api_add_note,
     list_content_types,
+    get_combined_notes,
     
     # Reminder views
     ReminderListView,
@@ -98,7 +99,7 @@ urlpatterns = [
     
     # Note management
     path('note/add/<int:content_type_id>/<int:object_id>/', add_note, name='add_note'),
-    path('note/update/<int:note_id>/', note_update, name='note_update'),
+    path('note/update/<int:pk>/', note_update, name='note_update'),
     path('note/delete/<int:note_id>/', delete_note, name='delete_note'),
     path('api/add-note/', api_add_note, name='api_add_note'),
     path('api/content-types/', list_content_types, name='list_content_types'),
@@ -120,6 +121,8 @@ urlpatterns = [
     path('clin/<int:clin_id>/notes/', get_clin_notes, name='get_clin_notes'),
     path('clin/<int:clin_id>/toggle-acknowledgment/', toggle_clin_acknowledgment, name='toggle_clin_acknowledgment'),
     path('api/options/<str:field_name>/', get_select_options, name='get_select_options'),
+    path('contract/<int:contract_id>/combined-notes/', get_combined_notes, name='get_combined_notes'),
+    path('contract/<int:contract_id>/clin/<int:clin_id>/combined-notes/', get_combined_notes, name='get_combined_notes_with_clin'),
     
     # Test
     path('test-app-name/', test_app_name, name='test_app_name'),

@@ -47,24 +47,26 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!csrfToken) console.error('CSRF token not found');
     else console.log('CSRF token found');
     
-    // Find all note action buttons
-    const noteButtons = document.querySelectorAll('[data-note-action="add"]');
-    console.log(`Found ${noteButtons.length} note action buttons`);
+    // Find all add note buttons
+    const addNoteButtons = document.querySelectorAll('[data-note-action="add"]');
+    console.log(`Found ${addNoteButtons.length} add note buttons`);
     
     // Add event listeners to all "Add Note" buttons with data attributes
-    noteButtons.forEach(button => {
+    addNoteButtons.forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation(); // Prevent event bubbling
             
             // Get data attributes
             const contentTypeId = this.dataset.contentTypeId;
             const objectId = this.dataset.objectId;
             const entityType = this.dataset.entityType || 'Item';
             
-            console.log('Add Note button clicked:');
-            console.log('Content Type ID:', contentTypeId);
-            console.log('Object ID:', objectId);
-            console.log('Entity Type:', entityType);
+            console.log(`Add Note button clicked:`, {
+                contentTypeId,
+                objectId,
+                entityType
+            });
             
             // Validate required data attributes
             if (!contentTypeId || !objectId) {
@@ -74,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Set modal title based on entity type
-            noteModalTitle.textContent = `Add Note to ${entityType}`;
+            noteModalTitle.textContent = `Add ${entityType} Note`;
             
             // Set form hidden fields
             noteContentTypeId.value = contentTypeId;
@@ -87,14 +89,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('Set referring URL:', referringUrlField.value);
             }
             
-            console.log('Form fields set:');
-            console.log('noteContentTypeId.value:', noteContentTypeId.value);
-            console.log('noteObjectId.value:', noteObjectId.value);
-            
             // Reset form
             noteForm.reset();
             createReminderCheckbox.checked = false;
             reminderFields.classList.add('hidden');
+            
+            // Set form action for add
+            noteForm.action = '/contracts/api/add-note/';
+            noteForm.method = 'POST';
             
             // Re-set the hidden fields after form reset
             noteContentTypeId.value = contentTypeId;
@@ -133,11 +135,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const objectId = formData.get('object_id');
         
         // Debug form data
-        console.log('Form data:');
-        console.log('Note text:', noteText);
-        console.log('Content Type ID:', contentTypeId);
-        console.log('Object ID:', objectId);
-        console.log('Create Reminder:', formData.get('create_reminder'));
+        console.log('Form data:', {
+            noteText,
+            contentTypeId,
+            objectId,
+            createReminder: formData.get('create_reminder')
+        });
         
         // Validate note text
         if (!noteText || noteText.trim() === '') {
@@ -186,15 +189,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('CSRF token:', csrfToken ? 'Found' : 'Not found');
         
-        // Submit form directly
-        noteForm.action = '/contracts/api/add-note/';
-        noteForm.method = 'POST';
+        // Submit form
         noteForm.submit();
     });
     
     // Function to close the modal
     function closeModal() {
         noteModal.classList.add('hidden');
+        // Reset form state
+        saveNoteBtn.disabled = false;
+        saveNoteBtn.textContent = 'Save Note';
     }
     
     // Function to show error message
@@ -255,4 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closeModal();
         }
     });
+    
+    // Make the closeModal function globally available
+    window.closeNoteModal = closeModal;
 }); 

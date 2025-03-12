@@ -206,6 +206,12 @@ def get_clin_notes(request, clin_id):
             object_id=clin.id
         ).order_by('-created_on')
         
+        # Add entity_type and content_type_id attributes
+        for note in notes:
+            setattr(note, 'entity_type', 'clin')
+            setattr(note, 'content_type_id', clin_type.id) 
+            setattr(note, 'object_id', clin.id)
+        
         # Format notes for JSON response
         notes_data = []
         for note in notes:
@@ -220,7 +226,10 @@ def get_clin_notes(request, clin_id):
         # Also render HTML for direct insertion
         notes_html = render_to_string('contracts/partials/notes_list.html', {
             'notes': notes,
-            'content_object': clin
+            'content_object': clin,
+            'entity_type': 'clin',
+            'content_type_id': str(clin_type.id),
+            'object_id': clin.id
         })
         
         return JsonResponse({

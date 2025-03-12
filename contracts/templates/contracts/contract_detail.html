@@ -111,7 +111,7 @@
     <!-- Main Content Grid -->
     <div class="grid grid-cols-3 gap-8">
         <!-- CLINs Section - 2/3 width -->
-        <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
+        <div class="col-span-3 bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
                 {% if contract.open %}
@@ -192,98 +192,42 @@
                 </table>
             </div>
         </div>
-
-        <!-- CLIN Notes Section - 1/3 width -->
-        <div class="bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">CLIN Notes</h2>
-                <button 
-                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                    data-note-action="add"
-                    data-content-type-id="12"
-                    data-object-id="{{ selected_clin.id|default:'' }}"
-                    data-entity-type="CLIN"
-                    {% if not selected_clin %}disabled{% endif %}
-                    onclick="console.log('CLIN Note button clicked', this.dataset)"
-                >
-                    Add Note
-                </button>
-            </div>
-            <div id="clin-notes" class="space-y-4 max-h-[500px] overflow-y-auto">
-                <table>
-                    {% for note in clin_notes %}
-                    <tr>
-                        <td class="border-l-4 border-green-500 pl-4 py-2">
-                            <p class="text-gray-700">{{ note.note }}</p>
-                            <div class="mt-2 text-sm text-gray-500">
-                                Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <a href="{% url 'contracts:note_update' note.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                            No CLIN notes found
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </div>
     </div>
 
     <!-- Bottom Sections Grid -->
     <div class="grid grid-cols-3 gap-8 mt-8">
-        <!-- Contract Notes - 1/3 width -->
-        <div class="bg-white shadow-lg rounded-lg p-6">
+        <!-- All Notes Combined Section - 2/3 width -->
+        <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Contract Notes</h2>
-                <button 
-                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                    data-note-action="add"
-                    data-content-type-id="18"
-                    data-object-id="{{ contract.id }}"
-                    data-entity-type="Contract"
-                    onclick="console.log('Contract Note button clicked', this.dataset)"
-                >
-                    Add Note
-                </button>
-            </div>
-            <div id="notes-container">
-                {% for note in contract_notes %}
-                <div class="border-l-4 border-green-500 pl-4 py-2 mb-4">
-                    <p class="text-gray-700">{{ note.note }}</p>
-                    <div class="mt-2 flex justify-between items-center">
-                        <div class="text-sm text-gray-500">
-                            Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
-                        </div>
-                        <div class="flex space-x-2">
-                            {% if note.note_reminders.exists %}
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Reminder
-                                </span>
-                            {% endif %}
-                            <a href="{% url 'contracts:note_update' note.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </a>
-                        </div>
-                    </div>
+                <h2 class="text-xl font-bold text-gray-800">Contract Activity Timeline</h2>
+                <div class="flex space-x-3">
+                    <button 
+                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+                        data-note-action="add"
+                        data-content-type-id="18"
+                        data-object-id="{{ contract.id }}"
+                        data-entity-type="Contract"
+                        onclick="console.log('Contract Note button clicked', this.dataset)"
+                    >
+                        Add Contract Note
+                    </button>
+                    <button 
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg js-add-clin-note"
+                        data-note-action="add"
+                        data-content-type-id="12"
+                        data-object-id="{{ selected_clin.id|default:'' }}"
+                        data-entity-type="CLIN"
+                        {% if not selected_clin %}disabled{% endif %}
+                        onclick="console.log('CLIN Note button clicked', this.dataset)"
+                    >
+                        Add CLIN Note
+                    </button>
                 </div>
-                {% empty %}
-                <p class="text-gray-500 text-center">No Contract notes found</p>
-                {% endfor %}
+            </div>
+            <div id="combined-notes-container" class="combined-notes-container space-y-4 max-h-[400px] overflow-y-auto" style="max-height: 400px !important; overflow-y: auto !important; display: block !important;">
+                {% with combined_notes=all_notes %}
+                    {% include "contracts/partials/notes_list.html" with notes=combined_notes combined_view=True show_note_type=True entity_type="Note" content_type_id="" contract_content_type_id="18" clin_content_type_id="12" object_id=contract.id %}
+                {% endwith %}
             </div>
         </div>
 
@@ -339,16 +283,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Future Section 2 - 1/3 width -->
-        <div class="bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Future Section 2</h2>
-            </div>
-            <div class="space-y-4">
-                <p class="text-gray-500 text-center">Content coming soon</p>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -361,6 +295,36 @@
         outline-offset: -3px;
         position: relative;
         z-index: 10;
+    }
+
+    /* Custom styling for note containers */
+    .note-content {
+        max-height: 100px !important;
+        overflow-y: auto !important;
+        display: block !important;
+    }
+    
+    /* Strict container height enforcement */
+    #combined-notes-container {
+        overflow-y: auto !important;
+        display: block !important;
+        height: auto !important;
+        max-height: 400px !important;
+    }
+    
+    /* Ensure individual notes don't push out the container */
+    #combined-notes-container > div {
+        margin-bottom: 0.75rem !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Color coding for notes */
+    .contract-note {
+        border-left-color: #10B981 !important; /* Green */
+    }
+    
+    .clin-note {
+        border-left-color: #3B82F6 !important; /* Blue */
     }
 </style>
 
@@ -417,38 +381,96 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.clin-row').forEach(row => {
         row.addEventListener('click', function() {
             const clinId = this.dataset.clinId;
-            selectClin(clinId);
+            const clinElement = this;
+            selectClin(clinId, clinElement);
         });
     });
 
     // Select default CLIN if it exists
     const defaultClinId = '{{ selected_clin.id|default:"" }}';
     if (defaultClinId) {
-        selectClin(defaultClinId);
+        const defaultClinElement = document.getElementById(`clin-row-${defaultClinId}`);
+        if (defaultClinElement) {
+            selectClin(defaultClinId, defaultClinElement);
+        }
     }
 });
 
-function selectClin(clinId) {
-    // Remove highlight from all rows
+// Function to open edit note modal - directly called by button onclick
+function openEditNoteModal(button) {
+    // Prevent default button behavior
+    event.preventDefault();
+    event.stopPropagation();
+
+    const noteId = button.dataset.noteId;
+    const noteText = button.dataset.noteText;
+    const contentTypeId = button.dataset.contentTypeId;
+    const objectId = button.dataset.objectId;
+    const entityType = button.dataset.entityType;
+
+    console.log("Opening edit modal for note:", noteId);
+
+    // Set modal for edit mode
+    const noteModal = document.getElementById('noteModal');
+    const noteModalTitle = document.getElementById('noteModalTitle');
+    const noteForm = document.getElementById('noteForm');
+    const noteTextArea = document.getElementById('id_note');
+    const noteContentTypeIdInput = document.getElementById('noteContentTypeId');
+    const noteObjectIdInput = document.getElementById('noteObjectId');
+
+    // Update modal title and form action
+    noteModalTitle.textContent = `Edit ${entityType} Note`;
+    
+    // Match the URL pattern and parameter name expected by Django
+    noteForm.action = `/contracts/note/update/${noteId}/`;
+    noteForm.method = 'POST';  // Ensure form method is POST
+    
+    // Set form values - decode Unicode escape sequences like \u000D\u000A back to newlines
+    noteTextArea.value = decodeUnicodeEscapes(noteText);
+    noteContentTypeIdInput.value = contentTypeId;
+    noteObjectIdInput.value = objectId;
+
+    // Show modal
+    noteModal.classList.remove('hidden');
+    return false;
+}
+
+// Helper function to decode Unicode escape sequences like \u000D\u000A back to actual newlines
+function decodeUnicodeEscapes(str) {
+    return str.replace(/\\u([0-9a-f]{4})/gi, function(match, grp) {
+        return String.fromCharCode(parseInt(grp, 16));
+    });
+}
+
+function selectClin(clinId, clinElement) {
+    // Store contract ID in a variable to avoid template tag issues
+    const contractId = "{{ contract.id }}";
+    
+    // Remove highlight from all rows and add it to the selected row
     document.querySelectorAll('.clin-row').forEach(row => {
         row.classList.remove('selected-row');
     });
+    clinElement.classList.add('selected-row');
     
-    // Add highlight to selected row
-    const selectedRow = document.getElementById(`clin-row-${clinId}`);
-    if (selectedRow) {
-        selectedRow.classList.add('selected-row');
-    }
+    // Update all CLIN Add Note buttons with the selected CLIN ID and enable them
+    document.querySelectorAll('[data-entity-type="CLIN"]').forEach(btn => {
+        btn.dataset.objectId = clinId;
+        btn.removeAttribute('disabled');
+    });
     
-    // Update the Add Note button for CLIN
-    const clinNoteBtn = document.querySelector('[data-entity-type="CLIN"]');
-    if (clinNoteBtn) {
-        clinNoteBtn.dataset.objectId = clinId;
-        clinNoteBtn.removeAttribute('disabled');
-    }
-    
-    // Fetch and update CLIN notes
-    fetch(`/contracts/clin/${clinId}/notes/`)
+    // Fetch combined notes
+    fetchCombinedNotes(contractId, clinId);
+}
+
+function fetchClinNotes(clinId) {
+    // This function is now only used for fetching CLIN notes for the combined view
+    // So we'll just call fetchCombinedNotes instead
+    const contractId = "{{ contract.id }}";
+    fetchCombinedNotes(contractId, clinId);
+}
+
+function fetchCombinedNotes(contractId, clinId) {
+    fetch(`/contracts/contract/${contractId}/clin/${clinId}/combined-notes/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Server responded with status: ${response.status}`);
@@ -456,54 +478,36 @@ function selectClin(clinId) {
             return response.json();
         })
         .then(data => {
-            const clinNotesDiv = document.getElementById('clin-notes');
             if (data.success) {
-                if (data.notes_html) {
-                    clinNotesDiv.innerHTML = data.notes_html;
-                } else if (data.notes && data.notes.length > 0) {
-                    clinNotesDiv.innerHTML = data.notes.map(note => `
-                        <div class="border-l-4 border-green-500 pl-4 py-2 mb-4">
-                            <p class="text-gray-700">${note.note}</p>
-                            <div class="mt-2 flex justify-between items-center">
-                                <div class="text-sm text-gray-500">
-                                    Added by ${note.created_by} on ${note.created_on}
-                                </div>
-                                <div class="flex space-x-2">
-                                    ${note.has_reminder ? `
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            Reminder
-                                        </span>
-                                    ` : ''}
-                                    <a href="/contracts/note/update/${note.id}/" class="text-indigo-600 hover:text-indigo-900" title="Edit">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </a>
-                                    <a href="/contracts/note/delete/${note.id}/" class="text-red-600 hover:text-red-900" title="Delete" onclick="return confirm('Are you sure you want to delete this note?');">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No CLIN notes found</p>';
+                const combinedNotesContainer = document.getElementById('combined-notes-container');
+                if (combinedNotesContainer) {
+                    combinedNotesContainer.innerHTML = data.notes_html;
+                    setupEditButtons(combinedNotesContainer);
+                    console.log('Combined notes updated successfully');
                 }
             } else {
-                clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Error loading notes</p>';
-                console.error('Error loading notes:', data.error);
+                console.error('Error loading combined notes:', data.error);
+                document.getElementById('combined-notes-container').innerHTML = 
+                    '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
             }
         })
         .catch(error => {
-            console.error('Error fetching CLIN notes:', error);
-            const clinNotesDiv = document.getElementById('clin-notes');
-            clinNotesDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Error loading notes</p>';
+            console.error('Error fetching combined notes:', error);
+            document.getElementById('combined-notes-container').innerHTML = 
+                '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
         });
+}
+
+function setupEditButtons(container) {
+    // Setup edit buttons functionality
+    container.querySelectorAll('[data-note-action="edit"]').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openEditNoteModal(this);
+            return false;
+        });
+    });
 }
 
 function toggleAcknowledgment(field) {

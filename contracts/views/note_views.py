@@ -272,3 +272,99 @@ def list_content_types(request):
         })
     
     return JsonResponse({'content_types': content_type_data})
+
+
+@conditional_login_required
+def get_combined_notes(request, contract_id, clin_id=None):
+    """
+    Get combined notes for a contract and optionally a CLIN.
+    Returns both sets of notes sorted by creation date.
+    """
+    try:
+        contract = get_object_or_404(Contract, id=contract_id)
+        contract_type = ContentType.objects.get_for_model(Contract)
+        clin_type = ContentType.objects.get_for_model(Clin)
+        
+        # Get contract notes
+        contract_notes = Note.objects.filter(
+            content_type=contract_type,
+            object_id=contract_id
+        ).order_by('-created_on')
+        
+        # Add entity type to contract notes for visual distinction
+        for note in contract_notes:
+            setattr(note, 'entity_type', 'contract')
+            setattr(note, 'content_type_id', contract_type.id)
+            setattr(note, 'object_id', contract_id)
+        
+        # Initialize all_notes with contract notes
+        all_notes = list(contract_notes)
+        
+        # If a CLIN ID is provided, get CLIN notes as well
+        if clin_id:
+            clin = get_object_or_404(Clin, id=clin_id)
+            
+            clin_notes = Note.objects.filter(
+                content_type=clin_type,
+                object_id=clin_id
+            ).order_by('-created_on')
+            
+            # Add entity type to clin notes for visual distinction
+            for note in clin_notes:
+                setattr(note, 'entity_type', 'clin')
+                setattr(note, 'content_type_id', clin_type.id)
+                setattr(note, 'object_id', clin_id)
+            
+            # Add CLIN notes to the combined list
+            all_notes.extend(clin_notes)
+            
+            # Sort all notes by creation date (newest first)
+            all_notes.sort(key=lambda x: x.created_on, reverse=True)
+        
+        # Ensure all notes have entity_type, content_type_id, and object_id set
+        for note in all_notes:
+            if not hasattr(note, 'entity_type') or not hasattr(note, 'content_type_id') or not hasattr(note, 'object_id'):
+                # Check what type this note is and set accordingly
+                if note.content_type == contract_type:
+                    setattr(note, 'entity_type', 'contract')
+                    setattr(note, 'content_type_id', contract_type.id)
+                    if not hasattr(note, 'object_id'):
+                        setattr(note, 'object_id', note.object_id)
+                elif note.content_type == clin_type:
+                    setattr(note, 'entity_type', 'clin')
+                    setattr(note, 'content_type_id', clin_type.id)
+                    if not hasattr(note, 'object_id'):
+                        setattr(note, 'object_id', note.object_id)
+                else:
+                    setattr(note, 'entity_type', 'note')
+                    # Set a default content type ID
+                    setattr(note, 'content_type_id', contract_type.id)
+                    if not hasattr(note, 'object_id'):
+                        setattr(note, 'object_id', note.object_id)
+        
+        # Render the combined notes to HTML
+        notes_html = render_to_string('contracts/partials/notes_list.html', {
+            'notes': all_notes,
+            'content_object': contract,
+            'combined_view': True,
+            'show_note_type': True,
+            'entity_type': 'Note',
+            'content_type_id': '',
+            'object_id': contract_id,
+            'contract_content_type_id': str(contract_type.id),
+            'clin_content_type_id': str(clin_type.id)
+        })
+        
+        return JsonResponse({
+            'success': True,
+            'notes_html': notes_html
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in get_combined_notes: {str(e)}")
+        print(traceback.format_exc())
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

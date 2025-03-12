@@ -36,21 +36,74 @@ class ContractDetailView(DetailView):
         )
         context['clins'] = clins
         
-        # Use the notes attribute directly instead of note_set
+        # Get contract notes
         context['contract_notes'] = contract.notes.all().order_by('-created_on')
         
         # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
         context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
         if context['selected_clin']:
-            # Use the notes attribute directly instead of note_set
+            # Get CLIN notes
             context['clin_notes'] = context['selected_clin'].notes.all().order_by('-created_on')
             try:
                 context['acknowledgment'] = context['selected_clin'].clinacknowledgment_set.first()
             except:
                 context['acknowledgment'] = None
+                
+            # Prepare combined notes (contract + selected CLIN)
+            # First, get the ContentType models
+            contract_type = ContentType.objects.get_for_model(Contract)
+            clin_type = ContentType.objects.get_for_model(Clin)
+            
+            # Get both sets of notes
+            contract_notes = list(context['contract_notes'])
+            clin_notes = list(context['clin_notes'])
+            
+            # Add entity_type attribute to each note for visual distinction
+            for note in contract_notes:
+                setattr(note, 'entity_type', 'contract')
+                setattr(note, 'content_type_id', contract_type.id)
+                setattr(note, 'object_id', contract.id)
+            for note in clin_notes:
+                setattr(note, 'entity_type', 'clin')
+                setattr(note, 'content_type_id', clin_type.id)
+                setattr(note, 'object_id', context['selected_clin'].id)
+            
+            # Combine the notes
+            all_notes = contract_notes + clin_notes
+            
+            # Sort by created_on date (newest first)
+            all_notes.sort(key=lambda x: x.created_on, reverse=True)
+            
+            # Ensure all notes have entity_type and content_type_id set
+            for note in all_notes:
+                if not hasattr(note, 'entity_type') or not hasattr(note, 'content_type_id') or not hasattr(note, 'object_id'):
+                    # Check what type this note is and set accordingly
+                    if note.content_type == contract_type:
+                        setattr(note, 'entity_type', 'contract')
+                        setattr(note, 'content_type_id', contract_type.id)
+                        setattr(note, 'object_id', contract.id)
+                    elif note.content_type == clin_type:
+                        setattr(note, 'entity_type', 'clin')
+                        setattr(note, 'content_type_id', clin_type.id)
+                        setattr(note, 'object_id', context['selected_clin'].id)
+                    else:
+                        setattr(note, 'entity_type', 'note')
+                        # Set a default content type ID for unknown types
+                        setattr(note, 'content_type_id', contract_type.id)
+                        setattr(note, 'object_id', contract.id)
+            
+            # Add to context
+            context['all_notes'] = all_notes
         else:
             context['clin_notes'] = []
             context['acknowledgment'] = None
+            # If no CLIN is selected, all_notes is just contract_notes
+            contract_notes = list(context['contract_notes'])
+            for note in contract_notes:
+                setattr(note, 'entity_type', 'contract')
+                setattr(note, 'content_type_id', contract_type.id)
+                setattr(note, 'object_id', contract.id)
+            context['all_notes'] = contract_notes
             
         return context
 
