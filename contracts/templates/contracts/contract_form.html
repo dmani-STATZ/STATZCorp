@@ -6,6 +6,38 @@
     {% if form.instance.pk %}Edit Contract{% else %}New Contract{% endif %}
 {% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+    /* Form label styling */
+    .form-label {
+        text-transform: capitalize;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+        display: block;
+        font-family: inherit;
+    }
+    
+    /* For acronyms that should always be uppercase */
+    .text-uppercase {
+        text-transform: uppercase !important;
+    }
+    
+    /* Section headers */
+    .section-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-family: inherit;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
@@ -31,7 +63,7 @@
 
     {% if not form.instance.pk %}
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">Upload DD Form 1155</h2>
+        <h2 class="section-header">Upload DD Form 1155</h2>
         <p class="text-gray-600 mb-4">Upload a DD Form 1155 to automatically populate the contract form fields.</p>
         
         <form id="dd1155-upload-form" enctype="multipart/form-data" class="space-y-4">
@@ -85,64 +117,226 @@
         <form method="post" class="space-y-6" id="contract-form">
             {% csrf_token %}
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Contract Identification -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        Contract Identification
-                    </h2>
-                </div>
-                
-                <div class="space-y-4">
-                    {{ form.contract_number|as_crispy_field }}
-                    {{ form.po_number|as_crispy_field }}
-                    {{ form.tab_num|as_crispy_field }}
-                    {{ form.nist|as_crispy_field }}
-                </div>
-                
-                <div class="space-y-4">
-                    {{ form.contract_type|as_crispy_field }}
-                    {{ form.buyer|as_crispy_field }}
-                    {{ form.sales_class|as_crispy_field }}
-                </div>
-                
-                <div class="space-y-4">
-                    {{ form.status|as_crispy_field }}
-                    {{ form.contract_value|as_crispy_field }}
-                </div>
-                
-                <!-- Dates -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        Contract Dates
-                    </h2>
-                </div>
-                
-                <div class="space-y-4">
-                    {{ form.award_date|as_crispy_field }}
-                </div>
-                
-                <div class="space-y-4">
-                     {{ form.due_date|as_crispy_field }}
+            <!-- Contract Identification -->
+            <div>
+                <h2 class="section-header">Contract Identification</h2>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.contract_number.id_for_label }}" class="form-label">
+                                Contract Number
+                            </label>
+                            {{ form.contract_number }}
+                            {% if form.contract_number.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.contract_number.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.po_number.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">PO</span> Number
+                            </label>
+                            {{ form.po_number }}
+                            {% if form.po_number.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.po_number.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.tab_num.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">TAB</span> Number
+                            </label>
+                            {{ form.tab_num }}
+                            {% if form.tab_num.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.tab_num.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Row 2 -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.contract_type.id_for_label }}" class="form-label">
+                                Contract Type
+                            </label>
+                            {{ form.contract_type }}
+                            {% if form.contract_type.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.contract_type.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.buyer.id_for_label }}" class="form-label">
+                                Buyer
+                            </label>
+                            {{ form.buyer }}
+                            {% if form.buyer.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.buyer.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.sales_class.id_for_label }}" class="form-label">
+                                Sales Class
+                            </label>
+                            {{ form.sales_class }}
+                            {% if form.sales_class.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.sales_class.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Row 3 -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.status.id_for_label }}" class="form-label">
+                                Status
+                            </label>
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.status.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.contract_value.id_for_label }}" class="form-label">
+                                Contract Value
+                            </label>
+                            {{ form.contract_value }}
+                            {% if form.contract_value.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.contract_value.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.nist.id_for_label }}" class="form-label">
+                                <span class="text-uppercase">NIST</span>
+                            </label>
+                            {{ form.nist }}
+                            {% if form.nist.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.nist.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
             
-
+            <!-- Contract Dates -->
+            <div>
+                <h2 class="section-header">Contract Dates</h2>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.award_date.id_for_label }}" class="form-label">
+                                Award Date
+                            </label>
+                            {{ form.award_date }}
+                            {% if form.award_date.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.award_date.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.due_date.id_for_label }}" class="form-label">
+                                Due Date
+                            </label>
+                            {{ form.due_date }}
+                            {% if form.due_date.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.due_date.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Management Information -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-200">
-                        Management Information
-                    </h2>
-                </div>
-                <div class="space-y-4">
-                    {{ form.assigned_user|as_crispy_field }}
-                </div>
-                <div class="space-y-4">
-                    {{ form.assigned_date|as_crispy_field }}
+            <div>
+                <h2 class="section-header">Management Information</h2>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.assigned_user.id_for_label }}" class="form-label">
+                                Assigned User
+                            </label>
+                            {{ form.assigned_user }}
+                            {% if form.assigned_user.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.assigned_user.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.assigned_date.id_for_label }}" class="form-label">
+                                Assigned Date
+                            </label>
+                            {{ form.assigned_date }}
+                            {% if form.assigned_date.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.assigned_date.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                        <!-- Empty cell for alignment -->
+                        </div>
+                    </div>
+                    
+                    <!-- Row 2 -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.reviewed.id_for_label }}" class="form-label">
+                                Reviewed
+                            </label>
+                            {{ form.reviewed }}
+                            {% if form.reviewed.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.reviewed.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.reviewed_by.id_for_label }}" class="form-label">
+                                Reviewed By
+                            </label>
+                            {{ form.reviewed_by }}
+                            {% if form.reviewed_by.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.reviewed_by.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label for="{{ form.reviewed_on.id_for_label }}" class="form-label">
+                                Reviewed On
+                            </label>
+                            {{ form.reviewed_on }}
+                            {% if form.reviewed_on.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.reviewed_on.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
-            
             
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 {% if form.instance.pk %}
@@ -167,6 +361,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{{ block.super }}
 <script>
     function showStatus(message, type) {
         const statusDiv = document.getElementById('extraction-status');
@@ -242,7 +437,7 @@
                 const formData = new FormData();
                 formData.append('dd1155_file', file);
                 
-                fetch('{% url "contracts:extract_dd1155" %}', {
+                fetch('/contracts/extract-dd1155/', {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -252,159 +447,76 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        console.log('Raw data received:', data);
-                        console.log('Contract total from data:', data.contract_total);
+                        showStatus('Data extracted successfully!', 'success');
                         
-                        // Populate form fields with extracted data
-                        const fields = {
-                            'contract_number': data.contract_number?.value || data.contract_number,
-                            'award_date': data.award_date?.value || data.award_date,
-                            'due_date': data.due_date?.value || data.due_date,
-                            'buyer': data.buyer?.value || data.buyer,
-                            'contract_type': data.contract_type?.value || data.contract_type,
-                            'nist': data.nist?.value || data.nist,
-                            'contract_value': data.contract_total || 0
-                        };
-                        
-                        console.log('Fields object:', fields);
-                        console.log('Contract value in fields:', fields.contract_value);
-
-                        // Helper function to safely set field values and types
-                        const setFieldValue = (fieldId, value) => {
-                            const field = document.getElementById(fieldId);
-                            console.log(`Setting field ${fieldId} with value:`, value);
-                            if (field && value) {
-                                if (field.type === 'checkbox') {
-                                    field.checked = Boolean(value);
-                                } else if (fieldId === 'id_contract_value') {
-                                    console.log('Processing contract value:', value);
-                                    const formattedValue = parseFloat(value).toFixed(2);
-                                    console.log('Formatted contract value:', formattedValue);
-                                    field.value = formattedValue;
-                                } else if (fieldId === 'id_award_date' || fieldId === 'id_due_date') {
-                                    try {
-                                        const date = new Date(value);
-                                        field.value = date.toISOString().split('T')[0];
-                                    } catch (e) {
-                                        console.error(`Error formatting date for ${fieldId}:`, e);
-                                        field.value = value;
-                                    }
-                                } else {
-                                    field.value = value;
-                                }
-                                console.log(`Set ${fieldId} to ${field.value}`);
-                            }
-                        };
-
                         // Populate form fields
-                        Object.entries(fields).forEach(([key, value]) => {
-                            const fieldId = `id_${key}`;
-                            setFieldValue(fieldId, value);
-                        });
-
-                        // Handle CLIN data
-                        if (data.clins && Array.isArray(data.clins)) {
-                            extractedClinData = data.clins;
-                            const clinCount = extractedClinData.length;
-                            const clinCountElement = document.getElementById('clin-count');
+                        if (data.contract_data) {
+                            Object.keys(data.contract_data).forEach(field => {
+                                const input = document.getElementById(`id_${field}`);
+                                if (input) {
+                                    input.value = data.contract_data[field];
+                                }
+                            });
+                        }
+                        
+                        // Store CLIN data for later use
+                        if (data.clin_data) {
+                            extractedClinData = data.clin_data;
+                            
+                            // Show CLIN data section
                             const clinDataSection = document.getElementById('clin-data-section');
+                            const clinCount = document.getElementById('clin-count');
                             const clinDataBody = document.getElementById('clin-data-body');
                             
-                            clinCountElement.textContent = `${clinCount} CLIN${clinCount !== 1 ? 's' : ''} Found`;
-                            clinDataSection.classList.remove('hidden');
+                            clinCount.textContent = `Found ${data.clin_data.length} CLINs`;
                             
-                            // Clear existing table rows
+                            // Clear existing rows
                             clinDataBody.innerHTML = '';
                             
-                            // Add rows for each CLIN
-                            extractedClinData.forEach(clin => {
+                            // Add CLIN data rows
+                            data.clin_data.forEach(clin => {
                                 const row = document.createElement('tr');
                                 row.innerHTML = `
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.clin_number || ''}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.clin_type || ''}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.nsn_code || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.nsn || ''}</td>
                                     <td class="px-6 py-4 text-sm text-gray-900">${clin.description || ''}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.order_qty || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.quantity || ''}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.unit || ''}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.unit_price ? '$' + parseFloat(clin.unit_price).toFixed(2) : ''}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.po_amount ? '$' + parseFloat(clin.po_amount).toFixed(2) : ''}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.fob === 'O' ? 'Origin' : 'Destination'}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.ia === 'O' ? 'Origin' : 'Destination'}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.unit_price || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.amount || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.fob || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.ia || ''}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.due_date || ''}</td>
                                 `;
                                 clinDataBody.appendChild(row);
                             });
+                            
+                            clinDataSection.classList.remove('hidden');
                         }
-                        
-                        showStatus('Data extracted successfully! Form fields have been populated.', 'success');
                     } else {
-                        showStatus(data.error || 'Failed to extract data from the form.', 'error');
+                        showStatus(data.error || 'Error extracting data from DD Form 1155', 'error');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    showStatus('An error occurred during extraction.', 'error');
+                    showStatus('Error extracting data from DD Form 1155', 'error');
                 });
             });
         }
         
-        // Form submission handler
-        async function handleFormSubmit(e) {
-            e.preventDefault();
-            
-            // Show loading state
-            const submitButton = contractForm.querySelector('button[type="submit"]');
-            const originalButtonText = submitButton.innerHTML;
-            submitButton.disabled = true;
-            submitButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Creating Contract...
-            `;
-            
-            try {
-                // Create FormData from the form
-                const formData = new FormData(contractForm);
-                
-                // Add CLIN data if available
-                if (extractedClinData && extractedClinData.length > 0) {
-                    formData.append('extracted_clin_data', JSON.stringify(extractedClinData));
-                }
-                
-                // Submit the form
-                const response = await fetch(contractForm.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showStatus('Contract created successfully!', 'success');
-                    setTimeout(() => {
-                        window.location.href = result.redirect_url;
-                    }, 1500);
-                } else {
-                    showStatus(result.error || 'Failed to create contract.', 'error');
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalButtonText;
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showStatus('An error occurred while creating the contract.', 'error');
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalButtonText;
-            }
-        }
-        
         // Add form submission handler
         if (contractForm) {
-            contractForm.addEventListener('submit', handleFormSubmit);
+            contractForm.addEventListener('submit', function(e) {
+                // Don't prevent form submission, just attach CLIN data if available
+                if (extractedClinData.length > 0) {
+                    const clinDataInput = document.createElement('input');
+                    clinDataInput.type = 'hidden';
+                    clinDataInput.name = 'extracted_clin_data';
+                    clinDataInput.value = JSON.stringify(extractedClinData);
+                    this.appendChild(clinDataInput);
+                }
+            });
         }
     });
 </script>

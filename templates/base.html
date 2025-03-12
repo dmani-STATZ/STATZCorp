@@ -1,35 +1,7 @@
 {% extends "base_template.html" %}
 
 {% block extra_head %}
-<!-- <script>
-    // Set session storage flag on login
-    function setSessionFlag() {
-        sessionStorage.setItem('isLoggedIn', 'true');
-    }
 
-    // Clear session storage flag on logout
-    function clearSessionFlag() {
-        sessionStorage.removeItem('isLoggedIn');
-    }
-
-    // Check session storage flag on page load
-    window.onload = function() {
-        if (!sessionStorage.getItem('isLoggedIn')) {
-            // Redirect to logout URL if not logged in
-            window.location.href = "{% url 'users:logout' %}";
-        }
-    }
-
-    // Set session flag when the user logs in
-    document.addEventListener('DOMContentLoaded', function() {
-        setSessionFlag();
-    });
-
-    // Clear session flag when the user logs out
-    document.addEventListener('beforeunload', function() {
-        clearSessionFlag();
-    });
-</script> -->
 
 {% endblock %}
 
@@ -56,44 +28,5 @@
 {% endblock body %}
 
 {% block extra_scripts %}
-<!-- <script>
-    let idleTime = 0;
-    const maxIdleTime = 30 * 60 * 1000; // 10 minutes in milliseconds
 
-    function resetIdleTimer() {
-        idleTime = 0;
-    }
-
-    function checkIdleTime() {
-        idleTime += 1000; // Increment idle time by 1 second
-        if (idleTime >= maxIdleTime) {
-            logoutUser(); // Call the logout function
-        }
-    }
-
-    function logoutUser() {
-        fetch("{% url 'users:logout' %}", {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}', // Include CSRF token
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        }).then(response => {
-            if (response.ok) {
-                window.location.href = "{% url 'users:login' %}"; // Redirect to login page
-            }
-        }).catch(error => console.error('Error logging out:', error));
-    }
-
-    // Reset the idle timer on any of these events
-    window.onload = resetIdleTimer;
-    window.onmousemove = resetIdleTimer;
-    window.onmousedown = resetIdleTimer; // Catch touchpad/mouse events
-    window.ontouchstart = resetIdleTimer;
-    window.onclick = resetIdleTimer;     // Catch touch events
-    window.onkeypress = resetIdleTimer;  // Catch keyboard events
-
-    // Check idle time every second
-    setInterval(checkIdleTime, 1000);
-</script> -->
 {% endblock %}

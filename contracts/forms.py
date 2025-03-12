@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from .models import (
     Nsn, Supplier, Contract, Clin, Note, Reminder,
     ClinAcknowledgment, AcknowledgementLetter, Contact, Address,
@@ -9,6 +10,18 @@ from .models import (
     CertificationType, CertificationStatus, SupplierClassification,
     ClassificationType
 )
+
+User = get_user_model()
+
+class ActiveUserModelChoiceField(forms.ModelChoiceField):
+    def __init__(self, *args, **kwargs):
+        if 'queryset' not in kwargs:
+            kwargs['queryset'] = User.objects.filter(is_active=True).order_by('username')
+        if 'widget' not in kwargs:
+            kwargs['widget'] = forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
+            })
+        super().__init__(*args, **kwargs)
 
 class NsnForm(forms.ModelForm):
     class Meta:
@@ -139,6 +152,15 @@ class SupplierForm(forms.ModelForm):
             self.fields['contact'].queryset = self.fields['contact'].queryset.order_by('name')
 
 class ContractForm(forms.ModelForm):
+    assigned_user = ActiveUserModelChoiceField(
+        required=False,
+        empty_label="Select User",
+    )
+    reviewed_by = ActiveUserModelChoiceField(
+        required=False,
+        empty_label="Select User",
+    )
+
     class Meta:
         model = Contract
         fields = [
@@ -151,14 +173,14 @@ class ContractForm(forms.ModelForm):
         ]
         widgets = {
             'idiq_contract': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'contract_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Contract Number'
             }),
             'status': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'open': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
@@ -175,7 +197,7 @@ class ContractForm(forms.ModelForm):
                 'type': 'datetime-local'
             }),
             'canceled_reason': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'po_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -186,10 +208,10 @@ class ContractForm(forms.ModelForm):
                 'placeholder': 'Enter Tab Number'
             }),
             'buyer': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'contract_type': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'award_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -203,7 +225,7 @@ class ContractForm(forms.ModelForm):
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
             'sales_class': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'survey_date': forms.DateInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -212,9 +234,6 @@ class ContractForm(forms.ModelForm):
             'survey_type': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Survey Type'
-            }),
-            'assigned_user': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
             'assigned_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -230,17 +249,9 @@ class ContractForm(forms.ModelForm):
             'reviewed': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
-            'reviewed_by': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
-            }),
             'reviewed_on': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'type': 'datetime-local'
-            }),
-            'statz_value': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter STATZ Value',
-                'step': '0.01'
             }),
             'contract_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -478,23 +489,34 @@ class NoteForm(forms.ModelForm):
         }
 
 class ReminderForm(forms.ModelForm):
+    assigned_to = ActiveUserModelChoiceField(
+        required=False,
+        empty_label="Select User",
+    )
+    
     class Meta:
         model = Reminder
-        fields = ['reminder_title', 'reminder_text', 'reminder_date']
+        fields = ['reminder_title', 'reminder_text', 'reminder_date', 'reminder_user', 'reminder_completed']
         widgets = {
             'reminder_title': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Reminder Title'
+                'placeholder': 'Enter title'
             }),
             'reminder_text': forms.Textarea(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'rows': 3,
-                'placeholder': 'Enter Reminder Details'
+                'placeholder': 'Enter description',
+                'rows': 3
             }),
             'reminder_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'type': 'datetime-local'
             }),
+            'reminder_user': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
+            }),
+            'reminder_completed': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            })
         }
 
 class ClinAcknowledgmentForm(forms.ModelForm):

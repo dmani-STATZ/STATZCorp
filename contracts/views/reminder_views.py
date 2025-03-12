@@ -21,13 +21,10 @@ def add_reminder(request, note_id=None):
         form = ReminderForm(request.POST)
         if form.is_valid():
             reminder = form.save(commit=False)
-            reminder.created_by = request.user
-            reminder.assigned_to = form.cleaned_data.get('assigned_to') or request.user
+            reminder.reminder_user = request.user
             
             if note:
                 reminder.note = note
-                reminder.content_type = note.content_type
-                reminder.object_id = note.object_id
             
             reminder.save()
             
@@ -45,7 +42,7 @@ def add_reminder(request, note_id=None):
     else:
         initial = {}
         if note:
-            initial['description'] = f"Follow up on note: {note.text[:50]}..."
+            initial['reminder_text'] = f"Follow up on note: {note.note[:50]}..."
         
         form = ReminderForm(initial=initial)
     
@@ -64,29 +61,29 @@ class ReminderListView(ListView):
         # Get reminders for the current user
         user = self.request.user
         
-        # Base queryset - reminders assigned to the current user or created by them
+        # Base queryset - reminders assigned to the user
         queryset = Reminder.objects.filter(
-            Q(assigned_to=user) | Q(created_by=user)
+            reminder_user=user
         ).select_related(
-            'created_by', 'assigned_to', 'note', 'content_type'
-        ).order_by('due_date')
+            'reminder_user', 'reminder_completed_user', 'note'
+        ).order_by('reminder_date')
         
-        # Filter by status if specified
+        # Filter by completion status if specified
         status_filter = self.request.GET.get('status')
         if status_filter == 'completed':
-            queryset = queryset.filter(completed=True)
+            queryset = queryset.filter(reminder_completed=True)
         elif status_filter == 'pending':
-            queryset = queryset.filter(completed=False)
+            queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
         
         # Filter by due date if specified
         due_filter = self.request.GET.get('due')
         today = timezone.now().date()
         if due_filter == 'overdue':
-            queryset = queryset.filter(due_date__lt=today, completed=False)
+            queryset = queryset.filter(reminder_date__lt=today, reminder_completed=False)
         elif due_filter == 'today':
-            queryset = queryset.filter(due_date=today)
+            queryset = queryset.filter(reminder_date__date=today)
         elif due_filter == 'upcoming':
-            queryset = queryset.filter(due_date__gt=today)
+            queryset = queryset.filter(reminder_date__gt=today)
         
         return queryset
     
@@ -100,16 +97,19 @@ class ReminderListView(ListView):
         context['due_filter'] = self.request.GET.get('due', '')
         
         # Add counts for different reminder categories
-        all_reminders = Reminder.objects.filter(
-            Q(assigned_to=user) | Q(created_by=user)
-        )
+        all_reminders = Reminder.objects.filter(reminder_user=user)
         
         context['total_count'] = all_reminders.count()
-        context['completed_count'] = all_reminders.filter(completed=True).count()
-        context['pending_count'] = all_reminders.filter(completed=False).count()
-        context['overdue_count'] = all_reminders.filter(due_date__lt=today, completed=False).count()
-        context['today_count'] = all_reminders.filter(due_date=today).count()
-        context['upcoming_count'] = all_reminders.filter(due_date__gt=today).count()
+        context['completed_count'] = all_reminders.filter(reminder_completed=True).count()
+        context['pending_count'] = all_reminders.filter(
+            Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
+        ).count()
+        context['overdue_count'] = all_reminders.filter(
+            reminder_date__lt=today, 
+            reminder_completed=False
+        ).count()
+        context['today_count'] = all_reminders.filter(reminder_date__date=today).count()
+        context['upcoming_count'] = all_reminders.filter(reminder_date__gt=today).count()
         
         return context
 
@@ -119,24 +119,24 @@ def toggle_reminder_completion(request, reminder_id):
     reminder = get_object_or_404(Reminder, id=reminder_id)
     
     # Check if the user has permission to update this reminder
-    if reminder.assigned_to != request.user and reminder.created_by != request.user and not request.user.is_staff:
+    if reminder.reminder_user != request.user and not request.user.is_staff:
         messages.error(request, 'You do not have permission to update this reminder.')
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
     
     # Toggle the completion status
-    reminder.completed = not reminder.completed
+    reminder.reminder_completed = not reminder.reminder_completed
     
     # Update completion metadata if completing the reminder
-    if reminder.completed:
-        reminder.completed_date = timezone.now()
-        reminder.completed_by = request.user
+    if reminder.reminder_completed:
+        reminder.reminder_completed_date = timezone.now()
+        reminder.reminder_completed_user = request.user
     else:
-        reminder.completed_date = None
-        reminder.completed_by = None
+        reminder.reminder_completed_date = None
+        reminder.reminder_completed_user = None
     
     reminder.save()
     
-    messages.success(request, f'Reminder marked as {"completed" if reminder.completed else "pending"}.')
+    messages.success(request, f'Reminder marked as {"completed" if reminder.reminder_completed else "pending"}.')
     
     # Redirect back to the referring page
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list')))
@@ -147,7 +147,7 @@ def delete_reminder(request, reminder_id):
     reminder = get_object_or_404(Reminder, id=reminder_id)
     
     # Check if the user has permission to delete this reminder
-    if reminder.created_by != request.user and not request.user.is_staff:
+    if reminder.reminder_user != request.user and not request.user.is_staff:
         messages.error(request, 'You do not have permission to delete this reminder.')
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
     
