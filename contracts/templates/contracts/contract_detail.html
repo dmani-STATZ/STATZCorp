@@ -6,104 +6,158 @@
     {% csrf_token %}
 </form>
 <div class="container mx-auto px-4 py-6">
-    <!-- Contract Header -->
-
-
-    <div class="bg-white shadow-lg rounded-lg p-4 mb-6">
-        {% if contract.cancelled %}
-            <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-bold text-gray-800">
-                    Contract {{ contract.contract_number }}
-                </h1>
-                <div class="flex items-center space-x-3">
-                    <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
-                    <a href="{% url 'contracts:contracts_dashboard' %}" 
-                    class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                         <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                     </svg>
-                     Back to Dashboard
-                 </a>
+    <!-- Top Section Grid Layout -->
+    <div class="grid grid-cols-3 gap-8 mb-6">
+        <!-- CLIN Acknowledgment Section - Left Column -->
+        <div class="col-span-1 bg-white shadow-lg rounded-lg p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">CLIN Acknowledgment</h2>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between py-1 border-b">
+                    <span class="text-sm text-gray-700">PO Acknowledge Letter</span>
+                    <span class="text-xs text-gray-500">Coming Soon</span>
                 </div>
-            </div>
-        {% elif not contract.open %}
-            <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-bold text-gray-800">
-                    Contract {{ contract.contract_number }}
-                </h1>
-                <div class="flex items-center space-x-3">
-                    <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
-                    <a href="{% url 'contracts:contracts_dashboard' %}" 
-                    class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                         <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                     </svg>
-                     Back to Dashboard
-                 </a>
-                </div>
-            </div>
-        {% else %}
-            <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-bold text-gray-800 flex items-center">
-                    Contract {{ contract.contract_number }}
-                    <a href="{% url 'contracts:contract_update' contract.id %}" 
-                       class="ml-3 text-indigo-500 hover:text-indigo-700 transition-colors duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                    </a>
-                </h1>
-                <div class="flex space-x-3 items-center">
-                    <a href="{% url 'contracts:contract_review' contract.id %}" 
-                       class="flex items-center px-3 py-1 rounded-full text-sm font-semibold {% if contract.reviewed %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} hover:opacity-80 transition-opacity duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {% if contract.reviewed %}
-                            Reviewed
+                <div class="flex items-center justify-between py-1 border-b">
+                    <span class="text-sm text-gray-700">PO Sent to Sup</span>
+                    <button 
+                        onclick="toggleAcknowledgment('po_to_supplier_bool')"
+                        id="po_to_supplier_bool_btn"
+                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 
+                        {% if acknowledgment.po_to_supplier_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                        {% if acknowledgment.po_to_supplier_bool %}
+                            {{ acknowledgment.po_to_supplier_date|date:"m/d/Y H:i" }}
                         {% else %}
-                            Not Reviewed
+                            Not Sent
                         {% endif %}
-                    </a>
-                    <span class="bg-white text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
-                    <a href="{% url 'contracts:contracts_dashboard' %}" 
-                    class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                    </svg>
-                    Back to Dashboard
-                    </a>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b">
+                    <span class="text-sm text-gray-700">Acknowledged</span>
+                    <button 
+                        onclick="toggleAcknowledgment('clin_reply_bool')"
+                        id="clin_reply_bool_btn"
+                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 
+                        {% if acknowledgment.clin_reply_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                        {% if acknowledgment.clin_reply_bool %}
+                            {{ acknowledgment.clin_reply_date|date:"m/d/Y H:i" }}
+                        {% else %}
+                            Not Acknowledged
+                        {% endif %}
+                    </button>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b">
+                    <span class="text-sm text-gray-700">PO Sent to QAR</span>
+                    <button 
+                        onclick="toggleAcknowledgment('po_to_qar_bool')"
+                        id="po_to_qar_bool_btn"
+                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 
+                        {% if acknowledgment.po_to_qar_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                        {% if acknowledgment.po_to_qar_bool %}
+                            {{ acknowledgment.po_to_qar_date|date:"m/d/Y H:i" }}
+                        {% else %}
+                            Not Sent
+                        {% endif %}
+                    </button>
                 </div>
             </div>
-        {% endif %}
+        </div>
 
-        <!-- Contract Details Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div class="p-2">
-                <p class="text-sm text-gray-600">PO Number</p>
-                <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
-            </div>
-            <div class="p-2">
-                <p class="text-sm text-gray-600">Tab Number</p>
-                <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
-            </div>
-            <div class="p-2">
-                <p class="text-sm text-gray-600">Buyer</p>
-                <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
-            </div>
-            <div class="p-2">
-                <p class="text-sm text-gray-600">Award Date</p>
-                <p class="font-medium">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
-            </div>
-            <div class="p-2">
-                <p class="text-sm text-gray-600">Due Date</p>
-                <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
-                    {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
-                </p>
-            </div>
-            <div class="p-2">
-                <p class="text-sm text-gray-600">Sales Class</p>
-                <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+        <!-- Contract Header - Right Columns -->
+        <div class="col-span-2 bg-white shadow-lg rounded-lg p-4">
+            {% if contract.cancelled %}
+                <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        Contract {{ contract.contract_number }}
+                    </h1>
+                    <div class="flex items-center space-x-3">
+                        <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" 
+                        class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                             <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                         </svg>
+                         Back to Dashboard
+                     </a>
+                    </div>
+                </div>
+            {% elif not contract.open %}
+                <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        Contract {{ contract.contract_number }}
+                    </h1>
+                    <div class="flex items-center space-x-3">
+                        <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" 
+                        class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                             <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                         </svg>
+                         Back to Dashboard
+                     </a>
+                    </div>
+                </div>
+            {% else %}
+                <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4">
+                    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                        Contract {{ contract.contract_number }}
+                        <a href="{% url 'contracts:contract_update' contract.id %}" 
+                           class="ml-3 text-indigo-500 hover:text-indigo-700 transition-colors duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </a>
+                    </h1>
+                    <div class="flex space-x-3 items-center">
+                        <a href="{% url 'contracts:contract_review' contract.id %}" 
+                           class="flex items-center px-3 py-1 rounded-full text-sm font-semibold {% if contract.reviewed %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} hover:opacity-80 transition-opacity duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {% if contract.reviewed %}
+                                Reviewed
+                            {% else %}
+                                Not Reviewed
+                            {% endif %}
+                        </a>
+                        <span class="bg-white text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" 
+                        class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Contract Details Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">PO Number</p>
+                    <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Tab Number</p>
+                    <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Buyer</p>
+                    <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Award Date</p>
+                    <p class="font-medium">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Due Date</p>
+                    <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
+                        {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
+                    </p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Sales Class</p>
+                    <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+                </div>
             </div>
         </div>
     </div>
@@ -111,7 +165,7 @@
     <!-- Main Content Grid -->
     <div class="grid grid-cols-3 gap-8">
         <!-- CLINs Section - 2/3 width -->
-        <div class="col-span-3 bg-white shadow-lg rounded-lg p-6">
+        <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
                 {% if contract.open %}
@@ -192,6 +246,16 @@
                 </table>
             </div>
         </div>
+        
+        <!-- Future Misc Section - 1/3 width -->
+        <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Future Misc Section</h2>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+                <p class="text-gray-500">This section is reserved for future functionality</p>
+            </div>
+        </div>
     </div>
 
     <!-- Bottom Sections Grid -->
@@ -231,61 +295,18 @@
             </div>
         </div>
 
-        <!-- CLIN Acknowledgment Section -->
-        <div class="bg-white shadow-lg rounded-lg p-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">CLIN Acknowledgment</h2>
-            <div class="space-y-2">
-                <div class="flex items-center justify-between py-1 border-b">
-                    <span class="text-sm text-gray-700">PO Acknowledge Letter</span>
-                    <span class="text-xs text-gray-500">Coming Soon</span>
-                </div>
-                <div class="flex items-center justify-between py-1 border-b">
-                    <span class="text-sm text-gray-700">PO Sent to Sup</span>
-                    <button 
-                        onclick="toggleAcknowledgment('po_to_supplier_bool')"
-                        id="po_to_supplier_bool_btn"
-                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 
-                        {% if acknowledgment.po_to_supplier_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
-                        {% if acknowledgment.po_to_supplier_bool %}
-                            {{ acknowledgment.po_to_supplier_date|date:"m/d/Y H:i" }}
-                        {% else %}
-                            Not Sent
-                        {% endif %}
-                    </button>
-                </div>
-                <div class="flex items-center justify-between py-1 border-b">
-                    <span class="text-sm text-gray-700">Acknowledged</span>
-                    <button 
-                        onclick="toggleAcknowledgment('clin_reply_bool')"
-                        id="clin_reply_bool_btn"
-                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 
-                        {% if acknowledgment.clin_reply_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
-                        {% if acknowledgment.clin_reply_bool %}
-                            {{ acknowledgment.clin_reply_date|date:"m/d/Y H:i" }}
-                        {% else %}
-                            Not Acknowledged
-                        {% endif %}
-                    </button>
-                </div>
-                <div class="flex items-center justify-between py-1 border-b">
-                    <span class="text-sm text-gray-700">PO Sent to QAR</span>
-                    <button 
-                        onclick="toggleAcknowledgment('po_to_qar_bool')"
-                        id="po_to_qar_bool_btn"
-                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors duration-150 
-                        {% if acknowledgment.po_to_qar_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
-                        {% if acknowledgment.po_to_qar_bool %}
-                            {{ acknowledgment.po_to_qar_date|date:"m/d/Y H:i" }}
-                        {% else %}
-                            Not Sent
-                        {% endif %}
-                    </button>
-                </div>
+        <!-- Future Section - 1/3 width -->
+        <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Future Section</h2>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+                <p class="text-gray-500">This section is reserved for future functionality</p>
             </div>
         </div>
     </div>
 </div>
-
+{% endblock %}
 <!-- Include Note Modal -->
 {% include "contracts/partials/note_modal.html" %}
 
@@ -373,7 +394,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 });
 </script>
-{% endblock %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -547,4 +567,4 @@ function toggleAcknowledgment(field) {
     .catch(error => console.error('Error:', error));
 }
 </script>
-{% endblock %} 
+{% endblock %}
