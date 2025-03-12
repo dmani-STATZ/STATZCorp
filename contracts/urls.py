@@ -10,7 +10,9 @@ from .views import (
     ContractUpdateView,
     ContractCloseView,
     ContractCancelView,
+    ContractReviewView,
     contract_search,
+    mark_contract_reviewed,
     
     # CLIN views
     ClinDetailView,
@@ -74,6 +76,8 @@ urlpatterns = [
     path('<int:pk>/update/', ContractUpdateView.as_view(), name='contract_update'),
     path('<int:pk>/close/', ContractCloseView.as_view(), name='contract_close'),
     path('<int:pk>/cancel/', ContractCancelView.as_view(), name='contract_cancel'),
+    path('<int:pk>/review/', ContractReviewView.as_view(), name='contract_review'),
+    path('<int:pk>/mark-reviewed/', mark_contract_reviewed, name='mark_contract_reviewed'),
     
     # DD Form 1155 processing
     path('extract-dd1155/', extract_dd1155_data, name='extract_dd1155'),

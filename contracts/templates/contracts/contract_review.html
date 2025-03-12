@@ -1,0 +1,689 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Review Contract {{ contract.contract_number }}{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+    
+    .review-page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .review-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #212529;
+        display: flex;
+        align-items: center;
+    }
+    
+    .review-status {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-left: 10px;
+    }
+    
+    .status-not-reviewed {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-reviewed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .section {
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .section-header {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+        font-size: 18px;
+        color: #343a40;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .section-title {
+        display: flex;
+        align-items: center;
+    }
+    
+    .section-content {
+        padding: 15px;
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+    
+    .data-table td {
+        padding: 8px 12px;
+
+    }
+    
+    .data-label {
+        width: 25%;
+        text-align: left;
+        font-weight: 500;
+        color: #495057;
+        background-color: #f8f9fa;
+        border-radius: 6px 0 0 6px;
+        border: 1px solid #dee2e6;
+        border-right: none;
+    }
+    
+    .data-value {
+        width: 25%;
+        color: #212529;
+        background-color: #ffffff;
+        border: 1px solid #013368;
+        border-radius: 0 6px 6px 0;
+        padding: 8px 12px;
+        margin-right: 15px;
+    }
+    
+    .clin-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .clin-table th {
+        background-color: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .clin-table td {
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .clin-table tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .clin-details {
+        display: none;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .clin-row.expanded .clin-details {
+        display: table-row;
+    }
+    
+    .edit-icon {
+        color: #007bff;
+        cursor: pointer;
+        margin-left: 8px;
+    }
+    
+    .review-button {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .review-button:hover {
+        background-color: #218838;
+    }
+    
+    .review-button svg {
+        margin-right: 8px;
+    }
+    
+    .back-link {
+        color: #007bff;
+        text-decoration: none;
+    }
+    
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    
+    .value-late {
+        color: #dc3545;
+    }
+    
+    .toggle-details {
+        cursor: pointer;
+        color: #007bff;
+        font-size: 14px;
+        margin-left: 10px;
+    }
+
+    .actions-container {
+        display: flex;
+        align-items: center;
+    }
+
+    /* Specific styles for CLIN details table */
+    .clin-details-content .data-table {
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .clin-details-content .data-label {
+        border-radius: 4px 0 0 4px;
+        border: 1px solid #dee2e6;
+        border-right: none;
+    }
+
+    .clin-details-content .data-value {
+        border-radius: 0 4px 4px 0;
+        border: 1px solid #007bff;
+    }
+    
+    .toggle-section {
+        cursor: pointer;
+        color: #007bff;
+        font-size: 14px;
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+    }
+    
+    .toggle-section svg {
+        margin-right: 5px;
+    }
+    
+    .section-content.collapsed {
+        display: none;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="review-page">
+    <!-- Header -->
+    <div class="review-header">
+        <div class="review-title">
+            Contract Review: {{ contract.contract_number }}
+            <span class="review-status {% if contract.reviewed %}status-reviewed{% else %}status-not-reviewed{% endif %}">
+                {% if contract.reviewed %}
+                    Reviewed by {{ contract.reviewed_by }} on {{ contract.reviewed_on|date:"M d, Y" }}
+                {% else %}
+                    Not Reviewed
+                {% endif %}
+            </span>
+        </div>
+        <a href="{% url 'contracts:contract_detail' contract.id %}" class="back-link">
+            Back to Contract
+        </a>
+    </div>
+
+    {% if contract.idiq_contract %}
+    <!-- IDIQ Contract Information -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">
+                IDIQ Contract Information
+                <a href="#" title="Edit Contract"> <!-- TODO: Add link to IDIQ Contract -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="edit-icon" viewBox="0 0 16 16">
+                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        <div class="section-content">
+            <table class="data-table">
+                <tr>
+                    <td class="data-label">IDIQ Contract Number</td>
+                    <td class="data-value">{{ contract.idiq_contract.contract_number|default:"N/A" }}</td>
+                    <td class="data-label">IDIQ TAB Number</td>
+                    <td class="data-value">{{ contract.idiq_contract.tab_num|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">IDIQ Buyer</td>
+                    <td class="data-value">{{ contract.idiq_contract.buyer.description|default:"N/A" }}</td>
+                    <td class="data-label">IDIQ Award Date</td>
+                    <td class="data-value">{{ contract.idiq_contract.award_date|date:"M d, Y"|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Term Length</td>
+                    <td class="data-value">{{ contract.idiq_contract.term_length|default:"N/A" }} months</td>
+                    <td class="data-label">Option Length</td>
+                    <td class="data-value">{{ contract.idiq_contract.option_length|default:"N/A" }} months</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Closed</td>
+                    <td class="data-value">{{ contract.idiq_contract.closed|yesno:"Yes,No,Unknown" }}</td>
+                    <td class="data-label"></td>
+                    <td class="data-value"></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Contract Information -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">
+                Contract Information
+                <a href="{% url 'contracts:contract_update' contract.id %}" title="Edit Contract">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="edit-icon" viewBox="0 0 16 16">
+                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        <div class="section-content">
+            <table class="data-table">
+                <tr>
+                    <td class="data-label">Contract Number</td>
+                    <td class="data-value">{{ contract.contract_number|default:"N/A" }}</td>
+                    <td class="data-label">Status</td>
+                    <td class="data-value">{{ contract.status.description|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">PO Number</td>
+                    <td class="data-value">{{ contract.po_number|default:"N/A" }}</td>
+                    <td class="data-label">TAB Number</td>
+                    <td class="data-value">{{ contract.tab_num|default:"N/A" }}</td>
+
+                </tr>
+                <tr>
+                    <td class="data-label">Buyer</td>
+                    <td class="data-value">{{ contract.buyer.description|default:"N/A" }}</td>
+                    <td class="data-label">Contract Type</td>
+                    <td class="data-value">{{ contract.contract_type.description|default:"N/A" }}</td>
+
+                </tr>
+                <tr>
+                    <td class="data-label">Sales Class</td>
+                    <td class="data-value">{{ contract.sales_class.sales_team|default:"N/A" }}</td>
+                    <td class="data-label">Contract Value</td>
+                    <td class="data-value">${{ contract.contract_value|floatformat:2|default:"0.00" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Award Date</td>
+                    <td class="data-value">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</td>
+                    <td class="data-label">Due Date</td>
+                    <td class="data-value {% if contract.due_date_late %}value-late{% endif %}">
+                        {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
+                        {% if contract.due_date_late %} (LATE){% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="data-label">NIST</td>
+                    <td class="data-value">{{ contract.nist|yesno:"Yes,No,Unknown" }}</td>
+                    <td class="data-label">Date Closed</td>
+                    <td class="data-value">{{ contract.date_closed|date:"M d, Y"|default:"N/A" }}</td>
+                </tr>
+
+                <tr>
+                    <td class="data-label">Cancellation Reason</td>
+                    <td class="data-value">{{ contract.canceled_reason|default:"N/A" }}</td>
+                    <td class="data-label">Date Cancelled</td>
+                    <td class="data-value">{{ contract.date_canceled|date:"M d, Y"|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Survey Date</td>
+                    <td class="data-value">{{ contract.survey_date|date:"M d, Y"|default:"N/A" }}</td>
+                    <td class="data-label">Survey Type</td>
+                    <td class="data-value">{{ contract.survey_type|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">STATZ Split</td>
+                    <td class="data-value">${{ contract.statz_split|default:"0.00"|floatformat:2 }}</td>
+                    <td class="data-label">STATZ Split Paid</td>
+                    <td class="data-value">${{ contract.statz_split_paid|default:"0.00"|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">PPI Split</td>
+                    <td class="data-value">${{ contract.ppi_split|default:"0.00"|floatformat:2 }}</td>
+                    <td class="data-label">PPI Split Paid</td>
+                    <td class="data-value">${{ contract.ppi_split_paid|default:"0.00"|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label"></td>
+                    <td class="data-value"></td>
+                    <td class="data-label">Planned Split</td>
+                    <td class="data-value">{{ contract.planned_split|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Created On</td>
+                    <td class="data-value">{{ contract.created_on|date:"M d, Y H:i"|default:"N/A" }}</td>
+                    <td class="data-label">Created By</td>
+                    <td class="data-value">{{ contract.created_by|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Modified On</td>
+                    <td class="data-value">{{ contract.modified_on|date:"M d, Y H:i"|default:"N/A" }}</td>
+                    <td class="data-label">Modified By</td>
+                    <td class="data-value">{{ contract.modified_by|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label" colspan="1">Files URL</td>
+                    <td class="data-value" colspan="3">{{ contract.files_url|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Cancelled</td>
+                    <td class="data-value">{{ contract.cancelled|yesno:"Yes,No,Unknown" }}</td>
+                    <td class="data-label">Open</td>
+                    <td class="data-value">{{ contract.open|yesno:"Yes,No,Unknown" }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Assignment Information -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">
+                Assignment Information
+            </div>
+            <div class="toggle-section" data-target="assignment-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M1.646 11.354a.5.5 0 0 1 0-.708L7.293 5 1.646 10.646a.5.5 0 1 1 .708.708l6 6a.5.5 0 0 0 .708 0l6-6a.5.5 0 0 1 .708-.708L8.707 5l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0l-6 6z"/>
+                </svg>
+                <span>Show</span>
+            </div>
+        </div>
+        <div class="section-content collapsed" id="assignment-info">
+            <table class="data-table">
+                <tr>
+                    <td class="data-label">Assigned User</td>
+                    <td class="data-value">{{ contract.assigned_user|default:"N/A" }}</td>
+                    <td class="data-label">Assigned Date</td>
+                    <td class="data-value">{{ contract.assigned_date|date:"M d, Y"|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Reviewed</td>
+                    <td class="data-value">{{ contract.reviewed|yesno:"Yes,No,Unknown" }}</td>
+                    <td class="data-label">Reviewed By</td>
+                    <td class="data-value">{{ contract.reviewed_by|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Reviewed On</td>
+                    <td class="data-value">{{ contract.reviewed_on|date:"M d, Y H:i"|default:"N/A" }}</td>
+                    <td class="data-label"></td>
+                    <td class="data-value"></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+
+    <!-- CLINs Information -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">
+                Contract Line Items (CLINs)
+            </div>
+        </div>
+        <div class="section-content">
+            <table class="clin-table">
+                <thead>
+                    <tr>
+                        <th>Item No</th>
+                        <th>Supplier</th>
+                        <th>NSN</th>
+                        <th>Order Qty</th>
+                        <th>Due Date</th>
+                        <th>Value</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for clin in clins %}
+                    <tr class="clin-row" data-clin-id="{{ clin.id }}">
+                        <td>{{ clin.item_number|default:"0000" }}</td>
+                        <td>{{ clin.supplier.name|default:"N/A" }}</td>
+                        <td>{{ clin.nsn.nsn_code|default:"N/A" }}</td>
+                        <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
+                        <td class="{% if clin.due_date_late %}value-late{% endif %}">
+                            {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                            {% if clin.due_date_late %} (LATE){% endif %}
+                        </td>
+                        <td>${{ clin.clin_value|default:"0.00"|floatformat:2 }}</td>
+                        <td>
+                            <div class="actions-container">
+                                <a href="{% url 'contracts:clin_update' clin.id %}" title="Edit CLIN">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="edit-icon" viewBox="0 0 16 16">
+                                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                                    </svg>
+                                </a>
+                                <span class="toggle-details" data-clin-id="{{ clin.id }}">Show Details</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="clin-details" id="clin-details-{{ clin.id }}">
+                        <td colspan="7">
+                            <div class="clin-details-content">
+                                <h4>CLIN Details</h4>
+                                <table class="data-table">
+                                    <tr>
+                                        <td class="data-label">Item Type</td>
+                                        <td class="data-value">{{ clin.item_type.description|default:"N/A" }}</td>
+                                        <td class="data-label">Item Number</td>
+                                        <td class="data-value">{{ clin.item_number|default:"0000" }}</td>
+                               
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Supplier</td>
+                                        <td class="data-value" colspan="3">{{ clin.supplier.name|default:"N/A" }} - {{ clin.supplier.cage_code|default:"N/A" }}</td>
+
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">NSN</td>
+                                        <td class="data-value">{{ clin.nsn.nsn_code|default:"N/A" }}</td>
+                                        <td class="data-label">NSN Description</td>
+                                        <td class="data-value">{{ clin.nsn.description|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">PO Number</td>
+                                        <td class="data-value">{{ clin.po_number|default:"N/A" }}</td>
+
+                                        <td class="data-label">PO Number Extension</td>
+                                        <td class="data-value">{{ clin.po_num_ext|default:"" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">TAB Number</td>
+                                        <td class="data-value">{{ clin.tab_num|default:"N/A" }}</td>
+                                        <td class="data-label">CLIN PO Number</td>
+                                        <td class="data-value">{{ clin.clin_po_num|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">FOB</td>
+                                        <td class="data-value">{{ clin.get_fob_display|default:"N/A" }}</td>
+                                        
+                                        <td class="data-label">IA</td>
+                                        <td class="data-value">{{ clin.get_ia_display|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Order Quantity</td>
+                                        <td class="data-value">{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
+                                        <td class="data-label">Due Date</td>
+                                        <td class="data-value {% if clin.due_date_late %}value-late{% endif %}">
+                                            {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                                            {% if clin.due_date_late %} (LATE){% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label"></td>
+                                        <td class="data-value"></td>
+                                        <td class="data-label">Supplier Due Date</td>
+                                        <td class="data-value {% if clin.supplier_due_date_late %}value-late{% endif %}">
+                                            {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
+                                            {% if clin.supplier_due_date_late %} (LATE){% endif %}
+                                        </td>
+                                 
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Ship Quantity</td>
+                                        <td class="data-value">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</td>
+                                        <td class="data-label">Ship Date</td>
+                                        <td class="data-value {% if clin.ship_date_late %}value-late{% endif %}">
+                                            {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
+                                            {% if clin.ship_date_late %} (LATE){% endif %}
+                                        </td>
+                                    </tr>
+ 
+                                    <tr>
+                                        <td class="data-label">Special Payment Terms</td>
+                                        <td class="data-value">{{ clin.special_payment_terms|default:"N/A" }}</td>
+                                        <td class="data-label">Special Payment Terms Paid</td>
+                                        <td class="data-value">{{ clin.special_payment_terms_paid|yesno:"Yes,No,Unknown" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Price Per Unit</td>
+                                        <td class="data-value">${{ clin.price_per_unit|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-label">CLIN Value (Sub PO)</td>
+                                        <td class="data-value">${{ clin.clin_value|default:"0.00"|floatformat:2 }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Paid Amount (Sub Paid)</td>
+                                        <td class="data-value">${{ clin.paid_amount|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-label">Paid Date</td>
+                                        <td class="data-value">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">WAWF Payment</td>
+                                        <td class="data-value">${{ clin.wawf_payment|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-label">WAWF Received</td>
+                                        <td class="data-value">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label"></td>
+                                        <td class="data-value"></td>
+                                        <td class="data-label">WAWF Invoice Date</td>
+                                        <td class="data-value">{{ clin.wawf_invoice_date|date:"M d, Y"|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Plan Gross</td>
+                                        <td class="data-value">${{ clin.plan_gross|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-label"></td>
+                                        <td class="data-value"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Created By</td>
+                                        <td class="data-value">{{ clin.created_by|default:"N/A" }}</td>
+                                        <td class="data-label">Created On</td>
+                                        <td class="data-value">{{ clin.created_on|date:"M d, Y H:i"|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Modified By</td>
+                                        <td class="data-value">{{ clin.modified_by|default:"N/A" }}</td>
+                                        <td class="data-label">Modified On</td>
+                                        <td class="data-value">{{ clin.modified_on|date:"M d, Y H:i"|default:"N/A" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Contract Value</td>
+                                        <td class="data-value">${{ clin.contract_value|default:"0.00"|floatformat:2 }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center" style="padding: 20px; color: #6c757d;">
+                            No CLINs found for this contract
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Review Button -->
+    {% if not contract.reviewed %}
+    <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+        <form method="post" action="{% url 'contracts:mark_contract_reviewed' contract.id %}">
+            {% csrf_token %}
+            <button type="submit" class="review-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+                </svg>
+                Mark as Reviewed
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle CLIN details
+        document.querySelectorAll('.toggle-details').forEach(function(element) {
+            element.addEventListener('click', function() {
+                const clinId = this.getAttribute('data-clin-id');
+                const detailsRow = document.getElementById('clin-details-' + clinId);
+                
+                if (detailsRow.style.display === 'table-row') {
+                    detailsRow.style.display = 'none';
+                    this.textContent = 'Show Details';
+                } else {
+                    detailsRow.style.display = 'table-row';
+                    this.textContent = 'Hide Details';
+                }
+            });
+        });
+        
+        // Toggle section visibility
+        document.querySelectorAll('.toggle-section').forEach(function(element) {
+            element.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const targetSection = document.getElementById(targetId);
+                const toggleText = this.querySelector('span');
+                const toggleIcon = this.querySelector('svg');
+                
+                if (targetSection.classList.contains('collapsed')) {
+                    targetSection.classList.remove('collapsed');
+                    toggleText.textContent = 'Hide';
+                    toggleIcon.innerHTML = '<path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>';
+                } else {
+                    targetSection.classList.add('collapsed');
+                    toggleText.textContent = 'Show';
+                    toggleIcon.innerHTML = '<path d="M1.646 11.354a.5.5 0 0 1 0-.708L7.293 5 1.646 10.646a.5.5 0 1 1 .708.708l6 6a.5.5 0 0 0 .708 0l6-6a.5.5 0 0 1 .708-.708L8.707 5l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0l-6 6z"/>';
+                }
+            });
+        });
+    });
+</script>
+{% endblock %} 

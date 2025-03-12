@@ -311,14 +311,16 @@ class ClinForm(forms.ModelForm):
     class Meta:
         model = Clin
         fields = [
-            'contract', 'sub_contract', 'po_num_ext', 'tab_num', 
+            'contract', 'po_num_ext', 'tab_num', 
             'clin_po_num', 'po_number', 'clin_type', 'supplier', 
             'nsn', 'ia', 'fob', 'order_qty', 'ship_qty', 
             'due_date', 'supplier_due_date', 'ship_date',
             'special_payment_terms', 'special_payment_terms_paid', 
-            'contract_value', 'po_amount', 'paid_amount', 
+            'clin_value', 'paid_amount', 
             'paid_date', 'wawf_payment', 'wawf_recieved', 
-            'wawf_invoice', 'plan_gross', 'planned_split'
+            'wawf_invoice', 'plan_gross', 'planned_split',
+            'ppi_split', 'statz_split', 'ppi_split_paid', 'statz_split_paid',
+            'item_number', 'item_type', 'item_value'
         ]
         widgets = {
             'contract': forms.Select(attrs={
@@ -388,9 +390,9 @@ class ClinForm(forms.ModelForm):
             'contract_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Contract Value',
-                'step': '0.0001'
+                'step': '0.01'
             }),
-            'po_amount': forms.NumberInput(attrs={
+            'clin_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter PO Amount',
                 'step': '0.0001'
@@ -426,6 +428,26 @@ class ClinForm(forms.ModelForm):
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter Planned Split'
             }),
+            'ppi_split': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PPI Split',
+                'step': '0.01'
+            }),
+            'statz_split': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Split',
+                'step': '0.01'
+            }),
+            'ppi_split_paid': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PPI Split Paid',
+                'step': '0.01'
+            }),
+            'statz_split_paid': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Split Paid',
+                'step': '0.01'
+            })
         }
         
     def __init__(self, *args, **kwargs):

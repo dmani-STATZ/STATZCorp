@@ -65,7 +65,7 @@ class Command(BaseCommand):
             'special_payment_terms_id': "CASE WHEN SPT = 1 THEN (SELECT TOP 1 id FROM contracts_specialpaymentterms WHERE code = SPT_Type) ELSE NULL END",
             'special_payment_terms_paid': 'SPT_Paid',
             'contract_value': 'ContractDol',
-            'po_amount': 'SubPODol',
+            'clin_value': 'SubPODol',
             'paid_amount': 'SubPaidDol',
             'paid_date': 'SubPaidDate',
             'wawf_payment': 'WAWFPaymentDol',

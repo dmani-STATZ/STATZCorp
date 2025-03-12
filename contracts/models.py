@@ -50,6 +50,11 @@ class Contract(AuditModel):
     reviewed_on = models.DateTimeField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='contract')
     contract_value = models.FloatField(null=True, blank=True, default=0)
+    planned_split = models.CharField(max_length=50, null=True, blank=True)
+    ppi_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -92,9 +97,18 @@ class Clin(AuditModel):
         ('O', 'Origin'),
         ('D', 'Destination'),
     ]
+    
+    ITEM_TYPE_CHOICES = [
+        ('P', 'Production'),
+        ('G', 'GFAT'),
+        ('C', 'CFAT'),
+        ('L', 'PLT')
+    ]
 
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE, null=True, blank=True)
-    sub_contract = models.CharField(max_length=20, null=True, blank=True) # What do we use this for?
+    item_number = models.CharField(max_length=20, null=True, blank=True) # What do we use this for?
+    item_type = models.CharField(max_length=20, null=True, blank=True, choices=ITEM_TYPE_CHOICES)
+    item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     po_num_ext = models.CharField(max_length=5, null=True, blank=True) # What do we use this for?
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     clin_po_num = models.CharField(max_length=10, null=True, blank=True) # What do we use this for?
@@ -118,9 +132,8 @@ class Clin(AuditModel):
     # CLIN_Finance
     special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
     special_payment_terms_paid = models.BooleanField(null=True, blank=True)
-    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to clin_value?
+    clin_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to clin_value?
     paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     paid_date = models.DateTimeField(null=True, blank=True)
     wawf_payment = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
@@ -128,6 +141,11 @@ class Clin(AuditModel):
     wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
     plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
+    ppi_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+
 
     class Meta:
         indexes = [
@@ -508,6 +526,9 @@ class ClinView(models.Model):
     """
     id = models.IntegerField(primary_key=True)
     contract_id = models.IntegerField(null=True)
+    item_number = models.CharField(max_length=20, null=True)
+    item_type = models.CharField(max_length=20, null=True)
+    item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True)
     contract_number = models.CharField(max_length=25, null=True)
     clin_po_num = models.CharField(max_length=10, null=True)
     po_number = models.CharField(max_length=10, null=True)
@@ -543,8 +564,7 @@ class ClinView(models.Model):
     special_payment_terms_description = models.CharField(max_length=30, null=True)
     special_payment_terms_paid = models.BooleanField(null=True)
     
-    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True)
-    po_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True)
+    clin_value = models.DecimalField(max_digits=19, decimal_places=4, null=True)
     paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True)
     
     created_by_id = models.IntegerField(null=True)

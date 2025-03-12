@@ -4,7 +4,9 @@ from .contract_views import (
     ContractUpdateView,
     ContractCloseView,
     ContractCancelView,
+    ContractReviewView,
     contract_search,
+    mark_contract_reviewed,
 )
 
 from .clin_views import (

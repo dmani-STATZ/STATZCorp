@@ -100,7 +100,7 @@ class ContractCreateView(CreateView):
                         ia=clin_info.get('ia'),
                         fob=clin_info.get('fob'),
                         due_date=clin_info.get('due_date'),
-                        po_amount=clin_info.get('po_amount'),
+                        clin_value=clin_info.get('clin_value'),
                         created_by=self.request.user
                     )
                     clin.save()
@@ -231,4 +231,41 @@ def check_contract_number(request):
         else:
             exists = Contract.objects.filter(contract_number=contract_number).exists()
         return JsonResponse({'exists': exists})
-    return JsonResponse({'exists': False}) 
+    return JsonResponse({'exists': False})
+
+
+@method_decorator(conditional_login_required, name='dispatch')
+class ContractReviewView(DetailView):
+    model = Contract
+    template_name = 'contracts/contract_review.html'
+    context_object_name = 'contract'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.get_object()
+        
+        # Get all CLINs for this contract with related data
+        context['clins'] = contract.clin_set.all().select_related(
+            'clin_type',
+            'supplier',
+            'nsn'
+        ).order_by('clin_type__description')
+        
+        return context
+
+
+@conditional_login_required
+def mark_contract_reviewed(request, pk):
+    if request.method == 'POST':
+        contract = get_object_or_404(Contract, pk=pk)
+        contract.reviewed = True
+        contract.reviewed_by = request.user
+        contract.reviewed_on = timezone.now()
+        contract.assigned_user = request.user
+        contract.assigned_on = timezone.now()
+        contract.save()
+        
+        messages.success(request, 'Contract marked as reviewed successfully.')
+        return redirect('contracts:contract_review', pk=pk)
+    
+    return redirect('contracts:contract_detail', pk=pk) 

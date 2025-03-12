@@ -476,15 +476,15 @@
                         <!-- Row 2 -->
                         <div class="md:col-span-4">
                             <div class="form-group">
-                                <label for="{{ form.po_amount.id_for_label }}" class="form-label">
+                                <label for="{{ form.clin_value.id_for_label }}" class="form-label">
                                     <span class="text-uppercase">PO</span> Amount
                                 </label>
-                                {{ form.po_amount }}
-                                {% if form.po_amount.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.po_amount.errors }}</div>
+                                {{ form.clin_value }}
+                                {% if form.clin_value.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.clin_value.errors }}</div>
                                 {% endif %}
-                                {% if form.po_amount.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.po_amount.help_text }}</div>
+                                {% if form.clin_value.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.clin_value.help_text }}</div>
                                 {% endif %}
                             </div>
                         </div>

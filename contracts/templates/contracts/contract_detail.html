@@ -54,6 +54,17 @@
                     </a>
                 </h1>
                 <div class="flex space-x-3 items-center">
+                    <a href="{% url 'contracts:contract_review' contract.id %}" 
+                       class="flex items-center px-3 py-1 rounded-full text-sm font-semibold {% if contract.reviewed %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} hover:opacity-80 transition-opacity duration-150">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {% if contract.reviewed %}
+                            Reviewed
+                        {% else %}
+                            Not Reviewed
+                        {% endif %}
+                    </a>
                     <span class="bg-white text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Open</span>
                     <a href="{% url 'contracts:contracts_dashboard' %}" 
                     class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">

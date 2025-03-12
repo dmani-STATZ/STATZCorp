@@ -105,7 +105,7 @@ class ContractLifecycleDashboardView(TemplateView):
                 'contracts_due': past_contracts.distinct().count(),
                 'contracts_due_late': past_contracts.filter(due_date_late=True).distinct().count(),
                 'contracts_due_ontime': past_contracts.filter(due_date_late=False).distinct().count(),
-                'new_contract_value': clins.aggregate(total=Sum('contract_value'))['total'] or 0,
+                'new_contract_value': contracts.aggregate(total=Sum('contract_value'))['total'] or 0,
                 'new_contracts': contracts.distinct().count(),
                 'date_range': mark_safe(f"{start_date.strftime('%Y/%m/%d')} to<br>{end_date.strftime('%Y/%m/%d')}"),
             }
