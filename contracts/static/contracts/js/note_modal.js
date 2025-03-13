@@ -7,7 +7,7 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing note modal functionality');
+    // console.log('DOM loaded, initializing note modal functionality');
     
     // Get modal elements
     const noteModal = document.getElementById('noteModal');
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Find all add note buttons
     const addNoteButtons = document.querySelectorAll('[data-note-action="add"]');
-    console.log(`Found ${addNoteButtons.length} add note buttons`);
+    // console.log(`Found ${addNoteButtons.length} add note buttons`);
     
     // Add event listeners to all "Add Note" buttons with data attributes
     addNoteButtons.forEach(button => {
@@ -62,11 +62,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const objectId = this.dataset.objectId;
             const entityType = this.dataset.entityType || 'Item';
             
-            console.log(`Add Note button clicked:`, {
-                contentTypeId,
-                objectId,
-                entityType
-            });
+            // console.log(`Add Note button clicked:`, {
+            //     contentTypeId,
+            //     objectId,
+            //     entityType
+            // });
             
             // Validate required data attributes
             if (!contentTypeId || !objectId) {
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const referringUrlField = document.getElementById('noteReferringUrl');
             if (referringUrlField) {
                 referringUrlField.value = window.location.href;
-                console.log('Set referring URL:', referringUrlField.value);
+                // console.log('Set referring URL:', referringUrlField.value);
             }
             
             // Reset form
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle form submission
     saveNoteBtn.addEventListener('click', function() {
-        console.log('Save Note button clicked');
+        // console.log('Save Note button clicked');
         
         // Get form data
         const formData = new FormData(noteForm);
@@ -135,12 +135,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const objectId = formData.get('object_id');
         
         // Debug form data
-        console.log('Form data:', {
-            noteText,
-            contentTypeId,
-            objectId,
-            createReminder: formData.get('create_reminder')
-        });
+        // console.log('Form data:', {
+        //     noteText,
+        //     contentTypeId,
+        //     objectId,
+        //     createReminder: formData.get('create_reminder')
+        // });
         
         // Validate note text
         if (!noteText || noteText.trim() === '') {
@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        console.log('CSRF token:', csrfToken ? 'Found' : 'Not found');
+        // console.log('CSRF token:', csrfToken ? 'Found' : 'Not found');
         
         // Submit form
         noteForm.submit();
