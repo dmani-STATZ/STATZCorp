@@ -40,6 +40,9 @@ from .reminder_views import (
     add_reminder,
     toggle_reminder_completion,
     delete_reminder,
+    mark_reminder_complete,
+    edit_reminder,
+    create_reminder,
 )
 
 from .acknowledgement_letter_views import (

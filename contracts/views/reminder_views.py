@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.db.models import Q
+from datetime import timedelta
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Reminder, Note
@@ -52,6 +53,10 @@ def add_reminder(request, note_id=None):
     })
 
 
+# Create an alias for add_reminder to support the create_reminder URL pattern
+create_reminder = add_reminder
+
+
 class ReminderListView(ListView):
     model = Reminder
     template_name = 'contracts/reminders_list.html'
@@ -78,12 +83,27 @@ class ReminderListView(ListView):
         # Filter by due date if specified
         due_filter = self.request.GET.get('due')
         today = timezone.now().date()
+        seven_days_ago = today - timedelta(days=7)
+        
         if due_filter == 'overdue':
-            queryset = queryset.filter(reminder_date__lt=today, reminder_completed=False)
-        elif due_filter == 'today':
-            queryset = queryset.filter(reminder_date__date=today)
+            # Overdue: reminder_date <= today-7days
+            queryset = queryset.filter(
+                reminder_date__date__lte=seven_days_ago, 
+                reminder_completed=False
+            )
+        elif due_filter == 'due':
+            # Due: reminder_date <= today AND reminder_date > today-7days
+            queryset = queryset.filter(
+                reminder_date__date__lte=today,
+                reminder_date__date__gt=seven_days_ago,
+                reminder_completed=False
+            )
         elif due_filter == 'upcoming':
-            queryset = queryset.filter(reminder_date__gt=today)
+            # Future/Pending: reminder_date > today
+            queryset = queryset.filter(
+                reminder_date__date__gt=today,
+                reminder_completed=False
+            )
         
         return queryset
     
@@ -91,6 +111,7 @@ class ReminderListView(ListView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         today = timezone.now().date()
+        seven_days_ago = today - timedelta(days=7)
         
         # Add filter parameters to context
         context['status_filter'] = self.request.GET.get('status', '')
@@ -101,15 +122,36 @@ class ReminderListView(ListView):
         
         context['total_count'] = all_reminders.count()
         context['completed_count'] = all_reminders.filter(reminder_completed=True).count()
-        context['pending_count'] = all_reminders.filter(
+        
+        # Get non-completed reminders
+        active_reminders = all_reminders.filter(
             Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
+        )
+        context['pending_count'] = active_reminders.count()
+        
+        # Overdue: reminder_date <= today-7days
+        context['overdue_count'] = active_reminders.filter(
+            reminder_date__date__lte=seven_days_ago
         ).count()
-        context['overdue_count'] = all_reminders.filter(
-            reminder_date__lt=today, 
-            reminder_completed=False
+        
+        # Due: reminder_date <= today AND reminder_date > today-7days
+        context['due_count'] = active_reminders.filter(
+            reminder_date__date__lte=today,
+            reminder_date__date__gt=seven_days_ago
         ).count()
-        context['today_count'] = all_reminders.filter(reminder_date__date=today).count()
-        context['upcoming_count'] = all_reminders.filter(reminder_date__gt=today).count()
+        
+        # Future/Pending: reminder_date > today
+        context['upcoming_count'] = active_reminders.filter(
+            reminder_date__date__gt=today
+        ).count()
+        
+        # Add seven_days_ago to context for template use
+        context['seven_days_ago'] = seven_days_ago
+        context['today'] = today
+        
+        # Process reminders to add is_overdue flag
+        for reminder in context['reminders']:
+            reminder.is_overdue = reminder.reminder_date.date() <= seven_days_ago
         
         return context
 
@@ -140,6 +182,62 @@ def toggle_reminder_completion(request, reminder_id):
     
     # Redirect back to the referring page
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list')))
+
+
+@conditional_login_required
+def mark_reminder_complete(request, reminder_id):
+    reminder = get_object_or_404(Reminder, id=reminder_id)
+    
+    # Check if the user has permission to update this reminder
+    if reminder.reminder_user != request.user and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to update this reminder.')
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+    
+    # Mark as completed
+    reminder.reminder_completed = True
+    reminder.reminder_completed_date = timezone.now()
+    reminder.reminder_completed_user = request.user
+    
+    reminder.save()
+    
+    messages.success(request, 'Reminder marked as completed.')
+    
+    # Redirect back to the referring page
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list')))
+
+
+@conditional_login_required
+def edit_reminder(request, reminder_id):
+    reminder = get_object_or_404(Reminder, id=reminder_id)
+    
+    # Check if the user has permission to edit this reminder
+    if reminder.reminder_user != request.user and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to edit this reminder.')
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+    
+    if request.method == 'POST':
+        form = ReminderForm(request.POST, instance=reminder)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Reminder updated successfully.')
+            
+            # Determine the redirect URL
+            if reminder.note and reminder.note.content_type.model == 'contract':
+                redirect_url = reverse('contracts:contract_detail', kwargs={'pk': reminder.note.object_id})
+            elif reminder.note and reminder.note.content_type.model == 'clin':
+                redirect_url = reverse('contracts:clin_detail', kwargs={'pk': reminder.note.object_id})
+            else:
+                redirect_url = reverse('contracts:reminders_list')
+            
+            return HttpResponseRedirect(redirect_url)
+    else:
+        form = ReminderForm(instance=reminder)
+    
+    return render(request, 'contracts/reminder_form.html', {
+        'form': form,
+        'reminder': reminder,
+        'is_edit': True
+    })
 
 
 @conditional_login_required

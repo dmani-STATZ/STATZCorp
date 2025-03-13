@@ -50,9 +50,13 @@
             overflow-y: auto;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        .reminder-status-pending {
+        .reminder-status-due-today {
             background-color: #fef3c7;
             border-left: 4px solid #f59e0b;
+        }
+        .reminder-status-recent-due {
+            background-color: #ffedd5;
+            border-left: 4px solid #fb923c;
         }
         .reminder-status-overdue {
             background-color: #fee2e2;
@@ -88,16 +92,35 @@
 </div>
 
 <!-- Reminders Menu -->
-<button class="toggle-btn fixed bottom-4 right-4 bg-green-600 text-white py-2 px-4 rounded-full shadow-lg hover:bg-green-700 transition-colors z-50 flex items-center" onclick="toggleReminderbar()">
+<button class="toggle-btn fixed bottom-4 right-4 {% if overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white py-2 px-4 rounded-full shadow-lg transition-colors z-50 flex items-center" onclick="toggleReminderbar()">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
     Reminders
+    {% if total_reminders_count > 0 %}
+        <span class="ml-2 bg-white {% if overdue_count > 0 %}text-red-700{% else %}text-green-700{% endif %} text-xs font-semibold rounded-full px-2 py-1 inline-flex items-center justify-center min-w-[20px]">
+            {{ total_reminders_count }}
+        </span>
+    {% endif %}
 </button>
 
-<div class="reminderbar bg-white text-gray-800 w-80 h-4/5 fixed top-20 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 border-green-600 shadow-xl" id="reminderbar">
-    <div class="flex justify-between items-center p-4 border-b border-gray-200 bg-green-50">
-        <h2 class="text-lg font-semibold text-green-800">My Reminders</h2>
+<div class="reminderbar bg-white text-gray-800 w-80 h-4/5 fixed top-20 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar">
+    <div class="flex justify-between items-center p-4 border-b border-gray-200 {% if overdue_count > 0 %}bg-red-50{% else %}bg-green-50{% endif %} flex-shrink-0">
+        <div>
+            <h2 class="text-lg font-semibold {% if overdue_count > 0 %}text-red-800{% else %}text-green-800{% endif %}">My Reminders</h2>
+            {% if reminders %}
+                <div class="flex flex-wrap text-xs mt-1 text-gray-600 gap-2">
+                    <span class="flex items-center">
+                        <span class="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>
+                        Due: {{ due_count|default:"0" }}
+                    </span>
+                    <span class="flex items-center">
+                        <span class="h-2 w-2 bg-red-500 rounded-full mr-1"></span>
+                        Overdue: {{ overdue_count|default:"0" }}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
         <button class="text-gray-600 hover:text-gray-800" onclick="toggleReminderbar()">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -105,76 +128,252 @@
         </button>
     </div>
     
-    <div class="p-2 border-b border-gray-200 bg-gray-50">
-        <a href="{% url 'contracts:add_reminder' %}" class="flex items-center justify-center w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm">
+    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+        <a href="{% url 'contracts:reminders_list' %}" class="flex items-center justify-center w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            Add New Reminder
+            View All Reminders
         </a>
     </div>
     
-    <div class="overflow-y-auto max-h-[calc(100%-120px)]"> 
+    <div class="overflow-y-auto flex-grow p-4">
         {% if reminders %}
-            {% for reminder in reminders %}
-                <div class="reminder-item {% if reminder.reminder_completed %}reminder-status-completed{% elif reminder.reminder_date < now %}reminder-status-overdue{% else %}reminder-status-pending{% endif %}"
-                     data-reminder-id="{{ reminder.id }}"
-                     data-reminder-title="{{ reminder.reminder_title|escapejs }}"
-                     data-reminder-text="{{ reminder.reminder_text|escapejs }}"
-                     data-reminder-date="{{ reminder.reminder_date|date:'M d, Y g:i A' }}"
-                     data-reminder-completed="{{ reminder.reminder_completed }}"
-                     data-reminder-iso-date="{{ reminder.reminder_date|date:'c' }}"
-                     data-reminder-toggle-url="{% url 'contracts:toggle_reminder' reminder.id %}?next={{ request.path|urlencode }}">
-                    <div class="flex items-center">
-                        <div class="mr-3">
-                            <div class="h-4 w-4 rounded-full 
-                                {% if reminder.reminder_completed %}
-                                    bg-green-500 text-white flex items-center justify-center
-                                {% elif reminder.reminder_date < now %}
-                                    bg-red-100 border border-red-500
-                                {% else %}
-                                    bg-yellow-100 border border-yellow-500
-                                {% endif %}
-                            ">
-                                {% if reminder.reminder_completed %}
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                {% endif %}
+            <div class="space-y-3">
+                {% if due_count > 0 or overdue_count > 0 %}
+                    {% for reminder in reminders %}
+                        {% if not reminder.completed %}
+                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200{% else %}bg-blue-50 border border-blue-200{% endif %} shadow-sm cursor-pointer reminder-item"
+                                 data-reminder-id="{{ reminder.id }}"
+                                 data-reminder-title="{{ reminder.title|escapejs }}"
+                                 data-reminder-text="{{ reminder.description|escapejs }}"
+                                 data-reminder-date="{{ reminder.reminder_date|date:'M d, Y g:i A' }}"
+                                 data-reminder-completed="{{ reminder.completed }}"
+                                 data-reminder-iso-date="{{ reminder.reminder_date|date:'c' }}"
+                                 onclick="showReminderDetails(this)">
+                                <div class="flex justify-between">
+                                    <h3 class="font-medium text-gray-800 mb-1">{{ reminder.title }}</h3>
+                                    <div class="flex">
+                                        <button type="button" class="text-gray-500 hover:text-green-600 mr-2" 
+                                                title="Mark Complete" 
+                                                onclick="event.stopPropagation(); completeReminder({{ reminder.id }})">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </button>
+                                        <button type="button" class="text-gray-500 hover:text-blue-600" 
+                                                title="Edit" 
+                                                onclick="event.stopPropagation(); editReminder({{ reminder.id }}, '{{ reminder.title|escapejs }}', '{{ reminder.description|escapejs }}', '{{ reminder.reminder_date|date:'Y-m-d H:i' }}')">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">{{ reminder.description|truncatewords:20 }}</p>
+                                <div class="flex justify-between items-center text-xs">
+                                    <div>
+                                        <span class="text-gray-500">Due: </span>
+                                        <span class="{% if reminder.is_overdue %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
+                                            {{ reminder.reminder_date|date:"F j, Y" }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        {% if reminder.is_overdue %}
+                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs">Overdue</span>
+                                        {% else %}
+                                            <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">Due</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="truncate">
-                            <p class="text-sm font-medium {% if reminder.reminder_completed %}text-gray-600{% elif reminder.reminder_date < now %}text-red-700{% else %}text-gray-800{% endif %}">
-                                {{ reminder.reminder_title|truncatechars:25 }}
-                            </p>
-                            <p class="text-xs text-gray-500">{{ reminder.reminder_date|date:"M d, Y" }}</p>
-                        </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-gray-500 py-8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>No due or overdue reminders!</p>
                     </div>
-                </div>
-            {% endfor %}
+                {% endif %}
+            </div>
         {% else %}
-            <div class="p-8 text-center text-gray-500">
-                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="text-center text-gray-500 py-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p class="mt-2">No reminders found</p>
-                <a href="{% url 'contracts:add_reminder' %}" class="mt-4 inline-block text-sm text-blue-600 hover:text-blue-800">Create your first reminder</a>
+                <p>No reminders yet.</p>
+                <button type="button" onclick="showNewReminderModal()" class="mt-3 inline-block text-blue-600 hover:text-blue-800 font-medium">Add one now</button>
             </div>
         {% endif %}
     </div>
-    
-    <div class="p-2 border-t border-gray-200 bg-gray-50">
-        <a href="{% url 'contracts:reminders_list' %}" class="flex items-center justify-center w-full py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors text-sm mb-2">
-            View All Reminders
-        </a>
-        <!-- <a href="{% url 'contracts:contract_log_view' %}" class="flex items-center justify-center w-full py-2 px-4 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    <div class="border-t border-gray-200 bg-white p-3 text-center flex-shrink-0">
+        <button type="button" onclick="showNewReminderModal()" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md w-full text-sm flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Contract Log
-        </a> -->
+            New Reminder
+        </button>
     </div>
 </div>
+
+<div class="overlay hidden fixed inset-0 bg-black opacity-30 z-40" id="overlay" onclick="toggleReminderbar()"></div>
+
+<script>
+    function toggleReminderbar() {
+        const reminderbar = document.getElementById('reminderbar');
+        const overlay = document.getElementById('overlay');
+        
+        if (reminderbar.classList.contains('inactive')) {
+            reminderbar.classList.remove('inactive');
+            reminderbar.classList.add('active');
+            reminderbar.style.transform = 'translateX(0)';
+            overlay.classList.remove('hidden');
+        } else {
+            reminderbar.classList.remove('active');
+            reminderbar.classList.add('inactive');
+            reminderbar.style.transform = 'translateX(100%)';
+            overlay.classList.add('hidden');
+        }
+    }
+    
+    function showReminderDetails(element) {
+        const id = element.dataset.reminderId;
+        const title = element.dataset.reminderTitle;
+        const text = element.dataset.reminderText;
+        const dateStr = element.dataset.reminderDate;
+        const completed = element.dataset.reminderCompleted;
+        const isoDate = element.dataset.reminderIsoDate;
+        
+        const modal = document.getElementById('reminderModal');
+        const modalTitle = document.getElementById('modalReminderTitle');
+        const modalText = document.getElementById('modalText');
+        const modalDate = document.getElementById('modalDate');
+        const modalStatus = document.getElementById('modalStatus');
+        const modalStatusIndicator = document.getElementById('modalStatusIndicator');
+        const modalToggleBtn = document.getElementById('modalToggleBtn');
+        
+        modalTitle.textContent = title;
+        modalText.textContent = text;
+        modalDate.textContent = dateStr;
+        
+        // Get today and 7 days ago for comparison
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Set to beginning of day
+        
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        
+        // Check reminder status
+        const reminderDate = new Date(isoDate);
+        reminderDate.setHours(0, 0, 0, 0); // Set to beginning of day
+        
+        const isDueToday = reminderDate.getTime() === today.getTime();
+        const isOverdue = reminderDate < sevenDaysAgo;
+        const isRecentlyDue = reminderDate < today && reminderDate >= sevenDaysAgo;
+        
+        if (completed === 'True') {
+            modalStatus.textContent = 'Completed';
+            modalStatus.className = 'text-sm font-medium text-green-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-green-500';
+            modalToggleBtn.textContent = 'Mark as Incomplete';
+            modalToggleBtn.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500';
+        } else if (isOverdue) {
+            modalStatus.textContent = 'Overdue (7+ days)';
+            modalStatus.className = 'text-sm font-medium text-red-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-red-100 border border-red-500';
+            modalToggleBtn.textContent = 'Mark as Complete';
+            modalToggleBtn.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
+        } else if (isDueToday) {
+            modalStatus.textContent = 'Due Today';
+            modalStatus.className = 'text-sm font-medium text-yellow-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-yellow-100 border border-yellow-500';
+            modalToggleBtn.textContent = 'Mark as Complete';
+            modalToggleBtn.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
+        } else if (isRecentlyDue) {
+            modalStatus.textContent = 'Recently Due';
+            modalStatus.className = 'text-sm font-medium text-orange-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-orange-100 border border-orange-500';
+            modalToggleBtn.textContent = 'Mark as Complete';
+            modalToggleBtn.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
+        } else {
+            // This would be a pending reminder (future date)
+            modalStatus.textContent = 'Upcoming';
+            modalStatus.className = 'text-sm font-medium text-blue-700';
+            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-blue-100 border border-blue-500';
+            modalToggleBtn.textContent = 'Mark as Complete';
+            modalToggleBtn.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
+        }
+        
+        // Set up the completion button
+        modalToggleBtn.onclick = function() {
+            completeReminder(id);
+        };
+        
+        modal.classList.add('active');
+    }
+    
+    function completeReminder(id) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/contracts/reminder/${id}/complete/`;
+        
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        
+        form.appendChild(csrfInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    function showNewReminderModal() {
+        // Set default date to today + 1 hour
+        const defaultDate = new Date();
+        defaultDate.setHours(defaultDate.getHours() + 1);
+        document.getElementById('reminderDate').value = defaultDate.toISOString().slice(0, 16);
+        
+        document.getElementById('newReminderModal').classList.add('active');
+    }
+    
+    function closeNewReminderModal() {
+        document.getElementById('newReminderModal').classList.remove('active');
+    }
+    
+    function editReminder(id, title, description, dueDate) {
+        // Populate the form fields
+        document.getElementById('editReminderId').value = id;
+        document.getElementById('editReminderTitle').value = title;
+        document.getElementById('editReminderDescription').value = description;
+        document.getElementById('editReminderDate').value = dueDate;
+        
+        // Update the form action
+        document.getElementById('editReminderForm').action = `/contracts/reminder/${id}/edit/`;
+        
+        // Show the modal
+        document.getElementById('editReminderModal').classList.add('active');
+    }
+    
+    function closeEditReminderModal() {
+        document.getElementById('editReminderModal').classList.remove('active');
+    }
+    
+    function closeReminderModal() {
+        document.getElementById('reminderModal').classList.remove('active');
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        const reminderbar = document.getElementById('reminderbar');
+        if (reminderbar) {
+            reminderbar.style.transform = 'translateX(100%)';
+            reminderbar.style.transition = 'transform 0.3s ease-in-out';
+        }
+    });
+</script>
 
 <!-- Reminder Modal -->
 <div class="reminder-modal" id="reminderModal">
@@ -201,9 +400,9 @@
             </div>
             
             <div class="flex justify-between mt-6">
-                <a href="#" id="modalToggleLink" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                <button type="button" id="modalToggleBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                     Mark as Complete
-                </a>
+                </button>
                 <button type="button" onclick="closeReminderModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     Close
                 </button>
@@ -212,79 +411,87 @@
     </div>
 </div>
 
+<!-- New Reminder Modal -->
+<div class="reminder-modal" id="newReminderModal">
+    <div class="reminder-modal-content">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800">New Reminder</h3>
+            <button class="text-gray-600 hover:text-gray-800" onclick="closeNewReminderModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <form id="newReminderForm" method="post" action="{% url 'contracts:add_reminder' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="reminderTitle" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="reminderTitle" name="reminder_title" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="reminderDate" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input type="datetime-local" id="reminderDate" name="reminder_date" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="reminderDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="reminderDescription" name="reminder_text" rows="4" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end mt-6 space-x-3">
+                    <button type="button" onclick="closeNewReminderModal()" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Save Reminder
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Reminder Modal -->
+<div class="reminder-modal" id="editReminderModal">
+    <div class="reminder-modal-content">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800">Edit Reminder</h3>
+            <button class="text-gray-600 hover:text-gray-800" onclick="closeEditReminderModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <form id="editReminderForm" method="post">
+                {% csrf_token %}
+                <input type="hidden" id="editReminderId" name="reminder_id">
+                <div class="mb-4">
+                    <label for="editReminderTitle" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="editReminderTitle" name="reminder_title" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="editReminderDate" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input type="datetime-local" id="editReminderDate" name="reminder_date" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="editReminderDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="editReminderDescription" name="reminder_text" rows="4" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end mt-6 space-x-3">
+                    <button type="button" onclick="closeEditReminderModal()" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Update Reminder
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock body %}
 
 {% block extra_scripts %}
-<script>
-    function toggleReminderbar() {
-        document.getElementById('reminderbar').classList.toggle('active');
-        document.getElementById('reminderbar').classList.toggle('inactive');
-    }
-
-    // Add event listeners to reminder items
-    document.addEventListener('DOMContentLoaded', function() {
-        const reminderItems = document.querySelectorAll('.reminder-item');
-        reminderItems.forEach(item => {
-            item.addEventListener('click', function() {
-                const id = this.dataset.reminderId;
-                const title = this.dataset.reminderTitle;
-                const text = this.dataset.reminderText;
-                const dateStr = this.dataset.reminderDate;
-                const completed = this.dataset.reminderCompleted;
-                const isoDate = this.dataset.reminderIsoDate;
-                const toggleUrl = this.dataset.reminderToggleUrl;
-                
-                showReminderModal(id, title, text, dateStr, completed, isoDate, toggleUrl);
-            });
-        });
-    });
-
-    function showReminderModal(id, title, text, dateStr, completed, isoDate, toggleUrl) {
-        const modal = document.getElementById('reminderModal');
-        const modalTitle = document.getElementById('modalReminderTitle');
-        const modalText = document.getElementById('modalText');
-        const modalDate = document.getElementById('modalDate');
-        const modalStatus = document.getElementById('modalStatus');
-        const modalStatusIndicator = document.getElementById('modalStatusIndicator');
-        const modalToggleLink = document.getElementById('modalToggleLink');
-        
-        modalTitle.textContent = title;
-        modalText.textContent = text;
-        modalDate.textContent = dateStr;
-        modalToggleLink.href = toggleUrl;
-        
-        // Check if reminder is overdue
-        const reminderDate = new Date(isoDate);
-        const now = new Date();
-        const isOverdue = reminderDate < now && completed !== 'True';
-        
-        if (completed === 'True') {
-            modalStatus.textContent = 'Completed';
-            modalStatus.className = 'text-sm font-medium text-green-700';
-            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-green-500';
-            modalToggleLink.textContent = 'Mark as Incomplete';
-            modalToggleLink.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500';
-        } else if (isOverdue) {
-            modalStatus.textContent = 'Overdue';
-            modalStatus.className = 'text-sm font-medium text-red-700';
-            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-red-100 border border-red-500';
-            modalToggleLink.textContent = 'Mark as Complete';
-            modalToggleLink.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
-        } else {
-            modalStatus.textContent = 'Pending';
-            modalStatus.className = 'text-sm font-medium text-yellow-700';
-            modalStatusIndicator.className = 'h-4 w-4 rounded-full mr-2 bg-yellow-100 border border-yellow-500';
-            modalToggleLink.textContent = 'Mark as Complete';
-            modalToggleLink.className = 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500';
-        }
-        
-        modal.classList.add('active');
-    }
-
-    function closeReminderModal() {
-        document.getElementById('reminderModal').classList.remove('active');
-    }
-</script>
-
 {% block extra_js %}{% endblock %}
 {% endblock %}

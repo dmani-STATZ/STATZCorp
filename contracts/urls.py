@@ -39,6 +39,8 @@ from .views import (
     add_reminder,
     toggle_reminder_completion,
     delete_reminder,
+    mark_reminder_complete,
+    edit_reminder,
     
     # Acknowledgement letter views
     generate_acknowledgement_letter,
@@ -107,9 +109,12 @@ urlpatterns = [
     # Reminder management
     path('reminders/', ReminderListView.as_view(), name='reminders_list'),
     path('reminder/add/', add_reminder, name='add_reminder'),
+    path('reminder/create/', add_reminder, name='create_reminder'),
     path('reminder/add/<int:note_id>/', add_reminder, name='add_note_reminder'),
     path('reminder/<int:reminder_id>/toggle/', toggle_reminder_completion, name='toggle_reminder'),
     path('reminder/<int:reminder_id>/delete/', delete_reminder, name='delete_reminder'),
+    path('reminder/<int:reminder_id>/complete/', mark_reminder_complete, name='mark_reminder_complete'),
+    path('reminder/<int:reminder_id>/edit/', edit_reminder, name='edit_reminder'),
     
     # Acknowledgement letter
     path('clin/<int:clin_id>/generate-letter/', generate_acknowledgement_letter, name='generate_acknowledgement_letter'),

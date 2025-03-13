@@ -7,10 +7,12 @@ from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, HttpResponseRedirect
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
+from datetime import timedelta, datetime, time
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinAcknowledgment, Contract, ClinView
+from ..models import Clin, ClinAcknowledgment, Contract, ClinView, Note, Reminder
 from ..forms import ClinForm, ClinAcknowledgmentForm
 
 
@@ -99,9 +101,7 @@ class ClinDetailView(DetailView):
         clin = self.object
         
         # Add notes to context
-        from django.contrib.contenttypes.models import ContentType
         clin_type = ContentType.objects.get_for_model(Clin)
-        from ..models import Note
         notes = Note.objects.filter(
             content_type=clin_type,
             object_id=clin.id
@@ -196,11 +196,9 @@ def get_clin_notes(request, clin_id):
         clin = get_object_or_404(Clin, id=clin_id)
         
         # Get notes for this CLIN
-        from django.contrib.contenttypes.models import ContentType
         clin_type = ContentType.objects.get_for_model(Clin)
         print(f"CLIN ContentType: {clin_type.id} - {clin_type.app_label}.{clin_type.model}")
         
-        from ..models import Note
         notes = Note.objects.filter(
             content_type=clin_type,
             object_id=clin.id
@@ -254,6 +252,7 @@ def toggle_clin_acknowledgment(request, clin_id):
         clin = get_object_or_404(Clin, id=clin_id)
         data = json.loads(request.body)
         field = data.get('field')
+        initial_state = data.get('initial_state', False)
         
         if not field:
             return JsonResponse({'error': 'Field parameter is required'}, status=400)
@@ -265,38 +264,95 @@ def toggle_clin_acknowledgment(request, clin_id):
         current_value = getattr(acknowledgment, field, False)
         new_value = not current_value
         
+        # Special case - if it's already true, don't toggle
+        if (field == 'po_to_supplier_bool' or field == 'clin_reply_bool' or field == 'po_to_qar_bool') and current_value:
+            return JsonResponse({
+                'success': True,
+                'status': current_value,
+                'message': f'{field} is already set to true'
+            })
+        
         # Update the field and corresponding timestamp/user
         setattr(acknowledgment, field, new_value)
         
-        if new_value:
-            if field == 'acknowledged':
-                acknowledgment.acknowledged_date = timezone.now()
-                acknowledgment.acknowledged_by = request.user
-            elif field == 'rejected':
-                acknowledgment.rejected_date = timezone.now()
-                acknowledgment.rejected_by = request.user
-        else:
-            if field == 'acknowledged':
-                acknowledgment.acknowledged_date = None
-                acknowledgment.acknowledged_by = None
-            elif field == 'rejected':
-                acknowledgment.rejected_date = None
-                acknowledgment.rejected_by = None
-        
-        acknowledgment.save()
-        
+        # Initialize response data
         response_data = {
+            'success': True,
             'status': new_value,
-            'date': None
+            'note_created': False,
+            'reminder_created': False
         }
         
+        # Update the corresponding user and date fields
+        field_base = field.replace('_bool', '')
+        date_field = f"{field_base}_date"
+        user_field = f"{field_base}_user"
+        
         if new_value:
-            if field == 'acknowledged':
-                response_data['date'] = acknowledgment.acknowledged_date.isoformat()
-            elif field == 'rejected':
-                response_data['date'] = acknowledgment.rejected_date.isoformat()
+            current_time = timezone.now()
+            setattr(acknowledgment, date_field, current_time)
+            setattr(acknowledgment, user_field, request.user)
+            
+            # Add user info to response
+            response_data['user_info'] = {
+                'username': request.user.username,
+                'date': current_time.strftime('%m/%d/%Y %H:%M %p')
+            }
+            
+            # Special processing for po_to_supplier_bool when toggled from false to true
+            if field == 'po_to_supplier_bool' and not initial_state:
+                # Create a note for the CLIN
+                clin_content_type = ContentType.objects.get_for_model(Clin)
+                note_text = f"PO ACKNOWLEDGMENT LETTER Followup - {request.user.username} on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
+                
+                note = Note.objects.create(
+                    content_type=clin_content_type,
+                    object_id=clin.id,
+                    note=note_text,
+                    created_by=request.user
+                )
+                
+                response_data['note_created'] = True
+                
+                # Calculate reminder date
+                reminder_date = None
+                reminder_title = "FIRST CHECK IN"
+                
+                if clin.supplier_due_date:
+                    # 60 days before supplier_due_date
+                    reminder_date = clin.supplier_due_date - timedelta(days=60)
+                elif clin.due_date:
+                    # 90 days before due_date
+                    reminder_date = clin.due_date - timedelta(days=90)
+                
+                # Create reminder if we have a valid date
+                if reminder_date:
+                    # Convert date to datetime at beginning of day
+                    reminder_datetime = datetime.combine(reminder_date, time(9, 0))
+                    aware_reminder_datetime = timezone.make_aware(reminder_datetime)
+                    
+                    reminder = Reminder.objects.create(
+                        reminder_title=reminder_title,
+                        reminder_text=f"Follow up on CLIN {clin.id} PO acknowledgment",
+                        reminder_date=aware_reminder_datetime,
+                        reminder_user=request.user,
+                        reminder_completed=False,
+                        note=note
+                    )
+                    
+                    response_data['reminder_created'] = True
+                    response_data['reminder_title'] = reminder_title
+                    response_data['reminder_date'] = aware_reminder_datetime.strftime('%m/%d/%Y')
+        else:
+            # If toggling to false, clear the user and date fields
+            setattr(acknowledgment, date_field, None)
+            setattr(acknowledgment, user_field, None)
+        
+        acknowledgment.save()
         
         return JsonResponse(response_data)
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400) 
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': str(e)}, status=400) 
