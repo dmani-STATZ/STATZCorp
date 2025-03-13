@@ -266,14 +266,101 @@
             </div>
         </div>
         
-        <!-- Future Misc Section - 1/3 width -->
+        <!-- NIST & Expedite Section - 1/3 width -->
         <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Future Misc Section</h2>
+                <h2 class="text-xl font-bold text-gray-800">Contract Controls</h2>
             </div>
-            <div class="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
-                <p class="text-gray-500">This section is reserved for future functionality</p>
+            
+            <!-- NIST and Expedite sections side by side -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- NIST Section -->
+                <div class="border border-gray-300 rounded-md p-2 bg-gray-50 flex items-center justify-center">
+                    <button 
+                        onclick="toggleContractField('nist')"
+                        id="nist_btn"
+                        data-nist-state="{% if contract.nist %}true{% else %}false{% endif %}"
+                        class="w-3/4 flex items-center justify-center p-2 border border-gray-300 rounded-md shadow-sm hover:opacity-90 transition-colors duration-150 {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}">
+                        <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-10">
+                    </button>
+                </div>
+                
+                <!-- Expedite Section -->
+                <div id="expedite_container" 
+                    class="border border-gray-300 rounded-md p-2 
+                    {% if expedite and expedite.used %}bg-fuchsia-200{% elif expedite and expedite.successful %}bg-yellow-200{% else %}bg-gray-50{% endif %}">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-gray-800">Expedite</h3>
+                        <button type="button" 
+                            onclick="resetExpedite()"
+                            class="bg-red-100 hover:bg-red-200 text-red-600 rounded-full w-6 h-6 flex items-center justify-center transition-colors duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <!-- Initiate button -->
+                        {% if not expedite or not expedite.successful %}
+                        <button 
+                            onclick="toggleExpediteStatus('initiate')"
+                            id="expedite_initiate_btn"
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                            {% if expedite and expedite.initiated %}disabled{% endif %}>
+                            Initiate
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Successful button -->
+                        {% if not expedite or not expedite.successful %}
+                        <button 
+                            onclick="toggleExpediteStatus('successful')"
+                            id="expedite_successful_btn"
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if not expedite or not expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% elif expedite and expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                            {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>
+                            Successful
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Use button (only shows after successful) -->
+                        {% if expedite and expedite.successful %}
+                        <button 
+                            onclick="toggleExpediteStatus('use')"
+                            id="expedite_use_btn"
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                            {% if expedite.used %}disabled{% endif %}>
+                            Use Expedite
+                        </button>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Status info display -->
+                    {% if expedite and expedite.initiated %}
+                    <div class="mt-2 text-xs text-gray-700">
+                        <p>Initiated: {{ expedite.initiateddate|date:"M d, Y H:i" }} by {{ expedite.initiatedby }}</p>
+                        {% if expedite.successful %}
+                        <p>Successful: {{ expedite.successfuldate|date:"M d, Y H:i" }} by {{ expedite.successfulby }}</p>
+                        {% endif %}
+                        {% if expedite.used %}
+                        <p>Used: {{ expedite.useddate|date:"M d, Y H:i" }} by {{ expedite.usedby }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
             </div>
+            
+            <!-- <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-500 italic">
+                <p>Green = Active NIST, Gray = Inactive NIST</p>
+                <p class="mt-1">Expedite: Yellow background = Successful, Pink background = Used</p>
+            </div> -->
         </div>
     </div>
 
@@ -432,6 +519,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (defaultClinElement) {
             selectClin(defaultClinId, defaultClinElement);
         }
+    }
+    
+    // Initialize NIST button state
+    const nistBtn = document.getElementById('nist_btn');
+    if (nistBtn) {
+        const isNistCertified = nistBtn.dataset.nistState === 'true';
+        // The button classes are already set in the template, no need to adjust them here
     }
 });
 
@@ -626,6 +720,255 @@ function toggleAcknowledgment(field) {
             const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
             if (userInfoContainer) {
                 userInfoContainer.innerHTML = '';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request. Please try again.');
+    });
+}
+
+// Functions for Expedite functionality
+function toggleExpediteStatus(action) {
+    const contractId = "{{ contract.id }}";
+    if (!contractId) return;
+    
+    fetch(`/contracts/contract/${contractId}/toggle-expedite/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            action: action
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success === false) {
+            alert(data.error || 'An error occurred while processing your request.');
+            return;
+        }
+        
+        // Update UI based on current state
+        const container = document.getElementById('expedite_container');
+        const buttonContainer = container.querySelector('.space-y-2');
+        
+        // Reset all background classes first
+        container.classList.remove('bg-gray-50', 'bg-yellow-200', 'bg-fuchsia-200');
+        
+        if (action === 'reset') {
+            // Handle reset action specifically
+            if (data.initiated === false) {
+                // Complete reset to initial state
+                location.reload(); // Simplest way to reset UI completely
+                return;
+            } else if (data.initiated && !data.successful) {
+                // Reset from successful to initiated state
+                container.classList.add('bg-gray-50');
+                
+                // Recreate buttons in the right state
+                buttonContainer.innerHTML = `
+                    <!-- Initiate button -->
+                    <button 
+                        onclick="toggleExpediteStatus('initiate')"
+                        id="expedite_initiate_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            bg-gray-300 text-gray-600 cursor-not-allowed"
+                        disabled>
+                        Initiate
+                    </button>
+                    
+                    <!-- Successful button -->
+                    <button 
+                        onclick="toggleExpediteStatus('successful')"
+                        id="expedite_successful_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            bg-red-200 text-red-800 hover:bg-red-300">
+                        Successful
+                    </button>
+                `;
+                
+                // Update status info
+                let statusHtml = '';
+                if (data.initiatedby) {
+                    statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
+                }
+                
+                // Update or add status div
+                let statusDiv = container.querySelector('.mt-2.text-xs');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.className = 'mt-2 text-xs text-gray-700';
+                    container.appendChild(statusDiv);
+                }
+                statusDiv.innerHTML = statusHtml;
+                
+                return;
+            } else if (data.initiated && data.successful && !data.used) {
+                // Reset from used to successful state
+                container.classList.add('bg-yellow-200');
+                
+                // Recreate just the Use Expedite button (active)
+                buttonContainer.innerHTML = `
+                    <button 
+                        onclick="toggleExpediteStatus('use')"
+                        id="expedite_use_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            bg-red-200 text-red-800 hover:bg-red-300">
+                        Use Expedite
+                    </button>
+                `;
+                
+                // Update status info
+                let statusHtml = '';
+                if (data.initiatedby) {
+                    statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
+                }
+                if (data.successfulby) {
+                    statusHtml += `<p>Successful: ${data.successfuldate} by ${data.successfulby}</p>`;
+                }
+                
+                // Update status div
+                let statusDiv = container.querySelector('.mt-2.text-xs');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.className = 'mt-2 text-xs text-gray-700';
+                    container.appendChild(statusDiv);
+                }
+                statusDiv.innerHTML = statusHtml;
+                
+                return;
+            }
+        }
+        
+        // Handle normal (non-reset) actions
+        if (data.initiated) {
+            const initiateBtn = document.getElementById('expedite_initiate_btn');
+            const successfulBtn = document.getElementById('expedite_successful_btn');
+            const useBtn = document.getElementById('expedite_use_btn');
+            
+            // Handle initiate state
+            if (initiateBtn) {
+                initiateBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                initiateBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                initiateBtn.disabled = true;
+            }
+            
+            if (data.successful) {
+                // Wild color 1 - Yellow background for successful
+                container.classList.add('bg-yellow-200');
+                
+                // Hide initiate and successful buttons
+                if (initiateBtn) initiateBtn.parentElement.removeChild(initiateBtn);
+                if (successfulBtn) successfulBtn.parentElement.removeChild(successfulBtn);
+                
+                // Add/update Use Expedite button if it doesn't exist
+                if (!useBtn) {
+                    const useBtnHtml = `
+                    <button 
+                        onclick="toggleExpediteStatus('use')"
+                        id="expedite_use_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                        ${data.used ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-red-200 text-red-800 hover:bg-red-300'}"
+                        ${data.used ? 'disabled' : ''}>
+                        Use Expedite
+                    </button>`;
+                    buttonContainer.innerHTML = useBtnHtml;
+                } else if (data.used) {
+                    // If already has use button and it's used, disable it
+                    useBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                    useBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                    useBtn.disabled = true;
+                    
+                    // Wild color 2 - Fuchsia background for used
+                    container.classList.remove('bg-yellow-200');
+                    container.classList.add('bg-fuchsia-200');
+                }
+            } else if (successfulBtn) {
+                // Enable successful button if not already successful
+                successfulBtn.classList.remove('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                successfulBtn.classList.add('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                successfulBtn.disabled = false;
+            }
+            
+            // Update status info
+            let statusHtml = '';
+            if (data.initiatedby) {
+                statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
+            }
+            if (data.successfulby) {
+                statusHtml += `<p>Successful: ${data.successfuldate} by ${data.successfulby}</p>`;
+            }
+            if (data.usedby) {
+                statusHtml += `<p>Used: ${data.useddate} by ${data.usedby}</p>`;
+            }
+            
+            // Add or update status div
+            let statusDiv = container.querySelector('.mt-2.text-xs');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.className = 'mt-2 text-xs text-gray-700';
+                container.appendChild(statusDiv);
+            }
+            statusDiv.innerHTML = statusHtml;
+        } else {
+            // Reset to initial state - just reload the page
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request. Please try again.');
+    });
+}
+
+function resetExpedite() {
+    if (confirm('Are you sure you want to reset the Expedite process? This will clear all current expedite data.')) {
+        toggleExpediteStatus('reset');
+    }
+}
+
+// Function to toggle contract fields like NIST
+function toggleContractField(field) {
+    const contractId = "{{ contract.id }}";
+    if (!contractId) return;
+
+    // Get the current state before the toggle
+    const btn = document.getElementById(`${field}_btn`);
+    const initialState = btn.classList.contains('bg-green-500');
+    
+    fetch(`/contracts/contract/${contractId}/toggle-field/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            field: field,
+            initial_state: initialState
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success === false) {
+            alert(data.error || 'An error occurred while processing your request.');
+            return;
+        }
+        
+        if (field === 'nist') {
+            // Toggle the button appearance
+            if (data.status) {
+                btn.classList.remove('bg-gray-300');
+                btn.classList.add('bg-green-500');
+                btn.classList.remove('text-gray-700');
+                btn.classList.add('text-white');
+            } else {
+                btn.classList.remove('bg-green-500');
+                btn.classList.add('bg-gray-300');
+                btn.classList.remove('text-white');
+                btn.classList.add('text-gray-700');
             }
         }
     })

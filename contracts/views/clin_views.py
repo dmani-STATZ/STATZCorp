@@ -43,7 +43,6 @@ class ClinDetailView(DetailView):
                 clin_po_num=clin_view.clin_po_num,
                 po_number=clin_view.po_number,
                 po_num_ext=clin_view.po_num_ext,
-                sub_contract=clin_view.sub_contract,
                 clin_type_id=clin_view.clin_type_id,
                 supplier_id=clin_view.supplier_id,
                 nsn_id=clin_view.nsn_id,
@@ -64,7 +63,7 @@ class ClinDetailView(DetailView):
                 created_by_id=clin_view.created_by_id,
                 created_on=clin_view.created_on,
                 modified_by_id=clin_view.modified_by_id,
-                modified_on=clin_view.modified_on
+                modified_on=clin_view.modified_on,
             )
             
             # Add additional attributes from the view for convenience

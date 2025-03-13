@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+  <!-- Hero Section with Primary Color -->
+  <header class="bg-primary-600 text-white py-12">
+    <div class="container mx-auto px-4">
+      <h1 class="text-4xl font-bold mb-4">Welcome to Our App</h1>
+      <p class="text-xl mb-8">Beautifully designed with custom Tailwind colors</p>
+      <button class="bg-white text-primary-600 hover:bg-primary-50 font-semibold py-2 px-6 rounded-lg shadow transition">
+        Get Started
+      </button>
+    </div>
+  </header>
+
+  <!-- Features Section with Secondary Color Cards -->
+  <section class="py-16 container mx-auto px-4">
+    <h2 class="text-3xl font-bold text-gray-800 mb-12 text-center">Key Features</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Feature Card 1 -->
+      <div class="bg-white rounded-lg shadow-md overflow-hidden border-t-4 border-secondary-500 hover:shadow-lg transition">
+        <div class="p-6">
+          <div class="w-12 h-12 bg-secondary-100 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-secondary-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">Flexible Layouts</h3>
+          <p class="text-gray-600">Create beautiful interfaces with our custom color system and layout tools.</p>
+        </div>
+      </div>
+      
+      <!-- Feature Card 2 -->
+      <div class="bg-white rounded-lg shadow-md overflow-hidden border-t-4 border-accent-500 hover:shadow-lg transition">
+        <div class="p-6">
+          <div class="w-12 h-12 bg-accent-100 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-accent-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">Team Collaboration</h3>
+          <p class="text-gray-600">Work together with your team using our collaborative tools and shared design system.</p>
+        </div>
+      </div>
+      
+      <!-- Feature Card 3 -->
+      <div class="bg-white rounded-lg shadow-md overflow-hidden border-t-4 border-primary-500 hover:shadow-lg transition">
+        <div class="p-6">
+          <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-primary-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">Smart Settings</h3>
+          <p class="text-gray-600">Customize your experience with powerful settings and configuration options.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section with Gradient Background -->
+  <section class="py-16 bg-gradient-to-r from-primary-600 to-secondary-600 text-white">
+    <div class="container mx-auto px-4 text-center">
+      <h2 class="text-3xl font-bold mb-6">Ready to get started?</h2>
+      <p class="text-xl mb-8 max-w-2xl mx-auto">Join thousands of users who are already building beautiful interfaces with our custom color system.</p>
+      <div class="space-x-4">
+        <button class="bg-white text-primary-600 hover:bg-primary-50 font-semibold py-3 px-8 rounded-lg shadow-lg transition">
+          Sign Up Free
+        </button>
+        <button class="bg-transparent border-2 border-white hover:bg-white/10 font-semibold py-3 px-8 rounded-lg transition">
+          Learn More
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer with Accent Color -->
+  <footer class="bg-gray-800 text-white py-12">
+    <div class="container mx-auto px-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div>
+          <h3 class="text-xl font-bold mb-4 text-accent-400">Company</h3>
+          <ul class="space-y-2">
+            <li><a href="#" class="hover:text-accent-300 transition">About</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Careers</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Blog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold mb-4 text-accent-400">Resources</h3>
+          <ul class="space-y-2">
+            <li><a href="#" class="hover:text-accent-300 transition">Documentation</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Guides</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">API</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold mb-4 text-accent-400">Support</h3>
+          <ul class="space-y-2">
+            <li><a href="#" class="hover:text-accent-300 transition">Help Center</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Contact Us</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Status</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold mb-4 text-accent-400">Legal</h3>
+          <ul class="space-y-2">
+            <li><a href="#" class="hover:text-accent-300 transition">Privacy</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Terms</a></li>
+            <li><a href="#" class="hover:text-accent-300 transition">Security</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-gray-700 pt-8 text-center text-sm">
+        <p>&copy; 2023 Your Company. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+</div>
+{% endblock %} 

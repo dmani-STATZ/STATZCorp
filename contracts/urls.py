@@ -13,6 +13,8 @@ from .views import (
     ContractReviewView,
     contract_search,
     mark_contract_reviewed,
+    toggle_contract_field,
+    toggle_expedite_status,
     
     # CLIN views
     ClinDetailView,
@@ -125,6 +127,8 @@ urlpatterns = [
     path('search/', contract_search, name='contract_search'),
     path('clin/<int:clin_id>/notes/', get_clin_notes, name='get_clin_notes'),
     path('clin/<int:clin_id>/toggle-acknowledgment/', toggle_clin_acknowledgment, name='toggle_clin_acknowledgment'),
+    path('contract/<int:contract_id>/toggle-field/', toggle_contract_field, name='toggle_contract_field'),
+    path('contract/<int:contract_id>/toggle-expedite/', toggle_expedite_status, name='toggle_expedite_status'),
     path('api/options/<str:field_name>/', get_select_options, name='get_select_options'),
     path('contract/<int:contract_id>/combined-notes/', get_combined_notes, name='get_combined_notes'),
     path('contract/<int:contract_id>/clin/<int:clin_id>/combined-notes/', get_combined_notes, name='get_combined_notes_with_clin'),

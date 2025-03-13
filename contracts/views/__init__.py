@@ -7,6 +7,8 @@ from .contract_views import (
     ContractReviewView,
     contract_search,
     mark_contract_reviewed,
+    toggle_contract_field,
+    toggle_expedite_status,
 )
 
 from .clin_views import (

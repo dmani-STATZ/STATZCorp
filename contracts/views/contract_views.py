@@ -16,7 +16,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, SequenceNumber, Clin, Note, ContentType, Nsn
+from ..models import Contract, SequenceNumber, Clin, Note, ContentType, Nsn, Expedite
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,12 @@ class ContractDetailView(DetailView):
         
         # Get contract notes
         context['contract_notes'] = contract.notes.all().order_by('-created_on')
+        
+        # Get expedite data for this contract
+        try:
+            context['expedite'] = Expedite.objects.get(contract=contract)
+        except Expedite.DoesNotExist:
+            context['expedite'] = None
         
         # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
         context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
@@ -287,6 +293,130 @@ def check_contract_number(request):
     return JsonResponse({'exists': False})
 
 
+@conditional_login_required
+def toggle_contract_field(request, contract_id):
+    """
+    Toggle boolean fields on the Contract model (e.g., nist)
+    """
+    try:
+        contract = get_object_or_404(Contract, id=contract_id)
+        data = json.loads(request.body)
+        field = data.get('field')
+        
+        if not field:
+            return JsonResponse({'success': False, 'error': 'Field parameter is required'}, status=400)
+        
+        # Verify the field exists on the Contract model
+        if not hasattr(contract, field):
+            return JsonResponse({'success': False, 'error': f'Field {field} does not exist on Contract model'}, status=400)
+        
+        # Get current value
+        current_value = getattr(contract, field, False)
+        new_value = not current_value
+        
+        # Update the field
+        setattr(contract, field, new_value)
+        contract.save()
+        
+        return JsonResponse({
+            'success': True,
+            'status': new_value,
+            'message': f'Contract {field} updated successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error toggling contract field: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@conditional_login_required
+def toggle_expedite_status(request, contract_id):
+    """
+    Handle expedite actions: initiate, successful, use, reset
+    """
+    try:
+        contract = get_object_or_404(Contract, id=contract_id)
+        data = json.loads(request.body)
+        action = data.get('action')  # 'initiate', 'successful', 'use', or 'reset'
+        
+        # Get or create expedite object
+        expedite, created = Expedite.objects.get_or_create(contract=contract)
+        
+        # Process based on action
+        if action == 'initiate':
+            expedite.initiated = True
+            expedite.initiateddate = timezone.now()
+            expedite.initiatedby = request.user
+            
+        elif action == 'successful':
+            if not expedite.initiated:
+                return JsonResponse({'success': False, 'error': 'Expedite must be initiated first'}, status=400)
+            expedite.successful = True
+            expedite.successfuldate = timezone.now()
+            expedite.successfulby = request.user
+            
+        elif action == 'use':
+            if not expedite.successful:
+                return JsonResponse({'success': False, 'error': 'Expedite must be successful first'}, status=400)
+            expedite.used = True
+            expedite.useddate = timezone.now()
+            expedite.usedby = request.user
+            
+        elif action == 'reset':
+            # If we're coming from successful state, go back to initiated state only
+            if expedite.used:
+                # From Used to Successful
+                expedite.used = False
+                expedite.usedby = None
+                expedite.useddate = None
+            elif expedite.successful:
+                # From Successful to Initiated
+                expedite.successful = False
+                expedite.successfulby = None 
+                expedite.successfuldate = None
+            else:
+                # Just delete the record completely if we're in initiated state
+                expedite.delete()
+                return JsonResponse({
+                    'success': True,
+                    'status': 'reset',
+                    'initiated': False,
+                    'successful': False,
+                    'used': False,
+                    'message': 'Expedite process reset completely'
+                })
+        else:
+            return JsonResponse({'success': False, 'error': f'Unknown action: {action}'}, status=400)
+        
+        expedite.save()
+        
+        # Return current state for UI update
+        response_data = {
+            'success': True,
+            'initiated': expedite.initiated,
+            'successful': expedite.successful,
+            'used': expedite.used,
+            'message': f'Expedite {action} successful'
+        }
+        
+        # Add user info if available
+        if expedite.initiated and expedite.initiatedby:
+            response_data['initiatedby'] = expedite.initiatedby.username
+            response_data['initiateddate'] = expedite.initiateddate.strftime('%Y-%m-%d %H:%M')
+            
+        if expedite.successful and expedite.successfulby:
+            response_data['successfulby'] = expedite.successfulby.username
+            response_data['successfuldate'] = expedite.successfuldate.strftime('%Y-%m-%d %H:%M')
+            
+        if expedite.used and expedite.usedby:
+            response_data['usedby'] = expedite.usedby.username
+            response_data['useddate'] = expedite.useddate.strftime('%Y-%m-%d %H:%M')
+        
+        return JsonResponse(response_data)
+    except Exception as e:
+        logger.error(f"Error handling expedite status: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractReviewView(DetailView):
     model = Contract
@@ -315,7 +445,7 @@ def mark_contract_reviewed(request, pk):
         contract.reviewed_by = request.user
         contract.reviewed_on = timezone.now()
         contract.assigned_user = request.user
-        contract.assigned_on = timezone.now()
+        contract.assigned_date = timezone.now()
         contract.save()
         
         messages.success(request, 'Contract marked as reviewed successfully.')

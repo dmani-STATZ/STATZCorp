@@ -324,7 +324,7 @@ class ClinForm(forms.ModelForm):
         ]
         widgets = {
             'contract': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'sub_contract': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -347,19 +347,19 @@ class ClinForm(forms.ModelForm):
                 'placeholder': 'Enter PO Number'
             }),
             'clin_type': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'supplier': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'nsn': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'ia': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'fob': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'order_qty': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -382,7 +382,7 @@ class ClinForm(forms.ModelForm):
                 'type': 'date'
             }),
             'special_payment_terms': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'special_payment_terms_paid': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
@@ -606,7 +606,7 @@ class ContactForm(forms.ModelForm):
         fields = ['salutation', 'name', 'company', 'title', 'phone', 'email', 'address', 'notes']
         widgets = {
             'salutation': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'name': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -630,7 +630,7 @@ class ContactForm(forms.ModelForm):
                 'placeholder': 'Enter Email'
             }),
             'address': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'notes': forms.Textarea(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',

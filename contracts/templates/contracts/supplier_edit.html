@@ -1,5 +1,37 @@
-{% extends "contract_base.html" %}
+{% extends "contracts/contract_base.html" %}
 {% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    /* Form label styling */
+    .form-label {
+        text-transform: capitalize;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+        display: block;
+        font-family: inherit;
+    }
+    
+    /* For acronyms that should always be uppercase */
+    .text-uppercase {
+        text-transform: uppercase !important;
+    }
+    
+    /* Section headers */
+    .section-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-family: inherit;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
@@ -25,19 +57,24 @@
                 
                 <!-- Basic Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Basic Information</h2>
+                    <h2 class="section-header">Basic Information</h2>
                     <div class="grid grid-cols-1 gap-4">
                         {% for field in form %}
                             {% if field.name == 'name' %}
                                 <div class="col-span-1">
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
+                                    <div class="form-group">
+                                        <label for="{{ field.id_for_label }}" class="form-label">
+                                            {{ field.label }}
+                                        </label>
                                         <input type="text" name="{{ field.name }}" value="{{ field.value|default:'' }}" 
-                                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                               class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                                id="{{ field.id_for_label }}">
+                                        {% if field.errors %}
+                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% endif %}
@@ -46,12 +83,17 @@
                             {% for field in form %}
                                 {% if field.name in 'cage_code,supplier_type' %}
                                     <div>
-                                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                            {{ field.label }}
-                                        </label>
-                                        <div class="mt-1">
-                                            {{ field.errors }}
+                                        <div class="form-group">
+                                            <label for="{{ field.id_for_label }}" class="form-label">
+                                                {{ field.label }}
+                                            </label>
                                             {{ field }}
+                                            {% if field.errors %}
+                                                <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                            {% endif %}
+                                            {% if field.help_text %}
+                                                <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 {% endif %}
@@ -62,43 +104,22 @@
 
                 <!-- Address Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Address Information</h2>
+                    <h2 class="section-header">Address Information</h2>
                     <div class="space-y-4">
                         {% for field in form %}
-                            {% if field.name == 'physical_address' %}
+                            {% if field.name in 'physical_address,shipping_address,billing_address' %}
                                 <div>
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
+                                    <div class="form-group">
+                                        <label for="{{ field.id_for_label }}" class="form-label">
+                                            {{ field.label }}
+                                        </label>
                                         {{ field }}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                        {% for field in form %}
-                            {% if field.name == 'shipping_address' %}
-                                <div>
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
-                                        {{ field }}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                        {% for field in form %}
-                            {% if field.name == 'billing_address' %}
-                                <div>
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
-                                        {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% endif %}
@@ -108,17 +129,22 @@
 
                 <!-- Contact Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Contact Information</h2>
+                    <h2 class="section-header">Contact Information</h2>
                     <div class="grid grid-cols-2 gap-4">
                         {% for field in form %}
                             {% if field.name in 'business_phone,business_fax,business_email,contact' %}
                                 <div>
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
+                                    <div class="form-group">
+                                        <label for="{{ field.id_for_label }}" class="form-label">
+                                            {{ field.label }}
+                                        </label>
                                         {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% endif %}
@@ -128,30 +154,40 @@
 
                 <!-- Additional Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Additional Information</h2>
+                    <h2 class="section-header">Additional Information</h2>
                     <div class="grid grid-cols-3 gap-4 mb-4">
                         {% for field in form %}
                             {% if field.name in 'probation,conditional,special_terms,prime,ppi,iso,allows_gsi' %}
                                 <div>
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
+                                    <div class="form-group">
+                                        <label for="{{ field.id_for_label }}" class="form-label">
+                                            {{ field.label }}
+                                        </label>
                                         {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% endif %}
                         {% endfor %}
                         {% for field in form %}
                             {% if field.name == 'is_packhouse' %}
-                                <div class="w-1/6">
-                                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                        {{ field.label }}
-                                    </label>
-                                    <div class="mt-1">
-                                        {{ field.errors }}
+                                <div>
+                                    <div class="form-group">
+                                        <label for="{{ field.id_for_label }}" class="form-label">
+                                            {{ field.label }}
+                                        </label>
                                         {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% endif %}
@@ -160,12 +196,17 @@
                     {% for field in form %}
                         {% if field.name == 'packhouse' %}
                             <div>
-                                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                    {{ field.label }}
-                                </label>
-                                <div class="mt-1">
-                                    {{ field.errors }}
+                                <div class="form-group">
+                                    <label for="{{ field.id_for_label }}" class="form-label">
+                                        {{ field.label }}
+                                    </label>
                                     {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endif %}
@@ -173,13 +214,18 @@
                     {% for field in form %}
                         {% if field.name == 'notes' %}
                             <div>
-                                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                    {{ field.label }}
-                                </label>
-                                <div class="mt-1">
-                                    {{ field.errors }}
+                                <div class="form-group">
+                                    <label for="{{ field.id_for_label }}" class="form-label">
+                                        {{ field.label }}
+                                    </label>
                                     <textarea name="{{ field.name }}" id="{{ field.id_for_label }}" rows="4"
-                                              class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ field.value|default:'' }}</textarea>
+                                              class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ field.value|default:'' }}</textarea>
+                                    {% if field.errors %}
+                                        <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endif %}
@@ -189,11 +235,11 @@
                 <div class="flex justify-end space-x-4">
                     <button type="button" 
                             onclick="history.back()" 
-                            class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">
+                            class="btn-secondary">
                         Cancel
                     </button>
                     <button type="submit" 
-                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            class="btn-primary">
                         Save Changes
                     </button>
                 </div>
@@ -205,39 +251,76 @@
 
 {% block extra_css %}
 <style>
-    /* Style form inputs */
-    input[type="text"], 
-    input[type="email"], 
-    input[type="url"],
-    input[type="tel"],
-    select {
-        @apply w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    /* Form control base styles */
+    .form-control {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        border: 1px solid #d1d5db;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+    
+    /* Style select boxes specifically */
+    select.form-control {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
     }
     
     /* Adjust textarea heights */
-    textarea {
-        @apply w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    textarea.form-control {
         min-height: 4rem;
     }
 
     /* Style form errors */
     .errorlist {
-        @apply text-red-600 text-sm mt-1;
+        color: #dc2626;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
         list-style-type: none;
         padding: 0;
     }
 
-    /* Make select boxes more compact and full width in their container */
-    select {
-        @apply text-sm w-full;
-        padding-top: 0.375rem;
-        padding-bottom: 0.375rem;
-        min-width: 100%;
+    /* Button styling */
+    .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        color: white;
+        background-color: #3b82f6;
+        transition: background-color 0.2s;
     }
-
-    /* Ensure select boxes take full width of their container */
-    .select-wrapper {
-        width: 100%;
+    
+    .btn-primary:hover {
+        background-color: #2563eb;
+    }
+    
+    .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        color: #374151;
+        background-color: #f3f4f6;
+        transition: background-color 0.2s;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #e5e7eb;
     }
 </style>
 {% endblock %} 

@@ -3,45 +3,38 @@ from django.db import connection
 import time
 
 class Command(BaseCommand):
-    help = 'Refreshes the materialized view for NSN data'
+    help = 'This command is deprecated - the NSN view is now a true database view that refreshes automatically'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--verbose',
             action='store_true',
-            help='Show detailed information about the refresh process',
+            help='Show detailed information about the view',
         )
 
     def handle(self, *args, **options):
         verbose = options.get('verbose', False)
         
-        self.stdout.write(self.style.SUCCESS('Starting NSN view refresh...'))
+        self.stdout.write(self.style.WARNING('DEPRECATED: The NSN view is now a true database view that refreshes automatically'))
         
         try:
-            start_time = time.time()
-            
+            # Just report some stats about the view
             with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM nsn_view")
+                count = cursor.fetchone()[0]
+                self.stdout.write(self.style.SUCCESS(f'Total records in NSN view: {count}'))
+                
                 if verbose:
-                    self.stdout.write('Executing stored procedure: dbo.sp_RefreshNsnView')
-                cursor.execute("EXEC dbo.sp_RefreshNsnView")
-            
-            end_time = time.time()
-            duration = end_time - start_time
-            
-            self.stdout.write(self.style.SUCCESS(f'NSN view refreshed successfully in {duration:.2f} seconds!'))
-            
-            # Get some stats about the refreshed view
-            if verbose:
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT COUNT(*) FROM nsn_view")
-                    count = cursor.fetchone()[0]
-                    self.stdout.write(f'Total records in NSN view: {count}')
+                    self.stdout.write('Getting sample data from the view:')
+                    cursor.execute("SELECT TOP 5 id, nsn_code, description, clin_count FROM nsn_view ORDER BY clin_count DESC")
+                    rows = cursor.fetchall()
+                    for row in rows:
+                        self.stdout.write(f'NSN {row[1]}: {row[2][:30]}... (Used in {row[3]} CLINs)')
             
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Error refreshing NSN view: {str(e)}'))
+            self.stdout.write(self.style.ERROR(f'Error accessing NSN view: {str(e)}'))
             self.stdout.write(self.style.WARNING('Common causes of this error:'))
-            self.stdout.write(self.style.WARNING('1. The stored procedure dbo.sp_RefreshNsnView does not exist'))
-            self.stdout.write(self.style.WARNING('2. The nsn_view table does not exist'))
-            self.stdout.write(self.style.WARNING('3. Insufficient database permissions'))
+            self.stdout.write(self.style.WARNING('1. The nsn_view database view does not exist'))
+            self.stdout.write(self.style.WARNING('2. Insufficient database permissions'))
             self.stdout.write(self.style.WARNING('\nTo fix this, run the setup script:'))
-            self.stdout.write(self.style.WARNING('sqlcmd -S <server> -d <database> -U <username> -P <password> -i contracts/sql/setup_nsn_fulltext_and_job.sql')) 
+            self.stdout.write(self.style.WARNING('sqlcmd -S <server> -d <database> -U <username> -P <password> -i create_nsn_view.sql')) 

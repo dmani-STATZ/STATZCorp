@@ -2452,3 +2452,12 @@ select {
     padding-right: 2rem;
   }
 }
+
+.floating-image {
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  width: 50px;
+  height: auto;
+  z-index: 1000;
+}
