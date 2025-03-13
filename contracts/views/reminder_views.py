@@ -60,7 +60,7 @@ create_reminder = add_reminder
 class ReminderListView(ListView):
     model = Reminder
     template_name = 'contracts/reminders_list.html'
-    context_object_name = 'reminders'
+    context_object_name = 'reminders_page'
     
     def get_queryset(self):
         # Get reminders for the current user
@@ -150,7 +150,7 @@ class ReminderListView(ListView):
         context['today'] = today
         
         # Process reminders to add is_overdue flag
-        for reminder in context['reminders']:
+        for reminder in context['reminders_page']:
             reminder.is_overdue = reminder.reminder_date.date() <= seven_days_ago
         
         return context

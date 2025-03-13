@@ -10,12 +10,12 @@
         <h1 class="text-2xl font-bold text-gray-800">My Reminders</h1>
         
         <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            <a href="{% url 'contracts:add_reminder' %}" class="btn-primary flex items-center justify-center">
+            <button onclick="showNewReminderModal()" class="btn-primary flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
                 New Reminder
-            </a>
+            </button>
         </div>
     </div>
     
@@ -84,9 +84,9 @@
     
     <!-- Reminders List -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        {% if reminders %}
+        {% if reminders_page %}
             <ul class="divide-y divide-gray-200">
-                {% for reminder in reminders %}
+                {% for reminder in reminders_page %}
                 <li class="{% if reminder.reminder_completed %}bg-gray-50{% elif reminder.is_overdue %}bg-red-50{% elif reminder.reminder_date.date <= today %}bg-blue-50{% else %}bg-green-50{% endif %}">
                     <div class="px-4 py-4 sm:px-6">
                         <div class="flex items-center justify-between">
@@ -170,7 +170,15 @@
                                     {% endwith %}
                                 {% endif %}
                             </div>
-                            <div>
+                            <div class="flex space-x-3">
+                                <button type="button" 
+                                        class="edit-reminder-btn text-sm text-blue-600 hover:text-blue-800"
+                                        data-id="{{ reminder.id }}"
+                                        data-title="{{ reminder.reminder_title|escapejs }}" 
+                                        data-description="{{ reminder.reminder_text|escapejs }}"
+                                        data-date="{{ reminder.reminder_date|date:'Y-m-d H:i' }}">
+                                    Edit
+                                </button>
                                 <a href="{% url 'contracts:delete_reminder' reminder.id %}?next={{ request.get_full_path|urlencode }}" class="text-sm text-red-600 hover:text-red-800">
                                     Delete
                                 </a>
@@ -196,15 +204,52 @@
                     {% endif %}
                 </p>
                 <div class="mt-6">
-                    <a href="{% url 'contracts:add_reminder' %}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <button onclick="showNewReminderModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
                         </svg>
                         Create a reminder
-                    </a>
+                    </button>
                 </div>
             </div>
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle edit reminder buttons
+        const editButtons = document.querySelectorAll('.edit-reminder-btn');
+        editButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const title = this.dataset.title;
+                const description = this.dataset.description;
+                const date = this.dataset.date;
+                
+                // Fill in the edit form - mapping from reminder_title to form field names
+                document.getElementById('editReminderId').value = id;
+                document.getElementById('editReminderTitle').value = title;
+                document.getElementById('editReminderDescription').value = description;
+                document.getElementById('editReminderDate').value = date;
+                
+                // Update the form action
+                document.getElementById('editReminderForm').action = `/contracts/reminder/${id}/edit/`;
+                
+                // Show the modal
+                document.getElementById('editReminderModal').classList.add('active');
+            });
+        });
+        
+        // Initialize modal forms
+        if (document.getElementById('reminderDate')) {
+            // Set default date to today + 1 hour
+            const defaultDate = new Date();
+            defaultDate.setHours(defaultDate.getHours() + 1);
+            document.getElementById('reminderDate').value = defaultDate.toISOString().slice(0, 16);
+        }
+    });
+</script>
 {% endblock %} 
