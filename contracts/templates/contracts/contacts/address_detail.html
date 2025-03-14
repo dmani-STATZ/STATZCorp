@@ -1,0 +1,381 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .info-section {
+        transition: all 0.2s ease;
+    }
+    .info-section:hover {
+        background-color: rgba(243, 244, 246, 0.8);
+    }
+    .action-button {
+        transition: all 0.2s ease;
+    }
+    .action-button:hover {
+        transform: translateY(-1px);
+    }
+    .related-card {
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+    }
+    .related-card:hover {
+        border-left: 3px solid #3b82f6;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header with action buttons -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div class="flex flex-col">
+                    <div class="flex items-center mb-1">
+                        <h1 class="text-2xl font-bold text-gray-800 mr-3">
+                            <span class="text-blue-600 mr-2">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </span>
+                            Address Details
+                        </h1>
+                    </div>
+                    <p class="text-lg text-gray-600">{{ address }}</p>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4 md:mt-0">
+                    <a href="{% url 'contracts:address_list' %}" class="action-button inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-sm text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Back to Addresses
+                    </a>
+                    
+                    <a href="{% url 'contracts:address_update' pk=address.id %}" class="action-button inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit Address
+                    </a>
+                    
+                    <a href="{% url 'contracts:address_delete' pk=address.id %}" class="action-button inline-flex items-center px-4 py-2 bg-red-100 border border-transparent rounded-md font-semibold text-sm text-red-900 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Address
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Address Information and Related Entities -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Column: Address Information -->
+            <div class="lg:col-span-1">
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-800">Address Information</h2>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-200">
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Address Line 1</h3>
+                            <p class="text-base text-gray-900">{{ address.address_line_1 }}</p>
+                        </div>
+                        
+                        {% if address.address_line_2 %}
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Address Line 2</h3>
+                            <p class="text-base text-gray-900">{{ address.address_line_2 }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">City</h3>
+                            <p class="text-base text-gray-900">{{ address.city }}</p>
+                        </div>
+                        
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">State</h3>
+                            <p class="text-base text-gray-900">{{ address.state }}</p>
+                        </div>
+                        
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">ZIP Code</h3>
+                            <p class="text-base text-gray-900">{{ address.zip }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Map Link -->
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-800">Map</h2>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="flex mb-4">
+                            <div class="mr-4 text-blue-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-base text-gray-900">{{ address.address_line_1 }}</p>
+                                {% if address.address_line_2 %}
+                                <p class="text-base text-gray-900">{{ address.address_line_2 }}</p>
+                                {% endif %}
+                                <p class="text-base text-gray-900">
+                                    {{ address.city }}{% if address.city and address.state %}, {% endif %}{{ address.state }} {{ address.zip }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <a href="https://maps.google.com/?q={{ address.address_line_1 }}{% if address.address_line_2 %} {{ address.address_line_2 }}{% endif %}, {{ address.city }}, {{ address.state }} {{ address.zip }}" target="_blank" class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:border-blue-700 focus:shadow-outline-blue transition ease-in-out duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                                Open in Google Maps
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Usage Summary -->
+                <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-800">Usage Summary</h2>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-blue-50 p-4 rounded-md border border-blue-100 text-center">
+                                <span class="block text-2xl font-bold text-blue-800">{{ suppliers_billing|length }}</span>
+                                <span class="text-sm text-blue-600">Billing Address</span>
+                            </div>
+                            
+                            <div class="bg-green-50 p-4 rounded-md border border-green-100 text-center">
+                                <span class="block text-2xl font-bold text-green-800">{{ suppliers_shipping|length }}</span>
+                                <span class="text-sm text-green-600">Shipping Address</span>
+                            </div>
+                            
+                            <div class="bg-purple-50 p-4 rounded-md border border-purple-100 text-center">
+                                <span class="block text-2xl font-bold text-purple-800">{{ suppliers_physical|length }}</span>
+                                <span class="text-sm text-purple-600">Physical Address</span>
+                            </div>
+                            
+                            <div class="bg-amber-50 p-4 rounded-md border border-amber-100 text-center">
+                                <span class="block text-2xl font-bold text-amber-800">{{ contacts|length }}</span>
+                                <span class="text-sm text-amber-600">Contacts</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Related Entities -->
+            <div class="lg:col-span-2">
+                <!-- Suppliers using this as billing address -->
+                {% if suppliers_billing %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-semibold text-gray-800">Billing Address For</h2>
+                            
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                {{ suppliers_billing|length }} Supplier{{ suppliers_billing|length|pluralize }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-200">
+                        {% for supplier in suppliers_billing %}
+                        <div class="related-card p-6">
+                            <div class="flex flex-col md:flex-row md:justify-between md:items-center">
+                                <div class="mb-4 md:mb-0">
+                                    <h3 class="text-lg font-medium text-gray-900">
+                                        {{ supplier.name }}
+                                        {% if supplier.cage_code %}
+                                        <span class="ml-2 text-sm font-mono text-gray-500">({{ supplier.cage_code }})</span>
+                                        {% endif %}
+                                    </h3>
+                                    
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        {% if supplier.supplier_type %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mr-2">
+                                            {{ supplier.supplier_type.description }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex space-x-3">
+                                    <a href="#" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
+                                        View Supplier
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Suppliers using this as shipping address -->
+                {% if suppliers_shipping %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-teal-50 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-semibold text-gray-800">Shipping Address For</h2>
+                            
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                {{ suppliers_shipping|length }} Supplier{{ suppliers_shipping|length|pluralize }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-200">
+                        {% for supplier in suppliers_shipping %}
+                        <div class="related-card p-6">
+                            <div class="flex flex-col md:flex-row md:justify-between md:items-center">
+                                <div class="mb-4 md:mb-0">
+                                    <h3 class="text-lg font-medium text-gray-900">
+                                        {{ supplier.name }}
+                                        {% if supplier.cage_code %}
+                                        <span class="ml-2 text-sm font-mono text-gray-500">({{ supplier.cage_code }})</span>
+                                        {% endif %}
+                                    </h3>
+                                    
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        {% if supplier.supplier_type %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mr-2">
+                                            {{ supplier.supplier_type.description }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex space-x-3">
+                                    <a href="#" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
+                                        View Supplier
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Suppliers using this as physical address -->
+                {% if suppliers_physical %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-semibold text-gray-800">Physical Address For</h2>
+                            
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                                {{ suppliers_physical|length }} Supplier{{ suppliers_physical|length|pluralize }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-200">
+                        {% for supplier in suppliers_physical %}
+                        <div class="related-card p-6">
+                            <div class="flex flex-col md:flex-row md:justify-between md:items-center">
+                                <div class="mb-4 md:mb-0">
+                                    <h3 class="text-lg font-medium text-gray-900">
+                                        {{ supplier.name }}
+                                        {% if supplier.cage_code %}
+                                        <span class="ml-2 text-sm font-mono text-gray-500">({{ supplier.cage_code }})</span>
+                                        {% endif %}
+                                    </h3>
+                                    
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        {% if supplier.supplier_type %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mr-2">
+                                            {{ supplier.supplier_type.description }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex space-x-3">
+                                    <a href="#" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
+                                        View Supplier
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Contacts using this address -->
+                {% if contacts %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-semibold text-gray-800">Contacts Using This Address</h2>
+                            
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+                                {{ contacts|length }} Contact{{ contacts|length|pluralize }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-200">
+                        {% for contact in contacts %}
+                        <div class="related-card p-6">
+                            <div class="flex flex-col md:flex-row md:justify-between md:items-center">
+                                <div class="mb-4 md:mb-0">
+                                    <h3 class="text-lg font-medium text-gray-900">
+                                        {% if contact.salutation %}{{ contact.salutation }} {% endif %}{{ contact.name }}
+                                    </h3>
+                                    
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        {% if contact.company %}
+                                        <span class="mr-2">{{ contact.company }}</span>
+                                        {% endif %}
+                                        
+                                        {% if contact.title %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                            {{ contact.title }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex space-x-3">
+                                    <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
+                                        View Contact
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- No related entities message -->
+                {% if not suppliers_billing and not suppliers_shipping and not suppliers_physical and not contacts %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden p-8 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Related Entities</h3>
+                    <p class="text-gray-500 mb-6">This address is not currently associated with any suppliers or contacts.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

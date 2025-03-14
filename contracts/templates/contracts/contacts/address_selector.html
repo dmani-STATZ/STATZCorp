@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Address Selector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .address-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .address-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-color: #3b82f6;
+        }
+        .address-card.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        body {
+            background-color: #f9fafb;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-xl font-bold text-gray-800">Select Address</h1>
+            
+            <div class="flex space-x-2">
+                <button id="close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+        
+        <!-- Filter Section -->
+        <div class="mb-6 bg-gray-50 p-4 rounded-md border border-gray-200">
+            <form id="filter-form" class="space-y-4">
+                <input type="hidden" name="target_field" value="{{ target_field }}">
+                <input type="hidden" name="target_form" value="{{ target_form }}">
+                <input type="hidden" name="current_id" value="{{ current_id }}">
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- State/Province Filter -->
+                    <div>
+                        <label for="state" class="block text-sm font-medium text-gray-700 mb-1">State/Province</label>
+                        <select name="state" id="state" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="updateCityOptions()">
+                            <option value="">All States</option>
+                            {% for state in states %}
+                                {% if state %}
+                                <option value="{{ state }}" {% if state_filter == state %}selected{% endif %}>{{ state }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- City Filter -->
+                    <div>
+                        <label for="city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                        <select name="city" id="city" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="updateCityFilter()">
+                            <option value="">All Cities</option>
+                            {% for city in cities %}
+                                {% if city %}
+                                <option value="{{ city }}" {% if city_filter == city %}selected{% endif %}>{{ city }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Search Filter -->
+                    <div>
+                        <label for="q" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                        <div class="relative rounded-md shadow-sm">
+                            <input type="text" name="q" id="q" value="{{ search_query }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Search addresses...">
+                            {% if search_query %}
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                                <button type="button" onclick="clearSearch()" class="text-gray-400 hover:text-gray-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between">
+                    <button type="button" onclick="resetFilters()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Clear Filters
+                    </button>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        Apply Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Address List -->
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-lg font-medium text-gray-900">Addresses</h2>
+                <p class="text-sm text-gray-500">
+                    Showing {{ addresses|length }} of {{ total_count }} addresses
+                </p>
+            </div>
+            
+            {% if addresses %}
+                <div class="space-y-3 mb-4">
+                    {% for address in addresses %}
+                        <div class="address-card p-4 border rounded-md hover:border-blue-400 hover:bg-blue-50 cursor-pointer{% if current_id == address.id %} selected{% endif %}" data-address-id="{{ address.id }}">
+                            <div class="flex justify-between">
+                                <div>
+                                    <p class="font-medium text-gray-900">{{ address.address_line_1 }}</p>
+                                    <p class="text-sm text-gray-500">
+                                        {% if address.address_line_2 %}{{ address.address_line_2 }}, {% endif %}
+                                        {{ address.city }}, {{ address.state }} {{ address.zip }}
+                                    </p>
+                                </div>
+                                
+                                {% if current_id == address.id %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Current
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Pagination -->
+                {% if total_pages > 1 %}
+                <div class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+                    <div class="flex flex-1 justify-between sm:hidden">
+                        {% if has_previous %}
+                        <a href="javascript:goToPage({{ previous_page }})" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </a>
+                        {% endif %}
+                        {% if has_next %}
+                        <a href="javascript:goToPage({{ next_page }})" class="relative inline-flex items-center px-4 py-2 ml-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </a>
+                        {% endif %}
+                    </div>
+                    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm text-gray-700">
+                                Showing <span class="font-medium">{{ addresses|length }}</span> of <span class="font-medium">{{ total_count }}</span> addresses
+                            </p>
+                        </div>
+                        <div>
+                            <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                {% if has_previous %}
+                                <a href="javascript:goToPage({{ previous_page }})" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+                                    <span class="sr-only">Previous</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                                {% endif %}
+                                
+                                {% for i in total_pages|add:"1"|stringformat:"s"|slice:"1:" %}
+                                    {% if forloop.counter == current_page %}
+                                    <span class="relative z-10 inline-flex items-center bg-blue-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                        {{ forloop.counter }}
+                                    </span>
+                                    {% else %}
+                                    <a href="javascript:goToPage({{ forloop.counter }})" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+                                        {{ forloop.counter }}
+                                    </a>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if has_next %}
+                                <a href="javascript:goToPage({{ next_page }})" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+                                    <span class="sr-only">Next</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                                {% endif %}
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="p-8 text-center bg-gray-50 rounded-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p class="text-gray-600 mb-2">No addresses match your filters</p>
+                    <button onclick="resetFilters()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Reset Filters
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex justify-between border-t border-gray-200 pt-4">
+            <div>
+                <a href="{% url 'contracts:address_create' %}" onclick="openCreateAddressWindow(event)" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create New Address
+                </a>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button id="cancel-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Cancel
+                </button>
+                <button id="select-btn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled>
+                    Select Address
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedAddressId = null;
+        const targetField = "{{ target_field }}";
+        const targetForm = "{{ target_form }}";
+        
+        // Handle address selection
+        function selectAddress(element) {
+            // Remove selected class from all cards
+            document.querySelectorAll('.address-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked card
+            element.classList.add('selected');
+            
+            // Store selected address ID
+            selectedAddressId = element.dataset.addressId;
+            console.log("Selected address ID:", selectedAddressId);
+            
+            // Enable select button
+            document.getElementById('select-btn').disabled = false;
+        }
+        
+        // Handle form submission
+        document.getElementById('select-btn').addEventListener('click', function() {
+            // Check if we have a selected address
+            if (!selectedAddressId) {
+                alert("Please select an address first.");
+                return;
+            }
+            
+            console.log("Selecting address ID:", selectedAddressId);
+            console.log("Target field:", targetField);
+            
+            // Make sure the parent window exists and is accessible
+            if (window.opener && !window.opener.closed) {
+                try {
+                    // Simple approach - just set the value of the target field
+                    const targetElement = window.opener.document.getElementById(targetField);
+                    if (!targetElement) {
+                        throw new Error(`Target field '${targetField}' not found in parent window`);
+                    }
+                    
+                    // Set the value of the target field
+                    targetElement.value = selectedAddressId;
+                    console.log(`Set ${targetField} to ${selectedAddressId} in parent window`);
+                    
+                    // After setting the value, either call the parent window's refresh function
+                    // or simply reload the parent window
+                    if (typeof window.opener.refreshAfterAddressSelection === 'function') {
+                        try {
+                            window.opener.refreshAfterAddressSelection();
+                        } catch (refreshError) {
+                            console.error("Error refreshing parent window:", refreshError);
+                            alert("Address selected, but there was an error updating the display. The page will reload.");
+                            window.opener.location.reload();
+                        }
+                    } else {
+                        // Fallback - just reload the parent window
+                        console.log("No refresh function found, reloading parent window");
+                        window.opener.location.reload();
+                    }
+                    
+                    // Close this window
+                    window.close();
+                } catch (error) {
+                    console.error("Error updating the parent window:", error);
+                    alert("Error updating the parent window: " + error.message);
+                }
+            } else {
+                console.error("Parent window not available");
+                alert("Cannot access the parent window. It might be closed or not accessible.");
+            }
+        });
+        
+        // Handle cancel button
+        document.getElementById('cancel-btn').addEventListener('click', function() {
+            window.close();
+        });
+        
+        document.getElementById('close-btn').addEventListener('click', function() {
+            window.close();
+        });
+        
+        // Update city options based on selected state
+        function updateCityOptions() {
+            const stateSelect = document.getElementById('state');
+            const selectedState = stateSelect.value;
+            
+            // If a form submission is intended, just return
+            if (event && event.type === 'submit') return;
+            
+            // Update form and submit
+            document.getElementById('filter-form').submit();
+        }
+        
+        // Auto-submit when city filter changes
+        function updateCityFilter() {
+            // If a form submission is intended, just return
+            if (event && event.type === 'submit') return;
+            
+            // Submit the form to apply the city filter
+            document.getElementById('filter-form').submit();
+        }
+        
+        // Clear search field
+        function clearSearch() {
+            document.getElementById('q').value = '';
+            document.getElementById('filter-form').submit();
+        }
+        
+        // Reset all filters
+        function resetFilters() {
+            document.getElementById('state').value = '';
+            document.getElementById('city').value = '';
+            document.getElementById('q').value = '';
+            document.getElementById('filter-form').submit();
+        }
+        
+        // Pagination
+        function goToPage(page) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', page);
+            window.location.href = url.toString();
+            return false;
+        }
+        
+        // Open create address window
+        function openCreateAddressWindow(event) {
+            event.preventDefault();
+            const url = "{% url 'contracts:address_create' %}?popup=true";
+            
+            // Define popup dimensions
+            const popupWidth = 600;
+            const popupHeight = 800;
+            
+            // Calculate position to center the popup on the current window
+            const left = window.screenX + (window.outerWidth - popupWidth) / 2;
+            const top = window.screenY + (window.outerHeight - popupHeight) / 2;
+            
+            const newWindow = window.open(
+                url, 
+                "CreateAddress", 
+                `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+            );
+            
+            // Check periodically if the window was closed
+            const checkClosed = setInterval(function() {
+                if (newWindow.closed) {
+                    clearInterval(checkClosed);
+                    // Refresh this window to show the new address
+                    window.location.reload();
+                }
+            }, 500);
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set the initially selected address
+            const currentId = "{{ current_id }}";
+            if (currentId) {
+                const currentCard = document.querySelector(`.address-card[data-address-id="${currentId}"]`);
+                if (currentCard) {
+                    currentCard.classList.add('selected');
+                    selectedAddressId = currentId;
+                    document.getElementById('select-btn').disabled = false;
+                }
+            }
+            
+            // Add click listeners to all address cards
+            document.querySelectorAll('.address-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    selectAddress(this);
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

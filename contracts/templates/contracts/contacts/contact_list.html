@@ -1,0 +1,255 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .contact-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    .contact-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #3b82f6;
+    }
+    .contact-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.125rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .sort-icon {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        margin-left: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800 mb-4 sm:mb-0">
+                    <span class="text-blue-600">
+                        <i class="fas fa-address-book mr-2"></i>
+                    </span>
+                    Contact Management
+                </h1>
+                
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                    <a href="{% url 'contracts:contact_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add New Contact
+                    </a>
+                    
+                    <a href="{% url 'contracts:address_list' %}" class="inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-sm text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Manage Addresses
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Search Form -->
+            <form method="get" action="{% url 'contracts:contact_list' %}" class="mb-6">
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                    <div class="sm:flex-grow">
+                        <div class="relative rounded-md shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <input type="text" name="q" value="{{ search_query }}" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-2 border-gray-300 rounded-md" placeholder="Search by name, company, email, or phone...">
+                        </div>
+                    </div>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Search
+                    </button>
+                    {% if search_query %}
+                    <a href="{% url 'contracts:contact_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- Sort Controls -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-sm text-gray-500">
+                    {% with contact_count=contacts|length %}
+                    Showing {{ contact_count }} contact{{ contact_count|pluralize }}
+                    {% endwith %}
+                    {% if search_query %}
+                    matching <span class="font-medium">"{{ search_query }}"</span>
+                    {% endif %}
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-600">Sort by:</span>
+                    <div class="relative inline-block text-left">
+                        <select onchange="window.location.href='?{% if search_query %}q={{ search_query }}&{% endif %}sort=' + this.value" class="block pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name (A-Z)</option>
+                            <option value="-name" {% if sort_by == '-name' %}selected{% endif %}>Name (Z-A)</option>
+                            <option value="company" {% if sort_by == 'company' %}selected{% endif %}>Company (A-Z)</option>
+                            <option value="-company" {% if sort_by == '-company' %}selected{% endif %}>Company (Z-A)</option>
+                            <option value="-created_on" {% if sort_by == '-created_on' %}selected{% endif %}>Newest First</option>
+                            <option value="created_on" {% if sort_by == 'created_on' %}selected{% endif %}>Oldest First</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contacts Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for contact in contacts %}
+            <div class="contact-card bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                {% if contact.salutation %}{{ contact.salutation }} {% endif %}{{ contact.name }}
+                            </h3>
+                            {% if contact.company %}
+                            <p class="text-sm text-gray-600">{{ contact.company }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <div>
+                            {% if contact.supplier_count %}
+                            <span class="contact-badge bg-blue-100 text-blue-800">
+                                {{ contact.supplier_count }} Supplier{{ contact.supplier_count|pluralize }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="px-4 py-3">
+                    {% if contact.title %}
+                    <div class="flex items-start space-x-2 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span class="text-sm text-gray-700">{{ contact.title }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if contact.phone %}
+                    <div class="flex items-start space-x-2 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <span class="text-sm text-gray-700">{{ contact.phone }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if contact.email %}
+                    <div class="flex items-start space-x-2 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span class="text-sm text-gray-700 truncate">{{ contact.email }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if contact.address %}
+                    <div class="flex items-start space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="text-sm text-gray-700 truncate">{{ contact.address }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="px-4 py-3 bg-gray-50 border-t border-gray-200">
+                    <div class="flex justify-between">
+                        <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                            View details
+                        </a>
+                        <div class="flex space-x-2">
+                            <a href="{% url 'contracts:contact_update' pk=contact.id %}" class="text-sm font-medium text-gray-600 hover:text-gray-900">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </a>
+                            <a href="{% url 'contracts:contact_delete' pk=contact.id %}" class="text-sm font-medium text-red-600 hover:text-red-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full bg-white rounded-lg shadow p-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
+                <p class="text-gray-500 mb-6">
+                    {% if search_query %}
+                    No contacts match your search criteria. Try a different search term or add a new contact.
+                    {% else %}
+                    You haven't added any contacts yet. Create your first contact to get started.
+                    {% endif %}
+                </p>
+                <a href="{% url 'contracts:contact_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add New Contact
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow">
+            <div class="flex-1 flex justify-between items-center">
+                {% if page_obj.has_previous %}
+                <a href="?{% if search_query %}q={{ search_query }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Previous
+                </a>
+                {% else %}
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-gray-50 cursor-not-allowed">
+                    Previous
+                </span>
+                {% endif %}
+                
+                <div class="hidden md:flex">
+                    <span class="text-sm text-gray-700">
+                        Page <span class="font-medium">{{ page_obj.number }}</span> of <span class="font-medium">{{ page_obj.paginator.num_pages }}</span>
+                    </span>
+                </div>
+                
+                {% if page_obj.has_next %}
+                <a href="?{% if search_query %}q={{ search_query }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Next
+                </a>
+                {% else %}
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-gray-50 cursor-not-allowed">
+                    Next
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

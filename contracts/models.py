@@ -270,7 +270,9 @@ class Supplier(AuditModel):
     allows_gsi = models.BooleanField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.name.upper()} - {self.cage_code}"
+        name_display = self.name.upper() if self.name else "NO NAME"
+        cage_code_display = self.cage_code if self.cage_code else ""
+        return f"{name_display}{' - ' + cage_code_display if cage_code_display else ''}"
 
 
 class SupplierType(models.Model):

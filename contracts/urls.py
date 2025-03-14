@@ -28,6 +28,20 @@ from .views import (
     NsnUpdateView,
     SupplierUpdateView,
     
+    # Contact and Address views
+    ContactListView,
+    ContactDetailView,
+    ContactCreateView,
+    ContactUpdateView,
+    ContactDeleteView,
+    AddressListView,
+    AddressDetailView,
+    AddressCreateView,
+    AddressUpdateView,
+    AddressDeleteView,
+    AddressCreateSuccessView,
+    AddressSelectorView,
+    
     # Note views
     add_note,
     delete_note,
@@ -136,4 +150,20 @@ urlpatterns = [
     # Test
     path('test-app-name/', test_app_name, name='test_app_name'),
     path('check-contract-number/', check_contract_number, name='check_contract_number'),
+    
+    # Contact management
+    path('contacts/', ContactListView.as_view(), name='contact_list'),
+    path('contacts/<int:pk>/', ContactDetailView.as_view(), name='contact_detail'),
+    path('contacts/create/', ContactCreateView.as_view(), name='contact_create'),
+    path('contacts/<int:pk>/update/', ContactUpdateView.as_view(), name='contact_update'),
+    path('contacts/<int:pk>/delete/', ContactDeleteView.as_view(), name='contact_delete'),
+    
+    # Address management
+    path('addresses/', AddressListView.as_view(), name='address_list'),
+    path('addresses/create/', AddressCreateView.as_view(), name='address_create'),
+    path('addresses/create/success/', AddressCreateSuccessView.as_view(), name='address_create_success'),
+    path('addresses/<int:pk>/', AddressDetailView.as_view(), name='address_detail'),
+    path('addresses/<int:pk>/update/', AddressUpdateView.as_view(), name='address_update'),
+    path('addresses/<int:pk>/delete/', AddressDeleteView.as_view(), name='address_delete'),
+    path('addresses/selector/', AddressSelectorView.as_view(), name='address_selector'),
 ] 

@@ -1,0 +1,487 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .address-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    .address-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #3b82f6;
+    }
+    .usage-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.125rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .map-container {
+        height: 500px;
+        width: 100%;
+        position: relative;
+    }
+    #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+        border-radius: 0.5rem;
+    }
+    .map-overlay {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 15px;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        z-index: 1;
+        max-width: 300px;
+        display: none;
+    }
+    .map-card-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 4px;
+    }
+    .map-card-address {
+        font-size: 12px;
+        color: #4b5563;
+    }
+    .map-card-link {
+        display: block;
+        margin-top: 8px;
+        font-size: 12px;
+        color: #3b82f6;
+        text-decoration: none;
+    }
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .toggle-slider {
+        background-color: #3b82f6;
+    }
+    input:focus + .toggle-slider {
+        box-shadow: 0 0 1px #3b82f6;
+    }
+    input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+</style>
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css" rel="stylesheet">
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const viewToggle = document.getElementById('view-toggle');
+        const listView = document.getElementById('list-view');
+        const mapView = document.getElementById('map-view');
+        
+        if (viewToggle) {
+            viewToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    // Map view
+                    listView.classList.add('hidden');
+                    mapView.classList.remove('hidden');
+                    initMap();
+                } else {
+                    // List view
+                    mapView.classList.add('hidden');
+                    listView.classList.remove('hidden');
+                }
+            });
+        }
+        
+        // Initialize map when view is toggled to map
+        function initMap() {
+            // Only initialize once
+            if (window.mapInitialized) return;
+            
+            mapboxgl.accessToken = 'pk.eyJ1IjoiZXhhbXBsZXVzZXIiLCJhIjoiY2txeHR5NWR5MDI0ejJ2bzZleWFka2pmaiJ9.example-signature';
+            
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [-95.7129, 37.0902], // Center of USA
+                zoom: 3
+            });
+            
+            // Add navigation controls
+            map.addControl(new mapboxgl.NavigationControl());
+            
+            // Setup map overlay for address info
+            const overlay = document.getElementById('map-overlay');
+            
+            // Add markers for each address
+            const addresses = [
+                {% for address in addresses %}
+                {
+                    id: {{ address.id }},
+                    addressLine1: '{{ address.address_line_1|escapejs }}',
+                    addressLine2: '{% if address.address_line_2 %}{{ address.address_line_2|escapejs }}{% endif %}',
+                    city: '{{ address.city|escapejs }}',
+                    state: '{{ address.state|escapejs }}',
+                    zip: '{{ address.zip|escapejs }}',
+                    usage: {{ address.total_usage }},
+                    // Geocoding would normally be done server-side
+                    // These are placeholder coordinates - would be replaced with actual geocoded data
+                    coordinates: [
+                        -97 + (Math.random() * 20 - 10), // Random longitude near center of US
+                        38 + (Math.random() * 10 - 5)    // Random latitude near center of US
+                    ]
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ];
+            
+            addresses.forEach(address => {
+                // Create marker element
+                const el = document.createElement('div');
+                el.className = 'marker';
+                el.style.width = '24px';
+                el.style.height = '24px';
+                el.style.borderRadius = '50%';
+                el.style.backgroundColor = '#3b82f6';
+                el.style.border = '2px solid white';
+                el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+                el.style.cursor = 'pointer';
+                
+                // Add marker to map
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat(address.coordinates)
+                    .addTo(map);
+                
+                // Show info on marker click
+                el.addEventListener('click', () => {
+                    // Update overlay content
+                    document.getElementById('map-card-title').textContent = 
+                        `${address.city}, ${address.state}`;
+                    
+                    let addressText = address.addressLine1;
+                    if (address.addressLine2) {
+                        addressText += ', ' + address.addressLine2;
+                    }
+                    addressText += `<br>${address.city}, ${address.state} ${address.zip}`;
+                    
+                    document.getElementById('map-card-address').innerHTML = addressText;
+                    document.getElementById('map-card-usage').textContent = 
+                        `Used by ${address.usage} ${address.usage === 1 ? 'entity' : 'entities'}`;
+                    
+                    document.getElementById('map-card-link').href = 
+                        `{% url 'contracts:address_detail' pk=999 %}`.replace('999', address.id);
+                    
+                    // Show overlay
+                    overlay.style.display = 'block';
+                    
+                    // Center map on marker
+                    map.flyTo({
+                        center: address.coordinates,
+                        zoom: 10,
+                        essential: true
+                    });
+                });
+            });
+            
+            // Mark map as initialized
+            window.mapInitialized = true;
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800 mb-4 sm:mb-0">
+                    <span class="text-blue-600">
+                        <i class="fas fa-map-marker-alt mr-2"></i>
+                    </span>
+                    Address Management
+                </h1>
+                
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                    <a href="{% url 'contracts:address_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add New Address
+                    </a>
+                    
+                    <a href="{% url 'contracts:contact_list' %}" class="inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-sm text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Manage Contacts
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Search Form -->
+            <form method="get" action="{% url 'contracts:address_list' %}" class="mb-6">
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                    <div class="sm:flex-grow">
+                        <div class="relative rounded-md shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <input type="text" name="q" value="{{ search_query }}" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-2 border-gray-300 rounded-md" placeholder="Search by street, city, state, or zip...">
+                        </div>
+                    </div>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Search
+                    </button>
+                    {% if search_query %}
+                    <a href="{% url 'contracts:address_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- Controls Row -->
+            <div class="flex flex-wrap justify-between items-center">
+                <!-- Address Count -->
+                <div class="text-sm text-gray-500 mb-4 sm:mb-0">
+                    {% with address_count=addresses|length %}
+                    Showing {{ address_count }} address{{ address_count|pluralize:"es" }}
+                    {% endwith %}
+                    {% if search_query %}
+                    matching <span class="font-medium">"{{ search_query }}"</span>
+                    {% endif %}
+                </div>
+                
+                <div class="flex flex-wrap items-center space-x-6">
+                    <!-- Sort Controls -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-600">Sort by:</span>
+                        <div class="relative inline-block text-left">
+                            <select onchange="window.location.href='?{% if search_query %}q={{ search_query }}&{% endif %}sort=' + this.value" class="block pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="-id" {% if sort_by == '-id' %}selected{% endif %}>Newest First</option>
+                                <option value="id" {% if sort_by == 'id' %}selected{% endif %}>Oldest First</option>
+                                <option value="city" {% if sort_by == 'city' %}selected{% endif %}>City (A-Z)</option>
+                                <option value="-city" {% if sort_by == '-city' %}selected{% endif %}>City (Z-A)</option>
+                                <option value="state" {% if sort_by == 'state' %}selected{% endif %}>State (A-Z)</option>
+                                <option value="-state" {% if sort_by == '-state' %}selected{% endif %}>State (Z-A)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- View Toggle -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-600">List</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="view-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="text-sm text-gray-600">Map</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- List View -->
+        <div id="list-view" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for address in addresses %}
+            <div class="address-card bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-lg font-semibold text-gray-800">
+                            {{ address.city }}{% if address.state %}, {{ address.state }}{% endif %}
+                        </h3>
+                        
+                        {% if address.total_usage %}
+                        <span class="usage-badge bg-blue-100 text-blue-800">
+                            {{ address.total_usage }} Use{{ address.total_usage|pluralize }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="p-4">
+                    <div class="mb-4">
+                        <p class="text-gray-700">{{ address.address_line_1 }}</p>
+                        {% if address.address_line_2 %}
+                        <p class="text-gray-700">{{ address.address_line_2 }}</p>
+                        {% endif %}
+                        <p class="text-gray-700">{{ address.city }}{% if address.city and address.state %}, {% endif %}{{ address.state }} {{ address.zip }}</p>
+                    </div>
+                    
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        {% if address.supplier_billing_count %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {{ address.supplier_billing_count }} Billing
+                        </span>
+                        {% endif %}
+                        
+                        {% if address.supplier_shipping_count %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            {{ address.supplier_shipping_count }} Shipping
+                        </span>
+                        {% endif %}
+                        
+                        {% if address.supplier_physical_count %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {{ address.supplier_physical_count }} Physical
+                        </span>
+                        {% endif %}
+                        
+                        {% if address.contact_count %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            {{ address.contact_count }} Contact{{ address.contact_count|pluralize }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="px-4 py-3 bg-gray-50 border-t border-gray-200">
+                    <div class="flex justify-between">
+                        <a href="{% url 'contracts:address_detail' pk=address.id %}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                            View details
+                        </a>
+                        
+                        <div class="flex space-x-2">
+                            <a href="https://maps.google.com/?q={{ address.address_line_1 }}{% if address.address_line_2 %}, {{ address.address_line_2 }}{% endif %}, {{ address.city }}, {{ address.state }} {{ address.zip }}" target="_blank" class="text-sm font-medium text-gray-600 hover:text-gray-900" title="Open in Google Maps">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                            </a>
+                            <a href="{% url 'contracts:address_update' pk=address.id %}" class="text-sm font-medium text-gray-600 hover:text-gray-900">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </a>
+                            <a href="{% url 'contracts:address_delete' pk=address.id %}" class="text-sm font-medium text-red-600 hover:text-red-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full bg-white rounded-lg shadow p-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No addresses found</h3>
+                <p class="text-gray-500 mb-6">
+                    {% if search_query %}
+                    No addresses match your search criteria. Try a different search term or add a new address.
+                    {% else %}
+                    You haven't added any addresses yet. Create your first address to get started.
+                    {% endif %}
+                </p>
+                <a href="{% url 'contracts:address_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add New Address
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Map View -->
+        <div id="map-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Address Map</h2>
+                    <p class="text-sm text-gray-600">Visualize all addresses on the map. Click on a marker to view details.</p>
+                </div>
+                
+                <div class="map-container">
+                    <div id="map"></div>
+                    <div id="map-overlay" class="map-overlay">
+                        <div id="map-card-title" class="map-card-title"></div>
+                        <div id="map-card-address" class="map-card-address"></div>
+                        <div id="map-card-usage" class="map-card-address mt-2"></div>
+                        <a id="map-card-link" href="#" class="map-card-link">View Details</a>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-sm text-gray-500">
+                    <p>Note: The map view displays approximate locations for demonstration purposes.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow">
+            <div class="flex-1 flex justify-between items-center">
+                {% if page_obj.has_previous %}
+                <a href="?{% if search_query %}q={{ search_query }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Previous
+                </a>
+                {% else %}
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-gray-50 cursor-not-allowed">
+                    Previous
+                </span>
+                {% endif %}
+                
+                <div class="hidden md:flex">
+                    <span class="text-sm text-gray-700">
+                        Page <span class="font-medium">{{ page_obj.number }}</span> of <span class="font-medium">{{ page_obj.paginator.num_pages }}</span>
+                    </span>
+                </div>
+                
+                {% if page_obj.has_next %}
+                <a href="?{% if search_query %}q={{ search_query }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Next
+                </a>
+                {% else %}
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-gray-50 cursor-not-allowed">
+                    Next
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

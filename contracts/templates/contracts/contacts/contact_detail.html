@@ -1,0 +1,263 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .info-section {
+        transition: all 0.2s ease;
+    }
+    .info-section:hover {
+        background-color: rgba(243, 244, 246, 0.8);
+    }
+    .action-button {
+        transition: all 0.2s ease;
+    }
+    .action-button:hover {
+        transform: translateY(-1px);
+    }
+    .supplier-card {
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+    }
+    .supplier-card:hover {
+        border-left: 3px solid #3b82f6;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header with action buttons -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div class="flex flex-col">
+                    <div class="flex items-center mb-1">
+                        <h1 class="text-2xl font-bold text-gray-800 mr-3">
+                            <span class="text-blue-600 mr-2">
+                                <i class="fas fa-user-tie"></i>
+                            </span>
+                            {% if contact.salutation %}{{ contact.salutation }} {% endif %}{{ contact.name }}
+                        </h1>
+                    </div>
+                    {% if contact.company %}
+                    <p class="text-lg text-gray-600">{{ contact.company }}</p>
+                    {% endif %}
+                </div>
+                
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4 md:mt-0">
+                    <a href="{% url 'contracts:contact_list' %}" class="action-button inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-sm text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Back to Contacts
+                    </a>
+                    
+                    <a href="{% url 'contracts:contact_update' pk=contact.id %}" class="action-button inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit Contact
+                    </a>
+                    
+                    <a href="{% url 'contracts:contact_delete' pk=contact.id %}" class="action-button inline-flex items-center px-4 py-2 bg-red-100 border border-transparent rounded-md font-semibold text-sm text-red-900 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Contact
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contact Information and Related Suppliers -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Column: Contact Information -->
+            <div class="lg:col-span-1">
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-800">Contact Information</h2>
+                    </div>
+                    
+                    <div class="divide-y divide-gray-200">
+                        {% if contact.title %}
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Job Title</h3>
+                            <p class="text-base text-gray-900">{{ contact.title }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if contact.phone %}
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Phone</h3>
+                            <p class="text-base text-gray-900">
+                                <a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">
+                                    {{ contact.phone }}
+                                </a>
+                            </p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if contact.email %}
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Email</h3>
+                            <p class="text-base text-gray-900">
+                                <a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">
+                                    {{ contact.email }}
+                                </a>
+                            </p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if contact.company %}
+                        <div class="info-section px-6 py-4">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Company</h3>
+                            <p class="text-base text-gray-900">{{ contact.company }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Address Information -->
+                {% if contact.address %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-semibold text-gray-800">Address</h2>
+                            
+                            <a href="{% url 'contracts:address_detail' pk=contact.address.id %}" class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View Address
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="flex mb-4">
+                            <div class="mr-4 text-blue-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-base text-gray-900">{{ contact.address.address_line_1 }}</p>
+                                {% if contact.address.address_line_2 %}
+                                <p class="text-base text-gray-900">{{ contact.address.address_line_2 }}</p>
+                                {% endif %}
+                                <p class="text-base text-gray-900">
+                                    {{ contact.address.city }}{% if contact.address.city and contact.address.state %}, {% endif %}{{ contact.address.state }} {{ contact.address.zip }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <a href="https://maps.google.com/?q={{ contact.address.address_line_1 }}{% if contact.address.address_line_2 %} {{ contact.address.address_line_2 }}{% endif %}, {{ contact.address.city }}, {{ contact.address.state }} {{ contact.address.zip }}" target="_blank" class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:border-blue-700 focus:shadow-outline-blue transition ease-in-out duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                                Open in Maps
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Notes Section -->
+                {% if contact.notes %}
+                <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-800">Notes</h2>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="bg-yellow-50 p-4 rounded-md border border-yellow-100">
+                            <p class="text-gray-700 whitespace-pre-line">{{ contact.notes }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Right Column: Related Suppliers -->
+            <div class="lg:col-span-2">
+                <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-semibold text-gray-800">Related Suppliers</h2>
+                            
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                {{ related_suppliers|length }} Supplier{{ related_suppliers|length|pluralize }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {% if related_suppliers %}
+                    <div class="divide-y divide-gray-200">
+                        {% for supplier in related_suppliers %}
+                        <div class="supplier-card p-6">
+                            <div class="flex flex-col md:flex-row md:justify-between md:items-center">
+                                <div class="mb-4 md:mb-0">
+                                    <h3 class="text-lg font-medium text-gray-900">
+                                        {{ supplier.name }}
+                                        {% if supplier.cage_code %}
+                                        <span class="ml-2 text-sm font-mono text-gray-500">({{ supplier.cage_code }})</span>
+                                        {% endif %}
+                                    </h3>
+                                    
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        {% if supplier.supplier_type %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mr-2">
+                                            {{ supplier.supplier_type.description }}
+                                        </span>
+                                        {% endif %}
+                                        
+                                        {% if supplier.business_phone %}
+                                        <span class="inline-flex items-center mr-3">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                            </svg>
+                                            {{ supplier.business_phone }}
+                                        </span>
+                                        {% endif %}
+                                        
+                                        {% if supplier.business_email %}
+                                        <span class="inline-flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            {{ supplier.business_email }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex space-x-3">
+                                    <a href="{% url 'contracts:supplier_detail' pk=supplier.id %}" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
+                                        View Supplier
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-8 text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No Related Suppliers</h3>
+                        <p class="text-gray-500 mb-6">This contact is not associated with any suppliers yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

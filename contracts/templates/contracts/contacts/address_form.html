@@ -1,0 +1,262 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .field-help {
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    #map-preview {
+        height: 300px;
+        border-radius: 0.5rem;
+    }
+    .map-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+        overflow: hidden;
+        border-radius: 0.5rem;
+    }
+</style>
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css" rel="stylesheet">
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Mapbox
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZXhhbXBsZXVzZXIiLCJhIjoiY2txeHR5NWR5MDI0ejJ2bzZleWFka2pmaiJ9.example-signature';
+        
+        const map = new mapboxgl.Map({
+            container: 'map-preview',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [-95.7129, 37.0902], // Default center (USA)
+            zoom: 3
+        });
+        
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+        
+        // Create marker
+        const marker = new mapboxgl.Marker({
+            color: "#3b82f6",
+            draggable: true
+        });
+        
+        // Function to update map based on address
+        function updateMap() {
+            const address1 = document.getElementById('id_address_line_1').value;
+            const address2 = document.getElementById('id_address_line_2').value;
+            const city = document.getElementById('id_city').value;
+            const state = document.getElementById('id_state').value;
+            const zip = document.getElementById('id_zip').value;
+            
+            if (!city || !state) return; // Need at least city and state
+            
+            const fullAddress = `${address1}, ${city}, ${state} ${zip}`;
+            document.getElementById('preview-status').textContent = 'Locating address...';
+            
+            // In a real implementation, you would call a geocoding service here
+            // This is a simplified example that generates a random point near the given state
+            // For production, use Mapbox Geocoding API or Google Geocoding API
+            
+            // Simplified mocked geocoding - would be replaced with actual API call
+            const stateCoordinates = {
+                'AL': [-86.8073, 32.7990],
+                'AK': [-149.4937, 64.2008],
+                'AZ': [-111.0937, 34.0489],
+                'AR': [-92.3809, 34.9513],
+                'CA': [-119.4179, 36.7783],
+                'CO': [-105.7821, 39.5501],
+                'CT': [-72.7273, 41.6032],
+                'DE': [-75.5148, 39.1454],
+                'FL': [-81.5158, 27.6648],
+                'GA': [-83.6431, 32.9406],
+                'HI': [-155.5828, 19.8968],
+                'ID': [-114.7420, 44.0682],
+                'IL': [-89.3985, 40.6331],
+                'IN': [-86.2604, 39.8647],
+                'IA': [-93.0977, 41.8780],
+                'KS': [-98.3804, 39.0119],
+                'KY': [-84.2700, 37.8393],
+                'LA': [-91.9623, 30.9843],
+                'ME': [-69.4455, 44.6074],
+                'MD': [-76.6413, 39.0458],
+                'MA': [-71.3824, 42.4072],
+                'MI': [-84.5603, 44.3148],
+                'MN': [-94.6859, 46.7296],
+                'MS': [-89.6812, 32.7416],
+                'MO': [-92.6036, 37.9643],
+                'MT': [-110.3626, 46.9219],
+                'NE': [-99.9018, 41.4925],
+                'NV': [-117.1219, 38.8026],
+                'NH': [-71.5724, 43.1939],
+                'NJ': [-74.4057, 40.0583],
+                'NM': [-106.0260, 34.5199],
+                'NY': [-74.2179, 43.2994],
+                'NC': [-79.8431, 35.7596],
+                'ND': [-100.4701, 47.5515],
+                'OH': [-82.7937, 40.4173],
+                'OK': [-97.5170, 35.4676],
+                'OR': [-120.5542, 44.0593],
+                'PA': [-77.1945, 41.2033],
+                'RI': [-71.4774, 41.5801],
+                'SC': [-81.1637, 33.8361],
+                'SD': [-99.9018, 44.2998],
+                'TN': [-86.7844, 35.7478],
+                'TX': [-99.9018, 31.9686],
+                'UT': [-111.0937, 39.3210],
+                'VT': [-72.5778, 44.0687],
+                'VA': [-78.6569, 37.4316],
+                'WA': [-120.7401, 47.7511],
+                'WV': [-80.9696, 38.5976],
+                'WI': [-89.6385, 44.2563],
+                'WY': [-107.2903, 43.0760]
+            };
+            
+            // Default to center of US if state not found
+            let coordinates = [-95.7129, 37.0902]; 
+            
+            // If we have a match for the state, use those coordinates
+            if (stateCoordinates[state.toUpperCase()]) {
+                coordinates = stateCoordinates[state.toUpperCase()];
+                
+                // Add a slight randomness to simulate specific address
+                coordinates = [
+                    coordinates[0] + ((Math.random() - 0.5) * 0.5),
+                    coordinates[1] + ((Math.random() - 0.5) * 0.5)
+                ];
+            }
+            
+            // Add marker and fly to location
+            marker.setLngLat(coordinates).addTo(map);
+            
+            map.flyTo({
+                center: coordinates,
+                zoom: 13,
+                essential: true
+            });
+            
+            document.getElementById('preview-status').textContent = 'Address located (approximate)';
+            document.getElementById('map-section').classList.remove('hidden');
+        }
+        
+        // Set up event listeners for address fields
+        const addressFields = [
+            'id_address_line_1',
+            'id_city',
+            'id_state',
+            'id_zip'
+        ];
+        
+        addressFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('blur', function() {
+                    // Only update map if we have enough info
+                    if (document.getElementById('id_city').value && 
+                        document.getElementById('id_state').value) {
+                        updateMap();
+                    }
+                });
+            }
+        });
+        
+        // Preview button
+        const previewBtn = document.getElementById('preview-address-btn');
+        if (previewBtn) {
+            previewBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                updateMap();
+            });
+        }
+        
+        // If editing and we have address data already, show the map
+        if (document.getElementById('id_city').value && 
+            document.getElementById('id_state').value) {
+            updateMap();
+        } else {
+            document.getElementById('map-section').classList.add('hidden');
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+{% if is_popup %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-4">
+    <div class="max-w-lg mx-auto bg-white shadow-md rounded-lg p-6">
+        <h1 class="text-xl font-bold text-gray-800 mb-4">{{ title }}</h1>
+        
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            {{ form|crispy }}
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="window.close()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    {{ submit_text|default:"Create Address" }}
+                </button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+{% else %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-lg leading-6 font-medium text-gray-900">{{ title }}</h1>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">Create or edit address information</p>
+        </div>
+        <div>
+            <a href="{% url 'contracts:address_list' %}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Back to Address List
+            </a>
+        </div>
+    </div>
+    <div class="border-t border-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+            <form method="post" id="address-form">
+                {% csrf_token %}
+                <div class="space-y-6">
+                    {{ form|crispy }}
+                    
+                    <div class="flex justify-end">
+                        <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            {{ submit_text|default:"Save Address" }}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %} 

@@ -28,6 +28,21 @@ from .nsn_views import (
     NsnUpdateView,
 )
 
+from .contacts_views import (
+    ContactListView,
+    ContactDetailView,
+    ContactCreateView,
+    ContactUpdateView,
+    ContactDeleteView,
+    AddressListView,
+    AddressDetailView,
+    AddressCreateView,
+    AddressUpdateView,
+    AddressDeleteView,
+    AddressCreateSuccessView,
+    AddressSelectorView,
+)
+
 from .note_views import (
     add_note,
     delete_note,

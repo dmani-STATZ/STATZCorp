@@ -30,7 +30,129 @@
         border-bottom: 1px solid #e5e7eb;
         font-family: inherit;
     }
+    
+    /* Address card styling */
+    .address-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: #f9fafb;
+    }
+    
+    .address-card.current {
+        background-color: #eff6ff;
+        border-color: #3b82f6;
+    }
 </style>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+    // Function to open address selector popup
+    function openAddressSelector(fieldId) {
+        // Get the current address ID if any
+        const currentAddressId = document.getElementById(fieldId).value;
+        
+        // Define popup dimensions
+        const popupWidth = 850;
+        const popupHeight = 865;
+        
+        // Calculate position to center the popup on the parent window
+        const left = window.screenX + (window.outerWidth - popupWidth) / 2;
+        const top = window.screenY + (window.outerHeight - popupHeight) / 2;
+        
+        // Open the address selector in a new window with calculated position
+        const url = "{% url 'contracts:address_selector' %}?target_field=" + fieldId + "&current_id=" + currentAddressId;
+        const selectorWindow = window.open(
+            url,
+            "AddressSelector",
+            `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+    }
+    
+    // Function to open create address window
+    function openCreateAddressWindow(event) {
+        event.preventDefault();
+        const url = event.target.href || event.currentTarget.href;
+        
+        // Define popup dimensions
+        const popupWidth = 600;
+        const popupHeight = 800;
+        
+        // Calculate position to center the popup on the parent window
+        const left = window.screenX + (window.outerWidth - popupWidth) / 2;
+        const top = window.screenY + (window.outerHeight - popupHeight) / 2;
+        
+        const newWindow = window.open(
+            url, 
+            "CreateAddress", 
+            `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+        
+        // Check periodically if the window was closed
+        const checkClosed = setInterval(function() {
+            if (newWindow.closed) {
+                clearInterval(checkClosed);
+                // Refresh address display
+                window.refreshAfterAddressSelection();
+            }
+        }, 500);
+    }
+    
+    // Function to refresh address display after selection
+    window.refreshAfterAddressSelection = function() {
+        try {
+            // Try to find the form
+            const form = document.querySelector('form');
+            if (!form) {
+                console.error("Supplier form not found");
+                // Even if we can't refresh with AJAX, we can at least refresh the page
+                window.location.reload();
+                return;
+            }
+            
+            // Use a simple approach if the form is available
+            try {
+                const formData = new FormData(form);
+                
+                console.log("Refreshing supplier form");
+                
+                // If we're just updating an address field, we can make a simpler request
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.status);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // For simplicity, just reload the page
+                    window.location.reload();
+                })
+                .catch(error => {
+                    console.error('Error refreshing address display:', error);
+                    // If AJAX fails, reload the page
+                    window.location.reload();
+                });
+            } catch (formDataError) {
+                console.error('Error creating FormData from form:', formDataError);
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('Error in refreshAfterAddressSelection:', error);
+            // If anything goes wrong, just reload the page
+            window.location.reload();
+        }
+    };
+</script>
 {% endblock %}
 
 {% block content %}
@@ -54,50 +176,65 @@
         <div class="bg-white shadow-lg rounded-lg p-6">
             <form method="post" class="space-y-6">
                 {% csrf_token %}
+
+                <!-- Debug Information -->
+                <div class="bg-red-50 p-4 rounded-lg mb-6">
+                    <h2 class="text-lg font-semibold text-red-700">Debug Information</h2>
+                    <pre class="text-xs overflow-auto p-2 bg-white rounded border border-red-200 mt-2">
+Supplier ID: {{ supplier.id }}
+Supplier Name: {{ supplier.name }}
+Supplier Cage Code: {{ supplier.cage_code }}
+Form Data: {{ form.initial }}
+                    </pre>
+                </div>
                 
                 <!-- Basic Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
                     <h2 class="section-header">Basic Information</h2>
                     <div class="grid grid-cols-1 gap-4">
-                        {% for field in form %}
-                            {% if field.name == 'name' %}
-                                <div class="col-span-1">
-                                    <div class="form-group">
-                                        <label for="{{ field.id_for_label }}" class="form-label">
-                                            {{ field.label }}
-                                        </label>
-                                        <input type="text" name="{{ field.name }}" value="{{ field.value|default:'' }}" 
-                                               class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                               id="{{ field.id_for_label }}">
-                                        {% if field.errors %}
-                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                        {% endif %}
-                                        {% if field.help_text %}
-                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                        <div class="grid grid-cols-2 gap-4">
-                            {% for field in form %}
-                                {% if field.name in 'cage_code,supplier_type' %}
-                                    <div>
-                                        <div class="form-group">
-                                            <label for="{{ field.id_for_label }}" class="form-label">
-                                                {{ field.label }}
-                                            </label>
-                                            {{ field }}
-                                            {% if field.errors %}
-                                                <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                            {% endif %}
-                                            {% if field.help_text %}
-                                                <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
+                        <div class="col-span-1">
+                            <div class="form-group">
+                                <label for="{{ form.name.id_for_label }}" class="form-label">
+                                    {{ form.name.label }}
+                                </label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.name.errors }}</div>
                                 {% endif %}
-                            {% endfor %}
+                                {% if form.name.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.name.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="form-group">
+                                    <label for="{{ form.cage_code.id_for_label }}" class="form-label">
+                                        {{ form.cage_code.label }}
+                                    </label>
+                                    {{ form.cage_code }}
+                                    {% if form.cage_code.errors %}
+                                        <div class="text-red-500 text-sm mt-1">{{ form.cage_code.errors }}</div>
+                                    {% endif %}
+                                    {% if form.cage_code.help_text %}
+                                        <div class="text-gray-500 text-sm mt-1">{{ form.cage_code.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="form-group">
+                                    <label for="{{ form.supplier_type.id_for_label }}" class="form-label">
+                                        {{ form.supplier_type.label }}
+                                    </label>
+                                    {{ form.supplier_type }}
+                                    {% if form.supplier_type.errors %}
+                                        <div class="text-red-500 text-sm mt-1">{{ form.supplier_type.errors }}</div>
+                                    {% endif %}
+                                    {% if form.supplier_type.help_text %}
+                                        <div class="text-gray-500 text-sm mt-1">{{ form.supplier_type.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -105,7 +242,7 @@
                 <!-- Address Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
                     <h2 class="section-header">Address Information</h2>
-                    <div class="space-y-4">
+                    <div class="space-y-6">
                         {% for field in form %}
                             {% if field.name in 'physical_address,shipping_address,billing_address' %}
                                 <div>
@@ -113,7 +250,63 @@
                                         <label for="{{ field.id_for_label }}" class="form-label">
                                             {{ field.label }}
                                         </label>
-                                        {{ field }}
+                                        
+                                        <!-- We'll use a hidden input but make sure it gets the field's value correctly -->
+                                        {{ field.as_hidden }}
+                                        
+                                        <!-- Address display -->
+                                        <div class="mb-3">
+                                            {% if field.value and addresses %}
+                                                {% with address_id=field.value|stringformat:"s" %}
+                                                    {% for address in addresses %}
+                                                        {% if address.id|stringformat:"s" == address_id %}
+                                                            <div class="address-card current">
+                                                                <div class="flex justify-between items-start">
+                                                                    <div>
+                                                                        <div class="text-blue-700">
+                                                                            {{ address.address_line_1 }}{% if address.address_line_2 %}, {{ address.address_line_2 }}{% endif %}<br>
+                                                                            {{ address.city }}, {{ address.state }} {{ address.zip }}<br>
+                                                                            {% if address.country %}{{ address.country }}{% endif %}
+                                                                        </div>
+                                                                    </div>
+                                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800">
+                                                                        <svg class="mr-1.5 h-2 w-2 text-blue-400" fill="currentColor" viewBox="0 0 8 8">
+                                                                            <circle cx="4" cy="4" r="3" />
+                                                                        </svg>
+                                                                        Current
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                {% endwith %}
+                                            {% else %}
+                                                <div class="p-4 border rounded-md bg-gray-50 border-gray-200 mb-4">
+                                                    <div class="text-gray-500 italic">No address assigned</div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="flex space-x-4">
+                                            <button type="button" 
+                                                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                    onclick="openAddressSelector('{{ field.id_for_label }}')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                </svg>
+                                                Change Address
+                                            </button>
+                                            
+                                            <a href="{% url 'contracts:address_create' %}?popup=true" 
+                                               onclick="openCreateAddressWindow(event)"
+                                               class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                                </svg>
+                                                Create New Address
+                                            </a>
+                                        </div>
+                                        
                                         {% if field.errors %}
                                             <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
                                         {% endif %}
@@ -157,25 +350,7 @@
                     <h2 class="section-header">Additional Information</h2>
                     <div class="grid grid-cols-3 gap-4 mb-4">
                         {% for field in form %}
-                            {% if field.name in 'probation,conditional,special_terms,prime,ppi,iso,allows_gsi' %}
-                                <div>
-                                    <div class="form-group">
-                                        <label for="{{ field.id_for_label }}" class="form-label">
-                                            {{ field.label }}
-                                        </label>
-                                        {{ field }}
-                                        {% if field.errors %}
-                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                        {% endif %}
-                                        {% if field.help_text %}
-                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                        {% for field in form %}
-                            {% if field.name == 'is_packhouse' %}
+                            {% if field.name in 'probation,conditional,special_terms,prime,ppi,iso,allows_gsi,is_packhouse' %}
                                 <div>
                                     <div class="form-group">
                                         <label for="{{ field.id_for_label }}" class="form-label">

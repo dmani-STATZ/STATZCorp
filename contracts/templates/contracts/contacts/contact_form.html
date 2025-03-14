@@ -1,0 +1,510 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .field-help {
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    .address-card {
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .address-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-color: #3b82f6;
+    }
+    .address-card.selected {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Address selection functionality
+        const addressCards = document.querySelectorAll('.address-card');
+        const addressSelect = document.getElementById('id_address');
+        
+        addressCards.forEach(card => {
+            card.addEventListener('click', function() {
+                const addressId = this.dataset.addressId;
+                addressSelect.value = addressId;
+                
+                // Remove selected class from all cards
+                addressCards.forEach(c => c.classList.remove('selected'));
+                
+                // Add selected class to clicked card
+                this.classList.add('selected');
+            });
+            
+            // Mark as selected if it's the current address
+            if (addressSelect.value === card.dataset.addressId) {
+                card.classList.add('selected');
+            }
+        });
+        
+        // New address form modal
+        const newAddressBtn = document.getElementById('new-address-btn');
+        const addressModal = document.getElementById('address-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const addressForm = document.getElementById('new-address-form');
+        
+        if (newAddressBtn && addressModal) {
+            newAddressBtn.addEventListener('click', function() {
+                addressModal.classList.remove('hidden');
+            });
+            
+            closeModalBtn.addEventListener('click', function() {
+                addressModal.classList.add('hidden');
+            });
+            
+            // Close modal when clicking outside
+            addressModal.addEventListener('click', function(e) {
+                if (e.target === addressModal) {
+                    addressModal.classList.add('hidden');
+                }
+            });
+            
+            // Handle address form submission via AJAX
+            addressForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(addressForm);
+                
+                fetch("{% url 'contracts:address_create' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Add new option to select
+                        const newOption = new Option(data.address_text, data.address_id, true, true);
+                        addressSelect.add(newOption);
+                        
+                        // Add new card to address list
+                        const addressList = document.getElementById('address-list');
+                        const newCard = document.createElement('div');
+                        newCard.className = 'address-card p-3 border rounded-md mb-2 selected';
+                        newCard.dataset.addressId = data.address_id;
+                        newCard.innerHTML = `
+                            <p class="font-medium text-gray-900">${data.address_text}</p>
+                            <p class="text-xs text-gray-500">Just created</p>
+                        `;
+                        
+                        newCard.addEventListener('click', function() {
+                            addressSelect.value = data.address_id;
+                            addressCards.forEach(c => c.classList.remove('selected'));
+                            this.classList.add('selected');
+                        });
+                        
+                        addressList.insertBefore(newCard, addressList.firstChild);
+                        
+                        // Reset form and close modal
+                        addressForm.reset();
+                        addressModal.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+        }
+    });
+
+    // Function to open address selector popup
+    function openAddressSelector() {
+        // Get the current address ID if any
+        const currentAddressId = document.getElementById('id_address').value;
+        
+        // Define popup dimensions
+        const popupWidth = 850;
+        const popupHeight = 865;
+        
+        // Calculate position to center the popup on the parent window
+        const left = window.screenX + (window.outerWidth - popupWidth) / 2;
+        const top = window.screenY + (window.outerHeight - popupHeight) / 2;
+        
+        // Open the address selector in a new window with calculated position
+        const url = "{% url 'contracts:address_selector' %}?target_field=id_address&current_id=" + currentAddressId;
+        const selectorWindow = window.open(
+            url,
+            "AddressSelector",
+            `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+        
+        // Function to refresh address display after selection
+        window.refreshAfterAddressSelection = function() {
+            try {
+                // Try to find the form
+                const form = document.getElementById('contact-form');
+                if (!form) {
+                    console.error("Contact form not found with ID 'contact-form'");
+                    // Even if we can't refresh with AJAX, we can at least refresh the page
+                    window.location.reload();
+                    return;
+                }
+                
+                // Use a simple approach if the form is available
+                try {
+                    const formData = new FormData(form);
+                    const addressId = document.getElementById('id_address').value;
+                    
+                    console.log("Refreshing with address ID:", addressId);
+                    
+                    // If we're just updating an address field, we can make a simpler request
+                    fetch(window.location.href, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok: ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        // Parse the HTML response
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        // Update just the address section
+                        const newAddressSection = doc.querySelector('.mb-8');
+                        const currentAddressSection = document.querySelector('.mb-8');
+                        
+                        if (newAddressSection && currentAddressSection) {
+                            console.log("Updating address section");
+                            currentAddressSection.innerHTML = newAddressSection.innerHTML;
+                            
+                            // Reinitialize any event listeners if needed
+                            console.log("Initializing event listeners");
+                            if (typeof initializeEventListeners === 'function') {
+                                initializeEventListeners();
+                            }
+                        } else {
+                            console.error("Could not find address sections to update");
+                            // If we can't update the address section, reload the page
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error refreshing address display:', error);
+                        // If AJAX fails, reload the page
+                        window.location.reload();
+                    });
+                } catch (formDataError) {
+                    console.error('Error creating FormData from form:', formDataError);
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error in refreshAfterAddressSelection:', error);
+                // If anything goes wrong, just reload the page
+                window.location.reload();
+            }
+        };
+    }
+    
+    // Function to open create address window
+    function openCreateAddressWindow(event) {
+        event.preventDefault();
+        const url = event.target.href || event.currentTarget.href;
+        
+        // Define popup dimensions
+        const popupWidth = 600;
+        const popupHeight = 800;
+        
+        // Calculate position to center the popup on the parent window
+        const left = window.screenX + (window.outerWidth - popupWidth) / 2;
+        const top = window.screenY + (window.outerHeight - popupHeight) / 2;
+        
+        const newWindow = window.open(
+            url, 
+            "CreateAddress", 
+            `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+        
+        // Check periodically if the window was closed
+        const checkClosed = setInterval(function() {
+            if (newWindow.closed) {
+                clearInterval(checkClosed);
+                // Refresh address display
+                window.refreshAfterAddressSelection();
+            }
+        }, 500);
+    }
+    
+    // Initialize event listeners
+    function initializeEventListeners() {
+        // Add any listeners needed after DOM updates
+    }
+    
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeEventListeners();
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-3xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">{{ title }}</h1>
+                <button onclick="history.back()" 
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                    </svg>
+                    Back
+                </button>
+            </div>
+            
+            {% if supplier_id %}
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-700">
+                            This contact will be associated with supplier #{{ supplier_id }} upon creation.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Contact Form -->
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-800">Contact Information</h2>
+                <p class="text-sm text-gray-600 mt-1">Enter the contact's details below</p>
+            </div>
+            
+            <div class="p-6">
+                <form method="post" id="contact-form" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- Salutation -->
+                        <div class="form-group">
+                            <label for="{{ form.salutation.id_for_label }}" class="form-label">Salutation</label>
+                            {{ form.salutation }}
+                            {% if form.salutation.errors %}
+                            <p class="mt-1 text-red-600 text-sm">{{ form.salutation.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Name -->
+                        <div class="form-group md:col-span-1">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">Name *</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                            <p class="mt-1 text-red-600 text-sm">{{ form.name.errors.0 }}</p>
+                            {% endif %}
+                            <p class="field-help">Full name of the contact</p>
+                        </div>
+                        
+                        <!-- Company -->
+                        <div class="form-group md:col-span-1">
+                            <label for="{{ form.company.id_for_label }}" class="form-label">Company</label>
+                            {{ form.company }}
+                            {% if form.company.errors %}
+                            <p class="mt-1 text-red-600 text-sm">{{ form.company.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Title -->
+                        <div class="form-group md:col-span-1">
+                            <label for="{{ form.title.id_for_label }}" class="form-label">Job Title</label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                            <p class="mt-1 text-red-600 text-sm">{{ form.title.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Phone -->
+                        <div class="form-group md:col-span-1">
+                            <label for="{{ form.phone.id_for_label }}" class="form-label">Phone</label>
+                            {{ form.phone }}
+                            {% if form.phone.errors %}
+                            <p class="mt-1 text-red-600 text-sm">{{ form.phone.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Email -->
+                        <div class="form-group md:col-span-1">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                            <p class="mt-1 text-red-600 text-sm">{{ form.email.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Address Section -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Address Information</h3>
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <!-- Hidden field for address ID -->
+                            <input type="hidden" id="id_address" name="address" value="{{ form.address.value|default:'' }}">
+                            
+                            <div class="mb-4">
+                                {% if form.address.value %}
+                                    <div class="p-4 border rounded-md bg-blue-50 border-blue-200 mb-4">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <div class="font-medium text-blue-900">Current Address</div>
+                                                <div class="text-blue-700 mt-1">
+                                                    {{ address.address_line_1 }}{% if address.address_line_2 %}, {{ address.address_line_2 }}{% endif %}<br>
+                                                    {{ address.city }}, {{ address.state }} {{ address.zip }}<br>
+                                                    {% if address.country %}{{ address.country }}{% endif %}
+                                                </div>
+                                            </div>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800">
+                                                <svg class="mr-1.5 h-2 w-2 text-blue-400" fill="currentColor" viewBox="0 0 8 8">
+                                                    <circle cx="4" cy="4" r="3" />
+                                                </svg>
+                                                Current
+                                            </span>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="p-4 border rounded-md bg-gray-50 border-gray-200 mb-4">
+                                        <div class="text-gray-500 italic">No address assigned</div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex space-x-4">
+                                <button type="button" 
+                                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        onclick="openAddressSelector()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    Change Address
+                                </button>
+                                
+                                <a href="{% url 'contracts:address_create' %}?popup=true" 
+                                   onclick="openCreateAddressWindow(event)"
+                                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Create New Address
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                        <p class="mt-1 text-red-600 text-sm">{{ form.notes.errors.0 }}</p>
+                        {% endif %}
+                        <p class="field-help">Any additional information about this contact</p>
+                    </div>
+                    
+                    <!-- Form Actions -->
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <a href="{% if supplier_id %}{% url 'contracts:supplier_detail' pk=supplier_id %}{% else %}{% url 'contracts:contact_list' %}{% endif %}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Cancel
+                        </a>
+                        <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Save Contact
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Address Modal -->
+<div id="address-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg max-w-lg w-full max-h-screen overflow-y-auto">
+        <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-xl font-semibold text-gray-800">Create New Address</h3>
+            <button id="close-modal-btn" class="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        
+        <div class="p-6">
+            <form id="new-address-form" method="post" action="{% url 'contracts:address_create' %}">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label class="form-label">Address Line 1 *</label>
+                    <input type="text" name="address_line_1" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter street address">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Address Line 2</label>
+                    <input type="text" name="address_line_2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Apt, Suite, Unit, etc. (optional)">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">City *</label>
+                        <input type="text" name="city" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter city">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">State *</label>
+                        <input type="text" name="state" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter state">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">ZIP Code *</label>
+                    <input type="text" name="zip" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter ZIP code">
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancel-address-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" onclick="document.getElementById('address-modal').classList.add('hidden')">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Create Address
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

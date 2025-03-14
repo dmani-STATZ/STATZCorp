@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Address Created Successfully</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f9fafb;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="max-w-md w-full bg-white shadow-md rounded-lg p-6 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <h1 class="text-xl font-bold text-gray-800 mb-2">Address Created Successfully</h1>
+        <p class="text-gray-600 mb-4">The address has been created and saved.</p>
+        <p class="text-gray-500 text-sm mb-4">This window will close automatically in 2 seconds.</p>
+        <button onclick="closeWindow()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Close Window
+        </button>
+    </div>
+    
+    <script>
+        // Close the window and refresh the parent window
+        function closeWindow() {
+            if (window.opener && !window.opener.closed) {
+                if (window.opener.refreshAfterAddressSelection) {
+                    window.opener.refreshAfterAddressSelection();
+                } else if (window.opener.location.reload) {
+                    window.opener.location.reload();
+                }
+            }
+            window.close();
+        }
+        
+        // Auto close after 2 seconds
+        setTimeout(closeWindow, 2000);
+    </script>
+</body>
+</html> 
