@@ -3,6 +3,7 @@
 
 {% block title %}Contract Log View{% endblock %}
 
+
 {% block content %}
 <div class="container mx-auto px-4 py-6">
     <!-- Header Section -->
@@ -11,6 +12,14 @@
             <h1 class="text-2xl font-bold">Contract Log View</h1>
             
             <div class="flex items-center space-x-4">
+                <!-- Filter Toggle Button -->
+                <button id="toggleFilters" class="btn-secondary flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                    Show Filters
+                </button>
+                
                 <!-- Export Button -->
                 <button id="exportBtn" class="btn-primary flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -32,8 +41,8 @@
             </div>
         </div>
         
-        <!-- Filter Controls -->
-        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Filter Controls - Hidden by default -->
+        <div id="filterControls" class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4 hidden transform transition-all duration-300 ease-in-out">
             <div>
                 <label for="filterClass" class="block text-sm font-medium text-gray-700 mb-1">Filter by Class</label>
                 <select id="filterClass" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
@@ -41,6 +50,16 @@
                     {% for class_item in classes %}
                     <option value="{{ class_item }}">{{ class_item }}</option>
                     {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label for="filterStatus" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
+                <select id="filterStatus" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+                    <option value="">All Statuses</option>
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                    <option value="cancelled">Cancelled</option>
                 </select>
             </div>
             
@@ -59,181 +78,247 @@
     </div>
     
     <!-- Contract Table -->
-    <div class="bg-white shadow-md rounded-lg overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Open</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cancelled</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tab Num</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Number</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Num</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Date</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for contract in contracts %}
-                    <tr class="{% if contract.cancelled %}bg-red-50{% elif contract.open %}bg-green-50{% endif %} hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                {% if contract.open %}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                </svg>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                {% if contract.cancelled %}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                                </svg>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ contract.tab_num|default:"-" }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ contract.po_number|default:"-" }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-blue-600 hover:text-blue-800">
-                                <a href="{% url 'contracts:contract_detail' contract.id %}">
-                                    {{ contract.contract_number }}
+    <div >
+        <!-- Table Header Controls -->
+        <div class="bg-white shadow-md rounded-lg">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-medium">Contract List</h3>
+                <div class="text-sm text-gray-500">
+                    Total Records: {{ clins.paginator.count|default:total_records }}
+                    {% if is_paginated %}
+                    <span class="ml-2">(Pagination Enabled: Page {{ page_obj.number }} of {{ paginator.num_pages }})</span>
+                    {% else %}
+                    <span class="ml-2">(Pagination Disabled)</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-scroll" style="max-height: 1000px; overflow-y: auto;">
+                <table class="w-full table-fixed">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                            <!-- Fixed width for common columns -->
+                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Status</th>
+                            <th scope="col" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Tab Num</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">PO Number</th>
+                            <!-- Rest of the headers -->
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Num Ext</th>
+                            <th scope="col" class="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Num</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
+                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th scope="col" class="w-96 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Date</th>
+                            <th scope="col" class="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                            <th scope="col" class="w-96 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th scope="col" class="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IA</th>
+                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Sent</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Reply</th>
+                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QAR Sent</th>
+                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FOB</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN Due Date</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Due</th>
+                            <th scope="col" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order QTY</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ship Date</th>
+                            <th scope="col" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ship QTY</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN Value</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Amount</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Value</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WAWF Payment</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WAWF Received</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan Gross</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PPI Split</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATZ Split</th>
+                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Type</th>
+                            <th scope="col" class="w-96 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for clin in page_obj|default:clins %}
+                        <tr class="{% if clin.is_idiq %}bg-cyan-50{% endif %} 
+                                   {% if clin.payment_type == 'CIA' %}bg-purple-50{% endif %}
+                                   {% if clin.payment_type == 'COS' %}bg-orange-50{% endif %}
+                                   {% if clin.payment_type == 'NET' %}bg-blue-50{% endif %}
+                                   hover:bg-gray-50">
+                            <!-- Fixed columns -->
+                            <td class="w-24 px-6 py-4 whitespace-nowrap bg-inherit">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                              {% if clin.contract.cancelled %}bg-red-100 text-red-800
+                                              {% elif clin.contract.date_closed %}bg-yellow-100 text-yellow-800
+                                              {% else %}bg-green-100 text-green-800{% endif %}">
+                                            {% if clin.contract.cancelled %}Cancelled
+                                            {% elif clin.contract.date_closed %}Closed
+                                            {% else %}Open{% endif %}
+                                </span>
+                            </td>
+                            <td class="w-28 px-6 py-4 whitespace-nowrap text-sm text-gray-900 bg-inherit">{{ clin.contract.tab_num }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900 bg-inherit">{{ clin.contract.po_number }}</td>
+                            <!-- Rest of the cells with fixed widths -->
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.contract.po_number_ext }}</td>
+                            <td class="w-40 px-6 py-4 whitespace-nowrap">
+                                <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
+                                   class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                                    {{ clin.contract.contract_number }}
                                 </a>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ contract.buyer|default:"-" }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ contract.contract_type|default:"-" }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                {% if contract.clins.first.supplier %}
-                                {{ contract.clins.first.supplier.name|default:"-" }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ contract.award_date|date:"m/d/Y"|default:"-" }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                  {% if contract.cancelled %}bg-red-100 text-red-800
-                                  {% elif not contract.open %}bg-yellow-100 text-yellow-800
-                                  {% else %}bg-green-100 text-green-800{% endif %}">
-                                {% if contract.cancelled %}Cancelled
-                                {% elif not contract.open %}Closed
-                                {% else %}Open{% endif %}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                {% if contract.clins.first.nsn %}
-                                {{ contract.clins.first.nsn.nsn|default:"-" }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-900 max-w-xs truncate">
-                                {% if contract.clins.first.nsn %}
-                                {{ contract.clins.first.nsn.description|default:"-" }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="12" class="px-6 py-4 text-center text-sm text-gray-500">
-                            No contracts found
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Pagination -->
-    {% if contracts.has_other_pages %}
-    <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-lg shadow-md">
-        <div class="flex-1 flex justify-between sm:hidden">
-            {% if contracts.has_previous %}
-            <a href="?page={{ contracts.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                Previous
-            </a>
-            {% endif %}
-            {% if contracts.has_next %}
-            <a href="?page={{ contracts.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                Next
-            </a>
-            {% endif %}
-        </div>
-        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-                <p class="text-sm text-gray-700">
-                    Showing
-                    <span class="font-medium">{{ contracts.start_index }}</span>
-                    to
-                    <span class="font-medium">{{ contracts.end_index }}</span>
-                    of
-                    <span class="font-medium">{{ contracts.paginator.count }}</span>
-                    results
-                </p>
-            </div>
-            <div>
-                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                    {% if contracts.has_previous %}
-                    <a href="?page={{ contracts.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                        <span class="sr-only">Previous</span>
-                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                        </svg>
-                    </a>
-                    {% endif %}
-                    
-                    {% for i in contracts.paginator.page_range %}
-                        {% if contracts.number == i %}
-                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
-                            {{ i }}
-                        </span>
-                        {% elif i > contracts.number|add:'-3' and i < contracts.number|add:'3' %}
-                        <a href="?page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
-                            {{ i }}
-                        </a>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if contracts.has_next %}
-                    <a href="?page={{ contracts.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                        <span class="sr-only">Next</span>
-                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                        </svg>
-                    </a>
-                    {% endif %}
-                </nav>
+                            </td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.contract.buyer.description }}</td>
+                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm {% if clin.contract.contract_type.code == 'PKG' %}text-blue-600 font-medium{% else %}text-gray-900{% endif %}">
+                                {{ clin.contract.contract_type.description }}
+                            </td>
+                            <td class="w-40 px-6 py-4 whitespace-nowrap text-sm text-gray-900 
+                                       {% if clin.payment_type == 'CIA' %}bg-purple-100{% endif %}
+                                       {% if clin.payment_type == 'COS' %}bg-orange-100{% endif %}
+                                       {% if clin.payment_type == 'NET' %}bg-blue-100{% endif %}">
+                                {{ clin.supplier.name }}
+                            </td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.contract.award_date|date:"m/d/Y" }}</td>
+                            <td class="w-40 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_repeat %}bg-green-100{% endif %}">
+                                {{ clin.nsn.nsn_code }}
+                            </td>
+                            <td class="w-96 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.nsn.description }}</td>
+                            <td class="w-20 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.ia }}</td>
+                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.po_sent }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.supplier_reply }}</td>
+                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.qar_sent }}</td>
+                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.fob }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_late %}text-red-600 font-medium{% else %}text-gray-900{% endif %}">
+                                {{ clin.due_date|date:"m/d/Y" }}
+                            </td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_late_shipment %}text-red-600 font-medium{% else %}text-gray-900{% endif %}">
+                                {{ clin.ship_date|date:"m/d/Y" }}
+                            </td>
+                            <td class="w-28 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.order_qty }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.ship_qty }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ clin.clin_value|floatformat:2 }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_paid %}text-green-600 font-medium{% else %}text-gray-900{% endif %}">
+                                ${{ clin.paid_amount|floatformat:2 }}
+                            </td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ clin.contract.contract_value|floatformat:2 }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_paid %}text-green-600 font-medium{% else %}text-gray-900{% endif %}">
+                                ${{ clin.paid_amount|floatformat:2 }}
+                            </td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.wawf_payment }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.wawf_received }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.plan_gross }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.ppi_split }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.statz_split }}</td>
+                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.payment_type == 'CIA' %}bg-purple-100{% elif clin.payment_type == 'COS' %}bg-orange-100{% elif clin.payment_type == 'NET' %}bg-blue-100{% endif %}">
+                                {{ clin.payment_type }}
+                            </td>
+                            <td class="w-96 px-6 py-4 text-sm text-gray-900"></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="31" class="px-6 py-4 text-center text-sm text-gray-500">
+                                No CLINs found
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
+
+        <!-- Pagination Section -->
+        {% if is_paginated %}
+        <div class="bg-white shadow-md rounded-lg mt-4 px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing <span class="font-medium">{{ page_obj.start_index }}</span> to <span class="font-medium">{{ page_obj.end_index }}</span> of <span class="font-medium">{{ paginator.count }}</span> results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.class %}&class={{ request.GET.class }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" 
+                               class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Previous</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </a>
+                            {% endif %}
+
+                            {% for i in page_range|default:paginator.page_range %}
+                                {% if i == page_obj.number %}
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                                    {{ i }}
+                                </span>
+                                {% elif i == '...' %}
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                    ...
+                                </span>
+                                {% else %}
+                                <a href="?page={{ i }}{% if request.GET.class %}&class={{ request.GET.class }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    {{ i }}
+                                </a>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.class %}&class={{ request.GET.class }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" 
+                               class="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Next</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
+
+    <!-- Legend -->
+    <div class="mt-4 bg-white shadow-md rounded-lg p-4">
+        <h3 class="text-lg font-medium mb-4">Color Legend</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-4 h-4 bg-cyan-50"></div>
+                    <span class="text-sm">IDIQ Contract</span>
+                </div>
+                <div class="flex items-center space-x-2 mt-2">
+                    <div class="w-4 h-4 bg-purple-50"></div>
+                    <span class="text-sm">CIA Payment</span>
+                </div>
+                <div class="flex items-center space-x-2 mt-2">
+                    <div class="w-4 h-4 bg-orange-50"></div>
+                    <span class="text-sm">COS Payment</span>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-4 h-4 bg-blue-50"></div>
+                    <span class="text-sm">NET Payment</span>
+                </div>
+                <div class="flex items-center space-x-2 mt-2">
+                    <span class="text-blue-600 font-medium">Blue Text</span>
+                    <span class="text-sm">Packaging Contract</span>
+                </div>
+                <div class="flex items-center space-x-2 mt-2">
+                    <span class="text-red-600 font-medium">Red Text</span>
+                    <span class="text-sm">Late Shipment/Due Date</span>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-4 h-4 bg-green-100"></div>
+                    <span class="text-sm">Repeat Item</span>
+                </div>
+                <div class="flex items-center space-x-2 mt-2">
+                    <span class="text-green-600 font-medium">Green Text</span>
+                    <span class="text-sm">Paid Items</span>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Export Modal -->
     <div id="exportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
@@ -281,6 +366,34 @@
 {% block extra_scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Filter toggle functionality
+        const toggleFilters = document.getElementById('toggleFilters');
+        const filterControls = document.getElementById('filterControls');
+        let filtersVisible = false;
+        
+        toggleFilters.addEventListener('click', function() {
+            filtersVisible = !filtersVisible;
+            filterControls.classList.toggle('hidden');
+            toggleFilters.innerHTML = filtersVisible ? 
+                `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>Hide Filters` : 
+                `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>Show Filters`;
+        });
+        
+        // Show filters if any are active
+        if (document.getElementById('filterClass').value || 
+            document.getElementById('filterStatus').value || 
+            document.getElementById('searchContract').value) {
+            filterControls.classList.remove('hidden');
+            filtersVisible = true;
+            toggleFilters.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>Hide Filters`;
+        }
+        
         // Export button functionality
         const exportBtn = document.getElementById('exportBtn');
         const exportModal = document.getElementById('exportModal');
@@ -328,6 +441,7 @@
                     fileName: fileName,
                     filters: {
                         class: document.getElementById('filterClass').value,
+                        status: document.getElementById('filterStatus').value,
                         search: document.getElementById('searchContract').value
                     }
                 })
@@ -377,12 +491,16 @@
         
         applyFilters.addEventListener('click', function() {
             const classFilter = document.getElementById('filterClass').value;
+            const statusFilter = document.getElementById('filterStatus').value;
             const searchTerm = document.getElementById('searchContract').value;
             
             // Build query string
             let queryParams = [];
             if (classFilter) {
                 queryParams.push('class=' + encodeURIComponent(classFilter));
+            }
+            if (statusFilter) {
+                queryParams.push('status=' + encodeURIComponent(statusFilter));
             }
             if (searchTerm) {
                 queryParams.push('search=' + encodeURIComponent(searchTerm));
