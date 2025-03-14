@@ -95,62 +95,21 @@
         const checkClosed = setInterval(function() {
             if (newWindow.closed) {
                 clearInterval(checkClosed);
-                // Refresh address display
-                window.refreshAfterAddressSelection();
+                // Only reload if an address was actually created
+                // We'll handle this through a callback from the address creation window
+                // The address creation window should set window.opener.addressCreated = true
+                if (window.addressCreated) {
+                    window.addressCreated = false;
+                    window.location.reload();
+                }
             }
         }, 500);
     }
     
     // Function to refresh address display after selection
     window.refreshAfterAddressSelection = function() {
-        try {
-            // Try to find the form
-            const form = document.querySelector('form');
-            if (!form) {
-                console.error("Supplier form not found");
-                // Even if we can't refresh with AJAX, we can at least refresh the page
-                window.location.reload();
-                return;
-            }
-            
-            // Use a simple approach if the form is available
-            try {
-                const formData = new FormData(form);
-                
-                console.log("Refreshing supplier form");
-                
-                // If we're just updating an address field, we can make a simpler request
-                fetch(window.location.href, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok: ' + response.status);
-                    }
-                    return response.text();
-                })
-                .then(html => {
-                    // For simplicity, just reload the page
-                    window.location.reload();
-                })
-                .catch(error => {
-                    console.error('Error refreshing address display:', error);
-                    // If AJAX fails, reload the page
-                    window.location.reload();
-                });
-            } catch (formDataError) {
-                console.error('Error creating FormData from form:', formDataError);
-                window.location.reload();
-            }
-        } catch (error) {
-            console.error('Error in refreshAfterAddressSelection:', error);
-            // If anything goes wrong, just reload the page
-            window.location.reload();
-        }
+        // Instead of submitting the form or reloading the page, just refresh the current page
+        window.location.reload();
     };
 </script>
 {% endblock %}
@@ -178,7 +137,7 @@
                 {% csrf_token %}
 
                 <!-- Debug Information -->
-                <div class="bg-red-50 p-4 rounded-lg mb-6">
+                <!-- <div class="bg-red-50 p-4 rounded-lg mb-6">
                     <h2 class="text-lg font-semibold text-red-700">Debug Information</h2>
                     <pre class="text-xs overflow-auto p-2 bg-white rounded border border-red-200 mt-2">
 Supplier ID: {{ supplier.id }}
@@ -186,7 +145,7 @@ Supplier Name: {{ supplier.name }}
 Supplier Cage Code: {{ supplier.cage_code }}
 Form Data: {{ form.initial }}
                     </pre>
-                </div>
+                </div> -->
                 
                 <!-- Basic Information -->
                 <div class="bg-gray-50 p-4 rounded-lg mb-6">
@@ -244,7 +203,7 @@ Form Data: {{ form.initial }}
                     <h2 class="section-header">Address Information</h2>
                     <div class="space-y-6">
                         {% for field in form %}
-                            {% if field.name in 'physical_address,shipping_address,billing_address' %}
+                            {% if field.name == 'physical_address' or field.name == 'shipping_address' or field.name == 'billing_address' %}
                                 <div>
                                     <div class="form-group">
                                         <label for="{{ field.id_for_label }}" class="form-label">

@@ -75,18 +75,18 @@ class SupplierForm(forms.ModelForm):
                 'placeholder': 'Enter CAGE Code'
             }),
             'supplier_type': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             
             # Address Information
             'physical_address': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'shipping_address': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'billing_address': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             
             # Contact Information
@@ -105,7 +105,7 @@ class SupplierForm(forms.ModelForm):
                 'placeholder': 'Enter Business Email'
             }),
             'contact': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             
             # Additional Information - Checkboxes
@@ -116,7 +116,7 @@ class SupplierForm(forms.ModelForm):
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
             'special_terms': forms.Select(attrs={
-                'class': 'w-40 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'prime': forms.TextInput(attrs={
                 'class': 'w-10 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
@@ -134,7 +134,7 @@ class SupplierForm(forms.ModelForm):
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
             'packhouse': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'notes': forms.Textarea(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -303,7 +303,7 @@ class ContractCancelForm(forms.ModelForm):
                 'type': 'datetime-local'
             }),
             'canceled_reason': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
         }
 

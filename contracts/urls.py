@@ -27,6 +27,16 @@ from .views import (
     # NSN and Supplier views
     NsnUpdateView,
     SupplierUpdateView,
+    SupplierListView,
+    SupplierSearchView,
+    SupplierDetailView,
+    SupplierCreateView,
+    add_supplier_certification,
+    delete_supplier_certification,
+    get_supplier_certification,
+    add_supplier_classification,
+    delete_supplier_classification,
+    get_supplier_classification,
     
     # Contact and Address views
     ContactListView,
@@ -113,7 +123,20 @@ urlpatterns = [
     
     # NSN and Supplier management
     path('nsn/<int:pk>/edit/', NsnUpdateView.as_view(), name='nsn_edit'),
+    path('suppliers/', SupplierListView.as_view(), name='supplier_list'),
+    path('suppliers/search/', SupplierSearchView.as_view(), name='supplier_search'),
+    path('supplier/<int:pk>/', SupplierDetailView.as_view(), name='supplier_detail'),
     path('supplier/<int:pk>/edit/', SupplierUpdateView.as_view(), name='supplier_edit'),
+    path('supplier/create/', SupplierCreateView.as_view(), name='supplier_create'),
+    
+    # Supplier Certifications and Classifications
+    path('supplier/<int:supplier_id>/certification/add/', add_supplier_certification, name='supplier_add_certification'),
+    path('supplier/<int:supplier_id>/certification/<int:pk>/delete/', delete_supplier_certification, name='supplier_delete_certification'),
+    path('supplier/certification/<int:pk>/', get_supplier_certification, name='supplier_get_certification'),
+    
+    path('supplier/<int:supplier_id>/classification/add/', add_supplier_classification, name='supplier_add_classification'),
+    path('supplier/<int:supplier_id>/classification/<int:pk>/delete/', delete_supplier_classification, name='supplier_delete_classification'),
+    path('supplier/classification/<int:pk>/', get_supplier_classification, name='supplier_get_classification'),
     
     # Note management
     path('note/add/<int:content_type_id>/<int:object_id>/', add_note, name='add_note'),

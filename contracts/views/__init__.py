@@ -21,7 +21,17 @@ from .clin_views import (
 )
 
 from .supplier_views import (
+    SupplierListView,
+    SupplierSearchView,
+    SupplierDetailView,
+    SupplierCreateView,
     SupplierUpdateView,
+    add_supplier_certification,
+    delete_supplier_certification,
+    get_supplier_certification,
+    add_supplier_classification,
+    delete_supplier_classification,
+    get_supplier_classification,
 )
 
 from .nsn_views import (

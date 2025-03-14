@@ -1,0 +1,298 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Suppliers{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    /* Ensure base styles are preserved */
+    .contract-subnav {
+        margin-bottom: 0;
+    }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get the form and input elements
+        const form = document.getElementById('supplierFilterForm');
+        const inputs = form.querySelectorAll('input[type="text"]');
+        const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+
+        // Function to build query string with all current filter values
+        function buildQueryString() {
+            const params = new URLSearchParams();
+            
+            // Add text input values
+            inputs.forEach(input => {
+                if (input.value.trim()) {
+                    params.append(input.name, input.value.trim());
+                }
+            });
+            
+            // Add checkbox values
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    params.append(checkbox.name, checkbox.value);
+                }
+            });
+
+            // Add current page if it exists
+            const currentPage = new URLSearchParams(window.location.search).get('page');
+            if (currentPage) {
+                params.append('page', currentPage);
+            }
+
+            return params.toString();
+        }
+
+        // Handle Enter key press in text inputs
+        inputs.forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const queryString = buildQueryString();
+                    window.location.href = `${window.location.pathname}?${queryString}`;
+                }
+            });
+        });
+
+        // Handle checkbox changes
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const queryString = buildQueryString();
+                window.location.href = `${window.location.pathname}?${queryString}`;
+            });
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const queryString = buildQueryString();
+            window.location.href = `${window.location.pathname}?${queryString}`;
+        });
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg mt-4">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">Suppliers</h1>
+        <a href="{% url 'contracts:supplier_create' %}" 
+           class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Supplier
+        </a>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="p-6 border-b border-gray-200 bg-gray-50">
+        <form id="supplierFilterForm" method="get" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">Supplier Name</label>
+                    <input type="text" name="name" id="name" value="{{ request.GET.name }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                           placeholder="Search by name...">
+                </div>
+                <div>
+                    <label for="cage_code" class="block text-sm font-medium text-gray-700">CAGE Code</label>
+                    <input type="text" name="cage_code" id="cage_code" value="{{ request.GET.cage_code }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                           placeholder="Search by CAGE code...">
+                </div>
+                <div class="space-y-2">
+                    <p class="block text-sm font-medium text-gray-700">Status Filters</p>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="probation" value="true" {% if request.GET.probation == 'true' %}checked{% endif %}
+                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-600">On Probation</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="conditional" value="true" {% if request.GET.conditional == 'true' %}checked{% endif %}
+                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-600">Conditional</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="block text-sm font-medium text-gray-700">Certifications</p>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="iso" value="true" {% if request.GET.iso == 'true' %}checked{% endif %}
+                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-600">ISO Certified</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="ppi" value="true" {% if request.GET.ppi == 'true' %}checked{% endif %}
+                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-600">PPI</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <a href="{% url 'contracts:supplier_list' %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Clear Filters
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Suppliers List -->
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Supplier Info
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact Details
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Certifications
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for supplier in suppliers %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">
+                                    {{ supplier.name }}
+                                </div>
+                                {% if supplier.cage_code %}
+                                <div class="text-sm text-gray-500">
+                                    CAGE: {{ supplier.cage_code }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">{{ supplier.business_phone|default:"-" }}</div>
+                        <div class="text-sm text-gray-500">{{ supplier.business_email|default:"-" }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex flex-wrap gap-2">
+                            {% if supplier.probation %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                On Probation
+                            </span>
+                            {% endif %}
+                            {% if supplier.conditional %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                Conditional
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex flex-wrap gap-2">
+                            {% if supplier.iso %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                ISO
+                            </span>
+                            {% endif %}
+                            {% if supplier.ppi %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                PPI
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <a href="{% url 'contracts:supplier_detail' pk=supplier.id %}" class="text-indigo-600 hover:text-indigo-900 mr-4">View</a>
+                        <a href="{% url 'contracts:supplier_edit' pk=supplier.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                        No suppliers found matching your criteria
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div class="flex-1 flex justify-between sm:hidden">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Previous
+            </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Next
+            </a>
+            {% endif %}
+        </div>
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    Showing
+                    <span class="font-medium">{{ page_obj.start_index }}</span>
+                    to
+                    <span class="font-medium">{{ page_obj.end_index }}</span>
+                    of
+                    <span class="font-medium">{{ paginator.count }}</span>
+                    results
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Previous</span>
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-indigo-50 text-sm font-medium text-indigo-600">
+                            {{ num }}
+                        </span>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            {{ num }}
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Next</span>
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 
