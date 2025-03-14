@@ -44,60 +44,57 @@
                 </p>
             </div>
             
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Item Type</p>
+                <p class="font-medium">{{ clin.item_type.description|default:clin.item_type }}</p>
+            </div>
+
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Item Number</p>
+                <p class="font-medium">{{ clin.item_number|default:"0000" }}</p>
+            </div>
+            
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">PO Number</p>
                 <p class="font-medium">{{ clin.po_number|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
-                <!-- Empty cell for alignment -->
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Item Type</p>
+                <p class="font-medium">{{ clin.item_type.description|default:clin.item_type }}</p>
             </div>
             
-            <!-- Row 2 -->
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">CLIN Type</p>
-                <p class="font-medium">{{ clin.clin_type.description|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-4">
+            <div class="md:col-span-1">
                 <p class="text-sm text-gray-600 capitalize">I&A</p>
-                <p class="font-medium">{{ clin.ia|default:"N/A" }}</p>
+                <p class="font-medium">{{ clin.ia.description|default:clin.ia }}</p>
             </div>
-            
-            <div class="md:col-span-4">
+
+            <!-- Row 2 -->
+            <div class="md:col-span-1">
                 <p class="text-sm text-gray-600 capitalize">FOB</p>
-                <p class="font-medium">{{ clin.fob|default:"N/A" }}</p>
+                <p class="font-medium">{{ clin.fob.description|default:clin.fob }}</p>
             </div>
             
-            <!-- Row 3 -->
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">Tab Number</p>
-                <p class="font-medium">{{ clin.tab_num|default:"N/A" }}</p>
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">PO Number</p>
+                <p class="font-medium">{{ clin.po_number|default:"N/A" }}</p>
             </div>
-            
+             
             <div class="md:col-span-4">
                 <p class="text-sm text-gray-600 capitalize">PO Number Extension</p>
                 <p class="font-medium">{{ clin.po_num_ext|default:"N/A" }}</p>
             </div>
-            
-            <div class="md:col-span-4">
-                <!-- Empty cell for alignment -->
+                       <!-- Row 3 -->
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Tab Number</p>
+                <p class="font-medium">{{ clin.tab_num|default:"N/A" }}</p>
             </div>
-            
-            <!-- Row 4 -->
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">Item Value</p>
-                <p class="font-medium">{{ clin.item_value|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-4">
+
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">CLIN PO Number</p>
                 <p class="font-medium">{{ clin.clin_po_num|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
-                <!-- Empty cell for alignment -->
-            </div>
         </div>
     </div>
 
@@ -145,9 +142,9 @@
     <!-- Order Information -->
     <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
         <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Order Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
             <!-- Row 1 -->
-            <div class="md:col-span-2">
+            <div class="md:col-span-1">
                 <p class="text-sm text-gray-600 capitalize">Order Qty</p>
                 <p class="font-medium">{{ clin.order_qty|floatformat:'0'|default:"N/A" }}</p>
             </div>
@@ -156,15 +153,22 @@
                 <p class="text-sm text-gray-600 capitalize">UOM</p>
                 <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
             </div>
-            
-            <div class="md:col-span-3">
+            <div class="md:col-span-1">
+                <p class="text-sm text-gray-600 capitalize">Unit Price</p>
+                <p class="font-medium">${{ clin.unit_price|floatformat:'2'|default:0.00 }}</p>
+            </div>
+            <div class="md:col-span-1">
+                <p class="text-sm text-gray-600 capitalize">Amount</p>
+                <p class="font-medium">${{ clin.item_value|floatformat:'2'|default:0.00 }}</p>
+            </div>
+            <div class="md:col-span-1">
                 <p class="text-sm text-gray-600 capitalize">Due Date</p>
                 <p class="font-medium {% if clin.due_date_late %}text-red-600{% endif %}">
                     {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                 </p>
             </div>
             
-            <div class="md:col-span-3">
+            <div class="md:col-span-1">
                 <p class="text-sm text-gray-600 capitalize">Supplier Due Date</p>
                 <p class="font-medium {% if clin.supplier_due_date_late %}text-red-600{% endif %}">
                     {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
@@ -183,12 +187,12 @@
                 <p class="font-medium">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-1">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">UOM</p>
                 <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
             </div>
             
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Ship Date</p>
                 <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
                     {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
@@ -204,10 +208,20 @@
     <!-- Financial Information -->
     <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Financial Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-8 gap-4">
             <!-- Row 1 -->
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">Payment Status</p>
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">PO Amount</p>
+                <p class="font-medium">${{ clin.clin_value|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">Item Value</p>
+                <p class="font-medium">${{ clin.item_value|floatformat:2|intcomma|default:"N/A" }}</p>
+            </div>
+
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">SPT Paid Status</p>
                 <p class="font-medium">
                     {% if clin.special_payment_terms_paid %}
                         <span class="text-green-600">Paid</span>
@@ -217,62 +231,87 @@
                 </p>
             </div>
             
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Payment Terms</p>
                 <p class="font-medium">{{ clin.special_payment_terms.terms|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
-                <!-- Empty cell for alignment -->
-            </div>
-            
             <!-- Row 2 -->
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">PO Amount</p>
-                <p class="font-medium">${{ clin.clin_value|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-4">
+
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Paid Amount</p>
                 <p class="font-medium">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Paid Date</p>
                 <p class="font-medium">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</p>
             </div>
             
+            <div class="md:col-span-2">
+                <!-- Empty cell for alignment -->
+            </div>
+        
+            <div class="md:col-span-2">
+                <!-- Empty cell for alignment -->
+            </div>
+        
+
             <!-- Row 3 -->
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">WAWF Payment</p>
                 <p class="font-medium">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">WAWF Received</p>
                 <p class="font-medium">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">WAWF Invoice</p>
                 <p class="font-medium">{{ clin.wawf_invoice|default:"N/A" }}</p>
             </div>
             
+            <div class="md:col-span-2">
+                <!-- Empty cell for alignment -->
+            </div>
+        
             <!-- Row 4 -->
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Plan Gross</p>
                 <p class="font-medium">${{ clin.plan_gross|floatformat:2|intcomma|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
+            <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Planned Split</p>
                 <p class="font-medium">{{ clin.planned_split|default:"N/A" }}</p>
             </div>
             
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">Contract Value</p>
-                <p class="font-medium">${{ clin.contract_value|floatformat:2|intcomma|default:"N/A" }}</p>
+            <div class="md:col-span-2">
+                <!-- Empty cell for alignment -->
             </div>
+            <div class="md:col-span-2">
+                <!-- Empty cell for alignment -->
+            </div>
+
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">STATZ Split</p>
+                <p class="font-medium">${{ clin.statz_split|floatformat:2|default:0.00 }}</p>
+            </div>
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">STATZ Paid</p>
+                <p class="font-medium">${{ clin.statz_split_paid|floatformat:2|default:0.00 }}</p>
+            </div>
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">PPI Split</p>
+                <p class="font-medium">${{ clin.ppi_split|floatformat:2|default:0.00 }}</p>
+            </div>
+            <div class="md:col-span-2">
+                <p class="text-sm text-gray-600 capitalize">PPI Paid</p>
+                <p class="font-medium">${{ clin.ppi_split_paid|floatformat:2|default:0.00 }}</p>
+            </div>
+
         </div>
     </div>
 </div>

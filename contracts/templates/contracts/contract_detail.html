@@ -238,7 +238,7 @@
                     <thead>
                         <tr>
                             <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                CLIN Type
+                                Item No
                             </th>
                             <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Supplier
@@ -264,7 +264,7 @@
                             class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
-                                    {{ clin.clin_type.description|default:"N/A" }}
+                                    {{ clin.item_no|default:"0000" }}
                                 </a>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

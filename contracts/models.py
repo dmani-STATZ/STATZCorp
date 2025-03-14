@@ -110,6 +110,7 @@ class Clin(AuditModel):
     item_number = models.CharField(max_length=20, null=True, blank=True) # This is the Item Number of the CLIN 0001, 0002, etc.
     item_type = models.CharField(max_length=20, null=True, blank=True, choices=ITEM_TYPE_CHOICES) # This is the Type of CLIN (Production, GFAT, CFAT, PLT)  
     item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # This is the Value in $ for the CLIN
+    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # This is the Unit Price in $ for the CLIN
     po_num_ext = models.CharField(max_length=5, null=True, blank=True) # What do we use this for?
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     clin_po_num = models.CharField(max_length=10, null=True, blank=True) # What do we use this for?
