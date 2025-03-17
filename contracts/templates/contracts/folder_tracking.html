@@ -180,7 +180,11 @@
                                        placeholder="Search by Contract Number or PO Number..."
                                        hx-get="{% url 'contracts:search_contracts' %}"
                                        hx-trigger="keyup changed delay:500ms"
-                                       hx-target="#search-results">
+                                       hx-target="#search-results"
+                                       hx-indicator="#search-indicator">
+                                <div id="search-indicator" class="htmx-indicator">
+                                    Searching...
+                                </div>
                                 <div id="search-results" class="mt-4 max-h-96 overflow-y-auto"></div>
                             </div>
                         </div>
@@ -201,26 +205,43 @@
 <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
     const modal = document.getElementById('searchModal');
     const addNewBtn = document.getElementById('addNewBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const contractSearch = document.getElementById('contractSearch');
     const searchResults = document.getElementById('search-results');
 
+    console.log('Modal element:', modal);
+    console.log('Add New button:', addNewBtn);
+
     function openSearchModal() {
+        console.log('Opening modal');
         modal.classList.remove('hidden');
         contractSearch.focus();
     }
 
     function closeSearchModal() {
+        console.log('Closing modal');
         modal.classList.add('hidden');
         contractSearch.value = '';
         searchResults.innerHTML = '';
     }
 
     // Event Listeners
-    addNewBtn.addEventListener('click', openSearchModal);
-    cancelBtn.addEventListener('click', closeSearchModal);
+    if (addNewBtn) {
+        addNewBtn.addEventListener('click', function(e) {
+            console.log('Add New button clicked');
+            e.preventDefault();
+            openSearchModal();
+        });
+    } else {
+        console.error('Add New button not found');
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeSearchModal);
+    }
 
     // Close modal when clicking outside
     modal.addEventListener('click', function(e) {
@@ -235,6 +256,14 @@ document.addEventListener('DOMContentLoaded', function() {
             closeSearchModal();
         }
     });
+
+    // Initialize HTMX
+    if (typeof htmx !== 'undefined') {
+        console.log('HTMX initialized');
+        htmx.logAll(); // Enable HTMX logging
+    } else {
+        console.error('HTMX not loaded');
+    }
 });
 
 function handleSearch(event) {

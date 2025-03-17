@@ -104,7 +104,7 @@ if os.environ.get('DJANGO_HOSTNAME', 'WORK_PC') == 'WORK_PC':
     DATABASES = {
         'default': {
             'ENGINE': 'mssql',
-            'NAME': 'STATZWeb_Dev',
+            'NAME': os.environ.get('DB_NAME', ''),
             'USER': os.environ.get('DB_USER', ''),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
             'HOST': os.environ.get('DB_HOST', ''),
@@ -249,4 +249,6 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "http://STATZUTIL01"
+    "http://10.103.10.13"
 ]
