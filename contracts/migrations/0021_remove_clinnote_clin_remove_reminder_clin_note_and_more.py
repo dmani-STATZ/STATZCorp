@@ -30,10 +30,6 @@ class Migration(migrations.Migration):
             model_name='reminder',
             name='contract_note',
         ),
-        migrations.RemoveConstraint(
-            model_name='reminder',
-            name='reminder_single_note_constraint',
-        ),
         migrations.AddField(
             model_name='note',
             name='modified_by',
