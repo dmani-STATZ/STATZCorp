@@ -181,11 +181,18 @@
                                        hx-get="{% url 'contracts:search_contracts' %}"
                                        hx-trigger="keyup changed delay:500ms"
                                        hx-target="#search-results"
-                                       hx-indicator="#search-indicator">
-                                <div id="search-indicator" class="htmx-indicator">
+                                       hx-indicator="#search-indicator"
+                                       name="q">
+                                <div id="search-indicator" class="htmx-indicator mt-2 text-gray-500 text-sm">
+                                    <svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
                                     Searching...
                                 </div>
-                                <div id="search-results" class="mt-4 max-h-96 overflow-y-auto"></div>
+                                <div id="search-results" class="mt-4 max-h-96 overflow-y-auto divide-y divide-gray-200">
+                                    <!-- Search results will be loaded here -->
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -201,7 +208,10 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
+<script>
+console.log('Script starting to load...');
+</script>
 <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -218,7 +228,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function openSearchModal() {
         console.log('Opening modal');
         modal.classList.remove('hidden');
-        contractSearch.focus();
+        setTimeout(() => {
+            contractSearch.focus();
+            contractSearch.select();
+        }, 100);
     }
 
     function closeSearchModal() {
@@ -235,8 +248,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             openSearchModal();
         });
-    } else {
-        console.error('Add New button not found');
     }
 
     if (cancelBtn) {
@@ -261,8 +272,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof htmx !== 'undefined') {
         console.log('HTMX initialized');
         htmx.logAll(); // Enable HTMX logging
-    } else {
-        console.error('HTMX not loaded');
     }
 });
 

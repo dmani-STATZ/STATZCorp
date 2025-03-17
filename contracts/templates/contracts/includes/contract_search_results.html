@@ -1,0 +1,22 @@
+{% if contracts %}
+    {% for contract in contracts %}
+    <div class="p-4 hover:bg-gray-50 flex justify-between items-center">
+        <div>
+            <div class="text-sm font-medium text-gray-900">
+                Contract: {{ contract.contract_number }}
+            </div>
+            <div class="text-sm text-gray-500">
+                PO: {{ contract.po_number }}
+            </div>
+        </div>
+        <button onclick="selectContract('{{ contract.id }}', '{{ contract.contract_number }}')"
+                class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+            Select
+        </button>
+    </div>
+    {% endfor %}
+{% elif search_performed %}
+    <div class="p-4 text-center text-gray-500">
+        No contracts found matching your search.
+    </div>
+{% endif %} 

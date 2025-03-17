@@ -39,7 +39,8 @@ def folder_tracking(request):
 
 @login_required
 def search_contracts(request):
-    search_query = request.GET.get('search_query', '')
+    search_query = request.GET.get('q', '')
+    search_performed = bool(search_query)
     contracts = []
     
     if search_query:
@@ -51,10 +52,11 @@ def search_contracts(request):
     
     context = {
         'contracts': contracts,
+        'search_performed': search_performed,
     }
     
-    html = render_to_string('contracts/includes/contract_search_results.html', context)
-    return JsonResponse({'html': html})
+    # Return direct HTML instead of JSON
+    return render(request, 'contracts/includes/contract_search_results.html', context)
 
 @login_required
 def add_folder_tracking(request):
