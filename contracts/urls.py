@@ -85,6 +85,14 @@ from .views import (
     extract_dd1155_data,
     export_dd1155_text,
     export_dd1155_png,
+    
+    # Folder Tracking views
+    folder_tracking,
+    add_folder_tracking,
+    close_folder_tracking,
+    toggle_highlight,
+    export_folder_tracking,
+    search_contracts,
 )
 
 from .views.contract_views import check_contract_number
@@ -189,4 +197,12 @@ urlpatterns = [
     path('addresses/<int:pk>/update/', AddressUpdateView.as_view(), name='address_update'),
     path('addresses/<int:pk>/delete/', AddressDeleteView.as_view(), name='address_delete'),
     path('addresses/selector/', AddressSelectorView.as_view(), name='address_selector'),
+
+    # Folder Tracking
+    path('folder-tracking/', folder_tracking, name='folder_tracking'),
+    path('folder-tracking/search/', search_contracts, name='search_contracts'),
+    path('folder-tracking/add/', add_folder_tracking, name='add_folder_tracking'),
+    path('folder-tracking/<int:pk>/close/', close_folder_tracking, name='close_folder_tracking'),
+    path('folder-tracking/<int:pk>/toggle-highlight/', toggle_highlight, name='toggle_highlight'),
+    path('folder-tracking/export/', export_folder_tracking, name='export_folder_tracking'),
 ] 

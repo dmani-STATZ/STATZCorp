@@ -637,3 +637,88 @@ class Expedite(models.Model):
 
     def __str__(self):
         return f"Expedite {self.contract.contract_number}"
+
+class FolderTracking(AuditModel):
+    STACK_CHOICES = [
+        ('1 - COS', 'COS'),
+        ('2 - PACK', 'PACK'),
+        ('3 - PROCESS', 'PROCESS'),
+        ('4 - W4QAR', 'W4QAR'),
+        ('5 - W4BOL', 'W4BOL'),
+        ('6 - W4POS', 'W4POS'),
+        ('7 - W4POD', 'W4POD'),
+        ('8 - W4PAY', 'W4PAY'),
+        ('9 - QSIGN', 'QSIGN'),
+        ('10 - PAID', 'PAID'),
+    ]
+
+    STACK_COLORS = {
+        '1 - COS': 'gold',
+        '2 - PACK': 'white',
+        '3 - PROCESS': 'lightblue',
+        '4 - W4QAR': 'yellow',
+        '5 - W4BOL': 'green',
+        '6 - W4POS': 'salmon',
+        '7 - W4POD': 'lavender',
+        '8 - W4PAY': 'grey',
+        '9 - QSIGN': 'teal',
+        '10 - PAID': 'red',
+    }
+
+    # Visible Fields
+    stack = models.CharField(max_length=20, choices=STACK_CHOICES)
+    contract = models.ForeignKey('Contract', on_delete=models.CASCADE, related_name='folder_tracking')
+    partial = models.CharField(max_length=20, null=True, blank=True)
+    rts_email = models.BooleanField(default=False)
+    qb_inv = models.CharField(max_length=10, null=True, blank=True)
+    wawf = models.BooleanField(default=False)
+    wawf_qar = models.BooleanField(default=False)
+    vsm_scn = models.CharField(max_length=20, null=True, blank=True)
+    sir_scn = models.CharField(max_length=20, null=True, blank=True)
+    tracking = models.CharField(max_length=20, null=True, blank=True)
+    tracking_number = models.CharField(max_length=20, null=True, blank=True)
+    sort_data = models.CharField(max_length=20, null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+    highlight = models.BooleanField(default=False)
+
+    # Behind the scenes fields
+    closed = models.BooleanField(default=False)
+    date_added = models.DateTimeField(auto_now_add=True)
+    date_closed = models.DateTimeField(null=True, blank=True)
+    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='folder_tracking_added')
+    closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='folder_tracking_closed')
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['contract'], name='fld_track_contract_idx'),
+            models.Index(fields=['stack'], name='fld_track_stack_idx'),
+            models.Index(fields=['closed'], name='fld_track_closed_idx'),
+            models.Index(fields=['date_added'], name='fld_track_added_idx'),
+            models.Index(fields=['date_closed'], name='fld_track_dclosed_idx'),
+            # Compound indexes for common query patterns
+            models.Index(fields=['contract', 'stack'], name='fld_track_con_stack_idx'),
+            models.Index(fields=['closed', 'stack'], name='fld_track_cls_stack_idx'),
+        ]
+
+    def __str__(self):
+        return f"Folder Tracking - {self.contract.contract_number} ({self.stack})"
+
+    @property
+    def stack_color(self):
+        return self.STACK_COLORS.get(self.stack, '')
+
+    def close_record(self, user):
+        """
+        Close the record instead of deleting it
+        """
+        self.closed = True
+        self.date_closed = timezone.now()
+        self.closed_by = user
+        self.save()
+
+    def toggle_highlight(self):
+        """
+        Toggle the highlight status of the record
+        """
+        self.highlight = not self.highlight
+        self.save()

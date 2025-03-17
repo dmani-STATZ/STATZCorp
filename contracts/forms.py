@@ -8,7 +8,7 @@ from .models import (
     Buyer, ContractType, ClinType, CanceledReason, SalesClass,
     SpecialPaymentTerms, IdiqContract, IdiqContractDetails, SupplierType, SupplierCertification,
     CertificationType, CertificationStatus, SupplierClassification,
-    ClassificationType
+    ClassificationType, FolderTracking
 )
 
 User = get_user_model()
@@ -637,4 +637,24 @@ class ContactForm(forms.ModelForm):
                 'rows': 3,
                 'placeholder': 'Enter Notes'
             }),
+        }
+
+class ContractSearchForm(forms.Form):
+    search_query = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Search by Contract Number or PO Number...',
+            'hx-get': '/contracts/folder-tracking/search/',
+            'hx-trigger': 'keyup changed delay:500ms',
+            'hx-target': '#search-results'
+        })
+    )
+
+class FolderTrackingForm(forms.ModelForm):
+    class Meta:
+        model = FolderTracking
+        fields = ['contract']
+        widgets = {
+            'contract': forms.HiddenInput()
         } 

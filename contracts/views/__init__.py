@@ -93,3 +93,21 @@ from .dd1155_views import (
     export_dd1155_text,
     export_dd1155_png,
 )
+
+from .folder_tracking_views import (
+    folder_tracking,
+    add_folder_tracking,
+    close_folder_tracking,
+    toggle_highlight,
+    export_folder_tracking,
+    search_contracts,
+)
+
+__all__ = [
+    'folder_tracking',
+    'add_folder_tracking',
+    'close_folder_tracking',
+    'toggle_highlight',
+    'export_folder_tracking',
+]
+

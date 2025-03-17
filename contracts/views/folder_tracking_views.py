@@ -1,11 +1,11 @@
-from .views import *
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
-from .models import FolderTracking
-from .forms import FolderTrackingForm
+from django.template.loader import render_to_string
+from ..models import FolderTracking, Contract
+from ..forms import FolderTrackingForm, ContractSearchForm
 import json
 import csv
 from datetime import datetime
@@ -32,21 +32,51 @@ def folder_tracking(request):
 
     context = {
         'folders': folders,
-        'form': FolderTrackingForm(),
+        'search_form': ContractSearchForm(),
         'search_query': search_query,
     }
     return render(request, 'contracts/folder_tracking.html', context)
 
 @login_required
+def search_contracts(request):
+    search_query = request.GET.get('search_query', '')
+    contracts = []
+    
+    if search_query:
+        contracts = Contract.objects.filter(
+            Q(contract_number__icontains=search_query) |
+            Q(po_number__icontains=search_query),
+            open=True
+        ).order_by('contract_number')[:10]  # Limit to 10 results for performance
+    
+    context = {
+        'contracts': contracts,
+    }
+    
+    html = render_to_string('contracts/includes/contract_search_results.html', context)
+    return JsonResponse({'html': html})
+
+@login_required
 def add_folder_tracking(request):
     if request.method == 'POST':
-        form = FolderTrackingForm(request.POST)
-        if form.is_valid():
-            folder = form.save(commit=False)
-            folder.added_by = request.user
-            folder.save()
-            return JsonResponse({'status': 'success'})
-        return JsonResponse({'status': 'error', 'errors': form.errors})
+        contract_id = request.POST.get('contract')
+        contract = get_object_or_404(Contract, id=contract_id)
+        
+        # Check if a folder already exists for this contract
+        if FolderTracking.objects.filter(contract=contract, closed=False).exists():
+            return JsonResponse({
+                'status': 'error',
+                'message': 'A folder already exists for this contract'
+            })
+        
+        # Create new folder with default values
+        folder = FolderTracking.objects.create(
+            contract=contract,
+            stack='1 - COS',  # Default to first stack
+            added_by=request.user
+        )
+        return JsonResponse({'status': 'success'})
+        
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 @login_required
@@ -90,4 +120,4 @@ def export_folder_tracking(request):
             folder.note
         ])
 
-    return response
+    return response 
