@@ -9,6 +9,29 @@ from ..forms import FolderTrackingForm, ContractSearchForm
 import json
 import csv
 from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import webcolors
+
+def color_to_argb(color):
+    """Convert color names or RGB values to ARGB hex format required by openpyxl"""
+    try:
+        # If it's a hex value
+        if color.startswith('#'):
+            color = color[1:]
+            # Add alpha channel if not present
+            if len(color) == 6:
+                return 'FF' + color.upper()
+            return color.upper()
+        
+        # Try to convert color name to hex
+        rgb = webcolors.name_to_rgb(color.lower())
+        hex_color = '%02x%02x%02x' % rgb
+        return 'FF' + hex_color.upper()
+    except (ValueError, AttributeError):
+        # Return white if color is not recognized
+        return 'FFFFFFFF'
 
 @login_required
 def folder_tracking(request):
@@ -87,8 +110,10 @@ def add_folder_tracking(request):
         # Create new folder with default values
         folder = FolderTracking.objects.create(
             contract=contract,
-            stack='1 - COS',  # Default to first stack
-            added_by=request.user
+            stack='0 - NONE',  # Default to first stack
+            added_by=request.user,
+            created_by=request.user,
+            modified_by=request.user
         )
         return JsonResponse({'status': 'success'})
         
@@ -103,38 +128,121 @@ def close_folder_tracking(request, pk):
 @login_required
 def toggle_highlight(request, pk):
     folder = get_object_or_404(FolderTracking, pk=pk)
-    folder.toggle_highlight()
+    folder.toggle_highlight(request.user)
     return JsonResponse({'status': 'success', 'highlighted': folder.highlight})
 
 @login_required
 def export_folder_tracking(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="folder_tracking_{datetime.now().strftime("%Y%m%d")}.csv"'
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="folder_tracking_{datetime.now().strftime("%Y%m%d")}.xlsx"'
 
-    writer = csv.writer(response)
-    writer.writerow(['Stack', 'Contract', 'PO', 'Partial', 'RTS Email', 'QB INV', 'WAWF', 'WAWF QAR',
-                    'VSM SCN', 'SIR SCN', 'Tracking', 'Tracking #', 'Sort Data', 'Note'])
+    # Create workbook and select active sheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Folder Tracking"
 
-    folders = FolderTracking.objects.filter(closed=False).order_by('stack', 'contract__contract_number')
+    # Define headers
+    headers = ['Stack', 'Contract', 'PO', 'Partial', 'RTS Email', 'QB INV', 'WAWF', 'WAWF QAR',
+               'VSM SCN', 'SIR SCN', 'Tracking', 'Tracking #', 'Sort Data', 'Note']
+
+    # Write headers with styling
+    header_fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    header_alignment = Alignment(horizontal='center', vertical='center')
     
-    for folder in folders:
-        writer.writerow([
+    # Initialize dictionary to track maximum width of each column
+    max_lengths = {i: len(str(header)) for i, header in enumerate(headers)}
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+
+    # Get folders and sort them
+    folders = FolderTracking.objects.filter(closed=False).extra(
+        select={'stack_num': "CAST(SUBSTRING(stack, 1, CHARINDEX(' -', stack) - 1) AS INTEGER)"}
+    ).order_by('stack_num', 'contract__contract_number')
+
+    # Write data with styling
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    # Define boolean fields (these will be center-aligned)
+    boolean_fields = {'RTS Email', 'WAWF', 'WAWF QAR'}
+
+    for row_idx, folder in enumerate(folders, 2):
+        # Get stack color
+        stack_color = folder.stack_color
+        if not stack_color:
+            stack_color = 'FFFFFF'  # Default to white if no color specified
+        
+        # Convert color to ARGB format
+        argb_color = color_to_argb(stack_color)
+        
+        # Create fill style for the stack column
+        stack_fill = PatternFill(start_color=argb_color, end_color=argb_color, fill_type="solid")
+
+        # Write row data with styling
+        row_data = [
             folder.stack,
             folder.contract.contract_number,
             folder.contract.po_number,
-            folder.partial,
+            folder.partial or '',
             'Yes' if folder.rts_email else 'No',
-            folder.qb_inv,
+            folder.qb_inv or '',
             'Yes' if folder.wawf else 'No',
             'Yes' if folder.wawf_qar else 'No',
-            folder.vsm_scn,
-            folder.sir_scn,
-            folder.tracking,
-            folder.tracking_number,
-            folder.sort_data,
-            folder.note
-        ])
+            folder.vsm_scn or '',
+            folder.sir_scn or '',
+            folder.tracking or '',
+            folder.tracking_number or '',
+            folder.sort_data or '',
+            folder.note or ''
+        ]
 
+        # Update maximum lengths
+        for i, value in enumerate(row_data):
+            max_lengths[i] = max(max_lengths[i], len(str(value or '')))
+
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            
+            # Apply basic styling to all cells
+            cell.border = thin_border
+            cell.font = Font(color="000000")  # Black text for all cells
+            
+            # Set alignment based on field type
+            if headers[col_idx - 1] in boolean_fields:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            else:
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+            
+            # Apply color only to stack column
+            if col_idx == 1:  # Stack column
+                cell.fill = stack_fill
+            else:
+                cell.fill = PatternFill(start_color="FFFFFFFF", end_color="FFFFFFFF", fill_type="solid")  # White background
+            
+            # Apply highlight to non-stack columns if needed
+            if folder.highlight and col_idx > 1:
+                cell.fill = PatternFill(start_color="FFFFFF00", end_color="FFFFFF00", fill_type="solid")  # ARGB yellow
+
+    # Adjust column widths based on content
+    for i, max_length in max_lengths.items():
+        column = get_column_letter(i + 1)
+        # Set width with some padding and maximum width limit
+        adjusted_width = min(max_length + 2, 50)  # Add 2 for padding, cap at 50
+        ws.column_dimensions[column].width = adjusted_width
+
+    # Save workbook
+    wb.save(response)
     return response
 
 @login_required
@@ -154,7 +262,13 @@ def update_folder_field(request, pk):
     if field in ['rts_email', 'wawf', 'wawf_qar']:
         value = value.lower() == 'true'
     
+    # Update the field value
     setattr(folder, field, value)
+    
+    # Update audit fields
+    folder.modified_by = request.user
+    # modified_on will be automatically updated by Django's auto_now=True
+    
     folder.save()
     
     return JsonResponse({

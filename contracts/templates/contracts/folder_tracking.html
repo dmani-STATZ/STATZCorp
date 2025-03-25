@@ -91,7 +91,7 @@
     .checkbox-input {
         width: 1rem !important;
         height: 1rem !important;
-        border: 2px solid #3b82f6 !important;  /* Blue border */
+        border: 1px solid #e5e7eb !important;  /* Blue border */
         border-radius: 0.25rem !important;
         appearance: none !important;
         -webkit-appearance: none !important;
@@ -103,7 +103,7 @@
     
     .checkbox-input:checked {
         background-color: #3b82f6 !important;  /* Blue background when checked */
-        border-color: #3b82f6 !important;
+        border-color: #e5e7eb !important;
     }
 
     .checkbox-input:checked::after {
@@ -150,21 +150,25 @@
         font-size: 0.75rem !important;
         font-weight: 500 !important;
         text-transform: uppercase !important;
-        color: #6B7280 !important;
+        color: #252525 !important;
         letter-spacing: 0.05em !important;
     }
     
     .table-compact .editable-input,
     .table-compact .editable-select {
-        padding: 0.125rem 0.25rem !important;
-        height: 1.75rem !important;
-        min-height: 1.75rem !important;
+        padding: 0.125rem 0.125rem !important;
+        height: 1.50rem !important;
+        min-height: 1.50rem !important;
         font-size: 0.75rem !important;      /* Reduced from 0.875rem */
     }
     
     .table-compact .checkbox-input {
         width: 1rem !important;
         height: 1rem !important;
+    }
+
+    .container-fluid {
+        font-size: 0.5rem !important;
     }
 </style>
 {% endblock %}
@@ -197,8 +201,8 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="w-30">Stack</th>
-                    <th class="w-36">Contract</th>
-                    <th class="w-24">PO</th>
+                    <th class="w-32">Contract</th>
+                    <th class="w-16">PO</th>
                     <th class="w-36">Partial</th>
                     <th class="w-12">RTS Email</th>
                     <th class="w-32">QB Invoice</th>
@@ -206,8 +210,8 @@
                     <th class="w-12">WAWF QAR</th>
                     <th class="w-32">VSM SCN</th>
                     <th class="w-32">SIR SCN</th>
-                    <th class="w-38">Tracking Type</th>
-                    <th class="w-38">Tracking Number</th>
+                    <th class="w-38">Tracking</th>
+                    <th class="w-38">Tracking #</th>
                     <th class="w-16">Sort Data</th>
                     <th class="w-80">Notes</th>
                     <th class="w-32">Actions</th>

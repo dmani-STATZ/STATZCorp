@@ -719,11 +719,13 @@ class FolderTracking(AuditModel):
         self.closed = True
         self.date_closed = timezone.now()
         self.closed_by = user
+        self.modified_by = user
         self.save()
 
-    def toggle_highlight(self):
+    def toggle_highlight(self, user):
         """
         Toggle the highlight status of the record
         """
         self.highlight = not self.highlight
+        self.modified_by = user
         self.save()
