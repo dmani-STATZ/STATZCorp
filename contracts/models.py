@@ -433,8 +433,11 @@ class CertificationType(models.Model):
     
 
 class CertificationStatus(models.Model):
-    code = models.CharField(max_length=25, null=True, blank=True)
-    name = models.TextField(null=True, blank=True)
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True, default=None)
+    certification_type = models.ForeignKey('CertificationType', on_delete=models.CASCADE, null=True, blank=True, default=None)
+    compliance_status = models.CharField(max_length=25, null=True, blank=True, default=None)
+    certification_date = models.DateTimeField(null=True, blank=True)
+    certification_expiration = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -640,6 +643,7 @@ class Expedite(models.Model):
 
 class FolderTracking(AuditModel):
     STACK_CHOICES = [
+        ('0 - NONE', 'NONE'),
         ('1 - COS', 'COS'),
         ('2 - PACK', 'PACK'),
         ('3 - PROCESS', 'PROCESS'),
@@ -653,6 +657,7 @@ class FolderTracking(AuditModel):
     ]
 
     STACK_COLORS = {
+        '0 - NONE': 'white',
         '1 - COS': 'gold',
         '2 - PACK': 'white',
         '3 - PROCESS': 'lightblue',
