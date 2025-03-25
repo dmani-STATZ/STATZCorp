@@ -101,6 +101,7 @@ from .folder_tracking_views import (
     toggle_highlight,
     export_folder_tracking,
     search_contracts,
+    update_folder_field,
 )
 
 __all__ = [

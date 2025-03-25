@@ -659,7 +659,7 @@ class FolderTracking(AuditModel):
     STACK_COLORS = {
         '0 - NONE': 'white',
         '1 - COS': 'gold',
-        '2 - PACK': 'white',
+        '2 - PACK': 'blue',
         '3 - PROCESS': 'lightblue',
         '4 - W4QAR': 'yellow',
         '5 - W4BOL': 'green',

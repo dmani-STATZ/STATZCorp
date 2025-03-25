@@ -93,6 +93,7 @@ from .views import (
     toggle_highlight,
     export_folder_tracking,
     search_contracts,
+    update_folder_field,
 )
 
 from .views.contract_views import check_contract_number
@@ -205,4 +206,5 @@ urlpatterns = [
     path('folder-tracking/<int:pk>/close/', close_folder_tracking, name='close_folder_tracking'),
     path('folder-tracking/<int:pk>/toggle-highlight/', toggle_highlight, name='toggle_highlight'),
     path('folder-tracking/export/', export_folder_tracking, name='export_folder_tracking'),
+    path('folder-tracking/<int:pk>/update-field/', update_folder_field, name='update_folder_field'),
 ] 

@@ -3,23 +3,32 @@
 
 {% block extra_head %}
 <style>
-    .stack-1-cos { background-color: gold; }
-    .stack-2-pack { background-color: white; }
-    .stack-3-process { background-color: lightblue; }
-    .stack-4-w4qar { background-color: yellow; }
-    .stack-5-w4bol { background-color: green; }
-    .stack-6-w4pos { background-color: salmon; }
-    .stack-7-w4pod { background-color: lavender; }
-    .stack-8-w4pay { background-color: grey; }
-    .stack-9-qsign { background-color: teal; }
-    .stack-10-paid { background-color: red; }
-    .highlighted { background-color: #ffff00 !important; }
+    /* Stack background colors - dynamically generated from model */
+    {% for stack_key, colors in stack_colors.items %}
+    select.stack-{{ stack_key }} {
+        background-color: {{ colors.bg }} !important;
+        color: {{ colors.text }} !important;
+    }
+    {% endfor %}
+    
+    /* Make highlight more vibrant */
+    tr.highlight-row {
+        background-color: #ffff00 !important;
+    }
+    tr.highlight-row td:not(:first-child) {
+        background-color: #ffff00 !important;
+    }
+    tr.highlight-row input:not([type="checkbox"]) {
+        background-color: #ffff00 !important;
+    }
     .compact-table th, .compact-table td {
         padding: 0.5rem;
         font-size: 0.875rem;
     }
     .checkbox-cell {
-        text-align: center;
+        text-align: center !important;
+        padding: 0.5rem !important;
+        vertical-align: middle !important;
     }
     .modal {
         display: none;
@@ -40,88 +49,253 @@
         max-width: 600px;
         border-radius: 8px;
     }
+    .editable-cell {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .editable-cell:hover {
+        background-color: #f3f4f6;
+    }
+    .editable-input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        outline: none;
+    }
+    .editable-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+    .editable-select {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        outline: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.5rem center !important;
+        background-size: 1em !important;
+        padding-right: 2.5rem !important;
+    }
+    .editable-select option {
+        background-color: white !important;
+        color: black !important;
+        padding: 0.5rem !important;
+    }
+    .editable-select, .editable-select option {
+        font-weight: 500;
+    }
+    .checkbox-input {
+        width: 1rem !important;
+        height: 1rem !important;
+        border: 2px solid #3b82f6 !important;  /* Blue border */
+        border-radius: 0.25rem !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        background-color: white !important;
+        margin: 0 !important;
+        cursor: pointer !important;
+        position: relative !important;
+    }
+    
+    .checkbox-input:checked {
+        background-color: #3b82f6 !important;  /* Blue background when checked */
+        border-color: #3b82f6 !important;
+    }
+
+    .checkbox-input:checked::after {
+        content: '' !important;
+        position: absolute !important;
+        left: 4px !important;
+        top: 1px !important;
+        width: 4px !important;
+        height: 8px !important;
+        border: solid white !important;
+        border-width: 0 2px 2px 0 !important;
+        transform: rotate(45deg) !important;
+        display: block !important;
+    }
+
+    .checkbox-input:focus {
+        outline: 2px solid #93c5fd !important;  /* Light blue focus ring */
+        outline-offset: 2px !important;
+    }
+    
+    /* Table styles */
+    .table-compact td, 
+    .table-compact th {
+        padding-top: 0.25rem !important;    /* 4px */
+        padding-bottom: 0.25rem !important; /* 4px */
+        padding-left: 0.5rem !important;    /* 8px */
+        padding-right: 0.5rem !important;   /* 8px */
+        font-size: 0.75rem !important;      /* Reduced from 0.875rem */
+    }
+    
+    /* Header specific styles */
+    .table-compact th {
+        padding: 1rem 0.5rem 0.5rem 0.5rem !important;  /* More top padding, standard sides/bottom */
+        height: auto !important;                        /* Allow natural height */
+        min-height: 3.5rem !important;                 /* Ensure minimum height for headers */
+        white-space: normal !important;                /* Allow text wrapping */
+        line-height: 1.2 !important;                   /* Tighter line height for wrapped text */
+        vertical-align: bottom !important;             /* Align text to bottom */
+    }
+
+    /* Remove the span wrapper and flexbox styling */
+    .table-compact th {
+        text-align: left !important;
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        text-transform: uppercase !important;
+        color: #6B7280 !important;
+        letter-spacing: 0.05em !important;
+    }
+    
+    .table-compact .editable-input,
+    .table-compact .editable-select {
+        padding: 0.125rem 0.25rem !important;
+        height: 1.75rem !important;
+        min-height: 1.75rem !important;
+        font-size: 0.75rem !important;      /* Reduced from 0.875rem */
+    }
+    
+    .table-compact .checkbox-input {
+        width: 1rem !important;
+        height: 1rem !important;
+    }
 </style>
 {% endblock %}
 
 {% block body %}
-<div class="container mx-auto px-4 py-8">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Folder Tracking</h1>
-        <div class="flex space-x-4">
-            <button type="button" id="addNewBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+<div class="container-fluid">
+    <div class="flex justify-between items-center mb-2">
+        <h1 class="text-xl font-bold text-gray-900">Folder Tracking</h1>
+        <div class="flex items-center space-x-4 flex-1 mx-4">
+            <input type="text" 
+                   name="search" 
+                   placeholder="Search folders by Contract Number, PO Number, Partial, or Tracking Number..." 
+                   value="{{ search_query }}"
+                   onkeyup="handleSearch(event)"
+                   class="w-full px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div class="flex space-x-2">
+            <button type="button" id="addNewBtn" class="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm">
                 Add New
             </button>
-            <a href="{% url 'contracts:export_folder_tracking' %}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+            <a href="{% url 'contracts:export_folder_tracking' %}" class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 text-sm">
                 Export to Excel
             </a>
         </div>
     </div>
 
-    <!-- Search Bar -->
-    <div class="mb-6">
-        <input type="text" 
-               name="search" 
-               placeholder="Search folders by Contract Number, PO Number, Partial, or Tracking Number..." 
-               value="{{ search_query }}"
-               onkeyup="handleSearch(event)"
-               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-    </div>
-
     <!-- Folder Table -->
     <div class="overflow-x-auto bg-white rounded-lg shadow">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="w-full divide-y divide-gray-200 table-compact">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stack</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Partial</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RTS Email</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QB INV</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WAWF</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WAWF QAR</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VSM SCN</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SIR SCN</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking #</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sort Data</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th class="w-30">Stack</th>
+                    <th class="w-36">Contract</th>
+                    <th class="w-24">PO</th>
+                    <th class="w-36">Partial</th>
+                    <th class="w-12">RTS Email</th>
+                    <th class="w-32">QB Invoice</th>
+                    <th class="w-12">WAWF Submit</th>
+                    <th class="w-12">WAWF QAR</th>
+                    <th class="w-32">VSM SCN</th>
+                    <th class="w-32">SIR SCN</th>
+                    <th class="w-38">Tracking Type</th>
+                    <th class="w-38">Tracking Number</th>
+                    <th class="w-16">Sort Data</th>
+                    <th class="w-80">Notes</th>
+                    <th class="w-32">Actions</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for folder in folders %}
-                <tr class="{% if folder.highlight %}bg-yellow-50{% endif %}" data-id="{{ folder.id }}">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 py-1 text-sm rounded" style="background-color: {{ folder.stack_color }}">
-                            {{ folder.get_stack_display }}
-                        </span>
+                <tr class="{% if folder.highlight %}highlight-row{% endif %}" data-id="{{ folder.id }}">
+                    <td class="whitespace-nowrap">
+                        <select class="editable-select stack-{{ folder.stack|slice:'4:'|lower|cut:' ' }}" 
+                                data-id="{{ folder.id }}" 
+                                data-field="stack" 
+                                onchange="updateField(this)">
+                            {% for choice in folder.STACK_CHOICES %}
+                            <option value="{{ choice.0 }}" 
+                                    {% if folder.stack == choice.0 %}selected{% endif %}>
+                                {{ choice.1 }}
+                            </option>
+                            {% endfor %}
+                        </select>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.contract.contract_number }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.contract.po_number }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.partial|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{% if folder.rts_email %}✓{% endif %}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.qb_inv|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{% if folder.wawf %}✓{% endif %}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{% if folder.wawf_qar %}✓{% endif %}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.vsm_scn|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.sir_scn|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.tracking|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.tracking_number|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.sort_data|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ folder.note|default:'' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onclick="toggleHighlight({{ folder.id }})" class="text-indigo-600 hover:text-indigo-900 mr-2">
+                    <td class="whitespace-nowrap">{{ folder.contract.contract_number }}</td>
+                    <td class="whitespace-nowrap">{{ folder.contract.po_number }}</td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.partial|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="partial" onchange="updateField(this)"
+                               placeholder="Enter partial...">
+                    </td>
+                    <td class="whitespace-nowrap checkbox-cell">
+                        <input type="checkbox" class="checkbox-input" 
+                               {% if folder.rts_email %}checked{% endif %}
+                               data-id="{{ folder.id }}" data-field="rts_email" onchange="updateField(this)">
+                    </td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.qb_inv|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="qb_inv" onchange="updateField(this)"
+                               placeholder="Enter QB INV...">
+                    </td>
+                    <td class="whitespace-nowrap checkbox-cell">
+                        <input type="checkbox" class="checkbox-input"
+                               {% if folder.wawf %}checked{% endif %}
+                               data-id="{{ folder.id }}" data-field="wawf" onchange="updateField(this)">
+                    </td>
+                    <td class="whitespace-nowrap checkbox-cell">
+                        <input type="checkbox" class="checkbox-input"
+                               {% if folder.wawf_qar %}checked{% endif %}
+                               data-id="{{ folder.id }}" data-field="wawf_qar" onchange="updateField(this)">
+                    </td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.vsm_scn|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="vsm_scn" onchange="updateField(this)"
+                               placeholder="Enter VSM SCN...">
+                    </td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.sir_scn|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="sir_scn" onchange="updateField(this)"
+                               placeholder="Enter SIR SCN...">
+                    </td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.tracking|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="tracking" onchange="updateField(this)"
+                               placeholder="Enter tracking...">
+                    </td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.tracking_number|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="tracking_number" onchange="updateField(this)"
+                               placeholder="Enter tracking number...">
+                    </td>
+                    <td class="whitespace-nowrap">{{ folder.sort_data|default:'' }}</td>
+                    <td class="whitespace-nowrap editable-cell">
+                        <input type="text" class="editable-input" value="{{ folder.note|default:'' }}"
+                               data-id="{{ folder.id }}" data-field="note" onchange="updateField(this)"
+                               placeholder="Enter note...">
+                    </td>
+                    <td class="whitespace-nowrap text-right text-sm font-medium">
+                        <button class="text-indigo-600 hover:text-indigo-900 mr-2"
+                                data-id="{{ folder.id }}" onclick="toggleHighlightBtn(this)">
                             {% if folder.highlight %}Unhighlight{% else %}Highlight{% endif %}
                         </button>
-                        <button onclick="closeFolder({{ folder.id }})" class="text-red-600 hover:text-red-900">
+                        <button class="text-red-600 hover:text-red-900"
+                                data-id="{{ folder.id }}" onclick="closeFolderBtn(this)">
                             Close
                         </button>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="15" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="15" class="text-center text-gray-500">
                         No folders found
                     </td>
                 </tr>
@@ -132,7 +306,7 @@
 
     <!-- Pagination -->
     {% if folders.has_other_pages %}
-    <div class="flex justify-center mt-4">
+    <div class="flex justify-center mt-2">
         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
             {% if folders.has_previous %}
             <a href="?page={{ folders.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
@@ -346,6 +520,52 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+function updateField(element) {
+    const folderId = element.dataset.id;
+    const field = element.dataset.field;
+    const value = element.type === 'checkbox' ? element.checked : element.value;
+
+    const formData = new FormData();
+    formData.append('field', field);
+    formData.append('value', value);
+
+    fetch(`/contracts/folder-tracking/${folderId}/update-field/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (field === 'stack') {
+                // Update the select element's class
+                const stackName = value.split(' - ')[1].toLowerCase(); // Get the part after the dash
+                element.className = `editable-select stack-${stackName}`;
+            }
+        } else {
+            alert('Error updating field: ' + (data.message || 'Unknown error'));
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating field. Please try again.');
+        location.reload();
+    });
+}
+
+function toggleHighlightBtn(element) {
+    const folderId = element.dataset.id;
+    toggleHighlight(folderId);
+}
+
+function closeFolderBtn(element) {
+    const folderId = element.dataset.id;
+    closeFolder(folderId);
 }
 </script>
 {% endblock %} 

@@ -173,6 +173,7 @@
                         </svg>
                         Files
                     </button>
+                    <a href="{{ contract.files_url }}" target="_blank">Files</a>
                     {% endif %}
                 </div>
                 <div class="p-2">
@@ -264,7 +265,7 @@
                             class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
-                                    {{ clin.item_no|default:"0000" }}
+                                    {{ clin.item_number|default:"0000" }}
                                 </a>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -595,41 +596,48 @@ function copyContractPath(path) {
 
 // Try various methods to open the folder directly
 function tryDirectOpen(path) {
-    // Try several approaches - some may be blocked by browser security
-    
-    // Method 1: Try the explorer protocol (works in some IE/Edge configurations)
-    try {
-        window.open('explorer:' + path, '_blank');
-    } catch (e) {
-        console.log('Explorer protocol failed:', e);
-    }
-    
-    // Method 2: Try the shell: protocol (works in some Windows configurations)
-    try {
-        window.open('shell:' + path, '_blank');
-    } catch (e) {
-        console.log('Shell protocol failed:', e);
-    }
-    
-    // Method 3: Try the direct file:// protocol
-    try {
-        // Convert backslashes to forward slashes for URL format
-        const urlPath = path.replace(/\\/g, '/');
+    // Handle UNC paths specifically
+    if (path.startsWith('\\\\')) {
+        // Format UNC path for file protocol
+        // Remove any leading or trailing spaces
+        path = path.trim();
         
-        // For UNC paths, use the correct number of slashes
-        let fileUrl = path.startsWith('\\\\') ? 
-            'file:////' + urlPath.substring(2) : 
-            'file:///' + urlPath;
+        // Replace backslashes with forward slashes
+        let formattedPath = path.replace(/\\/g, '/');
+        
+        // Ensure proper encoding of special characters
+        formattedPath = encodeURI(formattedPath);
+        
+        // Create the file URL with the correct number of slashes for UNC
+        let fileUrl = 'file:' + formattedPath;
+        
+        // Try to open the URL
+        try {
+            window.open(fileUrl, '_blank');
+        } catch (e) {
+            console.error('Failed to open UNC path:', e);
+            // Show manual instructions after a short delay
+            setTimeout(() => {
+                document.getElementById('try-manual').classList.remove('hidden');
+            }, 1500);
+        }
+    } else {
+        // Handle local paths
+        try {
+            // Convert backslashes to forward slashes and encode
+            let formattedPath = path.trim().replace(/\\/g, '/');
+            formattedPath = encodeURI(formattedPath);
             
-        window.open(fileUrl, '_blank');
-    } catch (e) {
-        console.log('File protocol failed:', e);
+            // Add file:/// prefix for local paths
+            let fileUrl = 'file:///' + formattedPath;
+            window.open(fileUrl, '_blank');
+        } catch (e) {
+            console.error('Failed to open local path:', e);
+            setTimeout(() => {
+                document.getElementById('try-manual').classList.remove('hidden');
+            }, 1500);
+        }
     }
-    
-    // Inform the user that they may need to use the manual method
-    setTimeout(() => {
-        document.getElementById('try-manual').classList.remove('hidden');
-    }, 1500);
 }
 
 // Show system message modal

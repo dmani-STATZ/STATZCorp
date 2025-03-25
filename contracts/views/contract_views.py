@@ -33,7 +33,7 @@ class ContractDetailView(DetailView):
         contract = self.get_object()
         clins = contract.clin_set.all().select_related(
             'clin_type', 'supplier', 'nsn'
-        )
+        ).order_by('item_number')
         context['clins'] = clins
         
         # Get contract notes

@@ -23,6 +23,9 @@
             padding-top: 40px;
             display: flex;
             flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
         }
         header {
             position: fixed;
@@ -45,15 +48,14 @@
                 );
             background-blend-mode: multiply;
             background-color: #004eb3;
-            z-index: 1000; /* Ensure the header is above other content */
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             color: rgb(255, 255, 255);
-            width: 100%;
-            padding: 1rem;
+            padding: 0.5rem 1rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 60px;
+            height: 48px; /* Reduced from 60px */
         }
         .sidebar {
             background: repeating-linear-gradient(
@@ -93,12 +95,29 @@
         }
         .content {
             transition: margin-left 0.3s;
+            width: 100%;
+            max-width: none;
+            padding: 0.5rem;
+            margin-top: 48px; /* Match header height */
         }
         .content.active {
             margin-left: 0px;
         }
         .content.inactive {
             margin-left: 0px;
+        }
+        
+        /* Add new container max-width utilities */
+        .container-fluid {
+            width: 100%;
+            margin-right: auto;
+            margin-left: auto;
+        }
+        
+        @media (min-width: 1920px) {
+            .container-fluid {
+                max-width: 1880px; /* 1920px - 40px padding */
+            }
         }
     </style>
 </head>
@@ -165,7 +184,7 @@
             </ul>
         </div>
     </div>
-    <div class="content flex-1 p-10 inactive" id="content">
+    <div class="content flex-1 inactive" id="content">
         {% block body %}{% endblock %}
         {% block extra_scripts %}{% endblock %}
     </div>

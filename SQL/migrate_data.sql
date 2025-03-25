@@ -1348,6 +1348,11 @@ DROP PROCEDURE #EnsureIdentityInsertOff;
 GO 
 
 
+-- Update contract values
+print ('##########################################')
+print 'Update contract values'
+print ('##########################################')
+
 UPDATE       contracts_contract
 SET                contract_value = subquery.NewTotal, ppi_split =subquery.ppi_split, statz_split = subquery.statz_split, ppi_split_paid=subquery.ppi_split_paid, statz_split_paid=subquery.statz_split_paid
 FROM            (SELECT        ISNULL(SUM(ContractDol), 0.00) AS NewTotal, Contract_ID, ISNULL(SUM(PPISplitDol), 0.00) AS ppi_split, ISNULL(SUM(STATZSplitDol), 0.00) AS statz_split, ISNULL(SUM(ActualPaidPPIDol), 0.00) AS ppi_split_paid, 
@@ -1356,9 +1361,75 @@ FROM            (SELECT        ISNULL(SUM(ContractDol), 0.00) AS NewTotal, Contr
                           GROUP BY Contract_ID) AS subquery INNER JOIN
                          contracts_contract ON subquery.Contract_ID = contracts_contract.id
 
+-- Update planned split
+print ('##########################################')
+print 'Update planned split'
+print ('##########################################')
+
 UPDATE       contracts_contract
 SET                [planned_split] = PlanSplit_per_PPIbid
 FROM            (SELECT        Contract_ID, PlanSplit_per_PPIbid, Type_ID
 				FROM            ContractLog.dbo.STATZ_SUB_CONTRACTS_TBL
 				WHERE        (Type_ID = 1)) AS subquery INNER JOIN
                          contracts_contract ON subquery.Contract_ID = contracts_contract.id
+
+-- Update contract status
+print ('##########################################')
+print 'Update contract status'
+print ('##########################################')
+
+UPDATE contracts_contract
+SET status_id = CASE
+    WHEN cancelled = 1 THEN 3
+    WHEN cancelled = 0 AND [open] = 0 THEN 2
+    WHEN cancelled = 0 AND [open] = 1 THEN 1
+END;
+
+-- Update clin item number
+print ('##########################################')
+print 'Update clin item number'
+print ('##########################################')
+
+WITH NumberedCLINs AS (
+    SELECT 
+        contract_id,
+        id,
+        clin_type_id,
+        ROW_NUMBER() OVER (PARTITION BY contract_id ORDER BY id) AS row_num,
+        CASE 
+            WHEN clin_type_id = 1 THEN 1
+            WHEN clin_type_id IN (17, 27, 18, 7, 20, 19, 28) THEN 2
+            WHEN clin_type_id IN (2, 15) THEN 3
+            WHEN clin_type_id = 25 THEN 100
+            WHEN clin_type_id IN (14, 24, 26, 29, 30, 31, 32) THEN 101
+            ELSE 999 -- Default case, if needed
+        END AS initial_number
+    FROM contracts_clin
+),
+FormattedCLINs AS (
+    SELECT 
+        contract_id,
+        id,
+        clin_type_id,
+        initial_number,
+        ROW_NUMBER() OVER (PARTITION BY contract_id, initial_number ORDER BY id) AS seq_num
+    FROM NumberedCLINs
+)
+UPDATE contracts_clin
+SET item_number = RIGHT('0000' + CAST(FormattedCLINs.initial_number + FormattedCLINs.seq_num - 1 AS VARCHAR), 4)
+FROM FormattedCLINs
+WHERE contracts_clin.id = FormattedCLINs
+
+
+
+-- Update folder tracking closed status
+print ('##########################################')
+print 'Update folder tracking closed status'
+print ('##########################################')
+
+UPDATE       contracts_foldertracking
+SET                closed = 1
+WHERE        (stack = N'CLOSE')
+
+
+

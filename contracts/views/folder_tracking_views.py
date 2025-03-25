@@ -12,8 +12,10 @@ from datetime import datetime
 
 @login_required
 def folder_tracking(request):
-    # Get all non-closed records
-    folders = FolderTracking.objects.filter(closed=False).order_by('stack', 'contract__contract_number')
+    # Get all non-closed records and sort by numeric stack value
+    folders = FolderTracking.objects.filter(closed=False).extra(
+        select={'stack_num': "CAST(SUBSTRING(stack, 1, CHARINDEX(' -', stack) - 1) AS INTEGER)"}
+    ).order_by('stack_num', 'contract__contract_number')
     
     # Search functionality
     search_query = request.GET.get('search', '')
@@ -26,14 +28,25 @@ def folder_tracking(request):
         )
 
     # Pagination
-    paginator = Paginator(folders, 50)  # Show 50 items per page
+    paginator = Paginator(folders, 25)  # Show 25 items per page
     page = request.GET.get('page')
     folders = paginator.get_page(page)
+
+    # Get stack colors from model - simplified key format
+    stack_colors = {}
+    for key, value in FolderTracking.STACK_COLORS.items():
+        # Extract the name part (e.g., 'NONE', 'COS', 'PAID', etc.)
+        name = key.split(' - ')[1]
+        stack_colors[name.lower()] = {
+            'bg': value,
+            'text': 'white' if value.lower() in ['blue', 'green', 'grey', 'teal', 'red'] else 'black'
+        }
 
     context = {
         'folders': folders,
         'search_form': ContractSearchForm(),
         'search_query': search_query,
+        'stack_colors': stack_colors,
     }
     return render(request, 'contracts/folder_tracking.html', context)
 
@@ -122,4 +135,29 @@ def export_folder_tracking(request):
             folder.note
         ])
 
-    return response 
+    return response
+
+@login_required
+def update_folder_field(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+    
+    folder = get_object_or_404(FolderTracking, pk=pk)
+    field = request.POST.get('field')
+    value = request.POST.get('value')
+    
+    if field not in ['stack', 'partial', 'rts_email', 'qb_inv', 'wawf', 'wawf_qar', 
+                    'vsm_scn', 'sir_scn', 'tracking', 'tracking_number', 'note']:
+        return JsonResponse({'status': 'error', 'message': 'Invalid field'})
+    
+    # Handle boolean fields
+    if field in ['rts_email', 'wawf', 'wawf_qar']:
+        value = value.lower() == 'true'
+    
+    setattr(folder, field, value)
+    folder.save()
+    
+    return JsonResponse({
+        'status': 'success',
+        'value': value if field not in ['rts_email', 'wawf', 'wawf_qar'] else bool(value)
+    }) 
