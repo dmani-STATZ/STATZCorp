@@ -5,3 +5,6 @@ class ContractsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'contracts'
     verbose_name = 'Contracts Management'
+
+    def ready(self):
+        import contracts.signals  # noqa

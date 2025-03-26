@@ -1,93 +1,20 @@
-from .views import *
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponse
-from django.core.paginator import Paginator
-from django.db.models import Q
-from .models import FolderTracking
-from .forms import FolderTrackingForm
-import json
-import csv
-from datetime import datetime
+from .views.folder_tracking_views import (
+    folder_tracking,
+    add_folder_tracking,
+    close_folder_tracking,
+    toggle_highlight,
+    export_folder_tracking,
+    update_folder_field,
+    search_contracts
+)
 
-@login_required
-def folder_tracking(request):
-    # Get all non-closed records
-    folders = FolderTracking.objects.filter(closed=False).order_by('stack', 'contract__contract_number')
-    
-    # Search functionality
-    search_query = request.GET.get('search', '')
-    if search_query:
-        folders = folders.filter(
-            Q(contract__contract_number__icontains=search_query) |
-            Q(contract__po_number__icontains=search_query) |
-            Q(partial__icontains=search_query) |
-            Q(tracking_number__icontains=search_query)
-        )
-
-    # Pagination
-    paginator = Paginator(folders, 50)  # Show 50 items per page
-    page = request.GET.get('page')
-    folders = paginator.get_page(page)
-
-    context = {
-        'folders': folders,
-        'form': FolderTrackingForm(),
-        'search_query': search_query,
-    }
-    return render(request, 'contracts/folder_tracking.html', context)
-
-@login_required
-def add_folder_tracking(request):
-    if request.method == 'POST':
-        form = FolderTrackingForm(request.POST)
-        if form.is_valid():
-            folder = form.save(commit=False)
-            folder.added_by = request.user
-            folder.save()
-            return JsonResponse({'status': 'success'})
-        return JsonResponse({'status': 'error', 'errors': form.errors})
-    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
-
-@login_required
-def close_folder_tracking(request, pk):
-    folder = get_object_or_404(FolderTracking, pk=pk)
-    folder.close_record(request.user)
-    return JsonResponse({'status': 'success'})
-
-@login_required
-def toggle_highlight(request, pk):
-    folder = get_object_or_404(FolderTracking, pk=pk)
-    folder.toggle_highlight()
-    return JsonResponse({'status': 'success', 'highlighted': folder.highlight})
-
-@login_required
-def export_folder_tracking(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="folder_tracking_{datetime.now().strftime("%Y%m%d")}.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(['Stack', 'Contract', 'PO', 'Partial', 'RTS Email', 'QB INV', 'WAWF', 'WAWF QAR',
-                    'VSM SCN', 'SIR SCN', 'Tracking', 'Tracking #', 'Sort Data', 'Note'])
-
-    folders = FolderTracking.objects.filter(closed=False).order_by('stack', 'contract__contract_number')
-    
-    for folder in folders:
-        writer.writerow([
-            folder.stack,
-            folder.contract.contract_number,
-            folder.contract.po_number,
-            folder.partial,
-            'Yes' if folder.rts_email else 'No',
-            folder.qb_inv,
-            'Yes' if folder.wawf else 'No',
-            'Yes' if folder.wawf_qar else 'No',
-            folder.vsm_scn,
-            folder.sir_scn,
-            folder.tracking,
-            folder.tracking_number,
-            folder.sort_data,
-            folder.note
-        ])
-
-    return response
+# Export all views
+__all__ = [
+    'folder_tracking',
+    'add_folder_tracking',
+    'close_folder_tracking',
+    'toggle_highlight',
+    'export_folder_tracking',
+    'update_folder_field',
+    'search_contracts'
+]

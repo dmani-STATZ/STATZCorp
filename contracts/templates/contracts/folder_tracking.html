@@ -192,6 +192,10 @@
             <a href="{% url 'contracts:export_folder_tracking' %}" class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 text-sm">
                 Export to Excel
             </a>
+            <button type="button" id="togglePaginationBtn" 
+                    class="{% if pagination_disabled %}bg-red-600 hover:bg-red-700{% else %}bg-blue-600 hover:bg-blue-700{% endif %} text-white px-3 py-1.5 rounded text-sm">
+                {% if pagination_disabled %}Enable Pagination{% else %}Disable Pagination{% endif %}
+            </button>
         </div>
     </div>
 
@@ -309,11 +313,11 @@
     </div>
 
     <!-- Pagination -->
-    {% if folders.has_other_pages %}
+    {% if not pagination_disabled and folders.has_other_pages %}
     <div class="flex justify-center mt-2">
         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
             {% if folders.has_previous %}
-            <a href="?page={{ folders.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+            <a href="?page={{ folders.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 Previous
             </a>
             {% endif %}
@@ -324,14 +328,14 @@
                     {{ i }}
                 </span>
                 {% else %}
-                <a href="?page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <a href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
                     {{ i }}
                 </a>
                 {% endif %}
             {% endfor %}
 
             {% if folders.has_next %}
-            <a href="?page={{ folders.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+            <a href="?page={{ folders.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 Next
             </a>
             {% endif %}
@@ -571,5 +575,54 @@ function closeFolderBtn(element) {
     const folderId = element.dataset.id;
     closeFolder(folderId);
 }
+
+// Replace the pagination toggle JavaScript with this updated version
+document.addEventListener('DOMContentLoaded', function() {
+    const togglePaginationBtn = document.getElementById('togglePaginationBtn');
+    if (togglePaginationBtn) {
+        togglePaginationBtn.addEventListener('click', function() {
+            const formData = new FormData();
+            formData.append('toggle_pagination', 'true');
+            
+            fetch(window.location.pathname, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    console.log('Pagination toggled successfully:', data);
+                    
+                    // Preserve search query if it exists
+                    const currentUrl = new URL(window.location.href);
+                    const searchQuery = currentUrl.searchParams.get('search');
+                    const newUrl = new URL(window.location.pathname, window.location.origin);
+                    
+                    if (searchQuery) {
+                        newUrl.searchParams.set('search', searchQuery);
+                    }
+                    
+                    // Preserve page parameter if pagination is enabled and we have a page
+                    if (!data.pagination_disabled && currentUrl.searchParams.has('page')) {
+                        newUrl.searchParams.set('page', currentUrl.searchParams.get('page'));
+                    }
+                    
+                    // Reload the page with the new state
+                    window.location.href = newUrl.toString();
+                } else {
+                    console.error('Error toggling pagination:', data);
+                    alert('Error toggling pagination');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error toggling pagination');
+            });
+        });
+    }
+});
 </script>
 {% endblock %} 

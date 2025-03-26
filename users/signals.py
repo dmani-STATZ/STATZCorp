@@ -2,7 +2,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from .models import AppPermission, AppRegistry
+from .models import AppPermission, AppRegistry, UserSetting, UserSettingState
 from django.apps import apps
 import logging
 
@@ -36,3 +36,24 @@ def create_default_permissions(sender, instance, created, **kwargs):
                 except Exception as e:
                     logger.error(f"Error creating permission for app {app_config.name}: {e}")
 """
+
+@receiver(post_save, sender=User)
+def create_user_setting_states(sender, instance, created, **kwargs):
+    if created:
+        # Get or create default settings
+        folder_tracking_pagination, _ = UserSetting.objects.get_or_create(
+            name='folder_tracking_pagination_disabled',
+            defaults={
+                'description': 'Disable pagination in the folder tracking view',
+                'setting_type': 'boolean',
+                'default_value': 'false',
+                'is_global': False
+            }
+        )
+        
+        # Create the user's setting state with default value
+        UserSettingState.objects.create(
+            user=instance,
+            setting=folder_tracking_pagination,
+            value=folder_tracking_pagination.default_value
+        )

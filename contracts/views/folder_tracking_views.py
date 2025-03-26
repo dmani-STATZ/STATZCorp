@@ -5,6 +5,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.template.loader import render_to_string
 from ..models import FolderTracking, Contract
+from users.models import UserSetting, UserSettingState
 from ..forms import FolderTrackingForm, ContractSearchForm
 import json
 import csv
@@ -50,10 +51,54 @@ def folder_tracking(request):
             Q(tracking_number__icontains=search_query)
         )
 
-    # Pagination
-    paginator = Paginator(folders, 22)  # Show 25 items per page
-    page = request.GET.get('page')
-    folders = paginator.get_page(page)
+    # Get or create the pagination setting
+    pagination_setting, setting_created = UserSetting.objects.get_or_create(
+        name='folder_tracking_pagination_disabled',
+        defaults={
+            'description': 'Controls whether pagination is disabled in the folder tracking view',
+            'setting_type': 'boolean',
+            'default_value': 'false',
+            'is_global': False
+        }
+    )
+    
+    if setting_created:
+        print(f"Created new pagination setting with default value: {pagination_setting.default_value}")
+
+    # Get or create the user's setting state
+    setting_state, state_created = UserSettingState.objects.get_or_create(
+        user=request.user,
+        setting=pagination_setting,
+        defaults={'value': pagination_setting.default_value}
+    )
+    
+    if state_created:
+        print(f"Created new pagination state for user {request.user.username} with default value: {setting_state.get_value()}")
+
+    # Handle toggle button click (POST request)
+    if request.method == 'POST' and request.POST.get('toggle_pagination') == 'true':
+        current_value = setting_state.get_value()
+        new_value = not current_value
+        setting_state.set_value(new_value)
+        print(f"Toggled pagination setting for user {request.user.username} from {current_value} to {new_value}")
+        return JsonResponse({
+            'status': 'success',
+            'pagination_disabled': new_value
+        })
+
+    # Get current pagination state
+    pagination_disabled = setting_state.get_value()
+    print(f"Current pagination state for user {request.user.username}: {pagination_disabled}")
+    
+    if pagination_disabled:
+        # Return all records without pagination
+        print(f"Pagination disabled - returning all {folders.count()} records")
+    else:
+        # Apply pagination
+        paginator = Paginator(folders, 22)  # Show 22 items per page  (22 Items is the perfect size for the screen)
+        page = request.GET.get('page')
+        folders = paginator.get_page(page)
+        print(f"Pagination enabled - returning page {page} with {len(folders)} records")
 
     # Get stack colors from model - simplified key format
     stack_colors = {}
@@ -70,6 +115,7 @@ def folder_tracking(request):
         'search_form': ContractSearchForm(),
         'search_query': search_query,
         'stack_colors': stack_colors,
+        'pagination_disabled': pagination_disabled,
     }
     return render(request, 'contracts/folder_tracking.html', context)
 

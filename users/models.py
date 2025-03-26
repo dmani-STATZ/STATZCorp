@@ -98,3 +98,71 @@ class AppPermission(models.Model):
             
         logger.info(f"Final permissions dictionary: {permissions}")
         return permissions
+
+class UserSetting(models.Model):
+    """Model to define available user settings"""
+    SETTING_TYPES = [
+        ('boolean', 'Boolean'),
+        ('string', 'String'),
+        ('integer', 'Integer'),
+        ('json', 'JSON'),
+    ]
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    setting_type = models.CharField(max_length=20, choices=SETTING_TYPES)
+    default_value = models.TextField(blank=True)
+    is_global = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'User Setting'
+        verbose_name_plural = 'User Settings'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+class UserSettingState(models.Model):
+    """Model to store user-specific setting states"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='setting_states')
+    setting = models.ForeignKey(UserSetting, on_delete=models.CASCADE, related_name='user_states')
+    value = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'User Setting State'
+        verbose_name_plural = 'User Setting States'
+        unique_together = ['user', 'setting']
+        indexes = [
+            models.Index(fields=['user', 'setting']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.setting.name}"
+
+    def get_value(self):
+        """Convert the stored value to the appropriate type"""
+        if self.setting.setting_type == 'boolean':
+            return self.value.lower() == 'true'
+        elif self.setting.setting_type == 'integer':
+            return int(self.value) if self.value else 0
+        elif self.setting.setting_type == 'json':
+            import json
+            return json.loads(self.value) if self.value else {}
+        return self.value
+
+    def set_value(self, value):
+        """Convert the value to string before saving"""
+        if self.setting.setting_type == 'boolean':
+            self.value = str(value).lower()
+        elif self.setting.setting_type == 'integer':
+            self.value = str(int(value))
+        elif self.setting.setting_type == 'json':
+            import json
+            self.value = json.dumps(value)
+        else:
+            self.value = str(value)
+        self.save()
