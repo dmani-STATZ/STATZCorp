@@ -1388,7 +1388,7 @@ END;
 -- Update clin item number
 print ('##########################################')
 print 'Update clin item number'
-print ('##########################################')
+print ('##########################################');
 
 WITH NumberedCLINs AS (
     SELECT 
@@ -1418,7 +1418,7 @@ FormattedCLINs AS (
 UPDATE contracts_clin
 SET item_number = RIGHT('0000' + CAST(FormattedCLINs.initial_number + FormattedCLINs.seq_num - 1 AS VARCHAR), 4)
 FROM FormattedCLINs
-WHERE contracts_clin.id = FormattedCLINs
+WHERE contracts_clin.id = FormattedCLINs;
 
 
 
@@ -1429,7 +1429,7 @@ print ('##########################################')
 
 UPDATE       contracts_foldertracking
 SET                closed = 1
-WHERE        (stack = N'CLOSE')
+WHERE        (stack = N'CLOSE');
 
 
 

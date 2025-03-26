@@ -51,7 +51,7 @@ def folder_tracking(request):
         )
 
     # Pagination
-    paginator = Paginator(folders, 25)  # Show 25 items per page
+    paginator = Paginator(folders, 22)  # Show 25 items per page
     page = request.GET.get('page')
     folders = paginator.get_page(page)
 
