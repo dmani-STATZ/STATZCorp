@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.generic import ListView
 from django.utils.decorators import method_decorator
 from django.http import HttpResponse, JsonResponse
@@ -11,111 +11,84 @@ import subprocess
 from django.conf import settings
 import sys
 from decimal import Decimal
+import time
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin
+from ..models import Contract, Clin, ClinAcknowledgment, Supplier, ExportTiming
 
 
 class ContractLogView(ListView):
     model = Clin
     template_name = 'contracts/contract_log_view.html'
     context_object_name = 'clins'
-    paginate_by = 15  # Enable pagination with 10 records per page
+    paginate_by = 25
     
     def get_queryset(self):
-        # Start with all CLINs and handle null relationships
-        queryset = Clin.objects.all()
-        
-        # Add select_related for performance but don't filter out records with missing relationships
-        queryset = queryset.select_related(
+        """Get the list of CLINs for this view."""
+        clins = Clin.objects.all().select_related(
             'contract',
             'contract__buyer',
             'contract__contract_type',
-            'contract__sales_class',
+            'contract__status',
+            'contract__idiq_contract',
             'supplier',
-            'nsn',
-            'special_payment_terms'
-        ).order_by('-contract__award_date', 'contract__po_number', 'id')
-        
-        # Check for repeat NSNs - include nulls
-        repeat_nsn = Exists(
-            Clin.objects.filter(
-                nsn=OuterRef('nsn')
-            ).exclude(
-                id=OuterRef('id')
-            ).filter(nsn__isnull=False)  # Only check repeats if NSN exists
-        )
+            'nsn'
+        ).prefetch_related(
+            'clinacknowledgment_set'
+        ).order_by('contract__award_date', 'contract__po_number', 'item_number')
         
         # Apply filters if provided
         search_query = self.request.GET.get('search', '')
         status_filter = self.request.GET.get('status', '')
-        class_filter = self.request.GET.get('class', '')
+        supplier_filter = self.request.GET.get('supplier', '')
         
         if search_query:
-            queryset = queryset.filter(
+            clins = clins.filter(
                 Q(contract__contract_number__icontains=search_query) |
                 Q(contract__po_number__icontains=search_query) |
                 Q(contract__tab_num__icontains=search_query) |
-                Q(contract__buyer__username__icontains=search_query) |
-                Q(nsn__nsn__icontains=search_query) |
-                Q(po_num_ext__icontains=search_query)  # Added PO Num Ext to search
+                Q(supplier__name__icontains=search_query) |
+                Q(nsn__nsn_code__icontains=search_query) |
+                Q(item_number__icontains=search_query)
             ).distinct()
         
         if status_filter:
             if status_filter == 'open':
-                queryset = queryset.filter(
+                clins = clins.filter(
                     Q(contract__cancelled=False) & 
                     Q(contract__date_closed__isnull=True)
                 )
             elif status_filter == 'closed':
-                queryset = queryset.filter(
+                clins = clins.filter(
                     Q(contract__cancelled=False) & 
                     Q(contract__date_closed__isnull=False)
                 )
             elif status_filter == 'cancelled':
-                queryset = queryset.filter(contract__cancelled=True)
+                clins = clins.filter(contract__cancelled=True)
         
-        if class_filter:
-            queryset = queryset.filter(contract__sales_class=class_filter)
+        if supplier_filter:
+            # Get all contract IDs that have any CLIN with the specified supplier
+            contract_ids = Clin.objects.filter(
+                supplier_id=supplier_filter
+            ).values_list('contract_id', flat=True).distinct()
+            
+            # Filter CLINs to show all CLINs from the matched contracts
+            clins = clins.filter(contract_id__in=contract_ids)
         
-        # Annotate additional fields for color coding and display
-        queryset = queryset.annotate(
-            is_idiq=Case(
-                When(contract__idiq_contract__isnull=False, then=True),
-                default=False,
-                output_field=BooleanField()
-            ),
-            is_repeat=repeat_nsn,
-            is_late=Case(
-                When(contract__due_date_late=True, then=True),
-                default=False,
-                output_field=BooleanField()
-            ),
-            is_late_shipment=Case(
-                When(ship_date_late=True, then=True),
-                default=False,
-                output_field=BooleanField()
-            ),
-            is_paid=Case(
-                When(
-                    Q(paid_amount__isnull=False) & 
-                    Q(clin_value__isnull=False) & 
-                    Q(paid_amount__gte=F('clin_value')), 
-                    then=True
-                ),
-                default=False,
-                output_field=BooleanField()
-            ),
-            payment_type=Case(
-                When(special_payment_terms__code='CIA', then=Value('CIA')),
-                When(special_payment_terms__code='COS', then=Value('COS')),
-                default=Value('NET'),
-                output_field=CharField()
-            )
-        )
-        
-        # Ensure we have a valid queryset
-        return queryset
+        return clins
+    
+    def get(self, request, *args, **kwargs):
+        # If no page is specified, calculate and redirect to the last page
+        if 'page' not in request.GET:
+            queryset = self.get_queryset()
+            paginator = self.get_paginator(queryset, self.paginate_by)
+            # Get the URL parameters excluding the page parameter
+            params = request.GET.copy()
+            # Add the last page number
+            params['page'] = paginator.num_pages
+            # Redirect to the last page with all other parameters preserved
+            return redirect(f"{request.path}?{params.urlencode()}")
+        return super().get(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -123,13 +96,10 @@ class ContractLogView(ListView):
         # Add filter parameters to context
         context['search_query'] = self.request.GET.get('search', '')
         context['status_filter'] = self.request.GET.get('status', '')
-        context['class_filter'] = self.request.GET.get('class', '')
+        context['supplier_filter'] = self.request.GET.get('supplier', '')
         
-        # Add contract classes for the filter dropdown
-        context['classes'] = Contract.objects.values_list('sales_class__sales_team', flat=True).distinct()
-        
-        # Debug information
-        context['total_records'] = Clin.objects.count()
+        # Add suppliers list for the dropdown
+        context['suppliers'] = Supplier.objects.all().order_by('name')
         
         # Ensure paginator data is explicitly available in the template
         if self.paginate_by is not None:
@@ -139,7 +109,6 @@ class ContractLogView(ListView):
                 context['is_paginated'] = True
                 context['page_obj'] = page_obj
                 context['paginator'] = paginator
-                context['page_range'] = paginator.get_elided_page_range(page_obj.number, on_each_side=2, on_ends=1)
         
         return context
 
@@ -147,36 +116,41 @@ class ContractLogView(ListView):
 @conditional_login_required
 def export_contract_log(request):
     """Export contract log to CSV with all relevant fields."""
-    # Get all CLINs with related data
-    clins = Clin.objects.all()
+    start_time = time.time()
     
-    # Add select_related for performance but don't filter out records with missing relationships
-    clins = clins.select_related(
+    # Get all CLINs with related data
+    clins = Clin.objects.all().select_related(
         'contract',
         'contract__buyer',
         'contract__contract_type',
-        'contract__sales_class',
+        'contract__status',
+        'contract__idiq_contract',
         'supplier',
-        'nsn',
-        'special_payment_terms'
-    ).order_by('-contract__award_date', 'contract__po_number', 'id')
+        'nsn'
+    ).prefetch_related(
+        'clinacknowledgment_set'  # Use prefetch_related for reverse relation
+    ).order_by('contract__award_date', 'contract__po_number', 'item_number')
     
     # Apply filters if provided
     search_query = request.GET.get('search', '')
     status_filter = request.GET.get('status', '')
-    class_filter = request.GET.get('class', '')
+    supplier_filter = request.GET.get('supplier', '')
+    
+    filters_applied = {}
     
     if search_query:
+        filters_applied['search'] = search_query
         clins = clins.filter(
             Q(contract__contract_number__icontains=search_query) |
             Q(contract__po_number__icontains=search_query) |
             Q(contract__tab_num__icontains=search_query) |
-            Q(contract__buyer__username__icontains=search_query) |
-            Q(nsn__nsn__icontains=search_query) |
-            Q(po_num_ext__icontains=search_query)
+            Q(supplier__name__icontains=search_query) |
+            Q(nsn__nsn_code__icontains=search_query) |
+            Q(item_number__icontains=search_query)
         ).distinct()
     
     if status_filter:
+        filters_applied['status'] = status_filter
         if status_filter == 'open':
             clins = clins.filter(
                 Q(contract__cancelled=False) & 
@@ -190,8 +164,15 @@ def export_contract_log(request):
         elif status_filter == 'cancelled':
             clins = clins.filter(contract__cancelled=True)
     
-    if class_filter:
-        clins = clins.filter(contract__sales_class=class_filter)
+    if supplier_filter:
+        filters_applied['supplier'] = supplier_filter
+        # Get all contract IDs that have any CLIN with the specified supplier
+        contract_ids = Clin.objects.filter(
+            supplier_id=supplier_filter
+        ).values_list('contract_id', flat=True).distinct()
+        
+        # Filter CLINs to show all CLINs from the matched contracts
+        clins = clins.filter(contract_id__in=contract_ids)
     
     # Create response
     response = HttpResponse(content_type='text/csv')
@@ -199,66 +180,83 @@ def export_contract_log(request):
     
     writer = csv.writer(response)
     writer.writerow([
-        'Status', 'Tab Num', 'PO Number', 'PO Num Ext', 'Contract Num', 'Buyer', 'Contract Type',
-        'Supplier', 'Award Date', 'Contract Status', 'NSN', 'NSN Description', 'IA',
-        'PO Sent to Supplier', 'CLIN has Replied', 'PO Sent to QAR', 'FOB',
-        'CLIN Due Date', 'Contract Due Date', 'Order QTY', 'Ship Date', 'Ship QTY',
-        'CLIN Value', 'Paid Amount', 'Contract Value', 'WAWF Payment', 'WAWF Received',
-        'Plan Gross', 'PPI Split Paid', 'STATZ Split Paid', 'Payment Type',
-        'Is IDIQ', 'Is Repeat', 'Is Late', 'Notes'
+        'Status', 'Tab #', 'PO #', 'IDIQ Contract #', 'Contract #', 'Buyer', 'Type', 'CLIN #',
+        'Supplier', 'Award Date', 'Contract Status', 'NSN', 'NSN Description',
+        'IA', 'PO to Sub', 'Sub Reply', 'PO to QAR', 'FOB', 'QDD', 'CDD',
+        'Order Qty', 'Ship Date', 'Ship Qty', 'Sub PO $', 'Sub Paid $', 'X',
+        'Contract $', 'WAWF Payment $', 'Date Pay Recv', 'Plan Gross $',
+        'Actual Paid PPI $', 'Actual STATZ $', 'Plan Split per PPI bid',
+        'PPI Split $', 'STATZ Split $', 'Notes'
     ])
     
+    # Get total count before writing rows
+    total_rows = clins.count()
+    
     for clin in clins:
-        # Handle potentially missing relationships safely
-        contract = clin.contract if hasattr(clin, 'contract') else None
-        buyer = contract.buyer if contract and hasattr(contract, 'buyer') else None
-        contract_type = contract.contract_type if contract and hasattr(contract, 'contract_type') else None
-        supplier = clin.supplier if hasattr(clin, 'supplier') else None
-        nsn = clin.nsn if hasattr(clin, 'nsn') else None
-        special_payment_terms = clin.special_payment_terms if hasattr(clin, 'special_payment_terms') else None
-        
-        # Check for repeat NSN only if NSN exists
-        is_repeat = 'Yes' if nsn and Clin.objects.filter(nsn=nsn).exclude(id=clin.id).exists() else 'No'
+        # Get the first acknowledgment for the CLIN (if any)
+        acknowledgment = clin.clinacknowledgment_set.first()
         
         writer.writerow([
-            'Cancelled' if contract and contract.cancelled else 'Closed' if contract and contract.date_closed else 'Open',
-            contract.tab_num if contract else '',
-            contract.po_number if contract else '',
-            clin.po_num_ext or '',
-            contract.contract_number if contract else '',
-            buyer.username if buyer else '',
-            contract_type.code if contract_type else '',
-            supplier.code if supplier else '',
-            contract.award_date.strftime('%Y-%m-%d') if contract and contract.award_date else '',
-            'Active' if contract and not contract.cancelled and not contract.date_closed else 'Closed' if contract and contract.date_closed else 'Cancelled' if contract and contract.cancelled else '',
-            nsn.nsn if nsn else '',
-            nsn.description if nsn else '',
-            'Yes' if clin.ia else 'No',
-            'Yes' if clin.clinacknowledgment_set.filter(sent_to_supplier=True).exists() else 'No',
-            'Yes' if clin.clinacknowledgment_set.filter(supplier_replied=True).exists() else 'No',
-            'Yes' if clin.clinacknowledgment_set.filter(sent_to_qar=True).exists() else 'No',
-            clin.fob or '',
-            clin.due_date.strftime('%Y-%m-%d') if clin.due_date else '',
-            contract.due_date.strftime('%Y-%m-%d') if contract and contract.due_date else '',
-            clin.order_qty or '',
-            clin.ship_date.strftime('%Y-%m-%d') if clin.ship_date else '',
-            clin.ship_qty or '',
+            'Cancelled' if clin.contract.cancelled else 'Closed' if clin.contract.date_closed else 'Open',
+            clin.contract.tab_num,
+            clin.contract.po_number,
+            clin.contract.idiq_contract.contract_number if clin.contract.idiq_contract else '',
+            clin.contract.contract_number,
+            clin.contract.buyer.description if clin.contract.buyer else '',
+            clin.contract.contract_type.description if clin.contract.contract_type else '',
+            clin.item_number,
+            clin.supplier.name if clin.supplier else '',
+            clin.contract.award_date.strftime('%m/%d/%Y') if clin.contract.award_date else '',
+            clin.contract.status.description if clin.contract.status else '',
+            clin.nsn.nsn_code if clin.nsn else '',
+            clin.nsn.description if clin.nsn else '',
+            clin.ia,
+            'Yes' if acknowledgment and acknowledgment.po_to_supplier_bool else 'No',
+            'Yes' if acknowledgment and acknowledgment.clin_reply_bool else 'No',
+            'Yes' if acknowledgment and acknowledgment.po_to_qar_bool else 'No',
+            clin.fob,
+            clin.supplier_due_date.strftime('%m/%d/%Y') if clin.supplier_due_date else '',
+            clin.due_date.strftime('%m/%d/%Y') if clin.due_date else '',
+            f"{clin.order_qty} {clin.uom}" if clin.order_qty else '',
+            clin.ship_date.strftime('%m/%d/%Y') if clin.ship_date else '',
+            clin.ship_qty,
             f"${clin.clin_value:,.2f}" if clin.clin_value else '',
             f"${clin.paid_amount:,.2f}" if clin.paid_amount else '',
-            f"${contract.contract_value:,.2f}" if contract and contract.contract_value else '',
+            '',  # X column
+            f"${clin.contract.contract_value:,.2f}" if clin.contract.contract_value else '',
             f"${clin.wawf_payment:,.2f}" if clin.wawf_payment else '',
-            'Yes' if clin.wawf_recieved else 'No',
+            clin.wawf_recieved.strftime('%m/%d/%Y') if clin.wawf_recieved else '',
             f"${clin.plan_gross:,.2f}" if clin.plan_gross else '',
-            f"${clin.ppi_split_paid:,.2f}" if clin.ppi_split_paid else '',
-            f"${clin.statz_split_paid:,.2f}" if clin.statz_split_paid else '',
-            special_payment_terms.code if special_payment_terms else 'NET',
-            'Yes' if contract and contract.idiq_contract else 'No',
-            is_repeat,
-            'Yes' if contract and contract.due_date_late else 'No',
-            contract.notes if contract else ''
+            f"${clin.contract.ppi_split_paid:,.2f}" if clin.contract.ppi_split_paid else '',
+            f"${clin.contract.statz_split_paid:,.2f}" if clin.contract.statz_split_paid else '',
+            clin.contract.planned_split,
+            f"${clin.contract.ppi_split:,.2f}" if clin.contract.ppi_split else '',
+            f"${clin.contract.statz_split:,.2f}" if clin.contract.statz_split else '',
+            clin.notes.count()
         ])
     
+    # Record the export timing
+    end_time = time.time()
+    export_time = end_time - start_time
+    
+    ExportTiming.objects.create(
+        row_count=total_rows,
+        export_time=export_time,
+        filters_applied=filters_applied
+    )
+    
     return response
+
+
+@conditional_login_required
+def get_export_estimate(request):
+    """Get estimated export time based on row count."""
+    row_count = int(request.GET.get('rows', 0))
+    estimated_time = ExportTiming.get_estimated_time(row_count)
+    return JsonResponse({
+        'estimated_seconds': estimated_time,
+        'recent_timings': list(ExportTiming.objects.values('row_count', 'export_time', 'timestamp')[:5])
+    })
 
 
 @conditional_login_required

@@ -729,3 +729,64 @@ class FolderTracking(AuditModel):
         self.highlight = not self.highlight
         self.modified_by = user
         self.save()
+
+class ExportTiming(models.Model):
+    row_count = models.IntegerField()
+    export_time = models.FloatField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    filters_applied = models.JSONField(default=dict)
+
+    @classmethod
+    def get_estimated_time(cls, row_count):
+        """
+        Get estimated export time based on historical data.
+        Uses weighted average of recent exports, giving more weight to:
+        1. More recent exports
+        2. Exports with similar row counts
+        3. Exports with similar filters
+        """
+        if row_count <= 0:
+            return 1  # Minimum 1 second for empty exports
+            
+        # Get the last 10 export timings, ordered by most recent
+        recent_timings = cls.objects.order_by('-timestamp')[:10]
+        
+        if not recent_timings:
+            # If no historical data, use a conservative estimate
+            return max(1, row_count * 0.015)  # Base estimate of 15ms per row
+            
+        total_weight = 0
+        weighted_time_per_row = 0
+        
+        for timing in recent_timings:
+            # Calculate time per row for this export
+            time_per_row = timing.export_time / timing.row_count if timing.row_count > 0 else 0
+            
+            # Calculate weights based on different factors
+            recency_weight = 1.0  # Most recent entries get full weight
+            if timing.timestamp:
+                # Reduce weight for older entries (weight reduces by 10% per day, minimum 0.1)
+                days_old = (timezone.now() - timing.timestamp).days
+                recency_weight = max(0.1, 1.0 - (days_old * 0.1))
+            
+            # Size similarity weight (1.0 for exact match, decreasing as difference increases)
+            size_ratio = min(timing.row_count, row_count) / max(timing.row_count, row_count)
+            size_weight = size_ratio ** 2  # Square to emphasize similarity
+            
+            # Combine weights
+            total_weight_this_entry = recency_weight * size_weight
+            
+            weighted_time_per_row += time_per_row * total_weight_this_entry
+            total_weight += total_weight_this_entry
+        
+        # Calculate final weighted average time per row
+        avg_time_per_row = (
+            weighted_time_per_row / total_weight if total_weight > 0 
+            else 0.015  # Default to 15ms per row if weights sum to 0
+        )
+        
+        # Add 10% buffer for safety
+        estimated_time = (avg_time_per_row * row_count) * 1.1
+        
+        # Ensure minimum of 1 second
+        return max(1, estimated_time)

@@ -80,6 +80,7 @@ from .views import (
     ContractLogView,
     export_contract_log,
     open_export_folder,
+    get_export_estimate,
     
     # DD1155 views
     extract_dd1155_data,
@@ -105,7 +106,8 @@ urlpatterns = [
     # Dashboard views
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
     path('log/', ContractLogView.as_view(), name='contract_log_view'),
-    path('export-log/', export_contract_log, name='export_contract_log'),
+    path('log/export/', export_contract_log, name='export_contract_log'),
+    path('log/get-export-estimate/', get_export_estimate, name='get_export_estimate'),
     path('open-export-folder/', open_export_folder, name='open_export_folder'),
 
     # Contract management

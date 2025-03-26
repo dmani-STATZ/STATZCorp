@@ -86,6 +86,7 @@ from .contract_log_views import (
     ContractLogView,
     export_contract_log,
     open_export_folder,
+    get_export_estimate,
 )
 
 from .dd1155_views import (
@@ -110,5 +111,7 @@ __all__ = [
     'close_folder_tracking',
     'toggle_highlight',
     'export_folder_tracking',
+    
+
 ]
 

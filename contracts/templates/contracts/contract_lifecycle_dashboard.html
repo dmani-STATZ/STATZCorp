@@ -2,380 +2,372 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Contract Lifecycle Dashboard{% endblock %}
+{% block title %}Contract Dashboard{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-6">
-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
-        <h1 class="text-2xl font-bold text-gray-800">Contract Lifecycle Dashboard</h1>
-        
-        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            <a href="{% url 'contracts:contract_create' %}" class="btn-primary flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                New Contract
-            </a>
-            <!-- <a href="{% url 'contracts:contract_search' %}" class="btn-secondary flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Search Contracts
-            </a> -->
-        </div>
-    </div>
-
-    <!-- Search Section -->
-    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div class="max-w-3xl mx-auto">
-            <label for="contract-search" class="block text-sm font-medium text-gray-700 mb-2">Search Contracts</label>
-            <div class="relative">
-                <input type="text" 
-                       id="contract-search" 
-                       class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                       placeholder="Enter contract number, last 6 of contract number, or PO number..."
-                       autocomplete="off">
-                <div id="search-results" 
-                     class="absolute z-50 w-full bg-white mt-1 rounded-md shadow-xl border border-gray-200 max-h-96 overflow-y-auto hidden">
-                    <!-- Autocomplete results will be inserted here -->
+<div class="container mx-auto px-4 py-4">
+    <!-- Combined Header Section -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+        <div class="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
+            <h1 class="text-2xl font-bold text-gray-800">Contract Dashboard</h1>
+            
+            <div class="w-full lg:w-1/2 px-2">
+                <div class="relative">
+                    <input type="text" 
+                           id="contract-search" 
+                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           placeholder="Search contracts by number, PO number..."
+                           autocomplete="off">
+                    <div id="search-results" 
+                         class="absolute z-50 w-full bg-white mt-1 rounded-md shadow-xl border border-gray-200 max-h-96 overflow-y-auto hidden">
+                    </div>
                 </div>
+            </div>
+
+            <div class="flex space-x-2">
+                <a href="{% url 'contracts:contract_create' %}" class="btn-primary flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    New Contract
+                </a>
             </div>
         </div>
     </div>
 
-<!-- Main Dashboard Card -->
-<div class="bg-white rounded-lg shadow-lg overflow-hidden">
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
-        <h1 class="text-xl font-semibold text-white">Contracts Dashboard</h1>
-    </div>
-
-    <!-- Stats Table -->
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100">Category</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Week</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Week</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Month</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Month</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Quarter</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Quarter</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Year</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Year</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Date Range</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.date_range }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.date_range }}</td>
-                </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.contracts_due }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.contracts_due }}</td>
-                </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due Late</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_week.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_week.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_month.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_month.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_quarter.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_quarter.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_year.contracts_due_late }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_year.contracts_due_late }}</td>
-                </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due OnTime</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_week.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_week.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_month.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_month.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_quarter.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_quarter.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_year.contracts_due_ontime }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_year.contracts_due_ontime }}</td>
-                </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contract Value</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</td>
-                </tr>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contracts</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.new_contracts }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.new_contracts }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Contract List -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4 flex justify-between items-center">
-            <h2 class="text-xl font-semibold text-white">Recent Contracts</h2>
-            <a href="{% url 'contracts:contract_log_view' %}" class="text-white hover:text-blue-100 text-sm font-medium">
-                View All Contracts
-            </a>
+    <!-- Main Dashboard Card -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <!-- Dashboard Header - Reduced padding -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2">
+            <h1 class="text-lg font-semibold text-white">Dashboard</h1>
         </div>
-        <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto;">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50 sticky top-0">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            <span class="text-green-600 font-medium">TAB #</span> / <span class="text-yellow-600 font-medium">PO #</span>
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            IDIQ #
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Contract
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Supplier
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Award Date
-                        </th>
 
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Due Date
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                        </th>
+        <!-- Stats Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100">Category</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Week</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Week</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Month</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Month</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Quarter</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Quarter</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Year</th>
+                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Year</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    {% for contract in contracts %}
-                    <tr class="{% if contract.cancelled %}bg-red-50{% elif not contract.open %}bg-gray-50{% endif %} hover:bg-gray-100">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                {% if contract.status.description == 'Cancelled' %}
-                                    bg-red-100 text-red-800
-                                {% elif contract.status.description == 'Open' %}
-                                    bg-green-100 text-green-800
-                                {% else %}
-                                    bg-gray-100 text-gray-800
-                                {% endif %}">
-                            {{ contract.status.description }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            <span class="text-green-600 font-medium">{{ contract.tab_num }}</span> / <span class="text-yellow-600 font-medium">{{ contract.po_number }}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {{ contract.idiq_contract }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            <a href="{% url 'contracts:contract_detail' contract.id %}" class="hover:text-blue-800">
-                                {{ contract.contract_number }}{% if contract.is_idiq %}*{% endif %}
-                            </a>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            {{ contract.supplier_name|upper }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ contract.award_date|date:"M d, Y" }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {% if contract.due_date %}
-                                {{ contract.due_date|date:"M d, Y" }}
-                                {% if contract.open and contract.due_date < today %}
-                                    <span class="text-red-600 font-medium">(Overdue)</span>
-                                {% endif %}
-                            {% else %}
-                                --
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div class="flex space-x-2">
-                                <a href="{% url 'contracts:contract_detail' contract.id %}" class="text-blue-600 hover:text-blue-900" title="View">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                </a>
-                                <a href="{% url 'contracts:contract_update' contract.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                </a>
-                                {% if contract.status.description == 'Open' %}
-                                <a href="{% url 'contracts:contract_close' contract.id %}" class="text-yellow-600 hover:text-yellow-900" title="Close">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </a>
-                                {% endif %}
-                                {% if contract.status.description != 'Cancelled' %}
-                                <a href="{% url 'contracts:contract_cancel' contract.id %}" class="text-red-600 hover:text-red-900" title="Cancel">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </a>
-                                {% endif %}
-                            </div>
-                        </td>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Date Range</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.date_range }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.date_range }}</td>
                     </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="px-6 py-10 text-center text-gray-500">
-                            <p class="text-base">No contracts found matching your criteria.</p>
-                            <p class="text-sm mt-2">Try adjusting your search or filter settings.</p>
-                        </td>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.contracts_due }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.contracts_due }}</td>
                     </tr>
-                    {% endfor %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due Late</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_week.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_week.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_month.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_month.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_quarter.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_quarter.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_year.contracts_due_late }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_year.contracts_due_late }}</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due OnTime</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_week.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_week.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_month.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_month.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_quarter.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_quarter.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_year.contracts_due_ontime }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_year.contracts_due_ontime }}</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contract Value</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contracts</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.new_contracts }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.new_contracts }}</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
-    </div>
 
-    <!-- Dashboard Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <!-- Open Contracts -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                    <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Open Contracts</dt>
-                        <dd>
-                            <div class="text-lg font-medium text-gray-900">{{ metrics.open_contracts }}</div>
-                        </dd>
-                    </dl>
-                </div>
+        <!-- Contract List -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-white">Recent Contracts</h2>
+                <a href="{% url 'contracts:contract_log_view' %}" class="text-white hover:text-blue-100 text-sm font-medium">
+                    View All
+                </a>
             </div>
-            <div class="mt-4">
-                <div class="flex justify-between items-center">
-                    <span class="text-sm font-medium text-red-600">Overdue: {{ metrics.overdue_contracts }}</span>
-                    <span class="text-sm font-medium text-green-600">On Time: {{ metrics.on_time_contracts }}</span>
-                </div>
-                <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
-                    {% if metrics.open_contracts > 0 %}
-                        <div class="bg-blue-600 h-2 rounded-full" style="width:25% ">{{ metrics.on_time_percentage }}%</div>
-                    {% endif %}
-                </div>
+            <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto;">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <span class="text-green-600 font-medium">TAB #</span> / <span class="text-yellow-600 font-medium">PO #</span>
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                IDIQ #
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Contract
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Supplier
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Award Date
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Due Date
+                            </th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for contract in contracts %}
+                        <tr class="{% if contract.cancelled %}bg-red-50{% elif not contract.open %}bg-gray-50{% endif %} hover:bg-gray-100">
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if contract.status.description == 'Cancelled' %}
+                                        bg-red-100 text-red-800
+                                    {% elif contract.status.description == 'Open' %}
+                                        bg-green-100 text-green-800
+                                    {% else %}
+                                        bg-gray-100 text-gray-800
+                                    {% endif %}">
+                                {{ contract.status.description }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <span class="text-green-600 font-medium">{{ contract.tab_num }}</span> / <span class="text-yellow-600 font-medium">{{ contract.po_number }}</span>
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ contract.idiq_contract }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">
+                                <a href="{% url 'contracts:contract_detail' contract.id %}" class="hover:text-blue-800">
+                                    {{ contract.contract_number }}{% if contract.is_idiq %}*{% endif %}
+                                </a>
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap">
+                                {{ contract.supplier_name|upper }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {{ contract.award_date|date:"M d, Y" }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {% if contract.due_date %}
+                                    {{ contract.due_date|date:"M d, Y" }}
+                                    {% if contract.open and contract.due_date < today %}
+                                        <span class="text-red-600 font-medium">(Overdue)</span>
+                                    {% endif %}
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex space-x-2">
+                                    <a href="{% url 'contracts:contract_detail' contract.id %}" class="text-blue-600 hover:text-blue-900" title="View">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </a>
+                                    <a href="{% url 'contracts:contract_update' contract.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                    </a>
+                                    {% if contract.status.description == 'Open' %}
+                                    <a href="{% url 'contracts:contract_close' contract.id %}" class="text-yellow-600 hover:text-yellow-900" title="Close">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </a>
+                                    {% endif %}
+                                    {% if contract.status.description != 'Cancelled' %}
+                                    <a href="{% url 'contracts:contract_cancel' contract.id %}" class="text-red-600 hover:text-red-900" title="Cancel">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                                <p class="text-base">No contracts found matching your criteria.</p>
+                                <p class="text-sm mt-2">Try adjusting your search or filter settings.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Contracts by Type -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                    <svg class="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                    </svg>
+        <!-- Dashboard Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <!-- Open Contracts -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-blue-100 rounded-md p-3">
+                        <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Open Contracts</dt>
+                            <dd>
+                                <div class="text-lg font-medium text-gray-900">{{ metrics.open_contracts }}</div>
+                            </dd>
+                        </dl>
+                    </div>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Contracts by Type</dt>
-                        <dd>
-                            <div class="text-lg font-medium text-gray-900">{{ metrics.total_contracts }}</div>
-                        </dd>
-                    </dl>
+                <div class="mt-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-red-600">Overdue: {{ metrics.overdue_contracts }}</span>
+                        <span class="text-sm font-medium text-green-600">On Time: {{ metrics.on_time_contracts }}</span>
+                    </div>
+                    <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
+                        {% if metrics.open_contracts > 0 %}
+                            <div class="bg-blue-600 h-2 rounded-full" style="width:25% ">{{ metrics.on_time_percentage }}%</div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-            <div class="mt-4 space-y-2">
-                {% for type, count in metrics.contract_types.items %}
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-gray-600">{{ type }}</span>
-                    <span class="font-medium text-gray-900">{{ count }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
 
-        <!-- Upcoming Due Dates -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                    <svg class="h-6 w-6 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+            <!-- Contracts by Type -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-purple-100 rounded-md p-3">
+                        <svg class="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Contracts by Type</dt>
+                            <dd>
+                                <div class="text-lg font-medium text-gray-900">{{ metrics.total_contracts }}</div>
+                            </dd>
+                        </dl>
+                    </div>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Upcoming Due Dates</dt>
-                        <dd>
-                            <div class="text-lg font-medium text-gray-900">{{ metrics.upcoming_due_dates }}</div>
-                        </dd>
-                    </dl>
+                <div class="mt-4 space-y-2">
+                    {% for type, count in metrics.contract_types.items %}
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">{{ type }}</span>
+                        <span class="font-medium text-gray-900">{{ count }}</span>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
-            <div class="mt-4 space-y-2">
-                {% for contract in metrics.upcoming_contracts|slice:":3" %}
-                <div class="flex justify-between items-center text-sm">
-                    <a href="{% url 'contracts:contract_detail' contract.id %}" class="text-blue-600 hover:text-blue-800 truncate max-w-[180px]">
-                        {{ contract.contract_number }}
-                    </a>
-                    <span class="font-medium text-gray-900">{{ contract.due_date|date:"M d" }}</span>
-                </div>
-                {% empty %}
-                <div class="text-sm text-gray-500">No upcoming due dates</div>
-                {% endfor %}
-            </div>
-        </div>
 
-        <!-- Recent Activity -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
-                    <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+            <!-- Upcoming Due Dates -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
+                        <svg class="h-6 w-6 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Upcoming Due Dates</dt>
+                            <dd>
+                                <div class="text-lg font-medium text-gray-900">{{ metrics.upcoming_due_dates }}</div>
+                            </dd>
+                        </dl>
+                    </div>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Recent Activity</dt>
-                        <dd>
-                            <div class="text-lg font-medium text-gray-900">{{ metrics.recent_activity_count }}</div>
-                        </dd>
-                    </dl>
+                <div class="mt-4 space-y-2">
+                    {% for contract in metrics.upcoming_contracts|slice:":3" %}
+                    <div class="flex justify-between items-center text-sm">
+                        <a href="{% url 'contracts:contract_detail' contract.id %}" class="text-blue-600 hover:text-blue-800 truncate max-w-[180px]">
+                            {{ contract.contract_number }}
+                        </a>
+                        <span class="font-medium text-gray-900">{{ contract.due_date|date:"M d" }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="text-sm text-gray-500">No upcoming due dates</div>
+                    {% endfor %}
                 </div>
             </div>
-            <div class="mt-4 space-y-2">
-                {% for activity in metrics.recent_activity|slice:":3" %}
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-gray-600 truncate max-w-[180px]">{{ activity.description }}</span>
-                    <span class="font-medium text-gray-500">{{ activity.date|naturaltime }}</span>
+
+            <!-- Recent Activity -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
+                        <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Recent Activity</dt>
+                            <dd>
+                                <div class="text-lg font-medium text-gray-900">{{ metrics.recent_activity_count }}</div>
+                            </dd>
+                        </dl>
+                    </div>
                 </div>
-                {% empty %}
-                <div class="text-sm text-gray-500">No recent activity</div>
-                {% endfor %}
+                <div class="mt-4 space-y-2">
+                    {% for activity in metrics.recent_activity|slice:":3" %}
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600 truncate max-w-[180px]">{{ activity.description }}</span>
+                        <span class="font-medium text-gray-500">{{ activity.date|naturaltime }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="text-sm text-gray-500">No recent activity</div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>

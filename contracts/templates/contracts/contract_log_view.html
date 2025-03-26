@@ -3,59 +3,63 @@
 
 {% block title %}Contract Log View{% endblock %}
 
-
 {% block content %}
-<div class="container mx-auto px-4 py-6">
+<div class="container-fluid px-2 py-2" style="max-width: 1920px;">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 class="text-lg font-semibold mb-4">Exporting Contract Log</h3>
+            <div class="mb-4">
+                <div class="h-2 bg-gray-200 rounded-full">
+                    <div id="progressBar" class="h-2 bg-blue-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+            <p id="exportStatus" class="text-sm text-gray-600 mb-2">Preparing export...</p>
+            <p id="exportTime" class="text-sm text-gray-600"></p>
+            <div id="exportStats" class="mt-4 text-xs text-gray-500 hidden">
+                <p>Recent Export Times:</p>
+                <ul id="recentExports" class="list-disc pl-5 space-y-1"></ul>
+            </div>
+        </div>
+    </div>
+
     <!-- Header Section -->
-    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+    <div class="bg-white shadow-md rounded-lg p-3 mb-3">
         <div class="flex justify-between items-center">
-            <h1 class="text-2xl font-bold">Contract Log View</h1>
+            <h1 class="text-xl font-bold">Contract Log View</h1>
             
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
                 <!-- Filter Toggle Button -->
-                <button id="toggleFilters" class="btn-secondary flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button id="toggleFilters" class="btn-secondary flex items-center text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                     </svg>
                     Show Filters
                 </button>
+
+                <!-- Clear Filters Button -->
+                <button id="clearFilters" class="btn-secondary flex items-center text-sm ">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear Filters
+                </button>
                 
                 <!-- Export Button -->
-                <button id="exportBtn" class="btn-primary flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button id="exportBtn" class="btn-primary flex items-center text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Export Contracts
                 </button>
-                
-                <!-- Export Size Display -->
-                <div class="text-sm text-gray-600">
-                    <span class="font-medium">Export Folder Size:</span>
-                    <span id="exportSize" class="ml-1">{{ export_size|default:"0 MB" }}</span>
-                    <button id="openExportFolder" class="text-blue-600 hover:text-blue-800 ml-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                    </button>
-                </div>
             </div>
         </div>
         
         <!-- Filter Controls - Hidden by default -->
-        <div id="filterControls" class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4 hidden transform transition-all duration-300 ease-in-out">
+        <div id="filterControls" class="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2 hidden">
             <div>
-                <label for="filterClass" class="block text-sm font-medium text-gray-700 mb-1">Filter by Class</label>
-                <select id="filterClass" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
-                    <option value="">All Classes</option>
-                    {% for class_item in classes %}
-                    <option value="{{ class_item }}">{{ class_item }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div>
-                <label for="filterStatus" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
-                <select id="filterStatus" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+                <label for="filterStatus" class="block text-xs font-medium text-gray-700 mb-1">Filter by Status</label>
+                <select id="filterStatus" class="w-full border border-gray-300 rounded-md shadow-sm p-1 text-sm">
                     <option value="">All Statuses</option>
                     <option value="open">Open</option>
                     <option value="closed">Closed</option>
@@ -64,13 +68,25 @@
             </div>
             
             <div>
-                <label for="searchContract" class="block text-sm font-medium text-gray-700 mb-1">Search Contracts</label>
+                <label for="filterSupplier" class="block text-xs font-medium text-gray-700 mb-1">Filter by Supplier</label>
+                <select id="filterSupplier" class="w-full border border-gray-300 rounded-md shadow-sm p-1 text-sm">
+                    <option value="">All Suppliers</option>
+                    {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}" {% if supplier.id|stringformat:"s" == request.GET.supplier %}selected{% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label for="searchContract" class="block text-xs font-medium text-gray-700 mb-1">Search Contracts</label>
                 <input type="text" id="searchContract" placeholder="Search by contract number, PO, etc." 
-                       class="w-full border border-gray-300 rounded-md shadow-sm p-2">
+                       class="w-full border border-gray-300 rounded-md shadow-sm p-1 text-sm">
             </div>
             
             <div class="flex items-end">
-                <button id="applyFilters" class="btn-secondary">
+                <button id="applyFilters" class="btn-secondary text-sm py-1">
                     Apply Filters
                 </button>
             </div>
@@ -78,70 +94,61 @@
     </div>
     
     <!-- Contract Table -->
-    <div >
-        <!-- Table Header Controls -->
-        <div class="bg-white shadow-md rounded-lg">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-medium">Contract List</h3>
-                <div class="text-sm text-gray-500">
-                    Total Records: {{ clins.paginator.count|default:total_records }}
-                    {% if is_paginated %}
-                    <span class="ml-2">(Pagination Enabled: Page {{ page_obj.number }} of {{ paginator.num_pages }})</span>
-                    {% else %}
-                    <span class="ml-2">(Pagination Disabled)</span>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Table Container -->
-            <div class="overflow-x-scroll" style="max-height: 1000px; overflow-y: auto;">
-                <table class="w-full table-fixed">
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full whitespace-nowrap">
                     <thead class="bg-gray-50 sticky top-0 z-10">
-                        <tr>
-                            <!-- Fixed width for common columns -->
-                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Status</th>
-                            <th scope="col" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Tab Num</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">PO Number</th>
-                            <!-- Rest of the headers -->
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Num Ext</th>
-                            <th scope="col" class="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Num</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
-                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th scope="col" class="w-96 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Date</th>
-                            <th scope="col" class="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
-                            <th scope="col" class="w-96 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th scope="col" class="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IA</th>
-                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Sent</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Reply</th>
-                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QAR Sent</th>
-                            <th scope="col" class="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FOB</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN Due Date</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Due</th>
-                            <th scope="col" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order QTY</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ship Date</th>
-                            <th scope="col" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ship QTY</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN Value</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Amount</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Value</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WAWF Payment</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WAWF Received</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan Gross</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PPI Split</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATZ Split</th>
-                            <th scope="col" class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Type</th>
-                            <th scope="col" class="w-96 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                    <tr class="text-xs font-medium text-gray-500 uppercase tracking-wider text-left">
+                        <th class="px-1.5 py-1">Status</th>
+                        <th class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            Tab #
+                        </th>
+                        <th class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            PO #
+                        </th>
+                        <th class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            IDIQ Contract #
+                        </th>
+                        <th class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            Contract #
+                        </th>
+                        <th class="px-1.5 py-1">Buyer</th>
+                        <th class="px-1.5 py-1">Type</th>
+                        <th class="px-1.5 py-1">CLIN #</th>
+                        <th class="px-1.5 py-1">Supplier</th>
+                        <th class="px-1.5 py-1">Award Date</th>
+                        <th class="px-1.5 py-1">Contract Status</th>
+                        <th class="px-1.5 py-1">NSN</th>
+                        <th class="px-1.5 py-1">NSN Description</th>
+                        <th class="px-1.5 py-1">IA</th>
+                        <th class="px-1.5 py-1">PO to Sub</th>
+                        <th class="px-1.5 py-1">Sub Reply</th>
+                        <th class="px-1.5 py-1">PO to QAR</th>
+                        <th class="px-1.5 py-1">FOB</th>
+                        <th class="px-1.5 py-1">QDD</th>
+                        <th class="px-1.5 py-1">CDD</th>
+                        <th class="px-1.5 py-1">Order Qty</th>
+                        <th class="px-1.5 py-1">Ship Date</th>
+                        <th class="px-1.5 py-1">Ship Qty</th>
+                        <th class="px-1.5 py-1">Sub PO $</th>
+                        <th class="px-1.5 py-1">Sub Paid $</th>
+                        <th class="px-1.5 py-1">X</th>
+                        <th class="px-1.5 py-1">Contract $</th>
+                        <th class="px-1.5 py-1">WAWF Payment $</th>
+                        <th class="px-1.5 py-1">Date Pay Recv</th>
+                        <th class="px-1.5 py-1">Plan Gross $</th>
+                        <th class="px-1.5 py-1">Actual Paid PPI $</th>
+                        <th class="px-1.5 py-1">Actual STATZ $</th>
+                        <th class="px-1.5 py-1">Plan Split per PPI bid</th>
+                        <th class="px-1.5 py-1">PPI Split $</th>
+                        <th class="px-1.5 py-1">STATZ Split $</th>
+                        <th class="px-1.5 py-1">Notes</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        {% for clin in page_obj|default:clins %}
-                        <tr class="{% if clin.is_idiq %}bg-cyan-50{% endif %} 
-                                   {% if clin.payment_type == 'CIA' %}bg-purple-50{% endif %}
-                                   {% if clin.payment_type == 'COS' %}bg-orange-50{% endif %}
-                                   {% if clin.payment_type == 'NET' %}bg-blue-50{% endif %}
-                                   hover:bg-gray-50">
-                            <!-- Fixed columns -->
-                            <td class="w-24 px-6 py-4 whitespace-nowrap bg-inherit">
+                    {% for clin in clins %}
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="px-1.5 py-1">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                               {% if clin.contract.cancelled %}bg-red-100 text-red-800
                                               {% elif clin.contract.date_closed %}bg-yellow-100 text-yellow-800
@@ -150,67 +157,68 @@
                                             {% elif clin.contract.date_closed %}Closed
                                             {% else %}Open{% endif %}
                                 </span>
-                            </td>
-                            <td class="w-28 px-6 py-4 whitespace-nowrap text-sm text-gray-900 bg-inherit">{{ clin.contract.tab_num }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900 bg-inherit">{{ clin.contract.po_number }}</td>
-                            <!-- Rest of the cells with fixed widths -->
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.contract.po_number_ext }}</td>
-                            <td class="w-40 px-6 py-4 whitespace-nowrap">
-                                <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
-                                   class="text-sm font-medium text-blue-600 hover:text-blue-800">
-                                    {{ clin.contract.contract_number }}
-                                </a>
-                            </td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.contract.buyer.description }}</td>
-                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm {% if clin.contract.contract_type.code == 'PKG' %}text-blue-600 font-medium{% else %}text-gray-900{% endif %}">
-                                {{ clin.contract.contract_type.description }}
-                            </td>
-                            <td class="w-40 px-6 py-4 whitespace-nowrap text-sm text-gray-900 
-                                       {% if clin.payment_type == 'CIA' %}bg-purple-100{% endif %}
-                                       {% if clin.payment_type == 'COS' %}bg-orange-100{% endif %}
-                                       {% if clin.payment_type == 'NET' %}bg-blue-100{% endif %}">
+                            </td>   
+                        <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                            {{ clin.contract.tab_num }}
+                        </td>
+                        <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                            {{ clin.contract.po_number }}
+                        </td>
+                        <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                            {{ clin.contract.idiq_contract.contract_number|default:'' }}
+                        </td>
+                        <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                            <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
+                               class="text-blue-600 hover:text-blue-800">
+                                {{ clin.contract.contract_number }}
+                            </a>
+                        </td>
+                        <td class="px-1.5 py-1">{{ clin.contract.buyer.description }}</td>
+                        <td class="px-1.5 py-1">{{ clin.contract.contract_type.description }}</td>
+                        <td class="px-1.5 py-1">{{ clin.item_number }}</td>
+                        <td class="px-1.5 py-1">
+                            <a href="{% url 'contracts:supplier_detail' clin.supplier.id %}" 
+                               class="text-blue-600 hover:text-blue-800">
                                 {{ clin.supplier.name }}
-                            </td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.contract.award_date|date:"m/d/Y" }}</td>
-                            <td class="w-40 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_repeat %}bg-green-100{% endif %}">
-                                {{ clin.nsn.nsn_code }}
-                            </td>
-                            <td class="w-96 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.nsn.description }}</td>
-                            <td class="w-20 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.ia }}</td>
-                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.po_sent }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.supplier_reply }}</td>
-                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.qar_sent }}</td>
-                            <td class="w-24 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.fob }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_late %}text-red-600 font-medium{% else %}text-gray-900{% endif %}">
-                                {{ clin.due_date|date:"m/d/Y" }}
-                            </td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_late_shipment %}text-red-600 font-medium{% else %}text-gray-900{% endif %}">
-                                {{ clin.ship_date|date:"m/d/Y" }}
-                            </td>
-                            <td class="w-28 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.order_qty }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.ship_qty }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ clin.clin_value|floatformat:2 }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_paid %}text-green-600 font-medium{% else %}text-gray-900{% endif %}">
-                                ${{ clin.paid_amount|floatformat:2 }}
-                            </td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ clin.contract.contract_value|floatformat:2 }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.is_paid %}text-green-600 font-medium{% else %}text-gray-900{% endif %}">
-                                ${{ clin.paid_amount|floatformat:2 }}
-                            </td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.wawf_payment }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.wawf_received }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.plan_gross }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.ppi_split }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ clin.statz_split }}</td>
-                            <td class="w-32 px-6 py-4 whitespace-nowrap text-sm {% if clin.payment_type == 'CIA' %}bg-purple-100{% elif clin.payment_type == 'COS' %}bg-orange-100{% elif clin.payment_type == 'NET' %}bg-blue-100{% endif %}">
-                                {{ clin.payment_type }}
-                            </td>
-                            <td class="w-96 px-6 py-4 text-sm text-gray-900"></td>
+                            </a>
+                        </td>
+                        <td class="px-1.5 py-1">{{ clin.contract.award_date|date:"m/d/Y"|default:"-" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.contract.status.description|default:"" }}</td>
+                        <td class="px-1.5 py-1">
+                            <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}" 
+                               class="text-blue-600 hover:text-blue-800">
+                                {{ clin.nsn.nsn_code|default:"" }}
+                            </a>
+                        </td>
+                        <td class="px-1.5 py-1">{{ clin.nsn.description|default:"" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.ia|default:"" }}</td>
+                        <td class="px-1.5 py-1">{% if clin.clinacknowledgment_set.first.po_to_supplier_bool %}Yes{% else %}No{% endif %}</td>
+                        <td class="px-1.5 py-1">{% if clin.clinacknowledgment_set.first.clin_reply_bool %}Yes{% else %}No{% endif %}</td>
+                        <td class="px-1.5 py-1">{% if clin.clinacknowledgment_set.first.po_to_qar_bool %}Yes{% else %}No{% endif %}</td>
+                        <td class="px-1.5 py-1">{{ clin.fob|default:"" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.supplier_due_date|date:"m/d/Y" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.due_date|date:"m/d/Y"|default:"-" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.order_qty|default:"0" }} {{ clin.uom|default:"ea" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.ship_date|date:"m/d/Y"|default:"-" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.ship_qty|default:"-" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.clin_value|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.paid_amount|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1"></td>
+                        <td class="px-1.5 py-1">${{ clin.contract.contract_value|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.wawf_payment|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.wawf_recieved|date:"m/d/Y"|default:"-" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.plan_gross|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.contract.ppi_split_paid|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.contract.statz_split_paid|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.contract.planned_split|default:"-" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.contract.ppi_split|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.contract.statz_split|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1"></td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="31" class="px-6 py-4 text-center text-sm text-gray-500">
-                                No CLINs found
+                        <td colspan="35" class="px-1.5 py-1 text-center text-gray-500">
+                            No records found
                             </td>
                         </tr>
                         {% endfor %}
@@ -219,148 +227,70 @@
             </div>
         </div>
 
-        <!-- Pagination Section -->
+    <!-- Pagination -->
         {% if is_paginated %}
-        <div class="bg-white shadow-md rounded-lg mt-4 px-4 py-3">
-            <div class="flex items-center justify-between">
-                <div class="flex-1 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-700">
-                            Showing <span class="font-medium">{{ page_obj.start_index }}</span> to <span class="font-medium">{{ page_obj.end_index }}</span> of <span class="font-medium">{{ paginator.count }}</span> results
-                        </p>
-                    </div>
-                    <div>
-                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                            {% if page_obj.has_previous %}
-                            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.class %}&class={{ request.GET.class }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" 
-                               class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                <span class="sr-only">Previous</span>
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                </svg>
-                            </a>
-                            {% endif %}
+        <div class="bg-white shadow-md rounded-lg mt-2 px-4 py-1">
+            <div class="flex flex-col items-center justify-center space-y-1">
+                <div class="bg-blue-700 text-white rounded-md p-1 pr-4 pl-4">
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm items-center space-x-2">
+                        <!-- First Page -->
+                        {% if page_obj.has_previous %}
+                            <a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                               class="btn-pagination underline">First</a>
+                        {% else %}
+                            <span class="btn-pagination opacity-50 cursor-not-allowed">First</span>
+                        {% endif %}
 
-                            {% for i in page_range|default:paginator.page_range %}
-                                {% if i == page_obj.number %}
-                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
-                                    {{ i }}
-                                </span>
-                                {% elif i == '...' %}
-                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                                    ...
-                                </span>
-                                {% else %}
-                                <a href="?page={{ i }}{% if request.GET.class %}&class={{ request.GET.class }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                    {{ i }}
-                                </a>
+                        <!-- Previous Page -->
+                        {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                               class="btn-pagination underline">Prev</a>
+                        {% else %}
+                            <span class="btn-pagination opacity-50 cursor-not-allowed">Prev</span>
+                        {% endif %}
+
+                        <!-- Page Range -->
+                        {% with ''|center:5 as range %}
+                            {% for i in paginator.page_range %}
+                                {% if i >= page_obj.number|add:"-3" and i <= page_obj.number|add:"3" %}
+                                    {% if page_obj.number == i %}
+                                        <span class="btn-pagination-active mx-1">{{ i }}</span>
+                                    {% else %}
+                                        <a href="?page={{ i }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                           class="btn-pagination mx-1 underline">{{ i }}</a>
+                                    {% endif %}
                                 {% endif %}
                             {% endfor %}
+                        {% endwith %}
 
-                            {% if page_obj.has_next %}
-                            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.class %}&class={{ request.GET.class }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" 
-                               class="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                <span class="sr-only">Next</span>
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                                </svg>
-                            </a>
-                            {% endif %}
-                        </nav>
-                    </div>
+                        <!-- Next Page -->
+                        {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                               class="btn-pagination underline">Next</a>
+                        {% else %}
+                            <span class="btn-pagination opacity-50 cursor-not-allowed">Next</span>
+                        {% endif %}
+
+                        <!-- Last Page -->
+                        {% if page_obj.has_next %}
+                            <a href="?page={{ paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                               class="btn-pagination underline">Last</a>
+                        {% else %}
+                            <span class="btn-pagination opacity-50 cursor-not-allowed">Last</span>
+                        {% endif %}
+                    </nav>
+                </div>
+                <div class="bg-blue-300 rounded-md p-1">
+                    <p class="text-sm text-black">
+                    Showing <span class="font-medium">{{ page_obj.start_index }}</span> to 
+                    <span class="font-medium">{{ page_obj.end_index }}</span> of 
+                    <span class="font-medium">{{ paginator.count }}</span> results
+                    </p>
                 </div>
             </div>
         </div>
         {% endif %}
     </div>
-
-    <!-- Legend -->
-    <div class="mt-4 bg-white shadow-md rounded-lg p-4">
-        <h3 class="text-lg font-medium mb-4">Color Legend</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <div class="flex items-center space-x-2">
-                    <div class="w-4 h-4 bg-cyan-50"></div>
-                    <span class="text-sm">IDIQ Contract</span>
-                </div>
-                <div class="flex items-center space-x-2 mt-2">
-                    <div class="w-4 h-4 bg-purple-50"></div>
-                    <span class="text-sm">CIA Payment</span>
-                </div>
-                <div class="flex items-center space-x-2 mt-2">
-                    <div class="w-4 h-4 bg-orange-50"></div>
-                    <span class="text-sm">COS Payment</span>
-                </div>
-            </div>
-            <div>
-                <div class="flex items-center space-x-2">
-                    <div class="w-4 h-4 bg-blue-50"></div>
-                    <span class="text-sm">NET Payment</span>
-                </div>
-                <div class="flex items-center space-x-2 mt-2">
-                    <span class="text-blue-600 font-medium">Blue Text</span>
-                    <span class="text-sm">Packaging Contract</span>
-                </div>
-                <div class="flex items-center space-x-2 mt-2">
-                    <span class="text-red-600 font-medium">Red Text</span>
-                    <span class="text-sm">Late Shipment/Due Date</span>
-                </div>
-            </div>
-            <div>
-                <div class="flex items-center space-x-2">
-                    <div class="w-4 h-4 bg-green-100"></div>
-                    <span class="text-sm">Repeat Item</span>
-                </div>
-                <div class="flex items-center space-x-2 mt-2">
-                    <span class="text-green-600 font-medium">Green Text</span>
-                    <span class="text-sm">Paid Items</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Export Modal -->
-    <div id="exportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Export Contract Log</h3>
-                <button id="closeExportModal" class="text-gray-400 hover:text-gray-500">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            
-            <form id="exportForm" class="space-y-4">
-                <div>
-                    <label for="exportFormat" class="block text-sm font-medium text-gray-700 mb-1">Export Format</label>
-                    <select id="exportFormat" class="w-full border border-gray-300 rounded-md shadow-sm p-2">
-                        <option value="excel">Excel (.xlsx)</option>
-                        <option value="csv">CSV (.csv)</option>
-                        <option value="pdf">PDF (.pdf)</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="exportFileName" class="block text-sm font-medium text-gray-700 mb-1">File Name</label>
-                    <input type="text" id="exportFileName" value="ContractLog_{{ today|date:'Ymd' }}" 
-                           class="w-full border border-gray-300 rounded-md shadow-sm p-2">
-                </div>
-                
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" id="cancelExport" class="btn-secondary">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn-primary">
-                        Export
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block extra_scripts %}
@@ -369,153 +299,162 @@
         // Filter toggle functionality
         const toggleFilters = document.getElementById('toggleFilters');
         const filterControls = document.getElementById('filterControls');
-        let filtersVisible = false;
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const progressBar = document.getElementById('progressBar');
         
         toggleFilters.addEventListener('click', function() {
-            filtersVisible = !filtersVisible;
             filterControls.classList.toggle('hidden');
-            toggleFilters.innerHTML = filtersVisible ? 
-                `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>Hide Filters` : 
-                `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>Show Filters`;
         });
         
-        // Show filters if any are active
-        if (document.getElementById('filterClass').value || 
-            document.getElementById('filterStatus').value || 
-            document.getElementById('searchContract').value) {
-            filterControls.classList.remove('hidden');
-            filtersVisible = true;
-            toggleFilters.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-            </svg>Hide Filters`;
+        // Apply filters
+        const applyFilters = document.getElementById('applyFilters');
+        const clearFilters = document.getElementById('clearFilters');
+        const filterStatus = document.getElementById('filterStatus');
+        const filterSupplier = document.getElementById('filterSupplier');
+        const searchContract = document.getElementById('searchContract');
+        
+        // Set initial values from URL if they exist
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('status')) {
+            filterStatus.value = urlParams.get('status');
+        }
+        if (urlParams.has('supplier')) {
+            filterSupplier.value = urlParams.get('supplier');
+        }
+        if (urlParams.has('search')) {
+            searchContract.value = urlParams.get('search');
         }
         
-        // Export button functionality
-        const exportBtn = document.getElementById('exportBtn');
-        const exportModal = document.getElementById('exportModal');
-        const closeExportModal = document.getElementById('closeExportModal');
-        const cancelExport = document.getElementById('cancelExport');
-        const exportForm = document.getElementById('exportForm');
-        const openExportFolder = document.getElementById('openExportFolder');
-        
-        // Show export modal
-        exportBtn.addEventListener('click', function() {
-            exportModal.classList.remove('hidden');
-        });
-        
-        // Close export modal
-        closeExportModal.addEventListener('click', function() {
-            exportModal.classList.add('hidden');
-        });
-        
-        cancelExport.addEventListener('click', function() {
-            exportModal.classList.add('hidden');
-        });
-        
-        // Handle export form submission
-        exportForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const format = document.getElementById('exportFormat').value;
-            const fileName = document.getElementById('exportFileName').value;
-            
-            // Show loading indicator
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Exporting...';
-            submitBtn.disabled = true;
-            
-            // Make AJAX request to export
-            fetch('/contracts/export-log/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({
-                    format: format,
-                    fileName: fileName,
-                    filters: {
-                        class: document.getElementById('filterClass').value,
-                        status: document.getElementById('filterStatus').value,
-                        search: document.getElementById('searchContract').value
-                    }
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Update export size
-                    document.getElementById('exportSize').textContent = data.export_size;
-                    
-                    // Close modal
-                    exportModal.classList.add('hidden');
-                    
-                    // Show success message
-                    alert('Export completed successfully! File saved to: ' + data.file_path);
-                    
-                    // Reset button
-                    submitBtn.textContent = originalText;
-                    submitBtn.disabled = false;
-                } else {
-                    alert('Export failed: ' + data.error);
-                    submitBtn.textContent = originalText;
-                    submitBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred during export.');
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            });
-        });
-        
-        // Open export folder
-        openExportFolder.addEventListener('click', function() {
-            fetch('/contracts/open-export-folder/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                }
-            });
-        });
-        
-        // Filter functionality
-        const applyFilters = document.getElementById('applyFilters');
-        
         applyFilters.addEventListener('click', function() {
-            const classFilter = document.getElementById('filterClass').value;
-            const statusFilter = document.getElementById('filterStatus').value;
-            const searchTerm = document.getElementById('searchContract').value;
+            const status = filterStatus.value;
+            const supplier = filterSupplier.value;
+            const search = searchContract.value;
             
-            // Build query string
             let queryParams = [];
-            if (classFilter) {
-                queryParams.push('class=' + encodeURIComponent(classFilter));
-            }
-            if (statusFilter) {
-                queryParams.push('status=' + encodeURIComponent(statusFilter));
-            }
-            if (searchTerm) {
-                queryParams.push('search=' + encodeURIComponent(searchTerm));
-            }
+            if (status) queryParams.push(`status=${status}`);
+            if (supplier) queryParams.push(`supplier=${supplier}`);
+            if (search) queryParams.push(`search=${search}`);
             
-            // Redirect with filters
-            window.location.href = '{% url "contracts:contract_log_view" %}' + 
-                (queryParams.length ? '?' + queryParams.join('&') : '');
+            window.location.href = `${window.location.pathname}${queryParams.length ? '?' + queryParams.join('&') : ''}`;
         });
         
-        // Double-click on header to minimize ribbon (simulating Access behavior)
-        document.querySelector('h1').addEventListener('dblclick', function() {
-            // This would typically be handled by the browser or application framework
-            console.log('Double-clicked header - would minimize ribbon in Access');
+        // Clear filters functionality
+        clearFilters.addEventListener('click', function() {
+            filterStatus.value = '';
+            filterSupplier.value = '';
+            searchContract.value = '';
+            window.location.href = window.location.pathname;
         });
+        
+        // Export functionality
+        const exportBtn = document.getElementById('exportBtn');
+        
+        function updateExportProgress(progress, message) {
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('exportStatus');
+            progressBar.style.width = `${progress}%`;
+            if (message) {
+                statusText.textContent = message;
+            }
+        }
+
+        async function getExportEstimate(rowCount) {
+            try {
+                const response = await fetch(`{% url "contracts:get_export_estimate" %}?rows=${rowCount}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error getting export estimate:', error);
+                return null;
+            }
+        }
+
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+
+        async function exportContractLog() {
+            const startTime = performance.now();
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const exportStats = document.getElementById('exportStats');
+            const recentExports = document.getElementById('recentExports');
+            const exportTime = document.getElementById('exportTime');
+            
+            loadingOverlay.classList.remove('hidden');
+            exportTime.textContent = '';
+            
+            try {
+                // Get row count from the table
+                const rowCount = document.querySelector('.text-sm.text-black')?.textContent.match(/of\s+(\d+)\s+results/)?.[1] || '0';
+                const numRows = parseInt(rowCount);
+                
+                // Get export estimate and recent timings
+                const estimateData = await getExportEstimate(numRows);
+                if (estimateData) {
+                    const { estimated_seconds, recent_timings } = estimateData;
+                    
+                    // Display recent export times
+                    recentExports.innerHTML = recent_timings.map(timing => `
+                        <li>${timing.row_count} rows in ${timing.export_time.toFixed(1)}s (${formatDateTime(timing.timestamp)})</li>
+                    `).join('');
+                    exportStats.classList.remove('hidden');
+                    
+                    // Start progress updates
+                    let progress = 0;
+                    const updateInterval = estimated_seconds * 10; // Update 10 times during estimated duration
+                    const progressIncrement = 100 / (estimated_seconds * 1000 / updateInterval);
+                    
+                    const progressTimer = setInterval(() => {
+                        progress = Math.min(progress + progressIncrement, 95);
+                        updateExportProgress(progress, `Exporting ${numRows} rows...`);
+                    }, updateInterval);
+                    
+                    // Perform the actual export
+                    const response = await fetch('{% url "contracts:export_contract_log" %}?' + new URLSearchParams(window.location.search));
+                    clearInterval(progressTimer);
+                    
+                    if (!response.ok) throw new Error('Export failed');
+                    
+                    const blob = await response.blob();
+                    const endTime = performance.now();
+                    const duration = ((endTime - startTime) / 1000).toFixed(1);
+                    
+                    // Update final progress and timing
+                    updateExportProgress(100, 'Export completed successfully');
+                    exportTime.textContent = `Export completed in ${duration} seconds`;
+                    
+                    // Download the file
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'contract_log.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    // Keep overlay visible for 2 more seconds to show completion
+                    setTimeout(() => {
+                        loadingOverlay.classList.add('hidden');
+                        exportStats.classList.add('hidden');
+                    }, 2000);
+                    
+                } else {
+                    throw new Error('Could not get export estimate');
+                }
+            } catch (error) {
+                console.error('Export failed:', error);
+                updateExportProgress(100, 'Export failed');
+                exportTime.textContent = 'An error occurred during export';
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                    exportStats.classList.add('hidden');
+                }, 2000);
+            }
+        }
+        
+        exportBtn.addEventListener('click', exportContractLog);
     });
 </script>
 {% endblock %} 

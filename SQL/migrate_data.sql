@@ -927,10 +927,31 @@ BEGIN TRY
             ISNULL(um_completed.user_id, 1) AS reminder_completed_user_id, 
             r.Notes_ID AS note_id
     FROM ContractLog.dbo.STATZ_REMINDERS_TBL AS r 
-    INNER JOIN contracts_note ON r.Notes_ID = contracts_note.id
     LEFT JOIN #UserMapping um_reminder ON r.ReminderUser = um_reminder.username
-    LEFT JOIN #UserMapping um_completed ON r.CompletedBy = um_completed.username;
-    
+    LEFT JOIN #UserMapping um_completed ON r.CompletedBy = um_completed.username
+    WHERE r.Notes_ID IS NULL;
+
+
+    INSERT INTO contracts_reminder (
+        id, reminder_title, reminder_text, reminder_date, reminder_user_id,
+        reminder_completed, reminder_completed_date, reminder_completed_user_id,
+        note_id
+    )
+    SELECT  r.ID AS id, 
+            r.Heading AS reminder_title, 
+            r.Details AS reminder_text, 
+            r.ReminderDate AS reminder_date, 
+            ISNULL(um_reminder.user_id, 1) AS reminder_user_id, 
+            r.Completed AS reminder_completed, 
+            r.DateCompleted AS reminder_completed_date, 
+            ISNULL(um_completed.user_id, 1) AS reminder_completed_user_id, 
+            r.Notes_ID AS note_id
+    FROM ContractLog.dbo.STATZ_REMINDERS_TBL AS r 
+    JOIN ContractLog.[dbo].[STATZ_NOTES_TBL] as notes ON r.Notes_ID = notes.id
+    LEFT JOIN #UserMapping um_reminder ON r.ReminderUser = um_reminder.username
+    LEFT JOIN #UserMapping um_completed ON r.CompletedBy = um_completed.username
+    WHERE r.Notes_ID IS NOT NULL;
+
     SET @RowCount = @@ROWCOUNT;
     
     SET IDENTITY_INSERT [dbo].[contracts_reminder] OFF;
@@ -1237,6 +1258,60 @@ BEGIN CATCH
 END CATCH;
 GO
 
+-- migrate idiq_contract
+print ('##########################################')
+print 'migrate idiq_contract'
+print ('##########################################')
+
+SET IDENTITY_INSERT [dbo].[contracts_idiqcontract] ON;
+
+    INSERT INTO [dbo].[contracts_idiqcontract]
+            ([id]
+            ,[created_on]
+            ,[modified_on]
+            ,[contract_number]
+            ,[award_date]
+            ,[term_length]
+            ,[option_length]
+            ,[closed]
+            ,[buyer_id]
+            ,[created_by_id]
+            ,[modified_by_id]
+            ,[tab_num])
+    SELECT [ID]
+        ,SYSDATETIME()
+        ,SYSDATETIME()
+        ,[ContractNum]
+        ,[AwardDate]
+        ,[TermLength]
+        ,[OptionLength]
+        ,[IDIQClosed]
+        ,[BuyerID]
+        ,1
+        ,1
+        ,[TabNum]
+    FROM [ContractLog].[dbo].[STATZ_IDIQ_TBL];
+
+SET IDENTITY_INSERT [dbo].[contracts_idiqcontract] OFF;
+
+
+
+-- migrate idiq_contractdetails
+print ('##########################################')
+print 'migrate idiq_contractdetails'
+print ('##########################################')
+
+INSERT INTO [dbo].[contracts_idiqcontractdetails]
+           ([idiq_contract_id]
+           ,[nsn_id]
+           ,[supplier_id])
+SELECT        ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS.IDIQ_ID, ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS.NSNID, ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS.SUPPLIERID
+FROM            ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS INNER JOIN
+                         contracts_idiqcontract ON ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS.IDIQ_ID = contracts_idiqcontract.id INNER JOIN
+                         contracts_nsn ON ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS.NSNID = contracts_nsn.id INNER JOIN
+                         contracts_supplier ON ContractLog.dbo.STATZ_IDIQ_CONTRACT_DETAILS.SUPPLIERID = contracts_supplier.id
+
+
 
 print ('##########################################')
 print 'reseed tables'
@@ -1385,12 +1460,23 @@ SET status_id = CASE
     WHEN cancelled = 0 AND [open] = 1 THEN 1
 END;
 
+
+-- Update idiq contract id
+print ('##########################################')
+print 'Update idiq contract id'
+print ('##########################################')
+
+UPDATE dbo.contracts_contract
+SET idiq_contract_id = STATZ_IDIQ_CONTRACTS_TBL.IDIQ_ID
+FROM dbo.contracts_contract AS cc
+INNER JOIN [ContractLog].dbo.STATZ_IDIQ_CONTRACTS_TBL ON cc.id = STATZ_IDIQ_CONTRACTS_TBL.Contract_ID
+
 -- Update clin item number
 print ('##########################################')
 print 'Update clin item number'
-print ('##########################################');
+print ('##########################################')
 
-WITH NumberedCLINs AS (
+;WITH NumberedCLINs AS (
     SELECT 
         contract_id,
         id,
@@ -1418,7 +1504,7 @@ FormattedCLINs AS (
 UPDATE contracts_clin
 SET item_number = RIGHT('0000' + CAST(FormattedCLINs.initial_number + FormattedCLINs.seq_num - 1 AS VARCHAR), 4)
 FROM FormattedCLINs
-WHERE contracts_clin.id = FormattedCLINs;
+WHERE contracts_clin.id = FormattedCLINs.id;
 
 
 
