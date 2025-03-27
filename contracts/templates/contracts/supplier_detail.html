@@ -321,7 +321,7 @@
                                 </div>
                             </div>
                             <div class="flex space-x-2">
-                                <a href="{% url 'contracts:contact_edit' pk=contact.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                                <a href="{% url 'contracts:contact_update' pk=contact.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
                                 <a href="{% url 'contracts:contact_delete' pk=contact.id %}" class="text-red-600 hover:text-red-900">Delete</a>
                             </div>
                         </div>
@@ -371,7 +371,7 @@
                                 {% for cert in certifications %}
                                 <tr>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_type.name }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.compliance_status.name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.compliance_status }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_date|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_expiration|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -514,11 +514,7 @@
                 </div>
                 <div>
                     <label for="compliance_status" class="block text-sm font-medium text-gray-700">Compliance Status</label>
-                    <select id="compliance_status" name="compliance_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
-                        {% for status in compliance_statuses %}
-                        <option value="{{ status.id }}">{{ status.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <input type="text" id="compliance_status" name="compliance_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
                 </div>
                 <div>
                     <label for="certification_date" class="block text-sm font-medium text-gray-700">Certification Date</label>

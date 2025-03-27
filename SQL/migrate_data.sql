@@ -71,8 +71,6 @@ END
 	DBCC CHECKIDENT ('contracts_specialpaymentterms', RESEED, 0);
 	DELETE FROM contracts_certificationtype;
 	DBCC CHECKIDENT ('contracts_certificationtype', RESEED, 0);
-	DELETE FROM contracts_certificationstatus;
-	DBCC CHECKIDENT ('contracts_certificationstatus', RESEED, 0);
 	DELETE FROM contracts_classificationtype;
 	DBCC CHECKIDENT ('contracts_classificationtype', RESEED, 0);
 
@@ -431,6 +429,32 @@ BEGIN CATCH
 END CATCH;
 GO
 
+
+-- Supplier type migration
+print ('##########################################')
+print 'Supplier type migration'
+print ('##########################################')
+
+INSERT INTO [dbo].[contracts_suppliertype]
+           ([code],[description])
+SELECT [Code]
+      ,[Description]
+FROM [CommonCore].[dbo].[STATZ_SUPPLIER_TYPE_CODE_TBL]
+
+
+-- Special payment terms migration
+print ('##########################################')
+print 'Special payment terms migration'
+print ('##########################################')
+
+INSERT INTO [dbo].[contracts_specialpaymentterms]
+           ([code],[terms])
+SELECT [Code]
+      ,[Description]
+FROM [CommonCore].[dbo].[STATZ_SPT_CODE_TBL]
+
+
+
 -- Supplier migration: Insert with packhouse_id as NULL
 print ('##########################################')
 print 'Supplier migration: Insert with packhouse_id as NULL'
@@ -519,6 +543,118 @@ BEGIN CATCH
     -- -- print 'Error migrating suppliers: ' + @ErrorMessage;
 END CATCH;
 GO
+
+-- Supplier Certifications types migration
+print ('##########################################')
+print 'Supplier Certifications types migration'
+print ('##########################################')
+
+INSERT INTO [dbo].[contracts_certificationtype]
+           ([name]
+           ,[code])
+SELECT [Code]
+      ,[Code]
+FROM [CommonCore].[dbo].[STATZ_QMS_CODE_TBL];
+
+
+-- Supplier Certifications migration
+print ('##########################################')
+print 'Supplier Certifications migration'
+print ('##########################################')
+
+INSERT INTO [dbo].[contracts_suppliercertification]
+           ([certification_date]
+           ,[certification_expiration]
+           ,[certification_type_id]
+           ,[supplier_id]
+           ,[compliance_status])
+SELECT        qms.CreatedOn, qms.ExpDate, contracts_certificationtype.id AS Expr1, qms.Supplier_ID, qms.Compliance
+FROM            CommonCore.dbo.STATZ_QMS_TBL as qms INNER JOIN
+                         contracts_certificationtype ON qms.Type = contracts_certificationtype.name INNER JOIN
+                         contracts_supplier ON qms.Supplier_ID = contracts_supplier.id
+
+
+
+-- Supplier Classification type migration
+print ('##########################################')
+print 'Supplier Classification type migration'
+print ('##########################################')
+
+set identity_insert [dbo].[contracts_classificationtype] ON;
+
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (1,'Small Business (SB)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (2,'Service Disabled (SD)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (3,'Women Owned (WOSB)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (4,'Veteran Owned (VOSB)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (5,'HUBZone (HZ)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (6,'8(a) Business Development (8a)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (7,'Community Development Corp (CDC)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (8,'Economically Disadvantaged (ED)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (9,'Minority Owned (MO)');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (10,'Shutting Down');
+INSERT INTO [dbo].[contracts_classificationtype] ([id],[name]) VALUES (11,'Native American Owned (NAO)');
+
+set identity_insert [dbo].[contracts_classificationtype] OFF;
+
+
+-- Supplier Classification migration
+print ('##########################################')
+print 'Supplier Classification migration'
+print ('##########################################')
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),1,sc.SupplierID FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE        (sc.[Small Business] = 1);
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),2,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Service Disabled]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),3,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Women Owned]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),4,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Veteran Owned]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),5,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[HUBZone]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),6,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[8A]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),7,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Community Development Corp]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),8,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Economically Disadvantaged]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),9,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Minority Owned]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),10,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Shutting Down]=1;
+
+INSERT INTO [dbo].[contracts_supplierclassification] ([classification_date] ,[classification_type_id] ,[supplier_id])
+SELECT sysdatetime(),11,[SupplierID] FROM CommonCore.dbo.STATZ_SUPPLIER_CLASSIFICATION_TBL AS sc INNER JOIN
+                         CommonCore.dbo.STATZ_SUPPLIERS_TBL AS s_1 ON sc.SupplierID = s_1.ID
+WHERE sc.[Native American Owned]=1;
 
 
 -- canceledreason migration

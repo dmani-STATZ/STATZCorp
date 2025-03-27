@@ -276,6 +276,7 @@ class Supplier(AuditModel):
 
 
 class SupplierType(models.Model):
+    code = models.CharField(max_length=1, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):
@@ -418,7 +419,7 @@ class SupplierCertification(models.Model):
     certification_type = models.ForeignKey('CertificationType', on_delete=models.CASCADE)
     certification_date = models.DateTimeField(null=True, blank=True)
     certification_expiration = models.DateTimeField(null=True, blank=True)
-    compliance_status = models.ForeignKey('CertificationStatus', on_delete=models.CASCADE, null=True, blank=True)
+    compliance_status = models.CharField(max_length=25, null=True, blank=True, default=None)
 
     def __str__(self):
         return f"{self.supplier.name} - {self.certification_type.name}"
@@ -430,18 +431,7 @@ class CertificationType(models.Model):
 
     def __str__(self):
         return self.name
-    
-
-class CertificationStatus(models.Model):
-    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True, default=None)
-    certification_type = models.ForeignKey('CertificationType', on_delete=models.CASCADE, null=True, blank=True, default=None)
-    compliance_status = models.CharField(max_length=25, null=True, blank=True, default=None)
-    certification_date = models.DateTimeField(null=True, blank=True)
-    certification_expiration = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return self.name
-    
+        
 
 class SupplierClassification(models.Model):
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)

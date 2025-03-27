@@ -11,7 +11,7 @@ from datetime import timedelta
 from STATZWeb.decorators import conditional_login_required
 from ..models import (
     Supplier, Address, Contract, Clin, Contact, 
-    SupplierCertification, SupplierClassification, CertificationType, ClassificationType, CertificationStatus
+    SupplierCertification, SupplierClassification, CertificationType, ClassificationType
 )
 from ..forms import SupplierForm
 
@@ -111,7 +111,6 @@ class SupplierDetailView(DetailView):
         # Get certification and classification types
         certification_types = CertificationType.objects.all()
         classification_types = ClassificationType.objects.all()
-        compliance_statuses = CertificationStatus.objects.all()
         
         # Calculate statistics
         now = timezone.now()
@@ -139,7 +138,6 @@ class SupplierDetailView(DetailView):
             'classifications': classifications,
             'certification_types': certification_types,
             'classification_types': classification_types,
-            'compliance_statuses': compliance_statuses,
             'contract_stats': contract_stats,
             'active_tab': self.request.GET.get('tab', 'info'),
         })
@@ -233,18 +231,17 @@ class SupplierUpdateView(UpdateView):
         all_needed_addresses = []
         
         # Add the supplier's assigned addresses to the list if they exist
-        if supplier.physical_address:
-            all_needed_addresses.append(supplier.physical_address)
-        if supplier.shipping_address:
-            all_needed_addresses.append(supplier.shipping_address)
-        if supplier.billing_address:
-            all_needed_addresses.append(supplier.billing_address)
-            
-        # Get IDs of already added addresses to avoid duplicates
-        existing_ids = [addr.id for addr in all_needed_addresses if addr]
+        # Use a set to track unique IDs
+        seen_address_ids = set()
         
+        # Add addresses, ensuring no duplicates
+        for address in [supplier.physical_address, supplier.shipping_address, supplier.billing_address]:
+            if address and address.id not in seen_address_ids:
+                all_needed_addresses.append(address)
+                seen_address_ids.add(address.id)
+            
         # Add 10 most recent addresses that aren't already included
-        recent_addresses = Address.objects.exclude(id__in=existing_ids).order_by('-id')[:10]
+        recent_addresses = Address.objects.exclude(id__in=seen_address_ids).order_by('-id')[:10]
         all_needed_addresses.extend(recent_addresses)
         
         # Add all addresses to context for display
@@ -304,12 +301,10 @@ def add_supplier_certification(request, supplier_id):
         
         supplier = get_object_or_404(Supplier, id=supplier_id)
         certification_type = get_object_or_404(CertificationType, id=request.POST.get('certification_type'))
-        compliance_status = get_object_or_404(CertificationStatus, id=request.POST.get('compliance_status'))
         
         print(f"DEBUG - Creating certification with:")
         print(f"DEBUG - Supplier: {supplier}")
         print(f"DEBUG - Type: {certification_type}")
-        print(f"DEBUG - Status: {compliance_status}")
         print(f"DEBUG - Date: {request.POST.get('certification_date')}")
         print(f"DEBUG - Expiration: {request.POST.get('certification_expiration')}")
         
@@ -317,7 +312,6 @@ def add_supplier_certification(request, supplier_id):
             certification = SupplierCertification.objects.create(
                 supplier=supplier,
                 certification_type=certification_type,
-                compliance_status=compliance_status,
                 certification_date=request.POST.get('certification_date'),
                 certification_expiration=request.POST.get('certification_expiration')
             )

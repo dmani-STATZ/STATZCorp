@@ -7,7 +7,7 @@ from .models import (
     ClinAcknowledgment, AcknowledgementLetter, Contact, Address,
     Buyer, ContractType, ClinType, CanceledReason, SalesClass,
     SpecialPaymentTerms, IdiqContract, IdiqContractDetails, SupplierType, SupplierCertification,
-    CertificationType, CertificationStatus, SupplierClassification,
+    CertificationType, SupplierClassification,
     ClassificationType, FolderTracking
 )
 

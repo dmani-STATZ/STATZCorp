@@ -199,8 +199,7 @@
                                 </a>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap">
-                                {{ contract.supplier_name|upper }}
-                            </td>
+                                    {{ contract.supplier_name|upper }}
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                                 {{ contract.award_date|date:"M d, Y" }}
                             </td>
@@ -283,7 +282,9 @@
                     </div>
                     <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
                         {% if metrics.open_contracts > 0 %}
-                            <div class="bg-blue-600 h-2 rounded-full" style="width:25% ">{{ metrics.on_time_percentage }}%</div>
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ metrics.on_time_percentage }}%">
+                            </div>
+                            <div class="text-xs text-center mt-1">{{ metrics.on_time_percentage }}%</div>
                         {% endif %}
                     </div>
                 </div>
@@ -299,9 +300,9 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Contracts by Type</dt>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Contracts by Buyer</dt>
                             <dd>
-                                <div class="text-lg font-medium text-gray-900">{{ metrics.total_contracts }}</div>
+                                <div class="text-lg font-medium text-gray-900">---</div>
                             </dd>
                         </dl>
                     </div>
@@ -347,31 +348,31 @@
                 </div>
             </div>
 
-            <!-- Recent Activity -->
+            <!-- Active Suppliers -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <div class="flex items-center">
                     <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
                         <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Recent Activity</dt>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Suppliers</dt>
                             <dd>
-                                <div class="text-lg font-medium text-gray-900">{{ metrics.recent_activity_count }}</div>
+                                <div class="text-lg font-medium text-gray-900">{{ metrics.active_supplier_count }}</div>
                             </dd>
                         </dl>
                     </div>
                 </div>
                 <div class="mt-4 space-y-2">
-                    {% for activity in metrics.recent_activity|slice:":3" %}
+                    {% for supplier in metrics.top_suppliers %}
                     <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600 truncate max-w-[180px]">{{ activity.description }}</span>
-                        <span class="font-medium text-gray-500">{{ activity.date|naturaltime }}</span>
+                        <span class="text-gray-600 truncate max-w-[180px]">{{ supplier.supplier__name }}</span>
+                        <span class="font-medium text-blue-600">{{ supplier.contract_count }} contracts</span>
                     </div>
                     {% empty %}
-                    <div class="text-sm text-gray-500">No recent activity</div>
+                    <div class="text-sm text-gray-500">No active suppliers</div>
                     {% endfor %}
                 </div>
             </div>

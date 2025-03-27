@@ -2,7 +2,8 @@ from django.shortcuts import render
 from django.views.generic import TemplateView
 from django.utils.decorators import method_decorator
 from django.utils import timezone
-from django.db.models import Q, Count, Sum, F, Value, CharField
+from django.db.models import Q, Count, Sum, F, Value, CharField, IntegerField
+from django.db.models.functions import Cast
 from django.utils.safestring import mark_safe
 from datetime import timedelta, datetime
 import calendar
@@ -188,5 +189,86 @@ class ContractLifecycleDashboardView(TemplateView):
             reminder_completed=False,
             reminder_date__lte=timezone.now() + timedelta(days=7)
         ).order_by('reminder_date')[:5]
+
+        # Metrics for contract lifecycle dashboard
+        # Get open contracts
+        open_contracts = Contract.objects.filter(
+            status__description='Open',  # Using the status relation with description='Open'
+            cancelled=False              # Ensure we exclude cancelled contracts
+        )
+
+        # Count total open contracts
+        open_contracts_count = open_contracts.count()
+
+        # Find overdue contracts (due_date is in the past)
+        overdue_contracts = open_contracts.filter(
+            due_date__lt=timezone.now()  # Due date is less than current time
+        )
+        overdue_contracts_count = overdue_contracts.count()
+
+        # Find on-time contracts (due_date is in the future or null)
+        on_time_contracts = open_contracts.filter(
+            Q(due_date__gte=timezone.now()) | Q(due_date__isnull=True)
+        )
+        on_time_contracts_count = on_time_contracts.count()
+
+        # Calculate percentage of on-time contracts
+        on_time_percentage = round((on_time_contracts_count / open_contracts_count * 100) if open_contracts_count > 0 else 0)
+
+        # Get upcoming contracts (due within next 14 days)
+        upcoming_contracts = open_contracts.filter(
+            due_date__range=[timezone.now(), timezone.now() + timedelta(days=14)]
+        ).order_by('due_date')
+        
+        upcoming_due_dates = upcoming_contracts.count()
+        
+        # Get buyer breakdown instead of contract types
+        buyer_breakdown = {
+            'DLA Land': open_contracts.filter(buyer_id__in=[4, 5, 8, 1048]).count(),
+            'DLA Aviation': open_contracts.filter(buyer_id__in=[3, 1098, 1095]).count(),
+            'DLA Maritime': open_contracts.filter(buyer_id__in=[6, 7, 1049, 1105, 1106]).count(),
+            'DLA Troop Support': open_contracts.filter(buyer_id=10).count(),
+        }
+        
+        # Calculate "Others" as the difference between total and the sum of the categorized buyers
+        categorized_count = sum(buyer_breakdown.values())
+        buyer_breakdown['Others'] = open_contracts_count - categorized_count
+        
+        # Get active suppliers (suppliers with open contracts and CLINs with item_number < 0990)
+        # First convert item_number to a numeric value for comparison
+        # Get suppliers with open contracts and specific CLIN conditions
+        active_suppliers = Clin.objects.filter(
+            contract__status__description='Open',
+            contract__cancelled=False
+        ).annotate(
+            numeric_item=Cast('item_number', output_field=IntegerField())
+        ).filter(
+            numeric_item__lt=99  # Only include CLINs with item_number < 0990
+        ).values(
+            'supplier_id',
+            'supplier__name'
+        ).annotate(
+            contract_count=Count('contract_id', distinct=True)  # distinct=True ensures each contract is counted only once
+        ).order_by('-contract_count')
+        
+        # Count total unique suppliers
+        active_supplier_count = active_suppliers.count()
+        
+        # Get top 5 suppliers
+        top_suppliers = active_suppliers[:5]
+        
+        # Create metrics dictionary for template
+        context['metrics'] = {
+            'open_contracts': open_contracts_count,
+            'overdue_contracts': overdue_contracts_count,
+            'on_time_contracts': on_time_contracts_count,
+            'on_time_percentage': on_time_percentage,
+            'upcoming_due_dates': upcoming_due_dates,
+            'upcoming_contracts': upcoming_contracts[:3],  # Limit to 3 for display
+            'contract_types': buyer_breakdown,  # Renamed for template compatibility
+            'total_contracts': Contract.objects.filter(cancelled=False).count(),
+            'active_supplier_count': active_supplier_count,
+            'top_suppliers': top_suppliers
+        }
 
         return context

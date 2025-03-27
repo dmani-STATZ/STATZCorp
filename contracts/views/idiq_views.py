@@ -7,6 +7,8 @@ from django.http import JsonResponse
 from django.views import View
 from django.views.generic.edit import UpdateView
 from django.db.models import Q
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 from contracts.models import IdiqContract, IdiqContractDetails, Contract, Nsn, Supplier
 
@@ -94,12 +96,49 @@ class IdiqContractDetailsCreateView(LoginRequiredMixin, View):
             })
 
 class IdiqContractDetailsDeleteView(LoginRequiredMixin, View):
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+        
     def post(self, request, pk, detail_id):
-        detail = get_object_or_404(IdiqContractDetails, 
-                                 id=detail_id, 
-                                 idiq_contract_id=pk)
-        detail.delete()
-        return JsonResponse({'success': True})
+        try:
+            # Log the request data for debugging
+            import json
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            logger.info(f"Delete request for IDIQ {pk}, detail {detail_id}")
+            logger.info(f"Request body: {request.body.decode('utf-8') if request.body else 'No body'}")
+            
+            # Get the detail_id from URL path
+            # If detail_id is 0, try to get it from the request body
+            if detail_id == 0 and request.body:
+                try:
+                    body_data = json.loads(request.body)
+                    detail_id = body_data.get('detail_id', detail_id)
+                except json.JSONDecodeError:
+                    pass
+            
+            logger.info(f"Using detail_id: {detail_id}")
+            
+            # Find and delete the detail
+            detail = IdiqContractDetails.objects.get(
+                id=detail_id, 
+                idiq_contract_id=pk
+            )
+            
+            detail.delete()
+            return JsonResponse({'success': True})
+        except IdiqContractDetails.DoesNotExist:
+            return JsonResponse(
+                {'success': False, 'error': f'Detail with ID {detail_id} not found for IDIQ {pk}'}, 
+                status=404
+            )
+        except Exception as e:
+            import traceback
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error deleting IDIQ detail: {str(e)}\n{traceback.format_exc()}")
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 class NsnSearchView(LoginRequiredMixin, View):
     def get(self, request):
