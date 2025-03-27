@@ -221,7 +221,7 @@
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900">Notes</h3>
                     <button type="button" 
-                            onclick="showNotesModal()" 
+                            data-action="show-notes-modal"
                             class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -375,7 +375,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_date|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_expiration|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onclick="deleteCertification({{ cert.id }})" class="text-red-600 hover:text-red-900">Delete</button>
+                                        <button data-action="delete-certification" data-id="{{ cert.id }}" class="text-red-600 hover:text-red-900">Delete</button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -413,7 +413,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ class.classification_date|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ class.classification_expiration|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onclick="deleteClassification({{ class.id }})" class="text-red-600 hover:text-red-900">Delete</button>
+                                        <button data-action="delete-classification" data-id="{{ class.id }}" class="text-red-600 hover:text-red-900">Delete</button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -495,7 +495,7 @@
     <div class="bg-white rounded-lg p-8 max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 id="certificationModalTitle" class="text-lg font-medium text-gray-900">Add Certification</h3>
-            <button onclick="hideModal('certificationModal')" class="text-gray-400 hover:text-gray-500">
+            <button data-action="hide-modal" data-modal="certificationModal" class="text-gray-400 hover:text-gray-500">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -526,7 +526,7 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" onclick="hideModal('certificationModal')" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" data-action="hide-modal" data-modal="certificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
                 <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -542,7 +542,7 @@
     <div class="bg-white rounded-lg p-8 max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 id="classificationModalTitle" class="text-lg font-medium text-gray-900">Add Classification</h3>
-            <button onclick="hideModal('classificationModal')" class="text-gray-400 hover:text-gray-500">
+            <button data-action="hide-modal" data-modal="classificationModal" class="text-gray-400 hover:text-gray-500">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -569,7 +569,7 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" onclick="hideModal('classificationModal')" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" data-action="hide-modal" data-modal="classificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
                 <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -585,7 +585,7 @@
     <div class="bg-white rounded-lg p-8 max-w-2xl w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-medium text-gray-900">Edit Notes</h3>
-            <button onclick="hideModal('notesModal')" class="text-gray-400 hover:text-gray-500">
+            <button data-action="hide-modal" data-modal="notesModal" class="text-gray-400 hover:text-gray-500">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -600,7 +600,7 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" onclick="hideModal('notesModal')" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" data-action="hide-modal" data-modal="notesModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
                 <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -635,6 +635,31 @@
                 url.searchParams.set('tab', tabId);
                 window.history.pushState({}, '', url);
             });
+        });
+
+        // Event delegation for all button actions
+        document.addEventListener('click', function(event) {
+            const button = event.target.closest('[data-action]');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const id = button.dataset.id;
+            const modalId = button.dataset.modal;
+
+            switch(action) {
+                case 'delete-certification':
+                    deleteCertification(id);
+                    break;
+                case 'delete-classification':
+                    deleteClassification(id);
+                    break;
+                case 'show-notes-modal':
+                    showModal('notesModal');
+                    break;
+                case 'hide-modal':
+                    hideModal(modalId);
+                    break;
+            }
         });
 
         // Add event listeners for certification and classification buttons
@@ -695,10 +720,6 @@
     function hideModal(modalId) {
         document.getElementById(modalId).classList.add('hidden');
         document.body.style.overflow = '';
-    }
-
-    function showNotesModal() {
-        showModal('notesModal');
     }
 
     // Certification functions

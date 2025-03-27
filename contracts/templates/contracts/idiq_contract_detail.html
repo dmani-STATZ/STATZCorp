@@ -150,8 +150,10 @@
                             <td class="px-4 py-2 text-sm">{{ detail.supplier.cage_code }}</td>
                             <td class="px-4 py-2 text-sm">{{ detail.supplier.name }}</td>
                             <td class="px-4 py-2 text-sm">
-                                <button class="delete-pair text-red-500 hover:text-red-700 transition-colors duration-150" 
-                                        data-id="{{ detail.id }}" title="Delete this pair">
+                                <button class="delete-pair" 
+                                        data-action="delete-pair"
+                                        data-id="{{ detail.id }}" 
+                                        title="Delete this pair">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
@@ -171,7 +173,7 @@
     <div class="relative mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 400px; max-width: 90%;">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold">Add NSN/Supplier Pair</h3>
-            <button id="closeModal" class="text-gray-400 hover:text-gray-500">
+            <button id="closeModal" data-action="hide-modal" data-modal="addPairModal" class="text-gray-400 hover:text-gray-500">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -200,6 +202,8 @@
             </div>
             <div class="flex justify-end space-x-3 mt-6">
                 <button type="button" id="cancelAddPair" 
+                        data-action="hide-modal" 
+                        data-modal="addPairModal"
                         class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">
                     Cancel
                 </button>
@@ -255,6 +259,25 @@ if (typeof window.idiqDetailInitialized === 'undefined') {
             }
             return cookieValue;
         }
+        
+        // Event delegation for all button actions
+        document.addEventListener('click', function(event) {
+            const button = event.target.closest('[data-action]');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const id = button.dataset.id;
+            const modalId = button.dataset.modal;
+
+            switch(action) {
+                case 'delete-pair':
+                    deletePair(id);
+                    break;
+                case 'hide-modal':
+                    hideModal(modalId);
+                    break;
+            }
+        });
         
         // Use event delegation for delete buttons instead of attaching handlers to each button
         const nsnsTable = document.querySelector('.col-span-3 table tbody');
@@ -315,7 +338,8 @@ if (typeof window.idiqDetailInitialized === 'undefined') {
             setTimeout(() => document.getElementById('nsnSearch').focus(), 100);
         }
         
-        function hideModal() {
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
             modal.classList.add('hidden');
             document.getElementById('addPairForm').reset();
             document.getElementById('nsnResults').classList.add('hidden');
@@ -514,8 +538,10 @@ if (typeof window.idiqDetailInitialized === 'undefined') {
                             <td class="px-4 py-2 text-sm">${data.detail.supplier_cage}</td>
                             <td class="px-4 py-2 text-sm">${data.detail.supplier_name}</td>
                             <td class="px-4 py-2 text-sm">
-                                <button class="delete-pair text-red-500 hover:text-red-700 transition-colors duration-150" 
-                                        data-id="${data.detail.id}" title="Delete this pair">
+                                <button class="delete-pair" 
+                                        data-action="delete-pair"
+                                        data-id="${data.detail.id}" 
+                                        title="Delete this pair">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
