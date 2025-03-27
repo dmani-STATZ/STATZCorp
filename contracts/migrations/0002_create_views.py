@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
                 spt.terms as special_payment_terms_description,
                 c.special_payment_terms_paid,
                 
-                c.clin_value,
+                c.quote_value,
                 c.paid_amount,
                 
                 c.created_by_id,

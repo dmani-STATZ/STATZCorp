@@ -200,7 +200,7 @@ def extract_dd1155_data(request):
                 'order_qty': clin.get('order_qty'),
                 'unit': clin.get('unit'),
                 'unit_price': clin.get('unit_price'),
-                'clin_value': clin.get('clin_value'),
+                'quote_value': clin.get('quote_value'),
                 'fob': clin.get('fob', 'O'),
                 'ia': clin.get('ia'),
                 'due_date': clin.get('due_date')
@@ -782,7 +782,7 @@ def create_clin_info(variant_type, clin_num, nsn_code, description, quantity, un
         'order_qty': quantity,
         'unit': unit,
         'unit_price': unit_price,
-        'clin_value': amount,
+        'quote_value': amount,
         'ia': ia,
         'fob': fob,
         'due_date': due_date
@@ -1011,9 +1011,9 @@ def process_extracted_data(extracted_data):
                 clin_info['notes'].append(f"Unit Price: ${clin['unit_price']:.2f}")
             
             # Add finance information if available
-            if clin.get('clin_value'):
+            if clin.get('quote_value'):
                 clin_info['finance'] = {
-                    'clin_value': clin['clin_value']
+                    'quote_value': clin['quote_value']
                 }
             
             processed_data['clins'].append(clin_info)
@@ -1140,7 +1140,7 @@ def export_dd1155_text(request):
                 f.write(f"Quantity: {clin.get('order_qty')}\n")
                 f.write(f"Unit: {clin.get('unit')}\n")
                 f.write(f"Unit Price: ${clin.get('unit_price')}\n")
-                f.write(f"Amount: ${clin.get('clin_value')}\n")
+                f.write(f"Amount: ${clin.get('quote_value')}\n")
                 f.write(f"FOB: {clin.get('fob')}\n")
                 f.write(f"IA: {clin.get('ia')}\n")
                 f.write(f"Due Date: {clin.get('due_date')}\n")

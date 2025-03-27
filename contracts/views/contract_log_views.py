@@ -220,7 +220,7 @@ def export_contract_log(request):
             f"{clin.order_qty} {clin.uom}" if clin.order_qty else '',
             clin.ship_date.strftime('%m/%d/%Y') if clin.ship_date else '',
             clin.ship_qty,
-            f"${clin.clin_value:,.2f}" if clin.clin_value else '',
+            f"${clin.quote_value:,.2f}" if clin.quote_value else '',
             f"${clin.paid_amount:,.2f}" if clin.paid_amount else '',
             '',  # X column
             f"${clin.contract.contract_value:,.2f}" if clin.contract.contract_value else '',

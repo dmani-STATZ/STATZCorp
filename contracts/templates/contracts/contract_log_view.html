@@ -201,7 +201,7 @@
                         <td class="px-1.5 py-1">{{ clin.order_qty|default:"0" }} {{ clin.uom|default:"ea" }}</td>
                         <td class="px-1.5 py-1">{{ clin.ship_date|date:"m/d/Y"|default:"-" }}</td>
                         <td class="px-1.5 py-1">{{ clin.ship_qty|default:"-" }}</td>
-                        <td class="px-1.5 py-1">${{ clin.clin_value|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">${{ clin.quote_value|floatformat:2|default:"0.00" }}</td>
                         <td class="px-1.5 py-1">${{ clin.paid_amount|floatformat:2|default:"0.00" }}</td>
                         <td class="px-1.5 py-1"></td>
                         <td class="px-1.5 py-1">${{ clin.contract.contract_value|floatformat:2|default:"0.00" }}</td>

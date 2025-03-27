@@ -159,7 +159,7 @@ class ContractCreateView(CreateView):
                         ia=clin_info.get('ia'),
                         fob=clin_info.get('fob'),
                         due_date=clin_info.get('due_date'),
-                        clin_value=clin_info.get('clin_value'),
+                        quote_value=clin_info.get('quote_value'),
                         created_by=self.request.user
                     )
                     clin.save()

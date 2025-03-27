@@ -479,7 +479,7 @@
                             {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                             {% if clin.due_date_late %} (LATE){% endif %}
                         </td>
-                        <td>${{ clin.clin_value|default:"0.00"|floatformat:2 }}</td>
+                        <td>${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
                         <td>
                             <div class="actions-container">
                                 <a href="{% url 'contracts:clin_update' clin.id %}" title="Edit CLIN">
@@ -573,7 +573,7 @@
                                         <td class="data-label">Price Per Unit</td>
                                         <td class="data-value">${{ clin.price_per_unit|default:"0.00"|floatformat:2 }}</td>
                                         <td class="data-label">CLIN Value (Sub PO)</td>
-                                        <td class="data-value">${{ clin.clin_value|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-value">${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
                                     </tr>
                                     <tr>
                                         <td class="data-label">Paid Amount (Sub Paid)</td>

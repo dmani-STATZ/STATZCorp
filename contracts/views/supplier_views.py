@@ -120,13 +120,13 @@ class SupplierDetailView(DetailView):
             'total_contracts': contracts.count(),
             'active_contracts': contracts.filter(open=True).count(),
             'total_value': Clin.objects.filter(supplier=supplier).aggregate(
-                total=Sum('clin_value', output_field=DecimalField())
+                total=Sum('quote_value', output_field=DecimalField())
             )['total'] or 0,
             'yearly_value': Clin.objects.filter(
                 supplier=supplier,
                 contract__created_on__gte=year_ago
             ).aggregate(
-                total=Sum('clin_value', output_field=DecimalField())
+                total=Sum('quote_value', output_field=DecimalField())
             )['total'] or 0,
         }
         

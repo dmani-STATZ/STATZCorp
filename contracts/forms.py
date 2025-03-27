@@ -316,7 +316,7 @@ class ClinForm(forms.ModelForm):
             'nsn', 'ia', 'fob', 'order_qty', 'ship_qty', 
             'due_date', 'supplier_due_date', 'ship_date',
             'special_payment_terms', 'special_payment_terms_paid', 
-            'clin_value', 'paid_amount', 
+            'quote_value', 'paid_amount', 
             'paid_date', 'wawf_payment', 'wawf_recieved', 
             'wawf_invoice', 'plan_gross', 'planned_split',
             'ppi_split', 'statz_split', 'ppi_split_paid', 'statz_split_paid',
@@ -392,7 +392,7 @@ class ClinForm(forms.ModelForm):
                 'placeholder': 'Enter Contract Value',
                 'step': '0.01'
             }),
-            'clin_value': forms.NumberInput(attrs={
+            'quote_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter PO Amount',
                 'step': '0.0001'

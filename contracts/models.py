@@ -56,6 +56,7 @@ class Contract(AuditModel):
     ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
 
+
     class Meta:
         indexes = [
             # Foreign key indexes
@@ -132,10 +133,10 @@ class Clin(AuditModel):
     notes = GenericRelation('Note', related_query_name='clin')
 
     # CLIN_Finance
-    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
-    special_payment_terms_paid = models.BooleanField(null=True, blank=True)
+    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True) # Moved to Contract
+    special_payment_terms_paid = models.BooleanField(null=True, blank=True) # Moved to Contract
     price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    clin_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to clin_value?
+    quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to quote_value? this is being populated with contract value
     paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     paid_date = models.DateTimeField(null=True, blank=True)
     wawf_payment = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
@@ -147,6 +148,8 @@ class Clin(AuditModel):
     statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
 
 
     class Meta:
@@ -175,6 +178,17 @@ class Clin(AuditModel):
 
     def __str__(self):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
+
+
+class PaymentHistory(models.Model):
+    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
+    payment_type = models.CharField(max_length=50, null=True, blank=True) #this will be (SubPaid, SubPO,Contract,PlanGross,WAWFPayment,PaidSTATZ,PaidPPI,Interest)
+    payment_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
+    payment_info = models.CharField(max_length=255, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_history_created_by')
+    created_on = models.DateTimeField(null=True, blank=True)
+
 
 
 class IdiqContract(AuditModel):
@@ -560,7 +574,7 @@ class ClinView(models.Model):
     special_payment_terms_description = models.CharField(max_length=30, null=True)
     special_payment_terms_paid = models.BooleanField(null=True)
     
-    clin_value = models.DecimalField(max_digits=19, decimal_places=4, null=True)
+    quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True)
     paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True)
     
     created_by_id = models.IntegerField(null=True)

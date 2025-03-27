@@ -904,7 +904,7 @@ BEGIN TRY
         special_payment_terms_id,
         special_payment_terms_paid,
         price_per_unit,
-        clin_value,
+        quote_value,
         paid_amount,
         paid_date,
         wawf_payment,

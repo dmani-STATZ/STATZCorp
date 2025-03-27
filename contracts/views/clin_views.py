@@ -58,7 +58,7 @@ class ClinDetailView(DetailView):
                 ship_date_late=clin_view.ship_date_late,
                 special_payment_terms_id=clin_view.special_payment_terms_id,
                 special_payment_terms_paid=clin_view.special_payment_terms_paid,
-                clin_value=clin_view.clin_value,
+                quote_value=clin_view.quote_value,
                 paid_amount=clin_view.paid_amount,
                 created_by_id=clin_view.created_by_id,
                 created_on=clin_view.created_on,
