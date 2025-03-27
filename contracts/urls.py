@@ -99,6 +99,14 @@ from .views import (
 
 from .views.contract_views import check_contract_number
 from .views.api_views import get_select_options
+from .views.idiq_views import (
+    IdiqContractDetailView,
+    IdiqContractUpdateView,
+    IdiqContractDetailsCreateView,
+    IdiqContractDetailsDeleteView,
+    NsnSearchView,
+    SupplierSearchView,
+)
 
 app_name = 'contracts'
 
@@ -209,4 +217,12 @@ urlpatterns = [
     path('folder-tracking/<int:pk>/toggle-highlight/', toggle_highlight, name='toggle_highlight'),
     path('folder-tracking/export/', export_folder_tracking, name='export_folder_tracking'),
     path('folder-tracking/<int:pk>/update-field/', update_folder_field, name='update_folder_field'),
+
+    # IDIQ Contract URLs
+    path('idiq/<int:pk>/', IdiqContractDetailView.as_view(), name='idiq_contract_detail'),
+    path('idiq/<int:pk>/update/', IdiqContractUpdateView.as_view(), name='idiq_contract_update'),
+    path('idiq/<int:pk>/details/create/', IdiqContractDetailsCreateView.as_view(), name='idiq_contract_detail_create'),
+    path('idiq/<int:pk>/details/<int:detail_id>/delete/', IdiqContractDetailsDeleteView.as_view(), name='idiq_contract_detail_delete'),
+    path('nsn/search/', NsnSearchView.as_view(), name='nsn_search'),
+    path('supplier/search/', SupplierSearchView.as_view(), name='supplier_search'),
 ] 

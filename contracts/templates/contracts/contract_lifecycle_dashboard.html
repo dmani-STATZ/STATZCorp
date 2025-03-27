@@ -185,7 +185,13 @@
                                 <span class="text-green-600 font-medium">{{ contract.tab_num }}</span> / <span class="text-yellow-600 font-medium">{{ contract.po_number }}</span>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {{ contract.idiq_contract }}
+                                {% if contract.idiq_contract and contract.idiq_contract.id %}
+                                    <a href="{% url 'contracts:idiq_contract_detail' contract.idiq_contract.id %}" class="hover:text-blue-800">
+                                        {{ contract.idiq_contract.contract_number|default:"-" }}
+                                    </a>
+                                {% else %}
+                                    -
+                                {% endif %}
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">
                                 <a href="{% url 'contracts:contract_detail' contract.id %}" class="hover:text-blue-800">

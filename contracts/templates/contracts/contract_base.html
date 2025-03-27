@@ -155,7 +155,9 @@
         
         <!-- Default width container that all pages will inherit -->
         <div class="w-[75%] mx-auto">
-            {% block content %}{% endblock content %}
+            {% block content %}
+                {% block contract_content %}{% endblock contract_content %}
+            {% endblock content %}
         </div>
     </main>
 

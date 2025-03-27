@@ -30,19 +30,25 @@ class ContractLifecycleDashboardView(TemplateView):
         for contract in last_20_contracts:
             # Get the first CLIN with clin_type_id=1 for this contract
             first_clin = contract.clin_set.filter().first()
+            
+            contract_data = {
+                'id': contract.id,
+                'tab_num': contract.tab_num,
+                'po_number': contract.po_number,
+                'contract_number': contract.contract_number,
+                'contract_value': contract.contract_value,
+                'award_date': contract.award_date,
+                'due_date': contract.due_date,
+                'status': contract.status,
+                'idiq_contract': contract.idiq_contract,  # Pass the entire object
+            }
+            
             if first_clin and first_clin.supplier:
-                contracts_data.append({
-                    'id': contract.id,
-                    'tab_num': contract.tab_num,
-                    'po_number': contract.po_number,
-                    'idiq_contract': contract.idiq_contract.contract_number if contract.idiq_contract else 'N/A',
-                    'contract_number': contract.contract_number,
-                    'supplier_name': first_clin.supplier.name,
-                    'contract_value': contract.contract_value,
-                    'award_date': contract.award_date,
-                    'due_date': contract.due_date,
-                    'status': contract.status,
-                })
+                contract_data['supplier_name'] = first_clin.supplier.name
+            else:
+                contract_data['supplier_name'] = 'N/A'
+            
+            contracts_data.append(contract_data)
 
         return contracts_data
     

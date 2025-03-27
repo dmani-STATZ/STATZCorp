@@ -1,0 +1,446 @@
+{% extends 'contracts/contract_base.html' %}
+{% load static %}
+
+{% block title %}IDIQ Contract {{ idiq_contract.contract_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .light-green-bg {
+        background-color: #e8f5e9;
+    }
+    /* Debug styles */
+    .debug-info {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        z-index: 9999;
+        max-width: 400px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-size: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto py-4">
+    <!-- Main Content -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <!-- Header -->
+    {% if not idiq_contract.closed %}
+    <div class="bg-green-100 p-4 mb-6 rounded-lg border border-green-200 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-semibold">IDIQ Contract {{ idiq_contract.contract_number }}</h1>
+            <a href="{% url 'contracts:idiq_contract_update' idiq_contract.id %}" class="text-indigo-500 hover:text-indigo-700 transition-colors duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            </a>
+        </div>
+        <a href="{% url 'contracts:contracts_dashboard' %}" 
+            class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back to Dashboard
+        </a>
+    </div>
+    {% else %}
+    <div class="bg-red-100 p-4 mb-6 rounded-t-lg border border-red-200 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-semibold">IDIQ Contract {{ idiq_contract.contract_number }}</h1>
+        </div>
+        <a href="{% url 'contracts:contracts_dashboard' %}" 
+            class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back to Dashboard
+        </a>
+    </div>
+    {% endif %}
+
+
+        <!-- Contract Details -->
+        <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-8">
+            <div class="flex items-center">
+                <label class="w-32 text-gray-600">Tab Num:</label>
+                <span class="text-gray-900 font-bold">{{ idiq_contract.tab_num }}</span>
+            </div>
+            <div class="flex items-center">
+                <label class="w-32 text-gray-600">Term Length:</label>
+                <span class="text-gray-900 font-bold">{{ idiq_contract.term_length }}</span>
+            </div>
+            <div class="flex items-center">
+                <label class="w-32 text-gray-600">Buyer ID:</label>
+                <span class="text-gray-900 font-bold">{{ idiq_contract.buyer }}</span>
+            </div>
+            <div class="flex items-center">
+                <label class="w-32 text-gray-600">Option Length:</label>
+                <span class="text-gray-900 font-bold" >{{ idiq_contract.option_length }}</span>
+            </div>
+            <div class="flex items-center">
+                <label class="w-32 text-gray-600">Award Date:</label>
+                <span class="text-gray-900 font-bold">{{ idiq_contract.award_date|date:"m/d/Y" }}</span>
+            </div>
+            <div class="flex items-center">
+                <label class="w-32 text-gray-600">IDIQ Closed:</label>
+                <input type="checkbox" {% if idiq_contract.closed %}checked{% endif %} disabled
+                       class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </div>
+        </div>
+
+        <!-- Four Column Layout for Tables -->
+
+    </div>
+    <div class="grid grid-cols-4 gap-8 pt-4">
+        <!-- Associated Contracts -->
+        <div class="col-span-1 border rounded-lg">
+            <div class="bg-gray-100 p-3 border-b">
+                <h2 class="text-lg font-medium text-gray-800">Associated Contracts</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Contract ID</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for contract in contracts %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 text-sm">{{ contract.contract_number }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- NSNs and Buyers -->
+        <div class="col-span-3 border rounded-lg">
+            <div class="bg-gray-100 p-3 border-b flex justify-between items-center">
+                <h2 class="text-lg font-medium text-gray-800">NSNs and Buyers</h2>
+                <button id="addPairBtn" class="px-3 py-1 bg-green-300 text-green-900 rounded hover:bg-green-400 border border-green-900">
+                    Add Pair
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">NSN</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Item Description</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Middle</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">CageCode</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Sub-Contractor</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for detail in idiq_details %}
+                        <tr class="hover:bg-gray-50" data-detail-id="{{ detail.id }}">
+                            <td class="px-4 py-2 text-sm">{{ detail.nsn.nsn_code }}</td>
+                            <td class="px-4 py-2 text-sm">{{ detail.nsn.description }}</td>
+                            <td class="px-4 py-2 text-sm">-----------</td>
+                            <td class="px-4 py-2 text-sm">{{ detail.supplier.cage_code }}</td>
+                            <td class="px-4 py-2 text-sm">{{ detail.supplier.name }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Pair Modal -->
+<div id="addPairModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full flex items-center justify-center">
+    <div class="relative mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 400px; max-width: 90%;">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Add NSN/Supplier Pair</h3>
+            <button id="closeModal" class="text-gray-400 hover:text-gray-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <form id="addPairForm">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">NSN</label>
+                    <input type="text" id="nsnSearch" 
+                           class="block w-full rounded border-gray-300" 
+                           placeholder="Search for NSN...">
+                    <input type="hidden" id="selectedNsn" name="nsn">
+                    <div id="nsnResults" class="absolute z-10 bg-white border rounded-md shadow-lg mt-1 w-full max-h-48 overflow-y-auto hidden"></div>
+                </div>
+                <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                    <input type="text" id="supplierSearch" 
+                           class="block w-full rounded border-gray-300" 
+                           placeholder="Search for Supplier...">
+                    <input type="hidden" id="selectedSupplier" name="supplier">
+                    <div id="supplierResults" class="absolute z-10 bg-white border rounded-md shadow-lg mt-1 w-full max-h-48 overflow-y-auto hidden"></div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" id="cancelAddPair" 
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded">
+                    Add Pair
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Debug element
+    const debugEl = document.createElement('div');
+    debugEl.className = 'debug-info';
+    debugEl.style.display = 'none';
+    document.body.appendChild(debugEl);
+    
+    function log(message) {
+        console.log(message);
+        debugEl.innerHTML += `<div>${message}</div>`;
+        debugEl.scrollTop = debugEl.scrollHeight;
+    }
+    
+    // Toggle debug info with Ctrl+D
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'd') {
+            e.preventDefault();
+            debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
+        }
+    });
+    
+    // Modal handling
+    const modal = document.getElementById('addPairModal');
+    const addPairBtn = document.getElementById('addPairBtn');
+    const closeModal = document.getElementById('closeModal');
+    const cancelAddPair = document.getElementById('cancelAddPair');
+    
+    function showModal() {
+        modal.classList.remove('hidden');
+        log('Modal opened');
+        // Focus the NSN input when modal opens
+        setTimeout(() => document.getElementById('nsnSearch').focus(), 100);
+    }
+    
+    function hideModal() {
+        modal.classList.add('hidden');
+        document.getElementById('addPairForm').reset();
+        document.getElementById('nsnResults').classList.add('hidden');
+        document.getElementById('supplierResults').classList.add('hidden');
+        document.getElementById('selectedNsn').value = '';
+        document.getElementById('selectedSupplier').value = '';
+    }
+    
+    addPairBtn.addEventListener('click', showModal);
+    closeModal.addEventListener('click', hideModal);
+    cancelAddPair.addEventListener('click', hideModal);
+
+    // Autocomplete for NSN
+    let nsnTimeout = null;
+    const nsnSearch = document.getElementById('nsnSearch');
+    const nsnResults = document.getElementById('nsnResults');
+    
+    nsnSearch.addEventListener('input', function() {
+        log(`NSN search input: "${this.value}"`);
+        clearTimeout(nsnTimeout);
+        const query = this.value.trim();
+        
+        if (query.length >= 3) {
+            nsnTimeout = setTimeout(() => fetchNsnResults(query), 300);
+        } else {
+            nsnResults.classList.add('hidden');
+        }
+    });
+    
+    async function fetchNsnResults(query) {
+        const url = "{% url 'contracts:nsn_search' %}?q=" + encodeURIComponent(query);
+        log(`Fetching NSN results from: ${url}`);
+        
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            log(`NSN search received ${data.results ? data.results.length : 0} results`);
+            
+            if (data.results && data.results.length > 0) {
+                nsnResults.innerHTML = data.results.map(result => `
+                    <div class="p-2 hover:bg-gray-100 cursor-pointer nsn-result" 
+                         data-id="${result.id}" 
+                         data-text="${result.text}">
+                        ${result.text}
+                    </div>
+                `).join('');
+                nsnResults.classList.remove('hidden');
+            } else {
+                nsnResults.innerHTML = '<div class="p-2 text-gray-500">No results found</div>';
+                nsnResults.classList.remove('hidden');
+            }
+        } catch (error) {
+            log(`Error fetching NSN results: ${error.message}`);
+            console.error('Error fetching NSN results:', error);
+            nsnResults.innerHTML = '<div class="p-2 text-red-500">Error loading results</div>';
+            nsnResults.classList.remove('hidden');
+        }
+    }
+    
+    nsnResults.addEventListener('click', function(e) {
+        const result = e.target.closest('.nsn-result');
+        if (result) {
+            log(`NSN selected: ${result.dataset.text}`);
+            nsnSearch.value = result.dataset.text;
+            document.getElementById('selectedNsn').value = result.dataset.id;
+            nsnResults.classList.add('hidden');
+            // Focus the supplier input after selecting NSN
+            document.getElementById('supplierSearch').focus();
+        }
+    });
+
+    // Autocomplete for Supplier
+    let supplierTimeout = null;
+    const supplierSearch = document.getElementById('supplierSearch');
+    const supplierResults = document.getElementById('supplierResults');
+    
+    supplierSearch.addEventListener('input', function() {
+        log(`Supplier search input: "${this.value}"`);
+        clearTimeout(supplierTimeout);
+        const query = this.value.trim();
+        
+        if (query.length >= 3) {
+            supplierTimeout = setTimeout(() => fetchSupplierResults(query), 300);
+        } else {
+            supplierResults.classList.add('hidden');
+        }
+    });
+    
+    async function fetchSupplierResults(query) {
+        const url = "{% url 'contracts:supplier_search' %}?q=" + encodeURIComponent(query);
+        log(`Fetching supplier results from: ${url}`);
+        
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            log(`Supplier search received ${data.results ? data.results.length : 0} results`);
+            
+            if (data.results && data.results.length > 0) {
+                supplierResults.innerHTML = data.results.map(result => `
+                    <div class="p-2 hover:bg-gray-100 cursor-pointer supplier-result" 
+                         data-id="${result.id}" 
+                         data-text="${result.text}">
+                        ${result.text}
+                    </div>
+                `).join('');
+                supplierResults.classList.remove('hidden');
+            } else {
+                supplierResults.innerHTML = '<div class="p-2 text-gray-500">No results found</div>';
+                supplierResults.classList.remove('hidden');
+            }
+        } catch (error) {
+            log(`Error fetching supplier results: ${error.message}`);
+            console.error('Error fetching supplier results:', error);
+            supplierResults.innerHTML = '<div class="p-2 text-red-500">Error loading results</div>';
+            supplierResults.classList.remove('hidden');
+        }
+    }
+    
+    supplierResults.addEventListener('click', function(e) {
+        const result = e.target.closest('.supplier-result');
+        if (result) {
+            log(`Supplier selected: ${result.dataset.text}`);
+            supplierSearch.value = result.dataset.text;
+            document.getElementById('selectedSupplier').value = result.dataset.id;
+            supplierResults.classList.remove('hidden');
+        }
+    });
+
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#nsnSearch') && !e.target.closest('#nsnResults')) {
+            nsnResults.classList.add('hidden');
+        }
+        if (!e.target.closest('#supplierSearch') && !e.target.closest('#supplierResults')) {
+            supplierResults.classList.add('hidden');
+        }
+    });
+    
+    // Form submission
+    document.getElementById('addPairForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const nsnId = document.getElementById('selectedNsn').value;
+        const supplierId = document.getElementById('selectedSupplier').value;
+
+        log(`Submitting form - NSN ID: ${nsnId}, Supplier ID: ${supplierId}`);
+
+        if (!nsnId || !supplierId) {
+            alert('Please select both an NSN and a Supplier');
+            return;
+        }
+        
+        try {
+            const url = "{% url 'contracts:idiq_contract_detail_create' idiq_contract.id %}";
+            log(`Submitting to: ${url}`);
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            });
+            
+            const data = await response.json();
+            log(`Submission result: ${JSON.stringify(data)}`);
+            
+            if (data.success) {
+                const newRow = `
+                    <tr class="hover:bg-gray-50" data-detail-id="${data.detail.id}">
+                        <td class="px-4 py-2 text-sm">${data.detail.nsn_code}</td>
+                        <td class="px-4 py-2 text-sm">${data.detail.nsn_description}</td>
+                        <td class="px-4 py-2 text-sm">-----------</td>
+                        <td class="px-4 py-2 text-sm">${data.detail.supplier_cage}</td>
+                        <td class="px-4 py-2 text-sm">${data.detail.supplier_name}</td>
+                    </tr>
+                `;
+                document.querySelector('table tbody').insertAdjacentHTML('beforeend', newRow);
+                hideModal();
+            } else {
+                alert(data.errors);
+            }
+        } catch (error) {
+            log(`Error submitting form: ${error.message}`);
+            alert('Error adding pair. Please try again.');
+        }
+    });
+
+    // Log that initialization is complete
+    log('Autocomplete initialized');
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends 'contracts/contract_base.html' %}
+{% load static %}
+
+{% block title %}Edit IDIQ Contract {{ object.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header with Back Button -->
+    <div class="flex justify-between items-center mb-6">
+        <a href="{% url 'contracts:idiq_contract_detail' object.pk %}" class="flex items-center text-blue-600 hover:text-blue-800">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to IDIQ Contract
+        </a>
+    </div>
+
+    <!-- Edit Form Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Edit IDIQ Contract</h1>
+        
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Contract Number -->
+                <div>
+                    <label for="{{ form.contract_number.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Contract Number
+                    </label>
+                    <div class="mt-1">
+                        {{ form.contract_number }}
+                    </div>
+                    {% if form.contract_number.errors %}
+                    <p class="mt-2 text-sm text-red-600">
+                        {{ form.contract_number.errors|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Buyer -->
+                <div>
+                    <label for="{{ form.buyer.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Buyer
+                    </label>
+                    <div class="mt-1">
+                        {{ form.buyer }}
+                    </div>
+                    {% if form.buyer.errors %}
+                    <p class="mt-2 text-sm text-red-600">
+                        {{ form.buyer.errors|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Award Date -->
+                <div>
+                    <label for="{{ form.award_date.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Award Date
+                    </label>
+                    <div class="mt-1">
+                        {{ form.award_date }}
+                    </div>
+                    {% if form.award_date.errors %}
+                    <p class="mt-2 text-sm text-red-600">
+                        {{ form.award_date.errors|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- TAB Number -->
+                <div>
+                    <label for="{{ form.tab_num.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        TAB Number
+                    </label>
+                    <div class="mt-1">
+                        {{ form.tab_num }}
+                    </div>
+                    {% if form.tab_num.errors %}
+                    <p class="mt-2 text-sm text-red-600">
+                        {{ form.tab_num.errors|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Term Length -->
+                <div>
+                    <label for="{{ form.term_length.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Term Length
+                    </label>
+                    <div class="mt-1">
+                        {{ form.term_length }}
+                    </div>
+                    {% if form.term_length.errors %}
+                    <p class="mt-2 text-sm text-red-600">
+                        {{ form.term_length.errors|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Option Length -->
+                <div>
+                    <label for="{{ form.option_length.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Option Length
+                    </label>
+                    <div class="mt-1">
+                        {{ form.option_length }}
+                    </div>
+                    {% if form.option_length.errors %}
+                    <p class="mt-2 text-sm text-red-600">
+                        {{ form.option_length.errors|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div>
+                <div class="flex items-center">
+                    {{ form.closed }}
+                    <label for="{{ form.closed.id_for_label }}" class="ml-2 block text-sm text-gray-900">
+                        Mark as Closed
+                    </label>
+                </div>
+                {% if form.closed.errors %}
+                <p class="mt-2 text-sm text-red-600">
+                    {{ form.closed.errors|join:", " }}
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-3">
+                <a href="{% url 'contracts:idiq_contract_detail' object.pk %}" 
+                   class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Style form inputs
+    const inputs = document.querySelectorAll('input[type="text"], input[type="number"], select');
+    inputs.forEach(input => {
+        input.classList.add(
+            'mt-1',
+            'block',
+            'w-full',
+            'rounded-md',
+            'border-gray-300',
+            'shadow-sm',
+            'focus:border-blue-500',
+            'focus:ring-blue-500',
+            'sm:text-sm'
+        );
+    });
+
+    // Style checkbox
+    const checkbox = document.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+        checkbox.classList.add(
+            'h-4',
+            'w-4',
+            'rounded',
+            'border-gray-300',
+            'text-blue-600',
+            'focus:ring-blue-500'
+        );
+    }
+});
+</script>
+{% endblock %} 

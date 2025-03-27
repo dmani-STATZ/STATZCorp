@@ -105,6 +105,14 @@ from .folder_tracking_views import (
     update_folder_field,
 )
 
+from .idiq_views import (
+    IdiqContractDetailView,
+    IdiqContractUpdateView,
+    IdiqContractDetailsCreateView,
+    IdiqContractDetailsDeleteView,
+
+)
+
 __all__ = [
     'folder_tracking',
     'add_folder_tracking',

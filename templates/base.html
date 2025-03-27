@@ -13,38 +13,9 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
     <!-- Top Navigation Bar -->
-    <nav class="bg-white shadow-sm py-1">
-        <div class="max-w-7xl mx-auto px-2">
-            <div class="flex justify-between h-10">
-                <div class="flex">
-                    <!-- Logo -->
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="{% url 'dashboard' %}">
-                            <img class="h-8 w-auto" src="{% static 'img/logo.png' %}" alt="STATZ">
-                        </a>
-                    </div>
-                </div>
-                
-                <!-- Right side menu -->
-                <div class="flex items-center space-x-2">
-                    {% if user.is_authenticated %}
-                    <span class="text-sm text-gray-700">{{ user.username }}</span>
-                    <a href="{% url 'logout' %}" class="text-sm text-gray-700 hover:text-gray-900">Logout</a>
-                    {% else %}
-                    <a href="{% url 'login' %}" class="text-sm text-gray-700 hover:text-gray-900">Login</a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </nav>
 
     <!-- Main Content -->
-    <div class="flex h-[calc(100vh-2.5rem)]">
-        <!-- Sidebar -->
-        <div class="w-48 bg-white shadow-md">
-            {% block sidebar %}{% endblock %}
-        </div>
-
+    <div class="flex h-[calc(100vh-2.5rem)] pt-16">
         <!-- Content Area -->
         <div class="flex-1 overflow-auto">
             {% block content %}{% endblock %}

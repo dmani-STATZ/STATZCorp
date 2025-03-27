@@ -657,4 +657,31 @@ class FolderTrackingForm(forms.ModelForm):
         fields = ['contract']
         widgets = {
             'contract': forms.HiddenInput()
+        }
+
+class IdiqContractForm(forms.ModelForm):
+    class Meta:
+        model = IdiqContract
+        fields = [
+            'contract_number',
+            'buyer',
+            'award_date',
+            'term_length',
+            'option_length',
+            'closed',
+            'tab_num'
+        ]
+        widgets = {
+            'award_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'term_length': forms.NumberInput(attrs={'min': 0}),
+            'option_length': forms.NumberInput(attrs={'min': 0}),
+        }
+
+class IdiqContractDetailsForm(forms.ModelForm):
+    class Meta:
+        model = IdiqContractDetails
+        fields = ['nsn', 'supplier']
+        widgets = {
+            'nsn': forms.Select(attrs={'class': 'select2'}),
+            'supplier': forms.Select(attrs={'class': 'select2'}),
         } 
