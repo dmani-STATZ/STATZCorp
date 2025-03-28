@@ -1,0 +1,91 @@
+<!-- Contract Cancel Modal -->
+<div id="cancelContractModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex justify-between items-center pb-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Cancel Contract</h3>
+                <button onclick="closeCancelModal()" class="text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <span class="text-sm text-gray-700">
+                You are about to cancel contract <span id="cancelContractNumber" class="font-semibold"></span>. Please provide a reason for cancellation, and add any notes you would like to add. This note will be added to the contract history.
+            </span>
+            <form id="cancelContractForm" class="mt-2">
+                {% csrf_token %}
+                <input type="hidden" id="contractId" name="contractId">
+                <div class="mb-4">
+                    <label for="cancelReason" class="block text-sm font-medium text-gray-700">Cancellation Reason</label>
+                    <select id="cancelReason" name="cancelReason" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-1">
+                        <option value="">Select a reason...</option>
+                        {% for reason in cancel_reasons %}
+                            <option value="{{ reason.id }}">{{ reason.description }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="cancelNote" class="block text-sm font-medium text-gray-700">Note (Optional)</label>
+                    <textarea id="cancelNote" name="cancelNote" rows="3"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-1"
+                            placeholder="Enter any additional notes..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeCancelModal()"
+                            class="btn-secondary bg-gray-600 hover:bg-gray-700 px-2 py-1 rounded-md text-white">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="btn-primary bg-red-800 text-white hover:bg-red-400 hover:text-black px-2 py-1 rounded-md">
+                        Confirm Cancellation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Contract cancellation functions
+function showCancelModal(contractId, contractNumber) {
+    document.getElementById('contractId').value = contractId;
+    document.getElementById('cancelContractNumber').textContent = contractNumber;
+    document.getElementById('cancelContractModal').classList.remove('hidden');
+}
+
+function closeCancelModal() {
+    document.getElementById('cancelContractModal').classList.add('hidden');
+    document.getElementById('cancelContractForm').reset();
+}
+
+document.getElementById('cancelContractForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const contractId = formData.get('contractId');
+    
+    fetch(`/contracts/${contractId}/cancel/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error cancelling contract: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while cancelling the contract.');
+    });
+});
+</script>
+{% endblock %} 

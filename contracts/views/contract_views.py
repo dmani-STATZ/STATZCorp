@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
-from django.views.generic import DetailView, UpdateView, CreateView
+from django.views.generic import DetailView, UpdateView, CreateView, TemplateView
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
@@ -16,7 +16,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, SequenceNumber, Clin, Note, ContentType, Nsn, Expedite
+from ..models import Contract, SequenceNumber, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
 
 logger = logging.getLogger(__name__)
@@ -232,13 +232,58 @@ class ContractCancelView(UpdateView):
     form_class = ContractCancelForm
     template_name = 'contracts/contract_cancel_form.html'
     
-    def form_valid(self, form):
-        form.instance.cancelled = True
-        form.instance.cancelled_date = timezone.now()
-        form.instance.cancelled_by = self.request.user
-        form.instance.status = 'Cancelled'
-        messages.success(self.request, 'Contract cancelled successfully.')
-        return super().form_valid(form)
+    def post(self, request, *args, **kwargs):
+        contract = self.get_object()
+        
+        try:
+            # Get the cancellation reason
+            reason_id = request.POST.get('cancelReason')
+            cancel_reason = CanceledReason.objects.get(id=reason_id)
+            
+            # Get the Cancelled status
+            cancelled_status = ContractStatus.objects.get(description='Cancelled')
+            
+            # Update contract
+            contract.cancelled = True
+            contract.date_canceled = timezone.now()
+            contract.cancelled_by = request.user
+            contract.canceled_reason = cancel_reason
+            contract.open = False
+            contract.status = cancelled_status
+            contract.save()
+            
+            # Add note if provided
+            note_text = request.POST.get('cancelNote')
+            if note_text:
+                content_type = ContentType.objects.get_for_model(Contract)
+                Note.objects.create(
+                    content_type=content_type,
+                    object_id=contract.id,
+                    note=f"Contract cancelled - Reason: {cancel_reason.description}\nNote: {note_text}",
+                    created_by=request.user,
+                    modified_by=request.user
+                )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Contract cancelled successfully.'
+            })
+            
+        except CanceledReason.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid cancellation reason.'
+            })
+        except ContractStatus.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not find Cancelled status.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
     
     def get_success_url(self):
         return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
@@ -451,4 +496,14 @@ def mark_contract_reviewed(request, pk):
         messages.success(request, 'Contract marked as reviewed successfully.')
         return redirect('contracts:contract_review', pk=pk)
     
-    return redirect('contracts:contract_detail', pk=pk) 
+    return redirect('contracts:contract_detail', pk=pk)
+
+
+class ContractLifecycleDashboardView(TemplateView):
+    template_name = 'contracts/contract_lifecycle_dashboard.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cancel_reasons'] = CanceledReason.objects.all()
+        # ... rest of the context data ...
+        return context 

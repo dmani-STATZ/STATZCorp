@@ -3,6 +3,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
+import json
 
 from ..models import (
     Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, NsnView
@@ -235,6 +237,52 @@ def get_select_options(request, field_name):
                 'total_count': total_count,
                 'total_pages': (total_count + page_size - 1) // page_size
             }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+@require_http_methods(["POST"])
+def update_clin_field(request, clin_id):
+    """API endpoint to update a single CLIN field"""
+    try:
+        clin = get_object_or_404(Clin, id=clin_id)
+        data = json.loads(request.body)
+        
+        field = data.get('field')
+        value = data.get('value')
+        
+        if field not in ['special_payment_terms', 'special_payment_terms_party', 'planned_split']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid field'
+            }, status=400)
+        
+        if field == 'special_payment_terms':
+            if value:
+                try:
+                    special_payment_terms = SpecialPaymentTerms.objects.get(id=value)
+                    clin.special_payment_terms = special_payment_terms
+                except SpecialPaymentTerms.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid special payment terms'
+                    }, status=400)
+            else:
+                clin.special_payment_terms = None
+        else:
+            setattr(clin, field, value)
+        
+        clin.modified_by = request.user
+        clin.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Successfully updated {field}'
         })
         
     except Exception as e:

@@ -215,6 +215,11 @@
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                                 <div class="flex space-x-2">
+                                    <a href="{% url 'contracts:finance_audit_detail' contract.id %}" class="text-blue-600 hover:text-blue-900" title="Finance Audit">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </a>
                                     <a href="{% url 'contracts:contract_detail' contract.id %}" class="text-blue-600 hover:text-blue-900" title="View">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -234,11 +239,11 @@
                                     </a>
                                     {% endif %}
                                     {% if contract.status.description != 'Cancelled' %}
-                                    <a href="{% url 'contracts:contract_cancel' contract.id %}" class="text-red-600 hover:text-red-900" title="Cancel">
+                                    <button onclick="showCancelModal('{{ contract.id }}', '{{ contract.contract_number }}')" class="text-red-600 hover:text-red-900" title="Cancel">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
-                                    </a>
+                                    </button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -380,6 +385,8 @@
     </div>
 </div>
 
+{% include "contracts/includes/cancel_contract_modal.html" %}
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -438,6 +445,45 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
             searchResults.classList.add('hidden');
         }
+    });
+});
+
+// Contract cancellation functions
+function showCancelModal(contractId, contractNumber) {
+    document.getElementById('contractId').value = contractId;
+    document.getElementById('cancelContractNumber').textContent = contractNumber;
+    document.getElementById('cancelContractModal').classList.remove('hidden');
+}
+
+function closeCancelModal() {
+    document.getElementById('cancelContractModal').classList.add('hidden');
+    document.getElementById('cancelContractForm').reset();
+}
+
+document.getElementById('cancelContractForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const contractId = formData.get('contractId');
+    
+    fetch(`/contracts/${contractId}/cancel/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error cancelling contract: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while cancelling the contract.');
     });
 });
 </script>

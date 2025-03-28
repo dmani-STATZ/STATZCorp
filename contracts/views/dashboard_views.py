@@ -9,7 +9,7 @@ from datetime import timedelta, datetime
 import calendar
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, Reminder
+from ..models import Contract, Clin, Reminder, CanceledReason
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -55,6 +55,7 @@ class ContractLifecycleDashboardView(TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['cancel_reasons'] = CanceledReason.objects.all()
         now = timezone.now()
         
         # Time periods

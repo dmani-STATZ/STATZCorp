@@ -1,0 +1,239 @@
+{% load static %}
+
+<div class="payment-history-modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="paymentHistoryPopup" data-source-page="" data-clin-id="" data-field-type="">
+    <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h3 class="text-lg font-semibold" id="popupTitle">Payment History</h3>
+                <p class="text-sm text-gray-500" id="popupSubtitle"></p>
+                <p class="text-sm font-medium text-blue-600 mt-1" id="currentValue"></p>
+            </div>
+            <button onclick="closePaymentHistoryPopup()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div id="historyContent" class="mb-4 max-h-96 overflow-y-auto">
+            <!-- History entries will be populated here -->
+        </div>
+        <form id="newHistoryForm" class="space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="payment_amount" class="block text-sm font-medium text-gray-700">Amount</label>
+                    <input type="number" id="payment_amount" name="payment_amount" step="0.01" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           required>
+                </div>
+                <div>
+                    <label for="payment_date" class="block text-sm font-medium text-gray-700">Date</label>
+                    <input type="date" id="payment_date" name="payment_date" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           required>
+                </div>
+            </div>
+            <div>
+                <label for="payment_info" class="block text-sm font-medium text-gray-700">Additional Information</label>
+                <textarea id="payment_info" name="payment_info" rows="3" 
+                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closePaymentHistoryPopup()" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    Save Entry
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPaymentHistoryPopup(clinId, fieldType, sourcePage, currentValue) {
+    const popup = document.getElementById('paymentHistoryPopup');
+    popup.dataset.clinId = clinId;
+    popup.dataset.fieldType = fieldType;
+    popup.dataset.sourcePage = sourcePage;
+    
+    // Update popup title and current value
+    document.getElementById('popupTitle').textContent = `Payment History - ${formatFieldType(fieldType)}`;
+    document.getElementById('popupSubtitle').textContent = `CLIN ID: ${clinId}`;
+    
+    // Handle the current value display with proper formatting
+    const formattedValue = currentValue ? formatCurrency(currentValue) : 'Not Available';
+    document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
+    
+    loadPaymentHistory(clinId, fieldType);
+    popup.classList.remove('hidden');
+}
+
+function closePaymentHistoryPopup() {
+    const popup = document.getElementById('paymentHistoryPopup');
+    popup.classList.add('hidden');
+    document.getElementById('newHistoryForm').reset();
+}
+
+function loadPaymentHistory(clinId, fieldType) {
+    fetch(`/contracts/api/payment-history/${clinId}/${fieldType}/`)
+        .then(response => response.json())
+        .then(data => {
+            const historyContent = document.getElementById('historyContent');
+            if (data.history && data.history.length > 0) {
+                let html = `
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <colgroup>
+                                <col class="w-1/4">
+                                <col class="w-1/4">
+                                <col class="w-2/4">
+                            </colgroup>
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                `;
+
+                data.history.forEach(entry => {
+                    html += `
+                        <tr>
+                            <td class="px-4 py-2 text-sm text-gray-900">${formatDate(entry.payment_date)}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900">${formatCurrency(entry.payment_amount)}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">${entry.payment_info || '-'}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                            <tfoot class="bg-gray-50">
+                                <tr>
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">Total</td>
+                                    <td class="px-4 py-2 text-sm text-right font-medium text-gray-900">${formatCurrency(data.total)}</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                `;
+                historyContent.innerHTML = html;
+            } else {
+                historyContent.innerHTML = '<p class="text-gray-500 text-center">No payment history found</p>';
+            }
+        });
+}
+
+function formatFieldType(type) {
+    return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function formatCurrency(amount) {
+    // Handle invalid, null, undefined, or 'NaN' values
+    if (amount === null || amount === undefined || amount === '' || amount === 'NaN') {
+        return 'Not Available';
+    }
+    
+    // If amount is a string, remove any commas and then parse
+    const cleanAmount = typeof amount === 'string' 
+        ? amount.replace(/,/g, '').trim()
+        : amount;
+    
+    // Try to convert to number
+    const numericAmount = typeof cleanAmount === 'string' 
+        ? parseFloat(cleanAmount) 
+        : cleanAmount;
+    
+    // Check if the conversion resulted in a valid number
+    if (isNaN(numericAmount)) {
+        return 'Not Available';
+    }
+    
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(numericAmount);
+}
+
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('en-US');
+}
+
+// Initialize form submission handler
+document.addEventListener('DOMContentLoaded', function() {
+    const historyForm = document.getElementById('newHistoryForm');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    historyForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const popup = document.getElementById('paymentHistoryPopup');
+        const formData = new FormData(historyForm);
+        const clinId = popup.dataset.clinId;
+        const fieldType = popup.dataset.fieldType;
+        const sourcePage = popup.dataset.sourcePage;
+
+        try {
+            // Create the data object with proper formatting
+            const data = {
+                payment_amount: parseFloat(formData.get('payment_amount')),
+                payment_date: formData.get('payment_date'),
+                payment_info: formData.get('payment_info') || '',
+                payment_type: fieldType
+            };
+
+            const response = await fetch(`/contracts/api/payment-history/${clinId}/${fieldType}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to save payment history');
+            }
+
+            const responseData = await response.json();
+            
+            if (responseData.success) {
+                // Update the main table cell if we're on the finance audit page
+                if (sourcePage === 'finance_audit') {
+                    const cell = document.querySelector(`[data-clin="${clinId}"][data-type="${fieldType}"]`);
+                    if (cell) {
+                        const newTotal = responseData.new_total;
+                        cell.textContent = formatCurrency(newTotal);
+                        cell.dataset.value = newTotal;
+                    }
+                }
+                
+                // Reset form and reload history
+                historyForm.reset();
+                loadPaymentHistory(clinId, fieldType);
+                
+                // Update current value display
+                const currentValueElement = document.getElementById('currentValue');
+                if (currentValueElement) {
+                    currentValueElement.textContent = `Current Value: ${formatCurrency(responseData.new_total)}`;
+                }
+            } else {
+                throw new Error(responseData.error || 'Failed to save payment history');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to save payment history: ' + error.message);
+        }
+    });
+});
+</script> 

@@ -101,8 +101,8 @@ from .folder_tracking_views import (
     close_folder_tracking,
     toggle_highlight,
     export_folder_tracking,
-    search_contracts,
     update_folder_field,
+    search_contracts
 )
 
 from .idiq_views import (
@@ -110,7 +110,17 @@ from .idiq_views import (
     IdiqContractUpdateView,
     IdiqContractDetailsCreateView,
     IdiqContractDetailsDeleteView,
+)
 
+from .finance_views import (
+    FinanceAuditView,
+    PaymentHistoryView,
+    payment_history_api,
+)
+
+from .api_views import (
+    get_select_options,
+    update_clin_field,
 )
 
 __all__ = [
@@ -119,7 +129,10 @@ __all__ = [
     'close_folder_tracking',
     'toggle_highlight',
     'export_folder_tracking',
-    
+    'update_folder_field',
+    'search_contracts',
+    'FinanceAuditView',
+    'PaymentHistoryView',
 
 ]
 

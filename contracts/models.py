@@ -6,6 +6,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -111,7 +113,7 @@ class Clin(AuditModel):
     item_number = models.CharField(max_length=20, null=True, blank=True) # This is the Item Number of the CLIN 0001, 0002, etc.
     item_type = models.CharField(max_length=20, null=True, blank=True, choices=ITEM_TYPE_CHOICES) # This is the Type of CLIN (Production, GFAT, CFAT, PLT)  
     item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # This is the Value in $ for the CLIN
-    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # This is the Unit Price in $ for the CLIN
+    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # This is the Unit Price in $ for the CLIN Data maps to PPP_Cont
     po_num_ext = models.CharField(max_length=5, null=True, blank=True) # What do we use this for?
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     clin_po_num = models.CharField(max_length=10, null=True, blank=True) # What do we use this for?
@@ -135,7 +137,7 @@ class Clin(AuditModel):
     # CLIN_Finance
     special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True) # Moved to Contract
     special_payment_terms_paid = models.BooleanField(null=True, blank=True) # Moved to Contract
-    price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # data maps to PPP_Sup
     quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True) # Possible name change to quote_value? this is being populated with contract value
     paid_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     paid_date = models.DateTimeField(null=True, blank=True)
@@ -181,15 +183,34 @@ class Clin(AuditModel):
 
 
 class PaymentHistory(models.Model):
-    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-    payment_type = models.CharField(max_length=50, null=True, blank=True) #this will be (SubPaid, SubPO,Contract,PlanGross,WAWFPayment,PaidSTATZ,PaidPPI,Interest)
-    payment_amount = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    payment_date = models.DateTimeField(null=True, blank=True)
-    payment_info = models.CharField(max_length=255, null=True, blank=True)
+    PAYMENT_TYPE_CHOICES = [
+        ('item_value', 'Item Value'),  # SubPO
+        ('quote_value', 'Quote Value'), # 2
+        ('paid_amount', 'Paid Amount'), # SubPaid
+        ('contract_value', 'Contract Value'), # Contract
+        ('wawf_payment', 'WAWF Payment'), # WAWFPayment
+        ('plan_gross', 'Plan Gross'), # PlanGross
+        ('statz_split_paid', 'STATZ Split Paid'), # PaidPPI
+        ('ppi_split_paid', 'PPI Split Paid'), # PaidSTATZ
+        ('special_payment_terms_interest', 'Special Payment Terms Interest'), # Interest
+    ]
+
+    clin = models.ForeignKey(Clin, on_delete=models.CASCADE, related_name='payment_history')
+    payment_type = models.CharField(max_length=50, choices=PAYMENT_TYPE_CHOICES)
+    payment_amount = models.DecimalField(max_digits=15, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
+    payment_date = models.DateField()
+    payment_info = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_history_created_by')
-    created_on = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_history_updated_by')
 
+    def __str__(self):
+        return f"{self.clin} - {self.payment_type} - {self.payment_amount}"
 
+    class Meta:
+        ordering = ['-payment_date', '-created_at']
+        verbose_name_plural = 'Payment histories'
 
 class IdiqContract(AuditModel):
     contract_number = models.CharField(max_length=50, null=True, blank=True)

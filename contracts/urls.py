@@ -1,6 +1,12 @@
-from django.urls import path
+from django.urls import path, re_path
 from django.views.generic import TemplateView
 from users.views import test_app_name
+from . import views
+from .views.finance_views import (
+    FinanceAuditView,
+    PaymentHistoryView,
+    payment_history_api
+)
 
 # Import views from the modular structure
 from .views import (
@@ -98,7 +104,7 @@ from .views import (
 )
 
 from .views.contract_views import check_contract_number
-from .views.api_views import get_select_options
+from .views.api_views import get_select_options, update_clin_field
 from .views.idiq_views import (
     IdiqContractDetailView,
     IdiqContractUpdateView,
@@ -225,4 +231,18 @@ urlpatterns = [
     path('idiq/<int:pk>/details/<int:detail_id>/delete/', IdiqContractDetailsDeleteView.as_view(), name='idiq_contract_detail_delete'),
     path('nsn/search/', NsnSearchView.as_view(), name='nsn_search'),
     path('supplier/search/', SupplierSearchView.as_view(), name='supplier_search'),
+
+    # Finance Audit URLs
+    path('finance-audit/', FinanceAuditView.as_view(), name='finance_audit'),
+    path('finance-audit/<int:pk>/', FinanceAuditView.as_view(), name='finance_audit_detail'),
+    
+    # Payment History API
+    path('api/payment-history/<int:clin_id>/<str:payment_type>/', 
+         payment_history_api, 
+         name='payment_history_api'),
+         
+    # CLIN Field Update API
+    path('api/clin/<int:clin_id>/update-field/', 
+         update_clin_field, 
+         name='update_clin_field'),
 ] 

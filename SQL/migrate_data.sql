@@ -26,6 +26,8 @@ END
 	DBCC CHECKIDENT ('contracts_acknowledgementletter', RESEED, 0);
 	DELETE FROM contracts_clinacknowledgment;
 	DBCC CHECKIDENT ('contracts_clinacknowledgment', RESEED, 0);
+    DELETE FROM contracts_paymenthistory;
+    DBCC CHECKIDENT ('contracts_paymenthistory', RESEED, 0);
 
 
 	-- Second Level
@@ -905,11 +907,17 @@ BEGIN TRY
         special_payment_terms_paid,
         price_per_unit,
         quote_value,
+        plan_gross,
         paid_amount,
         paid_date,
         wawf_payment,
         wawf_recieved,
         wawf_invoice,
+        ppi_split_paid,
+        statz_split_paid,
+        planned_split,
+        ppi_split,
+        statz_split,
         created_by_id,
         created_on,
         modified_by_id,
@@ -920,7 +928,7 @@ BEGIN TRY
         sc.Contract_ID,
         sc.[Sub-Contract], -- item_number maps to Sub-Contract
         sc.Type_ID,
-        sc.SubPODol, -- item_value maps to SubPODol
+        sc.ContractDol, -- item_value maps to SubPODol
         sc.PPP_Cont, -- unit_price maps to PPP_Cont
         sc.PONumExt,
         sc.TabNum,
@@ -942,12 +950,18 @@ BEGIN TRY
         CASE WHEN sc.SPT = 1 THEN (SELECT id FROM contracts_specialpaymentterms WHERE code = sc.SPT_Type) ELSE NULL END,
         sc.SPT_Paid,
         sc.PPP_Sup,
-        sc.ContractDol,
+        sc.SubPODol,
+        sc.PlanGrossDol,
         sc.SubPaidDol,
         sc.SubPaidDate,
         sc.WAWFPaymentDol,
         sc.DatePayRecv,
         sc.WAWFInvoice,
+        sc.ActualPaidPPIDol,
+        sc.ActualSTATZDol,
+        sc.PlanSplit_per_PPIbid,
+        sc.PPISplitDol,
+        sc.STATZSplitDol,
         ISNULL(um_created.user_id, 1) AS created_by_id,
         ISNULL(sc.CreatedOn, SYSDATETIME()) AS created_on,
         ISNULL(um_modified.user_id, 1) AS modified_by_id,
@@ -973,6 +987,86 @@ BEGIN CATCH
     -- print 'Error migrating CLINs: ' + @ErrorMessage;
 END CATCH;
 GO
+
+
+-- Update CLIN ITEM Type
+UPDATE [dbo].[contracts_clin]
+SET [item_type] = CASE
+    WHEN [item_type] IN (1, 2, 15, 24, 29) THEN 'P'
+    WHEN [item_type] = 17 THEN 'G'
+    WHEN [item_type] = 7 THEN 'C'
+    WHEN [item_type] IN (20, 27, 28, 18, 19) THEN 'L'
+    WHEN [item_type] IN (25, 26, 30, 31, 32, 14) THEN 'M'
+    ELSE [item_type] -- Keeps the original value if no condition is met
+END
+
+
+
+
+
+
+-- Pay History migration
+-- Still need to convert the payment type to the new data.
+print ('##########################################')
+print 'Pay History migration'
+print ('##########################################')
+INSERT INTO [dbo].[contracts_paymenthistory]
+           ([payment_type]
+           ,[payment_amount]
+           ,[payment_date]
+           ,[payment_info]
+           ,[clin_id]
+           ,[created_at]
+           ,[updated_at]
+           ,[created_by_id]
+           ,[updated_by_id])
+SELECT case when [PaymentType] = 'SubPO' then 'quote_value'
+        when [PaymentType] = 'SubPaid' then 'paid_amount' 
+        when [PaymentType] = 'Contract' then 'contract_value' 
+        when [PaymentType] = 'WAWFPayment' then 'wawf_payment' 
+        when [PaymentType] = 'PlanGross' then 'plan_gross' 
+        when [PaymentType] = 'PaidPPI' then 'statz_split_paid' 
+        when [PaymentType] = 'PaidSTATZ' then 'ppi_split_paid'
+        when [PaymentType] = 'Interest' then 'special_payment_terms_interest' 
+        else null end as [payment_type]
+      ,[PaymentAmount]
+      ,[PaymentDate]
+      ,[PaymentInfo]
+	  ,[SubContract_ID]
+	  ,ISNULL(ph.CreatedOn, SYSDATETIME()) AS created_at
+	  ,ISNULL(ph.CreatedOn, SYSDATETIME()) AS updated_at
+      ,ISNULL(um_created.user_id, 1) AS created_by_id
+      ,ISNULL(um_created.user_id, 1) AS updated_by_id
+FROM [ContractLog].[dbo].[STATZ_PAY_HIST_TBL] ph
+JOIN contracts_clin c ON ph.[SubContract_ID] = c.id
+LEFT JOIN #UserMapping um_created ON ph.CreatedBy = um_created.username
+WHERE ph.[PaymentType] in ('SubPO', 'SubPaid', 'Contract', 'WAWFPayment', 'PlanGross', 'PaidPPI', 'PaidSTATZ', 'Interest');
+
+
+-- Add Quote Value to Payment History
+INSERT INTO [dbo].[contracts_paymenthistory]
+           ([payment_type]
+           ,[payment_amount]
+           ,[payment_date]
+           ,[payment_info]
+           ,[clin_id]
+           ,[created_at]
+           ,[updated_at]
+           ,[created_by_id]
+           ,[updated_by_id])
+SELECT 'item_value' as [payment_type]
+      ,isnull(sc.ContractDol,0.00) as ContractDol
+      ,c.[Award Date]
+      ,'migrated data'
+	  ,sc.[ID]
+	  ,ISNULL(sc.CreatedOn, SYSDATETIME()) AS created_at
+	  ,ISNULL(sc.CreatedOn, SYSDATETIME()) AS updated_at
+      ,1 AS created_by_id
+      ,1 AS updated_by_id
+FROM [ContractLog].[dbo].[STATZ_SUB_CONTRACTS_TBL] sc
+INNER JOIN [ContractLog].[dbo].[STATZ_CONTRACTS_TBL] c ON sc.Contract_ID = c.ID;
+
+
 
 -- Note migration
 print ('##########################################')

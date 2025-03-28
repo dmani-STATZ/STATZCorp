@@ -8,6 +8,14 @@ from .views.folder_tracking_views import (
     search_contracts
 )
 
+from .views.finance_views import (
+    finance_audit,
+    api_search_contracts,
+    api_get_contract,
+    api_payment_history,
+    contract_search_results,
+)
+
 # Export all views
 __all__ = [
     'folder_tracking',
@@ -16,5 +24,9 @@ __all__ = [
     'toggle_highlight',
     'export_folder_tracking',
     'update_folder_field',
-    'search_contracts'
+    'search_contracts',
+    'finance_audit',
+    'api_search_contracts',
+    'api_get_contract',
+    'api_payment_history',
 ]

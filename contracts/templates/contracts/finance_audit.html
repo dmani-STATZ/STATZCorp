@@ -1,0 +1,470 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Finance Audit{% endblock %}
+
+{% block content %}
+<div class="w-full px-4 py-4">
+    <div class="flex flex-col items-center mb-6">
+        <!-- Search Section with inline styling to override any other styles -->
+        <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); padding: 1rem; margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
+            <input type="text" 
+                   id="contract-search" 
+                   style="width: 100%; height: 50px; padding: 0.75rem 1rem; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); outline: none;"
+                   placeholder="Search for Contract"
+                   autocomplete="off"
+                   value="{{ search_query }}">
+            <div id="search-results" 
+                 class="absolute z-50 w-full bg-white mt-1 rounded-md shadow-xl border border-gray-200 max-h-96 overflow-y-auto hidden">
+            </div>
+        </div>
+        
+        {% if messages %}
+        <div class="mb-4 w-[960px] max-w-full">
+            {% for message in messages %}
+            <div class="p-4 rounded-md {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if contract %}
+        <!-- Contract Details Section - 50% width (960px) -->
+        <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
+            <!-- Contract Header -->
+            <div class="bg-green-100 px-4 py-2 flex justify-between items-center border-b border-green-200">
+                <h2 class="text-lg font-semibold text-gray-800">Contract {{ contract.contract_number }}</h2>
+                <a href="{% url 'contracts:contracts_dashboard' %}" 
+                class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                 </svg>
+                 Back to Dashboard
+                </a>
+            </div>
+            
+            <!-- Contract Info -->
+            <div class="p-4 space-y-2 bg-white">
+                <div class="grid grid-cols-2 gap-x-8 text-sm">
+                    <div class="flex">
+                        <span class="font-medium w-32">Tab #</span>
+                        <span>{{ contract.tab_num|default:"-" }}</span>
+                    </div>
+                    <div class="flex">
+                        <span class="font-medium w-32">PO #</span>
+                        <span>{{ contract.po_number|default:"-" }}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-8 text-sm">
+                    <div class="flex">
+                        <span class="font-medium w-32">Buyer</span>
+                        <span>{{ contract.buyer }}</span>
+                    </div>
+                    <div class="flex">
+                        <span class="font-medium w-32">Contract Type</span>
+                        <span>{{ contract.contract_type }}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-8 text-sm">
+                    <div class="flex">
+                        <span class="font-medium w-32">Award Date</span>
+                        <span>{{ contract.award_date|date:"m/d/Y" }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <div class="flex">
+                            <span class="font-medium w-32">Due Date</span>
+                            <span>{{ contract.due_date|date:"m/d/Y" }}</span>
+                        </div>
+                        <div class="flex">
+                            <span class="font-medium mr-2">Contract Value:</span>
+                            <span>${{ contract.contract_value|floatformat:2|intcomma }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIN Table Section - 95% width -->
+    <div class="flex justify-center w-full">
+        <div class="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 w-[95%]">
+            <div class="overflow-x-auto relative">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Item #</span>
+                                    <div class="tooltip-text">
+                                        Item # From contract
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Item Type</span>
+                                    <div class="tooltip-text">
+                                        Item Type From contract
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Supplier</span>
+                                    <div class="tooltip-text">
+                                        Supplier
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Due Date</span>
+                                    <div class="tooltip-text">
+                                        Due Date for this clin
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Supplier Due Date</span>
+                                    <div class="tooltip-text">
+                                        Due Date the supplier quotedfor this clin
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Order Qty</span>
+                                    <div class="tooltip-text">
+                                        The amount we ordered for this clin
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Ship Qty</span>
+                                    <div class="tooltip-text">
+                                        The amount we've shipped for this clin
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Item Value</span>
+                                    <div class="tooltip-text">
+                                        Previously SubPO Value, Item Value from the contract
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Quote Value</span>
+                                    <div class="tooltip-text">
+                                        The amount the supplier quoted for this item
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Paid</span>
+                                    <div class="tooltip-text">
+                                        Previously SubPaid, The amount we've paid out for this item so far
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>WAWF Pay</span>
+                                    <div class="tooltip-text">
+                                        The amount we've been paid for this item form WAWF or the pay source
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Plan Gross</span>
+                                    <div class="tooltip-text">
+                                        The amount we plan to make for this item
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Terms</span>
+                                    <div class="tooltip-text">
+                                        The terms we've negotiated with this supplier
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Terms Int</span>
+                                    <div class="tooltip-text tooltip-text-right">
+                                        The amount of interest we've paid on the terms
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Terms Party</span>
+                                    <div class="tooltip-text tooltip-text-right">
+                                        The party that has paid the terms
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Paid PPI</span>
+                                    <div class="tooltip-text tooltip-text-right">
+                                        The amount we've paid paid PPI
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Paid STATZ</span>
+                                    <div class="tooltip-text tooltip-text-right">
+                                        The amount we've paid paid STATZ
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div class="tooltip-container">
+                                    <span>Split Per Bid</span>
+                                    <div class="tooltip-text tooltip-text-right">
+                                        The split we've negotiated for this item
+                                    </div>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for clin in clins %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.item_number }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.get_item_type_display }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.supplier.name }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.due_date|date:"m/d/Y" }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.supplier_due_date|date:"m/d/Y" }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.order_qty }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.ship_qty }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="item_value" data-value="{{ clin.item_value|floatformat:2|intcomma|default:"0.00" }}">${{ clin.item_value|floatformat:2|intcomma|default:"0.00" }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}">${{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}">${{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="wawf_payment" data-value="{{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}">${{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="plan_gross" data-value="{{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}">${{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}</td>
+                            <td class="px-4 py-2 text-sm text-left">
+                                <div class="relative inline-block">
+                                    <select class="w-30 appearance-none rounded border-gray-300 pr-8 pl-2 py-1 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                            data-clin="{{ clin.id }}" 
+                                            data-field="special_payment_terms">
+                                        {% for term in payment_terms %}
+                                        <option value="{{ term.id }}" 
+                                                {% if clin.special_payment_terms.id == term.id or not clin.special_payment_terms and term.id == net_terms_id %}selected{% endif %}>
+                                            {{ term.terms }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="special_payment_terms_interest" data-value="{{ clin.special_payment_terms_interest|floatformat:2|default:"0.00" }}">${{ clin.special_payment_terms_interest|floatformat:2|default:"0.00"|intcomma }}</td>
+                            <td class="px-4 py-2 text-sm">
+                                <input type="text" 
+                                       class="w-24 rounded border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                       value="{{ clin.special_payment_terms_party|default:'PPI' }}"
+                                       data-clin="{{ clin.id }}" 
+                                       data-field="special_payment_terms_party">
+                            </td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="ppi_split_paid" data-value="{{ clin.ppi_split_paid|floatformat:2|default:"0.00" }}">${{ clin.ppi_split_paid|floatformat:2|default:"0.00"|intcomma }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="statz_split_paid" data-value="{{ clin.statz_split_paid|floatformat:2|default:"0.00" }}">${{ clin.statz_split_paid|floatformat:2|default:"0.00"|intcomma }}</td>
+                            <td class="px-4 py-2 text-sm text-left">
+                                <input type="text" 
+                                       class="w-24 rounded border-gray-300 text-sm text-center focus:border-blue-500 focus:ring-blue-500"
+                                       value="{{ clin.planned_split|default:'50/50' }}"
+                                       data-clin="{{ clin.id }}" 
+                                       data-field="planned_split">
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="15" class="px-4 py-8 text-center text-gray-500">
+                                No CLINs found for this contract
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-4 rounded-lg shadow-xl">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-2 text-gray-600">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Include Payment History Popup -->
+    {% include 'contracts/includes/payment_history_popup.html' %}
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('contract-search');
+    const searchResults = document.getElementById('search-results');
+    let debounceTimer;
+
+    // Add click handlers for monetary fields
+    document.querySelectorAll('[data-type]').forEach(cell => {
+        cell.addEventListener('click', function() {
+            const clinId = this.dataset.clin;
+            const fieldType = this.dataset.type;
+            const currentValue = this.dataset.value || '0.00';
+            openPaymentHistoryPopup(clinId, fieldType, 'finance_audit', currentValue);
+        });
+    });
+
+    // Handle special payment terms changes
+    document.querySelectorAll('select[data-field="special_payment_terms"]').forEach(select => {
+        select.addEventListener('change', function() {
+            const clinId = this.dataset.clin;
+            const value = this.value;
+            updateClinField(clinId, 'special_payment_terms', value);
+        });
+    });
+
+    // Handle special payment terms party changes
+    document.querySelectorAll('input[data-field="special_payment_terms_party"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const clinId = this.dataset.clin;
+            const value = this.value;
+            updateClinField(clinId, 'special_payment_terms_party', value);
+        });
+    });
+
+    // Handle planned split changes
+    document.querySelectorAll('input[data-field="planned_split"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const clinId = this.dataset.clin;
+            const value = this.value;
+            updateClinField(clinId, 'planned_split', value);
+        });
+    });
+
+    // Function to update CLIN fields
+    function updateClinField(clinId, field, value) {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        loadingOverlay.classList.remove('hidden');
+
+        fetch(`/contracts/api/clin/${clinId}/update-field/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                field: field,
+                value: value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const messages = document.querySelector('.messages');
+                if (messages) {
+                    const message = document.createElement('div');
+                    message.className = 'p-4 rounded-md bg-green-100 text-green-700 mb-4';
+                    message.textContent = data.message;
+                    messages.appendChild(message);
+                    setTimeout(() => message.remove(), 3000);
+                }
+            } else {
+                throw new Error(data.error || 'Failed to update field');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update field: ' + error.message);
+        })
+        .finally(() => {
+            loadingOverlay.classList.add('hidden');
+        });
+    }
+
+    // Function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Search functionality
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const query = this.value;
+        
+        if (query.length < 3) {
+            searchResults.classList.add('hidden');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/contracts/search/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    searchResults.innerHTML = '';
+                    const results = data.results || data;
+                    
+                    if (results.length > 0) {
+                        results.forEach(contract => {
+                            const div = document.createElement('div');
+                            div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                            
+                            let html = `
+                                <a href="/contracts/finance-audit/${contract.id}/" class="block">
+                                    <div class="text-sm text-blue-600">${contract.contract_number}</div>
+                            `;
+                            
+                            if (contract.po_numbers && contract.po_numbers.length > 0) {
+                                html += `<div class="text-xs text-gray-500 mt-1">PO: ${contract.po_numbers.join(', ')}</div>`;
+                            }
+                            
+                            html += `</a>`;
+                            div.innerHTML = html;
+                            
+                            searchResults.appendChild(div);
+                        });
+                        searchResults.classList.remove('hidden');
+                    } else {
+                        searchResults.classList.add('hidden');
+                    }
+                });
+        }, 300);
+    });
+
+    // Hide search results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %} 
