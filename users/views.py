@@ -6,10 +6,13 @@ from django.dispatch import receiver
 from STATZWeb.decorators import login_required
 from django.http import JsonResponse
 from django.contrib.auth.decorators import user_passes_test
-from .models import AppPermission
+from .models import AppPermission, UserSetting, UserSettingState
 from django.contrib.auth.models import User
 from django.urls import resolve
 import logging
+from django.views.decorators.http import require_http_methods
+import json
+from .user_settings import UserSettings
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +92,33 @@ def test_app_name(request):
         'view_name': view_name,
         'path': request.path_info,
     })
+
+@login_required
+def save_user_setting(request):
+    """Handle saving user settings via AJAX"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'})
+    
+    try:
+        data = json.loads(request.body)
+        setting_type = data.get('setting_type')
+        value = data.get('value')
+        
+        if not setting_type or value is None:
+            return JsonResponse({'success': False, 'error': 'Missing required fields'})
+        
+        success = UserSettings.save_setting(
+            user=request.user,
+            name=setting_type,
+            value=value
+        )
+        
+        return JsonResponse({
+            'success': success,
+            'message': 'Setting saved successfully' if success else 'Failed to save setting'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

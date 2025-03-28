@@ -573,6 +573,109 @@ class ClinAcknowledgmentForm(forms.ModelForm):
             }),
         }
 
+class AcknowledgementLetterForm(forms.ModelForm):
+    class Meta:
+        model = AcknowledgementLetter
+        fields = [
+            'letter_date',
+            'salutation',
+            'addr_fname',
+            'addr_lname',
+            'supplier',
+            'st_address',
+            'city',
+            'state',
+            'zip',
+            'po',
+            'po_ext',
+            'contract_num',
+            'statz_contact',
+            'statz_contact_title',
+            'statz_contact_phone',
+            'statz_contact_email',
+            'fat_plt_due_date',
+            'supplier_due_date',
+            'dpas_priority',
+        ]
+        widgets = {
+            'letter_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'salutation': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Salutation'
+            }),
+            'addr_fname': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter First Name'
+            }),
+            'addr_lname': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Last Name'
+            }),
+            'supplier': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Supplier'
+            }),
+            'st_address': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Street Address'
+            }),
+            'city': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter City'
+            }),
+            'state': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter State'
+            }),
+            'zip': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter ZIP Code'
+            }),
+            'po': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Number'
+            }),
+            'po_ext': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter PO Extension'
+            }),
+            'contract_num': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Contract Number'
+            }),
+            'statz_contact': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Contact'
+            }),
+            'statz_contact_title': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Contact Title'
+            }),
+            'statz_contact_phone': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Contact Phone'
+            }),
+            'statz_contact_email': forms.EmailInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter STATZ Contact Email'
+            }),
+            'fat_plt_due_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'supplier_due_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'dpas_priority': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter DPAS Priority'
+            }),
+        }
+
 class AddressForm(forms.ModelForm):
     class Meta:
         model = Address

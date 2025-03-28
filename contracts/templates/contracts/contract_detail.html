@@ -14,8 +14,19 @@
             <div class="space-y-3">
                 <div class="flex items-center justify-between py-1 border-b">
                     <span class="text-sm text-gray-700 w-1/3">PO Acknowledge Letter</span>
-                    <span class="text-xs text-gray-500 w-1/3 text-center">Coming Soon</span>
-                    <span class="text-xs text-gray-500 w-1/3 text-right"></span>
+                    <div class="text-center w-1/3">
+                        <button 
+                            onclick="openAcknowledgmentLetter('{{ selected_clin.id }}')"
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if not selected_clin %}bg-gray-300 text-gray-500{% else %}bg-blue-500 text-white hover:bg-blue-600{% endif %}">
+                            {% if acknowledgment_letter %}Edit{% else %}Create{% endif %}
+                        </button>
+                    </div>
+                    <span class="text-xs text-gray-500 w-1/3 text-right">
+                        {% if acknowledgment_letter %}
+                            Last updated: {{ acknowledgment_letter.modified_on|date:"m/d/Y H:i A" }}
+                        {% endif %}
+                    </span>
                 </div>
                 
                 <!-- PO Sent to Sup -->
@@ -496,12 +507,29 @@
 
 {% include "contracts/includes/cancel_contract_modal.html" %}
 
+<!-- Acknowledgment Letter Modal -->
+<div id="acknowledgmentLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
+    <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 550px !important; max-width: 550px !important;">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-xl font-semibold">Purchase Order Acknowledge Letter</h3>
+            <button onclick="closeAcknowledgmentLetter()" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="acknowledgmentLetterContent" class="mt-4">
+            <!-- Form will be loaded here -->
+        </div>
+    </div>
+</div>
+
 <style>
     .selected-row {
         outline: 3px solid #39ff14;  /* Neon green color */
         outline-offset: -3px;
         position: relative;
-        z-index: 10;
+        z-index: 1 !important;  /* Force lower z-index */
     }
 
     /* Custom styling for note containers */
@@ -532,6 +560,29 @@
     
     .clin-note {
         border-left-color: #3B82F6 !important; /* Blue */
+    }
+
+    /* Ensure modal appears above everything */
+    #acknowledgmentLetterModal {
+        z-index: 99999 !important;
+    }
+
+    /* Ensure form inputs in modal appear above CLIN highlight */
+    #acknowledgmentLetterModal input,
+    #acknowledgmentLetterModal select,
+    #acknowledgmentLetterModal button {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Modal content styling */
+    #acknowledgmentLetterContent input,
+    #acknowledgmentLetterContent select {
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
     }
 </style>
 {% endblock %}
@@ -1226,5 +1277,114 @@ document.addEventListener('click', function(event) {
         menu.classList.add('hidden');
     }
 });
+
+function openAcknowledgmentLetter(clinId) {
+    console.log('Opening acknowledgment letter for CLIN:', clinId);
+    
+    // Get the modal and content elements
+    const modal = document.getElementById('acknowledgmentLetterModal');
+    const modalContent = document.getElementById('acknowledgmentLetterContent');
+    
+    // Show loading state
+    modalContent.innerHTML = '<div class="flex justify-center items-center h-64"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
+    
+    // Show the modal
+    modal.classList.remove('hidden');
+    
+    // Fetch the form
+    const url = `/contracts/acknowledgment-letter/${clinId}/`;
+    console.log('Fetching from URL:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received data:', data);
+            if (data.success) {
+                modalContent.innerHTML = data.html;
+                
+                // Initialize form after content is loaded
+                const form = modalContent.querySelector('form');
+                if (form) {
+                    // Style all form inputs
+                    form.querySelectorAll('input, select').forEach(input => {
+                        input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
+                    });
+                    
+                    // Set up form submission
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        const formData = new FormData(form);
+                        const letterId = form.dataset.letterId;
+                        
+                        fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        })
+                        .then(response => response.json())
+                        .then(result => {
+                            if (result.success) {
+                                // Close modal and refresh page
+                                closeAcknowledgmentLetter();
+                                location.reload();
+                            } else {
+                                // Show errors
+                                const errors = result.errors;
+                                Object.keys(errors).forEach(field => {
+                                    const input = form.querySelector(`[name="${field}"]`);
+                                    if (input) {
+                                        input.classList.add('border-red-500');
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.className = 'text-red-500 text-sm mt-1';
+                                        errorDiv.textContent = errors[field].join(' ');
+                                        input.parentNode.appendChild(errorDiv);
+                                    }
+                                });
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while saving the form');
+                        });
+                    });
+                }
+            } else {
+                modalContent.innerHTML = '<div class="p-4 text-red-500">Error loading form</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            modalContent.innerHTML = '<div class="p-4 text-red-500">Error loading form</div>';
+        });
+}
+
+function closeAcknowledgmentLetter() {
+    const modal = document.getElementById('acknowledgmentLetterModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Helper function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock %}

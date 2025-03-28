@@ -8,6 +8,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+from django.conf import settings
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -367,30 +368,48 @@ class Note(AuditModel):
     
 
 
-class AcknowledgementLetter(AuditModel):
-    clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
-    letter_date = models.DateTimeField(null=True, blank=True)
-    salutation = models.TextField(null=True, blank=True)
-    addr_fname = models.TextField(null=True, blank=True)
-    addr_lname = models.TextField(null=True, blank=True)
-    supplier = models.TextField(null=True, blank=True)
-    st_address = models.TextField(null=True, blank=True)
-    city = models.TextField(null=True, blank=True)
-    state = models.TextField(null=True, blank=True)
+class AcknowledgementLetter(models.Model):
+    SALUTATION_CHOICES = [
+        ('Mr.', 'Mr.'),
+        ('Mrs.', 'Mrs.'),
+        ('Ms.', 'Ms.'),
+        ('Dr.', 'Dr.'),
+        ('Prof.', 'Prof.'),
+        ('', 'None'),
+    ]
+
+    clin = models.ForeignKey('Clin', on_delete=models.CASCADE)
+    letter_date = models.DateField(null=True, blank=True)
+    salutation = models.CharField(max_length=10, choices=SALUTATION_CHOICES, null=True, blank=True)
+    addr_fname = models.CharField(max_length=50, null=True, blank=True)
+    addr_lname = models.CharField(max_length=50, null=True, blank=True)
+    supplier = models.CharField(max_length=100, null=True, blank=True)
+    st_address = models.CharField(max_length=100, null=True, blank=True)
+    city = models.CharField(max_length=50, null=True, blank=True)
+    state = models.CharField(max_length=20, null=True, blank=True)
     zip = models.CharField(max_length=10, null=True, blank=True)
-    po = models.CharField(max_length=10, null=True, blank=True)
-    po_ext = models.CharField(max_length=5, null=True, blank=True)
-    contract_num = models.CharField(max_length=25, null=True, blank=True)
-    fat_plt_due_date = models.DateTimeField(null=True, blank=True)
-    supplier_due_date = models.DateTimeField(null=True, blank=True)
-    dpas_priority = models.CharField(max_length=50, null=True, blank=True)
-    statz_contact = models.TextField(null=True, blank=True)
-    statz_contact_title = models.TextField(null=True, blank=True)
-    statz_contact_phone = models.CharField(max_length=25, null=True, blank=True)
+    po = models.CharField(max_length=50, null=True, blank=True)
+    po_ext = models.CharField(max_length=10, null=True, blank=True)
+    contract_num = models.CharField(max_length=50, null=True, blank=True)
+    statz_contact = models.CharField(max_length=100, null=True, blank=True)
+    statz_contact_title = models.CharField(max_length=50, null=True, blank=True)
+    statz_contact_phone = models.CharField(max_length=20, null=True, blank=True)
     statz_contact_email = models.EmailField(null=True, blank=True)
+    fat_plt_due_date = models.DateField(null=True, blank=True)
+    supplier_due_date = models.DateField(null=True, blank=True)
+    dpas_priority = models.CharField(max_length=10, null=True, blank=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='acknowledgement_letters_created')
+    modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='acknowledgement_letters_modified')
+
+    class Meta:
+        ordering = ['-modified_on']
+        verbose_name = 'Acknowledgement Letter'
+        verbose_name_plural = 'Acknowledgement Letters'
 
     def __str__(self):
-        return f"Acknowledgement Letter for CLIN {self.clin.id}"
+        return f'Acknowledgement Letter for CLIN {self.clin.id} - {self.letter_date}'
 
 class ClinAcknowledgment(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)

@@ -1,0 +1,238 @@
+{% load static %}
+
+<div class="space-y-3">
+    <!-- Form -->
+    <form id="acknowledgmentLetterForm" method="POST" data-letter-id="{{ letter.id }}" class="space-y-3">
+        {% csrf_token %}
+        
+        <!-- Letter Date -->
+        <div class="grid grid-cols-3 gap-3 items-center">
+            <div class="col-span-1">
+                <label class="block text-sm font-medium text-gray-700">LETTER DATE</label>
+                {{ form.letter_date }}
+            </div>
+        </div>
+
+        <!-- Supplier Section -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="col-span-3">
+                <label class="block text-sm font-medium text-gray-700">Supplier Contact</label>
+                <div class="flex space-x-2">
+                    <div class="w-1/4">
+                        <select name="salutation" id="id_salutation" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            {% for value, label in form.salutation.field.choices %}
+                                <option value="{{ value }}" {% if form.salutation.value == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {{ form.addr_fname }}
+                    {{ form.addr_lname }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Company Name -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Company Name</label>
+            {{ form.supplier }}
+        </div>
+
+        <!-- Address -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Street Address</label>
+            {{ form.st_address }}
+        </div>
+
+        <!-- City, State, Zip -->
+        <div class="grid grid-cols-6 gap-3">
+            <div class="col-span-3">
+                <label class="block text-sm font-medium text-gray-700">City</label>
+                {{ form.city }}
+            </div>
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">State</label>
+                {{ form.state }}
+            </div>
+            <div class="col-span-1">
+                <label class="block text-sm font-medium text-gray-700">ZIP</label>
+                {{ form.zip }}
+            </div>
+        </div>
+
+        <!-- PO and Contract Info -->
+        <div class="grid grid-cols-6 gap-3">
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">PO</label>
+                {{ form.po }}
+            </div>
+            <div class="col-span-1">
+                <label class="block text-sm font-medium text-gray-700">Ext</label>
+                {{ form.po_ext }}
+            </div>
+            <div class="col-span-3">
+                <label class="block text-sm font-medium text-gray-700">Contract #</label>
+                {{ form.contract_num }}
+            </div>
+        </div>
+
+        <!-- STATZ Contact Info -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">STATZ Contact</label>
+                {{ form.statz_contact }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Title</label>
+                {{ form.statz_contact_title }}
+            </div>
+        </div>
+
+        <!-- Phone -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Phone</label>
+            {{ form.statz_contact_phone }}
+        </div>
+
+        <!-- Email -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Email</label>
+            {{ form.statz_contact_email }}
+        </div>
+
+        <!-- Due Dates and DPAS -->
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <label class="block text-sm font-medium text-red-600">FAT/PLT Due</label>
+                {{ form.fat_plt_due_date }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-red-600">Supplier Due</label>
+                {{ form.supplier_due_date }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">DPAS</label>
+                {{ form.dpas_priority }}
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-end space-x-3 pt-3">
+            <button type="button" 
+                    class="px-3 py-1.5 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    onclick="closeAcknowledgmentLetter()">
+                Cancel
+            </button>
+            <button type="button"
+                    class="px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    onclick="generateLetter()">
+                Generate Letter
+            </button>
+            <button type="submit"
+                    class="px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600">
+                Save
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('acknowledgmentLetterForm');
+    
+    // Style all form inputs
+    form.querySelectorAll('input, select').forEach(input => {
+        input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
+    });
+
+    // Track original values for title and phone
+    const originalTitle = form.querySelector('[name="statz_contact_title"]').value;
+    const originalPhone = form.querySelector('[name="statz_contact_phone"]').value;
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const letterId = this.dataset.letterId;
+        const formData = new FormData(this);
+        const csrfToken = formData.get('csrfmiddlewaretoken');
+
+        // Check if title or phone have changed
+        const newTitle = formData.get('statz_contact_title');
+        const newPhone = formData.get('statz_contact_phone');
+        
+        try {
+            // First save the letter
+            const letterResponse = await fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
+                method: 'POST',
+                body: formData
+            });
+            const letterResult = await letterResponse.json();
+            
+            if (!letterResult.success) {
+                throw new Error('Failed to save letter: ' + JSON.stringify(letterResult.errors));
+            }
+            
+            // Save settings if they've changed
+            const settingsToSave = [];
+            
+            if (newTitle && newTitle !== originalTitle) {
+                settingsToSave.push({
+                    setting_type: 'statz_contact_title',
+                    value: newTitle
+                });
+            }
+            
+            if (newPhone && newPhone !== originalPhone) {
+                settingsToSave.push({
+                    setting_type: 'statz_contact_phone',
+                    value: newPhone
+                });
+            }
+            
+            // Save all changed settings
+            for (const setting of settingsToSave) {
+                const response = await fetch('/users/settings/save/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(setting)
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    console.warn(`Failed to save setting ${setting.setting_type}:`, result.error);
+                }
+            }
+            
+            // Close modal and refresh page
+            closeAcknowledgmentLetter();
+            location.reload();
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message || 'Error saving form data');
+        }
+    });
+});
+
+function closeAcknowledgmentLetter() {
+    // Clear the content of the acknowledgmentLetterContent div
+    const contentDiv = document.getElementById('acknowledgmentLetterContent');
+    if (contentDiv) {
+        contentDiv.innerHTML = '';
+    }
+    
+    // Hide the modal and refresh the page
+    const modal = document.getElementById('acknowledgmentLetterModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        location.reload();
+    }
+}
+
+function generateLetter() {
+    // TODO: Implement letter generation functionality
+    alert('Letter generation functionality will be implemented here');
+}
+</script> 

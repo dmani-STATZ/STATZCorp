@@ -114,6 +114,11 @@ from .views.idiq_views import (
     SupplierSearchView,
 )
 
+from .views.acknowledgment_views import (
+    get_acknowledgment_letter,
+    update_acknowledgment_letter,
+)
+
 app_name = 'contracts'
 
 urlpatterns = [
@@ -245,4 +250,8 @@ urlpatterns = [
     path('api/clin/<int:clin_id>/update-field/', 
          update_clin_field, 
          name='update_clin_field'),
+
+    # Acknowledgment Letter URLs
+    path('acknowledgment-letter/<int:clin_id>/', get_acknowledgment_letter, name='get_acknowledgment_letter'),
+    path('acknowledgment-letter/<int:letter_id>/update/', update_acknowledgment_letter, name='update_acknowledgment_letter'),
 ] 

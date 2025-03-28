@@ -55,6 +55,12 @@ class ContractDetailView(DetailView):
             except:
                 context['acknowledgment'] = None
                 
+            # Get acknowledgment letter status
+            try:
+                context['acknowledgment_letter'] = context['selected_clin'].acknowledgementletter_set.first()
+            except:
+                context['acknowledgment_letter'] = None
+                
             # Prepare combined notes (contract + selected CLIN)
             # First, get the ContentType models
             contract_type = ContentType.objects.get_for_model(Contract)
@@ -103,6 +109,7 @@ class ContractDetailView(DetailView):
         else:
             context['clin_notes'] = []
             context['acknowledgment'] = None
+            context['acknowledgment_letter'] = None
             # If no CLIN is selected, all_notes is just contract_notes
             contract_notes = list(context['contract_notes'])
             for note in contract_notes:

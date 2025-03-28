@@ -123,6 +123,11 @@ from .api_views import (
     update_clin_field,
 )
 
+from .acknowledgment_views import (
+    get_acknowledgment_letter,
+    update_acknowledgment_letter,
+)
+
 __all__ = [
     'folder_tracking',
     'add_folder_tracking',
@@ -133,6 +138,7 @@ __all__ = [
     'search_contracts',
     'FinanceAuditView',
     'PaymentHistoryView',
-
+    'get_acknowledgment_letter',
+    'update_acknowledgment_letter',
 ]
 

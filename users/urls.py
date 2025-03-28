@@ -23,4 +23,5 @@ urlpatterns = [
     path('permission-denied/', views.permission_denied, name='permission_denied'),
     path('test-app-name/', views.test_app_name, name='test_app_name'),
     path('debug/permissions/', views.debug_app_permissions, name='debug_permissions'),
+    path('settings/save/', views.save_user_setting, name='save_user_setting'),
 ] 
