@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+[payment_history_popup.html](mdc:contracts/templates/contracts/includes/payment_history_popup.html)
+
+Rule: Payment History Popup Interaction in Django Finance Audit
+
+Description:
+This rule describes the functionality of the payment history popup within the Django application, specifically focusing on the interaction between finance_audit.html and payment_history_popup.html. This popup allows users to view and add payment history entries for specific CLIN items.
+
+Key Functionality:
+
+1. Triggering the Popup:
+   - Clickable <td> elements in finance_audit.html, marked with 'data-type' attributes (e.g., item_value, paid_amount), trigger the popup.
+   - JavaScript event listeners on these elements capture click events.
+   - The openPaymentHistoryPopup function is called, passing the CLIN ID (data-clin), field type (data-type), and current value (data-value).
+
+2. Popup Display (payment_history_popup.html):
+   - The openPaymentHistoryPopup function loads the popup modal.
+   - It displays the current value, title, and subtitle.
+   - It calls loadPaymentHistory to fetch and display existing payment history entries.
+
+3. Fetching Payment History:
+   - loadPaymentHistory sends a GET request to /contracts/api/payment-history/${clinId}/${fieldType}/ to retrieve history data.
+   - The API returns payment history entries and the total amount as JSON.
+   - The popup displays this data in a table.
+
+4. Adding New Entries:
+   - The popup includes a form (newHistoryForm) for adding new payment entries.
+   - On form submission, JavaScript sends a POST request to /contracts/api/payment-history/${clinId}/${fieldType}/.
+   - The request includes payment details (amount, date, info) and the payment_type (fieldType).
+   - The API creates a new PaymentHistory record and updates the CLIN's total value.
+   - The popup refreshes the history table and updates the displayed total.
+   - The finance_audit.html table cell is also updated with the new total.
+
+5. Closing the Popup:
+   - The closePaymentHistoryPopup function hides the modal and resets the form.
+
+Key Elements:
+- [finance_audit.html](mdc:contracts/templates/contracts/finance_audit.html): Main page with the CLIN table and click triggers.
+- [payment_history_popup.html](mdc:contracts/templates/contracts/includes/payment_history_popup.html): Popup modal for viewing and adding payment history.
+- /contracts/api/payment-history/${clinId}/${fieldType}/: Backend API endpoint for data retrieval and submission.
+- openPaymentHistoryPopup, loadPaymentHistory, closePaymentHistoryPopup: JavaScript functions managing the popup's behavior.
+- data-clin, data-type, data-value: HTML attributes used to pass data.
+- newHistoryForm: Form for adding new payment entries.
+
+Use this rule to understand and modify the payment history popup functionality within the Django application. When asking questions about related functions, files, or API endpoints, reference this rule to provide context.

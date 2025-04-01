@@ -1,0 +1,56 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+[user_settings.py](mdc:users/user_settings.py)
+
+# Users Settings Class
+"""
+The UsersSettings class is a custom class built in the Users Application. It handles the creation, retrieval, and storage of user-specific settings.
+
+We have two tables in the database to store the data: UsersSettings and UsersSettingsData.
+"""
+
+# Import the class
+import users.usersettings as usersetting
+
+class UsersSettings:
+    """
+    The UsersSettings class manages user settings by interacting with the UsersSettings and UsersSettingsData tables.
+    """
+
+    def set_value(self, user, setting_name, setting_value):
+        """
+        Sets the value of a specific setting for a user.
+        
+        Args:
+            user (str): The user identifier.
+            setting_name (str): The name of the setting.
+            setting_value (str): The value to be set for the setting.
+        """
+        # Implementation
+
+    def get_value(self, user, setting_name):
+        """
+        Retrieves the value of a specific setting for a user.
+        
+        Args:
+            user (str): The user identifier.
+            setting_name (str): The name of the setting.
+        
+        Returns:
+            str: The value of the setting.
+        """
+        # Implementation
+
+# Usage Example
+user = 'user123'
+usersetting.set_value(user, 'statz_title', 'Contract Admin')
+title = usersetting.get_value(user, 'statz_title')
+
+# title should be 'Contract Admin'
