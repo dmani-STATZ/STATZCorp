@@ -143,66 +143,23 @@ document.addEventListener('DOMContentLoaded', function() {
     form.querySelectorAll('input, select').forEach(input => {
         input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
     });
-
-    // Track original values for title and phone
-    const originalTitle = form.querySelector('[name="statz_contact_title"]').value;
-    const originalPhone = form.querySelector('[name="statz_contact_phone"]').value;
     
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const letterId = this.dataset.letterId;
         const formData = new FormData(this);
-        const csrfToken = formData.get('csrfmiddlewaretoken');
-
-        // Check if title or phone have changed
-        const newTitle = formData.get('statz_contact_title');
-        const newPhone = formData.get('statz_contact_phone');
         
         try {
-            // First save the letter
-            const letterResponse = await fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
+            // Save the letter (the server will also save user settings)
+            const response = await fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
                 method: 'POST',
                 body: formData
             });
-            const letterResult = await letterResponse.json();
+            const result = await response.json();
             
-            if (!letterResult.success) {
-                throw new Error('Failed to save letter: ' + JSON.stringify(letterResult.errors));
-            }
-            
-            // Save settings if they've changed
-            const settingsToSave = [];
-            
-            if (newTitle && newTitle !== originalTitle) {
-                settingsToSave.push({
-                    setting_type: 'statz_contact_title',
-                    value: newTitle
-                });
-            }
-            
-            if (newPhone && newPhone !== originalPhone) {
-                settingsToSave.push({
-                    setting_type: 'statz_contact_phone',
-                    value: newPhone
-                });
-            }
-            
-            // Save all changed settings
-            for (const setting of settingsToSave) {
-                const response = await fetch('/users/settings/save/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify(setting)
-                });
-                
-                const result = await response.json();
-                if (!result.success) {
-                    console.warn(`Failed to save setting ${setting.setting_type}:`, result.error);
-                }
+            if (!result.success) {
+                throw new Error('Failed to save letter: ' + JSON.stringify(result.errors));
             }
             
             // Close modal and refresh page

@@ -97,7 +97,31 @@ def update_acknowledgment_letter(request, letter_id):
     if request.method == 'POST':
         form = AcknowledgementLetterForm(request.POST, instance=letter)
         if form.is_valid():
-            form.save()
+            letter = form.save()
+            
+            # Save user settings for contact title and phone
+            statz_contact_title = form.cleaned_data.get('statz_contact_title')
+            statz_contact_phone = form.cleaned_data.get('statz_contact_phone')
+            
+            # Save user settings if values are provided
+            if statz_contact_title:
+                UserSettings.save_setting(
+                    user=request.user,
+                    name='statz_contact_title',
+                    value=statz_contact_title,
+                    setting_type='string',
+                    description='User contact title for acknowledgment letters'
+                )
+                
+            if statz_contact_phone:
+                UserSettings.save_setting(
+                    user=request.user,
+                    name='statz_contact_phone',
+                    value=statz_contact_phone,
+                    setting_type='string',
+                    description='User contact phone for acknowledgment letters'
+                )
+                
             return JsonResponse({'success': True})
         else:
             return JsonResponse({
