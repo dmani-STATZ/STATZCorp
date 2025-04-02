@@ -117,6 +117,7 @@ from .views.idiq_views import (
 from .views.acknowledgment_views import (
     get_acknowledgment_letter,
     update_acknowledgment_letter,
+    generate_acknowledgment_letter_doc
 )
 
 app_name = 'contracts'
@@ -254,4 +255,5 @@ urlpatterns = [
     # Acknowledgment Letter URLs
     path('acknowledgment-letter/<int:clin_id>/', get_acknowledgment_letter, name='get_acknowledgment_letter'),
     path('acknowledgment-letter/<int:letter_id>/update/', update_acknowledgment_letter, name='update_acknowledgment_letter'),
+    path('acknowledgment-letter/<int:letter_id>/generate/', generate_acknowledgment_letter_doc, name='generate_acknowledgment_letter_doc'),
 ] 

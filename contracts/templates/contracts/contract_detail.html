@@ -146,7 +146,7 @@
                                     <a href="{% url 'contracts:contract_review' contract.id %}"
                                        class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                        <svg width="20" height="20" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 2h40c1.1 0 2 .9 2 2v56c0 1.1-.9 2-2 2H12c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2zm0 4v52h40V6H12zm4 4h32v4H16V10zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4z" fill="#000"/>
+                                            <path d="M12 2h40c1.1 0 2 .9 2 2v56c0 1.1-.9 2-2 2H12c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2zm0 4v52h40V6H12zm4 4h32v4H16V10zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4z" fill="#000"/>
                                        </svg>                                      
                                         {% if contract.reviewed %}Reviewed{% else %}Review Contract{% endif %}
                                     </a>
@@ -759,6 +759,70 @@ function closeSystemMessage() {
     modal.classList.add('hidden');
 }
 
+// Define generateLetter function globally
+function generateLetter() {
+    // Collect form data to send to the server
+    const letterId = document.getElementById('acknowledgmentLetterForm').dataset.letterId;
+    const formData = new FormData(document.getElementById('acknowledgmentLetterForm'));
+    
+    // Add indicator that this is a document generation request, not just a save
+    formData.append('action', 'generate');
+    
+    // Show loading state
+    const generateButton = document.querySelector('button[onclick="generateLetter()"]');
+    const originalText = generateButton.innerHTML;
+    generateButton.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...</span>';
+    generateButton.disabled = true;
+    
+    // Send request to generate letter
+    fetch(`/contracts/acknowledgment-letter/${letterId}/generate/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Reset button state
+        generateButton.innerHTML = originalText;
+        generateButton.disabled = false;
+        
+        if (data.success) {
+            // Open the document in a new window
+            window.open(data.file_url, '_blank');
+            
+            // Show success message
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'mt-3 p-2 bg-green-100 text-green-800 rounded-md';
+            messageDiv.textContent = 'Letter generated successfully!';
+            document.getElementById('acknowledgmentLetterForm').appendChild(messageDiv);
+            
+            // Remove message after 3 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 3000);
+        } else {
+            // Show error
+            alert(data.error || 'Error generating letter');
+            console.error('Error details:', data.details);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        generateButton.innerHTML = originalText;
+        generateButton.disabled = false;
+        alert('Error generating letter. Please try again.');
+    });
+}
+
 // Legacy function kept for reference
 function openContractFiles(path) {
     // Format the path correctly for Windows file explorer
@@ -936,12 +1000,6 @@ function toggleAcknowledgment(field) {
     const btn = document.getElementById(`${field}_btn`);
     const initialState = btn.classList.contains('bg-green-500');
     
-    // If this button is already true, do nothing
-    if ((field === 'po_to_supplier_bool' || field === 'clin_reply_bool' || field === 'po_to_qar_bool') && initialState) {
-        console.log(`${field} is already set to true. No action needed.`);
-        return;
-    }
-
     fetch(`/contracts/clin/${clinId}/toggle-acknowledgment/`, {
         method: 'POST',
         headers: {
