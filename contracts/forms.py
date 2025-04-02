@@ -471,8 +471,33 @@ class ClinForm(forms.ModelForm):
             self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.all().order_by('terms')
             
             # NSN and Supplier are handled via custom modal UI, so we keep them empty
+            # but don't make them required in the form (will be validated in the view)
             self.fields['supplier'].queryset = Supplier.objects.none()
+            self.fields['supplier'].required = False
             self.fields['nsn'].queryset = Nsn.objects.none()
+            self.fields['nsn'].required = False
+            
+            # If we have POST data (form validation failed), try to load the selected NSN and Supplier
+            if args and args[0] and isinstance(args[0], dict) and 'nsn' in args[0] and 'supplier' in args[0]:
+                # Form validation failed and we need to re-populate the NSN and Supplier querysets
+                nsn_id = args[0].get('nsn')
+                supplier_id = args[0].get('supplier')
+                
+                if nsn_id:
+                    try:
+                        self.fields['nsn'].queryset = Nsn.objects.filter(id=nsn_id)
+                        # Store the NSN instance for template access
+                        self.nsn_value = Nsn.objects.get(id=nsn_id)
+                    except (Nsn.DoesNotExist, ValueError):
+                        pass
+                
+                if supplier_id:
+                    try:
+                        self.fields['supplier'].queryset = Supplier.objects.filter(id=supplier_id)
+                        # Store the Supplier instance for template access
+                        self.supplier_value = Supplier.objects.get(id=supplier_id)
+                    except (Supplier.DoesNotExist, ValueError):
+                        pass
         else:
             # For existing instances, load all options but ensure the selected value is included
             instance = kwargs['instance']
@@ -497,6 +522,24 @@ class ClinForm(forms.ModelForm):
                 self.fields['nsn'].queryset = Nsn.objects.filter(id=instance.nsn_id)
             else:
                 self.fields['nsn'].queryset = Nsn.objects.none()
+                
+    def clean(self):
+        """
+        Custom clean method to handle NSN and Supplier validation.
+        """
+        cleaned_data = super().clean()
+        
+        # Skip the default field validation for nsn and supplier
+        # They will be validated and processed in the view
+        if 'nsn' in self._errors:
+            # We handle NSN validation in the view, so remove the error here
+            del self._errors['nsn']
+            
+        if 'supplier' in self._errors:
+            # We handle Supplier validation in the view, so remove the error here
+            del self._errors['supplier']
+            
+        return cleaned_data
 
 class NoteForm(forms.ModelForm):
     class Meta:

@@ -1,0 +1,91 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Button and Icon Styling Rules
+
+This rule is here to keep the buttons within the app pretty standard.
+
+## Inline Delete Icon
+When needing a small icon for a delete button:
+```html
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+</svg>
+```
+
+## Large Delete Button - Red
+Styling for a large delete button:
+```html
+<button class="bg-red-500 text-white hover:bg-red-600">Delete</button>
+```
+
+## Inline Cancel Icon
+When needing a small icon for a cancel button:
+```html
+<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+</svg>
+```
+## Large Cancel Button - Red
+Styling for a large cancel button:
+```html
+<button class="bg-grey-300 text-red hover:bg-grey-400 px-4 py-2 rounded">Cancel</button>
+```
+```html
+<a style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">Cancel</a>
+```
+
+## Inline Edit Icon
+When needing a small icon for an edit button:
+```html
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+</svg>
+```
+
+## Large Edit Button - Blue
+Styling for a large edit button:
+```html
+<button class="bg-blue-500 text-white hover:bg-blue-600">Edit</button>
+```
+
+## Inline Save Icon
+When needing a small icon for a save button:
+```html
+<svg fill="#000000" width="800px" height="800px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+    <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
+</svg>
+```
+
+## Large Save Button - Green
+Styling for a large save button:
+```html
+<button class="bg-green-500 text-white hover:bg-green-600">Save</button>
+```
+
+## Inline Add Icon
+When needing a small icon for an add button:
+```html
+<svg version="1.1" id="Uploaded to svgrepo.com" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800px" height="800px" viewBox="0 0 32 32" xml:space="preserve">
+    <style type="text/css">
+        .afiado_een{fill:#0B1719;}
+    </style>
+    <path class="afiado_een" d="M24,18h-6v6h-4v-6H8v-4h6V8h4v6h6V18z"/>
+</svg>
+```
+
+## Large Add Button - Green
+Styling for a large add button:
+```html
+<button class="bg-grey-400 text-green hover:bg-grey-500">Add</button>
+```
+
+## Close Button
+When needing a small icon for a close button:
+```html
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+</svg>
+```

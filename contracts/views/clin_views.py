@@ -12,7 +12,7 @@ from datetime import timedelta, datetime, time
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinAcknowledgment, Contract, ClinView, Note, Reminder
+from ..models import Clin, ClinAcknowledgment, Contract, ClinView, Note, Reminder, Nsn, Supplier
 from ..forms import ClinForm, ClinAcknowledgmentForm
 
 
@@ -119,7 +119,7 @@ class ClinDetailView(DetailView):
 
 @method_decorator(conditional_login_required, name='dispatch')
 class ClinCreateView(CreateView):
-    model = Clin
+    model = Clin  # Using the actual Clin model, not the view
     form_class = ClinForm
     template_name = 'contracts/clin_form.html'
     
@@ -135,14 +135,69 @@ class ClinCreateView(CreateView):
         return initial
     
     def form_valid(self, form):
-        response = super().form_valid(form)
-        clin = self.object
+        # Debugging information
+        print("Form data:", self.request.POST)
+        print("NSN ID:", self.request.POST.get('nsn'))
+        print("Supplier ID:", self.request.POST.get('supplier'))
+        print("Contract ID:", self.request.POST.get('contract'))
         
-        # Create related ClinAcknowledgment
-        ClinAcknowledgment.objects.create(clin=clin)
+        # Explicitly ensure we're working with a Clin instance
+        self.object = form.save(commit=False)
         
-        messages.success(self.request, 'CLIN created successfully.')
-        return response
+        # Verify that NSN and Supplier objects exist before saving
+        nsn_id = self.request.POST.get('nsn')
+        supplier_id = self.request.POST.get('supplier')
+        
+        try:
+            # Get the actual Nsn and Supplier objects to verify they exist
+            if nsn_id:
+                nsn_obj = Nsn.objects.get(pk=nsn_id)
+                # Explicitly set the nsn on the Clin instance
+                self.object.nsn = nsn_obj
+            else:
+                form.add_error('nsn', 'NSN is required')
+                return self.form_invalid(form)
+                
+            if supplier_id:
+                supplier_obj = Supplier.objects.get(pk=supplier_id)
+                # Explicitly set the supplier on the Clin instance
+                self.object.supplier = supplier_obj
+            else:
+                form.add_error('supplier', 'Supplier is required')
+                return self.form_invalid(form)
+                
+            # Set the created_by and modified_by fields
+            self.object.created_by = self.request.user
+            self.object.modified_by = self.request.user
+            
+            # Save the Clin instance directly
+            self.object.save()
+            
+            # Create related ClinAcknowledgment
+            ClinAcknowledgment.objects.create(
+                clin=self.object,
+                created_by=self.request.user,
+                modified_by=self.request.user
+            )
+            
+            messages.success(self.request, 'CLIN created successfully.')
+            return HttpResponseRedirect(self.get_success_url())
+            
+        except Nsn.DoesNotExist:
+            form.add_error('nsn', 'Selected NSN does not exist')
+            return self.form_invalid(form)
+        except Supplier.DoesNotExist:
+            form.add_error('supplier', 'Selected Supplier does not exist')
+            return self.form_invalid(form)
+        except Exception as e:
+            print(f"Error saving CLIN: {str(e)}")
+            form.add_error(None, f"Error saving CLIN: {str(e)}")
+            return self.form_invalid(form)
+    
+    def form_invalid(self, form):
+        # Log form errors for debugging
+        print("Form invalid with errors:", form.errors)
+        return super().form_invalid(form)
     
     def get_success_url(self):
         return reverse('contracts:clin_detail', kwargs={'pk': self.object.pk})
@@ -354,4 +409,25 @@ def toggle_clin_acknowledgment(request, clin_id):
     except Exception as e:
         import traceback
         print(traceback.format_exc())
-        return JsonResponse({'success': False, 'error': str(e)}, status=400) 
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@conditional_login_required
+def clin_delete(request, pk):
+    """
+    Delete a CLIN and redirect to its contract detail page.
+    """
+    clin = get_object_or_404(Clin, pk=pk)
+    contract_id = clin.contract.id
+    
+    if request.method == 'GET':
+        # Delete related objects first (if needed)
+        # Then delete the CLIN
+        try:
+            clin_po_num = clin.clin_po_num  # Save for the success message
+            clin.delete()
+            messages.success(request, f'CLIN {clin_po_num} has been deleted successfully.')
+        except Exception as e:
+            messages.error(request, f'Error deleting CLIN: {str(e)}')
+            
+    return redirect('contracts:contract_detail', pk=contract_id) 

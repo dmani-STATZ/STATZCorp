@@ -29,6 +29,7 @@ from .views import (
     ClinAcknowledgmentUpdateView,
     get_clin_notes,
     toggle_clin_acknowledgment,
+    clin_delete,
     
     # NSN and Supplier views
     NsnUpdateView,
@@ -150,6 +151,7 @@ urlpatterns = [
     path('contract/<int:contract_id>/clin/new/', ClinCreateView.as_view(), name='contract_clin_create'),
     path('clin/<int:pk>/', ClinDetailView.as_view(), name='clin_detail'),
     path('clin/<int:pk>/edit/', ClinUpdateView.as_view(), name='clin_update'),
+    path('clin/<int:pk>/delete/', clin_delete, name='clin_delete'),
     path('clin/acknowledgment/<int:pk>/edit/', ClinAcknowledgmentUpdateView.as_view(), name='clin_acknowledgment_update'),
     
     # NSN and Supplier management
