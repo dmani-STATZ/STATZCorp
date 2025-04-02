@@ -13,6 +13,7 @@ from ..models import AcknowledgementLetter, Clin, Contract
 from ..forms import AcknowledgementLetterForm
 from users.user_settings import UserSettings
 import logging
+from docx2pdf import convert
 
 @login_required
 def get_acknowledgment_letter(request, clin_id):
@@ -295,9 +296,13 @@ def generate_acknowledgment_letter_doc(request, letter_id):
         logger.info("Creating temp file for document")
         # Create a temp file
         with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
-            temp_filename = temp_file.name
-            doc.save(temp_filename)
-            logger.info(f"Document saved to temp file: {temp_filename}")
+            #temp_filename = temp_file.name
+            #doc.save(temp_filename)
+            #logger.info(f"Document saved to temp file: {temp_filename}")
+            temp_docx_filename = temp_file.name
+            doc.save(temp_docx_filename)
+            logger.info(f"Document saved to temp docx file: {temp_docx_filename}")
+
         
         # Determine where to save the file
         media_root = settings.MEDIA_ROOT
@@ -309,21 +314,41 @@ def generate_acknowledgment_letter_doc(request, letter_id):
         
         # Create directory if it doesn't exist
         os.makedirs(target_dir, exist_ok=True)
+ #--------------------------------------
+ # Code for the original save method
+ #--------------------------------------
+        # # Save the file with a meaningful name
+        # file_name = f"PO_Acknowledgment_{letter.po}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        # target_path = os.path.join(target_dir, file_name)
+        # logger.info(f"Target path: {target_path}")
         
-        # Save the file with a meaningful name
-        file_name = f"PO_Acknowledgment_{letter.po}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        # # Copy from temp file to target path
+        # import shutil
+        # shutil.copy2(temp_filename, target_path)
+        # logger.info(f"File copied from temp to target path")
+        
+        # # Remove the temp file
+        # os.unlink(temp_filename)
+        # logger.info(f"Temp file removed")
+#---------------------------------------
+# Code for the new save method
+#---------------------------------------
+        # Save the file with a meaningful name (PDF)
+        file_name = f"PO_Acknowledgment_{letter.po}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         target_path = os.path.join(target_dir, file_name)
         logger.info(f"Target path: {target_path}")
-        
-        # Copy from temp file to target path
-        import shutil
-        shutil.copy2(temp_filename, target_path)
-        logger.info(f"File copied from temp to target path")
-        
-        # Remove the temp file
-        os.unlink(temp_filename)
-        logger.info(f"Temp file removed")
-        
+
+        # Convert docx to pdf
+        logger.info("Converting docx to pdf")
+        convert(temp_docx_filename, target_path)
+        logger.info(f"Document converted to pdf at: {target_path}")
+
+        # Remove the temp docx file
+        os.unlink(temp_docx_filename)
+        logger.info(f"Temp docx file removed")
+#---------------------------------------
+
+
         # Generate URL for the file
         media_url = settings.MEDIA_URL
         file_url = f"{media_url}{relative_path}/{file_name}"

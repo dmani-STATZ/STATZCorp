@@ -98,3 +98,7 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER) 
+
+
+# Might need to install LibreOffice to convert docx to pdf on the server
+#https://www.libreoffice.org/download/download-libreoffice/
