@@ -13,6 +13,7 @@ import logging
 from django.views.decorators.http import require_http_methods
 import json
 from .user_settings import UserSettings
+from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +123,144 @@ def save_user_setting(request):
         return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def manage_settings(request):
+    """View for managing user settings."""
+    User = get_user_model()
+    
+    # Only get active users
+    users = User.objects.filter(is_active=True)
+    
+    # Get all settings for the current user
+    current_user_settings = UserSettings.get_all_settings(request.user)
+    
+    # Get all possible setting names from the database
+    all_settings = UserSetting.objects.all().values_list('name', flat=True).distinct()
+    
+    # Add debug info
+    logger.debug(f"Manage settings view: Found {users.count()} active users, {len(current_user_settings)} settings for current user, and {len(all_settings)} total unique settings")
+    
+    context = {
+        'users': users,
+        'current_user_settings': current_user_settings,
+        'all_settings': list(all_settings),
+        'setting_types': ['string', 'boolean', 'integer', 'float'],  # Available setting types
+    }
+    
+    return render(request, 'users/manage_settings.html', context)
+
+@login_required
+@require_http_methods(["POST"])
+def ajax_save_setting(request):
+    """AJAX endpoint for saving user settings."""
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        setting_name = data.get('setting_name')
+        setting_value = data.get('setting_value')
+        setting_type = data.get('setting_type', 'string')
+        
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        
+        # Convert value based on setting type
+        if setting_type == 'boolean':
+            setting_value = setting_value.lower() == 'true'
+        elif setting_type == 'integer':
+            setting_value = int(setting_value)
+        elif setting_type == 'float':
+            setting_value = float(setting_value)
+        
+        success = UserSettings.save_setting(
+            user=user,
+            name=setting_name,
+            value=setting_value,
+            setting_type=setting_type
+        )
+        
+        return JsonResponse({
+            'success': success,
+            'message': 'Setting saved successfully' if success else 'Failed to save setting'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def ajax_get_user_setting(request):
+    """AJAX endpoint for getting a user's settings."""
+    try:
+        user_id = request.GET.get('user_id')
+        setting_name = request.GET.get('setting_name')
+        
+        logger.debug(f"ajax_get_user_setting called for user_id={user_id}, setting_name={setting_name}")
+        
+        if not user_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'User ID is required'
+            }, status=400)
+        
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        
+        if setting_name:
+            # Get specific setting
+            value = UserSettings.get_setting(user, setting_name)
+            logger.debug(f"Returning specific setting {setting_name}={value}")
+            return JsonResponse({
+                'success': True,
+                'value': value
+            })
+        else:
+            # Get all settings
+            settings = UserSettings.get_all_settings(user)
+            logger.debug(f"Returning all settings for user {user.username}: {settings}")
+            return JsonResponse({
+                'success': True,
+                'settings': settings
+            })
+            
+    except User.DoesNotExist:
+        logger.error(f"User not found: {user_id}")
+        return JsonResponse({
+            'success': False,
+            'message': 'User not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error getting user settings: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f"Error: {str(e)}"
+        }, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def ajax_get_setting_types(request):
+    """AJAX endpoint for getting all setting types."""
+    try:
+        # Import here to avoid circular imports
+        from .models import UserSetting
+        
+        # Get all settings with their types
+        settings = UserSetting.objects.all()
+        
+        # Create dictionary of setting name to type
+        types_dict = {setting.name: setting.setting_type for setting in settings}
+        
+        logger.debug(f"Returning {len(types_dict)} setting types")
+        
+        return JsonResponse({
+            'success': True,
+            'types': types_dict
+        })
+    except Exception as e:
+        logger.error(f"Error getting setting types: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f"Error: {str(e)}"
+        }, status=400)

@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Manage User Settings{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8">User Settings Management</h1>
+    
+    <!-- User Selection Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">Select User</h2>
+        <div class="w-full">
+            <select id="userSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" onchange="loadUserSettings()">
+                <option value="{{ request.user.id }}" selected>{{ request.user.username }} (Current User)</option>
+                {% for user in users %}
+                    {% if user.id != request.user.id %}
+                        <option value="{{ user.id }}">{{ user.username }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- User Settings Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">User Settings</h2>
+        <div id="settingsContainer" class="grid grid-cols-1 gap-6">
+            <p class="text-gray-500">Loading settings...</p>
+        </div>
+    </div>
+
+    <!-- Create New Setting Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Create New Setting</h2>
+        <form id="newSettingForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Setting Name</label>
+                <input type="text" id="newSettingName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Setting Type</label>
+                <select id="newSettingType" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    {% for type in setting_types %}
+                    <option value="{{ type }}">{{ type|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Default Value</label>
+                <input type="text" id="newSettingValue" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <button type="button" id="createSettingBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700" onclick="createNewSetting()">
+                Create Setting
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-full transition-transform duration-300 hidden">
+    <span id="toastMessage"></span>
+</div>
+
+<script>
+// Global vars
+const csrfToken = '{{ csrf_token }}';
+const allPossibleSettings = {{ all_settings|safe }};
+// Get setting types from Django server
+const settingTypes = {};
+
+// Log to console only in development
+function log(message) {
+    console.log(message);
+}
+
+// Toast notification
+function showToast(message, isError = false) {
+    let toast = document.getElementById('toast');
+    let toastMessage = document.getElementById('toastMessage');
+    
+    toastMessage.textContent = message;
+    toast.classList.remove('hidden', 'translate-y-full');
+    toast.classList.add('translate-y-0');
+    
+    if (isError) {
+        toast.classList.add('bg-red-600');
+    } else {
+        toast.classList.add('bg-gray-800');
+    }
+    
+    setTimeout(() => {
+        toast.classList.add('translate-y-full');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.classList.remove('bg-red-600', 'bg-gray-800');
+        }, 300);
+    }, 3000);
+}
+
+// Load user settings
+function loadUserSettings() {
+    let userId = document.getElementById('userSelect').value;
+    log(`Loading settings for user ID: ${userId}`);
+    
+    if (!userId) {
+        showToast('Please select a user', true);
+        return;
+    }
+
+    let settingsContainer = document.getElementById('settingsContainer');
+    settingsContainer.innerHTML = '<p class="text-center py-4 text-gray-500">Loading settings...</p>';
+    
+    fetch(`{% url "users:ajax_get_user_setting" %}?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            displaySettings(data.settings);
+        } else {
+            settingsContainer.innerHTML = `<p class="text-red-500">Error: ${data.message}</p>`;
+            showToast(data.message, true);
+        }
+    })
+    .catch(error => {
+        settingsContainer.innerHTML = `<p class="text-red-500">Failed to load settings: ${error.message}</p>`;
+        showToast('Failed to load user settings', true);
+    });
+}
+
+// Create input field based on setting type
+function createInputForType(name, value, type) {
+    let placeholder = value ? "" : "Not set for this user";
+    
+    // Default input (string type)
+    if (!type || type === 'string') {
+        return `<input type="text" 
+                      class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      value="${value}"
+                      placeholder="${placeholder}"
+                      data-setting-name="${name}"
+                      data-setting-type="string"
+                      data-original-value="${value}">`;
+    }
+    
+    // Boolean type
+    if (type === 'boolean') {
+        const isTrue = value === true || value === 'true' || value === 'True';
+        return `<select class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                       data-setting-name="${name}"
+                       data-setting-type="boolean"
+                       data-original-value="${isTrue}">
+                  <option value="true" ${isTrue ? 'selected' : ''}>True</option>
+                  <option value="false" ${!isTrue ? 'selected' : ''}>False</option>
+                </select>`;
+    }
+    
+    // Integer type
+    if (type === 'integer') {
+        return `<input type="number" 
+                      step="1" 
+                      class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      value="${value}"
+                      placeholder="${placeholder}"
+                      data-setting-name="${name}"
+                      data-setting-type="integer"
+                      data-original-value="${value}">`;
+    }
+    
+    // Float type
+    if (type === 'float') {
+        return `<input type="number" 
+                      step="0.01" 
+                      class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      value="${value}"
+                      placeholder="${placeholder}"
+                      data-setting-name="${name}"
+                      data-setting-type="float"
+                      data-original-value="${value}">`;
+    }
+    
+    // Fallback to text input
+    return `<input type="text" 
+                  class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  value="${value}"
+                  placeholder="${placeholder}"
+                  data-setting-name="${name}"
+                  data-setting-type="string"
+                  data-original-value="${value}">`;
+}
+
+// Get setting types from server
+function getSettingTypes() {
+    fetch('{% url "users:ajax_get_setting_types" %}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Store setting types
+                Object.assign(settingTypes, data.types);
+                log(`Loaded setting types: ${JSON.stringify(settingTypes)}`);
+            }
+        })
+        .catch(error => {
+            log(`Failed to load setting types: ${error.message}`);
+        });
+}
+
+// Display settings
+function displaySettings(userSettings) {
+    let settingsContainer = document.getElementById('settingsContainer');
+    settingsContainer.innerHTML = '';
+    
+    // Convert userSettings to empty object if null/undefined
+    userSettings = userSettings || {};
+    
+    // If there are no settings and no possible settings
+    if (Object.keys(userSettings).length === 0 && allPossibleSettings.length === 0) {
+        settingsContainer.innerHTML = '<p class="text-gray-500">No settings found for selected user or in the system.</p>';
+        return;
+    }
+    
+    // Create a Set of all setting names to handle (existing + possible)
+    const allSettingNames = new Set([
+        ...Object.keys(userSettings),
+        ...allPossibleSettings
+    ]);
+    
+    // Sort settings alphabetically
+    const sortedSettings = Array.from(allSettingNames).sort();
+    
+    // Create setting elements for each
+    sortedSettings.forEach(name => {
+        const value = userSettings[name] || "";
+        const type = settingTypes[name] || "string";
+        
+        const settingDiv = document.createElement('div');
+        settingDiv.className = 'border rounded p-4';
+        settingDiv.innerHTML = `
+            <div class="flex justify-between items-start">
+                <div class="flex-grow">
+                    <p class="font-medium">${name}</p>
+                    <div class="mt-1 text-xs text-gray-500">${type}</div>
+                    <div class="mt-2 flex items-center space-x-4">
+                        ${createInputForType(name, value, type)}
+                        <button class="save-btn bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700" 
+                                onclick="saveSetting(this)">
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        settingsContainer.appendChild(settingDiv);
+    });
+    
+    // Add listeners for input changes to show visual feedback
+    attachInputListeners();
+}
+
+// Attach input event listeners
+function attachInputListeners() {
+    const inputs = document.querySelectorAll('[data-setting-name]');
+    inputs.forEach(input => {
+        // Remove existing listeners to avoid duplicates
+        input.removeEventListener('input', handleInputChange);
+        input.removeEventListener('change', handleInputChange);
+        
+        // Add new listeners for both input and change events
+        input.addEventListener('input', handleInputChange);
+        input.addEventListener('change', handleInputChange);
+    });
+}
+
+// Handle input changes
+function handleInputChange(event) {
+    const input = event.target;
+    const settingType = input.dataset.settingType;
+    let currentValue;
+    
+    // Get current value based on input type
+    if (settingType === 'boolean') {
+        currentValue = input.value === 'true';
+    } else if (settingType === 'integer') {
+        currentValue = parseInt(input.value, 10) || 0;
+    } else if (settingType === 'float') {
+        currentValue = parseFloat(input.value) || 0;
+    } else {
+        currentValue = input.value;
+    }
+    
+    // Get original value in appropriate type
+    let originalValue = input.dataset.originalValue;
+    if (settingType === 'boolean') {
+        originalValue = originalValue === 'true';
+    } else if (settingType === 'integer') {
+        originalValue = parseInt(originalValue, 10) || 0;
+    } else if (settingType === 'float') {
+        originalValue = parseFloat(originalValue) || 0;
+    }
+    
+    // Compare and highlight the input if changed
+    const hasChanged = currentValue !== originalValue;
+    input.classList.toggle('border-indigo-500', hasChanged);
+    input.classList.toggle('ring-2', hasChanged);
+    input.classList.toggle('ring-indigo-200', hasChanged);
+}
+
+// Save setting
+function saveSetting(button) {
+    let input = button.previousElementSibling;
+    let settingName = input.dataset.settingName;
+    let settingType = input.dataset.settingType;
+    let settingValue;
+    
+    // Get value based on input type
+    if (settingType === 'boolean') {
+        settingValue = input.value === 'true';
+    } else if (settingType === 'integer') {
+        settingValue = parseInt(input.value, 10) || 0;
+    } else if (settingType === 'float') {
+        settingValue = parseFloat(input.value) || 0;
+    } else {
+        settingValue = input.value;
+    }
+    
+    let userId = document.getElementById('userSelect').value;
+    
+    button.textContent = 'Saving...';
+    button.disabled = true;
+    
+    fetch('{% url "users:ajax_save_setting" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            setting_name: settingName,
+            setting_value: settingValue,
+            setting_type: settingType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.textContent = 'Save';
+        button.disabled = false;
+        
+        if (data.success) {
+            // Update the original value to match current value
+            if (settingType === 'boolean') {
+                input.dataset.originalValue = settingValue ? 'true' : 'false';
+            } else {
+                input.dataset.originalValue = String(settingValue);
+            }
+            
+            // Remove the highlight
+            input.classList.remove('border-indigo-500', 'ring-2', 'ring-indigo-200');
+            
+            showToast('Setting saved successfully');
+        } else {
+            showToast(data.message, true);
+        }
+    })
+    .catch(error => {
+        button.textContent = 'Save';
+        button.disabled = false;
+        showToast('Failed to save setting', true);
+    });
+}
+
+// Create new setting
+function createNewSetting() {
+    let name = document.getElementById('newSettingName').value;
+    let type = document.getElementById('newSettingType').value;
+    let value = document.getElementById('newSettingValue').value;
+    let userId = document.getElementById('userSelect').value;
+    
+    if (!name) {
+        showToast('Setting name is required', true);
+        return;
+    }
+    
+    // Convert value based on type
+    if (type === 'boolean') {
+        value = value.toLowerCase() === 'true';
+    } else if (type === 'integer') {
+        value = parseInt(value, 10) || 0;
+    } else if (type === 'float') {
+        value = parseFloat(value) || 0;
+    }
+    
+    fetch('{% url "users:ajax_save_setting" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            setting_name: name,
+            setting_value: value,
+            setting_type: type
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Setting created successfully');
+            document.getElementById('newSettingName').value = '';
+            document.getElementById('newSettingValue').value = '';
+            
+            // Add to possible settings list if new
+            if (!allPossibleSettings.includes(name)) {
+                allPossibleSettings.push(name);
+            }
+            
+            // Add to setting types
+            settingTypes[name] = type;
+            
+            // Reload settings to see the new one
+            loadUserSettings();
+        } else {
+            showToast(data.message, true);
+        }
+    })
+    .catch(error => {
+        showToast('Failed to create setting', true);
+    });
+}
+
+// When the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Try to load setting types
+    if ('{% url "users:ajax_get_setting_types" %}' !== 'url "users:ajax_get_setting_types"') {
+        getSettingTypes();
+    }
+    
+    // Load current user's settings initially
+    loadUserSettings();
+});
+</script>
+{% endblock %} 

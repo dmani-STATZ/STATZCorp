@@ -24,4 +24,8 @@ urlpatterns = [
     path('test-app-name/', views.test_app_name, name='test_app_name'),
     path('debug/permissions/', views.debug_app_permissions, name='debug_permissions'),
     path('settings/save/', views.save_user_setting, name='save_user_setting'),
+    path('settings/view/', views.manage_settings, name='manage_settings'),
+    path('settings/ajax/save/', views.ajax_save_setting, name='ajax_save_setting'),
+    path('settings/ajax/get/', views.ajax_get_user_setting, name='ajax_get_user_setting'),
+    path('settings/ajax/types/', views.ajax_get_setting_types, name='ajax_get_setting_types'),
 ] 

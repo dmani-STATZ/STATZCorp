@@ -3,54 +3,187 @@ description:
 globs: 
 alwaysApply: true
 ---
+Here's a comprehensive writeup for the user-settings-rule that explains how the user settings system works and how to implement it:
 
-# Your rule content
+# User Settings System Guide
 
-- You can @ files here
-[user_settings.py](mdc:users/user_settings.py)
+## Overview
 
-# Users Settings Class
-"""
-The UsersSettings class is a custom class built in the Users Application. It handles the creation, retrieval, and storage of user-specific settings.
+The User Settings system provides a flexible, type-aware way to store and retrieve user-specific preferences and configurations throughout the application. It supports multiple data types and offers an intuitive API for both developers and end-users.
 
-We have two tables in the database to store the data: UsersSettings and UsersSettingsData.
-"""
+## Key Components
 
+1. **UserSettings Class**: 
+   - Core utility class that provides methods for getting and setting user preferences
+   - Handles type conversion, storage, and retrieval 
+   - Located in `users/user_settings.py`
+
+2. **Data Models**:
+   - `UserSetting`: Defines available settings and their types
+   - `UserSettingState`: Stores the actual values for each user
+
+3. **Management Interface**:
+   - Web-based UI for managing settings at `/users/settings/view/`
+   - Supports viewing, editing, and creating settings across all users
+
+## Data Types
+
+The system supports four primary data types:
+
+- **string**: Text values (default)
+- **boolean**: True/False values
+- **integer**: Whole numbers
+- **float**: Decimal numbers
+
+## Core API Methods
+
+```python
 # Import the class
-import users.usersettings as usersetting
+from users.user_settings import UserSettings
 
-class UsersSettings:
-    """
-    The UsersSettings class manages user settings by interacting with the UsersSettings and UsersSettingsData tables.
-    """
+# Get a setting value (returns appropriate type)
+value = UserSettings.get_setting(user, "setting_name", default=None)
 
-    def set_value(self, user, setting_name, setting_value):
-        """
-        Sets the value of a specific setting for a user.
+# Save a setting value
+UserSettings.save_setting(user, "setting_name", value, setting_type="string")
+
+# Get multiple settings at once
+settings = UserSettings.get_multiple_settings(user, ["setting1", "setting2"])
+
+# Save multiple settings at once
+UserSettings.save_multiple_settings(user, {"setting1": "value1", "setting2": "value2"})
+
+# Delete a setting
+UserSettings.delete_setting(user, "setting_name")
+
+# Get all settings for a user
+all_settings = UserSettings.get_all_settings(user)
+```
+
+## Implementation Example
+
+Here's how to use the settings system in your views:
+
+```python
+from users.user_settings import UserSettings
+
+def my_view(request):
+    # Get user preference
+    theme = UserSettings.get_setting(request.user, "theme", default="light")
+    
+    # Get multiple preferences
+    preferences = UserSettings.get_multiple_settings(
+        request.user, 
+        ["items_per_page", "show_notifications"]
+    )
+    
+    # Use the settings
+    items_per_page = preferences.get("items_per_page", 10)
+    show_notifications = preferences.get("show_notifications", True)
+    
+    # Save a setting
+    UserSettings.save_setting(
+        user=request.user,
+        name="last_visited_page",
+        value="dashboard",
+        setting_type="string"
+    )
+    
+    # Use in templates
+    context = {
+        'theme': theme,
+        'items_per_page': items_per_page,
+        'show_notifications': show_notifications,
+    }
+    
+    return render(request, 'my_template.html', context)
+```
+
+## Type Handling
+
+The system automatically handles type conversion:
+
+```python
+# Boolean example
+UserSettings.save_setting(user, "dark_mode", True, setting_type="boolean")
+is_dark_mode = UserSettings.get_setting(user, "dark_mode")  # Returns True (boolean)
+
+# Integer example
+UserSettings.save_setting(user, "items_per_page", 20, setting_type="integer")
+limit = UserSettings.get_setting(user, "items_per_page")  # Returns 20 (integer)
+
+# Float example
+UserSettings.save_setting(user, "tax_rate", 0.07, setting_type="float")
+rate = UserSettings.get_setting(user, "tax_rate")  # Returns 0.07 (float)
+```
+
+## Management Interface
+
+The User Settings Management page at `/users/settings/view/` provides:
+
+1. **User Selection**: Choose any active user to view/edit their settings
+2. **Type-Appropriate Controls**: 
+   - Text fields for strings
+   - True/False dropdowns for booleans
+   - Number fields for integers and floats
+3. **Setting Creation**: Create new settings with specified types
+4. **Visual Feedback**: Highlighting for changed values
+
+## Best Practices
+
+1. **Use Descriptive Names**: Choose clear, namespaced setting names (e.g., `contract_default_status`)
+2. **Provide Defaults**: Always include defaults when retrieving settings
+3. **Use Appropriate Types**: Choose the right data type for each setting
+4. **Cache When Appropriate**: For frequently accessed settings
+5. **Group Related Settings**: Use `get_multiple_settings` for related preferences
+
+## Working with Templates
+
+In templates, you can access settings via the context:
+
+```html
+{% if user_preferences.dark_mode %}
+    <body class="dark-theme">
+{% else %}
+    <body class="light-theme">
+{% endif %}
+
+<div class="pagination">
+    Showing {{ user_preferences.items_per_page }} items per page
+</div>
+```
+
+## AJAX Integration
+
+For dynamic setting updates, use the AJAX endpoints:
+
+- `GET /users/settings/ajax/get/?user_id=<id>&setting_name=<name>`: Retrieve a setting
+- `GET /users/settings/ajax/get/?user_id=<id>`: Retrieve all settings for a user
+- `POST /users/settings/ajax/save/`: Save a setting
+- `GET /users/settings/ajax/types/`: Get types for all settings
+
+## Example: Creating a User Preference Form
+
+```python
+# views.py
+def user_preferences(request):
+    if request.method == 'POST':
+        # Save preferences
+        UserSettings.save_multiple_settings(request.user, {
+            'theme': request.POST.get('theme'),
+            'notifications_enabled': request.POST.get('notifications') == 'on',
+            'items_per_page': int(request.POST.get('items_per_page', 10))
+        })
+        messages.success(request, 'Preferences saved!')
+        return redirect('preferences')
         
-        Args:
-            user (str): The user identifier.
-            setting_name (str): The name of the setting.
-            setting_value (str): The value to be set for the setting.
-        """
-        # Implementation
+    # Get current preferences
+    preferences = UserSettings.get_multiple_settings(
+        request.user, 
+        ['theme', 'notifications_enabled', 'items_per_page']
+    )
+    
+    return render(request, 'preferences.html', {'preferences': preferences})
+```
 
-    def get_value(self, user, setting_name):
-        """
-        Retrieves the value of a specific setting for a user.
-        
-        Args:
-            user (str): The user identifier.
-            setting_name (str): The name of the setting.
-        
-        Returns:
-            str: The value of the setting.
-        """
-        # Implementation
-
-# Usage Example
-user = 'user123'
-usersetting.set_value(user, 'statz_title', 'Contract Admin')
-title = usersetting.get_value(user, 'statz_title')
-
-# title should be 'Contract Admin'
+This system provides a flexible, type-safe way to manage user-specific settings throughout your application while offering an intuitive management interface for administrators.
