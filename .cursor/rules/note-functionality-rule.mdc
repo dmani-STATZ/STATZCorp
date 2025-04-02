@@ -1,0 +1,27 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Adding Note functionality to a page
+
+This implementation follows modern web development practices:
+    - It uses a modal dialog for a better user experience
+    - It leverages AJAX for form submission to avoid page reloads
+    - It provides visual feedback for reminders with icons
+    - It's reusable across different pages and entities
+    
+To use this functionality on other pages, you would:
+1. Include the modal template: 
+    {% include "contracts/partials/note_modal.html" %}
+2. Include the JavaScript file: 
+    <script src="{% static 'contracts/js/note_modal.js' %}"></script>
+3. Add data attributes to your "Add Note" buttons:
+   <button 
+       data-note-action="add"
+       data-content-type-id="[CONTENT_TYPE_ID]"
+       data-object-id="[OBJECT_ID]"
+       data-entity-type="[ENTITY_TYPE]"
+   >
+       Add Note
+   </button>
