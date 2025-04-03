@@ -58,3 +58,5 @@ python-docx
 docx2pdf
 webcolors
 django-extensions
+Werkzeug
+pyOpenSSL
