@@ -57,3 +57,4 @@ urllib3==2.3.0
 python-docx
 docx2pdf
 webcolors
+django-extensions

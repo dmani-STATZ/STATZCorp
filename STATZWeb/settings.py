@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'tailwind',
     'theme_tw',
     'corsheaders',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
