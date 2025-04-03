@@ -38,22 +38,16 @@ def create_default_permissions(sender, instance, created, **kwargs):
 """
 
 @receiver(post_save, sender=User)
-def create_user_setting_states(sender, instance, created, **kwargs):
+def create_user_settings(sender, instance, created, **kwargs):
+    """Create default settings for new users"""
     if created:
-        # Get or create default settings
-        folder_tracking_pagination, _ = UserSetting.objects.get_or_create(
-            name='folder_tracking_pagination_disabled',
-            defaults={
-                'description': 'Disable pagination in the folder tracking view',
-                'setting_type': 'boolean',
-                'default_value': 'false',
-                'is_global': False
-            }
-        )
+        # Get all available settings
+        settings = UserSetting.objects.all()
         
-        # Create the user's setting state with default value
-        UserSettingState.objects.create(
-            user=instance,
-            setting=folder_tracking_pagination,
-            value=folder_tracking_pagination.default_value
-        )
+        # Create UserSettingState for each setting with default values
+        for setting in settings:
+            UserSettingState.objects.create(
+                user=instance,
+                setting=setting,
+                value=setting.default_value
+            )
