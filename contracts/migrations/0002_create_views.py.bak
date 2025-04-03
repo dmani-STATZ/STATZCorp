@@ -4,14 +4,13 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('contracts', '0001_initial'),
-        ('auth', '0012_alter_user_first_name_max_length'),  # Add dependency on auth app
     ]
 
     operations = [
         migrations.RunSQL(
             # Create CLIN View
             """
-            CREATE VIEW IF NOT EXISTS clin_view AS
+            CREATE VIEW clin_view AS
             SELECT 
                 c.id,
                 c.contract_id,
@@ -76,7 +75,7 @@ class Migration(migrations.Migration):
         migrations.RunSQL(
             # Create NSN View
             """
-            CREATE VIEW IF NOT EXISTS nsn_view AS
+            CREATE VIEW nsn_view AS
             SELECT 
                 n.id,
                 n.nsn_code,
