@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+*.pyc
 *.py[cod]
 *$py.class
 *.so
@@ -19,6 +20,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.vscode/
 
 # Django
 *.log
@@ -36,6 +38,7 @@ ENV/
 .venv
 env.bak/
 venv.bak/
+
 
 # IDE
 .idea/
