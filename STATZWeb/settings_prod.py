@@ -2,7 +2,7 @@ from .settings import *
 import os
 
 # Security Settings
-DEBUG = False
+DEBUG = True  # Temporarily to see detailed errors
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # Update ALLOWED_HOSTS with your production domain
