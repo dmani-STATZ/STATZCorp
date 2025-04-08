@@ -38,6 +38,18 @@ TEMPLATES = [
     },
 ]
 
+# Static and Media Files Configuration
+STATIC_URL = '/static/'  # Make sure this matches your Apache Alias
+MEDIA_URL = '/media/'    # Make sure this matches your Apache Alias
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Additional locations of static files
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
 # Security Headers
 SECURE_SSL_REDIRECT = False
 # SESSION_COOKIE_SECURE = True
@@ -53,10 +65,6 @@ SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = False
-
-# Static and Media Files
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Database Configuration
 DATABASES = {
