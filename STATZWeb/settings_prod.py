@@ -9,6 +9,8 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 ALLOWED_HOSTS = [
     'statzutil01',
     '10.103.10.13',
+    '127.0.0.1',
+    'localhost',
     # Add your production IP addresses here
 ]
 
