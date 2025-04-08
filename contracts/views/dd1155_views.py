@@ -3,12 +3,8 @@ import re
 import json
 import tempfile
 import logging
-import PyPDF2
-import pytesseract
-import pdf2image
-import fitz  # PyMuPDF
-from PIL import Image
-import numpy as np
+# Use our centralized image processing utilities to avoid numpy conflicts
+from contracts.utils.image_processing import np, fitz, PyPDF2, pytesseract, pdf2image, Image, ImageDraw
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.shortcuts import render, redirect
@@ -19,8 +15,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.db.models import Q
-from PIL import Image, ImageDraw
-
 
 
 from contracts.models import ClinType, Contract, Clin, ContractType, Buyer, Nsn
