@@ -1,10 +1,12 @@
 # Image Processing Utilities
 
-This module provides a centralized place for importing image processing libraries that depend on NumPy to avoid conflicts.
+This module provides a lazy-loading approach for importing image processing libraries, preventing import conflicts especially in production WSGI environments.
 
 ## Problem Solved
 
-Multiple imports of NumPy (sometimes direct, sometimes through different packages) can cause conflicts, especially when deploying the application.
+1. NumPy and other dependencies can cause conflicts when imported multiple times or in specific orders
+2. In production WSGI environments, modules might be loaded in different ways than in development
+3. The "CPU dispatcher tracer already initialized" error occurs when NumPy's initialization conflicts with itself
 
 ## Usage
 
@@ -19,15 +21,21 @@ import fitz  # PyMuPDF
 from PIL import Image, ImageDraw
 ```
 
-Import them from this utility module:
+Import the lazy-loading functions and call them when needed:
 
 ```python
 from contracts.utils.image_processing import np, fitz, PyPDF2, pytesseract, pdf2image, Image, ImageDraw
+
+# Use as functions
+numpy_array = np().array([1, 2, 3])
+pdf_doc = fitz().open(pdf_path)
+pil_image = Image().open("image.jpg")
 ```
 
 ## Benefits
 
-1. Ensures NumPy is imported before other packages that might depend on it
-2. Centralizes version management
-3. Avoids import conflicts
-4. Makes it easier to update or modify image processing dependencies across the app 
+1. Prevents initialization conflicts by loading libraries only when needed
+2. Avoids the "CPU dispatcher tracer already initialized" error in WSGI environments 
+3. Reduces memory usage for requests that don't use these libraries
+4. Makes application startup faster and more reliable
+5. Centralizes dependency management 

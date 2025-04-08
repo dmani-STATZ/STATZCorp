@@ -3,7 +3,7 @@ import re
 import json
 import tempfile
 import logging
-# Use our centralized image processing utilities to avoid numpy conflicts
+# Import lazy-loaded modules from our utility
 from contracts.utils.image_processing import np, fitz, PyPDF2, pytesseract, pdf2image, Image, ImageDraw
 from datetime import datetime, timedelta
 from django.conf import settings
@@ -233,7 +233,7 @@ def extract_text_from_pdf(pdf_path):
     # Try to extract text using PyMuPDF's coordinate-based approach
     try:
         # Open the PDF document
-        pdf_document = fitz.open(pdf_path)
+        pdf_document = fitz().open(pdf_path)
         
         # Extract text from the specific box areas of the first page
         if pdf_document.page_count > 0:
@@ -242,8 +242,8 @@ def extract_text_from_pdf(pdf_path):
 
             # Create an image of the page
             pix = first_page.get_pixmap()
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            draw = ImageDraw.Draw(img)
+            img = Image().frombytes("RGB", [pix.width, pix.height], pix.samples)
+            draw = ImageDraw().Draw(img)
             
             # Extract text from each box using coordinates
             for field_name, field_info in DD1155_FIELDS.items():
@@ -295,7 +295,7 @@ def extract_text_from_pdf(pdf_path):
     full_text = ""
     try:
         with open(pdf_path, 'rb') as file:
-            reader = PyPDF2.PdfReader(file, strict=False)
+            reader = PyPDF2().PdfReader(file, strict=False)
             
             for page in range(len(reader.pages)):
                 full_text += reader.pages[page].extract_text() + "\n"
@@ -313,7 +313,7 @@ def extract_text_from_pdf(pdf_path):
     try:
         # Check if pytesseract is properly configured
         try:
-            pytesseract.get_tesseract_version()
+            pytesseract().get_tesseract_version()
         except Exception as e:
             logger.error(f"Tesseract OCR not properly configured: {str(e)}")
             return {
@@ -322,11 +322,11 @@ def extract_text_from_pdf(pdf_path):
             }
         
         # Convert PDF to images
-        images = pdf2image.convert_from_path(pdf_path)
+        images = pdf2image().convert_from_path(pdf_path)
         
         # Perform OCR on each image
         for img in images:
-            full_text += pytesseract.image_to_string(img) + "\n"
+            full_text += pytesseract().image_to_string(img) + "\n"
             
     except Exception as e:
         logger.error(f"Error performing OCR: {str(e)}")
@@ -1266,14 +1266,14 @@ def save_pdf_page_as_image(pdf_path, page_number, output_image_path):
     """
     try:
         # Open the PDF file
-        pdf_document = fitz.open(pdf_path)
+        pdf_document = fitz().open(pdf_path)
         
         # Select the page
         page = pdf_document.load_page(page_number - 1)  # page_number is 1-based
         
         # Set a higher zoom factor for better quality
         zoom_factor = 2.0  # Adjust as needed
-        mat = fitz.Matrix(zoom_factor, zoom_factor)
+        mat = fitz().Matrix(zoom_factor, zoom_factor)
         
         # Render the page to a pixmap with alpha channel
         pix = page.get_pixmap(matrix=mat, alpha=False)
@@ -1290,7 +1290,7 @@ def save_pdf_page_as_image(pdf_path, page_number, output_image_path):
         
         # Fallback method if the first method fails
         try:
-            pdf_document = fitz.open(pdf_path)
+            pdf_document = fitz().open(pdf_path)
             page = pdf_document.load_page(page_number - 1)
             
             # Try with different parameters
@@ -1298,7 +1298,7 @@ def save_pdf_page_as_image(pdf_path, page_number, output_image_path):
             
             # Convert to PIL Image using a different approach
             img_data = pix.samples
-            img = Image.frombytes("RGB", [pix.width, pix.height], img_data)
+            img = Image().frombytes("RGB", [pix.width, pix.height], img_data)
             img.save(output_image_path)
             
             pdf_document.close()
