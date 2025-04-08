@@ -38,6 +38,9 @@ urlpatterns = [
     path('contracts/', include('contracts.urls')),
     path('accesslog/', include('accesslog.urls')),
     path('health/', health_check, name='health_check'),
+    # Announcement URLs
+    path('announcement/add/', views.add_announcement, name='add_announcement'),
+    path('announcement/delete/<int:announcement_id>/', views.delete_announcement, name='delete_announcement'),
 ]
 
 # Always serve static/media files (even in production)
