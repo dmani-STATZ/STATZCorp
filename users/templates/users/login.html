@@ -28,31 +28,54 @@
     }
     
     /* Style for error messages */
-    .text-gray-500, ul{
-        color: rgb(190, 77, 77) !important;
-        padding-left: 13rem !important;
-    }
+    .login-box {
+            background: repeating-linear-gradient(
+                45deg,
+                #3e3e4150,
+                #3e3e4150 2px,
+                #d0d1d450 4px,
+                #d0d1d450 6px
+                ),
+                repeating-linear-gradient(
+                90deg,
+                #3e3e4150,
+                #3e3e4150 2px,
+                #d0d1d450 4px,
+                #d0d1d450 6px
+                );
+            background-blend-mode: multiply;
+            background-color: #b30000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            color: rgb(255, 255, 255);
+            padding: 2rem;
+            height: 400px; /* Reduced from 60px */
+            width: 675px;
+            border-radius: 0.5rem;
+            border: 2px solid rgb(46, 46, 46);
+        }
 
 </style>
 
 <div class="min-h-screen flex items-start justify-center py-12 px-4 sm:px-6 lg:px-8 pt-8">
     <div class="max-w-2xl w-full space-y-8">
-        <div class="bg-gray-800 rounded-lg p-8 shadow-xl">
+        <div class="login-box">
             <h2 class="mt-2 text-center text-3xl font-extrabold text-gray-100">Sign in to your account</h2>
             <form class="mt-8 space-y-6" method="POST">
                 {% csrf_token %}
                 <div class="rounded-md shadow-sm -space-y-px">
                     {{ form|crispy }}
                 </div>
-                <div class="flex items-center justify-between">
-                    <div class="text-sm">
-                        <a href="{% url 'users:password_reset' %}" class="font-medium text-blue-400 hover:text-blue-300">
+                <br>
+
+                <!-- <div class="flex items-center justify-between">
+                    <div class="text-sm text-black">
+                        <a href="{% url 'users:password_reset' %}" class="font-medium text-white hover:text-white">
                             Forgot your password?
                         </a>
                     </div>
-                </div>
+                </div> -->
                 <div>
-                    <button type="submit" class="group relative w-1/2 mx-auto flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <button type="submit" class="group relative w-1/2 mx-auto flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gray-700 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                         Sign in
                     </button>
                 </div>

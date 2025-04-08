@@ -16,60 +16,98 @@
     {% else %}
     <title>STATZ Corporation</title>
     {% endif %}
+
+    <style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        height: 100%;
+    }
+
+    *, *::before, *::after {
+    box-sizing: inherit; /* And this */
+    }
+/* ... rest of your styles ... */
+    header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: repeating-linear-gradient(
+            45deg,
+            #3e3e4150,
+            #3e3e4150 2px,
+            #d0d1d450 4px,
+            #d0d1d450 6px
+            ),
+            repeating-linear-gradient(
+            90deg,
+            #3e3e4150,
+            #3e3e4150 2px,
+            #d0d1d450 4px,
+            #d0d1d450 6px
+            );
+        background-blend-mode: multiply;
+        background-color: #b30000;
+        z-index: 1000;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        color: rgb(255, 255, 255);
+        padding: 0.5rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 48px; /* Reduced from 60px */
+    }
+
+    .main-background {
+        position: fixed;
+        top: 48px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url("{% static 'images/gears-metal-stainless-technology.jpg' %}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    </style>
+
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-cover bg-center bg-no-repeat min-h-screen" style="background-image: url('{% static 'images/gears-metal-stainless-technology.jpg' %}')">
-    <header class="site-header">
-        <nav class="bg-gray-800 p-4">
-            <div class="container mx-auto flex items-center justify-between">
-                <!-- Left Section: Logo/Image -->
-                <div class="flex items-center">
-                    <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4"></a>
-                    <!-- App Links -->
-
-                </div>
-                <!-- Right Section: Username and Sign Out -->
-                <div class="flex items-center">
-                    {% if user.is_authenticated %}
-                    <div class="flex flex-col md:flex-row md:ml-auto">
-                        {% if user.is_superuser %}
-                            <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
-                        {% else %}
-                            <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
-                        {% endif %}
-                        
-                        <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
-                        </form>
-                    </div>
-                    {% else %}
-                    <div class="flex flex-col md:flex-row md:ml-auto">
-                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
-                        <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </nav>
-    </header>   
-
-    <div class="min-h-screen flex items-center justify-center">
-        <div class="max-w-3xl w-full mx-4"> <!-- Changed from max-w-md to max-w-2xl -->
-            <div >
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="mb-4 p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700{% elif message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
+<body>
+    <header id="header">
+        <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4"></a>
+            {% if user.is_authenticated %}
+            <div class="flex flex-col md:flex-row md:ml-auto">
+                {% if user.is_superuser %}
+                    <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                {% else %}
+                    <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
                 {% endif %}
-                {% block content %}{% endblock content %}
+                
+                <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
+                </form>
             </div>
-        </div>
+            {% else %}
+            <div class="flex flex-col md:flex-row md:ml-auto">
+                <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
+                <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
+            </div>
+            {% endif %}
+    </header>   
+    <div class="main-background">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700{% elif message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        {% block content %}{% endblock content %}
     </div>
-
-
     {% block extra_scripts %}{% endblock %}
 </body>
 </html> 
