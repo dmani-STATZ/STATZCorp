@@ -49,11 +49,10 @@ DATABASES = {
 }
 
 # CORS Settings
-# CORS_ALLOW_ALL_ORIGINS = False
-# CORS_ALLOWED_ORIGINS = [
-#     "https://your-domain.com",
-#     "https://www.your-domain.com",
-# ]
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
+CORS_ALLOW_HEADERS = ['Content-Type', 'X-CSRFToken']
 
 # Logging Configuration
 LOGGING = {
