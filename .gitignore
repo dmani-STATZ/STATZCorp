@@ -78,3 +78,6 @@ logs/*.log
 
 # Static files
 staticfiles/
+
+#Stuff
+install_requirements.bat
