@@ -18,6 +18,17 @@ try:
     print("Python path:", sys.path)
     print("Current directory:", os.getcwd())
     
+    # Load environment variables from .env.production
+    from pathlib import Path
+    from dotenv import load_dotenv
+    
+    # Build paths inside the project
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    env_file = os.path.join(BASE_DIR, '.env.production')
+    print(f"Loading environment from: {env_file}")
+    load_dotenv(env_file)
+    print(f"SECRET_KEY loaded: {'DJANGO_SECRET_KEY' in os.environ}")
+    
     from django.core.wsgi import get_wsgi_application
     
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'STATZWeb.settings_prod')
