@@ -10,9 +10,7 @@ from ..forms import FolderTrackingForm, ContractSearchForm
 import json
 import csv
 from datetime import datetime
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
+from contracts.utils.excel_utils import Workbook, get_column_letter, PatternFill, Font, Alignment, Border, Side
 import webcolors
 
 def color_to_argb(color):
@@ -185,7 +183,7 @@ def export_folder_tracking(request):
     response['Content-Disposition'] = f'attachment; filename="folder_tracking_{datetime.now().strftime("%Y%m%d")}.xlsx"'
 
     # Create workbook and select active sheet
-    wb = Workbook()
+    wb = Workbook()()  # Note the double parentheses: Workbook is now a function that returns the class
     ws = wb.active
     ws.title = "Folder Tracking"
 
@@ -194,15 +192,17 @@ def export_folder_tracking(request):
                'VSM SCN', 'SIR SCN', 'Tracking', 'Tracking #', 'Sort Data', 'Note']
 
     # Write headers with styling
-    header_fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-    header_alignment = Alignment(horizontal='center', vertical='center')
+    header_fill = PatternFill()(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
+    header_font = Font()(color="FFFFFF", bold=True)
+    header_alignment = Alignment()(horizontal='center', vertical='center')
     
     # Initialize dictionary to track maximum width of each column
     max_lengths = {i: len(str(header)) for i, header in enumerate(headers)}
     
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
+    # Apply styling to headers
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.value = header
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = header_alignment
@@ -213,11 +213,11 @@ def export_folder_tracking(request):
     ).order_by('stack_num', 'contract__contract_number')
 
     # Write data with styling
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
+    thin_border = Border()(
+        left=Side()(style='thin'),
+        right=Side()(style='thin'),
+        top=Side()(style='thin'),
+        bottom=Side()(style='thin')
     )
 
     # Define boolean fields (these will be center-aligned)
@@ -233,7 +233,7 @@ def export_folder_tracking(request):
         argb_color = color_to_argb(stack_color)
         
         # Create fill style for the stack column
-        stack_fill = PatternFill(start_color=argb_color, end_color=argb_color, fill_type="solid")
+        stack_fill = PatternFill()(start_color=argb_color, end_color=argb_color, fill_type="solid")
 
         # Write row data with styling
         row_data = [
@@ -262,27 +262,27 @@ def export_folder_tracking(request):
             
             # Apply basic styling to all cells
             cell.border = thin_border
-            cell.font = Font(color="000000")  # Black text for all cells
+            cell.font = Font()(color="000000")  # Black text for all cells
             
             # Set alignment based on field type
             if headers[col_idx - 1] in boolean_fields:
-                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.alignment = Alignment()(horizontal='center', vertical='center')
             else:
-                cell.alignment = Alignment(horizontal='left', vertical='center')
+                cell.alignment = Alignment()(horizontal='left', vertical='center')
             
             # Apply color only to stack column
             if col_idx == 1:  # Stack column
                 cell.fill = stack_fill
             else:
-                cell.fill = PatternFill(start_color="FFFFFFFF", end_color="FFFFFFFF", fill_type="solid")  # White background
+                cell.fill = PatternFill()(start_color="FFFFFFFF", end_color="FFFFFFFF", fill_type="solid")  # White background
             
             # Apply highlight to non-stack columns if needed
             if folder.highlight and col_idx > 1:
-                cell.fill = PatternFill(start_color="FFFFFF00", end_color="FFFFFF00", fill_type="solid")  # ARGB yellow
+                cell.fill = PatternFill()(start_color="FFFFFF00", end_color="FFFFFF00", fill_type="solid")  # ARGB yellow
 
     # Adjust column widths based on content
     for i, max_length in max_lengths.items():
-        column = get_column_letter(i + 1)
+        column = get_column_letter()(i + 1)  # Call as a function
         # Set width with some padding and maximum width limit
         adjusted_width = min(max_length + 2, 50)  # Add 2 for padding, cap at 50
         ws.column_dimensions[column].width = adjusted_width
