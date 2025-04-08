@@ -14,6 +14,30 @@ ALLOWED_HOSTS = [
     # Add your production IP addresses here
 ]
 
+# Explicitly configure template directories
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [
+            os.path.join(BASE_DIR, 'templates'),
+            os.path.join(BASE_DIR, 'users', 'templates'),
+            os.path.join(BASE_DIR, 'contracts', 'templates'),
+            os.path.join(BASE_DIR, 'inventory', 'templates'),
+            os.path.join(BASE_DIR, 'accesslog', 'templates'),
+        ],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+                'contracts.context_processors.reminders_processor',
+            ],
+        },
+    },
+]
+
 # Security Headers
 SECURE_SSL_REDIRECT = False
 # SESSION_COOKIE_SECURE = True
