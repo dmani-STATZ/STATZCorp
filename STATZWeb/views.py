@@ -3,6 +3,9 @@ from users.models import Announcement
 from django.contrib.auth.decorators import permission_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.conf import settings
+from datetime import datetime
+from django.utils.timezone import make_aware
 from STATZWeb.decorators import conditional_login_required
 
 def index(request):
@@ -12,7 +15,7 @@ def index(request):
 @conditional_login_required
 def about(request):
     return render(request, 'about.html', {'title': 'About'})
-
+ 
 
 def landing_page(request):
     return render(request, 'landing.html')

@@ -1,4 +1,4 @@
-USE [STATZWeb_dev]
+USE [STATZWeb]
 -- Rollback any open transactions to ensure a clean state
 IF @@TRANCOUNT > 0
 BEGIN
@@ -30,6 +30,7 @@ END
     DBCC CHECKIDENT ('contracts_paymenthistory', RESEED, 0);
 
 
+
 	-- Second Level
 	DELETE FROM contracts_clin;
 	DBCC CHECKIDENT ('contracts_clin', RESEED, 0);
@@ -53,6 +54,8 @@ END
 	DBCC CHECKIDENT ('contracts_contact', RESEED, 0);
 
 	-- Base Level
+    DELETE FROM contracts_contractstatus;
+    DBCC CHECKIDENT ('contracts_contractstatus', RESEED, 0);
 	DELETE FROM contracts_address;
 	DBCC CHECKIDENT ('contracts_address', RESEED, 0);
 	DELETE FROM contracts_suppliertype;
@@ -1677,6 +1680,22 @@ FROM            (SELECT        Contract_ID, PlanSplit_per_PPIbid, Type_ID
 				FROM            ContractLog.dbo.STATZ_SUB_CONTRACTS_TBL
 				WHERE        (Type_ID = 1)) AS subquery INNER JOIN
                          contracts_contract ON subquery.Contract_ID = contracts_contract.id
+
+
+-- Update contract_contractstatus
+print ('##########################################')
+print 'Update contract_contractstatus'
+print ('##########################################')
+
+SET IDENTITY_INSERT [dbo].[contracts_contractstatus] ON;
+
+INSERT INTO contracts_contractstatus (id, description)
+VALUES (1, 'Open'),
+       (2, 'Closed'),
+       (3, 'Canceled');
+
+SET IDENTITY_INSERT [dbo].[contracts_contractstatus] OFF;
+
 
 -- Update contract status
 print ('##########################################')

@@ -121,6 +121,16 @@ from .views.acknowledgment_views import (
     generate_acknowledgment_letter_doc
 )
 
+from .views.queue_views import (
+    ContractQueueListView,
+    get_next_numbers,
+    start_processing,
+    process_contract,
+    download_csv_template,
+    download_test_data,
+    upload_csv,
+)
+
 app_name = 'contracts'
 
 urlpatterns = [
@@ -214,6 +224,7 @@ urlpatterns = [
     path('contacts/<int:pk>/update/', ContactUpdateView.as_view(), name='contact_update'),
     path('contacts/<int:pk>/delete/', ContactDeleteView.as_view(), name='contact_delete'),
     
+    
     # Address management
     path('addresses/', AddressListView.as_view(), name='address_list'),
     path('addresses/create/', AddressCreateView.as_view(), name='address_create'),
@@ -258,4 +269,13 @@ urlpatterns = [
     path('acknowledgment-letter/<int:clin_id>/', get_acknowledgment_letter, name='get_acknowledgment_letter'),
     path('acknowledgment-letter/<int:letter_id>/update/', update_acknowledgment_letter, name='update_acknowledgment_letter'),
     path('acknowledgment-letter/<int:letter_id>/generate/', generate_acknowledgment_letter_doc, name='generate_acknowledgment_letter_doc'),
+
+    # Contract Queue URLs
+    path('queue/', ContractQueueListView.as_view(), name='contract_queue'),
+    path('api/get-next-numbers/', get_next_numbers, name='get_next_numbers'),
+    path('api/start-processing/', start_processing, name='start_processing'),
+    path('api/process-contract/', process_contract, name='process_contract'),
+    path('queue/template/', download_csv_template, name='download_csv_template'),
+    path('queue/test-data/', download_test_data, name='download_test_data'),
+    path('queue/upload/', upload_csv, name='upload_csv'),
 ] 

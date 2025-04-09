@@ -835,3 +835,67 @@ class ExportTiming(models.Model):
         
         # Ensure minimum of 1 second
         return max(1, estimated_time)
+
+class ContractQueue(AuditModel):
+    """Model for storing queued contracts before they become live contracts"""
+    contract_number = models.CharField(max_length=25, null=True, blank=True)
+    buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
+    award_date = models.DateTimeField(null=True, blank=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    contract_type = models.CharField(max_length=50, null=True, blank=True)  # Unilateral, Bilateral, IDIQ
+    solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
+    
+    # Status tracking
+    is_being_processed = models.BooleanField(default=False)
+    processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='processing_contracts')
+    processing_started = models.DateTimeField(null=True, blank=True)
+    
+    # Matched references (after processing)
+    matched_buyer = models.ForeignKey('Buyer', on_delete=models.SET_NULL, null=True, blank=True)
+    matched_contract_type = models.ForeignKey('ContractType', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['contract_number']),
+            models.Index(fields=['is_being_processed']),
+            models.Index(fields=['processed_by']),
+        ]
+
+    def __str__(self):
+        return f"Queued Contract {self.contract_number}"
+
+class ClinQueue(AuditModel):
+    """Model for storing queued CLINs before they become live CLINs"""
+    contract_queue = models.ForeignKey(ContractQueue, on_delete=models.CASCADE, related_name='clins')
+    item_number = models.CharField(max_length=20, null=True, blank=True)
+    item_type = models.CharField(max_length=20, null=True, blank=True)  # FAT, PVT, Production
+    nsn = models.CharField(max_length=20, null=True, blank=True)  # String value to be matched later
+    nsn_description = models.TextField(null=True, blank=True)
+    ia = models.CharField(max_length=5, null=True, blank=True, choices=Clin.ORIGIN_DESTINATION_CHOICES)
+    fob = models.CharField(max_length=5, null=True, blank=True, choices=Clin.ORIGIN_DESTINATION_CHOICES)
+    due_date = models.DateField(null=True, blank=True)
+    order_qty = models.FloatField(null=True, blank=True)
+    item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    
+    # Optional supplier information
+    supplier = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
+    supplier_due_date = models.DateField(null=True, blank=True)
+    supplier_unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    supplier_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    supplier_payment_terms = models.CharField(max_length=50, null=True, blank=True)
+    
+    # Matched references (after processing)
+    matched_nsn = models.ForeignKey('Nsn', on_delete=models.SET_NULL, null=True, blank=True)
+    matched_supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['contract_queue']),
+            models.Index(fields=['nsn']),
+            models.Index(fields=['supplier']),
+        ]
+
+    def __str__(self):
+        return f"Queued CLIN {self.item_number} for Contract {self.contract_queue.contract_number}"
