@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from decimal import Decimal
-from contracts.models import AuditModel, Buyer, Nsn, Supplier, ContractType
+from contracts.models import AuditModel, Buyer, Nsn, Supplier, ContractType, Contract, Clin
 
 class ContractQueue(AuditModel):
     """Model for storing queued contracts before they become live contracts"""
@@ -117,3 +117,84 @@ class SequenceNumber(models.Model):
         sequence.tab_number += 1
         sequence.save()
         return current
+
+class ProcessContract(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('in_progress', 'In Progress'),
+        ('ready_for_review', 'Ready for Review'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    # Contract Fields
+    contract_number = models.CharField(max_length=50)
+    buyer = models.ForeignKey(Buyer, on_delete=models.SET_NULL, null=True, blank=True)
+    buyer_text = models.CharField(max_length=255, blank=True)  # Store original text before matching
+    award_date = models.DateField()
+    due_date = models.DateField()
+    contract_value = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField(blank=True)
+    
+    # Processing Fields
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    queue_id = models.IntegerField()  # Reference to original queue item
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_process_contracts')
+    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='modified_process_contracts')
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+    
+    # Final Contract Reference (after processing)
+    final_contract = models.ForeignKey(Contract, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Processing Contract'
+        verbose_name_plural = 'Processing Contracts'
+
+    def __str__(self):
+        return f"Processing Contract: {self.contract_number}"
+
+class ProcessCLIN(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('in_progress', 'In Progress'),
+        ('ready_for_review', 'Ready for Review'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    # CLIN Fields
+    process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, related_name='clins')
+    clin_number = models.CharField(max_length=50)
+    nsn = models.ForeignKey(Nsn, on_delete=models.SET_NULL, null=True, blank=True)
+    nsn_text = models.CharField(max_length=255, blank=True)  # Store original text before matching
+    nsn_description_text = models.TextField(blank=True)  # Store original description before matching
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
+    supplier_text = models.CharField(max_length=255, blank=True)  # Store original text before matching
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField(blank=True)
+    
+    # Processing Fields
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+    
+    # Final CLIN Reference (after processing)
+    final_clin = models.ForeignKey(Clin, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['clin_number']
+        verbose_name = 'Processing CLIN'
+        verbose_name_plural = 'Processing CLINs'
+
+    def __str__(self):
+        return f"Processing CLIN: {self.clin_number} for {self.process_contract.contract_number}"
+
+    def save(self, *args, **kwargs):
+        # Calculate total_price if not set
+        if not self.total_price and self.quantity and self.unit_price:
+            self.total_price = self.quantity * self.unit_price
+        super().save(*args, **kwargs)

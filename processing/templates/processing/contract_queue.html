@@ -21,6 +21,20 @@
         </div>
     </div>
 
+    <!-- Drag and Drop Zone -->
+    <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 mb-6 text-center transition-colors duration-200 ease-in-out">
+        <div class="flex flex-col items-center justify-center">
+            <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <p class="text-lg text-gray-600 mb-2">Drag and drop your CSV file here</p>
+            <p class="text-sm text-gray-500">or</p>
+            <button onclick="document.getElementById('csv-upload').click()" class="mt-2 text-indigo-600 hover:text-indigo-500">
+                Browse files
+            </button>
+        </div>
+    </div>
+
     <div class="bg-white shadow-md rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -164,6 +178,75 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Add drag and drop functionality
+const dropZone = document.getElementById('drop-zone');
+
+// Prevent default drag behaviors
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, preventDefaults, false);
+    document.body.addEventListener(eventName, preventDefaults, false);
+});
+
+// Highlight drop zone when item is dragged over it
+['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, highlight, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, unhighlight, false);
+});
+
+// Handle dropped files
+dropZone.addEventListener('drop', handleDrop, false);
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function highlight(e) {
+    dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
+}
+
+function unhighlight(e) {
+    dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length > 0) {
+        const file = files[0];
+        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+            const formData = new FormData();
+            formData.append('csv_file', file);
+            
+            fetch('/processing/upload/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while uploading the file');
+            });
+        } else {
+            alert('Please upload a CSV file');
+        }
+    }
 }
 </script>
 {% endblock %} 

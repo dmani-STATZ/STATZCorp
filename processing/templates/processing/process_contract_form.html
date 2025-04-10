@@ -1,0 +1,190 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Edit Processing Contract{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Edit Processing Contract</h1>
+        <div class="space-x-4">
+            <a href="{% url 'processing:process_contract_detail' pk=process_contract.id %}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                Cancel
+            </a>
+        </div>
+    </div>
+
+    <form method="post" class="bg-white shadow-md rounded-lg p-6">
+        {% csrf_token %}
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div>
+                <h2 class="text-lg font-semibold mb-4">Contract Details</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Contract Number</label>
+                        {{ form.contract_number }}
+                        {% if form.contract_number.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.contract_number.errors }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Buyer</label>
+                        {{ form.buyer }}
+                        {% if form.buyer.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.buyer.errors }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Award Date</label>
+                        {{ form.award_date }}
+                        {% if form.award_date.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.award_date.errors }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Due Date</label>
+                        {{ form.due_date }}
+                        {% if form.due_date.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.due_date.errors }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Contract Value</label>
+                        {{ form.contract_value }}
+                        {% if form.contract_value.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.contract_value.errors }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Status</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.status.errors }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <h2 class="text-lg font-semibold mb-4">Description</h2>
+                <div>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.description.errors }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8">
+            <h2 class="text-lg font-semibold mb-4">CLIN Items</h2>
+            {{ clins_formset.management_form }}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for clin_form in clins_formset %}
+                        <tr>
+                            <td class="px-6 py-4">
+                                {{ clin_form.id }}
+                                {{ clin_form.clin_number }}
+                                {% if clin_form.clin_number.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.clin_number.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.nsn }}
+                                {% if clin_form.nsn.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.nsn.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.supplier }}
+                                {% if clin_form.supplier.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.supplier.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.quantity }}
+                                {% if clin_form.quantity.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.quantity.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.unit_price }}
+                                {% if clin_form.unit_price.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.unit_price.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.total_price }}
+                                {% if clin_form.total_price.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.total_price.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.status }}
+                                {% if clin_form.status.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.status.errors }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ clin_form.DELETE }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                Save Changes
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for quantity and unit price to calculate total price
+    const forms = document.querySelectorAll('tbody tr');
+    forms.forEach(form => {
+        const quantityInput = form.querySelector('input[name*="quantity"]');
+        const unitPriceInput = form.querySelector('input[name*="unit_price"]');
+        const totalPriceInput = form.querySelector('input[name*="total_price"]');
+        
+        function calculateTotal() {
+            if (quantityInput && unitPriceInput && totalPriceInput) {
+                const quantity = parseFloat(quantityInput.value) || 0;
+                const unitPrice = parseFloat(unitPriceInput.value) || 0;
+                totalPriceInput.value = (quantity * unitPrice).toFixed(2);
+            }
+        }
+        
+        if (quantityInput) quantityInput.addEventListener('input', calculateTotal);
+        if (unitPriceInput) unitPriceInput.addEventListener('input', calculateTotal);
+    });
+});
+</script>
+{% endblock %} 

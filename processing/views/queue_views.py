@@ -12,6 +12,10 @@ import csv
 from io import StringIO
 import random
 from datetime import datetime, timedelta
+from django.conf import settings
+from django.core.exceptions import PermissionDenied
+from django.db.models import Count
+import decimal
 
 @method_decorator(login_required, name='dispatch')
 class ContractQueueListView(ListView):
@@ -184,6 +188,10 @@ def download_csv_template(request):
 
 def download_test_data(request):
     """Download sample test data for contract queue upload"""
+    # Only allow in development environment
+    if not settings.DEBUG:
+        raise PermissionDenied("Test data download is only available in development environment")
+    
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="contract_queue_test_data.csv"'
     
@@ -213,40 +221,98 @@ def download_test_data(request):
         'Supplier Payment Terms'
     ])
     
-    # Generate some random test data
-    for i in range(5):
-        contract_number = f"TEST{i+1}"
-        buyer = f"Test Buyer {i+1}"
-        award_date = (datetime.now() - timedelta(days=random.randint(1, 30))).strftime('%Y-%m-%d')
-        due_date = (datetime.now() + timedelta(days=random.randint(30, 90))).strftime('%Y-%m-%d')
-        contract_value = round(random.uniform(10000, 100000), 2)
-        contract_type = random.choice(['Unilateral', 'Bilateral', 'IDIQ'])
-        solicitation_type = 'SDVOSB'
+    try:
+        # Get total count of NSNs and Suppliers
+        nsn_count = Nsn.objects.count()
+        supplier_count = Supplier.objects.count()
         
-        # Generate 1-3 CLINs per contract
-        for j in range(random.randint(1, 3)):
-            item_number = f"{j+1:04d}"
-            item_type = random.choice(['FAT', 'PVT', 'Production'])
-            nsn = f"TEST{i+1}{j+1}"
-            nsn_description = f"Test NSN Description {i+1}{j+1}"
+        # Get random NSNs (15 or all if less than 15)
+        nsn_limit = min(15, nsn_count)
+        nsn_ids = random.sample(range(1, nsn_count + 1), nsn_limit) if nsn_count > 0 else []
+        real_nsns = list(Nsn.objects.filter(id__in=nsn_ids).values_list('nsn_code', 'description'))
+        
+        # Get random Suppliers (15 or all if less than 15)
+        supplier_limit = min(15, supplier_count)
+        supplier_ids = random.sample(range(1, supplier_count + 1), supplier_limit) if supplier_count > 0 else []
+        real_suppliers = list(Supplier.objects.filter(id__in=supplier_ids).values_list('name', flat=True))
+        
+        # Get buyers
+        real_buyers = list(Buyer.objects.values_list('description', flat=True)[:10])
+        
+        # Generate 10 contracts
+        for i in range(10):
+            # Generate award date and use it for contract number
+            award_date = datetime.now() - timedelta(days=random.randint(1, 30))
+            year = award_date.strftime('%y')
+            contract_number = f"STATZ-{year}-P-{random.randint(1000, 9999)}"
+            
+            # Mix of real and made-up buyers
+            if i < len(real_buyers):
+                buyer = real_buyers[i]
+            else:
+                buyer = f"Test Buyer {i+1}"
+            
+            due_date = (award_date + timedelta(days=random.randint(30, 90))).strftime('%Y-%m-%d')
+            award_date_str = award_date.strftime('%Y-%m-%d')
+            contract_type = random.choice(['Unilateral', 'Bilateral', 'IDIQ'])
+            solicitation_type = 'SDVOSB'
+            
+            # Initialize contract value
+            contract_value = 0
+            
+            # Generate 1-4 CLINs per contract
+            num_clins = random.randint(1, 4)
+            clin_data = []
+            
+            # First CLIN must be Production
+            item_number = "0001"
+            item_type = "Production"
+            
+            # Generate CLIN data
+            order_qty = random.randint(1, 100)
+            unit_price = round(random.uniform(100, 1000), 2)
+            item_value = round(order_qty * unit_price, 2)
+            contract_value += item_value
+            
+            # Mix of real and made-up NSNs
+            if real_nsns and random.random() > 0.3:  # 70% chance to use real NSN
+                nsn, nsn_description = random.choice(real_nsns)
+            else:
+                nsn = f"TEST{i+1:03d}01"  # Format as TEST00101, TEST00102, etc.
+                nsn_description = f"Test NSN Description {i+1}01"
+            
             ia = random.choice(['O', 'D'])
             fob = random.choice(['O', 'D'])
-            clin_due_date = (datetime.now() + timedelta(days=random.randint(30, 90))).strftime('%Y-%m-%d')
-            order_qty = random.randint(1, 100)
-            item_value = round(random.uniform(1000, 10000), 2)
-            unit_price = round(item_value / order_qty, 2)
-            supplier = f"Test Supplier {i+1}{j+1}"
-            supplier_due_date = (datetime.now() + timedelta(days=random.randint(15, 45))).strftime('%Y-%m-%d')
-            supplier_unit_price = round(unit_price * random.uniform(0.8, 1.2), 2)
-            supplier_price = round(supplier_unit_price * order_qty, 2)
-            supplier_payment_terms = random.choice(['Net 30', 'Net 45', 'Net 60'])
+            clin_due_date = (award_date + timedelta(days=random.randint(30, 90))).strftime('%Y-%m-%d')
             
-            writer.writerow([
+            # Randomly decide if this CLIN should have supplier data (about 30% won't)
+            has_supplier = random.random() > 0.3
+            
+            if has_supplier and real_suppliers and random.random() > 0.3:  # 70% chance to use real supplier
+                supplier = random.choice(real_suppliers)
+            elif has_supplier:
+                supplier = f"Test Supplier {i+1:03d}01"  # Format as TEST00101, TEST00102, etc.
+            else:
+                supplier = ''
+            
+            if has_supplier and supplier:
+                supplier_due_date = (award_date + timedelta(days=random.randint(15, 45))).strftime('%Y-%m-%d')
+                supplier_unit_price = round(unit_price * random.uniform(0.8, 1.2), 2)
+                supplier_price = round(supplier_unit_price * order_qty, 2)
+                supplier_payment_terms = random.choice(['Net 30', 'Net 45', 'Net 60'])
+            else:
+                supplier_due_date = ''
+                supplier_unit_price = ''
+                supplier_price = ''
+                supplier_payment_terms = ''
+            
+            # Add first CLIN data
+            clin_data.append([
                 contract_number,
                 buyer,
-                award_date,
+                award_date_str,
                 due_date,
-                contract_value,
+                contract_value,  # Will be updated after all CLINs
                 contract_type,
                 solicitation_type,
                 item_number,
@@ -265,8 +331,96 @@ def download_test_data(request):
                 supplier_price,
                 supplier_payment_terms
             ])
+            
+            # Generate additional CLINs
+            for j in range(1, num_clins):
+                item_number = f"{j+1:04d}"
+                
+                # For additional CLINs, ensure at most one FAT and one PVT
+                if j == 1:
+                    item_type = random.choice(['FAT', 'PVT'])
+                elif j == 2:
+                    item_type = 'Production' if item_type == 'FAT' else 'Production'
+                else:
+                    item_type = 'Production'
+                
+                # Generate CLIN data
+                order_qty = random.randint(1, 100)
+                unit_price = round(random.uniform(100, 1000), 2)
+                item_value = round(order_qty * unit_price, 2)
+                contract_value += item_value
+                
+                # Mix of real and made-up NSNs
+                if real_nsns and random.random() > 0.3:  # 70% chance to use real NSN
+                    nsn, nsn_description = random.choice(real_nsns)
+                else:
+                    nsn = f"TEST{i+1:03d}{j+1:02d}"  # Format as TEST00101, TEST00102, etc.
+                    nsn_description = f"Test NSN Description {i+1}{j+1}"
+                
+                ia = random.choice(['O', 'D'])
+                fob = random.choice(['O', 'D'])
+                clin_due_date = (award_date + timedelta(days=random.randint(30, 90))).strftime('%Y-%m-%d')
+                
+                # Randomly decide if this CLIN should have supplier data (about 30% won't)
+                has_supplier = random.random() > 0.3
+                
+                if has_supplier and real_suppliers and random.random() > 0.3:  # 70% chance to use real supplier
+                    supplier = random.choice(real_suppliers)
+                elif has_supplier:
+                    supplier = f"Test Supplier {i+1:03d}{j+1:02d}"  # Format as TEST00101, TEST00102, etc.
+                else:
+                    supplier = ''
+                
+                if has_supplier and supplier:
+                    supplier_due_date = (award_date + timedelta(days=random.randint(15, 45))).strftime('%Y-%m-%d')
+                    supplier_unit_price = round(unit_price * random.uniform(0.8, 1.2), 2)
+                    supplier_price = round(supplier_unit_price * order_qty, 2)
+                    supplier_payment_terms = random.choice(['Net 30', 'Net 45', 'Net 60'])
+                else:
+                    supplier_due_date = ''
+                    supplier_unit_price = ''
+                    supplier_price = ''
+                    supplier_payment_terms = ''
+                
+                # Add CLIN data
+                clin_data.append([
+                    contract_number,
+                    buyer,
+                    award_date_str,
+                    due_date,
+                    contract_value,  # Will be updated after all CLINs
+                    contract_type,
+                    solicitation_type,
+                    item_number,
+                    item_type,
+                    nsn,
+                    nsn_description,
+                    ia,
+                    fob,
+                    clin_due_date,
+                    order_qty,
+                    item_value,
+                    unit_price,
+                    supplier,
+                    supplier_due_date,
+                    supplier_unit_price,
+                    supplier_price,
+                    supplier_payment_terms
+                ])
+            
+            # Update contract value in all CLINs for this contract
+            for clin in clin_data:
+                clin[4] = contract_value  # Update contract value
+                writer.writerow(clin)
+        
+        return response
     
-    return response
+    except Exception as e:
+        # Log the error and return a generic error message
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating test data: {str(e)}")
+        return HttpResponse("Error generating test data. Please check the logs for details.", status=500)
 
 @require_http_methods(["POST"])
 @login_required
@@ -283,45 +437,100 @@ def upload_csv(request):
         csv_data = csv_file.read().decode('utf-8')
         csv_reader = csv.DictReader(StringIO(csv_data))
         
+        # Define required decimal fields and their validation
+        decimal_fields = {
+            'Contract Value': 'contract_value',
+            'Order Qty': 'order_qty',
+            'Item Value': 'item_value',
+            'Unit Price': 'unit_price',
+            'Supplier Unit Price': 'supplier_unit_price',
+            'Supplier Price': 'supplier_price'
+        }
+        
         with transaction.atomic():
             current_contract = None
+            row_number = 0
+            
             for row in csv_reader:
+                row_number += 1
+                
+                # Validate decimal fields
+                for field_name, model_field in decimal_fields.items():
+                    if field_name in row:
+                        try:
+                            # Convert empty strings to None
+                            value = row[field_name].strip() if row[field_name] else None
+                            if value is not None:
+                                # Try to convert to decimal
+                                decimal.Decimal(value)
+                        except (decimal.InvalidOperation, ValueError) as e:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Invalid decimal value in row {row_number}, column "{field_name}": {str(e)}',
+                                'row': row_number,
+                                'column': field_name,
+                                'value': row[field_name]
+                            })
+                
                 # If this is a new contract (different contract number)
                 if not current_contract or current_contract.contract_number != row['Contract Number']:
-                    # Create new contract queue entry
-                    current_contract = ContractQueue.objects.create(
-                        contract_number=row['Contract Number'],
-                        buyer=row['Buyer'],
-                        award_date=datetime.strptime(row['Award Date'], '%Y-%m-%d') if row['Award Date'] else None,
+                    try:
+                        # Create new contract queue entry
+                        current_contract = ContractQueue.objects.create(
+                            contract_number=row['Contract Number'],
+                            buyer=row['Buyer'],
+                            award_date=datetime.strptime(row['Award Date'], '%Y-%m-%d') if row['Award Date'] else None,
+                            due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
+                            contract_value=decimal.Decimal(row['Contract Value']) if row['Contract Value'] else None,
+                            contract_type=row['Contract Type'],
+                            solicitation_type=row['Solicitation Type'],
+                            created_by=request.user,
+                            modified_by=request.user
+                        )
+                    except Exception as e:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Error creating contract in row {row_number}: {str(e)}',
+                            'row': row_number,
+                            'contract_number': row['Contract Number']
+                        })
+                
+                try:
+                    # Handle supplier fields - convert empty strings to None
+                    supplier = row['Supplier'].strip() if row['Supplier'] else None
+                    supplier_due_date = datetime.strptime(row['Supplier Due Date'], '%Y-%m-%d') if row['Supplier Due Date'] else None
+                    supplier_unit_price = decimal.Decimal(row['Supplier Unit Price']) if row['Supplier Unit Price'] else None
+                    supplier_price = decimal.Decimal(row['Supplier Price']) if row['Supplier Price'] else None
+                    supplier_payment_terms = row['Supplier Payment Terms'].strip() if row['Supplier Payment Terms'] else None
+                    
+                    # Create CLIN queue entry
+                    ClinQueue.objects.create(
+                        contract_queue=current_contract,
+                        item_number=row['Item Number'],
+                        item_type=row['Item Type'],
+                        nsn=row['NSN'],
+                        nsn_description=row['NSN Description'],
+                        ia=row['IA'],
+                        fob=row['FOB'],
                         due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
-                        contract_value=row['Contract Value'],
-                        contract_type=row['Contract Type'],
-                        solicitation_type=row['Solicitation Type'],
+                        order_qty=decimal.Decimal(row['Order Qty']) if row['Order Qty'] else None,
+                        item_value=decimal.Decimal(row['Item Value']) if row['Item Value'] else None,
+                        unit_price=decimal.Decimal(row['Unit Price']) if row['Unit Price'] else None,
+                        supplier=supplier,
+                        supplier_due_date=supplier_due_date,
+                        supplier_unit_price=supplier_unit_price,
+                        supplier_price=supplier_price,
+                        supplier_payment_terms=supplier_payment_terms,
                         created_by=request.user,
                         modified_by=request.user
                     )
-                
-                # Create CLIN queue entry
-                ClinQueue.objects.create(
-                    contract_queue=current_contract,
-                    item_number=row['Item Number'],
-                    item_type=row['Item Type'],
-                    nsn=row['NSN'],
-                    nsn_description=row['NSN Description'],
-                    ia=row['IA'],
-                    fob=row['FOB'],
-                    due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
-                    order_qty=row['Order Qty'],
-                    item_value=row['Item Value'],
-                    unit_price=row['Unit Price'],
-                    supplier=row['Supplier'],
-                    supplier_due_date=datetime.strptime(row['Supplier Due Date'], '%Y-%m-%d') if row['Supplier Due Date'] else None,
-                    supplier_unit_price=row['Supplier Unit Price'],
-                    supplier_price=row['Supplier Price'],
-                    supplier_payment_terms=row['Supplier Payment Terms'],
-                    created_by=request.user,
-                    modified_by=request.user
-                )
+                except Exception as e:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error creating CLIN in row {row_number}: {str(e)}',
+                        'row': row_number,
+                        'item_number': row['Item Number']
+                    })
         
         return JsonResponse({
             'success': True,
@@ -330,5 +539,5 @@ def upload_csv(request):
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': f'Error processing CSV file: {str(e)}'
         }) 
