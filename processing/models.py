@@ -3,9 +3,12 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from decimal import Decimal
-from contracts.models import AuditModel, Buyer, Nsn, Supplier, ContractType, Contract, Clin
+from contracts.models import (
+    AuditModel, Buyer, Nsn, Supplier, ContractType, Contract, 
+    Clin, IdiqContract, SalesClass, ClinType, SpecialPaymentTerms
+)
 
-class ContractQueue(AuditModel):
+class QueueContract(AuditModel):
     """Model for storing queued contracts before they become live contracts"""
     contract_number = models.CharField(max_length=25, null=True, blank=True)
     buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
@@ -36,9 +39,9 @@ class ContractQueue(AuditModel):
     def __str__(self):
         return f"Queued Contract {self.contract_number}"
 
-class ClinQueue(AuditModel):
+class QueueClin(AuditModel):
     """Model for storing queued CLINs before they become live CLINs"""
-    contract_queue = models.ForeignKey(ContractQueue, on_delete=models.CASCADE, related_name='clins')
+    contract_queue = models.ForeignKey(QueueContract, on_delete=models.CASCADE, related_name='clins')
     item_number = models.CharField(max_length=20, null=True, blank=True)
     item_type = models.CharField(max_length=20, null=True, blank=True)  # FAT, PVT, Production
     nsn = models.CharField(max_length=20, null=True, blank=True)  # String value to be matched later
@@ -127,15 +130,28 @@ class ProcessContract(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
-    # Contract Fields
-    contract_number = models.CharField(max_length=50)
-    buyer = models.ForeignKey(Buyer, on_delete=models.SET_NULL, null=True, blank=True)
-    buyer_text = models.CharField(max_length=255, blank=True)  # Store original text before matching
-    award_date = models.DateField()
-    due_date = models.DateField()
-    contract_value = models.DecimalField(max_digits=12, decimal_places=2)
-    description = models.TextField(blank=True)
-    
+    idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE, null=True, blank=True)
+    contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
+    solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
+    po_number = models.CharField(max_length=10, null=True, blank=True)
+    tab_num = models.CharField(max_length=10, null=True, blank=True)
+    buyer = models.ForeignKey(Buyer, on_delete=models.CASCADE, null=True, blank=True)
+    buyer_text = models.CharField(max_length=255, null=True, blank=True)
+    contract_type = models.ForeignKey(ContractType, on_delete=models.CASCADE, null=True, blank=True)
+    award_date = models.DateTimeField(null=True, blank=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    due_date_late = models.BooleanField(null=True, blank=True)
+    sales_class = models.ForeignKey(SalesClass, on_delete=models.CASCADE, null=True, blank=True)
+    nist = models.BooleanField(null=True, blank=True)
+    files_url = models.CharField(max_length=200, null=True, blank=True)
+    contract_value = models.FloatField(null=True, blank=True, default=0)
+    description = models.TextField(null=True, blank=True)
+    planned_split = models.CharField(max_length=50, null=True, blank=True)
+    ppi_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     queue_id = models.IntegerField()  # Reference to original queue item
@@ -143,7 +159,7 @@ class ProcessContract(models.Model):
     modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='modified_process_contracts')
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
-    
+
     # Final Contract Reference (after processing)
     final_contract = models.ForeignKey(Contract, on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -155,7 +171,7 @@ class ProcessContract(models.Model):
     def __str__(self):
         return f"Processing Contract: {self.contract_number}"
 
-class ProcessCLIN(models.Model):
+class ProcessClin(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('in_progress', 'In Progress'),
@@ -164,37 +180,70 @@ class ProcessCLIN(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
-    # CLIN Fields
-    process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, related_name='clins')
-    clin_number = models.CharField(max_length=50)
-    nsn = models.ForeignKey(Nsn, on_delete=models.SET_NULL, null=True, blank=True)
-    nsn_text = models.CharField(max_length=255, blank=True)  # Store original text before matching
-    nsn_description_text = models.TextField(blank=True)  # Store original description before matching
-    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
-    supplier_text = models.CharField(max_length=255, blank=True)  # Store original text before matching
-    quantity = models.IntegerField()
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
-    total_price = models.DecimalField(max_digits=12, decimal_places=2)
-    description = models.TextField(blank=True)
+    ORIGIN_DESTINATION_CHOICES = [
+        ('O', 'Origin'),
+        ('D', 'Destination'),
+    ]
     
+    ITEM_TYPE_CHOICES = [
+        ('P', 'Production'),
+        ('G', 'GFAT'),
+        ('C', 'CFAT'),
+        ('L', 'PLT'),
+        ('M', 'Miscellaneous')
+    ]
+
+    process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, null=True, blank=True, related_name='clins')
+    item_number = models.CharField(max_length=20, null=True, blank=True)
+    item_type = models.CharField(max_length=20, null=True, blank=True, choices=ITEM_TYPE_CHOICES)
+    item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    po_num_ext = models.CharField(max_length=5, null=True, blank=True)
+    tab_num = models.CharField(max_length=10, null=True, blank=True)
+    clin_po_num = models.CharField(max_length=10, null=True, blank=True)
+    po_number = models.CharField(max_length=10, null=True, blank=True)
+    clin_type = models.ForeignKey(ClinType, on_delete=models.CASCADE, null=True, blank=True)
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, null=True, blank=True)
+    supplier_text = models.CharField(max_length=255, null=True, blank=True)
+    nsn = models.ForeignKey(Nsn, on_delete=models.CASCADE, null=True, blank=True)
+    nsn_text = models.CharField(max_length=255, null=True, blank=True)
+    nsn_description_text = models.CharField(max_length=255, null=True, blank=True)
+    ia = models.CharField(max_length=5, null=True, blank=True, choices=ORIGIN_DESTINATION_CHOICES)
+    fob = models.CharField(max_length=5, null=True, blank=True, choices=ORIGIN_DESTINATION_CHOICES)
+    description = models.TextField(null=True, blank=True)
+    order_qty = models.FloatField(null=True, blank=True)
+    uom = models.CharField(max_length=10, null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    due_date_late = models.BooleanField(null=True, blank=True)
+    supplier_due_date = models.DateField(null=True, blank=True)
+    supplier_due_date_late = models.BooleanField(null=True, blank=True)
+
+    # CLIN_Finance
+    special_payment_terms = models.ForeignKey(SpecialPaymentTerms, on_delete=models.CASCADE, null=True, blank=True)
+    special_payment_terms_paid = models.BooleanField(null=True, blank=True)
+    price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    planned_split = models.CharField(max_length=50, null=True, blank=True)
+    ppi_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
+
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
-    
+
     # Final CLIN Reference (after processing)
     final_clin = models.ForeignKey(Clin, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
-        ordering = ['clin_number']
+        ordering = ['item_number']
         verbose_name = 'Processing CLIN'
         verbose_name_plural = 'Processing CLINs'
 
     def __str__(self):
-        return f"Processing CLIN: {self.clin_number} for {self.process_contract.contract_number}"
-
-    def save(self, *args, **kwargs):
-        # Calculate total_price if not set
-        if not self.total_price and self.quantity and self.unit_price:
-            self.total_price = self.quantity * self.unit_price
-        super().save(*args, **kwargs)
+        return f"Processing CLIN: {self.item_number} for {self.process_contract.contract_number}"

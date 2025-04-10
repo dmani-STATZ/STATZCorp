@@ -60,6 +60,9 @@
                         {% if contract.is_being_processed %}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                 Being Processed by {{ contract.processed_by.username }}
+                                {% if contract.processing_started %}
+                                    <br>Since {{ contract.processing_started|date:"Y-m-d H:i" }}
+                                {% endif %}
                             </span>
                         {% else %}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
@@ -73,8 +76,8 @@
                                 Start Processing
                             </button>
                         {% elif contract.processed_by == user %}
-                            <button onclick="processContract({{ contract.id }})" class="text-green-600 hover:text-green-900">
-                                Complete Processing
+                            <button onclick="resumeProcessing({{ contract.id }})" class="text-green-600 hover:text-green-900">
+                                Resume Processing
                             </button>
                         {% endif %}
                     </td>
@@ -91,50 +94,144 @@
     </div>
 </div>
 
+<div id="processingModal" class="hidden fixed z-10 inset-0 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            Processing Contract
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500" id="modal-message">
+                                Please wait while we process your request...
+                            </p>
+                            <div id="modal-error" class="mt-2 hidden">
+                                <p class="text-sm text-red-600"></p>
+                            </div>
+                            <div id="modal-progress" class="mt-4">
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" id="modal-close" class="hidden w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="hideModal()">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% csrf_token %}
+
 <script>
-function startProcessing(contractId) {
-    fetch('/processing/start/', {
+function showModal(message, showProgress = true) {
+    document.getElementById('modal-message').textContent = message;
+    document.getElementById('modal-error').classList.add('hidden');
+    document.getElementById('modal-close').classList.add('hidden');
+    document.getElementById('modal-progress').style.display = showProgress ? 'block' : 'none';
+    document.getElementById('processingModal').classList.remove('hidden');
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('modal-error');
+    errorDiv.querySelector('p').textContent = message;
+    errorDiv.classList.remove('hidden');
+    document.getElementById('modal-close').classList.remove('hidden');
+    document.getElementById('modal-progress').style.display = 'none';
+}
+
+function hideModal() {
+    document.getElementById('processingModal').classList.add('hidden');
+    // Reset progress bar
+    document.querySelector('#modal-progress .bg-blue-600').style.width = '0%';
+}
+
+function updateProgress(percent) {
+    document.querySelector('#modal-progress .bg-blue-600').style.width = `${percent}%`;
+}
+
+function startProcessing(queueId) {
+    showModal('Starting contract processing...');
+    updateProgress(25);
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    const fetchOptions = {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': getCookie('csrftoken')
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
         },
-        body: `contract_queue_id=${contractId}`
+        credentials: 'same-origin'
+    };
+
+    fetch(`{% url 'processing:start_processing' queue_id=0 %}`.replace('0', queueId), fetchOptions)
+    .then(response => {
+        updateProgress(50);
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Network response was not ok');
+            });
+        }
+        return response.json();
     })
-    .then(response => response.json())
     .then(data => {
+        updateProgress(75);
         if (data.success) {
-            location.reload();
+            updateProgress(100);
+            // Add a small delay to show the completion
+            setTimeout(() => {
+                window.location.href = `{% url 'processing:process_contract_detail' pk=0 %}`.replace('0', data.process_contract_id);
+            }, 500);
         } else {
-            alert(data.error);
+            throw new Error(data.error || 'An error occurred while processing the contract.');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while starting processing');
+        showError(error.message || 'An error occurred while processing the contract.');
     });
 }
 
-function processContract(contractId) {
-    fetch('/processing/process/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+function resumeProcessing(contractId) {
+    showModal('Retrieving contract information...', false);
+    
+    const getFetchOptions = {
+        'method': 'GET',
+        'headers': {
             'X-CSRFToken': getCookie('csrftoken')
         },
-        body: `contract_queue_id=${contractId}`
+        'credentials': 'same-origin'
+    };
+    fetch(`{% url 'processing:get_process_contract' queue_id=0 %}`.replace('0', contractId), getFetchOptions)
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Network response was not ok');
+            });
+        }
+        return response.json();
     })
-    .then(response => response.json())
     .then(data => {
         if (data.success) {
-            window.location.href = `/contracts/${data.contract_id}/`;
+            window.location.href = `{% url 'processing:process_contract_edit' pk=0 %}`.replace('0', data.process_contract_id);
         } else {
-            alert(data.error);
+            throw new Error(data.error || 'Could not find processing contract');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while processing the contract');
+        showError(error.message || 'An error occurred while resuming processing');
     });
 }
 
@@ -144,7 +241,10 @@ function handleFileUpload(input) {
     const formData = new FormData();
     formData.append('csv_file', input.files[0]);
     
-    fetch('/processing/upload/', {
+    // Show loading state
+    const loadingToast = showToast('Uploading and processing file...', 'info');
+    
+    fetch("{% url 'processing:upload_csv' %}", {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCookie('csrftoken')
@@ -153,16 +253,196 @@ function handleFileUpload(input) {
     })
     .then(response => response.json())
     .then(data => {
+        // Hide loading toast
+        loadingToast.remove();
+        
         if (data.success) {
+            showToast('File uploaded and processed successfully!', 'success');
             location.reload();
         } else {
-            alert(data.error);
+            let errorMessage = data.error;
+            let errorDetails = '';
+            
+            // Handle specific error types
+            switch (data.error_type) {
+                case 'missing_columns':
+                    errorMessage = 'Missing required columns in CSV file:';
+                    errorDetails = data.missing_columns.join(', ');
+                    break;
+                    
+                case 'missing_value':
+                    errorMessage = `Missing required value in row ${data.row}`;
+                    errorDetails = `Column: "${data.column}"`;
+                    break;
+                    
+                case 'invalid_decimal':
+                    errorMessage = `Invalid number format in row ${data.row}`;
+                    errorDetails = `Column: "${data.column}", Value: "${data.value}"
+                        Please ensure the number is properly formatted (e.g., 1234.56)`;
+                    break;
+                    
+                case 'invalid_date':
+                    errorMessage = `Invalid date format in row ${data.row}`;
+                    errorDetails = `Column: "${data.column}", Value: "${data.value}"
+                        Please use YYYY-MM-DD format (e.g., 2024-03-14)`;
+                    break;
+                    
+                case 'encoding_error':
+                    errorMessage = 'File encoding error';
+                    errorDetails = 'Please save your CSV file with UTF-8 encoding';
+                    break;
+                    
+                case 'csv_format_error':
+                    errorMessage = 'CSV file is malformed';
+                    errorDetails = 'Please ensure your CSV file is properly formatted and not corrupted';
+                    break;
+            }
+            
+            showErrorModal(errorMessage, errorDetails);
         }
     })
     .catch(error => {
+        // Hide loading toast
+        loadingToast.remove();
+        
         console.error('Error:', error);
-        alert('An error occurred while uploading the file');
+        showErrorModal('Upload Error', 'An unexpected error occurred while uploading the file. Please try again.');
     });
+    
+    // Clear the file input
+    input.value = '';
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length > 0) {
+        const file = files[0];
+        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+            const formData = new FormData();
+            formData.append('csv_file', file);
+            
+            // Show loading state
+            const loadingToast = showToast('Uploading and processing file...', 'info');
+            
+            fetch("{% url 'processing:upload_csv' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading toast
+                loadingToast.remove();
+                
+                if (data.success) {
+                    showToast('File uploaded and processed successfully!', 'success');
+                    location.reload();
+                } else {
+                    let errorMessage = data.error;
+                    let errorDetails = '';
+                    
+                    // Handle specific error types (same as above)
+                    switch (data.error_type) {
+                        case 'missing_columns':
+                            errorMessage = 'Missing required columns in CSV file:';
+                            errorDetails = data.missing_columns.join(', ');
+                            break;
+                            
+                        case 'missing_value':
+                            errorMessage = `Missing required value in row ${data.row}`;
+                            errorDetails = `Column: "${data.column}"`;
+                            break;
+                            
+                        case 'invalid_decimal':
+                            errorMessage = `Invalid number format in row ${data.row}`;
+                            errorDetails = `Column: "${data.column}", Value: "${data.value}"
+                                Please ensure the number is properly formatted (e.g., 1234.56)`;
+                            break;
+                            
+                        case 'invalid_date':
+                            errorMessage = `Invalid date format in row ${data.row}`;
+                            errorDetails = `Column: "${data.column}", Value: "${data.value}"
+                                Please use YYYY-MM-DD format (e.g., 2024-03-14)`;
+                            break;
+                            
+                        case 'encoding_error':
+                            errorMessage = 'File encoding error';
+                            errorDetails = 'Please save your CSV file with UTF-8 encoding';
+                            break;
+                            
+                        case 'csv_format_error':
+                            errorMessage = 'CSV file is malformed';
+                            errorDetails = 'Please ensure your CSV file is properly formatted and not corrupted';
+                            break;
+                    }
+                    
+                    showErrorModal(errorMessage, errorDetails);
+                }
+            })
+            .catch(error => {
+                // Hide loading toast
+                loadingToast.remove();
+                
+                console.error('Error:', error);
+                showErrorModal('Upload Error', 'An unexpected error occurred while uploading the file. Please try again.');
+            });
+        } else {
+            showToast('Please upload a CSV file', 'error');
+        }
+    }
+}
+
+// Toast notification system
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded shadow-lg ${
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+    
+    return toast;
+}
+
+// Error modal system
+function showErrorModal(title, details) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center';
+    modal.innerHTML = `
+        <div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="p-6">
+                <div class="flex items-start justify-between">
+                    <h3 class="text-lg font-medium text-red-600">${title}</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-500">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-4">
+                    <p class="text-sm text-gray-500 whitespace-pre-line">${details}</p>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button onclick="this.closest('.fixed').remove()" 
+                            class="bg-red-100 text-red-600 px-4 py-2 rounded hover:bg-red-200">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
 }
 
 function getCookie(name) {
@@ -212,41 +492,6 @@ function highlight(e) {
 
 function unhighlight(e) {
     dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
-}
-
-function handleDrop(e) {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    
-    if (files.length > 0) {
-        const file = files[0];
-        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-            const formData = new FormData();
-            formData.append('csv_file', file);
-            
-            fetch('/processing/upload/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert(data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while uploading the file');
-            });
-        } else {
-            alert('Please upload a CSV file');
-        }
-    }
 }
 </script>
 {% endblock %} 

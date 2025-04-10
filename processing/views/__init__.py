@@ -12,7 +12,7 @@ from .processing_views import (
     ProcessContractDetailView,
     ProcessContractUpdateView,
     finalize_contract,
-    ProcessCLINFormSet
+    ProcessClinFormSet
 )
 
 from .matching_views import (

@@ -1,12 +1,12 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import ListView
 from django.http import JsonResponse, HttpResponse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.utils import timezone
-from ..models import ContractQueue, ClinQueue, SequenceNumber
+from ..models import QueueContract, QueueClin, SequenceNumber, ProcessContract
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, ContractType
 import csv
 from io import StringIO
@@ -19,12 +19,12 @@ import decimal
 
 @method_decorator(login_required, name='dispatch')
 class ContractQueueListView(ListView):
-    model = ContractQueue
+    model = QueueContract
     template_name = 'processing/contract_queue.html'
     context_object_name = 'queued_contracts'
     
     def get_queryset(self):
-        return ContractQueue.objects.all().order_by('-created_on')
+        return QueueContract.objects.all().order_by('-created_on')
 
 @require_http_methods(["GET"])
 @login_required
@@ -52,7 +52,7 @@ def start_processing(request):
     
     try:
         with transaction.atomic():
-            contract_queue = ContractQueue.objects.select_for_update().get(id=contract_queue_id)
+            contract_queue = QueueContract.objects.select_for_update().get(id=contract_queue_id)
             
             if contract_queue.is_being_processed:
                 return JsonResponse({
@@ -69,7 +69,7 @@ def start_processing(request):
                 'success': True,
                 'message': 'Contract processing started'
             })
-    except ContractQueue.DoesNotExist:
+    except QueueContract.DoesNotExist:
         return JsonResponse({
             'success': False,
             'error': 'Contract not found'
@@ -88,7 +88,7 @@ def process_contract(request):
     
     try:
         with transaction.atomic():
-            contract_queue = ContractQueue.objects.select_for_update().get(id=contract_queue_id)
+            contract_queue = QueueContract.objects.select_for_update().get(id=contract_queue_id)
             
             if not contract_queue.is_being_processed:
                 return JsonResponse({
@@ -142,7 +142,7 @@ def process_contract(request):
                 'message': 'Contract processed successfully',
                 'contract_id': contract.id
             })
-    except ContractQueue.DoesNotExist:
+    except QueueContract.DoesNotExist:
         return JsonResponse({
             'success': False,
             'error': 'Contract not found'
@@ -429,13 +429,47 @@ def upload_csv(request):
     if 'csv_file' not in request.FILES:
         return JsonResponse({
             'success': False,
-            'error': 'No file uploaded'
+            'error': 'No file uploaded',
+            'error_type': 'missing_file'
         })
     
     try:
         csv_file = request.FILES['csv_file']
-        csv_data = csv_file.read().decode('utf-8')
+        
+        # Validate file type
+        if not csv_file.name.endswith('.csv'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid file type. Please upload a CSV file.',
+                'error_type': 'invalid_file_type'
+            })
+        
+        try:
+            csv_data = csv_file.read().decode('utf-8')
+        except UnicodeDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid file encoding. Please ensure the CSV file is saved with UTF-8 encoding.',
+                'error_type': 'encoding_error'
+            })
+            
         csv_reader = csv.DictReader(StringIO(csv_data))
+        
+        # Validate required columns
+        required_columns = [
+            'Contract Number', 'Buyer', 'Award Date', 'Due Date', 'Contract Value',
+            'Contract Type', 'Solicitation Type', 'Item Number', 'Item Type', 'NSN',
+            'NSN Description', 'Order Qty', 'Unit Price'
+        ]
+        
+        missing_columns = [col for col in required_columns if col not in csv_reader.fieldnames]
+        if missing_columns:
+            return JsonResponse({
+                'success': False,
+                'error': f'Missing required columns: {", ".join(missing_columns)}',
+                'error_type': 'missing_columns',
+                'missing_columns': missing_columns
+            })
         
         # Define required decimal fields and their validation
         decimal_fields = {
@@ -447,6 +481,9 @@ def upload_csv(request):
             'Supplier Price': 'supplier_price'
         }
         
+        # Define date fields for validation
+        date_fields = ['Award Date', 'Due Date', 'Supplier Due Date']
+        
         with transaction.atomic():
             current_contract = None
             row_number = 0
@@ -454,34 +491,64 @@ def upload_csv(request):
             for row in csv_reader:
                 row_number += 1
                 
+                # Validate required fields
+                for field in required_columns:
+                    if not row.get(field):
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Missing required value in row {row_number}, column "{field}"',
+                            'error_type': 'missing_value',
+                            'row': row_number,
+                            'column': field
+                        })
+                
                 # Validate decimal fields
                 for field_name, model_field in decimal_fields.items():
-                    if field_name in row:
+                    if field_name in row and row[field_name]:
                         try:
-                            # Convert empty strings to None
-                            value = row[field_name].strip() if row[field_name] else None
-                            if value is not None:
-                                # Try to convert to decimal
+                            value = row[field_name].strip()
+                            if value.startswith('$'):  # Handle dollar signs
+                                value = value[1:]
+                            if value.replace(',', '').replace('.', '').replace('-', '').isdigit():
+                                value = value.replace(',', '')  # Remove commas
                                 decimal.Decimal(value)
+                            else:
+                                raise decimal.InvalidOperation(f"Invalid characters in number: {value}")
                         except (decimal.InvalidOperation, ValueError) as e:
                             return JsonResponse({
                                 'success': False,
-                                'error': f'Invalid decimal value in row {row_number}, column "{field_name}": {str(e)}',
+                                'error': f'Invalid decimal value in row {row_number}, column "{field_name}". Please enter a valid number.',
+                                'error_type': 'invalid_decimal',
                                 'row': row_number,
                                 'column': field_name,
                                 'value': row[field_name]
+                            })
+                
+                # Validate date fields
+                for field in date_fields:
+                    if field in row and row[field]:
+                        try:
+                            datetime.strptime(row[field], '%Y-%m-%d')
+                        except ValueError:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Invalid date format in row {row_number}, column "{field}". Please use YYYY-MM-DD format.',
+                                'error_type': 'invalid_date',
+                                'row': row_number,
+                                'column': field,
+                                'value': row[field]
                             })
                 
                 # If this is a new contract (different contract number)
                 if not current_contract or current_contract.contract_number != row['Contract Number']:
                     try:
                         # Create new contract queue entry
-                        current_contract = ContractQueue.objects.create(
+                        current_contract = QueueContract.objects.create(
                             contract_number=row['Contract Number'],
                             buyer=row['Buyer'],
                             award_date=datetime.strptime(row['Award Date'], '%Y-%m-%d') if row['Award Date'] else None,
                             due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
-                            contract_value=decimal.Decimal(row['Contract Value']) if row['Contract Value'] else None,
+                            contract_value=decimal.Decimal(row['Contract Value'].replace(',', '').replace('$', '')) if row['Contract Value'] else None,
                             contract_type=row['Contract Type'],
                             solicitation_type=row['Solicitation Type'],
                             created_by=request.user,
@@ -491,6 +558,7 @@ def upload_csv(request):
                         return JsonResponse({
                             'success': False,
                             'error': f'Error creating contract in row {row_number}: {str(e)}',
+                            'error_type': 'contract_creation_error',
                             'row': row_number,
                             'contract_number': row['Contract Number']
                         })
@@ -499,12 +567,12 @@ def upload_csv(request):
                     # Handle supplier fields - convert empty strings to None
                     supplier = row['Supplier'].strip() if row['Supplier'] else None
                     supplier_due_date = datetime.strptime(row['Supplier Due Date'], '%Y-%m-%d') if row['Supplier Due Date'] else None
-                    supplier_unit_price = decimal.Decimal(row['Supplier Unit Price']) if row['Supplier Unit Price'] else None
-                    supplier_price = decimal.Decimal(row['Supplier Price']) if row['Supplier Price'] else None
+                    supplier_unit_price = decimal.Decimal(row['Supplier Unit Price'].replace(',', '').replace('$', '')) if row['Supplier Unit Price'] else None
+                    supplier_price = decimal.Decimal(row['Supplier Price'].replace(',', '').replace('$', '')) if row['Supplier Price'] else None
                     supplier_payment_terms = row['Supplier Payment Terms'].strip() if row['Supplier Payment Terms'] else None
                     
                     # Create CLIN queue entry
-                    ClinQueue.objects.create(
+                    QueueClin.objects.create(
                         contract_queue=current_contract,
                         item_number=row['Item Number'],
                         item_type=row['Item Type'],
@@ -513,9 +581,9 @@ def upload_csv(request):
                         ia=row['IA'],
                         fob=row['FOB'],
                         due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
-                        order_qty=decimal.Decimal(row['Order Qty']) if row['Order Qty'] else None,
-                        item_value=decimal.Decimal(row['Item Value']) if row['Item Value'] else None,
-                        unit_price=decimal.Decimal(row['Unit Price']) if row['Unit Price'] else None,
+                        order_qty=decimal.Decimal(row['Order Qty'].replace(',', '')) if row['Order Qty'] else None,
+                        item_value=decimal.Decimal(row['Item Value'].replace(',', '').replace('$', '')) if row['Item Value'] else None,
+                        unit_price=decimal.Decimal(row['Unit Price'].replace(',', '').replace('$', '')) if row['Unit Price'] else None,
                         supplier=supplier,
                         supplier_due_date=supplier_due_date,
                         supplier_unit_price=supplier_unit_price,
@@ -528,6 +596,7 @@ def upload_csv(request):
                     return JsonResponse({
                         'success': False,
                         'error': f'Error creating CLIN in row {row_number}: {str(e)}',
+                        'error_type': 'clin_creation_error',
                         'row': row_number,
                         'item_number': row['Item Number']
                     })
@@ -536,8 +605,44 @@ def upload_csv(request):
             'success': True,
             'message': 'CSV file processed successfully'
         })
+    except csv.Error as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'CSV file is malformed: {str(e)}',
+            'error_type': 'csv_format_error'
+        })
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': f'Error processing CSV file: {str(e)}'
-        }) 
+            'error': f'Error processing CSV file: {str(e)}',
+            'error_type': 'general_error'
+        })
+
+@login_required
+@require_POST
+def cancel_processing(request, queue_id):
+    """
+    Cancel the processing of a contract and reset its status
+    """
+    try:
+        queue_contract = get_object_or_404(QueueContract, id=queue_id)
+        
+        # Delete the ProcessContract if it exists
+        ProcessContract.objects.filter(queue_contract=queue_contract).delete()
+        
+        # Reset the queue contract status
+        queue_contract.is_being_processed = False
+        queue_contract.processed_by = None
+        queue_contract.processing_started = None
+        queue_contract.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Processing cancelled successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400) 

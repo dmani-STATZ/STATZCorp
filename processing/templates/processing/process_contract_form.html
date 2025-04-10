@@ -1,190 +1,760 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}Edit Processing Contract{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 py-6">
+    <!-- Header Section -->
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Edit Processing Contract</h1>
-        <div class="space-x-4">
-            <a href="{% url 'processing:process_contract_detail' pk=process_contract.id %}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">
+                Edit Processing Contract: {{ process_contract.contract_number }}
+            </h1>
+            <p class="text-sm text-gray-600 mt-1">Started processing on {{ process_contract.created_at|date:"M d, Y H:i" }}</p>
+        </div>
+        <div class="flex space-x-4">
+            <a href="{% url 'processing:process_contract_detail' process_contract.id %}" 
+               class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
                 Cancel
             </a>
         </div>
     </div>
 
-    <form method="post" class="bg-white shadow-md rounded-lg p-6">
+    <form method="post" class="space-y-6">
         {% csrf_token %}
         
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div>
-                <h2 class="text-lg font-semibold mb-4">Contract Details</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Contract Number</label>
-                        {{ form.contract_number }}
-                        {% if form.contract_number.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.contract_number.errors }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Buyer</label>
-                        {{ form.buyer }}
-                        {% if form.buyer.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.buyer.errors }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Award Date</label>
-                        {{ form.award_date }}
-                        {% if form.award_date.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.award_date.errors }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Due Date</label>
-                        {{ form.due_date }}
-                        {% if form.due_date.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.due_date.errors }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Contract Value</label>
-                        {{ form.contract_value }}
-                        {% if form.contract_value.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.contract_value.errors }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Status</label>
-                        {{ form.status }}
-                        {% if form.status.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.status.errors }}</p>
-                        {% endif %}
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Contract Details Card -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Contract Details</h2>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Number</label>
+                            <input type="text" name="contract_number" value="{{ process_contract.contract_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Award Date</label>
+                            <input type="date" name="award_date" value="{{ process_contract.award_date|date:'Y-m-d' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">IDIQ Contract</label>
+                            <select name="idiq_contract" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">-------</option>
+                                {% for contract in idiq_contracts %}
+                                    <option value="{{ contract.id }}" {% if process_contract.idiq_contract_id == contract.id %}selected{% endif %}>{{ contract }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                            <input type="date" name="due_date" value="{{ process_contract.due_date|date:'Y-m-d' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Solicitation Type</label>
+                            <input type="text" name="solicitation_type" value="{{ process_contract.solicitation_type }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Due Date Late</label>
+                            <div class="flex items-center">
+                                <input type="checkbox" name="due_date_late" {% if process_contract.due_date_late %}checked{% endif %} class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
+                            <input type="text" name="po_number" value="{{ process_contract.po_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Sales Class</label>
+                            <select name="sales_class" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">-------</option>
+                                {% for class in sales_classes %}
+                                    <option value="{{ class.0 }}" {% if process_contract.sales_class == class.0 %}selected{% endif %}>{{ class.1 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tab Number</label>
+                            <input type="text" name="tab_number" value="{{ process_contract.tab_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">NIST</label>
+                            <input type="text" name="nist" value="{{ process_contract.nist }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Buyer</label>
+                            <div class="flex space-x-2">
+                                <select name="buyer" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">-------</option>
+                                    {% for buyer in buyers %}
+                                        <option value="{{ buyer.id }}" {% if process_contract.buyer_id == buyer.id %}selected{% endif %}>{{ buyer }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" onclick="matchBuyer()">Match Buyer</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Files URL</label>
+                            <input type="text" name="files_url" value="{{ process_contract.files_url }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Type</label>
+                            <select name="contract_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">-------</option>
+                                {% for type in contract_types %}
+                                    <option value="{{ type.0 }}" {% if process_contract.contract_type == type.0 %}selected{% endif %}>{{ type.1 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Value</label>
+                            <input type="number" step="0.01" name="contract_value" value="{{ process_contract.contract_value }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div>
-                <h2 class="text-lg font-semibold mb-4">Description</h2>
-                <div>
+
+            <!-- Status Card -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Processing Status</h2>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Current Status</label>
+                            <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                {% for status in statuses %}
+                                    <option value="{{ status.0 }}" {% if process_contract.status == status.0 %}selected{% endif %}>{{ status.1 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Created By</label>
+                            <input type="text" value="{{ process_contract.created_by }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Modified</label>
+                            <input type="text" value="{{ process_contract.modified_at }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Split Information Card -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Split Information</h2>
+                    <div class="grid grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Planned Split</label>
+                            <input type="number" step="0.01" name="planned_split" value="{{ process_contract.planned_split }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">PPI Split</label>
+                            <input type="number" step="0.01" name="ppi_split" value="{{ process_contract.ppi_split }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">STATZ Split</label>
+                            <input type="number" step="0.01" name="statz_split" value="{{ process_contract.statz_split }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">PPI Split Paid</label>
+                            <input type="number" step="0.01" name="ppi_split_paid" value="{{ process_contract.ppi_split_paid }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">STATZ Split Paid</label>
+                            <input type="number" step="0.01" name="statz_split_paid" value="{{ process_contract.statz_split_paid }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description Card -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Description</h2>
                     {{ form.description }}
                     {% if form.description.errors %}
                         <p class="mt-1 text-sm text-red-600">{{ form.description.errors }}</p>
                     {% endif %}
                 </div>
             </div>
-        </div>
 
-        <div class="mt-8">
-            <h2 class="text-lg font-semibold mb-4">CLIN Items</h2>
-            {{ clins_formset.management_form }}
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delete</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for clin_form in clins_formset %}
-                        <tr>
-                            <td class="px-6 py-4">
-                                {{ clin_form.id }}
-                                {{ clin_form.clin_number }}
-                                {% if clin_form.clin_number.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.clin_number.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.nsn }}
-                                {% if clin_form.nsn.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.nsn.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.supplier }}
-                                {% if clin_form.supplier.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.supplier.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.quantity }}
-                                {% if clin_form.quantity.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.quantity.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.unit_price }}
-                                {% if clin_form.unit_price.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.unit_price.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.total_price }}
-                                {% if clin_form.total_price.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.total_price.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.status }}
-                                {% if clin_form.status.errors %}
-                                    <p class="mt-1 text-sm text-red-600">{{ clin_form.status.errors }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ clin_form.DELETE }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- CLIN Items Card -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">CLIN Items</h2>
+                    {{ clin_formset.management_form }}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Type</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for clin_form in clin_formset %}
+                                <tr class="hover:bg-gray-50">
+                                    <!-- Actions Column -->
+                                    <td class="px-4 py-3 text-sm font-medium">
+                                        <div class="flex items-center space-x-2">
+                                            <button type="button" 
+                                                    data-action="toggle-clin"
+                                                    data-index="{{ forloop.counter0 }}"
+                                                    class="text-blue-600 hover:text-blue-900">
+                                                <span class="clin-expand-icon-{{ forloop.counter0 }}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                            {% if not clin_form.instance.nsn %}
+                                            <button type="button" 
+                                                    data-action="open-nsn"
+                                                    data-id="{{ clin_form.instance.id }}"
+                                                    data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
+                                                    data-description="{{ clin_form.instance.nsn_description_text|default:'' }}"
+                                                    class="ml-2 text-blue-600 hover:text-blue-900">
+                                                Match NSN
+                                            </button>
+                                            {% endif %}
+                                            {% if not clin_form.instance.supplier %}
+                                            <button type="button" 
+                                                    data-action="open-supplier"
+                                                    data-id="{{ clin_form.instance.id }}"
+                                                    data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
+                                                    class="ml-2 text-blue-600 hover:text-blue-900">
+                                                Match Supplier
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <!-- Basic Info Columns -->
+                                    <td class="px-4 py-3">
+                                        <span class="text-sm font-medium text-gray-900">{{ clin_form.item_number.value|default:'' }}</span>
+                                        {{ clin_form.id }}
+                                        {{ clin_form.item_number.as_hidden }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="text-sm text-gray-900">{{ clin_form.item_type.value|default:'---' }}</span>
+                                        {{ clin_form.item_type.as_hidden }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="text-sm">
+                                            <div class="font-medium text-gray-900">{{ clin_form.instance.nsn_text|default:'Not Set' }}</div>
+                                            <div class="text-gray-500 text-xs">{{ clin_form.instance.nsn_description_text|default:'' }}</div>
+                                        </div>
+                                        {{ clin_form.nsn.as_hidden }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="text-sm text-gray-900">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                        {{ clin_form.supplier.as_hidden }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span class="text-sm font-medium text-gray-900">{{ clin_form.order_qty.value|default:'0' }}</span>
+                                        {{ clin_form.order_qty.as_hidden }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.unit_price.value|default:'0.00' }}</span>
+                                        {{ clin_form.unit_price.as_hidden }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.item_value.value|default:'0.00' }}</span>
+                                        {{ clin_form.item_value.as_hidden }}
+                                    </td>
+                                </tr>
+                                <!-- Detailed Edit Row (Initially Hidden) -->
+                                <tr class="clin-details-{{ forloop.counter0 }} hidden">
+                                    <td colspan="8" class="px-4 py-4 bg-gray-50">
+                                        <div class="grid grid-cols-3 gap-4 mb-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Item Number</label>
+                                                <input type="text" name="{{ clin_form.item_number.html_name }}" value="{{ clin_form.item_number.value|default:'' }}" 
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
+                                                <select name="{{ clin_form.item_type.html_name }}" 
+                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    <option value="">-------</option>
+                                                    {% for choice in clin_form.item_type.field.choices %}
+                                                        <option value="{{ choice.0 }}" {% if clin_form.item_type.value == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                                                <input type="number" name="{{ clin_form.order_qty.html_name }}" value="{{ clin_form.order_qty.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                        </div>
+
+                                        <!-- NSN and Supplier Selection Boxes -->
+                                        <div class="grid grid-cols-2 gap-4 mb-4">
+                                            <!-- NSN Selection Box -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">NSN*</label>
+                                                <div class="flex gap-2">
+                                                    <input type="text" value="{{ clin_form.instance.nsn_text|default:'' }}" 
+                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                                           readonly>
+                                                    {% if not clin_form.instance.nsn %}
+                                                    <button type="button" 
+                                                            data-action="open-nsn"
+                                                            data-id="{{ clin_form.instance.id }}"
+                                                            data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
+                                                            data-description="{{ clin_form.instance.nsn_description_text|default:'' }}"
+                                                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                        Match
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                                {% if clin_form.instance.nsn_description_text %}
+                                                <p class="mt-1 text-sm text-gray-500">{{ clin_form.instance.nsn_description_text }}</p>
+                                                {% endif %}
+                                            </div>
+
+                                            <!-- Supplier Selection Box -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Supplier*</label>
+                                                <div class="flex gap-2">
+                                                    <input type="text" value="{{ clin_form.instance.supplier_text|default:'' }}" 
+                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                                           readonly>
+                                                    {% if not clin_form.instance.supplier %}
+                                                    <button type="button" 
+                                                            data-action="open-supplier"
+                                                            data-id="{{ clin_form.instance.id }}"
+                                                            data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
+                                                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                        Match
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-3 gap-4 mb-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+                                                <input type="number" step="0.01" name="{{ clin_form.unit_price.html_name }}" value="{{ clin_form.unit_price.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Total Value</label>
+                                                <input type="number" step="0.01" name="{{ clin_form.item_value.html_name }}" value="{{ clin_form.item_value.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                                <select name="{{ clin_form.status.html_name }}"
+                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    {% for choice in clin_form.status.field.choices %}
+                                                        <option value="{{ choice.0 }}" {% if clin_form.status.value == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 flex justify-end">
+                                            <label class="inline-flex items-center text-sm text-red-600">
+                                                {{ clin_form.DELETE }}
+                                                <span class="ml-2">Delete this CLIN</span>
+                                            </label>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="mt-6 flex justify-end">
-            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                Save Changes
-            </button>
+        <!-- Action Buttons -->
+        <div class="flex justify-end space-x-4 mt-6">
+            <a href="{% url 'processing:queue' %}" class="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">Cancel</a>
+            <button type="submit" class="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">Save</button>
         </div>
     </form>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Add event listeners for quantity and unit price to calculate total price
-    const forms = document.querySelectorAll('tbody tr');
-    forms.forEach(form => {
-        const quantityInput = form.querySelector('input[name*="quantity"]');
-        const unitPriceInput = form.querySelector('input[name*="unit_price"]');
-        const totalPriceInput = form.querySelector('input[name*="total_price"]');
+<!-- Cancel Processing Confirmation Modal -->
+<div id="cancelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Cancel Processing</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">Are you sure you want to cancel processing this contract?</p>
+                <p class="text-sm text-red-500 mt-2">This action cannot be undone and all progress will be lost.</p>
+            </div>
+            <div class="mt-4 flex justify-center space-x-4">
+                <button onclick="closeModal()" 
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                    No, Keep Processing
+                </button>
+                <button onclick="cancelProcessing()" 
+                        class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                    Yes, Cancel Processing
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NSN Selection Modal -->
+<div id="nsn_modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-[800px] shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center border-b pb-3">
+            <h3 class="text-lg font-semibold text-gray-900">Select NSN</h3>
+            <button type="button" onclick="closeNsnModal()" class="text-gray-400 hover:text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
         
-        function calculateTotal() {
-            if (quantityInput && unitPriceInput && totalPriceInput) {
-                const quantity = parseFloat(quantityInput.value) || 0;
-                const unitPrice = parseFloat(unitPriceInput.value) || 0;
-                totalPriceInput.value = (quantity * unitPrice).toFixed(2);
+        <div class="mt-4">
+            <!-- Original NSN Info -->
+            <div class="mb-4 p-3 bg-gray-50 rounded">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Original NSN Information:</h4>
+                <p id="original_nsn_display" class="text-gray-900"></p>
+            </div>
+
+            <!-- Search Section -->
+            <div class="mb-4">
+                <label for="nsn_search" class="block text-sm font-medium text-gray-700 mb-1">Search NSN</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="nsn_search" class="form-control flex-1" placeholder="Enter NSN code or description">
+                    <button type="button" onclick="searchNsn()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Search
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="nsn_search_results" class="mt-4 max-h-[300px] overflow-y-auto">
+                <!-- Results will be populated here -->
+            </div>
+
+            <!-- Pagination -->
+            <div class="flex items-center justify-between mt-4 border-t pt-3">
+                <button type="button" onclick="closeNsnModal()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                    Cancel
+                </button>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="prevNsnPage()" class="bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        Previous
+                    </button>
+                    <span id="nsn_page_info" class="text-sm text-gray-600">Page 1 of 1</span>
+                    <button type="button" onclick="nextNsnPage()" class="bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Selection Modal -->
+<div id="supplier_modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-[800px] shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center border-b pb-3">
+            <h3 class="text-lg font-semibold text-gray-900">Select Supplier</h3>
+            <button type="button" onclick="closeSupplierModal()" class="text-gray-400 hover:text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="mt-4">
+            <!-- Original Supplier Info -->
+            <div class="mb-4 p-3 bg-gray-50 rounded">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Original Supplier Information:</h4>
+                <p id="original_supplier_display" class="text-gray-900"></p>
+            </div>
+
+            <!-- Search Section -->
+            <div class="mb-4">
+                <label for="supplier_search" class="block text-sm font-medium text-gray-700 mb-1">Search Supplier</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="supplier_search" class="form-control flex-1" placeholder="Enter supplier name or CAGE code">
+                    <button type="button" onclick="searchSupplier()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Search
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="supplier_search_results" class="mt-4 max-h-[300px] overflow-y-auto">
+                <!-- Results will be populated here -->
+            </div>
+
+            <!-- Pagination -->
+            <div class="flex items-center justify-between mt-4 border-t pt-3">
+                <button type="button" onclick="closeSupplierModal()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                    Cancel
+                </button>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="prevSupplierPage()" class="bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        Previous
+                    </button>
+                    <span id="supplier_page_info" class="text-sm text-gray-600">Page 1 of 1</span>
+                    <button type="button" onclick="nextSupplierPage()" class="bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for form functionality -->
+<script>
+    // Global variables for modal functionality
+    let currentNsnClinId = null,
+        currentSupplierClinId = null,
+        nsnCurrentPage = 1,
+        supplierCurrentPage = 1;
+
+    // Calculate total price when quantity or unit price changes
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('tr');
+        forms.forEach(form => {
+            const qtyInput = form.querySelector('[name$="-order_qty"]');
+            const priceInput = form.querySelector('[name$="-unit_price"]');
+            const totalInput = form.querySelector('[name$="-item_value"]');
+            
+            if (qtyInput && priceInput && totalInput) {
+                const calculateTotal = () => {
+                    const qty = parseFloat(qtyInput.value) || 0;
+                    const price = parseFloat(priceInput.value) || 0;
+                    totalInput.value = (qty * price).toFixed(2);
+                };
+                
+                qtyInput.addEventListener('input', calculateTotal);
+                priceInput.addEventListener('input', calculateTotal);
             }
+        });
+    });
+
+    // Match buyer function
+    function matchBuyer(buyerText) {
+        fetch(`/processing/match-buyer/${processContractId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: `buyer_text=${encodeURIComponent(buyerText)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to match buyer');
+            }
+        });
+    }
+
+    function openNsnModal(clinId, nsnText, nsnDescription) {
+        currentNsnClinId = clinId;
+        const modal = document.getElementById('nsn_modal');
+        const searchInput = document.getElementById('nsn_search');
+        const originalDisplay = document.getElementById('original_nsn_display');
+        
+        originalDisplay.textContent = `NSN: ${nsnText || 'Not specified'}`;
+        if (nsnDescription) {
+            originalDisplay.textContent += `\nDescription: ${nsnDescription}`;
         }
         
-        if (quantityInput) quantityInput.addEventListener('input', calculateTotal);
-        if (unitPriceInput) unitPriceInput.addEventListener('input', calculateTotal);
+        searchInput.value = nsnText || '';
+        modal.classList.remove('hidden');
+        searchInput.focus();
+        
+        if (nsnText) {
+            searchNsn();
+        }
+    }
+
+    function closeNsnModal() {
+        document.getElementById('nsn_modal').classList.add('hidden');
+        currentNsnClinId = null;
+    }
+
+    function searchNsn() {
+        const searchTerm = document.getElementById('nsn_search').value.trim();
+        if (searchTerm.length < 3) {
+            document.getElementById('nsn_search_results').innerHTML = 
+                '<div class="text-center text-gray-500 py-4">Enter at least 3 characters to search</div>';
+            return;
+        }
+        
+        document.getElementById('nsn_search_results').innerHTML = 
+            '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>';
+        
+        fetch('/processing/search-nsn/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: `search_term=${encodeURIComponent(searchTerm)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('nsn_search_results').innerHTML = data.html;
+            } else {
+                alert(data.error || 'Failed to search for NSN');
+            }
+        });
+    }
+
+    function openSupplierModal(clinId, supplierText) {
+        currentSupplierClinId = clinId;
+        const modal = document.getElementById('supplier_modal');
+        const searchInput = document.getElementById('supplier_search');
+        const originalDisplay = document.getElementById('original_supplier_display');
+        
+        originalDisplay.textContent = `Supplier: ${supplierText || 'Not specified'}`;
+        searchInput.value = supplierText || '';
+        modal.classList.remove('hidden');
+        searchInput.focus();
+        
+        if (supplierText) {
+            searchSupplier();
+        }
+    }
+
+    function closeSupplierModal() {
+        document.getElementById('supplier_modal').classList.add('hidden');
+        currentSupplierClinId = null;
+    }
+
+    function searchSupplier() {
+        const searchTerm = document.getElementById('supplier_search').value.trim();
+        if (searchTerm.length < 3) {
+            document.getElementById('supplier_search_results').innerHTML = 
+                '<div class="text-center text-gray-500 py-4">Enter at least 3 characters to search</div>';
+            return;
+        }
+        
+        document.getElementById('supplier_search_results').innerHTML = 
+            '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>';
+        
+        fetch('/processing/search-supplier/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: `search_term=${encodeURIComponent(searchTerm)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('supplier_search_results').innerHTML = data.html;
+            } else {
+                alert(data.error || 'Failed to search for supplier');
+            }
+        });
+    }
+
+    function prevNsnPage() {
+        nsnCurrentPage--;
+        searchNsn();
+    }
+
+    function nextNsnPage() {
+        nsnCurrentPage++;
+        searchNsn();
+    }
+
+    function prevSupplierPage() {
+        supplierCurrentPage--;
+        searchSupplier();
+    }
+
+    function nextSupplierPage() {
+        supplierCurrentPage++;
+        searchSupplier();
+    }
+
+    function confirmCancel() {
+        document.getElementById('cancelModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('cancelModal').classList.add('hidden');
+    }
+
+    function cancelProcessing() {
+        window.location.href = '{% url "processing:queue" %}';
+    }
+
+    // Add this function for CLIN expand/collapse
+    function toggleClinDetails(index) {
+        const detailsRow = document.querySelector(`.clin-details-${index}`);
+        const expandIcon = document.querySelector(`.clin-expand-icon-${index}`);
+        
+        if (detailsRow.classList.contains('hidden')) {
+            detailsRow.classList.remove('hidden');
+            expandIcon.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+            `;
+        } else {
+            detailsRow.classList.add('hidden');
+            expandIcon.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            `;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle CLIN toggle
+        document.querySelectorAll('[data-action="toggle-clin"]').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = this.dataset.index;
+                toggleClinDetails(index);
+            });
+        });
+
+        // Handle NSN modal
+        document.querySelectorAll('[data-action="open-nsn"]').forEach(button => {
+            button.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const nsn = this.dataset.nsn;
+                const description = this.dataset.description;
+                openNsnModal(id, nsn, description);
+            });
+        });
+
+        // Handle Supplier modal
+        document.querySelectorAll('[data-action="open-supplier"]').forEach(button => {
+            button.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const supplier = this.dataset.supplier;
+                openSupplierModal(id, supplier);
+            });
+        });
     });
-});
 </script>
-{% endblock %} 
+{% endblock %}

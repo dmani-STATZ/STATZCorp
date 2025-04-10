@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from processing.models import ProcessContract, ProcessCLIN
+from processing.models import ProcessContract, ProcessClin
 from contracts.models import Buyer, Nsn, Supplier
 
 def match_buyer(request, pk):
@@ -18,7 +18,7 @@ def match_buyer(request, pk):
     return JsonResponse({'success': False, 'message': 'No matching buyers found'})
 
 def match_nsn(request, pk, clin_id):
-    process_clin = get_object_or_404(ProcessCLIN, id=clin_id)
+    process_clin = get_object_or_404(ProcessClin, id=clin_id)
     nsn_text = request.POST.get('nsn_text', '')
     
     # Search for matching NSN
@@ -32,7 +32,7 @@ def match_nsn(request, pk, clin_id):
     return JsonResponse({'success': False, 'message': 'No matching NSNs found'})
 
 def match_supplier(request, pk, clin_id):
-    process_clin = get_object_or_404(ProcessCLIN, id=clin_id)
+    process_clin = get_object_or_404(ProcessClin, id=clin_id)
     supplier_text = request.POST.get('supplier_text', '')
     
     # Search for matching supplier

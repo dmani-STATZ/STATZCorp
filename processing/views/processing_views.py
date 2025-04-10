@@ -4,127 +4,366 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
-from processing.models import ProcessContract, ProcessCLIN, ContractQueue
-from processing.forms import ProcessContractForm, ProcessCLINForm
+from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin
+from processing.forms import ProcessContractForm, ProcessClinForm
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier
 import csv
 import os
 from django.conf import settings
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.urls import reverse_lazy, reverse
+from django.db import transaction
+from django.core.exceptions import PermissionDenied
+from django.views.decorators.http import require_http_methods
+from django.http import Http404
 
+@login_required
+@require_http_methods(["POST"])
 def start_processing(request, queue_id):
-    queue_item = get_object_or_404(ContractQueue, id=queue_id)
-    
-    # Create ProcessContract from queue item
-    process_contract = ProcessContract.objects.create(
-        contract_number=queue_item.contract_number,
-        buyer_text=queue_item.buyer,
-        award_date=queue_item.award_date,
-        due_date=queue_item.due_date,
-        contract_value=queue_item.contract_value,
-        description=queue_item.description,
-        queue_id=queue_id,
-        created_by=request.user,
-        modified_by=request.user
-    )
-    
-    # Create ProcessCLINs from queue item
-    for clin_data in queue_item.clins.all():
-        ProcessCLIN.objects.create(
-            process_contract=process_contract,
-            clin_number=clin_data.clin_number,
-            nsn_text=clin_data.nsn,
-            nsn_description_text=clin_data.nsn_description,
-            supplier_text=clin_data.supplier,
-            quantity=clin_data.quantity,
-            unit_price=clin_data.unit_price,
-            total_price=clin_data.total_price,
-            description=clin_data.description
+    """Start processing a contract from the queue"""
+    try:
+        queue_item = get_object_or_404(QueueContract, id=queue_id)
+        
+        if queue_item.is_being_processed:
+            return JsonResponse({
+                'success': False,
+                'error': 'This contract is already being processed by another user'
+            })
+        
+        # Create ProcessContract from queue item
+        process_contract = ProcessContract.objects.create(
+            contract_number=queue_item.contract_number,
+            buyer_text=queue_item.buyer,
+            solicitation_type=queue_item.solicitation_type,
+            contract_type=queue_item.matched_contract_type,
+            award_date=queue_item.award_date,
+            due_date=queue_item.due_date,
+            contract_value=queue_item.contract_value,
+            description=queue_item.description if hasattr(queue_item, 'description') else '',
+            status='in_progress',
+            queue_id=queue_id,
+            created_by=request.user,
+            modified_by=request.user
         )
-    
-    # Update queue item status
-    queue_item.status = 'processing'
-    queue_item.save()
-    
-    messages.success(request, 'Contract processing started successfully.')
-    return redirect('processing:process_contract_detail', pk=process_contract.id)
+        
+        # Create ProcessClins from queue item
+        for clin_data in queue_item.clins.all():
+            try:
+                ProcessClin.objects.create(
+                    process_contract=process_contract,
+                    item_number=clin_data.item_number,
+                    item_type=clin_data.item_type,
+                    nsn_text=clin_data.nsn,
+                    nsn_description_text=clin_data.nsn_description,
+                    supplier_text=clin_data.supplier,
+                    order_qty=float(clin_data.order_qty) if clin_data.order_qty else 0,
+                    unit_price=clin_data.unit_price if clin_data.unit_price else 0,
+                    item_value=clin_data.item_value if clin_data.item_value else 0,
+                    description=clin_data.description if hasattr(clin_data, 'description') else '',
+                    status='in_progress',
+                    ia=clin_data.ia if hasattr(clin_data, 'ia') else None,
+                    fob=clin_data.fob if hasattr(clin_data, 'fob') else None,
+                    po_num_ext=clin_data.po_num_ext if hasattr(clin_data, 'po_num_ext') else None,
+                    tab_num=clin_data.tab_num if hasattr(clin_data, 'tab_num') else None,
+                    clin_po_num=clin_data.clin_po_num if hasattr(clin_data, 'clin_po_num') else None,
+                    po_number=clin_data.po_number if hasattr(clin_data, 'po_number') else None,
+                    clin_type=clin_data.clin_type if hasattr(clin_data, 'clin_type') else None
+                )
+            except Exception as clin_error:
+                # If CLIN creation fails, delete the process contract and raise error
+                process_contract.delete()
+                raise Exception(f"Error creating CLIN: {str(clin_error)}")
+        
+        # Update queue item status and timestamp
+        queue_item.is_being_processed = True
+        queue_item.processed_by = request.user
+        queue_item.processing_started = timezone.now()
+        queue_item.save()
+        
+        return JsonResponse({
+            'success': True,
+            'process_contract_id': process_contract.id,
+            'message': 'Contract processing started successfully'
+        })
+    except QueueContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Contract not found'
+        })
+    except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in start_processing: {error_details}")
+        
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 class ProcessContractDetailView(LoginRequiredMixin, DetailView):
     model = ProcessContract
     template_name = 'processing/process_contract_detail.html'
-    context_object_name = 'contract'
+    context_object_name = 'process_contract'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['clins'] = self.object.clins.all()
+        context['clins'] = self.object.clins.all().order_by('item_number')
         return context
 
 class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
     model = ProcessContract
     form_class = ProcessContractForm
     template_name = 'processing/process_contract_form.html'
+    context_object_name = 'process_contract'
+    
+    def get_object(self, queryset=None):
+        try:
+            obj = super().get_object(queryset)
+            if obj is None:
+                raise Http404("Process contract not found")
+            return obj
+        except Http404:
+            messages.error(self.request, 'Process contract not found.')
+            return None
+    
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object is None:
+            return redirect('processing:queue')
+        return super().get(request, *args, **kwargs)
+    
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object is None:
+            return redirect('processing:queue')
+        return super().post(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.request.POST:
-            context['clins'] = ProcessCLINFormSet(self.request.POST, instance=self.object)
+            context['clin_formset'] = ProcessClinFormSet(
+                self.request.POST,
+                instance=self.object
+            )
         else:
-            context['clins'] = ProcessCLINFormSet(instance=self.object)
+            context['clin_formset'] = ProcessClinFormSet(instance=self.object)
         return context
     
     def form_valid(self, form):
         context = self.get_context_data()
-        clins = context['clins']
-        if clins.is_valid():
+        clin_formset = context['clin_formset']
+        
+        if clin_formset.is_valid():
             self.object = form.save()
-            clins.instance = self.object
-            clins.save()
-            return redirect('processing:process_contract_detail', pk=self.object.id)
-        return self.render_to_response(self.get_context_data(form=form))
+            clin_formset.instance = self.object
+            clin_formset.save()
+            messages.success(self.request, 'Contract updated successfully.')
+            return redirect(self.get_success_url())
+        else:
+            return self.render_to_response(self.get_context_data(form=form))
+    
+    def get_success_url(self):
+        return reverse('processing:process_contract_detail', kwargs={'pk': self.object.pk})
 
-def finalize_contract(request, pk):
-    process_contract = get_object_or_404(ProcessContract, id=pk)
+@login_required
+def match_buyer(request, process_contract_id):
+    """Match a buyer based on text input"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
     
-    # Create final Contract
-    contract = Contract.objects.create(
-        contract_number=process_contract.contract_number,
-        buyer=process_contract.buyer,
-        award_date=process_contract.award_date,
-        due_date=process_contract.due_date,
-        contract_value=process_contract.contract_value,
-        description=process_contract.description,
-        created_by=request.user,
-        modified_by=request.user
-    )
+    buyer_text = request.POST.get('buyer_text')
+    if not buyer_text:
+        return JsonResponse({'error': 'No buyer text provided'}, status=400)
     
-    # Create final CLINs
-    for process_clin in process_contract.clins.all():
-        Clin.objects.create(
-            contract=contract,
-            clin_number=process_clin.clin_number,
-            nsn=process_clin.nsn,
-            supplier=process_clin.supplier,
-            quantity=process_clin.quantity,
-            unit_price=process_clin.unit_price,
-            total_price=process_clin.total_price,
-            description=process_clin.description
+    try:
+        process_contract = ProcessContract.objects.get(id=process_contract_id)
+        buyer = Buyer.objects.filter(name__icontains=buyer_text).first()
+        
+        if buyer:
+            process_contract.buyer = buyer
+            process_contract.buyer_text = buyer.name
+            process_contract.save()
+            return JsonResponse({
+                'success': True,
+                'buyer_id': buyer.id,
+                'buyer_name': buyer.name
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'No buyer found matching "{buyer_text}"'
+            })
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'error': 'Process contract not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def match_nsn(request, process_clin_id):
+    """Match an NSN based on text input"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+    
+    nsn_text = request.POST.get('nsn_text')
+    if not nsn_text:
+        return JsonResponse({'error': 'No NSN text provided'}, status=400)
+    
+    try:
+        process_clin = ProcessClin.objects.get(id=process_clin_id)
+        nsn = Nsn.objects.filter(number__icontains=nsn_text).first()
+        
+        if nsn:
+            process_clin.nsn = nsn
+            process_clin.nsn_text = nsn.number
+            process_clin.nsn_description_text = nsn.description
+            process_clin.save()
+            return JsonResponse({
+                'success': True,
+                'nsn_id': nsn.id,
+                'nsn_number': nsn.number,
+                'nsn_description': nsn.description
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'No NSN found matching "{nsn_text}"'
+            })
+    except ProcessClin.DoesNotExist:
+        return JsonResponse({
+            'error': 'Process CLIN not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def match_supplier(request, process_clin_id):
+    """Match a supplier based on text input"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+    
+    supplier_text = request.POST.get('supplier_text')
+    if not supplier_text:
+        return JsonResponse({'error': 'No supplier text provided'}, status=400)
+    
+    try:
+        process_clin = ProcessClin.objects.get(id=process_clin_id)
+        supplier = Supplier.objects.filter(name__icontains=supplier_text).first()
+        
+        if supplier:
+            process_clin.supplier = supplier
+            process_clin.supplier_text = supplier.name
+            process_clin.save()
+            return JsonResponse({
+                'success': True,
+                'supplier_id': supplier.id,
+                'supplier_name': supplier.name
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'No supplier found matching "{supplier_text}"'
+            })
+    except ProcessClin.DoesNotExist:
+        return JsonResponse({
+            'error': 'Process CLIN not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+@login_required
+@transaction.atomic
+def finalize_contract(request, process_contract_id):
+    """Create a final Contract from a ProcessContract"""
+    try:
+        process_contract = ProcessContract.objects.get(id=process_contract_id)
+        
+        # Verify all required fields are set
+        if not process_contract.buyer:
+            return JsonResponse({
+                'success': False,
+                'error': 'Buyer must be matched before finalizing'
+            })
+        
+        # Create the Contract
+        contract = Contract.objects.create(
+            contract_number=process_contract.contract_number,
+            buyer=process_contract.buyer,
+            award_date=process_contract.award_date,
+            due_date=process_contract.due_date,
+            contract_value=process_contract.contract_value,
+            description=process_contract.description,
+            created_by=request.user,
+            modified_by=request.user
         )
-    
-    # Update queue item status
-    queue_item = ContractQueue.objects.get(id=process_contract.queue_id)
-    queue_item.status = 'completed'
-    queue_item.save()
-    
-    # Delete processing records
-    process_contract.delete()
-    
-    messages.success(request, 'Contract finalized successfully.')
-    return redirect('contracts:contract_detail', pk=contract.id)
+        
+        # Create CLINs
+        for process_clin in process_contract.clins.all():
+            if not process_clin.nsn:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'NSN must be matched for CLIN {process_clin.item_number}'
+                })
+            if not process_clin.supplier:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Supplier must be matched for CLIN {process_clin.item_number}'
+                })
+            
+            Clin.objects.create(
+                contract=contract,
+                clin_number=process_clin.item_number,
+                nsn=process_clin.nsn,
+                supplier=process_clin.supplier,
+                quantity=process_clin.order_qty,
+                unit_price=process_clin.unit_price,
+                total_price=process_clin.item_value,
+                description=process_clin.description,
+                ia=process_clin.ia,
+                fob=process_clin.fob,
+                created_by=request.user,
+                modified_by=request.user
+            )
+        
+        # Update queue item status
+        queue_contract = process_contract.queue_contract
+        if queue_contract:
+            queue_contract.status = 'processed'
+            queue_contract.save()
+        
+        # Delete the process contract
+        process_contract.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'contract_id': contract.id,
+            'message': 'Contract finalized successfully'
+        })
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Process contract not found'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 # Create formset for CLINs
-ProcessCLINFormSet = inlineformset_factory(
+ProcessClinFormSet = inlineformset_factory(
     ProcessContract,
-    ProcessCLIN,
-    form=ProcessCLINForm,
+    ProcessClin,
+    form=ProcessClinForm,
     extra=1,
     can_delete=True
 )
@@ -206,8 +445,8 @@ def upload_csv(request):
             reader = csv.DictReader(decoded_file)
             
             for row in reader:
-                # Create ContractQueue entry
-                contract = ContractQueue.objects.create(
+                # Create QueueContract entry
+                contract = QueueContract.objects.create(
                     contract_number=row['Contract Number'],
                     buyer=row['Buyer'],
                     award_date=row['Award Date'],
@@ -216,7 +455,7 @@ def upload_csv(request):
                     description=row['Description']
                 )
                 
-                # Create CLIN entries
+                # Create QueueClin entries
                 clin = contract.clins.create(
                     clin_number=row['CLIN Number'],
                     nsn=row['NSN'],
@@ -232,4 +471,26 @@ def upload_csv(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    return JsonResponse({'success': False, 'error': 'Invalid request'}) 
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+def get_process_contract(request, queue_id):
+    """Get the process contract ID for a queue item to resume processing"""
+    try:
+        queue_item = get_object_or_404(QueueContract, id=queue_id)
+        process_contract = ProcessContract.objects.filter(queue_id=queue_id).first()
+        
+        if process_contract:
+            return JsonResponse({
+                'success': True,
+                'process_contract_id': process_contract.id
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'No processing contract found for this queue item'
+            })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }) 

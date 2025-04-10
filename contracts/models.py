@@ -792,3 +792,4 @@ class ExportTiming(models.Model):
         
         # Ensure minimum of 1 second
         return max(1, estimated_time)
+
