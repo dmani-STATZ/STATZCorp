@@ -37,6 +37,7 @@ urlpatterns = [
     path('inventory/', include('inventory.urls')),
     path('contracts/', include('contracts.urls')),
     path('accesslog/', include('accesslog.urls')),
+    path('processing/', include('processing.urls')),
     path('health/', health_check, name='health_check'),
     # Announcement URLs
     path('announcement/add/', views.add_announcement, name='add_announcement'),

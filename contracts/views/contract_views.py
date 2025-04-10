@@ -16,7 +16,8 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, SequenceNumber, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus
+from ..models import Contract, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus
+from processing.models import SequenceNumber
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
 
 logger = logging.getLogger(__name__)

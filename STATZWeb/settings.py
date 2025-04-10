@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'theme_tw',
     'corsheaders',
     'django_extensions',
+    'processing.apps.ProcessingConfig',
 ]
 
 MIDDLEWARE = [

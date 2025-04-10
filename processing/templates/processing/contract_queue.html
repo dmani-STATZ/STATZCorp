@@ -1,0 +1,169 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Contract Queue{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Contract Queue</h1>
+        <div class="space-x-4">
+            <a href="{% url 'processing:download_csv_template' %}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                Download Template
+            </a>
+            <a href="{% url 'processing:download_test_data' %}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+                Download Test Data
+            </a>
+            <button onclick="document.getElementById('csv-upload').click()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                Upload CSV
+            </button>
+            <input type="file" id="csv-upload" class="hidden" accept=".csv" onchange="handleFileUpload(this)">
+        </div>
+    </div>
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Number</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for contract in queued_contracts %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ contract.contract_number }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ contract.buyer }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ contract.award_date|date:"Y-m-d" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ contract.due_date|date:"Y-m-d" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${{ contract.contract_value|floatformat:2 }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if contract.is_being_processed %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                Being Processed by {{ contract.processed_by.username }}
+                            </span>
+                        {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Ready for Processing
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {% if not contract.is_being_processed %}
+                            <button onclick="startProcessing({{ contract.id }})" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                Start Processing
+                            </button>
+                        {% elif contract.processed_by == user %}
+                            <button onclick="processContract({{ contract.id }})" class="text-green-600 hover:text-green-900">
+                                Complete Processing
+                            </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                        No contracts in queue
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function startProcessing(contractId) {
+    fetch('/processing/start/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: `contract_queue_id=${contractId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while starting processing');
+    });
+}
+
+function processContract(contractId) {
+    fetch('/processing/process/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: `contract_queue_id=${contractId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `/contracts/${data.contract_id}/`;
+        } else {
+            alert(data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing the contract');
+    });
+}
+
+function handleFileUpload(input) {
+    if (input.files.length === 0) return;
+    
+    const formData = new FormData();
+    formData.append('csv_file', input.files[0]);
+    
+    fetch('/processing/upload/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while uploading the file');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 
