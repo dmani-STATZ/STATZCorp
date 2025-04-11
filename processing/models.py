@@ -52,6 +52,7 @@ class QueueClin(AuditModel):
     order_qty = models.FloatField(null=True, blank=True)
     item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    uom = models.CharField(max_length=10, null=True, blank=True)
     
     # Optional supplier information
     supplier = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
@@ -138,10 +139,12 @@ class ProcessContract(models.Model):
     buyer = models.ForeignKey(Buyer, on_delete=models.CASCADE, null=True, blank=True)
     buyer_text = models.CharField(max_length=255, null=True, blank=True)
     contract_type = models.ForeignKey(ContractType, on_delete=models.CASCADE, null=True, blank=True)
+    contract_type_text = models.CharField(max_length=255, null=True, blank=True)
     award_date = models.DateTimeField(null=True, blank=True)
     due_date = models.DateTimeField(null=True, blank=True)
     due_date_late = models.BooleanField(null=True, blank=True)
     sales_class = models.ForeignKey(SalesClass, on_delete=models.CASCADE, null=True, blank=True)
+    sales_class_text = models.CharField(max_length=255, null=True, blank=True)
     nist = models.BooleanField(null=True, blank=True)
     files_url = models.CharField(max_length=200, null=True, blank=True)
     contract_value = models.FloatField(null=True, blank=True, default=0)
@@ -198,6 +201,7 @@ class ProcessClin(models.Model):
     clin_po_num = models.CharField(max_length=10, null=True, blank=True)
     po_number = models.CharField(max_length=10, null=True, blank=True)
     clin_type = models.ForeignKey(ClinType, on_delete=models.CASCADE, null=True, blank=True)
+    clin_type_text = models.CharField(max_length=255, null=True, blank=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, null=True, blank=True)
     supplier_text = models.CharField(max_length=255, null=True, blank=True)
     nsn = models.ForeignKey(Nsn, on_delete=models.CASCADE, null=True, blank=True)
@@ -215,6 +219,7 @@ class ProcessClin(models.Model):
 
     # CLIN_Finance
     special_payment_terms = models.ForeignKey(SpecialPaymentTerms, on_delete=models.CASCADE, null=True, blank=True)
+    special_payment_terms_text = models.CharField(max_length=255, null=True, blank=True)
     special_payment_terms_paid = models.BooleanField(null=True, blank=True)
     price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
