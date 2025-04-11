@@ -325,4 +325,57 @@ def update_clin_field(request, clin_id):
         return JsonResponse({
             'success': False,
             'error': str(e)
+        }, status=500)
+
+@login_required
+@require_http_methods(["POST"])
+def create_nsn(request):
+    """
+    API endpoint to create a new NSN record.
+    Expects JSON data with:
+    - nsn: NSN code
+    - description: NSN description
+    """
+    try:
+        data = json.loads(request.body)
+        nsn_code = data.get('nsn')
+        description = data.get('description')
+
+        if not nsn_code:
+            return JsonResponse({
+                'success': False,
+                'error': 'NSN code is required'
+            }, status=400)
+
+        # Check if NSN already exists
+        if Nsn.objects.filter(nsn_code=nsn_code).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'NSN code already exists'
+            }, status=400)
+
+        # Create new NSN record
+        nsn = Nsn.objects.create(
+            nsn_code=nsn_code,
+            description=description,
+            created_by=request.user,
+            modified_by=request.user
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': nsn.id,
+            'nsn_code': nsn.nsn_code,
+            'description': nsn.description
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
         }, status=500) 

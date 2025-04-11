@@ -581,6 +581,31 @@
             <div class="mb-4 p-3 bg-gray-50 rounded">
                 <h4 class="text-sm font-medium text-gray-700 mb-2">Original NSN Information:</h4>
                 <p id="original_nsn_display" class="text-gray-900"></p>
+                <button type="button" 
+                        onclick="showAddNsnForm()"
+                        class="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Add as New NSN
+                </button>
+            </div>
+
+            <!-- Add NSN Form (Initially Hidden) -->
+            <div id="add_nsn_form" class="mb-4 hidden">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Add New NSN</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">NSN Code</label>
+                        <input type="text" id="new_nsn_code" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="new_nsn_description" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+                    </div>
+                    <button type="button" 
+                            onclick="createNewNsn()"
+                            class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                        Create NSN
+                    </button>
+                </div>
             </div>
 
             <!-- Search Section -->
@@ -629,6 +654,31 @@
             <div class="mb-4 p-3 bg-gray-50 rounded">
                 <h4 class="text-sm font-medium text-gray-700 mb-2">Original Supplier Information:</h4>
                 <p id="original_supplier_display" class="text-gray-900"></p>
+                <button type="button" 
+                        onclick="showAddSupplierForm()"
+                        class="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Add as New Supplier
+                </button>
+            </div>
+
+            <!-- Add Supplier Form (Initially Hidden) -->
+            <div id="add_supplier_form" class="mb-4 hidden">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Add New Supplier</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
+                        <input type="text" id="new_supplier_name" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">CAGE Code*</label>
+                        <input type="text" id="new_supplier_cage_code" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <button type="button" 
+                            onclick="createNewSupplier()"
+                            class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                        Create Supplier
+                    </button>
+                </div>
             </div>
 
             <!-- Search Section -->
@@ -677,6 +727,27 @@
             <div class="mb-4 p-3 bg-gray-50 rounded">
                 <h4 class="text-sm font-medium text-gray-700 mb-2">Original Buyer Information:</h4>
                 <p id="original_buyer_display" class="text-gray-900"></p>
+                <button type="button" 
+                        onclick="showAddBuyerForm()"
+                        class="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Add as New Buyer
+                </button>
+            </div>
+
+            <!-- Add Buyer Form (Initially Hidden) -->
+            <div id="add_buyer_form" class="mb-4 hidden">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Add New Buyer</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
+                        <input type="text" id="new_buyer_name" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <button type="button" 
+                            onclick="createNewBuyer()"
+                            class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                        Create Buyer
+                    </button>
+                </div>
             </div>
 
             <!-- Search Section -->
@@ -1666,5 +1737,139 @@
             }
         });
     });
+
+    // Add these new functions for handling the add forms
+    function showAddBuyerForm() {
+        const form = document.getElementById('add_buyer_form');
+        const input = document.getElementById('new_buyer_name');
+        const originalText = document.getElementById('original_buyer_display').textContent.replace('Buyer: ', '');
+        
+        form.classList.remove('hidden');
+        input.value = originalText;
+    }
+
+    function showAddNsnForm() {
+        const form = document.getElementById('add_nsn_form');
+        const codeInput = document.getElementById('new_nsn_code');
+        const descInput = document.getElementById('new_nsn_description');
+        const originalText = document.getElementById('original_nsn_display').textContent;
+        
+        // Parse NSN and description from original text
+        const nsnMatch = originalText.match(/NSN: (.*?)(?:\nDescription: |$)/);
+        const descMatch = originalText.match(/Description: (.*?)$/);
+        
+        form.classList.remove('hidden');
+        if (nsnMatch) codeInput.value = nsnMatch[1].trim();
+        if (descMatch) descInput.value = descMatch[1].trim();
+    }
+
+    function showAddSupplierForm() {
+        const form = document.getElementById('add_supplier_form');
+        const nameInput = document.getElementById('new_supplier_name');
+        const originalText = document.getElementById('original_supplier_display').textContent.replace('Supplier: ', '');
+        
+        form.classList.remove('hidden');
+        nameInput.value = originalText;
+    }
+
+    function createNewBuyer() {
+        const buyerName = document.getElementById('new_buyer_name').value.trim();
+        
+        if (!buyerName) {
+            alert('Buyer name is required');
+            return;
+        }
+        
+        fetch('/contracts/api/buyers/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                buyer_text: buyerName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                selectBuyer(data.id, buyerName);
+            } else {
+                alert(data.error || 'Failed to create buyer');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating buyer');
+        });
+    }
+
+    function createNewNsn() {
+        const nsnCode = document.getElementById('new_nsn_code').value.trim();
+        const nsnDescription = document.getElementById('new_nsn_description').value.trim();
+        
+        if (!nsnCode) {
+            alert('NSN code is required');
+            return;
+        }
+        
+        fetch('/contracts/api/nsn/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                nsn: nsnCode,
+                description: nsnDescription
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                selectNsn(data.id, nsnCode);
+            } else {
+                alert(data.error || 'Failed to create NSN');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating NSN');
+        });
+    }
+
+    function createNewSupplier() {
+        const supplierName = document.getElementById('new_supplier_name').value.trim();
+        const cageCode = document.getElementById('new_supplier_cage_code').value.trim();
+        
+        if (!supplierName || !cageCode) {
+            alert('Supplier name and CAGE code are required');
+            return;
+        }
+        
+        fetch('/contracts/api/suppliers/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                supplier_name: supplierName,
+                cage_code: cageCode
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                selectSupplier(data.id, supplierName);
+            } else {
+                alert(data.error || 'Failed to create supplier');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating supplier');
+        });
+    }
 </script>
 {% endblock %}

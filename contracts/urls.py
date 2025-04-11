@@ -202,6 +202,7 @@ urlpatterns = [
     path('api/options/<str:field_name>/', get_select_options, name='get_select_options'),
     path('contract/<int:contract_id>/combined-notes/', get_combined_notes, name='get_combined_notes'),
     path('contract/<int:contract_id>/clin/<int:clin_id>/combined-notes/', get_combined_notes, name='get_combined_notes_with_clin'),
+    path('api/nsn/create/', views.api_views.create_nsn, name='api_nsn_create'),
     
     # Test
     path('test-app-name/', test_app_name, name='test_app_name'),
