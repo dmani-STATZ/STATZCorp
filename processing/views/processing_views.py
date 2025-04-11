@@ -436,6 +436,54 @@ def finalize_contract(request, process_contract_id):
             'error': str(e)
         })
 
+@login_required
+def match_idiq(request, process_contract_id):
+    """Match an IDIQ contract based on ID"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        idiq_id = data.get('idiq_id')
+        
+        process_contract = ProcessContract.objects.get(id=process_contract_id)
+        
+        if idiq_id is None:
+            # Handle removal of IDIQ contract
+            process_contract.idiq_contract = None
+            process_contract.save()
+            return JsonResponse({'success': True})
+            
+        # Handle setting new IDIQ contract
+        idiq_contract = IdiqContract.objects.get(id=idiq_id)
+        process_contract.idiq_contract = idiq_contract
+        process_contract.save()
+        
+        return JsonResponse({
+            'success': True,
+            'idiq_id': idiq_contract.id,
+            'contract_number': idiq_contract.contract_number
+        })
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'error': 'Process Contract not found'
+        }, status=404)
+    except IdiqContract.DoesNotExist:
+        return JsonResponse({
+            'error': 'IDIQ Contract not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        import traceback
+        print("Unexpected error:", str(e))
+        print("Traceback:", traceback.format_exc())
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
 # Create formset for CLINs
 ProcessClinFormSet = inlineformset_factory(
     ProcessContract,

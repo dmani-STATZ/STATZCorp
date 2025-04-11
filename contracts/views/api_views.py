@@ -7,69 +7,67 @@ from django.shortcuts import get_object_or_404
 import json
 
 from ..models import (
-    Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, NsnView, Buyer
+    Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, NsnView, Buyer, IdiqContract
 )
 
 @login_required
 @require_http_methods(["GET"])
 def get_select_options(request, field_name):
     """
-    API endpoint to get options for select fields asynchronously.
-    This improves page load time by loading the foreign key data after the page loads.
+    Generic view to get select options for various fields.
+    Supports pagination and search.
     """
+    search_term = request.GET.get('search', '')
+    page = int(request.GET.get('page', 1))
+    page_size = int(request.GET.get('page_size', 10))
+    specific_contract_id = request.GET.get('contract_id')
+    
+    offset = (page - 1) * page_size
+    limit = page_size
+    
     options = []
+    total_count = 0
     
     try:
-        # Get pagination and search parameters
-        page = int(request.GET.get('page', 1))
-        page_size = int(request.GET.get('page_size', 20))
-        search_term = request.GET.get('search', '')
-        include_id = request.GET.get('include_id')
-        
-        # Calculate offset and limit
-        offset = (page - 1) * page_size
-        limit = page_size
-        
-        if field_name == 'buyer':
-            # Get buyers, ordered by description
-            queryset = Buyer.objects.all().order_by('description')
-            
-            # Apply search if provided
+        if field_name == 'idiq':
+            # IDIQ Contract search
+            queryset = IdiqContract.objects.filter(closed=False)
             if search_term:
-                queryset = queryset.filter(description__icontains=search_term)
+                queryset = queryset.filter(
+                    Q(contract_number__icontains=search_term) |
+                    Q(tab_num__icontains=search_term)
+                ).order_by('contract_number')
             
-            # Get paginated results
-            total = queryset.count()
-            buyers = queryset[offset:offset + limit]
+            total_count = queryset.count()
+            queryset = queryset[offset:offset+limit]
             
-            # Format the results
-            options = [{'value': buyer.id, 'label': buyer.description} for buyer in buyers]
-            
-            return JsonResponse({
-                'success': True,
-                'options': options,
-                'total': total,
-                'has_more': (offset + limit) < total
-            })
+            for item in queryset:
+                options.append({
+                    'value': item.id,
+                    'label': f"{item.contract_number or 'Unknown'}",
+                    'tab_num': item.tab_num
+                })
+
         elif field_name == 'contract':
-            # Get contracts, ordered by contract number
-            queryset = Contract.objects.all().order_by('contract_number')
+            # Existing contract search logic
+            queryset = Contract.objects.all()
             
-            # Apply search if provided
             if search_term:
-                queryset = queryset.filter(contract_number__icontains=search_term)
+                queryset = queryset.filter(
+                    Q(contract_number__icontains=search_term) |
+                    Q(po_number__icontains=search_term)
+                ).order_by('-award_date')
             
-            # Check if we need to include a specific contract
-            specific_contract_id = include_id
             if specific_contract_id:
                 try:
                     specific_contract = Contract.objects.get(id=specific_contract_id)
-                    # Check if the contract is already in the queryset
-                    if not queryset.filter(id=specific_contract_id).exists():
-                        # If not, we'll add it to the results later
-                        pass
-                except Exception as e:
-                    print(f"Error getting specific contract: {str(e)}")
+                    # Add the specific contract to the start of the list
+                    options.append({
+                        'value': specific_contract.id,
+                        'label': f"{specific_contract.contract_number or 'Unknown'}"
+                    })
+                except Contract.DoesNotExist:
+                    pass
             
             try:
                 # Apply pagination
@@ -102,7 +100,28 @@ def get_select_options(request, field_name):
                         total_count = 0
                 else:
                     total_count = 0
-                
+                    
+        elif field_name == 'buyer':
+            # Get buyers, ordered by description
+            queryset = Buyer.objects.all().order_by('description')
+            
+            # Apply search if provided
+            if search_term:
+                queryset = queryset.filter(description__icontains=search_term)
+            
+            # Get paginated results
+            total = queryset.count()
+            buyers = queryset[offset:offset + limit]
+            
+            # Format the results
+            options = [{'value': buyer.id, 'label': buyer.description} for buyer in buyers]
+            
+            return JsonResponse({
+                'success': True,
+                'options': options,
+                'total': total,
+                'has_more': (offset + limit) < total
+            })
         elif field_name == 'clin_type':
             # Get CLIN types
             queryset = ClinType.objects.all().order_by('description')
@@ -112,11 +131,11 @@ def get_select_options(request, field_name):
                 queryset = queryset.filter(description__icontains=search_term)
             
             # Check if we need to include a specific clin_type
-            if include_id:
+            if specific_contract_id:
                 try:
-                    specific_clin_type = ClinType.objects.get(id=include_id)
+                    specific_clin_type = ClinType.objects.get(id=specific_contract_id)
                     # Make sure this specific clin_type is included in the results
-                    if not queryset.filter(id=include_id).exists():
+                    if not queryset.filter(id=specific_contract_id).exists():
                         # Create a new queryset with the specific item first
                         queryset = list(queryset)
                         queryset.insert(0, specific_clin_type)
@@ -149,11 +168,11 @@ def get_select_options(request, field_name):
                 )
             
             # Check if we need to include a specific supplier
-            if include_id:
+            if specific_contract_id:
                 try:
-                    specific_supplier = Supplier.objects.get(id=include_id)
+                    specific_supplier = Supplier.objects.get(id=specific_contract_id)
                     # Make sure this specific supplier is included in the results
-                    if not queryset.filter(id=include_id).exists():
+                    if not queryset.filter(id=specific_contract_id).exists():
                         # Create a new queryset with the specific item first
                         queryset = list(queryset)
                         queryset.insert(0, specific_supplier)
@@ -186,11 +205,11 @@ def get_select_options(request, field_name):
                 )
             
             # Check if we need to include a specific NSN
-            if include_id:
+            if specific_contract_id:
                 try:
-                    specific_nsn = Nsn.objects.get(id=include_id)
+                    specific_nsn = Nsn.objects.get(id=specific_contract_id)
                     # Make sure this specific NSN is included in the results
-                    if not queryset.filter(id=include_id).exists():
+                    if not queryset.filter(id=specific_contract_id).exists():
                         # For NSN, we need to handle this differently since we're using NsnView
                         # We'll add the specific NSN to the options at the end
                         options.append({
@@ -224,11 +243,11 @@ def get_select_options(request, field_name):
                 queryset = queryset.filter(terms__icontains=search_term)
             
             # Check if we need to include a specific payment term
-            if include_id:
+            if specific_contract_id:
                 try:
-                    specific_term = SpecialPaymentTerms.objects.get(id=include_id)
+                    specific_term = SpecialPaymentTerms.objects.get(id=specific_contract_id)
                     # Make sure this specific term is included in the results
-                    if not queryset.filter(id=include_id).exists():
+                    if not queryset.filter(id=specific_contract_id).exists():
                         # Create a new queryset with the specific item first
                         queryset = list(queryset)
                         queryset.insert(0, specific_term)
@@ -252,19 +271,15 @@ def get_select_options(request, field_name):
         return JsonResponse({
             'success': True,
             'options': options,
-            'pagination': {
-                'page': page,
-                'page_size': page_size,
-                'total_count': total_count,
-                'total_pages': (total_count + page_size - 1) // page_size
-            }
+            'total': total_count,
+            'has_more': total_count > (offset + limit)
         })
         
     except Exception as e:
         return JsonResponse({
             'success': False,
             'error': str(e)
-        }, status=500)
+        }, status=400)
 
 @login_required
 @require_http_methods(["POST"])

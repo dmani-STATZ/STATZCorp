@@ -36,12 +36,32 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">IDIQ Contract</label>
-                            <select name="idiq_contract" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">-------</option>
-                                {% for contract in idiq_contracts %}
-                                    <option value="{{ contract.id }}" {% if process_contract.idiq_contract_id == contract.id %}selected{% endif %}>{{ contract }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="flex gap-2 items-center">
+                                <input type="text" 
+                                       value="{{ process_contract.idiq_contract.contract_number|default:'' }}" 
+                                       class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                       readonly>
+                                <button type="button" 
+                                        data-action="open-idiq"
+                                        data-idiq="{{ process_contract.idiq_contract.contract_number|default:'' }}"
+                                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    Match
+                                </button>
+                                {% if process_contract.idiq_contract %}
+                                <button type="button" 
+                                        onclick="removeIdiq()"
+                                        class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                    Remove
+                                </button>
+                                <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                {% else %}
+                                <svg class="h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                {% endif %}
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
@@ -276,15 +296,15 @@
                                         {{ clin_form.supplier.as_hidden }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900 qty-display" data-clin-id="{{ clin_form.instance.id }}" id="qty_display_{{ clin_form.instance.id }}">{{ clin_form.order_qty.value|default:'0' }}</span>
+                                        <span class="text-sm font-medium text-gray-900 qty-display" data-clin-id="{{ clin_form.instance.id }}" id="qty_display_{{ clin_form.instance.id }}">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
                                         {{ clin_form.order_qty.as_hidden }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.unit_price.value|default:'0.00' }}</span>
+                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
                                         {{ clin_form.unit_price.as_hidden }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.item_value.value|default:'0.00' }}</span>
+                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
                                         {{ clin_form.item_value.as_hidden }}
                                     </td>
                                 </tr>
@@ -379,7 +399,7 @@
                                                 <input type="number" 
                                                        id="order_qty_{{ clin_form.instance.id }}"
                                                        name="{{ clin_form.order_qty.html_name }}" 
-                                                       value="{{ clin_form.order_qty.value|default:'0.00' }}"
+                                                       value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
                                             </div>
@@ -389,7 +409,7 @@
                                                        id="unit_price_{{ clin_form.instance.id }}"
                                                        step="0.01" 
                                                        name="{{ clin_form.unit_price.html_name }}" 
-                                                       value="{{ clin_form.unit_price.value|default:'0.00' }}"
+                                                       value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
                                             </div>
@@ -400,7 +420,7 @@
                                                            id="item_value_{{ clin_form.instance.id }}"
                                                            step="0.01" 
                                                            name="{{ clin_form.item_value.html_name }}" 
-                                                           value="{{ clin_form.item_value.value|default:'0.00' }}"
+                                                           value="{{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}"
                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                            readonly
                                                            data-clin-id="{{ clin_form.instance.id }}">
@@ -460,7 +480,7 @@
                                                 <input type="number" 
                                                        id="order_qty_{{ clin_form.instance.id }}_supplier"
                                                        name="{{ clin_form.order_qty.html_name }}" 
-                                                       value="{{ clin_form.order_qty.value|default:'0' }}"
+                                                       value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}"
                                                        readonly>
@@ -471,7 +491,7 @@
                                                        id="price_per_unit_{{ clin_form.instance.id }}"
                                                        step="0.01" 
                                                        name="{{ clin_form.price_per_unit.html_name }}" 
-                                                       value="{{ clin_form.price_per_unit.value|default:'0.00' }}"
+                                                       value="{{ clin_form.price_per_unit.value|floatformat:'2'|default:'0.00' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
                                             </div>
@@ -482,7 +502,7 @@
                                                            id="quote_value_{{ clin_form.instance.id }}"
                                                            step="0.01" 
                                                            name="{{ clin_form.quote_value.html_name }}" 
-                                                           value="{{ clin_form.quote_value.value|default:'0.00' }}"
+                                                           value="{{ clin_form.quote_value.value|floatformat:'2'|default:'0.00' }}"
                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                            readonly
                                                            data-clin-id="{{ clin_form.instance.id }}">
@@ -679,6 +699,54 @@
         <!-- Footer -->
         <div class="mt-4 flex justify-end border-t pt-3">
             <button type="button" onclick="closeBuyerModal()" 
+                    style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- IDIQ Contract Selection Modal -->
+<div id="idiq_modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border max-w-md shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center border-b pb-3">
+            <h3 class="text-lg font-semibold text-gray-900">Select IDIQ Contract</h3>
+            <button type="button" onclick="closeIdiqModal()" class="text-gray-400 hover:text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="mt-4">
+            <!-- Original IDIQ Info -->
+            <div class="mb-4 p-3 bg-gray-50 rounded">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Original IDIQ Contract Information:</h4>
+                <p id="original_idiq_display" class="text-gray-900"></p>
+            </div>
+
+            <!-- Search Section -->
+            <div class="mb-4">
+                <label for="idiq_search" class="block text-sm font-medium text-gray-700 mb-1">Search IDIQ Contract</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="idiq_search" class="form-control flex-1" placeholder="Enter contract number...">
+                    <button type="button" onclick="searchIdiq()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Search
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="idiq_search_results" class="mt-4 max-h-[300px] overflow-y-auto">
+                <!-- Results will be populated here -->
+                <div class="text-center text-gray-500 py-4">Search for IDIQ contract by number</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-4 flex justify-end border-t pt-3">
+            <button type="button" onclick="closeIdiqModal()" 
                     style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
                 Cancel
             </button>
@@ -1258,6 +1326,8 @@
             if (qtyInput && supplierPriceInput && supplierTotalInput) {
                 const qty = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(supplierPriceInput.value) || 0;
+                // Format price to 2 decimal places
+                supplierPriceInput.value = price.toFixed(2);
                 supplierTotalInput.value = (qty * price).toFixed(2);
             }
         } else {
@@ -1268,8 +1338,18 @@
             if (qtyInput && priceInput && totalInput) {
                 const qty = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(priceInput.value) || 0;
+                // Format price to 2 decimal places
+                priceInput.value = price.toFixed(2);
                 totalInput.value = (qty * price).toFixed(2);
             }
+        }
+    }
+
+    // Add function to format number inputs to 2 decimal places
+    function formatNumberInput(input) {
+        if (input && input.value) {
+            const value = parseFloat(input.value) || 0;
+            input.value = value.toFixed(2);
         }
     }
 
@@ -1313,6 +1393,16 @@
 
     // Add input event listeners for quantity fields and supplier price fields
     document.addEventListener('DOMContentLoaded', function() {
+        // Format all numeric inputs on page load
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            if (input.name.endsWith('-unit_price') || 
+                input.name.endsWith('-item_value') || 
+                input.name.endsWith('-price_per_unit') || 
+                input.name.endsWith('-quote_value')) {
+                formatNumberInput(input);
+            }
+        });
+
         // Add event listeners for quantity field changes
         document.querySelectorAll('input[id^="order_qty_"]').forEach(input => {
             if (!input.readOnly) {  // Only add listeners to editable fields
@@ -1329,6 +1419,15 @@
             }
         });
 
+        // Add event listeners for price field changes
+        document.querySelectorAll('input[name$="-unit_price"], input[name$="-price_per_unit"]').forEach(input => {
+            input.addEventListener('blur', function() {
+                formatNumberInput(this);
+                const calcButton = this.closest('.grid').querySelector('button[onclick^="recalculateTotal"]');
+                if (calcButton) recalculateTotal(calcButton);
+            });
+        });
+
         // Add event listeners for supplier price changes
         document.querySelectorAll('input[name$="-price_per_unit"]').forEach(input => {
             input.addEventListener('input', function() {
@@ -1338,5 +1437,173 @@
             });
         });
     });
+
+    function openIdiqModal(idiqText) {
+        const modal = document.getElementById('idiq_modal');
+        const searchInput = document.getElementById('idiq_search');
+        const originalDisplay = document.getElementById('original_idiq_display');
+        
+        originalDisplay.textContent = `IDIQ Contract: ${idiqText || 'Not specified'}`;
+        searchInput.value = idiqText || '';
+        modal.classList.remove('hidden');
+        searchInput.focus();
+        
+        if (idiqText) {
+            searchIdiq();
+        }
+    }
+
+    function closeIdiqModal() {
+        document.getElementById('idiq_modal').classList.add('hidden');
+    }
+
+    function searchIdiq() {
+        const searchTerm = document.getElementById('idiq_search').value.trim();
+        if (searchTerm.length < 3) {
+            document.getElementById('idiq_search_results').innerHTML = 
+                '<div class="text-center text-gray-500 py-4">Enter at least 3 characters to search</div>';
+            return;
+        }
+        
+        document.getElementById('idiq_search_results').innerHTML = 
+            '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
+        
+        fetch(`/contracts/api/options/idiq/?search=${encodeURIComponent(searchTerm)}&page=1&page_size=10`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const resultsDiv = document.getElementById('idiq_search_results');
+                    resultsDiv.innerHTML = '';
+                    
+                    if (data.options && data.options.length > 0) {
+                        let resultsHtml = '';
+                        data.options.forEach(option => {
+                            resultsHtml += `
+                                <div class="idiq-result-item hover:bg-gray-50 p-2 cursor-pointer" 
+                                     onclick="selectIdiq('${option.value}', '${option.label}')">
+                                    <div class="font-medium">${option.label}</div>
+                                    <div class="text-sm text-gray-500">TAB: ${option.tab_num || 'N/A'}</div>
+                                </div>
+                            `;
+                        });
+                        resultsDiv.innerHTML = resultsHtml;
+                    } else {
+                        resultsDiv.innerHTML = '<div class="text-center text-gray-500 py-4">No matches found</div>';
+                    }
+                } else {
+                    document.getElementById('idiq_search_results').innerHTML = 
+                        '<div class="text-center text-red-500 py-4">Error searching for IDIQ contracts</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                document.getElementById('idiq_search_results').innerHTML = 
+                    '<div class="text-center text-red-500 py-4">Error connecting to the server</div>';
+            });
+    }
+
+    function selectIdiq(id, text) {
+        console.log('Selecting IDIQ:', { id, text });
+        
+        // Update the contract's IDIQ
+        fetch(`/processing/match-idiq/${processContractId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ 
+                idiq_id: id,  // Changed from 'id' to 'idiq_id' to match expected format
+                contract_number: text  // Adding contract number for reference
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to select IDIQ contract');
+                }).catch(() => {
+                    throw new Error('Network response was not ok');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Success response:', data);
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Error selecting IDIQ contract');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(error.message || 'Error selecting IDIQ contract');
+        });
+    }
+
+    // Add event listeners for IDIQ contract search
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle IDIQ modal
+        document.querySelectorAll('[data-action="open-idiq"]').forEach(button => {
+            button.addEventListener('click', function() {
+                const idiq = this.dataset.idiq;
+                openIdiqModal(idiq);
+            });
+        });
+
+        // Add event listeners for IDIQ search
+        const idiqSearchInput = document.getElementById('idiq_search');
+        const idiqSearchButton = document.querySelector('button[onclick="searchIdiq()"]');
+        
+        if (idiqSearchInput) {
+            idiqSearchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchIdiq();
+                }
+            });
+        }
+        
+        if (idiqSearchButton) {
+            idiqSearchButton.addEventListener('click', searchIdiq);
+        }
+    });
+
+    // Add this function to the JavaScript section
+    function removeIdiq() {
+        console.log('Removing IDIQ contract');
+        
+        // Send request to remove IDIQ contract
+        fetch(`/processing/match-idiq/${processContractId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ id: null })  // Sending null to remove the IDIQ
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    console.error('Error response:', text);
+                    throw new Error('Network response was not ok');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Success response:', data);
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Error removing IDIQ contract');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error removing IDIQ contract: ' + error.message);
+        });
+    }
 </script>
 {% endblock %}

@@ -16,7 +16,8 @@ from .views.processing_views import (
     start_processing,
     match_buyer,
     match_nsn,
-    match_supplier
+    match_supplier,
+    match_idiq
 )
 from .views.api_views import (
     get_processing_contract,
@@ -45,6 +46,7 @@ urlpatterns = [
     path('match-buyer/<int:process_contract_id>/', match_buyer, name='match_buyer'),
     path('match-nsn/<int:process_clin_id>/', match_nsn, name='match_nsn'),
     path('match-supplier/<int:process_clin_id>/', match_supplier, name='match_supplier'),
+    path('match-idiq/<int:process_contract_id>/', match_idiq, name='match_idiq'),
     
     # API Endpoints
     path('api/processing/<int:id>/', get_processing_contract, name='api_get_processing_contract'),
