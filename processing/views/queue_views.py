@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.utils import timezone
-from ..models import QueueContract, QueueClin, SequenceNumber, ProcessContract
+from ..models import QueueContract, QueueClin, SequenceNumber, ProcessContract, ProcessClin
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, ContractType
 import csv
 from io import StringIO
@@ -24,7 +24,7 @@ class ContractQueueListView(ListView):
     context_object_name = 'queued_contracts'
     
     def get_queryset(self):
-        return QueueContract.objects.all().order_by('-created_on')
+        return QueueContract.objects.all().order_by('award_date')
 
 @require_http_methods(["GET"])
 @login_required
@@ -46,8 +46,17 @@ def get_next_numbers(request):
 
 @require_http_methods(["POST"])
 @login_required
-def start_processing(request):
-    """Mark a contract as being processed by a user"""
+def initiate_processing(request):
+    """Initiate the processing of a contract by marking it as being processed.
+    
+    This is the first step in the contract processing workflow:
+    1. Marks the contract as being processed (is_being_processed = True)
+    2. Records which user is processing it (processed_by)
+    3. Records when processing started (processing_started)
+    
+    After this function completes, the system will call start_processing (in processing_views.py)
+    to begin the actual processing workflow.
+    """
     contract_queue_id = request.POST.get('contract_queue_id')
     
     try:

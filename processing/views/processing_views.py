@@ -22,7 +22,17 @@ import json
 @login_required
 @require_http_methods(["POST"])
 def start_processing(request, queue_id):
-    """Start processing a contract from the queue"""
+    """Start the detailed processing workflow for a contract from the queue.
+    
+    This function is called after initiate_processing (in queue_views.py) has marked the contract
+    as being processed. This function creates the actual processing records:
+    1. Creates a ProcessContract from the queue item
+    2. Creates ProcessClins from the queue item's CLINs
+    3. Updates the queue item status
+    
+    This represents the start of the actual processing workflow, where data will be
+    validated and matched against the database.
+    """
     try:
         queue_item = get_object_or_404(QueueContract, id=queue_id)
         

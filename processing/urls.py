@@ -5,7 +5,8 @@ from .views.queue_views import (
     download_csv_template,
     download_test_data,
     upload_csv,
-    cancel_processing
+    cancel_processing,
+    initiate_processing
 )
 from .views.processing_views import (
     ProcessContractDetailView,
