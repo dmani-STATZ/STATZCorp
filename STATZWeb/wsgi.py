@@ -14,9 +14,9 @@ import traceback
 # Add debugging output
 try:
     # Print environment info to help with debugging
-    print("Python version:", sys.version)
-    print("Python path:", sys.path)
-    print("Current directory:", os.getcwd())
+    #print("Python version:", sys.version)
+    #print("Python path:", sys.path)
+    #print("Current directory:", os.getcwd())
     
     # Load environment variables from .env.production
     from pathlib import Path
@@ -25,9 +25,9 @@ try:
     # Build paths inside the project
     BASE_DIR = Path(__file__).resolve().parent.parent
     env_file = os.path.join(BASE_DIR, '.env.production')
-    print(f"Loading environment from: {env_file}")
+    #print(f"Loading environment from: {env_file}")
     load_dotenv(env_file)
-    print(f"SECRET_KEY loaded: {'DJANGO_SECRET_KEY' in os.environ}")
+    #print(f"SECRET_KEY loaded: {'DJANGO_SECRET_KEY' in os.environ}")
     
     from django.core.wsgi import get_wsgi_application
     
@@ -36,10 +36,10 @@ try:
     # Add basic error handling
     try:
         application = get_wsgi_application()
-        print("WSGI application initialized successfully")
+        #print("WSGI application initialized successfully")
     except Exception as e:
-        print("Error initializing WSGI application:", str(e))
-        print(traceback.format_exc())
+        #print("Error initializing WSGI application:", str(e))
+        #print(traceback.format_exc())
         # Fallback to a simple application for diagnostics
         def simple_app(environ, start_response):
             status = '500 Internal Server Error'
@@ -50,8 +50,8 @@ try:
         application = simple_app
         
 except Exception as e:
-    print("Error in WSGI file:", str(e))
-    print(traceback.format_exc())
+    #print("Error in WSGI file:", str(e))
+    #print(traceback.format_exc())
     # Provide a minimal working application for diagnosis
     def minimal_app(environ, start_response):
         status = '200 OK'

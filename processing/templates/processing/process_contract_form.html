@@ -489,11 +489,13 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Supplier Price</label>
                                                 <input type="number" 
                                                        id="price_per_unit_{{ clin_form.instance.id }}"
-                                                       step="0.01" 
                                                        name="{{ clin_form.price_per_unit.html_name }}" 
-                                                       value="{{ clin_form.price_per_unit.value|floatformat:'2'|default:'0.00' }}"
+                                                       value="{{ clin_form.price_per_unit.value|default:'0' }}"
+                                                       step="any"
+                                                       min="0"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}">
+                                                       data-clin-id="{{ clin_form.instance.id }}"
+                                                       onchange="handlePriceChange(this)">
                                             </div>
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Supplier Total</label>
@@ -1326,8 +1328,7 @@
             if (qtyInput && supplierPriceInput && supplierTotalInput) {
                 const qty = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(supplierPriceInput.value) || 0;
-                // Format price to 2 decimal places
-                supplierPriceInput.value = price.toFixed(2);
+                // Use the full value for calculation
                 supplierTotalInput.value = (qty * price).toFixed(2);
             }
         } else {
@@ -1338,8 +1339,6 @@
             if (qtyInput && priceInput && totalInput) {
                 const qty = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(priceInput.value) || 0;
-                // Format price to 2 decimal places
-                priceInput.value = price.toFixed(2);
                 totalInput.value = (qty * price).toFixed(2);
             }
         }
@@ -1399,19 +1398,16 @@
                 input.name.endsWith('-item_value') || 
                 input.name.endsWith('-price_per_unit') || 
                 input.name.endsWith('-quote_value')) {
-                formatNumberInput(input);
+                // Only format on initial load if the input has a value
+                if (input.value) {
+                    formatNumberInput(input);
+                }
             }
         });
 
         // Add event listeners for quantity field changes
         document.querySelectorAll('input[id^="order_qty_"]').forEach(input => {
             if (!input.readOnly) {  // Only add listeners to editable fields
-                input.addEventListener('input', function() {
-                    const clinId = this.dataset.clinId;
-                    syncQuantityFields(clinId, this.value);
-                });
-                
-                // Also sync on change event to catch spinner clicks
                 input.addEventListener('change', function() {
                     const clinId = this.dataset.clinId;
                     syncQuantityFields(clinId, this.value);
@@ -1421,17 +1417,16 @@
 
         // Add event listeners for price field changes
         document.querySelectorAll('input[name$="-unit_price"], input[name$="-price_per_unit"]').forEach(input => {
+            // Only format on blur (when leaving the field)
             input.addEventListener('blur', function() {
                 formatNumberInput(this);
                 const calcButton = this.closest('.grid').querySelector('button[onclick^="recalculateTotal"]');
                 if (calcButton) recalculateTotal(calcButton);
             });
-        });
 
-        // Add event listeners for supplier price changes
-        document.querySelectorAll('input[name$="-price_per_unit"]').forEach(input => {
+            // Allow free typing while in the field
             input.addEventListener('input', function() {
-                const clinId = this.closest('.grid').querySelector('input[data-clin-id]').dataset.clinId;
+                // Don't format during input
                 const calcButton = this.closest('.grid').querySelector('button[onclick^="recalculateTotal"]');
                 if (calcButton) recalculateTotal(calcButton);
             });
@@ -1605,5 +1600,71 @@
             alert('Error removing IDIQ contract: ' + error.message);
         });
     }
+
+    // Add these new functions for price handling
+    function handlePriceChange(input) {
+        // Only format when the user is done typing (on change)
+        if (input.value) {
+            const value = parseFloat(input.value) || 0;
+            // Store the full value but display formatted
+            input.setAttribute('data-full-value', value);
+            input.value = value.toFixed(2);
+        }
+    }
+
+    // Update the recalculateTotal function
+    function recalculateTotal(button) {
+        const row = button.closest('.grid');
+        const qtyInput = row.querySelector('input[name$="-order_qty"]');
+        
+        // Check if this is a supplier section by looking for price_per_unit input
+        const isSupplierSection = row.querySelector('input[id$="_supplier"]') !== null;
+        
+        if (isSupplierSection) {
+            // Handle supplier total calculation
+            const supplierPriceInput = row.querySelector('input[name$="-price_per_unit"]');
+            const supplierTotalInput = row.querySelector('input[name$="-quote_value"]');
+            
+            if (qtyInput && supplierPriceInput && supplierTotalInput) {
+                const qty = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(supplierPriceInput.value) || 0;
+                // Use the full value for calculation
+                supplierTotalInput.value = (qty * price).toFixed(2);
+            }
+        } else {
+            // Handle CLIN total calculation
+            const priceInput = row.querySelector('input[name$="-unit_price"]');
+            const totalInput = row.querySelector('input[name$="-item_value"]');
+            
+            if (qtyInput && priceInput && totalInput) {
+                const qty = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                totalInput.value = (qty * price).toFixed(2);
+            }
+        }
+    }
+
+    // Update the event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Remove the automatic formatting on input
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            // Remove any existing input event listeners
+            input.removeEventListener('input', formatNumberInput);
+            
+            // Only format on blur or change
+            if (input.name.endsWith('-unit_price') || 
+                input.name.endsWith('-price_per_unit') || 
+                input.name.endsWith('-quote_value')) {
+                
+                // Clear existing listeners
+                input.removeEventListener('blur', formatNumberInput);
+                
+                // Add new change handler
+                input.addEventListener('change', function() {
+                    handlePriceChange(this);
+                });
+            }
+        });
+    });
 </script>
 {% endblock %}
