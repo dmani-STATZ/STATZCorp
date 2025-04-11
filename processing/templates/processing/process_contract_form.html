@@ -1246,13 +1246,30 @@
     function recalculateTotal(button) {
         const row = button.closest('.grid');
         const qtyInput = row.querySelector('input[name$="-order_qty"]');
-        const priceInput = row.querySelector('input[name$="-unit_price"]');
-        const totalInput = row.querySelector('input[name$="-item_value"]');
         
-        if (qtyInput && priceInput && totalInput) {
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            totalInput.value = (qty * price).toFixed(2);
+        // Check if this is a supplier section by looking for price_per_unit input
+        const isSupplierSection = row.querySelector('input[id$="_supplier"]') !== null;
+        
+        if (isSupplierSection) {
+            // Handle supplier total calculation
+            const supplierPriceInput = row.querySelector('input[name$="-price_per_unit"]');
+            const supplierTotalInput = row.querySelector('input[name$="-quote_value"]');
+            
+            if (qtyInput && supplierPriceInput && supplierTotalInput) {
+                const qty = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(supplierPriceInput.value) || 0;
+                supplierTotalInput.value = (qty * price).toFixed(2);
+            }
+        } else {
+            // Handle CLIN total calculation
+            const priceInput = row.querySelector('input[name$="-unit_price"]');
+            const totalInput = row.querySelector('input[name$="-item_value"]');
+            
+            if (qtyInput && priceInput && totalInput) {
+                const qty = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                totalInput.value = (qty * price).toFixed(2);
+            }
         }
     }
 
@@ -1277,22 +1294,24 @@
             supplierQty.value = value || '0';
         }
 
-        // Recalculate totals
+        // Recalculate totals for both CLIN and supplier sections
         const clinSection = document.querySelector(`#order_qty_${clinId}`).closest('.grid');
         const supplierSection = document.querySelector(`#order_qty_${clinId}_supplier`).closest('.grid');
         
+        // Calculate CLIN total
         if (clinSection) {
             const calcButton = clinSection.querySelector('button[onclick^="recalculateTotal"]');
             if (calcButton) recalculateTotal(calcButton);
         }
         
+        // Calculate supplier total
         if (supplierSection) {
             const calcButton = supplierSection.querySelector('button[onclick^="recalculateTotal"]');
             if (calcButton) recalculateTotal(calcButton);
         }
     }
 
-    // Add input event listeners for quantity fields
+    // Add input event listeners for quantity fields and supplier price fields
     document.addEventListener('DOMContentLoaded', function() {
         // Add event listeners for quantity field changes
         document.querySelectorAll('input[id^="order_qty_"]').forEach(input => {
@@ -1308,6 +1327,15 @@
                     syncQuantityFields(clinId, this.value);
                 });
             }
+        });
+
+        // Add event listeners for supplier price changes
+        document.querySelectorAll('input[name$="-price_per_unit"]').forEach(input => {
+            input.addEventListener('input', function() {
+                const clinId = this.closest('.grid').querySelector('input[data-clin-id]').dataset.clinId;
+                const calcButton = this.closest('.grid').querySelector('button[onclick^="recalculateTotal"]');
+                if (calcButton) recalculateTotal(calcButton);
+            });
         });
     });
 </script>
