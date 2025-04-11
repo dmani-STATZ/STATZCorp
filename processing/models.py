@@ -146,15 +146,10 @@ class ProcessContract(models.Model):
     files_url = models.CharField(max_length=200, null=True, blank=True)
     contract_value = models.FloatField(null=True, blank=True, default=0)
     description = models.TextField(null=True, blank=True)
-    planned_split = models.CharField(max_length=50, null=True, blank=True)
-    ppi_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
 
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    queue_id = models.IntegerField()  # Reference to original queue item
+    queue_id = models.IntegerField()
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_process_contracts')
     modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='modified_process_contracts')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -247,3 +242,20 @@ class ProcessClin(models.Model):
 
     def __str__(self):
         return f"Processing CLIN: {self.item_number} for {self.process_contract.contract_number}"
+
+class ContractSplit(models.Model):
+    """Model for storing dynamic contract splits between different companies"""
+    process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, related_name='splits')
+    company_name = models.CharField(max_length=100)
+    split_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['company_name']
+        verbose_name = 'Contract Split'
+        verbose_name_plural = 'Contract Splits'
+
+    def __str__(self):
+        return f"{self.company_name} Split for {self.process_contract.contract_number}"

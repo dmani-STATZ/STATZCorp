@@ -1,6 +1,11 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import ProcessContract, ProcessClin
+from .models import ProcessContract, ProcessClin, ContractSplit
+
+class ContractSplitForm(forms.ModelForm):
+    class Meta:
+        model = ContractSplit
+        fields = ['company_name', 'split_value', 'split_paid']
 
 class ProcessContractForm(forms.ModelForm):
     class Meta:
@@ -22,11 +27,6 @@ class ProcessContractForm(forms.ModelForm):
             'files_url',
             'contract_value',
             'description',
-            'planned_split',
-            'ppi_split',
-            'statz_split',
-            'ppi_split_paid',
-            'statz_split_paid',
             'status'
         ]
         widgets = {
@@ -35,13 +35,64 @@ class ProcessContractForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'rows': 3}),
             'buyer_text': forms.TextInput(attrs={'class': 'buyer-text-input'}),
             'files_url': forms.URLInput(attrs={'class': 'url-input'}),
-            'planned_split': forms.TextInput(attrs={'class': 'split-input'}),
-            'ppi_split': forms.NumberInput(attrs={'step': '0.0001', 'class': 'split-input'}),
-            'statz_split': forms.NumberInput(attrs={'step': '0.0001', 'class': 'split-input'}),
-            'ppi_split_paid': forms.NumberInput(attrs={'step': '0.0001', 'class': 'split-input'}),
-            'statz_split_paid': forms.NumberInput(attrs={'step': '0.0001', 'class': 'split-input'}),
             'due_date_late': forms.CheckboxInput(attrs={'class': 'checkbox-input'})
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.splits_data = []
+        
+        if self.data:
+            # Extract splits data from POST
+            for key in self.data:
+                if key.startswith('splits-'):
+                    parts = key.split('-')
+                    if len(parts) == 3:  # splits-[id/new]-[field]
+                        split_id = parts[1]
+                        field = parts[2]
+                        
+                        # Find or create split data dict
+                        split_data = next((s for s in self.splits_data if s['id'] == split_id), None)
+                        if not split_data:
+                            split_data = {'id': split_id}
+                            self.splits_data.append(split_data)
+                        
+                        # Add field value
+                        split_data[field] = self.data[key]
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        if commit:
+            instance.save()
+            
+            # Handle splits
+            if self.splits_data:
+                # Delete removed splits
+                existing_split_ids = [s['id'] for s in self.splits_data if not s['id'].startswith('new')]
+                instance.splits.exclude(id__in=existing_split_ids).delete()
+                
+                # Update/create splits
+                for split_data in self.splits_data:
+                    split_id = split_data['id']
+                    
+                    if split_id.startswith('new'):
+                        # Create new split
+                        ContractSplit.objects.create(
+                            process_contract=instance,
+                            company_name=split_data['company'],
+                            split_value=split_data.get('value') or 0,
+                            split_paid=split_data.get('paid') or 0
+                        )
+                    else:
+                        # Update existing split
+                        split = instance.splits.get(id=split_id)
+                        split.company_name = split_data['company']
+                        split.split_value = split_data.get('value') or 0
+                        split.split_paid = split_data.get('paid') or 0
+                        split.save()
+        
+        return instance
 
 class ProcessClinForm(forms.ModelForm):
     class Meta:
@@ -90,7 +141,7 @@ class ProcessClinForm(forms.ModelForm):
 ProcessClinFormSet = inlineformset_factory(
     ProcessContract,
     ProcessClin,
-    form=ProcessClinForm,
-    extra=1,
+    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value', 'status'),
+    extra=0,
     can_delete=True
 ) 

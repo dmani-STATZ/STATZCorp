@@ -30,6 +30,7 @@ app_name = 'processing'
 urlpatterns = [
     # Queue Management
     path('queue/', ContractQueueListView.as_view(), name='queue'),
+    path('queue/', ContractQueueListView.as_view(), name='contract_queue'),
     path('next-numbers/', get_next_numbers, name='get_next_numbers'),
     path('start-processing/<int:queue_id>/', start_processing, name='start_processing'),
     path('get-process-contract/<int:queue_id>/', get_process_contract, name='get_process_contract'),

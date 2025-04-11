@@ -17,6 +17,7 @@ from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_http_methods
 from django.http import Http404
+import json
 
 @login_required
 @require_http_methods(["POST"])
@@ -169,112 +170,149 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
 
 @login_required
 def match_buyer(request, process_contract_id):
-    """Match a buyer based on text input"""
+    """Match a buyer based on ID"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
     
-    buyer_text = request.POST.get('buyer_text')
-    if not buyer_text:
-        return JsonResponse({'error': 'No buyer text provided'}, status=400)
-    
     try:
-        process_contract = ProcessContract.objects.get(id=process_contract_id)
-        buyer = Buyer.objects.filter(name__icontains=buyer_text).first()
+        # Log the raw request body for debugging
+        print("Raw request body:", request.body)
         
-        if buyer:
-            process_contract.buyer = buyer
-            process_contract.buyer_text = buyer.name
-            process_contract.save()
-            return JsonResponse({
-                'success': True,
-                'buyer_id': buyer.id,
-                'buyer_name': buyer.name
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': f'No buyer found matching "{buyer_text}"'
-            })
+        data = json.loads(request.body)
+        print("Parsed JSON data:", data)
+        
+        buyer_id = data.get('id')
+        print("Buyer ID:", buyer_id)
+        
+        if not buyer_id:
+            return JsonResponse({'error': 'No buyer ID provided'}, status=400)
+        
+        process_contract = ProcessContract.objects.get(id=process_contract_id)
+        print("Found ProcessContract:", process_contract)
+        
+        buyer = Buyer.objects.get(id=buyer_id)
+        print("Found Buyer:", buyer)
+        
+        # Update all buyer fields using the correct field names
+        process_contract.buyer = buyer
+        process_contract.buyer_text = buyer.description  # Using description field from Buyer model
+        process_contract.save()
+        
+        return JsonResponse({
+            'success': True,
+            'buyer_id': buyer.id,
+            'buyer_name': buyer.description  # Using description field from Buyer model
+        })
     except ProcessContract.DoesNotExist:
+        print("ProcessContract not found:", process_contract_id)
         return JsonResponse({
             'error': 'Process contract not found'
         }, status=404)
+    except Buyer.DoesNotExist:
+        print("Buyer not found:", buyer_id)
+        return JsonResponse({
+            'error': 'Buyer not found'
+        }, status=404)
+    except json.JSONDecodeError as e:
+        print("JSON decode error:", str(e))
+        print("Raw body:", request.body)
+        return JsonResponse({
+            'error': 'Invalid JSON data'
+        }, status=400)
     except Exception as e:
+        import traceback
+        print("Unexpected error:", str(e))
+        print("Traceback:", traceback.format_exc())
         return JsonResponse({
             'error': str(e)
         }, status=500)
 
 @login_required
 def match_nsn(request, process_clin_id):
-    """Match an NSN based on text input"""
+    """Match an NSN based on ID"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
     
-    nsn_text = request.POST.get('nsn_text')
-    if not nsn_text:
-        return JsonResponse({'error': 'No NSN text provided'}, status=400)
-    
     try:
-        process_clin = ProcessClin.objects.get(id=process_clin_id)
-        nsn = Nsn.objects.filter(number__icontains=nsn_text).first()
+        data = json.loads(request.body)
+        nsn_id = data.get('id')
         
-        if nsn:
-            process_clin.nsn = nsn
-            process_clin.nsn_text = nsn.number
-            process_clin.nsn_description_text = nsn.description
-            process_clin.save()
-            return JsonResponse({
-                'success': True,
-                'nsn_id': nsn.id,
-                'nsn_number': nsn.number,
-                'nsn_description': nsn.description
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': f'No NSN found matching "{nsn_text}"'
-            })
+        if not nsn_id:
+            return JsonResponse({'error': 'No NSN ID provided'}, status=400)
+        
+        process_clin = ProcessClin.objects.get(id=process_clin_id)
+        nsn = Nsn.objects.get(id=nsn_id)
+        
+        # Update all NSN fields using the correct field names
+        process_clin.nsn = nsn
+        process_clin.nsn_text = nsn.nsn_code
+        process_clin.nsn_description_text = nsn.description
+        process_clin.save()
+        
+        return JsonResponse({
+            'success': True,
+            'nsn_id': nsn.id,
+            'nsn_number': nsn.nsn_code,
+            'nsn_description': nsn.description
+        })
     except ProcessClin.DoesNotExist:
         return JsonResponse({
             'error': 'Process CLIN not found'
         }, status=404)
+    except Nsn.DoesNotExist:
+        return JsonResponse({
+            'error': 'NSN not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON data'
+        }, status=400)
     except Exception as e:
+        import traceback
+        print("Unexpected error:", str(e))
+        print("Traceback:", traceback.format_exc())
         return JsonResponse({
             'error': str(e)
         }, status=500)
 
 @login_required
 def match_supplier(request, process_clin_id):
-    """Match a supplier based on text input"""
+    """Match a supplier based on ID"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
     
-    supplier_text = request.POST.get('supplier_text')
-    if not supplier_text:
-        return JsonResponse({'error': 'No supplier text provided'}, status=400)
-    
     try:
-        process_clin = ProcessClin.objects.get(id=process_clin_id)
-        supplier = Supplier.objects.filter(name__icontains=supplier_text).first()
+        data = json.loads(request.body)
+        supplier_id = data.get('supplier_id')
         
-        if supplier:
-            process_clin.supplier = supplier
-            process_clin.supplier_text = supplier.name
-            process_clin.save()
-            return JsonResponse({
-                'success': True,
-                'supplier_id': supplier.id,
-                'supplier_name': supplier.name
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': f'No supplier found matching "{supplier_text}"'
-            })
+        if not supplier_id:
+            return JsonResponse({'error': 'No supplier ID provided'}, status=400)
+        
+        process_clin = ProcessClin.objects.get(id=process_clin_id)
+        supplier = Supplier.objects.get(id=supplier_id)
+        
+        # Update all supplier fields
+        process_clin.supplier = supplier
+        process_clin.supplier_text = supplier.name
+        process_clin.save()
+        
+        return JsonResponse({
+            'success': True,
+            'supplier_id': supplier.id,
+            'supplier_name': supplier.name
+        })
     except ProcessClin.DoesNotExist:
         return JsonResponse({
             'error': 'Process CLIN not found'
         }, status=404)
+    except Supplier.DoesNotExist:
+        return JsonResponse({
+            'error': 'Supplier not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON data'
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'error': str(e)

@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 import json
 
 from ..models import (
-    Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, NsnView
+    Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, NsnView, Buyer
 )
 
 @login_required
@@ -30,7 +30,28 @@ def get_select_options(request, field_name):
         offset = (page - 1) * page_size
         limit = page_size
         
-        if field_name == 'contract':
+        if field_name == 'buyer':
+            # Get buyers, ordered by description
+            queryset = Buyer.objects.all().order_by('description')
+            
+            # Apply search if provided
+            if search_term:
+                queryset = queryset.filter(description__icontains=search_term)
+            
+            # Get paginated results
+            total = queryset.count()
+            buyers = queryset[offset:offset + limit]
+            
+            # Format the results
+            options = [{'value': buyer.id, 'label': buyer.description} for buyer in buyers]
+            
+            return JsonResponse({
+                'success': True,
+                'options': options,
+                'total': total,
+                'has_more': (offset + limit) < total
+            })
+        elif field_name == 'contract':
             # Get contracts, ordered by contract number
             queryset = Contract.objects.all().order_by('contract_number')
             
