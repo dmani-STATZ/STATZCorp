@@ -4,9 +4,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
-from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin
+from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber
 from processing.forms import ProcessContractForm, ProcessClinForm
-from contracts.models import Contract, Clin, Buyer, Nsn, Supplier
+from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass
 import csv
 import os
 from django.conf import settings
@@ -42,16 +42,22 @@ def start_processing(request, queue_id):
                 'error': 'This contract is already being processed by another user'
             })
         
+        new_po_number = SequenceNumber.get_po_number()
+        new_tab_number = SequenceNumber.get_tab_number()
+        SequenceNumber.advance_po_number()
+        SequenceNumber.advance_tab_number()
+
         # Create ProcessContract from queue item
         process_contract = ProcessContract.objects.create(
             contract_number=queue_item.contract_number,
             buyer_text=queue_item.buyer,
             solicitation_type=queue_item.solicitation_type,
-            contract_type=queue_item.matched_contract_type,
+            contract_type_text=queue_item.matched_contract_type,
             award_date=queue_item.award_date,
             due_date=queue_item.due_date,
             contract_value=queue_item.contract_value,
-            description=queue_item.description if hasattr(queue_item, 'description') else '',
+            po_number=new_po_number,
+            tab_num=new_tab_number,
             status='in_progress',
             queue_id=queue_id,
             created_by=request.user,
@@ -71,15 +77,18 @@ def start_processing(request, queue_id):
                     order_qty=float(clin_data.order_qty) if clin_data.order_qty else 0,
                     unit_price=clin_data.unit_price if clin_data.unit_price else 0,
                     item_value=clin_data.item_value if clin_data.item_value else 0,
-                    description=clin_data.description if hasattr(clin_data, 'description') else '',
                     status='in_progress',
                     ia=clin_data.ia if hasattr(clin_data, 'ia') else None,
                     fob=clin_data.fob if hasattr(clin_data, 'fob') else None,
                     po_num_ext=clin_data.po_num_ext if hasattr(clin_data, 'po_num_ext') else None,
-                    tab_num=clin_data.tab_num if hasattr(clin_data, 'tab_num') else None,
-                    clin_po_num=clin_data.clin_po_num if hasattr(clin_data, 'clin_po_num') else None,
-                    po_number=clin_data.po_number if hasattr(clin_data, 'po_number') else None,
-                    clin_type=clin_data.clin_type if hasattr(clin_data, 'clin_type') else None
+                    tab_num=new_tab_number,
+                    clin_po_num=new_po_number,
+                    po_number=new_po_number,
+                    clin_type_text=clin_data.clin_type if hasattr(clin_data, 'clin_type') else None,
+                    supplier_due_date=clin_data.supplier_due_date if hasattr(clin_data, 'supplier_due_date') else None,
+                    price_per_unit=clin_data.supplier_unit_price if hasattr(clin_data, 'supplier_unit_price') else None,
+                    quote_value=clin_data.supplier_price if hasattr(clin_data, ' supplier_price') else None,
+                    special_payment_terms_text=clin_data.special_payment_terms if hasattr(clin_data, 'special_payment_terms') else None
                 )
             except Exception as clin_error:
                 # If CLIN creation fails, delete the process contract and raise error
@@ -160,6 +169,22 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
             )
         else:
             context['clin_formset'] = ProcessClinFormSet(instance=self.object)
+            
+        # Add all IDIQ contracts to the context
+        context['idiq_contracts'] = IdiqContract.objects.filter(closed=False).order_by('contract_number')
+
+        # Add all CLIN types to the context
+        context['clin_types'] = ClinType.objects.all().order_by('description')
+
+        # Add all Contract types to the context
+        context['contract_types'] = ContractType.objects.all().order_by('description')
+
+        # Add all special payment terms to the context
+        context['special_payment_terms'] = SpecialPaymentTerms.objects.all().order_by('code')
+
+        # Add all sales classes to the context
+        context['sales_classes'] = SalesClass.objects.all().order_by('sales_team')
+        
         return context
     
     def form_valid(self, form):
@@ -378,6 +403,10 @@ def finalize_contract(request, process_contract_id):
                 description=process_clin.description,
                 ia=process_clin.ia,
                 fob=process_clin.fob,
+                due_date=process_clin.due_date,
+                supplier_due_date=process_clin.supplier_due_date,
+                price_per_unit=process_clin.price_per_unit,
+                quote_value=process_clin.quote_value,
                 created_by=request.user,
                 modified_by=request.user
             )

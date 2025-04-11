@@ -116,7 +116,11 @@ class ProcessClinForm(forms.ModelForm):
             'clin_po_num',
             'po_number',
             'clin_type',
-            'status'
+            'status',
+            'due_date',
+            'supplier_due_date',
+            'price_per_unit',
+            'quote_value'
         ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 2}),
@@ -126,22 +130,30 @@ class ProcessClinForm(forms.ModelForm):
             'order_qty': forms.NumberInput(attrs={'step': '1', 'class': 'qty-input'}),
             'unit_price': forms.NumberInput(attrs={'step': '0.0001', 'class': 'price-input'}),
             'item_value': forms.NumberInput(attrs={'step': '0.0001', 'class': 'value-input', 'readonly': True}),
+            'due_date': forms.DateInput(attrs={'type': 'date'}),
+            'supplier_due_date': forms.DateInput(attrs={'type': 'date'}),
+            'price_per_unit': forms.NumberInput(attrs={'step': '0.0001', 'class': 'price-input'}),
+            'quote_value': forms.NumberInput(attrs={'step': '0.0001', 'class': 'value-input', 'readonly': True})
         }
 
     def clean(self):
         cleaned_data = super().clean()
         order_qty = cleaned_data.get('order_qty')
         unit_price = cleaned_data.get('unit_price')
+        price_per_unit = cleaned_data.get('price_per_unit')
         
         if order_qty and unit_price:
             cleaned_data['item_value'] = order_qty * unit_price
+            
+        if order_qty and price_per_unit:
+            cleaned_data['quote_value'] = order_qty * price_per_unit
         
         return cleaned_data
 
 ProcessClinFormSet = inlineformset_factory(
     ProcessContract,
     ProcessClin,
-    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value', 'status'),
+    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value', 'status', 'due_date', 'supplier_due_date', 'price_per_unit', 'quote_value'),
     extra=0,
     can_delete=True
 ) 

@@ -14,12 +14,6 @@
             </h1>
             <p class="text-sm text-gray-600 mt-1">Started processing on {{ process_contract.created_at|date:"M d, Y H:i" }}</p>
         </div>
-        <div class="flex space-x-4">
-            <a href="{% url 'processing:process_contract_detail' process_contract.id %}" 
-               class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
-                Cancel
-            </a>
-        </div>
     </div>
 
     <form method="post" class="space-y-6">
@@ -65,21 +59,24 @@
                             <input type="text" name="po_number" value="{{ process_contract.po_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Sales Class</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Sales Class ({{ process_contract.sales_class_text }})</label>
                             <select name="sales_class" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">-------</option>
-                                {% for class in sales_classes %}
-                                    <option value="{{ class.0 }}" {% if process_contract.sales_class == class.0 %}selected{% endif %}>{{ class.1 }}</option>
+                                {% for sales_class in sales_classes %}
+                                    <option value="{{ sales_class.sales_team }}" {% if process_contract.sales_class == sales_class.sales_team %}selected{% endif %}>{{ sales_class.sales_team }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tab Number</label>
-                            <input type="text" name="tab_number" value="{{ process_contract.tab_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" name="tab_number" value="{{ process_contract.tab_num }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">NIST</label>
-                            <input type="text" name="nist" value="{{ process_contract.nist }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select name="nist" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="Yes" {% if process_contract.nist == "Yes" %}selected{% endif %}>Yes</option>
+                                <option value="No" {% if process_contract.nist == "No" %}selected{% endif %}>No</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Buyer</label>
@@ -100,11 +97,11 @@
                             <input type="text" name="files_url" value="{{ process_contract.files_url }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Type</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Type ({{ process_contract.contract_type_text }})</label>
                             <select name="contract_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">-------</option>
                                 {% for type in contract_types %}
-                                    <option value="{{ type.0 }}" {% if process_contract.contract_type == type.0 %}selected{% endif %}>{{ type.1 }}</option>
+                                    <option value="{{ type.description }}" {% if process_contract.contract_type == type.description %}selected{% endif %}>{{ type.description }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -285,16 +282,23 @@
                                 <!-- Detailed Edit Row (Initially Hidden) -->
                                 <tr class="clin-details-{{ forloop.counter0 }} hidden">
                                     <td colspan="8" class="px-4 py-4 bg-gray-50">
+                                        <!-- ITEM LINE -->
                                         <div class="grid grid-cols-3 gap-4 mb-4">
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Item Number</label>
-                                                <input type="text" name="{{ clin_form.item_number.html_name }}" value="{{ clin_form.item_number.value|default:'' }}" 
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
+                                                <input type="text" 
+                                                       id="item_number_{{ clin_form.instance.id }}"
+                                                       name="{{ clin_form.item_number.html_name }}" 
+                                                       value="{{ clin_form.item_number.value|default:'' }}" 
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
                                             </div>
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
-                                                <select name="{{ clin_form.item_type.html_name }}" 
-                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
+                                                <select id="item_type_{{ clin_form.instance.id }}"
+                                                        name="{{ clin_form.item_type.html_name }}" 
+                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        data-clin-id="{{ clin_form.instance.id }}">
                                                     <option value="">-------</option>
                                                     {% for choice in clin_form.item_type.field.choices %}
                                                         <option value="{{ choice.0 }}" {% if clin_form.item_type.value == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
@@ -302,9 +306,11 @@
                                                 </select>
                                             </div>
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                                                <select name="{{ clin_form.status.html_name }}"
-                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">Status</label>
+                                                <select id="status_{{ clin_form.instance.id }}"
+                                                        name="{{ clin_form.status.html_name }}"
+                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        data-clin-id="{{ clin_form.instance.id }}">
                                                     {% for choice in clin_form.status.field.choices %}
                                                         <option value="{{ choice.0 }}" {% if clin_form.status.value == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
                                                     {% endfor %}
@@ -312,15 +318,18 @@
                                             </div>
                                         </div>
 
-                                        <!-- NSN and Supplier Selection Boxes -->
+                                        <!-- NSN and Due date Line -->
                                         <div class="grid grid-cols-2 gap-4 mb-4">
                                             <!-- NSN Selection Box -->
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">NSN*</label>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
                                                 <div class="flex gap-2">
-                                                    <input type="text" value="{{ clin_form.instance.nsn_text|default:'' }}" 
+                                                    <input type="text" 
+                                                           id="nsn_{{ clin_form.instance.id }}"
+                                                           value="{{ clin_form.instance.nsn_text|default:'' }}" 
                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
-                                                           readonly>
+                                                           readonly
+                                                           data-clin-id="{{ clin_form.instance.id }}">
                                                     <button type="button" 
                                                             data-action="open-nsn"
                                                             data-id="{{ clin_form.instance.id }}"
@@ -331,17 +340,73 @@
                                                     </button>
                                                 </div>
                                                 {% if clin_form.instance.nsn_description_text %}
-                                                <p class="mt-1 text-sm text-gray-500">{{ clin_form.instance.nsn_description_text }}</p>
+                                                <p id="nsn_description_{{ clin_form.instance.id }}" class="mt-1 text-sm text-gray-500">{{ clin_form.instance.nsn_description_text }}</p>
                                                 {% endif %}
                                             </div>
-
-                                            <!-- Supplier Selection Box -->
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Supplier*</label>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">Due Date</label>
+                                                <input type="date" 
+                                                       id="due_date_{{ clin_form.instance.id }}"
+                                                       name="{{ clin_form.due_date.html_name }}" 
+                                                       value="{{ clin_form.due_date.value|default:'Y-m-d' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
+
+                                             </div>
+                                        </div>
+                                        <!--  CLIN Section     -->
+                                        <div class="grid grid-cols-3 gap-4 mb-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
+                                                <input type="number" 
+                                                       id="order_qty_{{ clin_form.instance.id }}"
+                                                       name="{{ clin_form.order_qty.html_name }}" 
+                                                       value="{{ clin_form.order_qty.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="unit_price_{{ clin_form.instance.id }}">Unit Price</label>
+                                                <input type="number" 
+                                                       id="unit_price_{{ clin_form.instance.id }}"
+                                                       step="0.01" 
+                                                       name="{{ clin_form.unit_price.html_name }}" 
+                                                       value="{{ clin_form.unit_price.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="item_value_{{ clin_form.instance.id }}">Total Value</label>
                                                 <div class="flex gap-2">
-                                                    <input type="text" value="{{ clin_form.instance.supplier_text|default:'' }}" 
+                                                    <input type="number" 
+                                                           id="item_value_{{ clin_form.instance.id }}"
+                                                           step="0.01" 
+                                                           name="{{ clin_form.item_value.html_name }}" 
+                                                           value="{{ clin_form.item_value.value|default:'' }}"
+                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                           readonly
+                                                           data-clin-id="{{ clin_form.instance.id }}">
+                                                    <button type="button" 
+                                                            onclick="recalculateTotal(this)"
+                                                            data-clin-id="{{ clin_form.instance.id }}"
+                                                            class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                                        ReCalc
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Supplier Selection Box -->
+                                        <div class="grid grid-cols-2 gap-4 mb-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
+                                                <div class="flex gap-2">
+                                                    <input type="text" 
+                                                           id="supplier_{{ clin_form.instance.id }}"
+                                                           value="{{ clin_form.instance.supplier_text|default:'' }}" 
                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
-                                                           readonly>
+                                                           readonly
+                                                           data-clin-id="{{ clin_form.instance.id }}">
                                                     <button type="button" 
                                                             data-action="open-supplier"
                                                             data-id="{{ clin_form.instance.id }}"
@@ -351,26 +416,51 @@
                                                     </button>
                                                 </div>
                                             </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
+                                                <input type="date" 
+                                                       id="supplier_due_date_{{ clin_form.instance.id }}"
+                                                       name="{{ clin_form.supplier_due_date.html_name }}" 
+                                                       value="{{ clin_form.supplier_due_date.value|date:'Y-m-d' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
+                                            </div>
                                         </div>
 
                                         <div class="grid grid-cols-3 gap-4 mb-4">
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                                                <input type="number" name="{{ clin_form.order_qty.html_name }}" value="{{ clin_form.order_qty.value|default:'' }}"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
+                                                <input type="number" 
+                                                       id="order_qty_{{ clin_form.instance.id }}"
+                                                       name="{{ clin_form.order_qty.html_name }}" 
+                                                       value="{{ clin_form.order_qty.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
                                             </div>
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
-                                                <input type="number" step="0.01" name="{{ clin_form.unit_price.html_name }}" value="{{ clin_form.unit_price.value|default:'' }}"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Supplier Price</label>
+                                                <input type="number" 
+                                                       id="price_per_unit_{{ clin_form.instance.id }}"
+                                                       step="0.01" 
+                                                       name="{{ clin_form.price_per_unit.html_name }}" 
+                                                       value="{{ clin_form.price_per_unit.value|default:'' }}"
+                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                       data-clin-id="{{ clin_form.instance.id }}">
                                             </div>
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Total Value</label>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Supplier Total</label>
                                                 <div class="flex gap-2">
-                                                    <input type="number" step="0.01" name="{{ clin_form.item_value.html_name }}" value="{{ clin_form.item_value.value|default:'' }}"
-                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+                                                    <input type="number" 
+                                                           id="quote_value_{{ clin_form.instance.id }}"
+                                                           step="0.01" 
+                                                           name="{{ clin_form.quote_value.html_name }}" 
+                                                           value="{{ clin_form.quote_value.value|default:'' }}"
+                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                           readonly
+                                                           data-clin-id="{{ clin_form.instance.id }}">
                                                     <button type="button" 
                                                             onclick="recalculateTotal(this)"
+                                                            data-clin-id="{{ clin_form.instance.id }}"
                                                             class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
                                                         ReCalc
                                                     </button>
