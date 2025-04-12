@@ -711,122 +711,10 @@
     </div>
 </div>
 
-<!-- Buyer Selection Modal -->
-<div id="buyer_modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border max-w-md shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center border-b pb-3">
-            <h3 class="text-lg font-semibold text-gray-900">Select Buyer</h3>
-            <button type="button" onclick="closeBuyerModal()" class="text-gray-400 hover:text-gray-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-        
-        <div class="mt-4">
-            <!-- Original Buyer Info -->
-            <div class="mb-4 p-3 bg-gray-50 rounded">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Original Buyer Information:</h4>
-                <p id="original_buyer_display" class="text-gray-900"></p>
-                <button type="button" 
-                        onclick="showAddBuyerForm()"
-                        class="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
-                    Add as New Buyer
-                </button>
-            </div>
 
-            <!-- Add Buyer Form (Initially Hidden) -->
-            <div id="add_buyer_form" class="mb-4 hidden">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Add New Buyer</h4>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
-                        <input type="text" id="new_buyer_name" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                    </div>
-                    <button type="button" 
-                            onclick="createNewBuyer()"
-                            class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                        Create Buyer
-                    </button>
-                </div>
-            </div>
-
-            <!-- Search Section -->
-            <div class="mb-4">
-                <label for="buyer_search" class="block text-sm font-medium text-gray-700 mb-1">Search Buyer</label>
-                <div class="flex space-x-2">
-                    <input type="text" id="buyer_search" class="form-control flex-1" placeholder="Enter buyer name">
-                    <button type="button" onclick="searchBuyer()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                        Search
-                    </button>
-                </div>
-                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
-            </div>
-
-            <!-- Results Section -->
-            <div id="buyer_search_results" class="mt-4 max-h-[300px] overflow-y-auto">
-                <!-- Results will be populated here -->
-                <div class="text-center text-gray-500 py-4">Search for buyer by name</div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="mt-4 flex justify-end border-t pt-3">
-            <button type="button" onclick="closeBuyerModal()" 
-                    style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
-                Cancel
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- IDIQ Contract Selection Modal -->
-<div id="idiq_modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border max-w-md shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center border-b pb-3">
-            <h3 class="text-lg font-semibold text-gray-900">Select IDIQ Contract</h3>
-            <button type="button" onclick="closeIdiqModal()" class="text-gray-400 hover:text-gray-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-        
-        <div class="mt-4">
-            <!-- Original IDIQ Info -->
-            <div class="mb-4 p-3 bg-gray-50 rounded">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Original IDIQ Contract Information:</h4>
-                <p id="original_idiq_display" class="text-gray-900"></p>
-            </div>
-
-            <!-- Search Section -->
-            <div class="mb-4">
-                <label for="idiq_search" class="block text-sm font-medium text-gray-700 mb-1">Search IDIQ Contract</label>
-                <div class="flex space-x-2">
-                    <input type="text" id="idiq_search" class="form-control flex-1" placeholder="Enter contract number...">
-                    <button type="button" onclick="searchIdiq()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                        Search
-                    </button>
-                </div>
-                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
-            </div>
-
-            <!-- Results Section -->
-            <div id="idiq_search_results" class="mt-4 max-h-[300px] overflow-y-auto">
-                <!-- Results will be populated here -->
-                <div class="text-center text-gray-500 py-4">Search for IDIQ contract by number</div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="mt-4 flex justify-end border-t pt-3">
-            <button type="button" onclick="closeIdiqModal()" 
-                    style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
-                Cancel
-            </button>
-        </div>
-    </div>
-</div>
+<!-- Include all modals -->
+{% include "processing/modals/idiq_modal.html" %}
+{% include "processing/modals/buyer_modal.html" %}
 
 <!-- JavaScript for form functionality -->
 <script>
@@ -1258,133 +1146,6 @@
         updateTotalSplitValue();
     });
 
-    function openBuyerModal(buyerText) {
-        const modal = document.getElementById('buyer_modal');
-        const searchInput = document.getElementById('buyer_search');
-        const originalDisplay = document.getElementById('original_buyer_display');
-        
-        originalDisplay.textContent = `Buyer: ${buyerText || 'Not specified'}`;
-        searchInput.value = buyerText || '';
-        modal.classList.remove('hidden');
-        searchInput.focus();
-        
-        if (buyerText) {
-            searchBuyer();
-        }
-    }
-
-    function closeBuyerModal() {
-        document.getElementById('buyer_modal').classList.add('hidden');
-    }
-
-    function searchBuyer() {
-        const searchTerm = document.getElementById('buyer_search').value.trim();
-        if (searchTerm.length < 3) {
-            document.getElementById('buyer_search_results').innerHTML = 
-                '<div class="text-center text-gray-500 py-4">Enter at least 3 characters to search</div>';
-            return;
-        }
-        
-        document.getElementById('buyer_search_results').innerHTML = 
-            '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
-        
-        fetch(`/contracts/api/options/buyer/?search=${encodeURIComponent(searchTerm)}&page=1&page_size=10`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const resultsDiv = document.getElementById('buyer_search_results');
-                    resultsDiv.innerHTML = '';
-                    
-                    if (data.options && data.options.length > 0) {
-                        let resultsHtml = '';
-                        data.options.forEach(option => {
-                            resultsHtml += `
-                                <div class="buyer-result-item hover:bg-gray-50 p-2 cursor-pointer" 
-                                     onclick="selectBuyer('${option.value}', '${option.label}')">
-                                    <div class="font-medium">${option.label}</div>
-                                </div>
-                            `;
-                        });
-                        resultsDiv.innerHTML = resultsHtml;
-                    } else {
-                        resultsDiv.innerHTML = '<div class="text-center text-gray-500 py-4">No matches found</div>';
-                    }
-                } else {
-                    document.getElementById('buyer_search_results').innerHTML = 
-                        '<div class="text-center text-red-500 py-4">Error searching for buyer</div>';
-                }
-            })
-            .catch(error => {
-                console.error('Search error:', error);
-                document.getElementById('buyer_search_results').innerHTML = 
-                    '<div class="text-center text-red-500 py-4">Error connecting to the server</div>';
-            });
-    }
-
-    function selectBuyer(id, text) {
-        console.log('Selecting buyer:', { id, text });
-        
-        // Update the contract's buyer
-        fetch(`/processing/match-buyer/${processContractId}/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({ id: id })
-        })
-        .then(response => {
-            console.log('Response status:', response.status);
-            if (!response.ok) {
-                return response.text().then(text => {
-                    console.error('Error response:', text);
-                    throw new Error('Network response was not ok');
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Success response:', data);
-            if (data.success) {
-                location.reload();
-            } else {
-                alert(data.error || 'Error selecting buyer');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error selecting buyer: ' + error.message);
-        });
-    }
-
-    // Add event listeners for buyer search
-    document.addEventListener('DOMContentLoaded', function() {
-        // Handle Buyer modal
-        document.querySelectorAll('[data-action="open-buyer"]').forEach(button => {
-            button.addEventListener('click', function() {
-                const buyer = this.dataset.buyer;
-                openBuyerModal(buyer);
-            });
-        });
-
-        // Add event listeners for buyer search
-        const buyerSearchInput = document.getElementById('buyer_search');
-        const buyerSearchButton = document.querySelector('button[onclick="searchBuyer()"]');
-        
-        if (buyerSearchInput) {
-            buyerSearchInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    searchBuyer();
-                }
-            });
-        }
-        
-        if (buyerSearchButton) {
-            buyerSearchButton.addEventListener('click', searchBuyer);
-        }
-    });
-
     function recalculateTotal(button) {
         const row = button.closest('.grid');
         const qtyInput = row.querySelector('input[name$="-order_qty"]');
@@ -1740,15 +1501,6 @@
     });
 
     // Add these new functions for handling the add forms
-    function showAddBuyerForm() {
-        const form = document.getElementById('add_buyer_form');
-        const input = document.getElementById('new_buyer_name');
-        const originalText = document.getElementById('original_buyer_display').textContent.replace('Buyer: ', '');
-        
-        form.classList.remove('hidden');
-        input.value = originalText;
-    }
-
     function showAddNsnForm() {
         const form = document.getElementById('add_nsn_form');
         const codeInput = document.getElementById('new_nsn_code');
@@ -1771,38 +1523,6 @@
         
         form.classList.remove('hidden');
         nameInput.value = originalText;
-    }
-
-    function createNewBuyer() {
-        const buyerName = document.getElementById('new_buyer_name').value.trim();
-        
-        if (!buyerName) {
-            alert('Buyer name is required');
-            return;
-        }
-        
-        fetch('/contracts/api/buyers/create/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({
-                buyer_text: buyerName
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                selectBuyer(data.id, buyerName);
-            } else {
-                alert(data.error || 'Failed to create buyer');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error creating buyer');
-        });
     }
 
     function createNewNsn() {
@@ -1873,4 +1593,8 @@
         });
     }
 </script>
+
+<!-- Include modal scripts -->
+<script src="{% static 'processing/js/idiq_modal.js' %}"></script>
+<script src="{% static 'processing/js/buyer_modal.js' %}"></script>
 {% endblock %}

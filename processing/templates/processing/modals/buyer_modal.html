@@ -1,0 +1,71 @@
+{% load static %}
+
+<div id="buyer_modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border max-w-md shadow-lg rounded-md bg-white">
+        <!-- Header -->
+        <div class="flex justify-between items-center border-b pb-3">
+            <h3 class="text-lg font-semibold text-gray-900">Select Buyer</h3>
+            <button type="button" onclick="closeBuyerModal()" class="text-gray-400 hover:text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Content -->
+        <div class="mt-4">
+            <!-- Original Buyer Info -->
+            <div class="mb-4 p-3 bg-gray-50 rounded">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Original Buyer Information:</h4>
+                <p id="original_buyer_display" class="text-gray-900"></p>
+                <button type="button" 
+                        onclick="showAddBuyerForm()"
+                        class="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Add as New Buyer
+                </button>
+            </div>
+
+            <!-- Add Buyer Form (Initially Hidden) -->
+            <div id="add_buyer_form" class="mb-4 hidden">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Add New Buyer</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
+                        <input type="text" id="new_buyer_name" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <button type="button" 
+                            onclick="createNewBuyer()"
+                            class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                        Create Buyer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Section -->
+            <div class="mb-4">
+                <label for="buyer_search" class="block text-sm font-medium text-gray-700 mb-1">Search Buyer</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="buyer_search" class="form-control flex-1" placeholder="Enter buyer name">
+                    <button type="button" onclick="searchBuyer()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Search
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="buyer_search_results" class="mt-4 max-h-[300px] overflow-y-auto">
+                <!-- Results will be populated here -->
+                <div class="text-center text-gray-500 py-4">Search for buyer by name</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-4 flex justify-end border-t pt-3">
+            <button type="button" onclick="closeBuyerModal()" 
+                    style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
