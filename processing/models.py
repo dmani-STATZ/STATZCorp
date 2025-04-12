@@ -149,6 +149,8 @@ class ProcessContract(models.Model):
     files_url = models.CharField(max_length=200, null=True, blank=True)
     contract_value = models.FloatField(null=True, blank=True, default=0)
     description = models.TextField(null=True, blank=True)
+    planned_split = models.CharField(max_length=50, null=True, blank=True)
+    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
 
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -223,12 +225,6 @@ class ProcessClin(models.Model):
     special_payment_terms_paid = models.BooleanField(null=True, blank=True)
     price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    planned_split = models.CharField(max_length=50, null=True, blank=True)
-    ppi_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    statz_split = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
     special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
 

@@ -408,7 +408,9 @@ def finalize_contract(request, process_contract_id):
                 price_per_unit=process_clin.price_per_unit,
                 quote_value=process_clin.quote_value,
                 created_by=request.user,
-                modified_by=request.user
+                modified_by=request.user,
+                planned_split=process_clin.planned_split,
+                plan_gross=process_clin.plan_gross
             )
         
         # Update queue item status
