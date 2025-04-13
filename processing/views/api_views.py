@@ -186,7 +186,6 @@ def update_process_contract_field(request, pk):
 
     instance = get_object_or_404(ProcessContract, pk=pk)
     
-    # Special handling for different field types
     try:
         if field_name == 'contract_type':
             # Handle contract type selection
@@ -231,13 +230,16 @@ def update_process_contract_field(request, pk):
                 setattr(instance, field_name, field_value)
                 
         elif field_name == 'nist':
-            # Handle NIST field which should be Yes/No
-            if field_value not in ['Yes', 'No']:
+            # Handle NIST boolean field
+            if field_value.lower() in ['yes', 'true', '1']:
+                instance.nist = True
+            elif field_value.lower() in ['no', 'false', '0']:
+                instance.nist = False
+            else:
                 return JsonResponse({
                     'status': 'error',
                     'message': 'NIST must be Yes or No'
                 }, status=400)
-            setattr(instance, field_name, field_value)
             
         else:
             # Handle regular text fields
@@ -258,6 +260,9 @@ def update_process_contract_field(request, pk):
             response_data['related_updates']['contract_type_text'] = instance.contract_type_text
         elif field_name == 'sales_class':
             response_data['related_updates']['sales_class_text'] = instance.sales_class_text
+        elif field_name == 'nist':
+            # Return the display value for NIST
+            response_data['field_value'] = 'Yes' if instance.nist else 'No'
             
         return JsonResponse(response_data)
         
