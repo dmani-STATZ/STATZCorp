@@ -1,11 +1,12 @@
 from django.urls import path
+from django.shortcuts import redirect
 from .views.queue_views import (
     ContractQueueListView,
     get_next_numbers,
     download_csv_template,
     download_test_data,
     upload_csv,
-    cancel_processing,
+    cancel_processing as queue_cancel_processing,
     initiate_processing
 )
 from .views.processing_views import (
@@ -17,14 +18,18 @@ from .views.processing_views import (
     match_buyer,
     match_nsn,
     match_supplier,
-    match_idiq
+    match_idiq,
+    cancel_process_contract,
+    save_and_return_to_queue
 )
 from .views.api_views import (
     get_processing_contract,
     update_processing_contract,
     add_processing_clin,
     update_processing_clin,
-    delete_processing_clin
+    delete_processing_clin,
+    update_process_contract_field,
+    update_clin_field
 )
 
 app_name = 'processing'
@@ -32,15 +37,18 @@ app_name = 'processing'
 urlpatterns = [
     # Queue Management
     path('queue/', ContractQueueListView.as_view(), name='queue'),
-    path('queue/', ContractQueueListView.as_view(), name='contract_queue'),
     path('next-numbers/', get_next_numbers, name='get_next_numbers'),
-    path('start-processing/<int:queue_id>/', start_processing, name='start_processing'),
-    path('get-process-contract/<int:queue_id>/', get_process_contract, name='get_process_contract'),
+    path('queue/cancel/<int:queue_id>/', queue_cancel_processing, name='queue_cancel_processing'),
     
     # Contract Processing
+    path('process/<int:process_contract_id>/', lambda request, process_contract_id: redirect('processing:process_contract_edit', pk=process_contract_id), name='process_contract'),
     path('contract/<int:pk>/', ProcessContractDetailView.as_view(), name='process_contract_detail'),
     path('contract/<int:pk>/edit/', ProcessContractUpdateView.as_view(), name='process_contract_edit'),
+    path('contract/<int:process_contract_id>/save/', save_and_return_to_queue, name='save_and_return'),
     path('contract/<int:process_contract_id>/finalize/', finalize_contract, name='finalize_contract'),
+    path('process-contract/cancel/<int:process_contract_id>/', cancel_process_contract, name='cancel_process_contract'),
+    path('start-processing/<int:queue_id>/', start_processing, name='start_processing'),
+    path('get-process-contract/<int:queue_id>/', get_process_contract, name='get_process_contract'),
     
     # Matching Endpoints
     path('match-buyer/<int:process_contract_id>/', match_buyer, name='match_buyer'),
@@ -54,10 +62,11 @@ urlpatterns = [
     path('api/processing/<int:id>/clins/', add_processing_clin, name='api_add_processing_clin'),
     path('api/processing/<int:id>/clins/<int:clin_id>/', update_processing_clin, name='api_update_processing_clin'),
     path('api/processing/<int:id>/clins/<int:clin_id>/delete/', delete_processing_clin, name='api_delete_processing_clin'),
+    path('api/update-field/<int:pk>/', update_process_contract_field, name='update_process_contract_field'),
+    path('api/update-clin-field/<int:pk>/clin/<int:clin_id>/', update_clin_field, name='update_clin_field'),
     
     # File Management
     path('download-template/', download_csv_template, name='download_csv_template'),
     path('download-test-data/', download_test_data, name='download_test_data'),
     path('upload/', upload_csv, name='upload_csv'),
-    path('cancel-processing/<int:queue_id>/', cancel_processing, name='cancel_processing'),
 ] 

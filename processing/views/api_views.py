@@ -166,4 +166,193 @@ def delete_processing_clin(request, id, clin_id):
         return JsonResponse({
             'success': False,
             'error': str(e)
-        }) 
+        })
+
+def update_process_contract_field(request, pk):
+    """
+    Updates a single field in the ProcessContract model.
+    Expects POST data with:
+    - field_name: name of the field to update
+    - field_value: new value for the field
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST method allowed'}, status=405)
+
+    field_name = request.POST.get('field_name')
+    field_value = request.POST.get('field_value')
+    
+    if not field_name:
+        return JsonResponse({'status': 'error', 'message': 'field_name is required'}, status=400)
+
+    instance = get_object_or_404(ProcessContract, pk=pk)
+    
+    # Special handling for different field types
+    try:
+        if field_name == 'contract_type':
+            # Handle contract type selection
+            if field_value:
+                instance.contract_type_id = field_value
+                instance.contract_type_text = instance.contract_type.description
+            else:
+                instance.contract_type = None
+                instance.contract_type_text = None
+                
+        elif field_name == 'sales_class':
+            # Handle sales class selection
+            if field_value:
+                instance.sales_class_id = field_value
+                instance.sales_class_text = instance.sales_class.sales_team
+            else:
+                instance.sales_class = None
+                instance.sales_class_text = None
+                
+        elif field_name == 'buyer':
+            # Buyer should only be updated through the match process
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Buyer must be updated through the match process'
+            }, status=400)
+            
+        elif field_name in ['contract_value', 'plan_gross']:
+            # Handle numeric fields
+            try:
+                setattr(instance, field_name, float(field_value) if field_value else 0.0)
+            except ValueError:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'{field_name} must be a number'
+                }, status=400)
+                
+        elif field_name in ['award_date', 'due_date']:
+            # Handle date fields - assuming date format YYYY-MM-DD
+            if not field_value:
+                setattr(instance, field_name, None)
+            else:
+                setattr(instance, field_name, field_value)
+                
+        elif field_name == 'nist':
+            # Handle NIST field which should be Yes/No
+            if field_value not in ['Yes', 'No']:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'NIST must be Yes or No'
+                }, status=400)
+            setattr(instance, field_name, field_value)
+            
+        else:
+            # Handle regular text fields
+            setattr(instance, field_name, field_value if field_value else None)
+        
+        instance.save()
+        
+        # Return the new value and any related field values
+        response_data = {
+            'status': 'success',
+            'field_name': field_name,
+            'field_value': field_value,
+            'related_updates': {}
+        }
+        
+        # Add related field updates to response
+        if field_name == 'contract_type':
+            response_data['related_updates']['contract_type_text'] = instance.contract_type_text
+        elif field_name == 'sales_class':
+            response_data['related_updates']['sales_class_text'] = instance.sales_class_text
+            
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error updating {field_name}: {str(e)}'
+        }, status=500)
+
+@login_required
+@require_http_methods(["POST"])
+def update_clin_field(request, pk, clin_id):
+    """
+    Updates a single field in a ProcessClin model.
+    Expects POST data with:
+    - field_name: name of the field to update
+    - field_value: new value for the field
+    """
+    field_name = request.POST.get('field_name')
+    field_value = request.POST.get('field_value')
+    
+    if not field_name:
+        return JsonResponse({'status': 'error', 'message': 'field_name is required'}, status=400)
+
+    process_contract = get_object_or_404(ProcessContract, pk=pk)
+    clin = get_object_or_404(ProcessClin, id=clin_id, process_contract=process_contract)
+    
+    try:
+        # Protect fields that should only be updated through match process
+        protected_fields = ['nsn', 'nsn_text', 'nsn_description_text', 'supplier', 'supplier_text']
+        if field_name in protected_fields:
+            return JsonResponse({
+                'status': 'error', 
+                'message': f'{field_name} must be updated through the match process'
+            }, status=400)
+            
+        elif field_name in ['order_qty', 'unit_price', 'price_per_unit']:
+            # Handle numeric fields
+            try:
+                value = float(field_value) if field_value else 0.0
+                setattr(clin, field_name, value)
+                
+                # Recalculate dependent values
+                if field_name in ['order_qty', 'unit_price']:
+                    clin.item_value = clin.order_qty * clin.unit_price
+                if field_name in ['order_qty', 'price_per_unit']:
+                    clin.quote_value = clin.order_qty * clin.price_per_unit
+                    
+            except ValueError:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'{field_name} must be a number'
+                }, status=400)
+                
+        elif field_name in ['due_date', 'supplier_due_date']:
+            # Handle date fields
+            if not field_value:
+                setattr(clin, field_name, None)
+            else:
+                setattr(clin, field_name, field_value)
+                
+        elif field_name == 'item_type':
+            # Validate item type choices
+            valid_types = [choice[0] for choice in ProcessClin.ITEM_TYPE_CHOICES]
+            if field_value not in valid_types:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Invalid item type. Must be one of: {", ".join(valid_types)}'
+                }, status=400)
+            setattr(clin, field_name, field_value)
+            
+        else:
+            # Handle regular text fields
+            setattr(clin, field_name, field_value if field_value else None)
+        
+        clin.save()
+        
+        # Return the new value and any calculated values
+        response_data = {
+            'status': 'success',
+            'field_name': field_name,
+            'field_value': field_value,
+            'related_updates': {}
+        }
+        
+        # Add related field updates to response
+        if field_name in ['order_qty', 'unit_price']:
+            response_data['related_updates']['item_value'] = str(clin.item_value)
+        if field_name in ['order_qty', 'price_per_unit']:
+            response_data['related_updates']['quote_value'] = str(clin.quote_value)
+            
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error updating {field_name}: {str(e)}'
+        }, status=500) 

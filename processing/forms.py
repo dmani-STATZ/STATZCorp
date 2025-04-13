@@ -19,21 +19,27 @@ class ProcessContractForm(forms.ModelForm):
             'buyer',
             'buyer_text',
             'contract_type',
+            'contract_type_text',
             'award_date',
             'due_date',
             'due_date_late',
             'sales_class',
+            'sales_class_text',
             'nist',
             'files_url',
             'contract_value',
             'description',
+            'planned_split',
+            'plan_gross',
             'status'
         ]
         widgets = {
             'award_date': forms.DateInput(attrs={'type': 'date'}),
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             'description': forms.Textarea(attrs={'rows': 3}),
-            'buyer_text': forms.TextInput(attrs={'class': 'buyer-text-input'}),
+            'buyer_text': forms.TextInput(attrs={'class': 'buyer-text-input', 'readonly': True}),
+            'contract_type_text': forms.TextInput(attrs={'readonly': True}),
+            'sales_class_text': forms.TextInput(attrs={'readonly': True}),
             'files_url': forms.URLInput(attrs={'class': 'url-input'}),
             'due_date_late': forms.CheckboxInput(attrs={'class': 'checkbox-input'})
         }
@@ -62,6 +68,13 @@ class ProcessContractForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        
+        # Update text fields for foreign key relationships
+        if instance.contract_type:
+            instance.contract_type_text = instance.contract_type.description
+            
+        if instance.sales_class:
+            instance.sales_class_text = instance.sales_class.sales_team
         
         if commit:
             instance.save()

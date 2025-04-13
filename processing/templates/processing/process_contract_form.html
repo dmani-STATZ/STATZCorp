@@ -5,6 +5,31 @@
 {% block title %}Edit Processing Contract{% endblock %}
 
 {% block content %}
+<!-- Add this right after the opening body tag or as the first element in your template -->
+<div id="custom-messages-container" class="fixed top-0 left-0 right-0 flex justify-center items-start pt-20 z-[2000] pointer-events-none">
+    <div id="custom-messages" class="pointer-events-auto"></div>
+</div>
+
+<!-- System Messages Section - Fixed Position -->
+<div id="system-messages" class="fixed top-20 left-0 right-0 z-50 px-4">
+    {% if messages %}
+    <div class="messages max-w-4xl mx-auto">
+        {% for message in messages %}
+        <div class="bg-{{ message.tags }}-100 border border-{{ message.tags }}-400 text-{{ message.tags }}-700 px-4 py-3 rounded relative mb-2 shadow-lg" role="alert">
+            <span class="block sm:inline">{{ message }}</span>
+            <button type="button" class="absolute top-0 right-0 px-4 py-3" onclick="this.parentElement.remove()">
+                <svg class="h-6 w-6 text-{{ message.tags }}-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <title>Close</title>
+                    <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+                </svg>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Main Content Container -->
 <div class="container mx-auto px-4 py-6">
     <!-- Header Section -->
     <div class="flex justify-between items-center mb-6">
@@ -96,7 +121,7 @@
                             <select name="contract_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">-------</option>
                                 {% for type in contract_types %}
-                                    <option value="{{ type.description }}" {% if process_contract.contract_type == type.description %}selected{% endif %}>{{ type.description }}</option>
+                                    <option value="{{ type.id }}" {% if process_contract.contract_type_id == type.id %}selected{% endif %}>{{ type.description }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -117,7 +142,7 @@
                             <select name="sales_class" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">-------</option>
                                 {% for sales_class in sales_classes %}
-                                    <option value="{{ sales_class.sales_team }}" {% if process_contract.sales_class == sales_class.sales_team %}selected{% endif %}>{{ sales_class.sales_team }}</option>
+                                    <option value="{{ sales_class.id }}" {% if process_contract.sales_class_id == sales_class.id %}selected{% endif %}>{{ sales_class.sales_team }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -180,8 +205,22 @@
                     <h2 class="text-xl font-semibold mb-4">Contract Calculations</h2>
                     <div class="space-y-4">
                         <button type="button" 
-                                class="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                onclick="updateContractCalculations()"
+                                class="w-full px-4 py-2 bg-gray-100 text-green-500 border border-green-500 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200">
                             Update Value and Plan Gross
+                        </button>
+                    </div>
+                    <div class="space-y-4 pt-3">
+                        <button type="button" 
+                                onclick="confirmCancel()"
+                                class="w-full px-6 py-2 bg-gray-700 text-red-400 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                            Cancel and Return to Queue
+                        </button>
+                    </div>
+                    <div class="space-y-4 pt-3">
+                        <button type="submit" 
+                            class="w-full px-6 py-2 bg-green-400 text-black rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-300">
+                            Submit Contract and Create Email
                         </button>
                     </div>
                 </div>
@@ -316,16 +355,13 @@
                                         {{ clin_form.supplier.as_hidden }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900 qty-display" data-clin-id="{{ clin_form.instance.id }}" id="qty_display_{{ clin_form.instance.id }}">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
-                                        {{ clin_form.order_qty.as_hidden }}
+                                        <span class="text-sm font-medium text-gray-900" data-field="order_qty">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
-                                        {{ clin_form.unit_price.as_hidden }}
+                                        <span class="text-sm font-medium text-gray-900" data-field="unit_price">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
-                                        {{ clin_form.item_value.as_hidden }}
+                                        <span class="text-sm font-medium text-gray-900" data-field="item_value">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
                                     </td>
                                 </tr>
                                 <!-- Detailed Edit Row (Initially Hidden) -->
@@ -337,7 +373,7 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
                                                 <input type="text" 
                                                        id="item_number_{{ clin_form.instance.id }}"
-                                                       name="{{ clin_form.item_number.html_name }}" 
+                                                       name="item_number" 
                                                        value="{{ clin_form.item_number.value|default:'' }}" 
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
@@ -345,7 +381,7 @@
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
                                                 <select id="item_type_{{ clin_form.instance.id }}"
-                                                        name="{{ clin_form.item_type.html_name }}" 
+                                                        name="item_type" 
                                                         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                         data-clin-id="{{ clin_form.instance.id }}">
                                                     <option value="">-------</option>
@@ -397,7 +433,7 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">Due Date</label>
                                                 <input type="date" 
                                                        id="due_date_{{ clin_form.instance.id }}"
-                                                       name="{{ clin_form.due_date.html_name }}" 
+                                                       name="due_date" 
                                                        value="{{ clin_form.due_date.value|date:'Y-m-d' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
@@ -410,7 +446,7 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
                                                 <input type="number" 
                                                        id="order_qty_{{ clin_form.instance.id }}"
-                                                       name="{{ clin_form.order_qty.html_name }}" 
+                                                       name="order_qty" 
                                                        value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
@@ -420,7 +456,7 @@
                                                 <input type="number" 
                                                        id="unit_price_{{ clin_form.instance.id }}"
                                                        step="0.01" 
-                                                       name="{{ clin_form.unit_price.html_name }}" 
+                                                       name="unit_price" 
                                                        value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
@@ -431,7 +467,7 @@
                                                     <input type="number" 
                                                            id="item_value_{{ clin_form.instance.id }}"
                                                            step="0.01" 
-                                                           name="{{ clin_form.item_value.html_name }}" 
+                                                           name="item_value" 
                                                            value="{{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}"
                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                            readonly
@@ -479,7 +515,7 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
                                                 <input type="date" 
                                                        id="supplier_due_date_{{ clin_form.instance.id }}"
-                                                       name="{{ clin_form.supplier_due_date.html_name }}" 
+                                                       name="supplier_due_date" 
                                                        value="{{ clin_form.supplier_due_date.value|date:'Y-m-d' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}">
@@ -491,7 +527,7 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}_supplier">Quantity</label>
                                                 <input type="number" 
                                                        id="order_qty_{{ clin_form.instance.id }}_supplier"
-                                                       name="{{ clin_form.order_qty.html_name }}" 
+                                                       name="order_qty" 
                                                        value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                        data-clin-id="{{ clin_form.instance.id }}"
@@ -501,8 +537,8 @@
                                                 <label class="block text-sm font-medium text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Supplier Price</label>
                                                 <input type="number" 
                                                        id="price_per_unit_{{ clin_form.instance.id }}"
-                                                       name="{{ clin_form.price_per_unit.html_name }}" 
-                                                       value="{{ clin_form.price_per_unit.value|default:'0' }}"
+                                                       name="price_per_unit" 
+                                                       value="{{ clin_form.price_per_unit.value|floatformat:'2'|default:'0' }}"
                                                        step="any"
                                                        min="0"
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -515,7 +551,7 @@
                                                     <input type="number" 
                                                            id="quote_value_{{ clin_form.instance.id }}"
                                                            step="0.01" 
-                                                           name="{{ clin_form.quote_value.html_name }}" 
+                                                           name="quote_value" 
                                                            value="{{ clin_form.quote_value.value|floatformat:'2'|default:'0.00' }}"
                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                            readonly
@@ -530,10 +566,15 @@
                                             </div>
                                         </div>
                                         <div class="mt-4 flex justify-end">
-                                            <label class="inline-flex items-center text-sm text-red-600">
-                                                {{ clin_form.DELETE }}
-                                                <span class="ml-2">Delete this CLIN</span>
-                                            </label>
+                                            <button type="button" 
+                                                    onclick="showDeleteModal(this)" 
+                                                    data-clin-id="{{ clin_form.instance.id }}"
+                                                    class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded flex items-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                                Delete CLIN
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -547,14 +588,13 @@
 
         <!-- Action Buttons -->
         <div class="flex justify-end space-x-4 mt-6">
-            <a href="{% url 'processing:queue' %}" class="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">Cancel</a>
-            <button type="submit" class="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">Save</button>
+
         </div>
     </form>
 </div>
 
 <!-- Cancel Processing Confirmation Modal -->
-<div id="cancelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+<div id="cancelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <div class="mt-3 text-center">
             <h3 class="text-lg leading-6 font-medium text-gray-900">Cancel Processing</h3>
@@ -576,6 +616,33 @@
     </div>
 </div>
 
+<!-- Add the delete confirmation modal -->
+<div id="deleteClinModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-[2000]">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Delete CLIN</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">Are you sure you want to delete this CLIN? This action cannot be undone.</p>
+            </div>
+            <div class="mt-4 flex justify-center space-x-4">
+                <button id="cancelDeleteClin" 
+                        class="bg-gray-200 text-gray-800 active:bg-gray-300 font-bold px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1">
+                    Cancel
+                </button>
+                <button id="confirmDeleteClin" 
+                        class="bg-red-500 text-white active:bg-red-600 font-bold px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1">
+                    Delete CLIN
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Include all modals -->
 {% include "processing/modals/idiq_modal.html" %}
 {% include "processing/modals/buyer_modal.html" %}
@@ -590,6 +657,98 @@
 
 <!-- JavaScript for form functionality -->
 <script>
+    // Function to update Contract Value and Plan Gross
+    function updateContractCalculations() {
+        let totalItemValue = 0;
+        let totalQuoteValue = 0;
+
+        // Get all CLIN item values from expanded sections only
+        document.querySelectorAll('[class^="clin-details-"] input[id^="item_value_"]').forEach(input => {
+            totalItemValue += parseFloat(input.value || 0);
+        });
+        console.log(totalItemValue);
+
+        // Get all quote values from expanded sections only
+        document.querySelectorAll('[class^="clin-details-"] input[id^="quote_value_"]').forEach(input => {
+            totalQuoteValue += parseFloat(input.value || 0);
+        });
+        console.log(totalQuoteValue);
+
+        // Update Contract Value field (total of item values)
+        const contractValueInput = document.querySelector('input[name="contract_value"]');
+        if (contractValueInput) {
+            contractValueInput.value = totalItemValue.toFixed(2);
+        }
+
+        // Update Plan Gross field (item values minus quote values)
+        const planGrossInput = document.querySelector('input[name="plan_gross"]');
+        if (planGrossInput) {
+            const planGrossValue = totalItemValue - totalQuoteValue;
+            planGrossInput.value = planGrossValue.toFixed(2);
+
+            // Calculate total of existing splits
+            let totalSplitValue = 0;
+            document.querySelectorAll('input[name$="-value"]').forEach(input => {
+                if (!input.name.includes('new-calculation-difference')) {
+                    totalSplitValue += parseFloat(input.value || 0);
+                }
+            });
+
+            // Find difference between Plan Gross and total splits
+            const splitDifference = planGrossValue - totalSplitValue;
+
+            // Remove any existing calculation difference split
+            document.querySelectorAll('.split-row').forEach(row => {
+                if (row.querySelector('input[name*="new-calculation-difference"]')) {
+                    row.remove();
+                }
+            });
+
+            // If there's a difference, add a new split
+            if (Math.abs(splitDifference) > 0.01) { // Using 0.01 to account for floating point precision
+                const table = document.querySelector('#splitsTable tbody');
+                const timestamp = new Date().getTime();
+                const newRow = document.createElement('tr');
+                newRow.className = 'split-row';
+                newRow.innerHTML = `
+                    <td class="px-4 py-3">
+                        <input type="text" 
+                               name="splits-new-calculation-difference-${timestamp}-company" 
+                               value="Calculation Difference" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </td>
+                    <td class="px-4 py-3">
+                        <input type="number" 
+                               step="0.01" 
+                               name="splits-new-calculation-difference-${timestamp}-value" 
+                               value="${splitDifference.toFixed(2)}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </td>
+                    <td class="px-4 py-3">
+                        <input type="number" 
+                               step="0.01" 
+                               name="splits-new-calculation-difference-${timestamp}-paid" 
+                               value="0.00" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button type="button" 
+                                onclick="removeSplit(this)" 
+                                class="text-red-600 hover:text-red-900">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </td>
+                `;
+                table.appendChild(newRow);
+            }
+
+            // Update the total split value display
+            updateTotalSplitValue();
+        }
+    }
+
     // Global variables for modal functionality
     const processContractId = "{{ process_contract.id }}";
 
@@ -622,8 +781,29 @@
         document.getElementById('cancelModal').classList.add('hidden');
     }
 
-    function cancelProcessing() {
-        window.location.href = '{% url "processing:queue" %}';
+    async function cancelProcessing() {
+        try {
+            // Make API call to handle lock removal and status change
+            const response = await fetch(`{% url 'processing:cancel_process_contract' process_contract_id=0 %}`.replace('0', processContractId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to cancel processing');
+            }
+
+            // If successful, redirect to queue
+            window.location.href = "{% url 'processing:queue' %}";
+        } catch (error) {
+            console.error('Error canceling processing:', error);
+            alert(error.message || 'Failed to cancel processing. Please try again.');
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -728,190 +908,212 @@
         updateTotalSplitValue();
     });
 
+    // Update the recalculateTotal function
     function recalculateTotal(button) {
+        const clinId = button.dataset.clinId;
         const row = button.closest('.grid');
-        const qtyInput = row.querySelector('input[name$="-order_qty"]');
+        const qtyInput = row.querySelector('input[name="order_qty"]');
         
         // Check if this is a supplier section by looking for price_per_unit input
         const isSupplierSection = row.querySelector('input[id$="_supplier"]') !== null;
         
         if (isSupplierSection) {
             // Handle supplier total calculation
-            const supplierPriceInput = row.querySelector('input[name$="-price_per_unit"]');
-            const supplierTotalInput = row.querySelector('input[name$="-quote_value"]');
+            const supplierPriceInput = row.querySelector('input[name="price_per_unit"]');
+            const supplierTotalInput = row.querySelector('input[name="quote_value"]');
             
             if (qtyInput && supplierPriceInput && supplierTotalInput) {
                 const qty = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(supplierPriceInput.value) || 0;
-                // Use the full value for calculation
-                supplierTotalInput.value = (qty * price).toFixed(2);
+                const total = qty * price;
+                
+                // Update the total input
+                supplierTotalInput.value = total.toFixed(2);
+                
+                // Save the total value first
+                saveClinField(supplierTotalInput, clinId).then(() => {
+                    // After total is saved, update the display in the main table
+                    const mainRow = row.closest('tr').previousElementSibling;
+                    if (mainRow) {
+                        const displaySpan = mainRow.querySelector('[data-field="quote_value"]');
+                        if (displaySpan) {
+                            displaySpan.textContent = `$${total.toFixed(2)}`;
+                        }
+                    }
+                });
             }
         } else {
             // Handle CLIN total calculation
-            const priceInput = row.querySelector('input[name$="-unit_price"]');
-            const totalInput = row.querySelector('input[name$="-item_value"]');
+            const priceInput = row.querySelector('input[name="unit_price"]');
+            const totalInput = row.querySelector('input[name="item_value"]');
             
             if (qtyInput && priceInput && totalInput) {
                 const qty = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(priceInput.value) || 0;
-                totalInput.value = (qty * price).toFixed(2);
+                const total = qty * price;
+                
+                // Update the total input
+                totalInput.value = total.toFixed(2);
+                
+                // Save the total value first
+                saveClinField(totalInput, clinId).then(() => {
+                    // After total is saved, update the display in the main table
+                    const mainRow = row.closest('tr').previousElementSibling;
+                    if (mainRow) {
+                        const displaySpan = mainRow.querySelector('[data-field="item_value"]');
+                        if (displaySpan) {
+                            displaySpan.textContent = `$${total.toFixed(2)}`;
+                        }
+                    }
+                    
+                    // After saving the total, trigger contract calculations update
+                    updateContractCalculations();
+                });
             }
         }
     }
 
-    // Add function to format number inputs to 2 decimal places
-    function formatNumberInput(input) {
-        if (input && input.value) {
-            const value = parseFloat(input.value) || 0;
-            input.value = value.toFixed(2);
-        }
-    }
-
-    // Add this function to synchronize quantity fields
-    function syncQuantityFields(clinId, value) {
-        // Update the main display in table header
-        const mainDisplay = document.getElementById(`qty_display_${clinId}`);
-        if (mainDisplay) {
-            mainDisplay.textContent = value || '0';
-        }
-
-        // Update all quantity inputs
-        document.querySelectorAll(`input[id^="order_qty_"][data-clin-id="${clinId}"]`).forEach(input => {
-            if (!input.readOnly) {
-                input.value = value || '0';
+    // Update the saveClinField function to return a Promise
+    function saveClinField(element, clinId) {
+        const fieldName = element.name;
+        const fieldValue = element.value;
+        const processContractId = "{{ process_contract.id }}";
+        
+        // Show saving indicator
+        showMessage(`Saving CLIN ${clinId} ${fieldName}...`, 'info');
+        
+        const formData = new FormData();
+        formData.append('field_name', fieldName);
+        formData.append('field_value', fieldValue);
+        
+        return fetch(`/processing/api/update-clin-field/${processContractId}/clin/${clinId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showMessage(`CLIN ${clinId} ${fieldName} saved successfully`, 'success');
+                
+                // Update any related fields
+                if (data.related_updates) {
+                    Object.entries(data.related_updates).forEach(([relatedField, value]) => {
+                        // Find the related input within the same CLIN section
+                        const clinSection = element.closest('tr');
+                        if (clinSection) {
+                            const relatedInput = clinSection.querySelector(`[name="${relatedField}"]`);
+                            if (relatedInput) {
+                                relatedInput.value = value;
+                                
+                                // Also update the display value in the main table row if it exists
+                                const mainRow = clinSection.previousElementSibling;
+                                if (mainRow) {
+                                    const displaySpan = mainRow.querySelector(`[data-field="${relatedField}"]`);
+                                    if (displaySpan) {
+                                        displaySpan.textContent = value;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                return data;
+            } else {
+                throw new Error(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Save error:', error);
+            showMessage('Error saving: ' + error.message, 'error');
+            // Revert the field to its previous value if needed
+            if (element.dataset.previousValue) {
+                element.value = element.dataset.previousValue;
+            }
+            throw error;
         });
-
-        // Update supplier quantity display (readonly)
-        const supplierQty = document.getElementById(`order_qty_${clinId}_supplier`);
-        if (supplierQty) {
-            supplierQty.value = value || '0';
-        }
-
-        // Recalculate totals for both CLIN and supplier sections
-        const clinSection = document.querySelector(`#order_qty_${clinId}`).closest('.grid');
-        const supplierSection = document.querySelector(`#order_qty_${clinId}_supplier`).closest('.grid');
-        
-        // Calculate CLIN total
-        if (clinSection) {
-            const calcButton = clinSection.querySelector('button[onclick^="recalculateTotal"]');
-            if (calcButton) recalculateTotal(calcButton);
-        }
-        
-        // Calculate supplier total
-        if (supplierSection) {
-            const calcButton = supplierSection.querySelector('button[onclick^="recalculateTotal"]');
-            if (calcButton) recalculateTotal(calcButton);
-        }
     }
 
-    // Add input event listeners for quantity fields and supplier price fields
-    document.addEventListener('DOMContentLoaded', function() {
-        // Format all numeric inputs on page load
-        document.querySelectorAll('input[type="number"]').forEach(input => {
-            if (input.name.endsWith('-unit_price') || 
-                input.name.endsWith('-item_value') || 
-                input.name.endsWith('-price_per_unit') || 
-                input.name.endsWith('-quote_value')) {
-                // Only format on initial load if the input has a value
-                if (input.value) {
-                    formatNumberInput(input);
+    // Update the quantity sync function
+    function handleQuantityChange(input) {
+        const clinId = input.dataset.clinId;
+        if (!clinId) return;
+        
+        // Sync the quantity across all related inputs
+        syncQuantityFields(clinId, input);
+    }
+
+    // Update setupFieldSaving to include quantity handling
+    function setupFieldSaving() {
+        document.querySelectorAll('input, select, textarea').forEach(element => {
+            // Store the initial value
+            element.dataset.previousValue = element.value;
+            
+            // Check if this is a CLIN field
+            const clinId = element.dataset.clinId;
+            const saveFunction = clinId ? 
+                () => saveClinField(element, clinId) : 
+                () => saveField(element);
+            
+            // For select elements and checkboxes
+            if (element.tagName === 'SELECT' || element.type === 'checkbox') {
+                element.addEventListener('change', function() {
+                    saveFunction();
+                });
+            }
+            // For text/number inputs
+            else if (element.type === 'text' || element.type === 'number' || element.type === 'date') {
+                let debounceTimer;
+                
+                // Special handling for quantity fields
+                if (element.name === 'order_qty' && clinId) {
+                    element.addEventListener('input', function() {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(() => {
+                            if (this.value !== this.dataset.previousValue) {
+                                handleQuantityChange(this);
+                                this.dataset.previousValue = this.value;
+                            }
+                        }, 1000);
+                    });
+                    
+                    element.addEventListener('blur', function() {
+                        if (this.value !== this.dataset.previousValue) {
+                            clearTimeout(debounceTimer);
+                            handleQuantityChange(this);
+                            this.dataset.previousValue = this.value;
+                        }
+                    });
+                } else {
+                    // Regular field handling
+                    element.addEventListener('input', function() {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(() => {
+                            if (this.value !== this.dataset.previousValue) {
+                                saveFunction();
+                                this.dataset.previousValue = this.value;
+                            }
+                        }, 1000);
+                    });
+                    
+                    element.addEventListener('blur', function() {
+                        if (this.value !== this.dataset.previousValue) {
+                            clearTimeout(debounceTimer);
+                            saveFunction();
+                            this.dataset.previousValue = this.value;
+                        }
+                    });
                 }
             }
         });
-
-        // Add event listeners for quantity field changes
-        document.querySelectorAll('input[id^="order_qty_"]').forEach(input => {
-            if (!input.readOnly) {  // Only add listeners to editable fields
-                input.addEventListener('change', function() {
-                    const clinId = this.dataset.clinId;
-                    syncQuantityFields(clinId, this.value);
-                });
-            }
-        });
-
-        // Add event listeners for price field changes
-        document.querySelectorAll('input[name$="-unit_price"], input[name$="-price_per_unit"]').forEach(input => {
-            // Only format on blur (when leaving the field)
-            input.addEventListener('blur', function() {
-                formatNumberInput(this);
-                const calcButton = this.closest('.grid').querySelector('button[onclick^="recalculateTotal"]');
-                if (calcButton) recalculateTotal(calcButton);
-            });
-
-            // Allow free typing while in the field
-            input.addEventListener('input', function() {
-                // Don't format during input
-                const calcButton = this.closest('.grid').querySelector('button[onclick^="recalculateTotal"]');
-                if (calcButton) recalculateTotal(calcButton);
-            });
-        });
-    });
-    // Add these new functions for price handling
-    function handlePriceChange(input) {
-        // Only format when the user is done typing (on change)
-        if (input.value) {
-            const value = parseFloat(input.value) || 0;
-            // Store the full value but display formatted
-            input.setAttribute('data-full-value', value);
-            input.value = value.toFixed(2);
-        }
     }
 
-    // Update the recalculateTotal function
-    function recalculateTotal(button) {
-        const row = button.closest('.grid');
-        const qtyInput = row.querySelector('input[name$="-order_qty"]');
-        
-        // Check if this is a supplier section by looking for price_per_unit input
-        const isSupplierSection = row.querySelector('input[id$="_supplier"]') !== null;
-        
-        if (isSupplierSection) {
-            // Handle supplier total calculation
-            const supplierPriceInput = row.querySelector('input[name$="-price_per_unit"]');
-            const supplierTotalInput = row.querySelector('input[name$="-quote_value"]');
-            
-            if (qtyInput && supplierPriceInput && supplierTotalInput) {
-                const qty = parseFloat(qtyInput.value) || 0;
-                const price = parseFloat(supplierPriceInput.value) || 0;
-                // Use the full value for calculation
-                supplierTotalInput.value = (qty * price).toFixed(2);
-            }
-        } else {
-            // Handle CLIN total calculation
-            const priceInput = row.querySelector('input[name$="-unit_price"]');
-            const totalInput = row.querySelector('input[name$="-item_value"]');
-            
-            if (qtyInput && priceInput && totalInput) {
-                const qty = parseFloat(qtyInput.value) || 0;
-                const price = parseFloat(priceInput.value) || 0;
-                totalInput.value = (qty * price).toFixed(2);
-            }
-        }
-    }
-
-    // Update the event listeners
+    // Call this when the document loads
     document.addEventListener('DOMContentLoaded', function() {
-        // Remove the automatic formatting on input
-        document.querySelectorAll('input[type="number"]').forEach(input => {
-            // Remove any existing input event listeners
-            input.removeEventListener('input', formatNumberInput);
-            
-            // Only format on blur or change
-            if (input.name.endsWith('-unit_price') || 
-                input.name.endsWith('-price_per_unit') || 
-                input.name.endsWith('-quote_value')) {
-                
-                // Clear existing listeners
-                input.removeEventListener('blur', formatNumberInput);
-                
-                // Add new change handler
-                input.addEventListener('change', function() {
-                    handlePriceChange(this);
-                });
-            }
-        });
+        setupFieldSaving();
+        // ... other existing DOMContentLoaded handlers ...
     });
-
 </script>
 {% endblock %}

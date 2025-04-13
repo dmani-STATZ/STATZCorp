@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
 from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber
-from processing.forms import ProcessContractForm, ProcessClinForm
+from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass
 import csv
 import os
@@ -15,12 +15,12 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy, reverse
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_POST
 from django.http import Http404
 import json
 
 @login_required
-@require_http_methods(["POST"])
+@require_POST
 def start_processing(request, queue_id):
     """Start the detailed processing workflow for a contract from the queue.
     
@@ -60,6 +60,7 @@ def start_processing(request, queue_id):
             tab_num=new_tab_number,
             status='in_progress',
             queue_id=queue_id,
+            files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number,
             created_by=request.user,
             modified_by=request.user
         )
@@ -486,15 +487,6 @@ def match_idiq(request, process_contract_id):
             'error': str(e)
         }, status=500)
 
-# Create formset for CLINs
-ProcessClinFormSet = inlineformset_factory(
-    ProcessContract,
-    ProcessClin,
-    form=ProcessClinForm,
-    extra=1,
-    can_delete=True
-)
-
 def download_csv_template(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="contract_template.csv"'
@@ -620,4 +612,183 @@ def get_process_contract(request, queue_id):
         return JsonResponse({
             'success': False,
             'error': str(e)
-        }) 
+        })
+
+@login_required
+@require_POST
+@transaction.atomic
+def cancel_processing(request, process_contract_id):
+    """Cancel processing of a contract and reset its status"""
+    try:
+        with transaction.atomic():
+            process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+            
+            # Get associated queue contract
+            queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+            
+            # Reset queue contract status
+            queue_contract.is_being_processed = False
+            queue_contract.processed_by = None
+            queue_contract.processing_started = None
+            queue_contract.status = 'ready_for_processing'
+            queue_contract.save()
+            
+            # Delete the process contract
+            process_contract.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Processing cancelled successfully'
+            })
+            
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Process contract not found'
+        }, status=404)
+    except QueueContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Queue contract not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+@require_POST
+@transaction.atomic
+def cancel_process_contract(request, process_contract_id):
+    """
+    Cancel a process contract and return to queue
+    """
+    try:
+        with transaction.atomic():
+            process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+            
+            # Only allow canceling if not already completed
+            if process_contract.status == 'completed':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Cannot cancel a completed contract'
+                }, status=400)
+            
+            # Get the queue contract
+            queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+            
+            # Reset queue contract status
+            queue_contract.is_being_processed = False
+            queue_contract.processed_by = None
+            queue_contract.processing_started = None
+            queue_contract.status = 'ready_for_processing'
+            queue_contract.save()
+            
+            # Delete the process contract
+            process_contract.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Contract processing cancelled successfully'
+            })
+            
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Process contract not found'
+        }, status=404)
+    except QueueContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Queue contract not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+@require_POST
+@transaction.atomic
+def save_and_return_to_queue(request, process_contract_id):
+    """
+    Save the current state of the process contract and return to queue
+    """
+    try:
+        with transaction.atomic():
+            process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+            
+            # Get the form data
+            form = ProcessContractForm(request.POST, instance=process_contract)
+            clin_formset = ProcessClinFormSet(request.POST, instance=process_contract)
+            
+            if form.is_valid() and clin_formset.is_valid():
+                # Save the contract
+                process_contract = form.save()
+                
+                # Save the CLINs
+                clin_formset.save()
+                
+                messages.success(request, 'Changes saved successfully')
+                return JsonResponse({
+                    'success': True,
+                    'redirect_url': reverse('processing:queue')
+                })
+            else:
+                # If there are form errors, return them
+                errors = {
+                    'form_errors': form.errors,
+                    'clin_errors': clin_formset.errors
+                }
+                return JsonResponse({
+                    'success': False,
+                    'errors': errors
+                }, status=400)
+            
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Process contract not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def process_contract_form(request, pk=None):
+    """
+    View for handling the processing contract form.
+    Supports both creation and editing of ProcessContract instances.
+    """
+    if pk:
+        instance = get_object_or_404(ProcessContract, pk=pk)
+    else:
+        instance = None
+        
+    if request.method == 'POST':
+        form = ProcessContractForm(request.POST, request.FILES, instance=instance)
+        
+        if form.is_valid():
+            try:
+                instance = form.save()
+                return JsonResponse({'status': 'success', 'message': 'Form saved successfully'})
+            except Exception as e:
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Error saving form: {str(e)}'
+                }, status=500)
+        else:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Invalid form data', 
+                'errors': form.errors
+            }, status=400)
+    else:
+        form = ProcessContractForm(instance=instance)
+        
+    context = {'form': form}
+    return render(request, 'processing/process_contract_form.html', context) 
