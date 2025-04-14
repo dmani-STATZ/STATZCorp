@@ -14,7 +14,7 @@ class QueueContract(AuditModel):
     buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
     award_date = models.DateTimeField(null=True, blank=True)
     due_date = models.DateTimeField(null=True, blank=True)
-    contract_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    contract_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     contract_type = models.CharField(max_length=50, null=True, blank=True)  # Unilateral, Bilateral, IDIQ
     solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
     
@@ -50,15 +50,15 @@ class QueueClin(AuditModel):
     fob = models.CharField(max_length=5, null=True, blank=True, choices=[('O', 'Origin'), ('D', 'Destination')])
     due_date = models.DateField(null=True, blank=True)
     order_qty = models.FloatField(null=True, blank=True)
-    item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    item_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     uom = models.CharField(max_length=10, null=True, blank=True)
     
     # Optional supplier information
     supplier = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
     supplier_due_date = models.DateField(null=True, blank=True)
-    supplier_unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    supplier_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    supplier_unit_price = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    supplier_price = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     supplier_payment_terms = models.CharField(max_length=50, null=True, blank=True)
     
     # Matched references (after processing)
@@ -147,10 +147,10 @@ class ProcessContract(models.Model):
     sales_class_text = models.CharField(max_length=255, null=True, blank=True)
     nist = models.BooleanField(null=True, blank=True)
     files_url = models.CharField(max_length=200, null=True, blank=True)
-    contract_value = models.FloatField(null=True, blank=True, default=0)
+    contract_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
-    plan_gross = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    plan_gross = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
 
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -196,8 +196,8 @@ class ProcessClin(models.Model):
     process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, null=True, blank=True, related_name='clins')
     item_number = models.CharField(max_length=20, null=True, blank=True)
     item_type = models.CharField(max_length=20, null=True, blank=True, choices=ITEM_TYPE_CHOICES)
-    item_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    unit_price = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    item_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     po_num_ext = models.CharField(max_length=5, null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     clin_po_num = models.CharField(max_length=10, null=True, blank=True)
@@ -223,9 +223,9 @@ class ProcessClin(models.Model):
     special_payment_terms = models.ForeignKey(SpecialPaymentTerms, on_delete=models.CASCADE, null=True, blank=True)
     special_payment_terms_text = models.CharField(max_length=255, null=True, blank=True)
     special_payment_terms_paid = models.BooleanField(null=True, blank=True)
-    price_per_unit = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    quote_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    price_per_unit = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    quote_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
 
     # Processing Fields
@@ -248,8 +248,8 @@ class ContractSplit(models.Model):
     """Model for storing dynamic contract splits between different companies"""
     process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, related_name='splits')
     company_name = models.CharField(max_length=100)
-    split_value = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
-    split_paid = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    split_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -260,3 +260,54 @@ class ContractSplit(models.Model):
 
     def __str__(self):
         return f"{self.company_name} Split for {self.process_contract.contract_number}"
+    
+    @classmethod
+    def create_split(cls, process_contract_id, company_name, split_value):
+        """Creates a new ContractSplit record."""
+        try:
+            process_contract = cls._meta.get_field('process_contract').related_model.objects.get(pk=process_contract_id)
+        except cls._meta.get_field('process_contract').related_model.DoesNotExist:
+            raise ValueError(f"ProcessContract with id '{process_contract_id}' does not exist.")
+
+        if not company_name:
+            raise ValueError("Company name cannot be empty.")
+        if split_value is None:
+            raise ValueError("Split value cannot be None.")
+
+        contract_split = cls(
+            process_contract=process_contract,
+            company_name=company_name,
+            split_value=split_value,
+            split_paid=0.00,
+        )
+        contract_split.save()
+        return contract_split
+
+    @classmethod
+    def update_split(cls, contract_split_id, company_name=None, split_value=None, split_paid=None):
+        """Updates an existing ContractSplit record."""
+        try:
+            contract_split = cls.objects.get(pk=contract_split_id)
+        except cls.DoesNotExist:
+            raise ValueError(f"ContractSplit with id '{contract_split_id}' does not exist.")
+
+        if company_name is not None:
+            contract_split.company_name = company_name
+        if split_value is not None:
+            contract_split.split_value = split_value
+        if split_paid is not None:
+            contract_split.split_paid = split_paid
+
+        contract_split.modified_at = timezone.now()
+        contract_split.save()
+        return contract_split
+
+    @classmethod
+    def delete_split(cls, contract_split_id):
+        """Deletes a ContractSplit record."""
+        try:
+            contract_split = cls.objects.get(pk=contract_split_id)
+            contract_split.delete()
+            return True  # Indicate successful deletion
+        except cls.DoesNotExist:
+            return False # Indicate record not found

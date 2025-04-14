@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
-from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber
+from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ContractSplit
 from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass
 import csv
@@ -15,7 +15,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy, reverse
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.http import Http404
 import json
 
@@ -792,3 +792,50 @@ def process_contract_form(request, pk=None):
         
     context = {'form': form}
     return render(request, 'processing/process_contract_form.html', context) 
+
+@require_http_methods(["POST"])
+def create_split_view(request):
+    try:
+        data = json.loads(request.body)
+        split = ContractSplit.create_split(
+            process_contract_id=data['process_contract_id'],
+            company_name=data['company_name'],
+            split_value=data['split_value']
+        )
+        return JsonResponse({
+            'success': True,
+            'split_id': split.id
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+@require_http_methods(["POST"])
+def update_split_view(request, split_id):
+    try:
+        data = json.loads(request.body)
+        split = ContractSplit.update_split(
+            contract_split_id=split_id,
+            company_name=data.get('company_name'),
+            split_value=data.get('split_value'),
+            split_paid=data.get('split_paid')
+        )
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+@require_http_methods(["POST"])
+def delete_split_view(request, split_id):
+    try:
+        success = ContractSplit.delete_split(split_id)
+        return JsonResponse({'success': success})
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)

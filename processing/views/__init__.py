@@ -22,8 +22,14 @@ from .matching_views import (
     match_supplier
 )
 
-from .api_views import save_and_return, cancel_process_contract, delete_processing_clin
-
+from .api_views import (
+    get_processing_contract,
+    delete_processing_clin, 
+    update_processing_clin,
+    add_processing_clin,
+    update_clin_field, 
+    update_process_contract_field
+)
 __all__ = [
     'process_contract_form',
     'queue_view',

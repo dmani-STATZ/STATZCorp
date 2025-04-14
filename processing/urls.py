@@ -20,7 +20,10 @@ from .views.processing_views import (
     match_supplier,
     match_idiq,
     cancel_process_contract,
-    save_and_return_to_queue
+    save_and_return_to_queue,
+    create_split_view,
+    update_split_view,
+    delete_split_view
 )
 from .views.api_views import (
     get_processing_contract,
@@ -69,4 +72,9 @@ urlpatterns = [
     path('download-template/', download_csv_template, name='download_csv_template'),
     path('download-test-data/', download_test_data, name='download_test_data'),
     path('upload/', upload_csv, name='upload_csv'),
+
+    path('contract/split/create/', create_split_view, name='create_split'),
+    path('contract/split/<int:split_id>/update/', update_split_view, name='update_split'),
+    path('contract/split/<int:split_id>/delete/', delete_split_view, name='delete_split'),
+
 ] 
