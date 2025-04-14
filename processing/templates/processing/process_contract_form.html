@@ -259,352 +259,410 @@
                                                name="splits-{{ split.id }}-company" 
                                                value="{{ split.company_name }}" 
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <input type="hidden" name="splits-{{ split.id }}-id" value="{{ split.id }}">
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <input type="number" 
-                                               step="0.01" 
-                                               name="splits-{{ split.id }}-value" 
-                                               value="{{ split.split_value }}" 
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <input type="number" 
-                                               step="0.01" 
-                                               name="splits-{{ split.id }}-paid" 
-                                               value="{{ split.split_paid }}" 
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <div class="flex justify-center space-x-2">
-                                            <button type="button" 
-                                                    onclick="saveSplit(this)" 
-                                                    class="text-green-600 hover:text-green-900"
-                                                    title="Save Split">
-                                                <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
-                                                    <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
-                                                </svg>
-                                            </button>
-                                            <button type="button" 
-                                                    onclick="removeSplit(this)" 
-                                                    class="text-red-600 hover:text-red-900"
-                                                    title="Delete Split">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Total Split Value Display -->
-                    <div class="mt-4 text-right">
-                        <p class="text-sm text-gray-600">Total Split Value: <span id="totalSplitValue">0.00</span></p>
-                        <p class="text-sm text-gray-600">Contract Value: {{ process_contract.contract_value|default:"0.00" }}</p>
-                    </div>
-                </div>
+                                <input type="hidden" name="splits-{{ split.id }}-id" value="{{ split.id }}">
+                            </td>
+                            <td class="px-4 py-3">
+                                <input type="number" 
+                                       step="0.01" 
+                                       name="splits-{{ split.id }}-value" 
+                                       value="{{ split.split_value }}" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </td>
+                            <td class="px-4 py-3">
+                                <input type="number" 
+                                       step="0.01" 
+                                       name="splits-{{ split.id }}-paid" 
+                                       value="{{ split.split_paid }}" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <div class="flex justify-center space-x-2">
+                                    <button type="button" 
+                                            onclick="saveSplit(this)" 
+                                            class="text-green-600 hover:text-green-900"
+                                            title="Save Split">
+                                        <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+                                            <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
+                                        </svg>
+                                    </button>
+                                    <button type="button" 
+                                            onclick="removeSplit(this)" 
+                                            class="text-red-600 hover:text-red-900"
+                                            title="Delete Split">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
 
-            <!-- CLIN Items Card -->
-            <div class="lg:col-span-3">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4">CLIN Items</h2>
-                    {{ clin_formset.management_form }}
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Type</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% for clin_form in clin_formset %}
-                                <tr class="hover:bg-gray-50">
-                                    <!-- Actions Column -->
-                                    <td class="px-4 py-3 text-sm font-medium">
-                                        <div class="flex items-center space-x-2">
+            <!-- Total Split Value Display -->
+            <div class="mt-4 text-right">
+                <p class="text-sm text-gray-600">Total Split Value: <span id="totalSplitValue">0.00</span></p>
+                <p class="text-sm text-gray-600">Contract Value: {{ process_contract.contract_value|default:"0.00" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIN Items Card -->
+    <div class="lg:col-span-3">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-800">CLIN Items</h2>
+                <button type="button" 
+                        onclick="addNewClin()"
+                        class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Add New CLIN
+                </button>
+            </div>
+            {{ clin_formset.management_form }}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                            <!-- <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th> -->
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for clin_form in clin_formset %}
+                        <tr class="hover:bg-gray-50">
+                            <!-- Actions Column -->
+                            <td class="px-4 py-3 text-sm font-medium">
+                                <div class="flex items-center space-x-2">
+                                    <button type="button" 
+                                            data-action="toggle-clin"
+                                            data-index="{{ forloop.counter0 }}"
+                                            class="text-blue-600 hover:text-blue-900 flex items-center">
+                                        <span class="clin-expand-icon-{{ forloop.counter0 }} flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                            <span class="ml-1 text-sm clin-text-{{ forloop.counter0 }}">Expand</span>
+                                        </span>
+                                    </button>
+                                </div>
+                            </td>
+                            <!-- Basic Info Columns -->
+                            <td class="px-4 py-3">
+                                <span class="text-sm font-medium text-gray-900">{{ clin_form.item_number.value|default:'' }}</span>
+                                {{ clin_form.id }}
+                                {{ clin_form.item_number.as_hidden }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-sm text-gray-900">{{ clin_form.item_type.value|default:'---' }}</span>
+                                {{ clin_form.item_type.as_hidden }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm">
+                                    <div class="font-medium text-gray-900">{{ clin_form.instance.nsn_text|default:'Not Set' }}</div>
+                                    <div class="text-gray-500 text-xs">{{ clin_form.instance.nsn_description_text|default:'' }}</div>
+                                </div>
+                                {{ clin_form.nsn.as_hidden }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-sm text-gray-900">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                {{ clin_form.supplier.as_hidden }}
+                            </td>
+                            <!-- <td class="px-4 py-3 text-right">
+                                <span class="text-sm font-medium text-gray-900" data-field="order_qty">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="text-sm font-medium text-gray-900" data-field="unit_price">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="text-sm font-medium text-gray-900" data-field="item_value">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
+                            </td> -->
+                        </tr>
+                        <!-- Detailed Edit Row (Initially Hidden) -->
+                        <tr class="clin-details-{{ forloop.counter0 }} hidden">
+                            <td colspan="8" class="px-4 py-4 bg-gray-50">
+                                <!-- ITEM LINE -->
+                                <div class="grid grid-cols-4 gap-4 mb-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
+                                        <input type="text" 
+                                               id="item_number_{{ clin_form.instance.id }}"
+                                               name="item_number" 
+                                               value="{{ clin_form.item_number.value|default:'' }}" 
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
+                                        <select id="item_type_{{ clin_form.instance.id }}"
+                                                name="item_type" 
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                data-clin-id="{{ clin_form.instance.id }}">
+                                            <option value="">-------</option>
+                                            {% for choice in clin_form.item_type.field.choices %}
+                                                <option value="{{ choice.0 }}" {% if clin_form.item_type.value == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="clin_po_num_{{ clin_form.instance.id }}">CLIN PO Number</label>
+                                        <input type="text" 
+                                        id="clin_po_num_{{ clin_form.instance.id }}"
+                                        name="clin_po_num" 
+                                        value="{{ clin_form.clin_po_num.value }}" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="tab_num_{{ clin_form.instance.id }}">Tab Number</label>
+                                        <input type="text" 
+                                        id="tab_num_{{ clin_form.instance.id }}"
+                                        name="tab_num" 
+                                        value="{{ clin_form.tab_num.value }}" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 mb-4">
+                                    <hr />
+                                </div>
+                                <!-- NSN and Due date Line -->
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <!-- NSN Selection Box -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
+                                        <div class="flex gap-2 items-center">
+                                            <input type="text" 
+                                                   id="nsn_{{ clin_form.instance.id }}"
+                                                   value="{{ clin_form.instance.nsn_text|default:'' }}" 
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                                   readonly
+                                                   data-clin-id="{{ clin_form.instance.id }}">
                                             <button type="button" 
-                                                    data-action="toggle-clin"
-                                                    data-index="{{ forloop.counter0 }}"
-                                                    class="text-blue-600 hover:text-blue-900 flex items-center">
-                                                <span class="clin-expand-icon-{{ forloop.counter0 }} flex items-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                                    </svg>
-                                                    <span class="ml-1 text-sm clin-text-{{ forloop.counter0 }}">Expand</span>
-                                                </span>
+                                                    data-action="open-nsn"
+                                                    data-id="{{ clin_form.instance.id }}"
+                                                    data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
+                                                    data-description="{{ clin_form.instance.nsn_description_text|default:'' }}"
+                                                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                Match
                                             </button>
+                                            {% if clin_form.instance.nsn %}
+                                            <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            {% else %}
+                                            <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                            {% endif %}
                                         </div>
-                                    </td>
-                                    <!-- Basic Info Columns -->
-                                    <td class="px-4 py-3">
-                                        <span class="text-sm font-medium text-gray-900">{{ clin_form.item_number.value|default:'' }}</span>
-                                        {{ clin_form.id }}
-                                        {{ clin_form.item_number.as_hidden }}
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="text-sm text-gray-900">{{ clin_form.item_type.value|default:'---' }}</span>
-                                        {{ clin_form.item_type.as_hidden }}
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="text-sm">
-                                            <div class="font-medium text-gray-900">{{ clin_form.instance.nsn_text|default:'Not Set' }}</div>
-                                            <div class="text-gray-500 text-xs">{{ clin_form.instance.nsn_description_text|default:'' }}</div>
-                                        </div>
-                                        {{ clin_form.nsn.as_hidden }}
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="text-sm text-gray-900">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
-                                        {{ clin_form.supplier.as_hidden }}
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900" data-field="order_qty">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900" data-field="unit_price">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <span class="text-sm font-medium text-gray-900" data-field="item_value">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
-                                    </td>
-                                </tr>
-                                <!-- Detailed Edit Row (Initially Hidden) -->
-                                <tr class="clin-details-{{ forloop.counter0 }} hidden">
-                                    <td colspan="8" class="px-4 py-4 bg-gray-50">
-                                        <!-- ITEM LINE -->
-                                        <div class="grid grid-cols-3 gap-4 mb-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
-                                                <input type="text" 
-                                                       id="item_number_{{ clin_form.instance.id }}"
-                                                       name="item_number" 
-                                                       value="{{ clin_form.item_number.value|default:'' }}" 
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
-                                                <select id="item_type_{{ clin_form.instance.id }}"
-                                                        name="item_type" 
-                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        data-clin-id="{{ clin_form.instance.id }}">
-                                                    <option value="">-------</option>
-                                                    {% for choice in clin_form.item_type.field.choices %}
-                                                        <option value="{{ choice.0 }}" {% if clin_form.item_type.value == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-                                            <div>
-
-                                            </div>
-                                        </div>
-
-                                        <!-- NSN and Due date Line -->
-                                        <div class="grid grid-cols-2 gap-4 mb-4">
-                                            <!-- NSN Selection Box -->
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
-                                                <div class="flex gap-2 items-center">
-                                                    <input type="text" 
-                                                           id="nsn_{{ clin_form.instance.id }}"
-                                                           value="{{ clin_form.instance.nsn_text|default:'' }}" 
-                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
-                                                           readonly
-                                                           data-clin-id="{{ clin_form.instance.id }}">
-                                                    <button type="button" 
-                                                            data-action="open-nsn"
-                                                            data-id="{{ clin_form.instance.id }}"
-                                                            data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
-                                                            data-description="{{ clin_form.instance.nsn_description_text|default:'' }}"
-                                                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                        Match
-                                                    </button>
-                                                    {% if clin_form.instance.nsn %}
-                                                    <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                    </svg>
-                                                    {% else %}
-                                                    <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                    </svg>
-                                                    {% endif %}
-                                                </div>
-                                                {% if clin_form.instance.nsn_description_text %}
-                                                <p id="nsn_description_{{ clin_form.instance.id }}" class="mt-1 text-sm text-gray-500">{{ clin_form.instance.nsn_description_text }}</p>
-                                                {% endif %}
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">Due Date</label>
-                                                <input type="date" 
-                                                       id="due_date_{{ clin_form.instance.id }}"
-                                                       name="due_date" 
-                                                       value="{{ clin_form.due_date.value|date:'Y-m-d' }}"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}">
-
-                                             </div>
-                                        </div>
-                                        <!--  CLIN Section     -->
-                                        <div class="grid grid-cols-3 gap-4 mb-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
-                                                <input type="number" 
-                                                       id="order_qty_{{ clin_form.instance.id }}"
-                                                       name="order_qty" 
-                                                       value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="unit_price_{{ clin_form.instance.id }}">Unit Price</label>
-                                                <input type="number" 
-                                                       id="unit_price_{{ clin_form.instance.id }}"
-                                                       step="0.01" 
-                                                       name="unit_price" 
-                                                       value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="item_value_{{ clin_form.instance.id }}">Total Value</label>
-                                                <div class="flex gap-2">
-                                                    <input type="number" 
-                                                           id="item_value_{{ clin_form.instance.id }}"
-                                                           step="0.01" 
-                                                           name="item_value" 
-                                                           value="{{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}"
-                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                           readonly
-                                                           data-clin-id="{{ clin_form.instance.id }}">
-                                                    <button type="button" 
-                                                            onclick="recalculateTotal(this)"
-                                                            data-clin-id="{{ clin_form.instance.id }}"
-                                                            class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
-                                                        ReCalc
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Supplier Selection Box -->
-                                        <div class="grid grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
-                                                <div class="flex gap-2 items-center">
-                                                    <input type="text" 
-                                                           id="supplier_{{ clin_form.instance.id }}"
-                                                           value="{{ clin_form.instance.supplier_text|default:'' }}" 
-                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
-                                                           readonly
-                                                           data-clin-id="{{ clin_form.instance.id }}">
-                                                    <button type="button" 
-                                                            data-action="open-supplier"
-                                                            data-id="{{ clin_form.instance.id }}"
-                                                            data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
-                                                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                        Match
-                                                    </button>
-                                                    {% if clin_form.instance.supplier %}
-                                                    <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                    </svg>
-                                                    {% else %}
-                                                    <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                    </svg>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
-                                                <input type="date" 
-                                                       id="supplier_due_date_{{ clin_form.instance.id }}"
-                                                       name="supplier_due_date" 
-                                                       value="{{ clin_form.supplier_due_date.value|date:'Y-m-d' }}"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}">
-                                            </div>
-                                        </div>
-
-                                        <div class="grid grid-cols-3 gap-4 mb-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}_supplier">Quantity</label>
-                                                <input type="number" 
-                                                       id="order_qty_{{ clin_form.instance.id }}_supplier"
-                                                       name="order_qty" 
-                                                       value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
-                                                       class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}"
-                                                       readonly>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Supplier Price</label>
-                                                <input type="number" 
-                                                       id="price_per_unit_{{ clin_form.instance.id }}"
-                                                       name="price_per_unit" 
-                                                       value="{{ clin_form.price_per_unit.value|default:'0' }}"
-                                                       step="any"
-                                                       min="0"
-                                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                       data-clin-id="{{ clin_form.instance.id }}"
-                                                       onchange="handlePriceChange(this)">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Supplier Total</label>
-                                                <div class="flex gap-2">
-                                                    <input type="number" 
-                                                           id="quote_value_{{ clin_form.instance.id }}"
-                                                           step="0.01" 
-                                                           name="quote_value" 
-                                                           value="{{ clin_form.quote_value.value|floatformat:'2'|default:'0.00' }}"
-                                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                           readonly
-                                                           data-clin-id="{{ clin_form.instance.id }}">
-                                                    <button type="button" 
-                                                            onclick="recalculateTotal(this)"
-                                                            data-clin-id="{{ clin_form.instance.id }}"
-                                                            class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
-                                                        ReCalc
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="mt-4 flex justify-end">
+                                        {% if clin_form.instance.nsn_description_text %}
+                                        <p id="nsn_description_{{ clin_form.instance.id }}" class="mt-1 text-sm text-gray-500">{{ clin_form.instance.nsn_description_text }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">Due Date</label>
+                                        <input type="date" 
+                                               id="due_date_{{ clin_form.instance.id }}"
+                                               name="due_date" 
+                                               value="{{ clin_form.due_date.value|date:'Y-m-d' }}"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}">
+                                     </div>
+                                </div>
+                                <!--  CLIN Section     -->
+                                <div class="grid grid-cols-9 gap-4 mb-4">
+                                    <div class="col-span-2">
+                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
+                                        <input type="number" 
+                                               id="order_qty_{{ clin_form.instance.id }}"
+                                               name="order_qty" 
+                                               value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                    <div class="col-span-1">
+                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="uom_{{ clin_form.instance.id }}">UOM</label>
+                                        <input type="text" 
+                                               id="uom_{{ clin_form.instance.id }}"
+                                               name="uom" 
+                                               value="{{ clin_form.uom.value }}"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="unit_price_{{ clin_form.instance.id }}">Unit Price</label>
+                                        <input type="number" 
+                                               id="unit_price_{{ clin_form.instance.id }}"
+                                               name="unit_price" 
+                                               value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="item_value_{{ clin_form.instance.id }}">Total Value</label>
+                                        <div class="flex gap-2">
+                                            <input type="number" 
+                                                   id="item_value_{{ clin_form.instance.id }}"
+                                                   name="item_value" 
+                                                   value="{{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}"
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                   readonly
+                                                   data-clin-id="{{ clin_form.instance.id }}">
                                             <button type="button" 
-                                                    onclick="showDeleteModal(this)" 
+                                                    onclick="recalculateTotal(this)"
                                                     data-clin-id="{{ clin_form.instance.id }}"
-                                                    class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded flex items-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                                Delete CLIN
+                                                    class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                                ReCalc
                                             </button>
                                         </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 mb-4">
+                                    <hr />
+                                </div>
+                                <!-- Supplier Selection Box -->
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
+                                        <div class="flex gap-2 items-center">
+                                            <input type="text" 
+                                                   id="supplier_{{ clin_form.instance.id }}"
+                                                   value="{{ clin_form.instance.supplier_text|default:'' }}" 
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                                   readonly
+                                                   data-clin-id="{{ clin_form.instance.id }}">
+                                            <button type="button" 
+                                                    data-action="open-supplier"
+                                                    data-id="{{ clin_form.instance.id }}"
+                                                    data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
+                                                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                Match
+                                            </button>
+                                            {% if clin_form.instance.supplier %}
+                                            <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            {% else %}
+                                            <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
+                                        <input type="date" 
+                                               id="supplier_due_date_{{ clin_form.instance.id }}"
+                                               name="supplier_due_date" 
+                                               value="{{ clin_form.supplier_due_date.value|date:'Y-m-d' }}"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1" for="special_payment_terms_{{ clin_form.instance.id }}">Special Payment Terms ({{ clin_form.special_payment_terms_text.value }})</label>
+                                            <select id="special_payment_terms_{{ clin_form.instance.id }}"
+                                                    name="special_payment_terms" 
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    data-clin-id="{{ clin_form.instance.id }}">
+                                                <option value="">-------</option>
+                                                {% for terms in special_payment_terms %}
+                                                    <option value="{{ terms.0 }}" {% if clin_form.special_payment_terms.value == terms.0 %}selected{% endif %}>{{ terms.terms }}</option>
+                                                {% endfor %}
+                                            </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Supplier Price</label>
+                                        <input type="number" 
+                                               id="price_per_unit_{{ clin_form.instance.id }}"
+                                               name="price_per_unit" 
+                                               value="{{ clin_form.price_per_unit.value|default:'0' }}"
+                                               step="any"
+                                               min="0"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               data-clin-id="{{ clin_form.instance.id }}"
+                                               onchange="handlePriceChange(this)">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Supplier Total</label>
+                                        <div class="flex gap-2">
+                                            <input type="number" 
+                                                   id="quote_value_{{ clin_form.instance.id }}"
+                                                   step="0.01" 
+                                                   name="quote_value" 
+                                                   value="{{ clin_form.quote_value.value|floatformat:'2'|default:'0.00' }}"
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                   readonly
+                                                   data-clin-id="{{ clin_form.instance.id }}">
+                                            <button type="button" 
+                                                    onclick="recalculateTotal(this)"
+                                                    data-clin-id="{{ clin_form.instance.id }}"
+                                                    class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                                ReCalc
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-8 gap-4 mb-4">
+                                    <div class="col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="ia_{{ clin_form.instance.id }}">IA</label>
+                                        <select id="ia_{{ clin_form.instance.id }}"
+                                                name="ia" 
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                data-clin-id="{{ clin_form.instance.id }}">
+                                                <option value="">-------</option>
+                                                <option value="O" {% if clin_form.instance.ia == 'O' %}selected{% endif %}>Origin</option>
+                                                <option value="D" {% if clin_form.instance.ia == 'D' %}selected{% endif %}>Destination</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="fob_{{ clin_form.instance.id }}">FOB</label>
+                                        <select id="fob_{{ clin_form.instance.id }}"
+                                                name="fob" 
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                data-clin-id="{{ clin_form.instance.id }}">
+                                                <option value="">-------</option>
+                                                <option value="O" {% if clin_form.instance.fob == 'O' %}selected{% endif %}>Origin</option>
+                                                <option value="D" {% if clin_form.instance.fob == 'D' %}selected{% endif %}>Destination</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex justify-end">
+                                    <button type="button" 
+                                            onclick="showDeleteModal(this)" 
+                                            data-clin-id="{{ clin_form.instance.id }}"
+                                            class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                        Delete CLIN
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- Action Buttons -->
-        <div class="flex justify-end space-x-4 mt-6">
+<!-- Action Buttons -->
+<div class="flex justify-end space-x-4 mt-6">
 
-        </div>
-    </form>
+</div>
+</form>
 </div>
 
 <!-- Cancel Processing Confirmation Modal -->
@@ -1117,7 +1175,7 @@
         
         if (isSupplierCalc) {
             // Supplier calculation
-            const qtyInput = row.querySelector('input[name="order_qty"]');
+            const qtyInput = document.querySelector(`#order_qty_${clinId}`); // Get the main quantity input
             const priceInput = row.querySelector('input[name="price_per_unit"]');
             const totalInput = row.querySelector('input[name="quote_value"]');
             
@@ -1130,9 +1188,6 @@
                 // Save the recalculated values
                 saveClinField(priceInput, clinId);
                 saveClinField(totalInput, clinId);
-                
-                // Update contract calculations after supplier values change
-                updateContractCalculations();
             }
         } else {
             // CLIN calculation
@@ -1150,11 +1205,11 @@
                 saveClinField(qtyInput, clinId);
                 saveClinField(priceInput, clinId);
                 saveClinField(totalInput, clinId);
-                
-                // Update contract calculations after CLIN values change
-                updateContractCalculations();
             }
         }
+        
+        // Update contract calculations after any value changes
+        // updateContractCalculations();
     }
 
     // Add function to format number inputs to 2 decimal places
@@ -1164,67 +1219,6 @@
             input.value = value.toFixed(2);
         }
     }
-
-    // Add this function to synchronize quantity fields
-    function syncQuantityFields(clinId, value) {
-        // Update the main display in table header
-        const mainDisplay = document.getElementById(`qty_display_${clinId}`);
-        if (mainDisplay) {
-            mainDisplay.textContent = value || '0';
-        }
-
-        // Update all quantity inputs
-        document.querySelectorAll(`input[id^="order_qty_"][data-clin-id="${clinId}"]`).forEach(input => {
-            if (!input.readOnly) {
-                input.value = value || '0';
-            }
-        });
-
-        // Update supplier quantity display (readonly)
-        const supplierQty = document.getElementById(`order_qty_${clinId}_supplier`);
-        if (supplierQty) {
-            supplierQty.value = value || '0';
-        }
-
-        // Recalculate totals for both CLIN and supplier sections
-        const clinSection = document.querySelector(`#order_qty_${clinId}`).closest('.grid');
-        const supplierSection = document.querySelector(`#order_qty_${clinId}_supplier`).closest('.grid');
-        
-        // Calculate CLIN total
-        if (clinSection) {
-            const calcButton = clinSection.querySelector('button[onclick^="recalculateTotal"]');
-            if (calcButton) recalculateTotal(calcButton);
-        }
-        
-        // Calculate supplier total
-        if (supplierSection) {
-            const calcButton = supplierSection.querySelector('button[onclick^="recalculateTotal"]');
-            if (calcButton) recalculateTotal(calcButton);
-        }
-    }
-
-    // Add input event listeners for quantity fields and supplier price fields
-    document.addEventListener('DOMContentLoaded', function() {
-        // Remove the automatic formatting on input
-        document.querySelectorAll('input[type="number"]').forEach(input => {
-            // Remove any existing input event listeners
-            input.removeEventListener('input', formatNumberInput);
-            
-            // Only format on blur or change
-            if (input.name.endsWith('-unit_price') || 
-                input.name.endsWith('-price_per_unit') || 
-                input.name.endsWith('-quote_value')) {
-                
-                // Clear existing listeners
-                input.removeEventListener('blur', formatNumberInput);
-                
-                // Add new change handler
-                input.addEventListener('change', function() {
-                    handlePriceChange(this);
-                });
-            }
-        });
-    });
 
     // Add these new functions for price handling
     function handlePriceChange(input) {
@@ -1375,13 +1369,29 @@
         preventEmptyCliCreation();
     });
 
-    // Add this function to show custom messages
+    // Update the showMessage function to handle message grouping and deduplication
     function showMessage(message, type = 'info') {
         const container = document.getElementById('custom-messages');
+        
+        // Remove any existing messages with the same text to prevent duplicates
+        const existingMessages = container.querySelectorAll('.message-text');
+        for (const existing of existingMessages) {
+            if (existing.textContent === message) {
+                return; // Skip showing duplicate message
+            }
+        }
+        
+        // Limit the number of visible messages
+        const maxMessages = 3;
+        const currentMessages = container.children;
+        while (currentMessages.length >= maxMessages) {
+            container.removeChild(currentMessages[0]);
+        }
+        
         const messageDiv = document.createElement('div');
         
         // Set message styles based on type
-        const baseClasses = 'px-4 py-3 rounded relative mb-2 shadow-lg transition-opacity duration-500';
+        const baseClasses = 'px-4 py-3 rounded relative mb-2 shadow-lg transition-all duration-500';
         const typeClasses = {
             'success': 'bg-green-100 border border-green-400 text-green-700',
             'error': 'bg-red-100 border border-red-400 text-red-700',
@@ -1391,7 +1401,7 @@
         
         messageDiv.className = `${baseClasses} ${typeClasses[type] || typeClasses.info}`;
         messageDiv.innerHTML = `
-            <span class="block sm:inline">${message}</span>
+            <span class="block sm:inline message-text">${message}</span>
             <button type="button" class="absolute top-0 right-0 px-4 py-3" onclick="this.parentElement.remove()">
                 <svg class="h-4 w-4" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                     <title>Close</title>
@@ -1402,22 +1412,27 @@
         
         container.appendChild(messageDiv);
         
-        // Remove message after 5 seconds
+        // Remove message after delay (longer for errors)
+        const delay = type === 'error' ? 8000 : 3000;
         setTimeout(() => {
             messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(-100%)';
             setTimeout(() => messageDiv.remove(), 500);
-        }, 5000);
+        }, delay);
     }
 
-    // Add this function after saveField
+    // Update saveField to be more selective about showing messages
     function saveField(element) {
         const fieldName = element.name;
         const fieldValue = element.value;
         const processContractId = "{{ process_contract.id }}";
         
-        // Show saving indicator
-        showMessage(`Saving ${fieldName}...`, 'info');
-        console.log('Saving field:', fieldName, fieldValue); // Debug log
+        // Don't show saving message for every field change
+        if (!['contract_value', 'plan_gross'].includes(fieldName)) {
+            console.log('Saving field:', fieldName, fieldValue); // Keep logging for debugging
+        } else {
+            showMessage(`Saving ${fieldName}...`, 'info');
+        }
         
         const formData = new FormData();
         formData.append('field_name', fieldName);
@@ -1432,9 +1447,12 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Save response:', data); // Debug log
+            console.log('Save response:', data);
             if (data.status === 'success') {
-                showMessage(`${fieldName} saved successfully`, 'success');
+                // Only show success messages for important fields
+                if (['contract_value', 'plan_gross'].includes(fieldName)) {
+                    showMessage(`${fieldName} saved successfully`, 'success');
+                }
                 
                 // Update any related fields
                 if (data.related_updates) {
@@ -1459,14 +1477,16 @@
         });
     }
 
+    // Update saveClinField to be more selective about showing messages
     function saveClinField(element, clinId) {
         const fieldName = element.name;
         const fieldValue = element.value;
         const processContractId = "{{ process_contract.id }}";
         
-        // Show saving indicator
-        showMessage(`Saving CLIN ${clinId} ${fieldName}...`, 'info');
-        console.log('Saving CLIN field:', clinId, fieldName, fieldValue); // Debug log
+        // Don't show saving message for routine field changes
+        if (['item_value', 'quote_value'].includes(fieldName)) {
+            showMessage(`Saving CLIN ${clinId} ${fieldName}...`, 'info');
+        }
         
         const formData = new FormData();
         formData.append('field_name', fieldName);
@@ -1481,14 +1501,15 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Save CLIN response:', data); // Debug log
             if (data.status === 'success') {
-                showMessage(`CLIN ${clinId} ${fieldName} saved successfully`, 'success');
+                // Only show success messages for important fields
+                if (['item_value', 'quote_value'].includes(fieldName)) {
+                    showMessage(`CLIN ${clinId} ${fieldName} saved successfully`, 'success');
+                }
                 
                 // Update any related fields
                 if (data.related_updates) {
                     Object.entries(data.related_updates).forEach(([relatedField, value]) => {
-                        // Find the related input within the same CLIN section
                         const clinSection = element.closest('tr').nextElementSibling;
                         if (clinSection) {
                             const relatedInput = clinSection.querySelector(`[name$="${relatedField}"]`);
@@ -1504,15 +1525,6 @@
                             }
                         }
                     });
-                }
-                
-                // Update the display value in the main table row
-                const mainRow = element.closest('tr').previousElementSibling;
-                if (mainRow) {
-                    const displaySpan = mainRow.querySelector(`[data-field="${fieldName}"]`);
-                    if (displaySpan) {
-                        displaySpan.textContent = fieldValue;
-                    }
                 }
             } else {
                 throw new Error(data.message);
@@ -1539,6 +1551,41 @@
             });
         }
 
+        // Add specific handling for CLIN text fields
+        const clinTextFields = ['uom', 'clin_po_num', 'tab_num'];
+        clinTextFields.forEach(fieldName => {
+            document.querySelectorAll(`[name="${fieldName}"]`).forEach(element => {
+                const clinId = element.dataset.clinId;
+                if (clinId) {
+                    // Store the initial value
+                    element.dataset.previousValue = element.value;
+                    
+                    // Add input event listener with debounce
+                    let debounceTimer;
+                    element.addEventListener('input', function() {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(() => {
+                            if (this.value !== this.dataset.previousValue) {
+                                console.log(`${fieldName} changed:`, this.value); // Debug log
+                                saveClinField(this, clinId);
+                                this.dataset.previousValue = this.value;
+                            }
+                        }, 1000);
+                    });
+
+                    // Add blur event listener
+                    element.addEventListener('blur', function() {
+                        if (this.value !== this.dataset.previousValue) {
+                            console.log(`${fieldName} blur:`, this.value); // Debug log
+                            clearTimeout(debounceTimer);
+                            saveClinField(this, clinId);
+                            this.dataset.previousValue = this.value;
+                        }
+                    });
+                }
+            });
+        });
+
         document.querySelectorAll('input, select, textarea').forEach(element => {
             // Skip elements that are part of hidden form management
             if (element.name.includes('TOTAL_FORMS') || 
@@ -1548,8 +1595,8 @@
                 return;
             }
             
-            // Skip NIST select as it's handled separately
-            if (element.name === 'nist') {
+            // Skip NIST select and CLIN text fields as they're handled separately
+            if (element.name === 'nist' || clinTextFields.includes(element.name)) {
                 return;
             }
             
@@ -1630,5 +1677,33 @@
         }
     `;
     document.head.appendChild(styles);
+
+    async function addNewClin() {
+        try {
+            const processContractId = "{{ process_contract.id }}";
+            const response = await fetch(`/processing/api/contract/${processContractId}/clin/create/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({})  // Empty object for default values
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Reload the page to show the new CLIN
+                window.location.reload();
+                showMessage('New CLIN added successfully', 'success');
+            } else {
+                throw new Error(data.error || 'Failed to add CLIN');
+            }
+        } catch (error) {
+            console.error('Error adding CLIN:', error);
+            showMessage('Error adding CLIN: ' + error.message, 'error');
+        }
+    }
 </script>
 {% endblock %}

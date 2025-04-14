@@ -3,9 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from ..models import ProcessContract, ProcessClin
+from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms
 from ..forms import ProcessContractForm, ProcessClinForm
 import json
+from decimal import Decimal
 
 @login_required
 @require_http_methods(["GET"])
@@ -85,35 +86,34 @@ def update_processing_contract(request, id):
 def add_processing_clin(request, id):
     """Add a new CLIN to a processing contract"""
     try:
-        data = json.loads(request.body)
         process_contract = get_object_or_404(ProcessContract, id=id)
         
-        form = ProcessClinForm(data)
-        if form.is_valid():
-            clin = form.save(commit=False)
-            clin.process_contract = process_contract
-            clin.save()
-            
-            return JsonResponse({
-                'success': True,
-                'clin': {
-                    'id': clin.id,
-                    'item_number': clin.item_number,
-                    'nsn': clin.nsn.id if clin.nsn else None,
-                    'nsn_text': clin.nsn_text,
-                    'supplier': clin.supplier.id if clin.supplier else None,
-                    'supplier_text': clin.supplier_text,
-                    'order_qty': clin.order_qty,
-                    'unit_price': clin.unit_price,
-                    'item_value': clin.item_value,
-                    'description': clin.description
-                }
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': form.errors
-            })
+        # Create a new CLIN with default values
+        clin = ProcessClin.objects.create(
+            process_contract=process_contract,
+            status='draft',
+            order_qty=0,
+            unit_price=0,
+            item_value=0,
+            price_per_unit=0,
+            quote_value=0
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'clin': {
+                'id': clin.id,
+                'item_number': clin.item_number,
+                'nsn': clin.nsn.id if clin.nsn else None,
+                'nsn_text': clin.nsn_text,
+                'supplier': clin.supplier.id if clin.supplier else None,
+                'supplier_text': clin.supplier_text,
+                'order_qty': clin.order_qty,
+                'unit_price': clin.unit_price,
+                'item_value': clin.item_value,
+                'description': clin.description
+            }
+        })
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -191,20 +191,20 @@ def update_process_contract_field(request, pk):
             # Handle contract type selection
             if field_value:
                 instance.contract_type_id = field_value
-                instance.contract_type_text = instance.contract_type.description
+                #instance.contract_type_text = instance.contract_type.description
             else:
                 instance.contract_type = None
-                instance.contract_type_text = None
+                #instance.contract_type_text = None
                 
         elif field_name == 'sales_class':
             # Handle sales class selection
             if field_value:
                 instance.sales_class_id = field_value
-                instance.sales_class_text = instance.sales_class.sales_team
+                #instance.sales_class_text = instance.sales_class.sales_team
             else:
                 instance.sales_class = None
-                instance.sales_class_text = None
-                
+                #instance.sales_class_text = None
+
         elif field_name == 'buyer':
             # Buyer should only be updated through the match process
             return JsonResponse({
@@ -302,19 +302,32 @@ def update_clin_field(request, pk, clin_id):
         elif field_name in ['order_qty', 'unit_price', 'price_per_unit']:
             # Handle numeric fields
             try:
-                value = float(field_value) if field_value else 0.0
+                # Convert order_qty to float since it's stored as FloatField
+                if field_name == 'order_qty':
+                    value = float(field_value) if field_value else 0.0
+                # Convert price fields to Decimal since they're stored as DecimalField
+                else:
+                    value = Decimal(field_value) if field_value else Decimal('0.0')
+                
                 setattr(clin, field_name, value)
                 
                 # Recalculate dependent values
                 if field_name in ['order_qty', 'unit_price']:
-                    clin.item_value = clin.order_qty * clin.unit_price
-                if field_name in ['order_qty', 'price_per_unit']:
-                    clin.quote_value = clin.order_qty * clin.price_per_unit
+                    # Convert to Decimal for calculation
+                    qty = Decimal(str(clin.order_qty))
+                    price = clin.unit_price if isinstance(clin.unit_price, Decimal) else Decimal(str(clin.unit_price))
+                    clin.item_value = qty * price
                     
-            except ValueError:
+                if field_name in ['order_qty', 'price_per_unit']:
+                    # Convert to Decimal for calculation
+                    qty = Decimal(str(clin.order_qty))
+                    price = clin.price_per_unit if isinstance(clin.price_per_unit, Decimal) else Decimal(str(clin.price_per_unit))
+                    clin.quote_value = qty * price
+                    
+            except (ValueError, TypeError) as e:
                 return JsonResponse({
                     'status': 'error',
-                    'message': f'{field_name} must be a number'
+                    'message': f'{field_name} must be a valid number'
                 }, status=400)
                 
         elif field_name in ['due_date', 'supplier_due_date']:
@@ -333,11 +346,34 @@ def update_clin_field(request, pk, clin_id):
                     'message': f'Invalid item type. Must be one of: {", ".join(valid_types)}'
                 }, status=400)
             setattr(clin, field_name, field_value)
-            
-        else:
-            # Handle regular text fields
+
+                
+        elif field_name == 'special_payment_terms':
+            # Handle special payment terms selection
+            if field_value:
+                try:
+                    # Try to get the SpecialPaymentTerms instance
+                    special_terms = SpecialPaymentTerms.objects.get(code=field_value)
+                    clin.special_payment_terms = special_terms
+                except SpecialPaymentTerms.DoesNotExist:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': f'Invalid special payment terms code: {field_value}'
+                    }, status=400)
+            else:
+                clin.special_payment_terms = None
+
+        # Handle text fields that don't need special processing
+        elif field_name in ['clin_po_num', 'tab_num', 'item_number', 'nsn_text', 'supplier_text', 'uom', 'fob', 'ia']:
+            print(f"Saving {field_name} with value: {field_value}")  # Debug log
             setattr(clin, field_name, field_value if field_value else None)
-        
+            
+            # If this is a supplier or NSN text field, also clear the related object
+            if field_name == 'supplier_text':
+                clin.supplier = None
+            elif field_name == 'nsn_text':
+                clin.nsn = None
+
         clin.save()
         
         # Return the new value and any calculated values

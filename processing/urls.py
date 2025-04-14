@@ -62,7 +62,7 @@ urlpatterns = [
     # API Endpoints
     path('api/processing/<int:id>/', get_processing_contract, name='api_get_processing_contract'),
     path('api/processing/<int:id>/update/', update_processing_contract, name='api_update_processing_contract'),
-    path('api/processing/<int:id>/clins/', add_processing_clin, name='api_add_processing_clin'),
+    path('api/contract/<int:id>/clin/create/', add_processing_clin, name='api_add_processing_clin'),
     path('api/processing/<int:id>/clins/<int:clin_id>/', update_processing_clin, name='api_update_processing_clin'),
     path('api/processing/<int:id>/clins/<int:clin_id>/delete/', delete_processing_clin, name='api_delete_processing_clin'),
     path('api/update-field/<int:pk>/', update_process_contract_field, name='update_process_contract_field'),

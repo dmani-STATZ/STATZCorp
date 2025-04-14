@@ -166,7 +166,9 @@ class ProcessClinForm(forms.ModelForm):
 ProcessClinFormSet = inlineformset_factory(
     ProcessContract,
     ProcessClin,
-    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value', 'status', 'due_date', 'supplier_due_date', 'price_per_unit', 'quote_value'),
+    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value', 
+            'status', 'due_date', 'supplier_due_date', 'price_per_unit', 'quote_value', 'clin_po_num', 
+            'tab_num', 'uom', 'ia', 'fob'),
     extra=0,
     can_delete=True
 ) 
