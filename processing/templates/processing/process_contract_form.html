@@ -181,15 +181,41 @@
             <!-- Status Card -->
             <div class="lg:col-span-1">
                 <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                    <h2 class="text-xl font-semibold mb-4">Processing Status</h2>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Processing Status</h2>
+                        <a href="{% url 'processing:queue' %}" 
+                           class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                            Return to Queue
+                        </a>
+                    </div>
                     <div class="grid grid-cols-1 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Current Status</label>
-                            <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                {% for status in statuses %}
-                                    <option value="{{ status.0 }}" {% if process_contract.status == status.0 %}selected{% endif %}>{{ status.1 }}</option>
-                                {% endfor %}
+                            <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="statusChange(this.value)">
+                            {% for choice in form.fields.status.choices %}
+                                <option value="{{ choice.0 }}" 
+                                    {% if process_contract.status == choice.0 %}selected{% endif %}
+                                    class="{% if choice.0 == 'draft' %}text-gray-700
+                                           {% elif choice.0 == 'in_progress' %}text-blue-700
+                                           {% elif choice.0 == 'ready_for_review' %}text-green-700
+                                           {% elif choice.0 == 'completed' %}text-purple-700
+                                           {% elif choice.0 == 'cancelled' %}text-red-700{% endif %}">
+                                    {{ choice.1 }}
+                                </option>
+                            {% endfor %}
                             </select>
+                            <div class="mt-2 flex items-center space-x-2 text-xs">
+                                <span class="inline-block w-3 h-3 bg-gray-200 rounded-full"></span>
+                                <span class="text-gray-600">Draft</span>
+                                <span class="inline-block w-3 h-3 bg-blue-200 rounded-full"></span>
+                                <span class="text-gray-600">In Progress</span>
+                                <span class="inline-block w-3 h-3 bg-green-200 rounded-full"></span>
+                                <span class="text-gray-600">Ready for Review</span>
+                                <span class="inline-block w-3 h-3 bg-purple-200 rounded-full"></span>
+                                <span class="text-gray-600">Completed</span>
+                                <span class="inline-block w-3 h-3 bg-red-200 rounded-full"></span>
+                                <span class="text-gray-600">Cancelled</span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Created By</label>
@@ -658,10 +684,6 @@
     </div>
 </div>
 
-<!-- Action Buttons -->
-<div class="flex justify-end space-x-4 mt-6">
-
-</div>
 </form>
 </div>
 
@@ -938,6 +960,31 @@
             console.error('Error canceling processing:', error);
             alert(error.message || 'Failed to cancel processing. Please try again.');
         }
+    }
+
+    function markReadyForReview() {
+        const processContractId = document.getElementById('process_contract_id').value;
+        const url = `/processing/process-contract/${processContractId}/mark-ready/`;
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/processing/queue/';
+            } else {
+                showErrorMessage(data.error || 'An error occurred while marking the contract as ready for review.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showErrorMessage('An error occurred while marking the contract as ready for review.');
+        });
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -1438,7 +1485,7 @@
         formData.append('field_name', fieldName);
         formData.append('field_value', fieldValue);
         
-        fetch(`/processing/api/update-field/${processContractId}/`, {
+        return fetch(`/processing/api/update-field/${processContractId}/`, {
             method: 'POST',
             body: formData,
             headers: {
@@ -1463,6 +1510,7 @@
                         }
                     });
                 }
+                return data; // Return the data for chaining
             } else {
                 throw new Error(data.message);
             }
@@ -1474,6 +1522,7 @@
             if (element.dataset.previousValue) {
                 element.value = element.dataset.previousValue;
             }
+            throw error; // Re-throw to maintain Promise rejection
         });
     }
 
@@ -1704,6 +1753,103 @@
             console.error('Error adding CLIN:', error);
             showMessage('Error adding CLIN: ' + error.message, 'error');
         }
+    }
+
+    // Confirmation dialog for cancelling the contract
+    function statusChange(status) {
+        const currentStatus = "{{ process_contract.status }}";
+        const validTransitions = {
+            'draft': ['in_progress', 'cancelled'],
+            'in_progress': ['ready_for_review', 'cancelled'],
+            'ready_for_review': ['completed', 'in_progress', 'cancelled'],
+            'completed': ['cancelled'],
+            'cancelled': []
+        };
+
+        // Check if the transition is valid
+        if (!validTransitions[currentStatus]?.includes(status)) {
+            showMessage(`Invalid status transition from ${currentStatus} to ${status}`, 'error');
+            // Reset the select to current status
+            document.querySelector('select[name="status"]').value = currentStatus;
+            return;
+        }
+
+        // Handle specific status transitions
+        switch(status) {
+            case 'cancelled':
+                confirmCancel();
+                break;
+            case 'completed':
+                // Validate all required fields before allowing completion
+                if (!validateForCompletion()) {
+                    showMessage('Please complete all required fields before marking as completed', 'error');
+                    document.querySelector('select[name="status"]').value = currentStatus;
+                    return;
+                }
+                break;
+            case 'ready_for_review':
+                // Check if all CLINs are properly matched
+                if (!validateClins()) {
+                    showMessage('Please ensure all CLINs have matched NSNs and suppliers before marking ready for review', 'error');
+                    document.querySelector('select[name="status"]').value = currentStatus;
+                    return;
+                }
+                // Save the status first
+                saveField(document.querySelector('select[name="status"]')).then(() => {
+                    showMessage('Contract marked as ready for review. Redirecting to queue...', 'success');
+                    // Wait a moment for the message to be visible
+                    setTimeout(() => {
+                        window.location.href = "{% url 'processing:queue' %}";
+                    }, 1500);
+                });
+                return; // Return early since we're handling the save and redirect
+                break;
+        }
+
+        // If we get here, save the new status (for non-ready_for_review cases)
+        saveField(document.querySelector('select[name="status"]'));
+    }
+
+    function validateForCompletion() {
+        // Check required fields
+        const requiredFields = [
+            'contract_number',
+            'buyer',
+            'contract_type',
+            'award_date',
+            'due_date',
+            'contract_value'
+        ];
+
+        for (const field of requiredFields) {
+            const element = document.querySelector(`[name="${field}"]`);
+            if (!element || !element.value) {
+                return false;
+            }
+        }
+
+        // Check if there's at least one CLIN
+        const clins = document.querySelectorAll('.clin-details-0');
+        if (!clins.length) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function validateClins() {
+        let isValid = true;
+        // Check each CLIN for NSN and supplier matches
+        document.querySelectorAll('[data-action="toggle-clin"]').forEach(clin => {
+            const clinRow = clin.closest('tr');
+            const nsnStatus = clinRow.querySelector('svg.text-red-500');
+            const supplierStatus = clinRow.nextElementSibling.querySelector('svg.text-red-500');
+            
+            if (nsnStatus || supplierStatus) {
+                isValid = false;
+            }
+        });
+        return isValid;
     }
 </script>
 {% endblock %}

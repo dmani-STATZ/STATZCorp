@@ -23,7 +23,9 @@ from .views.processing_views import (
     save_and_return_to_queue,
     create_split_view,
     update_split_view,
-    delete_split_view
+    delete_split_view,
+    cancel_processing,
+    mark_ready_for_review
 )
 from .views.api_views import (
     get_processing_contract,
@@ -76,5 +78,8 @@ urlpatterns = [
     path('contract/split/create/', create_split_view, name='create_split'),
     path('contract/split/<int:split_id>/update/', update_split_view, name='update_split'),
     path('contract/split/<int:split_id>/delete/', delete_split_view, name='delete_split'),
+
+    path('process-contract/<int:process_contract_id>/cancel/', cancel_processing, name='cancel_processing'),
+    path('process-contract/<int:process_contract_id>/mark-ready/', mark_ready_for_review, name='mark_ready_for_review'),
 
 ] 

@@ -790,8 +790,14 @@ def process_contract_form(request, pk=None):
     else:
         form = ProcessContractForm(instance=instance)
         
-    context = {'form': form}
-    return render(request, 'processing/process_contract_form.html', context) 
+    context = {
+        'form': form,
+        'process_contract': instance,  # Add the process_contract instance to context
+        'contract_types': ContractType.objects.all().order_by('description'),
+        'sales_classes': SalesClass.objects.all().order_by('sales_team'),
+        'special_payment_terms': SpecialPaymentTerms.objects.all().order_by('code'),
+    }
+    return render(request, 'processing/process_contract_form.html', context)
 
 @require_http_methods(["POST"])
 def create_split_view(request):
@@ -839,3 +845,49 @@ def delete_split_view(request, split_id):
             'success': False,
             'error': str(e)
         }, status=400)
+
+@login_required
+@require_POST
+@transaction.atomic
+def mark_ready_for_review(request, process_contract_id):
+    """
+    Mark a process contract as ready for review and update queue status
+    """
+    try:
+        with transaction.atomic():
+            process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+            
+            # Get the queue contract
+            queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+            
+            # Update queue contract status
+            queue_contract.is_being_processed = True
+            queue_contract.processed_by = request.user
+            queue_contract.processing_started = timezone.now()
+            queue_contract.save()
+            
+            # Update process contract status
+            process_contract.status = 'ready_for_review'
+            process_contract.modified_by = request.user
+            process_contract.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Contract marked as ready for review'
+            })
+            
+    except ProcessContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Process contract not found'
+        }, status=404)
+    except QueueContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Queue contract not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
