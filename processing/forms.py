@@ -141,12 +141,12 @@ class ProcessClinForm(forms.ModelForm):
             'nsn_description_text': forms.TextInput(attrs={'class': 'nsn-desc-input'}),
             'supplier_text': forms.TextInput(attrs={'class': 'supplier-text-input'}),
             'order_qty': forms.NumberInput(attrs={'step': '1', 'class': 'qty-input'}),
-            'unit_price': forms.NumberInput(attrs={'step': '0.0001', 'class': 'price-input'}),
-            'item_value': forms.NumberInput(attrs={'step': '0.0001', 'class': 'value-input', 'readonly': True}),
+            'unit_price': forms.NumberInput(attrs={'step': '0.01', 'class': 'price-input'}),
+            'item_value': forms.NumberInput(attrs={'step': '0.01', 'class': 'value-input', 'readonly': True}),
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             'supplier_due_date': forms.DateInput(attrs={'type': 'date'}),
-            'price_per_unit': forms.NumberInput(attrs={'step': '0.0001', 'class': 'price-input'}),
-            'quote_value': forms.NumberInput(attrs={'step': '0.0001', 'class': 'value-input', 'readonly': True})
+            'price_per_unit': forms.NumberInput(attrs={'step': '0.01', 'class': 'price-input'}),
+            'quote_value': forms.NumberInput(attrs={'step': '0.01', 'class': 'value-input', 'readonly': True})
         }
 
     def clean(self):

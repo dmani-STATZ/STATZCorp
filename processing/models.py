@@ -154,7 +154,7 @@ class ProcessContract(models.Model):
 
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    queue_id = models.IntegerField()
+    queue_id = models.IntegerField(null=True, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_process_contracts')
     modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='modified_process_contracts')
     created_at = models.DateTimeField(auto_now_add=True)

@@ -25,7 +25,8 @@ from .views.processing_views import (
     update_split_view,
     delete_split_view,
     cancel_processing,
-    mark_ready_for_review
+    mark_ready_for_review,
+    start_new_contract
 )
 from .views.api_views import (
     get_processing_contract,
@@ -42,6 +43,7 @@ app_name = 'processing'
 urlpatterns = [
     # Queue Management
     path('queue/', ContractQueueListView.as_view(), name='queue'),
+    path('start-new-contract/', start_new_contract, name='start_new_contract'),
     path('next-numbers/', get_next_numbers, name='get_next_numbers'),
     path('queue/cancel/<int:queue_id>/', queue_cancel_processing, name='queue_cancel_processing'),
     

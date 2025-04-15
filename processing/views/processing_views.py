@@ -21,6 +21,92 @@ import json
 
 @login_required
 @require_POST
+def start_new_contract(request):
+    """Start a new contract
+
+    This function is called when the user clicks the "Start New Contract" button in the contract queue.
+    It creates a new contract in the database and returns the contract ID.
+
+    The contract number is passed in the request body.
+    The function then creates a new contract in the database and returns the contract ID.
+    """
+    try:
+        #Get the contract number from the request body
+        data = json.loads(request.body.decode('utf-8'))
+        contract_number = data.get('contract_number')
+
+        if not contract_number:
+            return JsonResponse({
+                'success': False,
+                'error': 'No contract number provided'
+            }, status=400)
+
+        #Get next po_number and tab_num from the sequence table
+        new_po_number = SequenceNumber.get_po_number()
+        new_tab_number = SequenceNumber.get_tab_number()
+        SequenceNumber.advance_po_number()
+        SequenceNumber.advance_tab_number()
+        #print(f"Pulled new PO and Tab numbers: {new_po_number} and {new_tab_number}")
+
+
+        #step 1: create a new queue contract in the database
+        queue_contract = QueueContract.objects.create(
+            contract_number=contract_number,
+            award_date=timezone.now(),
+            created_by=request.user,
+            modified_by=request.user
+        )
+
+        queue_item = get_object_or_404(QueueContract, id=queue_contract.id)
+        queue_item.is_being_processed = True
+        queue_item.processed_by = request.user
+        queue_item.processing_started = timezone.now()
+        queue_item.save()
+
+
+        #Create a new blank contract in the database
+        process_contract = ProcessContract.objects.create(
+            queue_id=queue_contract.id,
+            contract_number=contract_number,
+            po_number=new_po_number,
+            tab_num=new_tab_number,
+            status='in_progress',
+            created_by=request.user,
+            modified_by=request.user
+        )
+        #print(f"Created new contract: {process_contract}")
+
+        # Create ProcessClins from queue item
+        ProcessClin.objects.create(
+            process_contract=process_contract,
+
+            item_number='0001',
+            item_type='P',  # Changed back to 'P' as it's likely an enum/choice field
+            tab_num=new_tab_number,
+            clin_po_num=new_po_number,
+            status='in_progress',
+            created_at=timezone.now(),
+            modified_at=timezone.now()
+        )
+        #print(f"Created new CLIN: {process_contract.clins.first()}")
+
+        return JsonResponse({
+            'success': True,
+            'process_contract_id': process_contract.id,
+            'message': 'Contract created successfully'
+        })
+    except Exception as e:
+        if 'process_contract' in locals():
+            process_contract.delete()
+        #print(f"Error in start_new_contract: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_POST
 def start_processing(request, queue_id):
     """Start the detailed processing workflow for a contract from the queue.
     
@@ -122,6 +208,7 @@ def start_processing(request, queue_id):
             'success': False,
             'error': str(e)
         })
+
 
 class ProcessContractDetailView(LoginRequiredMixin, DetailView):
     model = ProcessContract
