@@ -477,7 +477,7 @@
                             data.clin_data.forEach(clin => {
                                 const row = document.createElement('tr');
                                 row.innerHTML = `
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.clin_number || ''}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.item_number || ''}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.clin_type || ''}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${clin.nsn || ''}</td>
                                     <td class="px-6 py-4 text-sm text-gray-900">${clin.description || ''}</td>

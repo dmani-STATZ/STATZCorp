@@ -806,6 +806,7 @@ class ContractSplit(models.Model):
         ordering = ['company_name']
         verbose_name = 'Contract Split'
         verbose_name_plural = 'Contract Splits'
+        db_table = 'contracts_contractsplit'
 
     def __str__(self):
         return f"{self.company_name} Split for {self.contract.contract_number}"

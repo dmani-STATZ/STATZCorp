@@ -4,9 +4,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
-from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ContractSplit
+from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ProcessContractSplit
 from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
-from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass
+from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
 import csv
 import os
 from django.conf import settings
@@ -18,6 +18,11 @@ from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST, require_http_methods
 from django.http import Http404
 import json
+from urllib.parse import quote
+import logging
+from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 @login_required
 @require_POST
@@ -71,6 +76,7 @@ def start_new_contract(request):
             po_number=new_po_number,
             tab_num=new_tab_number,
             status='in_progress',
+            files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + contract_number,
             created_by=request.user,
             modified_by=request.user
         )
@@ -482,7 +488,7 @@ def finalize_contract(request, process_contract_id):
             
             Clin.objects.create(
                 contract=contract,
-                clin_number=process_clin.item_number,
+                item_number=process_clin.item_number,
                 nsn=process_clin.nsn,
                 supplier=process_clin.supplier,
                 quantity=process_clin.order_qty,
@@ -663,7 +669,7 @@ def upload_csv(request):
                 
                 # Create QueueClin entries
                 clin = contract.clins.create(
-                    clin_number=row['CLIN Number'],
+                    item_number=row['CLIN Number'],
                     nsn=row['NSN'],
                     nsn_description=row['NSN Description'],
                     supplier=row['Supplier'],
@@ -796,8 +802,6 @@ def cancel_process_contract(request, process_contract_id):
             'error': str(e)
         }, status=500)
 
-@login_required
-@require_POST
 @transaction.atomic
 def save_and_return_to_queue(request, process_contract_id):
     """
@@ -810,6 +814,19 @@ def save_and_return_to_queue(request, process_contract_id):
             # Get the form data
             form = ProcessContractForm(request.POST, instance=process_contract)
             clin_formset = ProcessClinFormSet(request.POST, instance=process_contract)
+            
+            # Log form and formset data for debugging
+            logger.debug(f"Form is_valid: {form.is_valid()}")
+            logger.debug(f"CLIN formset is_valid: {clin_formset.is_valid()}")
+            
+            if not form.is_valid():
+                logger.debug(f"Form errors: {form.errors}")
+            
+            if not clin_formset.is_valid():
+                logger.debug(f"CLIN formset errors: {clin_formset.errors}")
+                for i, form_errors in enumerate(clin_formset.errors):
+                    if form_errors:
+                        logger.debug(f"CLIN {i} errors: {form_errors}")
             
             if form.is_valid() and clin_formset.is_valid():
                 # Save the contract
@@ -824,14 +841,34 @@ def save_and_return_to_queue(request, process_contract_id):
                     'redirect_url': reverse('processing:queue')
                 })
             else:
-                # If there are form errors, return them
-                errors = {
-                    'form_errors': form.errors,
-                    'clin_errors': clin_formset.errors
-                }
+                # Collect detailed error information
+                errors = {}
+                
+                # Add form errors if any
+                if not form.is_valid():
+                    errors['form_errors'] = {}
+                    for field, error_list in form.errors.items():
+                        errors['form_errors'][field] = error_list[0] if error_list else "Invalid value"
+                
+                # Add CLIN errors if any
+                if not clin_formset.is_valid():
+                    errors['clin_errors'] = []
+                    for i, form_errors in enumerate(clin_formset.errors):
+                        if form_errors:
+                            # Get the CLIN number if possible
+                            clin_prefix = f'clins-{i}-'
+                            clin_number = request.POST.get(f'{clin_prefix}item_number', f'CLIN {i+1}')
+                            
+                            error_dict = {'item_number': clin_number}
+                            for field, error_list in form_errors.items():
+                                error_dict[field] = error_list[0] if error_list else "Invalid value"
+                            
+                            errors['clin_errors'].append(error_dict)
+                
                 return JsonResponse({
                     'success': False,
-                    'errors': errors
+                    'errors': errors,
+                    'error': 'Failed to save due to validation errors. Please check form values.'
                 }, status=400)
             
     except ProcessContract.DoesNotExist:
@@ -840,6 +877,7 @@ def save_and_return_to_queue(request, process_contract_id):
             'error': 'Process contract not found'
         }, status=404)
     except Exception as e:
+        logger.exception("Error in save_and_return_to_queue")
         return JsonResponse({
             'success': False,
             'error': str(e)
@@ -890,7 +928,7 @@ def process_contract_form(request, pk=None):
 def create_split_view(request):
     try:
         data = json.loads(request.body)
-        split = ContractSplit.create_split(
+        split = ProcessContractSplit.create_split(
             process_contract_id=data['process_contract_id'],
             company_name=data['company_name'],
             split_value=data['split_value']
@@ -909,7 +947,7 @@ def create_split_view(request):
 def update_split_view(request, split_id):
     try:
         data = json.loads(request.body)
-        split = ContractSplit.update_split(
+        split = ProcessContractSplit.update_split(
             contract_split_id=split_id,
             company_name=data.get('company_name'),
             split_value=data.get('split_value'),
@@ -925,7 +963,7 @@ def update_split_view(request, split_id):
 @require_http_methods(["POST"])
 def delete_split_view(request, split_id):
     try:
-        success = ContractSplit.delete_split(split_id)
+        success = ProcessContractSplit.delete_split(split_id)
         return JsonResponse({'success': success})
     except Exception as e:
         return JsonResponse({
@@ -974,6 +1012,236 @@ def mark_ready_for_review(request, process_contract_id):
             'error': 'Queue contract not found'
         }, status=404)
     except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@require_http_methods(["POST"])
+@transaction.atomic
+def finalize_and_email_contract(request, process_contract_id):
+    try:
+        process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+        
+        # Validate required fields
+        validation_errors = {}
+        
+        # Contract-level validations
+        required_fields = [
+            'contract_number', 'po_number', 'tab_num', 'contract_type',
+            'buyer', 'award_date', 'contract_value'
+        ]
+        for field in required_fields:
+            if not getattr(process_contract, field):
+                validation_errors[field] = f'{field.replace("_", " ").title()} is required'
+        
+        # CLIN validations
+        clin_errors = []
+        process_clins = ProcessClin.objects.filter(process_contract=process_contract)
+        
+        if not process_clins.exists():
+            validation_errors['clins'] = 'At least one CLIN is required'
+        else:
+            for clin in process_clins:
+                clin_error = {}
+                required_clin_fields = [
+                    'item_value', 'quote_value', 'item_number',
+                    'nsn', 'supplier', 'order_qty', 'unit_price'
+                ]
+                for field in required_clin_fields:
+                    if not getattr(clin, field):
+                        clin_error[field] = f'{field.replace("_", " ").title()} is required'
+                if clin_error:
+                    clin_error['item_number'] = clin.item_number or 'Unknown CLIN'
+                    clin_errors.append(clin_error)
+        
+        if clin_errors:
+            validation_errors['clins'] = clin_errors
+            
+        if validation_errors:
+            return JsonResponse({
+                'success': False,
+                'validation_errors': validation_errors
+            }, status=400)
+            
+            
+        # Create the final contract with all relevant fields
+        contract = Contract.objects.create(
+            contract_number=process_contract.contract_number,
+            idiq_contract=process_contract.idiq_contract,
+            solicitation_type=process_contract.solicitation_type,
+            po_number=process_contract.po_number,
+            tab_num=process_contract.tab_num,
+            buyer=process_contract.buyer,
+            contract_type=process_contract.contract_type,
+            award_date=process_contract.award_date,
+            due_date=process_contract.due_date,
+            sales_class=process_contract.sales_class,
+            nist=process_contract.nist,
+            files_url=process_contract.files_url,
+            contract_value=process_contract.contract_value,
+            planned_split=process_contract.planned_split,
+            created_by=request.user,
+            modified_by=request.user,
+            status=ContractStatus.objects.get(id=1)  # Use the ContractStatus instance with ID=1
+        )
+        
+        # Create CLINs and payment history with all relevant fields
+        for process_clin in process_clins:
+            clin = Clin.objects.create(
+                contract=contract,
+                open=True,
+                closed=False,
+                item_number=process_clin.item_number,
+                item_type=process_clin.item_type,
+                nsn=process_clin.nsn,
+                supplier=process_clin.supplier,
+                order_qty=process_clin.order_qty,
+                unit_price=process_clin.unit_price,
+                item_value=process_clin.item_value,
+                po_num_ext=process_clin.po_num_ext,
+                tab_num=process_clin.tab_num,
+                clin_po_num=process_clin.clin_po_num,
+                po_number=process_clin.po_number,
+                clin_type=process_clin.clin_type,
+                ia=process_clin.ia,
+                fob=process_clin.fob,
+                due_date=process_clin.due_date,
+                supplier_due_date=process_clin.supplier_due_date,
+                price_per_unit=process_clin.price_per_unit,
+                quote_value=process_clin.quote_value,
+                special_payment_terms=process_clin.special_payment_terms,
+                created_by=request.user,
+                modified_by=request.user
+            )
+            
+            # Create payment history records
+            PaymentHistory.objects.create(
+                clin=clin,
+                payment_type='item_value',
+                payment_amount=process_clin.item_value,
+                payment_date=process_contract.award_date,
+                payment_info='Initial item value',
+                created_by=request.user,
+                updated_by=request.user
+            )
+            PaymentHistory.objects.create(
+                clin=clin,
+                payment_type='quote_value',
+                payment_amount=process_clin.quote_value,
+                payment_date=process_contract.award_date,
+                payment_info='Initial quote value',
+                created_by=request.user,
+                updated_by=request.user
+            )
+            
+        # Create contract splits
+        for process_split in ProcessContractSplit.objects.filter(process_contract=process_contract):
+            ContractSplit.objects.create(
+                contract=contract,
+                company_name=process_split.company_name,
+                split_value=process_split.split_value,
+                split_paid=process_split.split_paid or Decimal('0.00'),
+            )
+            
+        # Update queue contract status if it exists
+        if process_contract.queue_id:
+            try:
+                queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+                queue_contract.status = 'completed'
+                queue_contract.is_being_processed = False
+                queue_contract.save()
+            except QueueContract.DoesNotExist:
+                pass  # Queue contract might have been deleted
+            
+        
+        email_subject = f"New Contract: {contract.contract_number}"
+        email_body = (
+            f"A new Contract has been created\n\n"
+            f"Tab #: {contract.tab_num}\n"
+            f"PO #: {contract.po_number}\n"
+            f"Contract #: {contract.contract_number}\n"
+            f"{contract.files_url}"
+        )
+        
+        # Create mailto URL
+        mailto_url = (
+            f"mailto:?subject={quote(email_subject)}&"
+            f"body={quote(email_body)}"
+            f"to=dmani@statzcorp.com"
+        )
+        
+        # Delete the process contract
+        process_contract.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'mailto_url': mailto_url,
+            'contract_id': contract.id,
+            'message': 'Contract finalized successfully'
+        })
+        
+    except Exception as e:
+        logger.exception("Error finalizing contract")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+@require_POST
+def save_contract_data(request, process_contract_id):
+    """
+    Simple view for auto-saving contract data without redirecting.
+    Used for background saves during editing.
+    """
+    try:
+        process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+        
+        # Get the form data
+        form = ProcessContractForm(request.POST, instance=process_contract)
+        clin_formset = ProcessClinFormSet(request.POST, instance=process_contract)
+        
+        # Attempt to save even with partial data for autosave
+        # We don't do full validation for autosaves
+        is_autosave = request.POST.get('auto_save') == 'true'
+        
+        if is_autosave:
+            # For autosave, save what we can without strict validation
+            if form.is_valid():
+                process_contract = form.save()
+            
+            # For each valid CLIN in the formset, save it
+            for clin_form in clin_formset:
+                if clin_form.is_valid() and not clin_form.cleaned_data.get('DELETE', False):
+                    clin_form.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Data auto-saved'
+            })
+        else:
+            # For manual saves, use standard validation
+            if form.is_valid() and clin_formset.is_valid():
+                process_contract = form.save()
+                clin_formset.save()
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Data saved successfully'
+                })
+            else:
+                errors = {
+                    'form_errors': form.errors,
+                    'clin_errors': clin_formset.errors
+                }
+                return JsonResponse({
+                    'success': False,
+                    'errors': errors
+                }, status=400)
+                
+    except Exception as e:
+        logger.exception("Error saving contract data")
         return JsonResponse({
             'success': False,
             'error': str(e)

@@ -41,8 +41,9 @@
         </div>
     </div>
 
-    <form method="post" class="space-y-6">
+    <form id="process-contract-form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        <input type="hidden" name="status" value="{{ process_contract.status|default:'in_progress' }}">
         
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -246,7 +247,8 @@
                         </button>
                     </div>
                     <div class="space-y-4 pt-3">
-                        <button type="submit" 
+                        <button type="button" 
+                            onclick="finalizeContract()"
                             class="w-full px-6 py-2 bg-green-400 text-black rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-300">
                             Submit Contract and Create Email
                         </button>
@@ -1851,5 +1853,126 @@
         });
         return isValid;
     }
+
+    // Add this JavaScript function at the end of the script section
+    async function finalizeContract() {
+        try {
+            // Show processing indicator
+            showMessage('Finalizing contract...', 'info');
+            
+            // Call finalize endpoint directly
+            const response = await fetch(`/processing/contract/${processContractId}/finalize-and-email/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showMessage('Contract finalized successfully', 'success');
+                
+                // Open email client with pre-populated email
+                window.location.href = data.mailto_url;
+                
+                // Redirect to queue after a short delay
+                setTimeout(() => {
+                    window.location.href = "{% url 'processing:queue' %}";
+                }, 2000);
+            } else if (data.validation_errors) {
+                // Handle validation errors from the finalize endpoint
+                let errorMsg = 'Contract validation failed:';
+                
+                // Process contract-level validation errors
+                const validationErrors = data.validation_errors;
+                for (const [field, error] of Object.entries(validationErrors)) {
+                    if (field !== 'clins') {
+                        errorMsg += `\n- ${error}`;
+                    }
+                }
+                
+                // Process CLIN validation errors
+                if (validationErrors.clins) {
+                    if (typeof validationErrors.clins === 'string') {
+                        errorMsg += `\n- ${validationErrors.clins}`;
+                    } else {
+                        errorMsg += '\n- CLIN errors:';
+                        validationErrors.clins.forEach(clinError => {
+                            const clinNum = clinError.clin_number;
+                            errorMsg += `\n  - CLIN ${clinNum}:`;
+                            for (const [field, error] of Object.entries(clinError)) {
+                                if (field !== 'clin_number') {
+                                    errorMsg += `\n    - ${error}`;
+                                }
+                            }
+                        });
+                    }
+                }
+                
+                throw new Error(errorMsg);
+            } else {
+                throw new Error(data.error || 'Failed to finalize contract');
+            }
+        } catch (error) {
+            console.error('Error finalizing contract:', error);
+            showMessage('Error finalizing contract: ' + error.message, 'error');
+        }
+    }
+
+    // Add this near the beginning of your script section
+    let autoSaveTimer;
+    
+    // Function to automatically save form data periodically
+    function setupAutoSave() {
+        clearTimeout(autoSaveTimer);
+        
+        autoSaveTimer = setTimeout(async function() {
+            try {
+                const form = document.querySelector('form');
+                const formData = new FormData(form);
+                
+                // Add silent parameter to indicate this is an autosave
+                formData.append('auto_save', 'true');
+                
+                // Get CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                // Perform the save quietly in the background
+                const response = await fetch('/processing/save-contract-data/{{ process_contract.id }}/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                
+                // Only show message if there's an error
+                if (!response.ok) {
+                    console.warn('Auto-save failed:', await response.text());
+                } else {
+                    console.log('Auto-save completed successfully');
+                }
+                
+            } catch (error) {
+                console.warn('Auto-save error:', error);
+            }
+            
+            // Set up the next auto-save
+            setupAutoSave();
+        }, 30000); // Auto-save every 30 seconds
+    }
+    
+    // Start the auto-save when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        setupAutoSave();
+        
+        // Reset the auto-save timer when user interacts with the form
+        const form = document.querySelector('form');
+        form.addEventListener('input', function() {
+            clearTimeout(autoSaveTimer);
+            setupAutoSave();
+        });
+    });
 </script>
 {% endblock %}

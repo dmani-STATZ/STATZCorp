@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.utils import timezone
-from ..models import QueueContract, QueueClin, SequenceNumber, ProcessContract, ProcessClin
+from ..models import QueueContract, QueueClin, SequenceNumber, ProcessContract, ProcessClin, ProcessContractSplit
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, ContractType
 import csv
 from io import StringIO

@@ -244,7 +244,7 @@ class ProcessClin(models.Model):
     def __str__(self):
         return f"Processing CLIN: {self.item_number} for {self.process_contract.contract_number}"
 
-class ContractSplit(models.Model):
+class ProcessContractSplit(models.Model):
     """Model for storing dynamic contract splits between different companies"""
     process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, related_name='splits')
     company_name = models.CharField(max_length=100)
@@ -257,6 +257,7 @@ class ContractSplit(models.Model):
         ordering = ['company_name']
         verbose_name = 'Contract Split'
         verbose_name_plural = 'Contract Splits'
+        db_table = 'processing_contractsplit'
 
     def __str__(self):
         return f"{self.company_name} Split for {self.process_contract.contract_number}"

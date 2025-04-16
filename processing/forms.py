@@ -1,10 +1,10 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import ProcessContract, ProcessClin, ContractSplit
+from .models import ProcessContract, ProcessClin, ProcessContractSplit
 
 class ContractSplitForm(forms.ModelForm):
     class Meta:
-        model = ContractSplit
+        model = ProcessContractSplit
         fields = ['company_name', 'split_value', 'split_paid']
 
 class ProcessContractForm(forms.ModelForm):
@@ -91,7 +91,7 @@ class ProcessContractForm(forms.ModelForm):
                     
                     if split_id.startswith('new'):
                         # Create new split
-                        ContractSplit.objects.create(
+                        ProcessContractSplit.objects.create(
                             process_contract=instance,
                             company_name=split_data['company'],
                             split_value=split_data.get('value') or 0,

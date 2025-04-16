@@ -26,7 +26,9 @@ from .views.processing_views import (
     delete_split_view,
     cancel_processing,
     mark_ready_for_review,
-    start_new_contract
+    start_new_contract,
+    finalize_and_email_contract,
+    save_contract_data
 )
 from .views.api_views import (
     get_processing_contract,
@@ -52,7 +54,9 @@ urlpatterns = [
     path('contract/<int:pk>/', ProcessContractDetailView.as_view(), name='process_contract_detail'),
     path('contract/<int:pk>/edit/', ProcessContractUpdateView.as_view(), name='process_contract_edit'),
     path('contract/<int:process_contract_id>/save/', save_and_return_to_queue, name='save_and_return'),
+    path('save-contract-data/<int:process_contract_id>/', save_contract_data, name='save_contract_data'),
     path('contract/<int:process_contract_id>/finalize/', finalize_contract, name='finalize_contract'),
+    path('contract/<int:process_contract_id>/finalize-and-email/', finalize_and_email_contract, name='finalize_and_email_contract'),
     path('process-contract/cancel/<int:process_contract_id>/', cancel_process_contract, name='cancel_process_contract'),
     path('start-processing/<int:queue_id>/', start_processing, name='start_processing'),
     path('get-process-contract/<int:queue_id>/', get_process_contract, name='get_process_contract'),
