@@ -1,4 +1,4 @@
-USE [STATZWeb]
+USE [STATZWeb_dev]
 -- Rollback any open transactions to ensure a clean state
 IF @@TRANCOUNT > 0
 BEGIN
@@ -7,6 +7,20 @@ BEGIN
 END
 
 -- Proceed with migration
+-- Delete all the records in the processing tables
+DELETE FROM processing_processclin;
+DELETE FROM processing_queueclin;
+DELETE FROM processing_contractsplit;
+DELETE FROM processing_processcontract;
+DELETE FROM processing_queuecontract;
+
+DBCC CHECKIDENT ('processing_processcontract', RESEED, 0);
+DBCC CHECKIDENT ('processing_processclin', RESEED, 0);
+DBCC CHECKIDENT ('processing_contractsplit', RESEED, 0);
+DBCC CHECKIDENT ('processing_queuecontract', RESEED, 0);
+DBCC CHECKIDENT ('processing_queueclin', RESEED, 0);
+
+
 -- Delete all rows and reseed identity columns to 0
     -- Insert statements for procedure here
     print ('##########################################')
@@ -28,7 +42,8 @@ END
 	DBCC CHECKIDENT ('contracts_clinacknowledgment', RESEED, 0);
     DELETE FROM contracts_paymenthistory;
     DBCC CHECKIDENT ('contracts_paymenthistory', RESEED, 0);
-
+    DELETE FROM contracts_contractsplit;
+    DBCC CHECKIDENT ('contracts_contractsplit', RESEED, 0);
 
 
 	-- Second Level
@@ -52,6 +67,7 @@ END
 	DBCC CHECKIDENT ('contracts_supplier', RESEED, 0);
 	DELETE FROM contracts_contact;
 	DBCC CHECKIDENT ('contracts_contact', RESEED, 0);
+
 
 	-- Base Level
     DELETE FROM contracts_contractstatus;
@@ -79,9 +95,11 @@ END
 	DELETE FROM contracts_classificationtype;
 	DBCC CHECKIDENT ('contracts_classificationtype', RESEED, 0);
 
+
     -- InventoryItem migration
     DELETE FROM STATZ_WAREHOUSE_INVENTORY_TBL;
     DBCC CHECKIDENT ('STATZ_WAREHOUSE_INVENTORY_TBL', RESEED, 0);
+
 
     -- AccessLog
     DELETE FROM accesslog_visitor;
@@ -1005,6 +1023,105 @@ END
 
 
 
+print ('##########################################')
+print 'Contract Split migration'
+print ('##########################################')
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    -- Insert new contract splits - STATZ
+    INSERT INTO [dbo].[contracts_contractsplit]
+           ([company_name]
+           ,[split_value]
+           ,[split_paid]
+           ,[created_at]
+           ,[modified_at]
+           ,[contract_id])
+    SELECT        
+        'STATZ' AS company_name, 
+        sc.STATZSplitDol, 
+        sc.ActualSTATZDol, 
+        isnull(sc.CreatedOn,SYSDATETIME()), 
+        isnull(sc.ModifiedOn,isnull(sc.CreatedOn,SYSDATETIME())), 
+        sc.Contract_ID 
+    FROM            
+        ContractLog.dbo.STATZ_SUB_CONTRACTS_TBL sc
+    INNER JOIN [ContractLog].[dbo].[STATZ_CONTRACTS_TBL] c ON sc.Contract_ID = c.ID
+    INNER JOIN [contracts_contract] cc ON c.ID = cc.id;
+
+
+    -- Insert new contract splits - PPI
+    INSERT INTO [dbo].[contracts_contractsplit]
+           ([company_name]
+           ,[split_value]
+           ,[split_paid]
+           ,[created_at]
+           ,[modified_at]
+           ,[contract_id])
+    SELECT        
+        'PPI' AS company_name, 
+        sc.PPISplitDol, 
+        sc.ActualPaidPPIDol, 
+        isnull(sc.CreatedOn,SYSDATETIME()), 
+        isnull(sc.ModifiedOn,isnull(sc.CreatedOn,SYSDATETIME())), 
+        sc.Contract_ID 
+    FROM            
+        ContractLog.dbo.STATZ_SUB_CONTRACTS_TBL sc
+    INNER JOIN [ContractLog].[dbo].[STATZ_CONTRACTS_TBL] c ON sc.Contract_ID = c.ID
+    INNER JOIN [contracts_contract] cc ON c.ID = cc.id;
+
+
+    -- Insert new contract splits - DGCI
+    INSERT INTO [dbo].[contracts_contractsplit]
+           ([company_name]
+           ,[split_value]
+           ,[split_paid]
+           ,[created_at]
+           ,[modified_at]
+           ,[contract_id])
+    SELECT        
+        'DGCI' AS company_name, 
+        sc.DGCISplitDol, 
+        sc.ActualPaidDGCIDol, 
+        isnull(sc.CreatedOn,SYSDATETIME()), 
+        isnull(sc.ModifiedOn,isnull(sc.CreatedOn,SYSDATETIME())), 
+        sc.Contract_ID 
+    FROM            
+        ContractLog.dbo.STATZ_SUB_CONTRACTS_TBL sc
+    INNER JOIN [ContractLog].[dbo].[STATZ_CONTRACTS_TBL] c ON sc.Contract_ID = c.ID
+    INNER JOIN [contracts_contract] cc ON c.ID = cc.id;
+
+    -- Delete Records from split table where split value and split paid are null
+    DELETE FROM [dbo].[contracts_contractsplit]
+    WHERE isnull([split_value],0.00) = 0.00 AND isnull([split_paid],0.00) = 0.00;
+
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+    -- print 'Error migrating contract splits: ' + ERROR_MESSAGE();
+END CATCH;
+GO
+
+
+-- Update Planned Split and Plan Gross
+print ('##########################################')
+print 'Update Planned Split and Plan Gross'
+print ('##########################################')
+
+UPDATE [dbo].[contracts_contract]
+SET planned_split = sc.PlanSplit_per_PPIbid
+FROM [dbo].[contracts_contract] c
+INNER JOIN [ContractLog].[dbo].[STATZ_SUB_CONTRACTS_TBL] sc ON c.id = sc.Contract_ID;
+
+--Update Plan Gross
+UPDATE [dbo].[contracts_contract]
+SET plan_gross = sc.PlanGrossDol
+FROM [dbo].[contracts_contract] c
+INNER JOIN [ContractLog].[dbo].[STATZ_SUB_CONTRACTS_TBL] sc ON c.id = sc.Contract_ID;
 
 
 
