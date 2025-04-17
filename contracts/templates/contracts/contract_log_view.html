@@ -207,12 +207,18 @@
                         <td class="px-1.5 py-1">${{ clin.contract.contract_value|floatformat:2|default:"0.00" }}</td>
                         <td class="px-1.5 py-1">${{ clin.wawf_payment|floatformat:2|default:"0.00" }}</td>
                         <td class="px-1.5 py-1">{{ clin.wawf_recieved|date:"m/d/Y"|default:"-" }}</td>
-                        <td class="px-1.5 py-1">${{ clin.plan_gross|floatformat:2|default:"0.00" }}</td>
-                        <td class="px-1.5 py-1">${{ clin.contract.ppi_split_paid|floatformat:2|default:"0.00" }}</td>
-                        <td class="px-1.5 py-1">${{ clin.contract.statz_split_paid|floatformat:2|default:"0.00" }}</td>
-                        <td class="px-1.5 py-1">{{ clin.contract.planned_split|default:"-" }}</td>
-                        <td class="px-1.5 py-1">${{ clin.contract.ppi_split|floatformat:2|default:"0.00" }}</td>
-                        <td class="px-1.5 py-1">${{ clin.contract.statz_split|floatformat:2|default:"0.00" }}</td>
+                        <td class="px-1.5 py-1">Need to move this plan_gross to contract</td>
+                        <!-- <td class="px-1.5 py-1">${{ clin.plan_gross|floatformat:2|default:"0.00" }}</td> -->
+                        <td class="px-1.5 py-1">Move to a Splits Table</td>
+                        <!-- <td class="px-1.5 py-1">${{ clin.contract.ppi_split_paid|floatformat:2|default:"0.00" }}</td> -->
+                        <td class="px-1.5 py-1">Move to a Splits Table</td>
+                        <!-- <td class="px-1.5 py-1">${{ clin.contract.statz_split_paid|floatformat:2|default:"0.00" }}</td> -->
+                        <td class="px-1.5 py-1">Need to move planned split to contract</td>
+                        <!-- <td class="px-1.5 py-1">{{ clin.contract.planned_split|default:"-" }}</td> -->
+                        <td class="px-1.5 py-1">Move to a Splits Table</td>
+                        <!-- <td class="px-1.5 py-1">${{ clin.contract.ppi_split|floatformat:2|default:"0.00" }}</td> -->
+                        <td class="px-1.5 py-1">Move to a Splits Table</td>
+                        <!-- <td class="px-1.5 py-1">${{ clin.contract.statz_split|floatformat:2|default:"0.00" }}</td> -->
                         <td class="px-1.5 py-1"></td>
                         </tr>
                         {% empty %}

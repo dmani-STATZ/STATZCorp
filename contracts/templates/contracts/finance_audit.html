@@ -254,7 +254,8 @@
                             <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}">${{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}</td>
                             <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}">${{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}</td>
                             <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="wawf_payment" data-value="{{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}">${{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="plan_gross" data-value="{{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}">${{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="plan_gross" >Need to move this plan_gross to contract</td>
+                            <!-- <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="plan_gross" data-value="{{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}">${{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}</td> -->
                             <td class="px-4 py-2 text-sm text-left">
                                 <div class="relative inline-block">
                                     <select class="w-30 appearance-none rounded border-gray-300 pr-8 pl-2 py-1 text-sm focus:border-blue-500 focus:ring-blue-500"
@@ -277,14 +278,17 @@
                                        data-clin="{{ clin.id }}" 
                                        data-field="special_payment_terms_party">
                             </td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="ppi_split_paid" data-value="{{ clin.ppi_split_paid|floatformat:2|default:"0.00" }}">${{ clin.ppi_split_paid|floatformat:2|default:"0.00"|intcomma }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="statz_split_paid" data-value="{{ clin.statz_split_paid|floatformat:2|default:"0.00" }}">${{ clin.statz_split_paid|floatformat:2|default:"0.00"|intcomma }}</td>
+                            <td class="px-4 py-2 text-sm text-left">Move ppi_split_paid to a Splits Table</td>
+                            <td class="px-4 py-2 text-sm text-left">Move statz_split_paid to a Splits Table</td>
+                            <!-- <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="ppi_split_paid" data-value="{{ clin.ppi_split_paid|floatformat:2|default:"0.00" }}">${{ clin.ppi_split_paid|floatformat:2|default:"0.00"|intcomma }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="statz_split_paid" data-value="{{ clin.statz_split_paid|floatformat:2|default:"0.00" }}">${{ clin.statz_split_paid|floatformat:2|default:"0.00"|intcomma }}</td> -->
                             <td class="px-4 py-2 text-sm text-left">
-                                <input type="text" 
-                                       class="w-24 rounded border-gray-300 text-sm text-center focus:border-blue-500 focus:ring-blue-500"
-                                       value="{{ clin.planned_split|default:'50/50' }}"
-                                       data-clin="{{ clin.id }}" 
-                                       data-field="planned_split">
+                                <p>Need to move planned split to contract</p>
+                                    <!-- <input type="text" 
+                                        class="w-24 rounded border-gray-300 text-sm text-center focus:border-blue-500 focus:ring-blue-500"
+                                        value="{{ clin.planned_split|default:'50/50' }}"
+                                        data-clin="{{ clin.id }}" 
+                                        data-field="planned_split"> -->
                             </td>
                         </tr>
                         {% empty %}

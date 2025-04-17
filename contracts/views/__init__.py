@@ -129,6 +129,11 @@ from .acknowledgment_views import (
     update_acknowledgment_letter,
 )
 
+from .split_views import (
+    create_split_view,
+    update_split_view,
+    delete_split_view,
+)
 
 __all__ = [
     'folder_tracking',

@@ -292,7 +292,7 @@ def update_clin_field(request, clin_id):
         field = data.get('field')
         value = data.get('value')
         
-        if field not in ['special_payment_terms', 'special_payment_terms_party', 'planned_split']:
+        if field not in ['special_payment_terms', 'special_payment_terms_party']: # Need to move planned split to contract
             return JsonResponse({
                 'success': False,
                 'error': 'Invalid field'

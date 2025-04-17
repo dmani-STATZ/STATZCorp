@@ -168,6 +168,34 @@
             opacity: 1;
         }
 
+        main {
+            padding-bottom: 4.5rem; /* Increased padding to account for sticky footer */
+        }
+
+        /* Adjust reminders sidebar height to account for sticky footer */
+        .reminderbar {
+            height: calc(100vh - 4rem - 4rem); /* Subtract header height and footer height */
+            margin-bottom: 4rem; /* Add margin to avoid overlap with footer */
+        }
+        
+        /* Ensure the sticky footer stays on top */
+        .sticky-footer {
+            z-index: 49; /* Just below the reminders button */
+        }
+        
+        /* Transition for reminders sidebar */
+        .reminderbar {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        .reminderbar.inactive {
+            transform: translateX(100%);
+        }
+        
+        .reminderbar.active {
+            transform: translateX(0);
+        }
+
     </style>
 {% endblock %}
 
@@ -194,192 +222,69 @@
         </div>
     </main>
 
-    <!-- Floating Menu Button -->
-    <button class="floating-menu-btn" id="menuBtn" title="Navigation Menu">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-    </button>
-
-    <!-- Menu Panel -->
-    <div class="menu-panel" id="menuPanel">
-        <a href="{% url 'contracts:contracts_dashboard' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'contracts_dashboard' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z M14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-            Dashboard
-        </a>
-        <a href="{% url 'contracts:finance_audit' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'finance_audit' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Finance Audit
-        </a>
-        <a href="{% url 'contracts:contract_log_view' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'contract_log_view' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Contract Log
-        </a>
-        <a href="{% url 'contracts:reminders_list' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'reminders_list' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Reminders
-        </a>
-        <a href="{% url 'contracts:contact_list' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'contact_list' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Contacts
-        </a>
-        <a href="{% url 'contracts:address_list' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'address_list' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Addresses
-        </a>
-        <a href="{% url 'contracts:supplier_list' %}" 
-           class="menu-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_detail' or request.resolver_match.url_name == 'supplier_edit' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            Suppliers
-        </a>
-    </div>
-</div>
-
-<!-- Reminders Menu -->
-<button class="toggle-btn fixed bottom-4 right-4 {% if overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white py-2 px-4 rounded-full shadow-lg transition-colors z-50 flex items-center" onclick="toggleReminderbar()">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-    Reminders
-    {% if total_reminders_count > 0 %}
-        <span class="ml-2 bg-white {% if overdue_count > 0 %}text-red-700{% else %}text-green-700{% endif %} text-xs font-semibold rounded-full px-2 py-1 inline-flex items-center justify-center min-w-[20px]">
-            {{ total_reminders_count }}
-        </span>
-    {% endif %}
-</button>
-
-<div class="reminderbar bg-white text-gray-800 w-80 h-4/5 fixed top-20 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar">
-    <div class="flex justify-between items-center p-4 border-b border-gray-200 {% if overdue_count > 0 %}bg-red-50{% else %}bg-green-50{% endif %} flex-shrink-0">
-        <div>
-            <h2 class="text-lg font-semibold {% if overdue_count > 0 %}text-red-800{% else %}text-green-800{% endif %}">My Reminders</h2>
-            {% if reminders %}
-                <div class="flex flex-wrap text-xs mt-1 text-gray-600 gap-2">
-                    <span class="flex items-center">
-                        <span class="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>
-                        Due: {{ due_count|default:"0" }}
-                    </span>
-                    <span class="flex items-center">
-                        <span class="h-2 w-2 bg-red-500 rounded-full mr-1"></span>
-                        Overdue: {{ overdue_count|default:"0" }}
-                    </span>
-                </div>
-            {% endif %}
-        </div>
-        <button class="text-gray-600 hover:text-gray-800" onclick="toggleReminderbar()">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-    </div>
-    
-    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-        <a href="{% url 'contracts:reminders_list' %}" class="flex items-center justify-center w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            View All Reminders
-        </a>
-    </div>
-    
-    <div class="overflow-y-auto flex-grow p-4">
-        {% if reminders %}
-            <div class="space-y-3">
-                {% if due_count > 0 or overdue_count > 0 %}
-                    {% for reminder in reminders %}
-                        {% if not reminder.completed %}
-                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200{% else %}bg-blue-50 border border-blue-200{% endif %} shadow-sm cursor-pointer reminder-item"
-                                 data-reminder-id="{{ reminder.id }}"
-                                 data-reminder-title="{{ reminder.title|escapejs }}"
-                                 data-reminder-text="{{ reminder.description|escapejs }}"
-                                 data-reminder-date="{{ reminder.reminder_date|date:'M d, Y g:i A' }}"
-                                 data-reminder-completed="{{ reminder.completed }}"
-                                 data-reminder-iso-date="{{ reminder.reminder_date|date:'c' }}"
-                                 onclick="showReminderDetails(this)">
-                                <div class="flex justify-between">
-                                    <h3 class="font-medium text-gray-800 mb-1">{{ reminder.title }}</h3>
-                                    <div class="flex">
-                                        <button type="button" class="text-gray-500 hover:text-green-600 mr-2" 
-                                                title="Mark Complete" 
-                                                onclick="event.stopPropagation(); completeReminder({{ reminder.id }})"
-                                                >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </button>
-                                        <button type="button" class="text-gray-500 hover:text-blue-600" 
-                                                title="Edit" 
-                                                onclick="event.stopPropagation(); editReminder({{ reminder.id }}, '{{ reminder.title|escapejs }}', '{{ reminder.description|escapejs }}', '{{ reminder.reminder_date|date:'Y-m-d H:i' }}')">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="text-sm text-gray-600 mb-2">{{ reminder.description|truncatewords:20 }}</p>
-                                <div class="flex justify-between items-center text-xs">
-                                    <div>
-                                        <span class="text-gray-500">Due: </span>
-                                        <span class="{% if reminder.is_overdue %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
-                                            {{ reminder.reminder_date|date:"F j, Y" }}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        {% if reminder.is_overdue %}
-                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs">Overdue</span>
-                                        {% else %}
-                                            <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">Due</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center text-gray-500 py-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <!-- Sticky Footer -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t z-50">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <!-- Left side: Contract Navigation Menu -->
+                <div class="relative">
+                    <button id="menuBtn" class="flex items-center gap-2 text-gray-700 hover:text-blue-600 px-4 py-2 rounded-md transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
-                        <p>No due or overdue reminders!</p>
+                        <span class="font-medium">Contract Menu</span>
+                    </button>
+                    
+                    <!-- Menu Panel with updated styling -->
+                    <div class="menu-panel absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200" id="menuPanel">
+                        <div class="py-2">
+                            <a href="{% url 'contracts:contracts_dashboard' %}" 
+                               class="menu-item {% if request.resolver_match.url_name == 'contracts_dashboard' %}active{% endif %}">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z M14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                </svg>
+                                Dashboard
+                            </a>
+                            <!-- Keep other menu items -->
+                            {% include "contracts/includes/contract_menu_items.html" %}
+                        </div>
                     </div>
-                {% endif %}
+                </div>
+
+                <!-- Center: Action Buttons -->
+                <div class="flex gap-3">
+                    {% block footer_actions %}
+                        <!-- Default action buttons - can be overridden by child templates -->
+                        {% if show_cancel_button|default:False %}
+                            <button type="button" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" onclick="window.history.back()">
+                                Cancel
+                            </button>
+                        {% endif %}
+                        {% if show_save_button|default:False %}
+                            <button type="submit" form="{{ form_id|default:'mainForm' }}" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Save
+                            </button>
+                        {% endif %}
+                    {% endblock footer_actions %}
+                </div>
+                
+                <!-- Right side: Reminders Button -->
+                <div class="flex items-center">
+                    <button onclick="toggleReminderbar()" 
+                            class="flex items-center gap-2 px-6 py-2 rounded-full shadow-md transition-all transform hover:scale-105 {% if overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="font-medium">Reminders</span>
+                        {% if total_reminders_count > 0 %}
+                            <span class="flex items-center justify-center h-6 w-6 rounded-full bg-white {% if overdue_count > 0 %}text-red-700{% else %}text-green-700{% endif %} text-xs font-bold">
+                                {{ total_reminders_count }}
+                            </span>
+                        {% endif %}
+                    </button>
+                </div>
             </div>
-        {% else %}
-            <div class="text-center text-gray-500 py-8">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p>No reminders yet.</p>
-                <button type="button" onclick="showNewReminderModal()" class="mt-3 inline-block text-blue-600 hover:text-blue-800 font-medium">Add one now</button>
-            </div>
-        {% endif %}
-    </div>
-    <div class="border-t border-gray-200 bg-white p-3 text-center flex-shrink-0">
-        <button type="button" onclick="showNewReminderModal()" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md w-full text-sm flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            New Reminder
-        </button>
+        </div>
     </div>
 </div>
 
@@ -678,6 +583,125 @@
                 </div>
             </form>
         </div>
+    </div>
+</div>
+
+<!-- Reminders Sidebar -->
+<div class="reminderbar bg-white text-gray-800 w-80 h-[calc(100vh-4rem)] fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar">
+    <div class="flex justify-between items-center p-4 border-b border-gray-200 {% if overdue_count > 0 %}bg-red-50{% else %}bg-green-50{% endif %} flex-shrink-0">
+        <div>
+            <h2 class="text-lg font-semibold {% if overdue_count > 0 %}text-red-800{% else %}text-green-800{% endif %}">My Reminders</h2>
+            {% if reminders %}
+                <div class="flex flex-wrap text-xs mt-1 text-gray-600 gap-2">
+                    <span class="flex items-center">
+                        <span class="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>
+                        Due: {{ due_count|default:"0" }}
+                    </span>
+                    <span class="flex items-center">
+                        <span class="h-2 w-2 bg-red-500 rounded-full mr-1"></span>
+                        Overdue: {{ overdue_count|default:"0" }}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+        <button class="text-gray-600 hover:text-gray-800" onclick="toggleReminderbar()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+    
+    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+        <a href="{% url 'contracts:reminders_list' %}" class="flex items-center justify-center w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+            View All Reminders
+        </a>
+    </div>
+    
+    <div class="overflow-y-auto flex-grow p-4">
+        {% if reminders %}
+            <div class="space-y-3">
+                {% if due_count > 0 or overdue_count > 0 %}
+                    {% for reminder in reminders %}
+                        {% if not reminder.completed %}
+                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200{% else %}bg-blue-50 border border-blue-200{% endif %} shadow-sm cursor-pointer reminder-item"
+                                 data-reminder-id="{{ reminder.id }}"
+                                 data-reminder-title="{{ reminder.title|escapejs }}"
+                                 data-reminder-text="{{ reminder.description|escapejs }}"
+                                 data-reminder-date="{{ reminder.reminder_date|date:'M d, Y g:i A' }}"
+                                 data-reminder-completed="{{ reminder.completed }}"
+                                 data-reminder-iso-date="{{ reminder.reminder_date|date:'c' }}"
+                                 onclick="showReminderDetails(this)">
+                                <div class="flex justify-between">
+                                    <h3 class="font-medium text-gray-800 mb-1">{{ reminder.title }}</h3>
+                                    <div class="flex">
+                                        <button type="button" class="text-gray-500 hover:text-green-600 mr-2" 
+                                                title="Mark Complete" 
+                                                onclick="event.stopPropagation(); completeReminder('{{ reminder.id }}')">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </button>
+                                        <button type="button" class="text-gray-500 hover:text-blue-600"
+                                                title="Edit"
+                                                data-reminder-id="{{ reminder.id }}"
+                                                data-reminder-title="{{ reminder.title|escapejs }}"
+                                                data-reminder-description="{{ reminder.description|escapejs }}"
+                                                data-reminder-date="{{ reminder.reminder_date|date:'Y-m-d H:i' }}"
+                                                onclick="event.stopPropagation(); editReminder(this.dataset.reminderId, this.dataset.reminderTitle, this.dataset.reminderDescription, this.dataset.reminderDate)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">{{ reminder.description|truncatewords:20 }}</p>
+                                <div class="flex justify-between items-center text-xs">
+                                    <div>
+                                        <span class="text-gray-500">Due: </span>
+                                        <span class="{% if reminder.is_overdue %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
+                                            {{ reminder.reminder_date|date:"F j, Y" }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        {% if reminder.is_overdue %}
+                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs">Overdue</span>
+                                        {% else %}
+                                            <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">Due</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-gray-500 py-8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>No due or overdue reminders!</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="text-center text-gray-500 py-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p>No reminders yet.</p>
+                <button type="button" onclick="showNewReminderModal()" class="mt-3 inline-block text-blue-600 hover:text-blue-800 font-medium">Add one now</button>
+            </div>
+        {% endif %}
+    </div>
+    <div class="border-t border-gray-200 bg-white p-3 text-center flex-shrink-0">
+        <button type="button" onclick="showNewReminderModal()" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md w-full text-sm flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            New Reminder
+        </button>
     </div>
 </div>
 

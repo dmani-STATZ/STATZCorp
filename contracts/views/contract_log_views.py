@@ -226,12 +226,12 @@ def export_contract_log(request):
             f"${clin.contract.contract_value:,.2f}" if clin.contract.contract_value else '',
             f"${clin.wawf_payment:,.2f}" if clin.wawf_payment else '',
             clin.wawf_recieved.strftime('%m/%d/%Y') if clin.wawf_recieved else '',
-            f"${clin.plan_gross:,.2f}" if clin.plan_gross else '',
-            f"${clin.contract.ppi_split_paid:,.2f}" if clin.contract.ppi_split_paid else '',
-            f"${clin.contract.statz_split_paid:,.2f}" if clin.contract.statz_split_paid else '',
-            clin.contract.planned_split,
-            f"${clin.contract.ppi_split:,.2f}" if clin.contract.ppi_split else '',
-            f"${clin.contract.statz_split:,.2f}" if clin.contract.statz_split else '',
+            # f"${clin.plan_gross:,.2f}" if clin.plan_gross else '',  # Moved to contract
+            #f"${clin.contract.ppi_split_paid:,.2f}" if clin.contract.ppi_split_paid else '',  # Moved to splits table
+            #f"${clin.contract.statz_split_paid:,.2f}" if clin.contract.statz_split_paid else '',  # Moved to splits table
+            # clin.contract.planned_split,  # Need to move planned split to contract
+            #f"${clin.contract.ppi_split:,.2f}" if clin.contract.ppi_split else '',  # Moved to splits table
+            #f"${clin.contract.statz_split:,.2f}" if clin.contract.statz_split else '',  # Moved to splits table
             clin.notes.count()
         ])
     

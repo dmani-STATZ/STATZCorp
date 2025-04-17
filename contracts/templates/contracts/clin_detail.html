@@ -280,12 +280,14 @@
             <!-- Row 4 -->
             <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Plan Gross</p>
-                <p class="font-medium">${{ clin.plan_gross|floatformat:2|intcomma|default:"N/A" }}</p>
+                <p>Need to move plan gross to contract</p>
+                <!-- <p class="font-medium">${{ clin.plan_gross|floatformat:2|intcomma|default:"N/A" }}</p> -->
             </div>
             
             <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">Planned Split</p>
-                <p class="font-medium">{{ clin.planned_split|default:"N/A" }}</p>
+                <p>Need to move planned split to contract</p>
+                <!-- <p class="font-medium">{{ clin.planned_split|default:"N/A" }}</p> -->
             </div>
             
             <div class="md:col-span-2">
@@ -297,19 +299,23 @@
 
             <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">STATZ Split</p>
-                <p class="font-medium">${{ clin.statz_split|floatformat:2|default:0.00 }}</p>
+                <p>Move statz_split to a Splits Table</p>
+                <!-- <p class="font-medium">${{ clin.statz_split|floatformat:2|default:0.00 }}</p> -->
             </div>
             <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">STATZ Paid</p>
-                <p class="font-medium">${{ clin.statz_split_paid|floatformat:2|default:0.00 }}</p>
+                <p>Move statz_split_paid to a Splits Table</p>
+                <!-- <p class="font-medium">${{ clin.statz_split_paid|floatformat:2|default:0.00 }}</p> -->
             </div>
             <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">PPI Split</p>
-                <p class="font-medium">${{ clin.ppi_split|floatformat:2|default:0.00 }}</p>
+                <p>Move to a Splits Table</p>
+                <!-- <p class="font-medium">${{ clin.ppi_split|floatformat:2|default:0.00 }}</p> -->
             </div>
             <div class="md:col-span-2">
                 <p class="text-sm text-gray-600 capitalize">PPI Paid</p>
-                <p class="font-medium">${{ clin.ppi_split_paid|floatformat:2|default:0.00 }}</p>
+                <p>Move to a Splits Table</p>
+                <!-- <p class="font-medium">${{ clin.ppi_split_paid|floatformat:2|default:0.00 }}</p> -->
             </div>
 
         </div>

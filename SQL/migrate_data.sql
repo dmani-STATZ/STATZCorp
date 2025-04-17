@@ -928,17 +928,11 @@ BEGIN TRY
         special_payment_terms_paid,
         price_per_unit,
         quote_value,
-        plan_gross,
         paid_amount,
         paid_date,
         wawf_payment,
         wawf_recieved,
         wawf_invoice,
-        ppi_split_paid,
-        statz_split_paid,
-        planned_split,
-        ppi_split,
-        statz_split,
         created_by_id,
         created_on,
         modified_by_id,
@@ -972,17 +966,11 @@ BEGIN TRY
         sc.SPT_Paid,
         sc.PPP_Sup,
         sc.SubPODol,
-        sc.PlanGrossDol,
         sc.SubPaidDol,
         sc.SubPaidDate,
         sc.WAWFPaymentDol,
         sc.DatePayRecv,
         sc.WAWFInvoice,
-        sc.ActualPaidPPIDol,
-        sc.ActualSTATZDol,
-        sc.PlanSplit_per_PPIbid,
-        sc.PPISplitDol,
-        sc.STATZSplitDol,
         ISNULL(um_created.user_id, 1) AS created_by_id,
         ISNULL(sc.CreatedOn, SYSDATETIME()) AS created_on,
         ISNULL(um_modified.user_id, 1) AS modified_by_id,
@@ -1779,9 +1767,8 @@ print 'Update contract values'
 print ('##########################################')
 
 UPDATE       contracts_contract
-SET                contract_value = subquery.NewTotal, ppi_split =subquery.ppi_split, statz_split = subquery.statz_split, ppi_split_paid=subquery.ppi_split_paid, statz_split_paid=subquery.statz_split_paid
-FROM            (SELECT        ISNULL(SUM(ContractDol), 0.00) AS NewTotal, Contract_ID, ISNULL(SUM(PPISplitDol), 0.00) AS ppi_split, ISNULL(SUM(STATZSplitDol), 0.00) AS statz_split, ISNULL(SUM(ActualPaidPPIDol), 0.00) AS ppi_split_paid, 
-                                                    ISNULL(SUM(ActualSTATZDol), 0.00) AS statz_split_paid
+SET                contract_value = subquery.NewTotal, plan_gross = subquery.planGross
+FROM            (SELECT        ISNULL(SUM(ContractDol), 0.00) AS NewTotal, Contract_ID, ISNULL(SUM(PlanGrossDol), 0.00) AS planGross
                           FROM            ContractLog.dbo.STATZ_SUB_CONTRACTS_TBL
                           GROUP BY Contract_ID) AS subquery INNER JOIN
                          contracts_contract ON subquery.Contract_ID = contracts_contract.id

@@ -169,7 +169,7 @@ class ContractForm(forms.ModelForm):
             'buyer', 'contract_type', 'award_date', 'due_date', 'due_date_late',
             'sales_class', 'survey_date', 'survey_type', 'assigned_user',
             'assigned_date', 'nist', 'files_url', 'reviewed', 'reviewed_by',
-            'reviewed_on', 'contract_value'
+            'reviewed_on', 'contract_value', 'plan_gross'
         ]
         widgets = {
             'idiq_contract': forms.Select(attrs={
@@ -255,7 +255,12 @@ class ContractForm(forms.ModelForm):
             }),
             'contract_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter 1155 Total Value',
+                'placeholder': 'Total Value',
+                'step': '0.01'
+            }),
+            'plan_gross': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Plan Gross',
                 'step': '0.01'
             }),
         }
@@ -318,9 +323,7 @@ class ClinForm(forms.ModelForm):
             'special_payment_terms', 'special_payment_terms_paid', 
             'quote_value', 'paid_amount', 
             'paid_date', 'wawf_payment', 'wawf_recieved', 
-            'wawf_invoice', 'plan_gross', 'planned_split',
-            'ppi_split', 'statz_split', 'ppi_split_paid', 'statz_split_paid',
-            'item_number', 'item_type', 'item_value'
+            'wawf_invoice', 'item_number', 'item_type', 'item_value'
         ]
         widgets = {
             'contract': forms.Select(attrs={
@@ -387,11 +390,6 @@ class ClinForm(forms.ModelForm):
             'special_payment_terms_paid': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
-            'contract_value': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Contract Value',
-                'step': '0.01'
-            }),
             'quote_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter PO Amount',
@@ -418,35 +416,6 @@ class ClinForm(forms.ModelForm):
             'wawf_invoice': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter WAWF Invoice'
-            }),
-            'plan_gross': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Plan Gross',
-                'step': '0.0001'
-            }),
-            'planned_split': forms.TextInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Planned Split'
-            }),
-            'ppi_split': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter PPI Split',
-                'step': '0.01'
-            }),
-            'statz_split': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter STATZ Split',
-                'step': '0.01'
-            }),
-            'ppi_split_paid': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter PPI Split Paid',
-                'step': '0.01'
-            }),
-            'statz_split_paid': forms.NumberInput(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter STATZ Split Paid',
-                'step': '0.01'
             })
         }
         

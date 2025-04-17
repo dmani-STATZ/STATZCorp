@@ -55,10 +55,6 @@ class Contract(AuditModel):
     notes = GenericRelation('Note', related_query_name='contract')
     contract_value = models.FloatField(null=True, blank=True, default=0)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
-    ppi_split = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    statz_split = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     plan_gross = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
 
     class Meta:
@@ -146,12 +142,6 @@ class Clin(AuditModel):
     wawf_payment = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     wawf_recieved = models.DateTimeField(null=True, blank=True)
     wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
-    plan_gross = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    planned_split = models.CharField(max_length=50, null=True, blank=True)
-    ppi_split = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    statz_split = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    ppi_split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    statz_split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
 
@@ -191,7 +181,7 @@ class PaymentHistory(models.Model):
         ('paid_amount', 'Paid Amount'), # SubPaid
         ('contract_value', 'Contract Value'), # Contract
         ('wawf_payment', 'WAWF Payment'), # WAWFPayment
-        ('plan_gross', 'Plan Gross'), # PlanGross
+        ('plan_gross', 'Plan Gross'), # PlanGross Moved to contract
         ('statz_split_paid', 'STATZ Split Paid'), # PaidPPI
         ('ppi_split_paid', 'PPI Split Paid'), # PaidSTATZ
         ('special_payment_terms_interest', 'Special Payment Terms Interest'), # Interest
@@ -813,7 +803,7 @@ class ContractSplit(models.Model):
         return f"{self.company_name} Split for {self.contract.contract_number}"
     
     @classmethod
-    def create_split(cls, contract_id, company_name, split_value):
+    def create_split(cls, contract_id, company_name, split_value, split_paid=0.00):
         """Creates a new ContractSplit record."""
         try:
             contract = cls._meta.get_field('contract').related_model.objects.get(pk=contract_id)
@@ -829,7 +819,7 @@ class ContractSplit(models.Model):
             contract=contract,
             company_name=company_name,
             split_value=split_value,
-            split_paid=0.00,
+            split_paid=split_paid,
         )
         contract_split.save()
         return contract_split
