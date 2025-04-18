@@ -95,9 +95,11 @@
         <div class="col-span-2 bg-white shadow-lg rounded-lg p-4">
             {% if contract.cancelled %}
                 <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
-                    <h1 class="text-2xl font-bold text-gray-800">
-                        Contract {{ contract.contract_number }}
-                    </h1>
+                    <a href="{% url 'contracts:contract_detail' contract.id %}">
+                        <h1 class="text-2xl font-bold text-gray-800">
+                            Contract {{ contract.contract_number }}
+                        </h1>
+                    </a>
                     <div class="flex items-center space-x-3">
                         <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
                         <a href="{% url 'contracts:contracts_dashboard' %}" 
@@ -111,9 +113,10 @@
                 </div>
             {% elif not contract.open %}
                 <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
+                    <a href="{% url 'contracts:contract_detail' contract.id %}">
                     <h1 class="text-2xl font-bold text-gray-800">
                         Contract {{ contract.contract_number }}
-                    </h1>
+                    </h1></a>
                     <div class="flex items-center space-x-3">
                         <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
                         <a href="{% url 'contracts:contracts_dashboard' %}" 
@@ -127,9 +130,10 @@
                 </div>
             {% else %}
                 <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4 p-2">
+                    <a href="{% url 'contracts:contract_detail' contract.id %}">
                     <h1 class="text-2xl font-bold text-gray-800 flex items-center">
                         Contract {{ contract.contract_number }}
-                    </h1>
+                    </h1></a>
 
                         <!-- Contract Options Dropdown -->
                         <div class="relative inline-block text-left">

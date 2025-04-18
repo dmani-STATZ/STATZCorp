@@ -47,6 +47,7 @@ from .views import (
     
     # Contact and Address views
     ContactListView,
+    ContractManagementView,
     ContactDetailView,
     ContactCreateView,
     ContactUpdateView,
@@ -138,7 +139,8 @@ urlpatterns = [
 
     # Contract management
     path('create/', ContractCreateView.as_view(), name='contract_create'),
-    path('<int:pk>/', ContractDetailView.as_view(), name='contract_management'),
+    path('<int:pk>/', ContractManagementView.as_view(), name='contract_management'),
+    path('<int:pk>/detail/', ContractDetailView.as_view(), name='contract_detail'),
     path('<int:pk>/update/', ContractUpdateView.as_view(), name='contract_update'),
     path('<int:pk>/close/', ContractCloseView.as_view(), name='contract_close'),
     path('<int:pk>/cancel/', ContractCancelView.as_view(), name='contract_cancel'),

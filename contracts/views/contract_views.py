@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractDetailView(DetailView):
+class ContractManagementView(DetailView):
     model = Contract
     template_name = 'contracts/contract_management.html'
     context_object_name = 'contract'
@@ -119,6 +119,19 @@ class ContractDetailView(DetailView):
                 setattr(note, 'object_id', contract.id)
             context['all_notes'] = contract_notes
             
+        return context
+
+
+@method_decorator(conditional_login_required, name='dispatch')
+class ContractDetailView(DetailView):
+    model = Contract
+    template_name = 'contracts/contract_detail.html'
+    context_object_name = 'contract'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.get_object()
+        context['contract'] = contract
         return context
 
 

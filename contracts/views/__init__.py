@@ -1,5 +1,6 @@
 from .contract_views import (
     ContractDetailView,
+    ContractManagementView,
     ContractCreateView,
     ContractUpdateView,
     ContractCloseView,
