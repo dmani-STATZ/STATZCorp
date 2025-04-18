@@ -1,6 +1,7 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load humanize %}
 
 {% block title %}
     {% if form.instance.pk %}Edit Contract{% else %}New Contract{% endif %}
@@ -122,7 +123,7 @@
                 <h2 class="section-header">Contract Identification</h2>
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <!-- Row 1 -->
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.contract_number.id_for_label }}" class="form-label">
                                 Contract Number
@@ -133,8 +134,18 @@
                             {% endif %}
                         </div>
                     </div>
-                    
-                    <div class="md:col-span-4">
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            <label for="{{ form.solicitation_type.id_for_label }}" class="form-label">Solicitation Type</label>
+                            {{ form.solicitation_type }}
+                            {% if form.solicitation_type.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.solicitation_type.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.po_number.id_for_label }}" class="form-label">
                                 <span class="text-uppercase">PO</span> Number
@@ -146,7 +157,7 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.tab_num.id_for_label }}" class="form-label">
                                 <span class="text-uppercase">TAB</span> Number
@@ -159,7 +170,7 @@
                     </div>
                     
                     <!-- Row 2 -->
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.contract_type.id_for_label }}" class="form-label">
                                 Contract Type
@@ -171,7 +182,7 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.buyer.id_for_label }}" class="form-label">
                                 Buyer
@@ -183,7 +194,7 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.sales_class.id_for_label }}" class="form-label">
                                 Sales Class
@@ -196,7 +207,7 @@
                     </div>
                     
                     <!-- Row 3 -->
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.status.id_for_label }}" class="form-label">
                                 Status
@@ -208,7 +219,7 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.contract_value.id_for_label }}" class="form-label">
                                 Contract Value
@@ -220,7 +231,7 @@
                         </div>
                     </div>
 
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.plan_gross.id_for_label }}" class="form-label">
                                 Plan Gross
@@ -232,7 +243,7 @@
                         </div>
                     </div>
 
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.nist.id_for_label }}" class="form-label">
                                 <span class="text-uppercase">NIST</span>
@@ -250,7 +261,7 @@
             <div>
                 <h2 class="section-header">Contract Dates</h2>
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.award_date.id_for_label }}" class="form-label">
                                 Award Date
@@ -262,15 +273,21 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.due_date.id_for_label }}" class="form-label">
                                 Due Date
                             </label>
-                            {{ form.due_date }}
+                                {{ form.due_date }}
                             {% if form.due_date.errors %}
                                 <div class="text-red-500 text-sm mt-1">{{ form.due_date.errors }}</div>
                             {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            
                         </div>
                     </div>
                 </div>
@@ -349,8 +366,14 @@
 
                     <!-- Total Split Value Display -->
                     <div class="mt-4 text-right">
-                        <p class="text-sm text-gray-600">Total Split Value: <span id="totalSplitValue">0.00</span></p>
-                        <p class="text-sm text-gray-600">Contract Value: {{ form.instance.contract_value|default:"0.00" }}</p>
+                        {% if form.instance.total_split_value != form.instance.plan_gross %}
+                            <p class="text-sm text-red-600">Total Split Value: ${{ form.instance.total_split_value|floatformat:2|intcomma }}</p>
+                        {% else %}
+                            <p class="text-sm text-gray-600">Total Split Value: ${{ form.instance.plan_gross|floatformat:2|intcomma }}</p>
+                        {% endif %}
+                        {% if form.instance.total_split_paid != form.instance.contract_value %}
+                            <p class="text-sm text-gray-600">Total Split Paid: ${{ form.instance.total_split_paid|floatformat:2|intcomma }}</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

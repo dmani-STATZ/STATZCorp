@@ -36,6 +36,10 @@ class ContractManagementView(DetailView):
             'clin_type', 'supplier', 'nsn'
         ).order_by('item_number')
         context['clins'] = clins
+
+        # Get the CanceledReason model
+        cancel_reason = CanceledReason.objects.all()
+        context['cancel_reasons'] = cancel_reason
         
         # Get contract notes
         context['contract_notes'] = contract.notes.all().order_by('-created_on')
@@ -66,7 +70,8 @@ class ContractManagementView(DetailView):
             # First, get the ContentType models
             contract_type = ContentType.objects.get_for_model(Contract)
             clin_type = ContentType.objects.get_for_model(Clin)
-            
+
+           
             # Get both sets of notes
             contract_notes = list(context['contract_notes'])
             clin_notes = list(context['clin_notes'])

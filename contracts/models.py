@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.db.models.signals import pre_save
+from django.db.models import Sum
 from django.dispatch import receiver
 from django.core.validators import MinValueValidator
 from decimal import Decimal
@@ -86,6 +87,14 @@ class Contract(AuditModel):
 
     def __str__(self):
         return f"Contract {self.contract_number}"
+    
+    @property
+    def total_split_value(self):
+        return self.splits.aggregate(Sum('split_value'))['split_value__sum'] or 0
+    
+    @property
+    def total_split_paid(self):
+        return self.splits.aggregate(Sum('split_paid'))['split_paid__sum'] or 0
     
 class ContractStatus(models.Model):
     description = models.TextField(null=True, blank=True)
@@ -802,6 +811,7 @@ class ContractSplit(models.Model):
     def __str__(self):
         return f"{self.company_name} Split for {self.contract.contract_number}"
     
+   
     @classmethod
     def create_split(cls, contract_id, company_name, split_value, split_paid=0.00):
         """Creates a new ContractSplit record."""

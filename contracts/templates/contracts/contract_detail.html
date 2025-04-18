@@ -10,30 +10,29 @@ Contract Details: {{ contract.contract_number }}
 {{ block.super }}
 <style>
     /* Form label styling */
+    .section-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #0f1216;
+        background-color: #f0f0f0;
+        margin-top: 1rem;
+        padding: 0.5rem;
+        padding-top: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-family: inherit;
+    }
+
     .form-label {
         text-transform: capitalize;
         font-size: 0.875rem;
         font-weight: 500;
         color: #4b5563;
-        margin-bottom: 0.5rem;
         display: block;
         font-family: inherit;
     }
-    
-    /* For acronyms that should always be uppercase */
+
     .text-uppercase {
         text-transform: uppercase !important;
-    }
-    
-    /* Section headers */
-    .section-header {
-        font-size: 1.125rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #e5e7eb;
-        font-family: inherit;
     }
 </style>
 {% endblock %}
@@ -64,14 +63,21 @@ Contract Details: {{ contract.contract_number }}
             <h2 class="section-header">Contract Identification</h2>
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                 <!-- Row 1 -->
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Contract Number</label>
                         <p class="font-medium">{{ contract.contract_number }}</p>
                     </div>
                 </div>
-                
-                <div class="md:col-span-4">
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Solicitation Type</label>
+                        <p class="font-medium">{{ contract.solicitation_type }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">
                             <span class="text-uppercase">PO</span> Number
@@ -80,7 +86,7 @@ Contract Details: {{ contract.contract_number }}
                     </div>
                 </div>
                 
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">
                             <span class="text-uppercase">TAB</span> Number
@@ -90,47 +96,55 @@ Contract Details: {{ contract.contract_number }}
                 </div>
                 
                 <!-- Row 2 -->
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Contract Type</label>
-                        <p class="font-medium">{{ contract.get_contract_type_display }}</p>
+                        <p class="font-medium">{{ contract.contract_type }}</p>
                     </div>
                 </div>
                 
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Buyer</label>
                         <p class="font-medium">{{ contract.buyer|default:"N/A" }}</p>
                     </div>
                 </div>
                 
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Sales Class</label>
-                        <p class="font-medium">{{ contract.get_sales_class_display }}</p>
+                        <p class="font-medium">{{ contract.sales_class }}</p>
                     </div>
+                </div>
+
+                <div class="md:col-span-3">
+
                 </div>
                 
                 <!-- Row 3 -->
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Status</label>
-                        <p class="font-medium">{{ contract.get_status_display }}</p>
+                        <p class="font-medium">{{ contract.status }}</p>
                     </div>
                 </div>
                 
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Contract Value</label>
                         <p class="font-medium">${{ contract.contract_value|floatformat:2|intcomma|default:"0.00" }}</p>
                     </div>
                 </div>
 
-                <div class="md:col-span-4">
+                <div class="md:col-span-3">
                     <div class="form-group">
                         <label class="form-label">Plan Gross</label>
                         <p class="font-medium">${{ contract.plan_gross|floatformat:2|intcomma|default:"0.00" }}</p>
                     </div>
+                </div>
+
+                <div class="md:col-span-3">
+
                 </div>
 
                 <div class="md:col-span-4">
@@ -138,7 +152,7 @@ Contract Details: {{ contract.contract_number }}
                         <label class="form-label">
                             <span class="text-uppercase">NIST</span>
                         </label>
-                        <p class="font-medium">{{ contract.get_nist_display|default:"N/A" }}</p>
+                        <p class="font-medium">{{ contract.nist|default:"No" }}</p>
                     </div>
                 </div>
             </div>
@@ -185,10 +199,10 @@ Contract Details: {{ contract.contract_number }}
                                 <p class="font-medium">{{ split.company_name }}</p>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <p class="font-medium">${{ split.split_value|floatformat:2|intcomma }}</p>
+                                <p class="font-medium">${{ split.split_value|floatformat:2|intcomma|default:"0.00" }}</p>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <p class="font-medium">${{ split.split_paid|floatformat:2|intcomma }}</p>
+                                <p class="font-medium">${{ split.split_paid|floatformat:2|intcomma|default:"0.00" }}</p>
                             </td>
                         </tr>
                         {% empty %}
@@ -204,8 +218,12 @@ Contract Details: {{ contract.contract_number }}
 
             <!-- Total Split Value Display -->
             <div class="mt-4 text-right">
-                <p class="text-sm text-gray-600">Total Split Value: ${{ contract.total_split_value|floatformat:2|intcomma }}</p>
-                <p class="text-sm text-gray-600">Contract Value: ${{ contract.contract_value|floatformat:2|intcomma }}</p>
+                {% if contract.total_split_value != contract.plan_gross %}
+                    <p class="text-sm text-red-600">Total Split Value: ${{ contract.total_split_value|floatformat:2|intcomma }}</p>
+                {% else %}
+                    <p class="text-sm text-gray-600">Total Split Value: ${{ contract.plan_gross|floatformat:2|intcomma }}</p>
+                {% endif %}
+                <p class="text-sm text-gray-600">Total Split Paid: ${{ contract.contract_value|floatformat:2|intcomma }}</p>
             </div>
         </div>
 
@@ -214,6 +232,10 @@ Contract Details: {{ contract.contract_number }}
             <h2 class="section-header">Management Information</h2>
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                 <!-- Row 1 -->
+                <div class="md:col-span-4">
+                    
+                </div>
+
                 <div class="md:col-span-4">
                     <div class="form-group">
                         <label class="form-label">Assigned User</label>
@@ -227,6 +249,8 @@ Contract Details: {{ contract.contract_number }}
                         <p class="font-medium">{{ contract.assigned_date|date:"M d, Y"|default:"N/A" }}</p>
                     </div>
                 </div>
+
+
                 
                 <div class="md:col-span-4">
                     <div class="form-group">
