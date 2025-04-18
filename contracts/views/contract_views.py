@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractDetailView(DetailView):
     model = Contract
-    template_name = 'contracts/contract_detail.html'
+    template_name = 'contracts/contract_management.html'
     context_object_name = 'contract'
 
     def get_context_data(self, **kwargs):
@@ -200,7 +200,7 @@ class ContractCreateView(CreateView):
         return response
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -214,7 +214,7 @@ class ContractUpdateView(UpdateView):
         return super().form_valid(form)
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -231,7 +231,7 @@ class ContractCloseView(UpdateView):
         return super().form_valid(form)
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -294,7 +294,7 @@ class ContractCancelView(UpdateView):
             })
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 
 @conditional_login_required
@@ -512,7 +512,7 @@ def mark_contract_reviewed(request, pk):
         messages.success(request, 'Contract marked as reviewed successfully.')
         return redirect('contracts:contract_review', pk=pk)
     
-    return redirect('contracts:contract_detail', pk=pk)
+    return redirect('contracts:contract_management', pk=pk)
 
 
 class ContractLifecycleDashboardView(TemplateView):

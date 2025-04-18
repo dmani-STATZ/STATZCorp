@@ -168,7 +168,7 @@
                             {{ clin.contract.idiq_contract.contract_number|default:'' }}
                         </td>
                         <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                            <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
+                            <a href="{% url 'contracts:contract_management' clin.contract.id %}" 
                                class="text-blue-600 hover:text-blue-800">
                                 {{ clin.contract.contract_number }}
                             </a>

@@ -430,4 +430,4 @@ def clin_delete(request, pk):
         except Exception as e:
             messages.error(request, f'Error deleting CLIN: {str(e)}')
             
-    return redirect('contracts:contract_detail', pk=contract_id) 
+    return redirect('contracts:contract_management', pk=contract_id) 

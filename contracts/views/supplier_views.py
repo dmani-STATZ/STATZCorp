@@ -288,7 +288,7 @@ class SupplierUpdateView(UpdateView):
     
     def get_success_url(self):
         if 'contract_id' in self.kwargs:
-            return reverse('contracts:contract_detail', kwargs={'pk': self.kwargs['contract_id']})
+            return reverse('contracts:contract_management', kwargs={'pk': self.kwargs['contract_id']})
         return reverse('contracts:supplier_list')
 
 

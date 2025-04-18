@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractDetailView(DetailView):
     model = Contract
-    template_name = 'contracts/contract_detail.html'
+    template_name = 'contracts/contract_management.html'
     context_object_name = 'contract'
 
     def get_context_data(self, **kwargs):
@@ -235,7 +235,7 @@ class ContractCreateView(CreateView):
         return response
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractUpdateView(UpdateView):
@@ -250,7 +250,7 @@ class ContractUpdateView(UpdateView):
         return response
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractCloseView(UpdateView):
@@ -268,7 +268,7 @@ class ContractCloseView(UpdateView):
         return response
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractCancelView(UpdateView):
@@ -286,7 +286,7 @@ class ContractCancelView(UpdateView):
         return response
     
     def get_success_url(self):
-        return reverse('contracts:contract_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 # CLIN Management Views
 @method_decorator(conditional_login_required, name='dispatch')
@@ -407,7 +407,7 @@ def add_note(request, content_type_id, object_id):
             
             # Determine the redirect URL based on the content type
             if content_type.model == 'contract':
-                return redirect('contracts:contract_detail', pk=object_id)
+                return redirect('contracts:contract_management', pk=object_id)
             elif content_type.model == 'clin':
                 return redirect('contracts:clin_detail', pk=object_id)
             else:
@@ -433,7 +433,7 @@ def delete_note(request, note_id):
     if note.created_by != request.user and not request.user.is_staff:
         messages.error(request, "You don't have permission to delete this note.")
         if content_type.model == 'contract':
-            return redirect('contracts:contract_detail', pk=content_object.id)
+            return redirect('contracts:contract_management', pk=content_object.id)
         elif content_type.model == 'clin':
             return redirect('contracts:clin_detail', pk=content_object.id)
         else:
@@ -445,7 +445,7 @@ def delete_note(request, note_id):
         
         # Determine the redirect URL based on the content type
         if content_type.model == 'contract':
-            return redirect('contracts:contract_detail', pk=content_object.id)
+            return redirect('contracts:contract_management', pk=content_object.id)
         elif content_type.model == 'clin':
             return redirect('contracts:clin_detail', pk=content_object.id)
         else:
@@ -479,7 +479,7 @@ def add_reminder(request, note_id=None):
                 content_object = note.content_object
                 content_type = note.content_type
                 if content_type.model == 'contract':
-                    return redirect('contracts:contract_detail', pk=content_object.id)
+                    return redirect('contracts:contract_management', pk=content_object.id)
                 elif content_type.model == 'clin':
                     return redirect('contracts:clin_detail', pk=content_object.id)
             

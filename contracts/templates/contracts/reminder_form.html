@@ -17,7 +17,7 @@
             {% if note %}
                 {% with content_object=note.content_object content_type=note.content_type %}
                     {% if content_type.model == 'contract' %}
-                        <a href="{% url 'contracts:contract_detail' content_object.id %}" class="btn-secondary">
+                        <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn-secondary">
                             Cancel
                         </a>
                     {% elif content_type.model == 'clin' %}

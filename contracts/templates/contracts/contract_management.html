@@ -1,0 +1,1453 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block content %}
+<form id="csrf-form">
+    {% csrf_token %}
+</form>
+<div class="container mx-auto px-4 py-6">
+    <!-- Top Section Grid Layout -->
+    <div class="grid grid-cols-3 gap-8 mb-6">
+        <!-- CLIN Acknowledgment Section - Left Column -->
+        <div class="col-span-1 bg-white shadow-lg rounded-lg p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">CLIN Acknowledgment</h2>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between py-1 border-b">
+                    <span class="text-sm text-gray-700 w-1/3">PO Acknowledge Letter</span>
+                    <div class="text-center w-1/3">
+                        <button 
+                            onclick="openAcknowledgmentLetter('{{ selected_clin.id }}')"
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if not selected_clin %}bg-gray-300 text-gray-500{% else %}bg-blue-500 text-white hover:bg-blue-600{% endif %}">
+                            {% if acknowledgment_letter %}Edit{% else %}Create{% endif %}
+                        </button>
+                    </div>
+                    <span class="text-xs text-gray-500 w-1/3 text-right">
+                        {% if acknowledgment_letter %}
+                            Last updated: {{ acknowledgment_letter.modified_on|date:"m/d/Y H:i A" }}
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <!-- PO Sent to Sup -->
+                <div class="grid grid-cols-3 items-center py-1 border-b">
+                    <span class="text-sm text-gray-700">PO Sent to Supplier</span>
+                    <div class="text-center">
+                        <button 
+                            onclick="toggleAcknowledgment('po_to_supplier_bool')"
+                            id="po_to_supplier_bool_btn"
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            {% if acknowledgment.po_to_supplier_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                            {% if acknowledgment.po_to_supplier_bool %}Sent{% else %}Not Sent{% endif %}
+                        </button>
+                    </div>
+                    <div class="text-right text-xs text-gray-600">
+                        {% if acknowledgment.po_to_supplier_bool %}
+                            <div>{{ acknowledgment.po_to_supplier_user.username }}</div>
+                            <div>{{ acknowledgment.po_to_supplier_date|date:"m/d/Y H:i A" }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Acknowledged -->
+                <div class="grid grid-cols-3 items-center py-1 border-b">
+                    <span class="text-sm text-gray-700">Acknowledged</span>
+                    <div class="text-center">
+                        <button 
+                            onclick="toggleAcknowledgment('clin_reply_bool')"
+                            id="clin_reply_bool_btn"
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            {% if acknowledgment.clin_reply_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                            {% if acknowledgment.clin_reply_bool %}Yes{% else %}No{% endif %}
+                        </button>
+                    </div>
+                    <div class="text-right text-xs text-gray-600">
+                        {% if acknowledgment.clin_reply_bool %}
+                            <div>{{ acknowledgment.clin_reply_user.username }}</div>
+                            <div>{{ acknowledgment.clin_reply_date|date:"m/d/Y H:i A" }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- PO Sent to QAR -->
+                <div class="grid grid-cols-3 items-center py-1 border-b">
+                    <span class="text-sm text-gray-700">PO Sent to QAR</span>
+                    <div class="text-center">
+                        <button 
+                            onclick="toggleAcknowledgment('po_to_qar_bool')"
+                            id="po_to_qar_bool_btn"
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            {% if acknowledgment.po_to_qar_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                            {% if acknowledgment.po_to_qar_bool %}Sent{% else %}Not Sent{% endif %}
+                        </button>
+                    </div>
+                    <div class="text-right text-xs text-gray-600">
+                        {% if acknowledgment.po_to_qar_bool %}
+                            <div>{{ acknowledgment.po_to_qar_user.username }}</div>
+                            <div>{{ acknowledgment.po_to_qar_date|date:"m/d/Y H:i A" }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contract Header - Right Columns -->
+        <div class="col-span-2 bg-white shadow-lg rounded-lg p-4">
+            {% if contract.cancelled %}
+                <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        Contract {{ contract.contract_number }}
+                    </h1>
+                    <div class="flex items-center space-x-3">
+                        <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" 
+                        class="hover:bg-gray-200 text-red px-4 py-2 rounded-lg flex items-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                             <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                         </svg>
+                         Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            {% elif not contract.open %}
+                <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        Contract {{ contract.contract_number }}
+                    </h1>
+                    <div class="flex items-center space-x-3">
+                        <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" 
+                        class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                             <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                         </svg>
+                         Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            {% else %}
+                <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4 p-2">
+                    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                        Contract {{ contract.contract_number }}
+                    </h1>
+
+                        <!-- Contract Options Dropdown -->
+                        <div class="relative inline-block text-left">
+                            <button type="button" onclick="toggleOptionsMenu()" 
+                                    class="inline-flex items-center px-4 py-2 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Options
+                                <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                            <div id="optionsMenu" 
+                                 class="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-50">
+                                <div class="py-1">
+                                    <a href="{% url 'contracts:contract_review' contract.id %}"
+                                       class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                       <svg width="20" height="20" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 2h40c1.1 0 2 .9 2 2v56c0 1.1-.9 2-2 2H12c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2zm0 4v52h40V6H12zm4 4h32v4H16V10zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4z" fill="#000"/>
+                                       </svg>                                      
+                                        {% if contract.reviewed %}Reviewed{% else %}Review Contract{% endif %}
+                                    </a>
+                                    <a href="{% url 'contracts:contract_update' contract.id %}"
+                                        class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                        <svg class="mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit Contract
+                                    </a>
+                                    <a href="{% url 'contracts:finance_audit_detail' contract.id %}"
+                                        class="group flex items-center px-4 py-2 text-sm text-green-800 hover:bg-gray-100 hover:text-gray-900">
+                                        <svg class="mr-3 h-5 w-5 text-green-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Finance Audit
+                                </div>                        
+                                <div class="py-1">
+                                    {% if contract.status.description != 'Cancelled' %}
+                                    <button onclick="showCancelModal('{{ contract.id }}', '{{ contract.contract_number }}')"
+                                            class="group flex w-full items-center px-4 py-2 text-sm text-red-700 hover:bg-gray-100 hover:text-red-900">
+                                        <svg class="mr-3 h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                        </svg>
+                                        Cancel Contract
+                                    </button>
+                                    {% endif %}
+                                    {% if contract.status.description == 'Open' %}
+                                    <a href="{% url 'contracts:contract_close' contract.id %}"
+                                       class="group flex items-center px-4 py-2 text-sm text-yellow-700 hover:bg-gray-100 hover:text-yellow-900">
+                                        <svg class="mr-3 h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                        </svg>
+                                        Close Contract
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                        <span class="bg-white {% if contract.open %}text-green-800{% else %}text-gray-800{% endif %} px-3 py-1 rounded-full text-sm font-semibold">
+                            {% if contract.open %}Open{% else %}Closed{% endif %}
+                        </span>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" 
+                        class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Contract Details Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">PO Number</p>
+                    <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Tab Number</p>
+                    <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
+                </div>
+                <div class="p-2 flex justify-between items-center">
+                    <div>
+                        <p class="text-sm text-gray-600">Buyer</p>
+                        <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
+                    </div>
+                </div>
+                <div class="p-2">
+                    {% if contract.files_url %}
+                    <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')" 
+                        class="flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-150">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clip-rule="evenodd" />
+                            <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
+                        </svg>
+                        Files
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Award Date</p>
+                    <p class="font-medium">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Due Date</p>
+                    <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
+                        {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
+                    </p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Sales Class</p>
+                    <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Solisitation Type</p>
+                    <p class="font-medium">{{ contract.solicitation_type|default:"N/A" }}</p>
+                </div>
+            </div>
+            <!-- Toast message for clipboard copy -->
+            <div id="clipboard-toast" class="hidden fixed top-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded-lg shadow-lg z-50">
+                Path copied to clipboard! Paste in File Explorer address bar.
+            </div>
+            <!-- System message for additional instructions -->
+            <div id="system-message" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg mx-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-bold text-gray-800" id="system-message-title">Information</h3>
+                        <button onclick="closeSystemMessage()" class="text-gray-500 hover:text-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="system-message-content" class="text-gray-600 mb-6">
+                        Message content will appear here.
+                    </div>
+                    <div class="flex justify-end">
+                        <button onclick="closeSystemMessage()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-3 gap-8">
+        <!-- CLINs Section - 2/3 width -->
+        <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
+                {% if contract.open %}
+                <a href="{% url 'contracts:contract_clin_create' contract.id %}" 
+                   class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Add CLIN
+                </a>
+                {% endif %}
+            </div>
+            
+            <!-- CLINs Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Item No
+                            </th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Supplier
+                            </th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                NSN
+                            </th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Order Qty
+                            </th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Due Date
+                            </th>
+                            <!-- <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th> -->
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for clin in clins %}
+                        <tr id="clin-row-{{ clin.id }}"
+                            data-clin-id="{{ clin.id }}"
+                            class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
+                                    {{ clin.item_number|default:"0000" }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ clin.supplier.name|default:"N/A" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ clin.nsn.nsn_code|default:"N/A" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm {% if clin.due_date_late %}text-red-600{% endif %}">
+                                {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                            </td>
+                            <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="event.stopPropagation();">Edit</button>
+                                <button class="text-red-600 hover:text-red-800" onclick="event.stopPropagation();">Delete</button>
+                            </td> -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <a href="{% url 'contracts:clin_update' clin.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                No CLINs found for this contract
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- NIST & Expedite Section - 1/3 width -->
+        <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Contract Controls</h2>
+            </div>
+            
+            <!-- NIST and Expedite sections side by side -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- NIST Section -->
+                <div class="border border-gray-300 rounded-md p-2 bg-gray-50 flex items-center justify-center">
+                    <button 
+                        onclick="toggleContractField('nist')"
+                        id="nist_btn"
+                        data-nist-state="{% if contract.nist %}true{% else %}false{% endif %}"
+                        class="w-3/4 flex items-center justify-center p-2 border border-gray-300 rounded-md shadow-sm hover:opacity-90 transition-colors duration-150 {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}">
+                        <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-10">
+                    </button>
+                </div>
+                
+                <!-- Expedite Section -->
+                <div id="expedite_container" 
+                    class="border border-gray-300 rounded-md p-2 
+                    {% if expedite and expedite.used %}bg-fuchsia-200{% elif expedite and expedite.successful %}bg-yellow-200{% else %}bg-gray-50{% endif %}">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-gray-800">Expedite</h3>
+                        <button type="button" 
+                            onclick="resetExpedite()"
+                            class="bg-red-100 hover:bg-red-200 text-red-600 rounded-full w-6 h-6 flex items-center justify-center transition-colors duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <!-- Initiate button -->
+                        {% if not expedite or not expedite.successful %}
+                        <button 
+                            onclick="toggleExpediteStatus('initiate')"
+                            id="expedite_initiate_btn"
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                            {% if expedite and expedite.initiated %}disabled{% endif %}>
+                            Initiate
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Successful button -->
+                        {% if not expedite or not expedite.successful %}
+                        <button 
+                            onclick="toggleExpediteStatus('successful')"
+                            id="expedite_successful_btn"
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if not expedite or not expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% elif expedite and expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                            {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>
+                            Successful
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Use button (only shows after successful) -->
+                        {% if expedite and expedite.successful %}
+                        <button 
+                            onclick="toggleExpediteStatus('use')"
+                            id="expedite_use_btn"
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                                {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed
+                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                            {% if expedite.used %}disabled{% endif %}>
+                            Use Expedite
+                        </button>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Status info display -->
+                    {% if expedite and expedite.initiated %}
+                    <div class="mt-2 text-xs text-gray-700">
+                        <p>Initiated: {{ expedite.initiateddate|date:"M d, Y H:i" }} by {{ expedite.initiatedby }}</p>
+                        {% if expedite.successful %}
+                        <p>Successful: {{ expedite.successfuldate|date:"M d, Y H:i" }} by {{ expedite.successfulby }}</p>
+                        {% endif %}
+                        {% if expedite.used %}
+                        <p>Used: {{ expedite.useddate|date:"M d, Y H:i" }} by {{ expedite.usedby }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-500 italic">
+                <p>Green = Active NIST, Gray = Inactive NIST</p>
+                <p class="mt-1">Expedite: Yellow background = Successful, Pink background = Used</p>
+            </div> -->
+        </div>
+    </div>
+
+    <!-- Bottom Sections Grid -->
+    <div class="grid grid-cols-3 gap-8 mt-8">
+        <!-- All Notes Combined Section - 2/3 width -->
+        <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Contract Activity Timeline</h2>
+                <div class="flex space-x-3">
+                    <button 
+                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+                        data-note-action="add"
+                        data-content-type-id="18"
+                        data-object-id="{{ contract.id }}"
+                        data-entity-type="Contract"
+                        <!-- onclick="console.log('Contract Note button clicked', this.dataset)" -->
+                        Add Contract Note
+                    </button>
+                    <button 
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg js-add-clin-note"
+                        data-note-action="add"
+                        data-content-type-id="12"
+                        data-object-id="{{ selected_clin.id|default:'' }}"
+                        data-entity-type="CLIN"
+                        {% if not selected_clin %}disabled{% endif %}
+                        onclick="console.log('CLIN Note button clicked', this.dataset)"
+                    >
+                        Add CLIN Note
+                    </button>
+                </div>
+            </div>
+            <div id="combined-notes-container" class="combined-notes-container space-y-4 max-h-[400px] overflow-y-auto" style="max-height: 400px !important; overflow-y: auto !important; display: block !important;">
+                {% with combined_notes=all_notes %}
+                    {% include "contracts/partials/notes_list.html" with notes=combined_notes combined_view=True show_note_type=True entity_type="Note" content_type_id="" contract_content_type_id="18" clin_content_type_id="12" object_id=contract.id %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Future Section - 1/3 width -->
+        <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Future Section</h2>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+                <p class="text-gray-500">This section is reserved for future functionality</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Note Modal -->
+{% include "contracts/partials/note_modal.html" %}
+
+{% include "contracts/includes/cancel_contract_modal.html" %}
+
+<!-- Acknowledgment Letter Modal -->
+<div id="acknowledgmentLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
+    <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 550px !important; max-width: 550px !important;">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-xl font-semibold">Purchase Order Acknowledge Letter</h3>
+            <button onclick="closeAcknowledgmentLetter()" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="acknowledgmentLetterContent" class="mt-4">
+            <!-- Form will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<style>
+    .selected-row {
+        outline: 3px solid #39ff14;  /* Neon green color */
+        outline-offset: -3px;
+        position: relative;
+        z-index: 1 !important;  /* Force lower z-index */
+    }
+
+    /* Custom styling for note containers */
+    .note-content {
+        max-height: 100px !important;
+        overflow-y: auto !important;
+        display: block !important;
+    }
+    
+    /* Strict container height enforcement */
+    #combined-notes-container {
+        overflow-y: auto !important;
+        display: block !important;
+        height: auto !important;
+        max-height: 400px !important;
+    }
+    
+    /* Ensure individual notes don't push out the container */
+    #combined-notes-container > div {
+        margin-bottom: 0.75rem !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Color coding for notes */
+    .contract-note {
+        border-left-color: #10B981 !important; /* Green */
+    }
+    
+    .clin-note {
+        border-left-color: #3B82F6 !important; /* Blue */
+    }
+
+    /* Ensure modal appears above everything */
+    #acknowledgmentLetterModal {
+        z-index: 99999 !important;
+    }
+
+    /* Ensure form inputs in modal appear above CLIN highlight */
+    #acknowledgmentLetterModal input,
+    #acknowledgmentLetterModal select,
+    #acknowledgmentLetterModal button {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Modal content styling */
+    #acknowledgmentLetterContent input,
+    #acknowledgmentLetterContent select {
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'contracts/js/note_modal.js' %}"></script>
+<script>
+// Debug ContentType IDs
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch content types for debugging
+    fetch('/contracts/api/content-types/')
+        .then(response => response.json())
+        .then(data => {
+            // console.log('Available ContentTypes:');
+            // data.content_types.forEach(ct => {
+            //      console.log(`ID: ${ct.id}, App: ${ct.app_label}, Model: ${ct.model}`);
+            // });
+            
+            // Check if our content type IDs are valid
+            const contractBtn = document.querySelector('[data-entity-type="Contract"]');
+            const clinBtn = document.querySelector('[data-entity-type="CLIN"]');
+            
+            if (contractBtn) {
+                const contractTypeId = contractBtn.dataset.contentTypeId;
+                // console.log(`Contract button content type ID: ${contractTypeId}`);
+                const matchingType = data.content_types.find(ct => ct.id == contractTypeId);
+                if (matchingType) {
+                    console.log(`Found matching type: ${matchingType.app_label}.${matchingType.model}`);
+                } else {
+                    console.error(`No matching content type found for ID: ${contractTypeId}`);
+                }
+            }
+            
+            if (clinBtn) {
+                const clinTypeId = clinBtn.dataset.contentTypeId;
+                // console.log(`CLIN button content type ID: ${clinTypeId}`);
+                const matchingType = data.content_types.find(ct => ct.id == clinTypeId);
+                if (matchingType) {
+                    console.log(`Found matching type: ${matchingType.app_label}.${matchingType.model}`);
+                } else {
+                    console.error(`No matching content type found for ID: ${clinTypeId}`);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching content types:', error);
+        });
+});
+</script>
+
+<script>
+// Function to copy contract path to clipboard
+function copyContractPath(path) {
+    // Create temporary textarea to copy from
+    const tempTextArea = document.createElement('textarea');
+    tempTextArea.value = path;
+    document.body.appendChild(tempTextArea);
+    tempTextArea.select();
+    
+    try {
+        // Execute copy command
+        document.execCommand('copy');
+        
+        // Show toast notification
+        const toast = document.getElementById('clipboard-toast');
+        toast.classList.remove('hidden');
+        
+        // Hide toast after 3 seconds
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 3000);
+        
+        // Display a system message with instructions
+        showSystemMessage(
+            "Contract Files Location", 
+            `<p>The file path has been copied to your clipboard:</p>
+            <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm overflow-x-auto">${path}</p>
+            <p class="mt-3 font-semibold">Quick Access:</p>
+            <p class="mt-1">
+                <button onclick="tryDirectOpen('${path.replace(/\\/g, '\\\\')}')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">
+                    Try One-Click Open
+                </button>
+            </p>
+            <p class="mt-3 font-semibold">Manual Steps (Keyboard Shortcuts):</p>
+            <ol class="list-decimal ml-5 space-y-2 mt-2">
+                <li><kbd class="bg-gray-200 px-2 py-1 rounded">Windows+E</kbd> to open Windows Explorer</li>
+                <li><kbd class="bg-gray-200 px-2 py-1 rounded">Alt+D</kbd> to select the address bar</li>
+                <li><kbd class="bg-gray-200 px-2 py-1 rounded">Ctrl+V</kbd> to paste the path</li>
+                <li><kbd class="bg-gray-200 px-2 py-1 rounded">Enter</kbd> to navigate to the folder</li>
+            </ol>`
+        );
+    } catch (err) {
+        // Show error message to user
+        showSystemMessage(
+            "Error Copying Path", 
+            `<p>Unable to copy the path to your clipboard.</p>
+            <p>Please manually copy this path and paste it into File Explorer:</p>
+            <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm overflow-x-auto">${path}</p>`
+        );
+    } finally {
+        // Clean up
+        document.body.removeChild(tempTextArea);
+    }
+}
+
+// Try various methods to open the folder directly
+function tryDirectOpen(path) {
+    // Handle UNC paths specifically
+    if (path.startsWith('\\\\')) {
+        // Format UNC path for file protocol
+        // Remove any leading or trailing spaces
+        path = path.trim();
+        
+        // Replace backslashes with forward slashes
+        let formattedPath = path.replace(/\\/g, '/');
+        
+        // Ensure proper encoding of special characters
+        formattedPath = encodeURI(formattedPath);
+        
+        // Create the file URL with the correct number of slashes for UNC
+        let fileUrl = 'file:' + formattedPath;
+        
+        // Try to open the URL
+        try {
+            window.open(fileUrl, '_blank');
+        } catch (e) {
+            console.error('Failed to open UNC path:', e);
+            // Show manual instructions after a short delay
+            setTimeout(() => {
+                document.getElementById('try-manual').classList.remove('hidden');
+            }, 1500);
+        }
+    } else {
+        // Handle local paths
+        try {
+            // Convert backslashes to forward slashes and encode
+            let formattedPath = path.trim().replace(/\\/g, '/');
+            formattedPath = encodeURI(formattedPath);
+            
+            // Add file:/// prefix for local paths
+            let fileUrl = 'file:///' + formattedPath;
+            window.open(fileUrl, '_blank');
+        } catch (e) {
+            console.error('Failed to open local path:', e);
+            setTimeout(() => {
+                document.getElementById('try-manual').classList.remove('hidden');
+            }, 1500);
+        }
+    }
+}
+
+// Show system message modal
+function showSystemMessage(title, content) {
+    const modal = document.getElementById('system-message');
+    const titleElement = document.getElementById('system-message-title');
+    const contentElement = document.getElementById('system-message-content');
+    
+    titleElement.textContent = title;
+    contentElement.innerHTML = content + 
+        `<div id="try-manual" class="hidden mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p class="text-yellow-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                One-click opening may be blocked by your browser. Please use the keyboard shortcuts instead.
+            </p>
+        </div>`;
+    
+    modal.classList.remove('hidden');
+}
+
+// Close system message modal
+function closeSystemMessage() {
+    const modal = document.getElementById('system-message');
+    modal.classList.add('hidden');
+}
+
+// Define generateLetter function globally
+function generateLetter() {
+    // Collect form data to send to the server
+    const letterId = document.getElementById('acknowledgmentLetterForm').dataset.letterId;
+    const formData = new FormData(document.getElementById('acknowledgmentLetterForm'));
+    
+    // Add indicator that this is a document generation request, not just a save
+    formData.append('action', 'generate');
+    
+    // Show loading state
+    const generateButton = document.querySelector('button[onclick="generateLetter()"]');
+    const originalText = generateButton.innerHTML;
+    generateButton.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...</span>';
+    generateButton.disabled = true;
+    
+    // Send request to generate letter
+    fetch(`/contracts/acknowledgment-letter/${letterId}/generate/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Reset button state
+        generateButton.innerHTML = originalText;
+        generateButton.disabled = false;
+        
+        if (data.success) {
+            // Open the document in a new window
+            window.open(data.file_url, '_blank');
+            
+            // Show success message
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'mt-3 p-2 bg-green-100 text-green-800 rounded-md';
+            messageDiv.textContent = 'Letter generated successfully!';
+            document.getElementById('acknowledgmentLetterForm').appendChild(messageDiv);
+            
+            // Remove message after 3 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 3000);
+        } else {
+            // Show error
+            alert(data.error || 'Error generating letter');
+            console.error('Error details:', data.details);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        generateButton.innerHTML = originalText;
+        generateButton.disabled = false;
+        alert('Error generating letter. Please try again.');
+    });
+}
+
+// Legacy function kept for reference
+function openContractFiles(path) {
+    // Format the path correctly for Windows file explorer
+    // Replace backslashes with forward slashes for URI compatibility
+    // For network paths (UNC), use the proper file:// protocol format
+    if (path.startsWith('\\\\')) {
+        // For UNC paths like \\server\share\path, use file://// format
+        const formattedPath = 'file:////' + path.replace(/\\/g, '/');
+        // Display a system message with the path information
+        showSystemMessage(
+            "UNC Path Detected", 
+            `<p>Attempting to open UNC path:</p>
+            <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm">${path}</p>
+            <p>If the folder doesn't open automatically, please copy and paste this path into File Explorer.</p>`
+        );
+        window.open(formattedPath, '_blank');
+    } else {
+        // For local paths, use regular file:// format
+        showSystemMessage(
+            "Local Path Detected", 
+            `<p>Attempting to open local path:</p>
+            <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm">${path}</p>
+            <p>If the folder doesn't open automatically, please copy and paste this path into File Explorer.</p>`
+        );
+        window.open('file://' + path.replace(/\\/g, '/'), '_blank');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click handlers to all CLIN rows
+    document.querySelectorAll('.clin-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const clinId = this.dataset.clinId;
+            const clinElement = this;
+            selectClin(clinId, clinElement);
+        });
+    });
+
+    // Select default CLIN if it exists
+    const defaultClinId = '{{ selected_clin.id|default:"" }}';
+    if (defaultClinId) {
+        const defaultClinElement = document.getElementById(`clin-row-${defaultClinId}`);
+        if (defaultClinElement) {
+            selectClin(defaultClinId, defaultClinElement);
+        }
+    }
+    
+    // Initialize NIST button state
+    const nistBtn = document.getElementById('nist_btn');
+    if (nistBtn) {
+        const isNistCertified = nistBtn.dataset.nistState === 'true';
+        // The button classes are already set in the template, no need to adjust them here
+    }
+});
+
+// Function to open edit note modal - directly called by button onclick
+function openEditNoteModal(button) {
+    // Prevent default button behavior
+    event.preventDefault();
+    event.stopPropagation();
+
+    const noteId = button.dataset.noteId;
+    const noteText = button.dataset.noteText;
+    const contentTypeId = button.dataset.contentTypeId;
+    const objectId = button.dataset.objectId;
+    const entityType = button.dataset.entityType;
+
+    console.log("Opening edit modal for note:", noteId);
+
+    // Set modal for edit mode
+    const noteModal = document.getElementById('noteModal');
+    const noteModalTitle = document.getElementById('noteModalTitle');
+    const noteForm = document.getElementById('noteForm');
+    const noteTextArea = document.getElementById('id_note');
+    const noteContentTypeIdInput = document.getElementById('noteContentTypeId');
+    const noteObjectIdInput = document.getElementById('noteObjectId');
+
+    // Update modal title and form action
+    noteModalTitle.textContent = `Edit ${entityType} Note`;
+    
+    // Match the URL pattern and parameter name expected by Django
+    noteForm.action = `/contracts/note/update/${noteId}/`;
+    noteForm.method = 'POST';  // Ensure form method is POST
+    
+    // Set form values - decode Unicode escape sequences like \u000D\u000A back to newlines
+    noteTextArea.value = decodeUnicodeEscapes(noteText);
+    noteContentTypeIdInput.value = contentTypeId;
+    noteObjectIdInput.value = objectId;
+
+    // Show modal
+    noteModal.classList.remove('hidden');
+    return false;
+}
+
+// Helper function to decode Unicode escape sequences like \u000D\u000A back to actual newlines
+function decodeUnicodeEscapes(str) {
+    return str.replace(/\\u([0-9a-f]{4})/gi, function(match, grp) {
+        return String.fromCharCode(parseInt(grp, 16));
+    });
+}
+
+function selectClin(clinId, clinElement) {
+    // Store contract ID in a variable to avoid template tag issues
+    const contractId = "{{ contract.id }}";
+    
+    // Remove highlight from all rows and add it to the selected row
+    document.querySelectorAll('.clin-row').forEach(row => {
+        row.classList.remove('selected-row');
+    });
+    clinElement.classList.add('selected-row');
+    
+    // Update all CLIN Add Note buttons with the selected CLIN ID and enable them
+    document.querySelectorAll('[data-entity-type="CLIN"]').forEach(btn => {
+        btn.dataset.objectId = clinId;
+        btn.removeAttribute('disabled');
+    });
+    
+    // Fetch combined notes
+    fetchCombinedNotes(contractId, clinId);
+}
+
+function fetchClinNotes(clinId) {
+    // This function is now only used for fetching CLIN notes for the combined view
+    // So we'll just call fetchCombinedNotes instead
+    const contractId = "{{ contract.id }}";
+    fetchCombinedNotes(contractId, clinId);
+}
+
+function fetchCombinedNotes(contractId, clinId) {
+    fetch(`/contracts/contract/${contractId}/clin/${clinId}/combined-notes/`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const combinedNotesContainer = document.getElementById('combined-notes-container');
+                if (combinedNotesContainer) {
+                    combinedNotesContainer.innerHTML = data.notes_html;
+                    setupEditButtons(combinedNotesContainer);
+                    console.log('Combined notes updated successfully');
+                }
+            } else {
+                console.error('Error loading combined notes:', data.error);
+                document.getElementById('combined-notes-container').innerHTML = 
+                    '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching combined notes:', error);
+            document.getElementById('combined-notes-container').innerHTML = 
+                '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
+        });
+}
+
+function setupEditButtons(container) {
+    // Setup edit buttons functionality
+    container.querySelectorAll('[data-note-action="edit"]').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openEditNoteModal(this);
+            return false;
+        });
+    });
+}
+
+function toggleAcknowledgment(field) {
+    const clinId = '{{ selected_clin.id }}';
+    if (!clinId) return;
+
+    // Get the current state before the toggle
+    const btn = document.getElementById(`${field}_btn`);
+    const initialState = btn.classList.contains('bg-green-500');
+    
+    fetch(`/contracts/clin/${clinId}/toggle-acknowledgment/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            field: field,
+            initial_state: initialState
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success === false) {
+            alert(data.error || 'An error occurred while processing your request.');
+            return;
+        }
+        
+        const btn = document.getElementById(`${field}_btn`);
+        if (data.status === true) {
+            btn.classList.remove('bg-red-500');
+            btn.classList.add('bg-green-500');
+            
+            // Update button text based on field
+            if (field.includes('po_to_supplier')) {
+                btn.textContent = 'Sent';
+            } else if (field.includes('clin_reply')) {
+                btn.textContent = 'Yes';
+            } else if (field.includes('po_to_qar')) {
+                btn.textContent = 'Sent';
+            }
+            
+            // Update user info if provided
+            if (data.user_info) {
+                const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
+                if (userInfoContainer) {
+                    userInfoContainer.innerHTML = `
+                        <div>${data.user_info.username}</div>
+                        <div>${data.user_info.date}</div>
+                    `;
+                }
+            }
+            
+            // If a note was created, refresh the notes section
+            if (data.note_created) {
+                fetchCombinedNotes("{{ contract.id }}", clinId);
+            }
+            
+            // Show message if a reminder was created
+            if (data.reminder_created) {
+                const message = `Reminder "${data.reminder_title}" created for ${data.reminder_date}`;
+                // Display notification (can be enhanced with a proper notification system)
+                alert(message);
+            }
+        } else {
+            btn.classList.remove('bg-green-500');
+            btn.classList.add('bg-red-500');
+            btn.textContent = field.includes('po_sent') ? 'Not Sent' : 'Not Acknowledged';
+            
+            // Clear user info
+            const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
+            if (userInfoContainer) {
+                userInfoContainer.innerHTML = '';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request. Please try again.');
+    });
+}
+
+// Functions for Expedite functionality
+function toggleExpediteStatus(action) {
+    const contractId = "{{ contract.id }}";
+    if (!contractId) return;
+    
+    fetch(`/contracts/contract/${contractId}/toggle-expedite/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            action: action
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success === false) {
+            alert(data.error || 'An error occurred while processing your request.');
+            return;
+        }
+        
+        // Update UI based on current state
+        const container = document.getElementById('expedite_container');
+        const buttonContainer = container.querySelector('.space-y-2');
+        
+        // Reset all background classes first
+        container.classList.remove('bg-gray-50', 'bg-yellow-200', 'bg-fuchsia-200');
+        
+        if (action === 'reset') {
+            // Handle reset action specifically
+            if (data.initiated === false) {
+                // Complete reset to initial state
+                location.reload(); // Simplest way to reset UI completely
+                return;
+            } else if (data.initiated && !data.successful) {
+                // Reset from successful to initiated state
+                container.classList.add('bg-gray-50');
+                
+                // Recreate buttons in the right state
+                buttonContainer.innerHTML = `
+                    <!-- Initiate button -->
+                    <button 
+                        onclick="toggleExpediteStatus('initiate')"
+                        id="expedite_initiate_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            bg-gray-300 text-gray-600 cursor-not-allowed"
+                        disabled>
+                        Initiate
+                    </button>
+                    
+                    <!-- Successful button -->
+                    <button 
+                        onclick="toggleExpediteStatus('successful')"
+                        id="expedite_successful_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            bg-red-200 text-red-800 hover:bg-red-300">
+                        Successful
+                    </button>
+                `;
+                
+                // Update status info
+                let statusHtml = '';
+                if (data.initiatedby) {
+                    statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
+                }
+                
+                // Update or add status div
+                let statusDiv = container.querySelector('.mt-2.text-xs');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.className = 'mt-2 text-xs text-gray-700';
+                    container.appendChild(statusDiv);
+                }
+                statusDiv.innerHTML = statusHtml;
+                
+                return;
+            } else if (data.initiated && data.successful && !data.used) {
+                // Reset from used to successful state
+                container.classList.add('bg-yellow-200');
+                
+                // Recreate just the Use Expedite button (active)
+                buttonContainer.innerHTML = `
+                    <button 
+                        onclick="toggleExpediteStatus('use')"
+                        id="expedite_use_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            bg-red-200 text-red-800 hover:bg-red-300">
+                        Use Expedite
+                    </button>
+                `;
+                
+                // Update status info
+                let statusHtml = '';
+                if (data.initiatedby) {
+                    statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
+                }
+                if (data.successfulby) {
+                    statusHtml += `<p>Successful: ${data.successfuldate} by ${data.successfulby}</p>`;
+                }
+                
+                // Update status div
+                let statusDiv = container.querySelector('.mt-2.text-xs');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.className = 'mt-2 text-xs text-gray-700';
+                    container.appendChild(statusDiv);
+                }
+                statusDiv.innerHTML = statusHtml;
+                
+                return;
+            }
+        }
+        
+        // Handle normal (non-reset) actions
+        if (data.initiated) {
+            const initiateBtn = document.getElementById('expedite_initiate_btn');
+            const successfulBtn = document.getElementById('expedite_successful_btn');
+            const useBtn = document.getElementById('expedite_use_btn');
+            
+            // Handle initiate state
+            if (initiateBtn) {
+                initiateBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                initiateBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                initiateBtn.disabled = true;
+            }
+            
+            if (data.successful) {
+                // Wild color 1 - Yellow background for successful
+                container.classList.add('bg-yellow-200');
+                
+                // Hide initiate and successful buttons
+                if (initiateBtn) initiateBtn.parentElement.removeChild(initiateBtn);
+                if (successfulBtn) successfulBtn.parentElement.removeChild(successfulBtn);
+                
+                // Add/update Use Expedite button if it doesn't exist
+                if (!useBtn) {
+                    const useBtnHtml = `
+                    <button 
+                        onclick="toggleExpediteStatus('use')"
+                        id="expedite_use_btn"
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                        ${data.used ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-red-200 text-red-800 hover:bg-red-300'}"
+                        ${data.used ? 'disabled' : ''}>
+                        Use Expedite
+                    </button>`;
+                    buttonContainer.innerHTML = useBtnHtml;
+                } else if (data.used) {
+                    // If already has use button and it's used, disable it
+                    useBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                    useBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                    useBtn.disabled = true;
+                    
+                    // Wild color 2 - Fuchsia background for used
+                    container.classList.remove('bg-yellow-200');
+                    container.classList.add('bg-fuchsia-200');
+                }
+            } else if (successfulBtn) {
+                // Enable successful button if not already successful
+                successfulBtn.classList.remove('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                successfulBtn.classList.add('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                successfulBtn.disabled = false;
+            }
+            
+            // Update status info
+            let statusHtml = '';
+            if (data.initiatedby) {
+                statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
+            }
+            if (data.successfulby) {
+                statusHtml += `<p>Successful: ${data.successfuldate} by ${data.successfulby}</p>`;
+            }
+            if (data.usedby) {
+                statusHtml += `<p>Used: ${data.useddate} by ${data.usedby}</p>`;
+            }
+            
+            // Add or update status div
+            let statusDiv = container.querySelector('.mt-2.text-xs');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.className = 'mt-2 text-xs text-gray-700';
+                container.appendChild(statusDiv);
+            }
+            statusDiv.innerHTML = statusHtml;
+        } else {
+            // Reset to initial state - just reload the page
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request. Please try again.');
+    });
+}
+
+function resetExpedite() {
+    if (confirm('Are you sure you want to reset the Expedite process? This will clear all current expedite data.')) {
+        toggleExpediteStatus('reset');
+    }
+}
+
+// Function to toggle contract fields like NIST
+function toggleContractField(field) {
+    const contractId = "{{ contract.id }}";
+    if (!contractId) return;
+
+    // Get the current state before the toggle
+    const btn = document.getElementById(`${field}_btn`);
+    const initialState = btn.classList.contains('bg-green-500');
+    
+    fetch(`/contracts/contract/${contractId}/toggle-field/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            field: field,
+            initial_state: initialState
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success === false) {
+            alert(data.error || 'An error occurred while processing your request.');
+            return;
+        }
+        
+        if (field === 'nist') {
+            // Toggle the button appearance
+            if (data.status) {
+                btn.classList.remove('bg-gray-300');
+                btn.classList.add('bg-green-500');
+                btn.classList.remove('text-gray-700');
+                btn.classList.add('text-white');
+            } else {
+                btn.classList.remove('bg-green-500');
+                btn.classList.add('bg-gray-300');
+                btn.classList.remove('text-white');
+                btn.classList.add('text-gray-700');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request. Please try again.');
+    });
+}
+
+function toggleOptionsMenu() {
+    const menu = document.getElementById('optionsMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close the menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('optionsMenu');
+    const button = event.target.closest('button');
+    
+    if (!button || !button.hasAttribute('onclick') || button.getAttribute('onclick') !== 'toggleOptionsMenu()') {
+        menu.classList.add('hidden');
+    }
+});
+
+function openAcknowledgmentLetter(clinId) {
+    console.log('Opening acknowledgment letter for CLIN:', clinId);
+    
+    // Get the modal and content elements
+    const modal = document.getElementById('acknowledgmentLetterModal');
+    const modalContent = document.getElementById('acknowledgmentLetterContent');
+    
+    // Show loading state
+    modalContent.innerHTML = '<div class="flex justify-center items-center h-64"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
+    
+    // Show the modal
+    modal.classList.remove('hidden');
+    
+    // Fetch the form
+    const url = `/contracts/acknowledgment-letter/${clinId}/`;
+    console.log('Fetching from URL:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received data:', data);
+            if (data.success) {
+                modalContent.innerHTML = data.html;
+                
+                // Initialize form after content is loaded
+                const form = modalContent.querySelector('form');
+                if (form) {
+                    // Style all form inputs
+                    form.querySelectorAll('input, select').forEach(input => {
+                        input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
+                    });
+                    
+                    // Set up form submission
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        const formData = new FormData(form);
+                        const letterId = form.dataset.letterId;
+                        
+                        fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        })
+                        .then(response => response.json())
+                        .then(result => {
+                            if (result.success) {
+                                // Close modal and refresh page
+                                closeAcknowledgmentLetter();
+                                location.reload();
+                            } else {
+                                // Show errors
+                                const errors = result.errors;
+                                Object.keys(errors).forEach(field => {
+                                    const input = form.querySelector(`[name="${field}"]`);
+                                    if (input) {
+                                        input.classList.add('border-red-500');
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.className = 'text-red-500 text-sm mt-1';
+                                        errorDiv.textContent = errors[field].join(' ');
+                                        input.parentNode.appendChild(errorDiv);
+                                    }
+                                });
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while saving the form');
+                        });
+                    });
+                }
+            } else {
+                modalContent.innerHTML = '<div class="p-4 text-red-500">Error loading form</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            modalContent.innerHTML = '<div class="p-4 text-red-500">Error loading form</div>';
+        });
+}
+
+function closeAcknowledgmentLetter() {
+    const modal = document.getElementById('acknowledgmentLetterModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Helper function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

@@ -33,7 +33,7 @@ def add_reminder(request, note_id=None):
             
             # Determine the redirect URL
             if note and note.content_type.model == 'contract':
-                redirect_url = reverse('contracts:contract_detail', kwargs={'pk': note.object_id})
+                redirect_url = reverse('contracts:contract_management', kwargs={'pk': note.object_id})
             elif note and note.content_type.model == 'clin':
                 redirect_url = reverse('contracts:clin_detail', kwargs={'pk': note.object_id})
             else:
@@ -223,7 +223,7 @@ def edit_reminder(request, reminder_id):
             
             # Determine the redirect URL
             if reminder.note and reminder.note.content_type.model == 'contract':
-                redirect_url = reverse('contracts:contract_detail', kwargs={'pk': reminder.note.object_id})
+                redirect_url = reverse('contracts:contract_management', kwargs={'pk': reminder.note.object_id})
             elif reminder.note and reminder.note.content_type.model == 'clin':
                 redirect_url = reverse('contracts:clin_detail', kwargs={'pk': reminder.note.object_id})
             else:

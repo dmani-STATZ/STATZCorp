@@ -29,7 +29,7 @@ def add_note(request, content_type_id, object_id):
             
             # Determine the redirect URL based on the content object type
             if content_type.model == 'contract':
-                redirect_url = reverse('contracts:contract_detail', kwargs={'pk': object_id})
+                redirect_url = reverse('contracts:contract_management', kwargs={'pk': object_id})
             elif content_type.model == 'clin':
                 redirect_url = reverse('contracts:clin_detail', kwargs={'pk': object_id})
             else:
@@ -102,7 +102,7 @@ def delete_note(request, note_id):
     
     # Determine the redirect URL based on the content object type
     if content_type.model == 'contract':
-        redirect_url = reverse('contracts:contract_detail', kwargs={'pk': object_id})
+        redirect_url = reverse('contracts:contract_management', kwargs={'pk': object_id})
     elif content_type.model == 'clin':
         redirect_url = reverse('contracts:clin_detail', kwargs={'pk': object_id})
     else:
@@ -118,7 +118,7 @@ def note_update(request, pk):
         form = NoteForm(request.POST, instance=note)
         if form.is_valid():
             form.save()
-            return redirect('contracts:contract_detail', note.object_id)
+            return redirect('contracts:contract_management', note.object_id)
     else:
         form = NoteForm(instance=note)
     return render(request, 'contracts/note_form.html', {'form': form})

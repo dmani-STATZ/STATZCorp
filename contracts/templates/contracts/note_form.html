@@ -20,7 +20,7 @@
         <div>
             {% if content_object %}
                 {% if content_type_id == 15 %}
-                    <a href="{% url 'contracts:contract_detail' content_object.id %}" class="btn-secondary">
+                    <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn-secondary">
                         Cancel
                     </a>
                 {% elif content_type_id == 16 %}
@@ -60,7 +60,7 @@
                 <div class="flex space-x-4">
                     {% if content_object %}
                         {% if content_type_id == 15 %}
-                            <a href="{% url 'contracts:contract_detail' content_object.id %}" class="btn-secondary">
+                            <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn-secondary">
                                 Cancel
                             </a>
                         {% elif content_type_id == 16 %}
