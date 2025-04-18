@@ -487,6 +487,14 @@ class ContractReviewView(DetailView):
             'nsn'
         ).order_by('clin_type__description')
         
+        # Calculate split totals
+        splits = contract.splits.all()
+        total_split_value = sum(split.split_value or 0 for split in splits)
+        total_split_paid = sum(split.split_paid or 0 for split in splits)
+        
+        context['total_split_value'] = total_split_value
+        context['total_split_paid'] = total_split_paid
+        
         return context
 
 

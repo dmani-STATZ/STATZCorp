@@ -333,10 +333,22 @@
 
                 </tr>
                 <tr>
-                    <td class="data-label">Sales Class</td>
-                    <td class="data-value">{{ contract.sales_class.sales_team|default:"N/A" }}</td>
                     <td class="data-label">Contract Value</td>
                     <td class="data-value">${{ contract.contract_value|floatformat:2|default:"0.00" }}</td>
+                    <td class="data-label"></td>
+                    <td class="data-value"></td>
+                </tr>
+                <tr>
+                    <td class="data-label">Plan Gross</td>
+                    <td class="data-value">${{ contract.plan_gross|default:"0.00"|floatformat:2 }}</td>
+                    <td class="data-label">Planned Split</td>
+                    <td class="data-value">{{ contract.planned_split|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td class="data-label">Sales Class</td>
+                    <td class="data-value">{{ contract.sales_class.sales_team|default:"N/A" }}</td>
+                    <td class="data-label">Solicitation Type</td>
+                    <td class="data-value">{{ contract.solicitation_type|default:"N/A" }}</td>
                 </tr>
                 <tr>
                     <td class="data-label">Award Date</td>
@@ -367,28 +379,10 @@
                     <td class="data-value">{{ contract.survey_type|default:"N/A" }}</td>
                 </tr>
                 <tr>
-                    <td class="data-label">STATZ Split</td>
-                    <td class="data-value">Move to a Splits Table</td>
-                    <!-- <td class="data-value">${{ contract.statz_split|default:"0.00"|floatformat:2 }}</td> -->
-                    <td class="data-label">STATZ Split Paid</td>
-                    <td class="data-value">Move to a Splits Table</td>
-                    <!-- <td class="data-value">${{ contract.statz_split_paid|default:"0.00"|floatformat:2 }}</td> -->
+                    <td class="data-label" colspan="1">Files URL</td>
+                    <td class="data-value" colspan="3">{{ contract.files_url|default:"N/A" }}</td>
                 </tr>
-                <tr>
-                    <td class="data-label">PPI Split</td>
-                    <td class="data-value">Move to a Splits Table</td>
-                    <!-- <td class="data-value">${{ contract.ppi_split|default:"0.00"|floatformat:2 }}</td> -->
-                    <td class="data-label">PPI Split Paid</td>
-                    <td class="data-value">Move to a Splits Table</td>
-                    <!-- <td class="data-value">${{ contract.ppi_split_paid|default:"0.00"|floatformat:2 }}</td> -->
-                </tr>
-                <tr>
-                    <td class="data-label"></td>
-                    <td class="data-value"></td>
-                    <td class="data-label">Planned Split</td>
-                    <td class="data-value">Need to move planned split to contract</td>
-                    <!-- <td class="data-value">{{ contract.planned_split|default:"N/A" }}</td> -->
-                </tr>
+
                 <tr>
                     <td class="data-label">Created On</td>
                     <td class="data-value">{{ contract.created_on|date:"M d, Y H:i"|default:"N/A" }}</td>
@@ -401,19 +395,13 @@
                     <td class="data-label">Modified By</td>
                     <td class="data-value">{{ contract.modified_by|default:"N/A" }}</td>
                 </tr>
-                <tr>
-                    <td class="data-label" colspan="1">Files URL</td>
-                    <td class="data-value" colspan="3">{{ contract.files_url|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Cancelled</td>
-                    <td class="data-value">{{ contract.cancelled|yesno:"Yes,No,Unknown" }}</td>
-                    <td class="data-label">Open</td>
-                    <td class="data-value">{{ contract.open|yesno:"Yes,No,Unknown" }}</td>
-                </tr>
+
             </table>
         </div>
     </div>
+
+    <!-- Include Contract Splits Section -->
+    {% include "contracts/partials/contract_splits.html" %}
 
     <!-- Assignment Information -->
     <div class="section">
@@ -479,11 +467,11 @@
                         <td>{{ clin.item_number|default:"0000" }}</td>
                         <td>{{ clin.supplier.name|default:"N/A" }}</td>
                         <td>{{ clin.nsn.nsn_code|default:"N/A" }}</td>
-                        <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
                         <td class="{% if clin.due_date_late %}value-late{% endif %}">
                             {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                             {% if clin.due_date_late %} (LATE){% endif %}
                         </td>
+                        <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
                         <td>${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
                         <td>
                             <div class="actions-container">
@@ -509,9 +497,20 @@
                                
                                     </tr>
                                     <tr>
+                                        <td class="data-label">Order Quantity</td>
+                                        <td class="data-value">{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
+                                        <td class="data-label"></td>
+                                        <td class="data-value"></td>
+                                    </tr>
+                                    <tr>
                                         <td class="data-label">Supplier</td>
                                         <td class="data-value" colspan="3">{{ clin.supplier.name|default:"N/A" }} - {{ clin.supplier.cage_code|default:"N/A" }}</td>
-
+                                    </tr>
+                                    <tr>
+                                        <td class="data-label">Quote Price</td>
+                                        <td class="data-value">${{ clin.price_per_unit|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-label">Quote Value</td>
+                                        <td class="data-value">${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
                                     </tr>
                                     <tr>
                                         <td class="data-label">NSN</td>
@@ -519,6 +518,12 @@
                                         <td class="data-label">NSN Description</td>
                                         <td class="data-value">{{ clin.nsn.description|default:"N/A" }}</td>
                                     </tr>
+                                    <TR>
+                                        <td class="data-label">Bid Price</td>
+                                        <td class="data-value">${{ clin.unit_price|default:"0.00"|floatformat:2 }}</td>
+                                        <td class="data-label">Bid Value</td>
+                                        <td class="data-value">${{ clin.item_value|default:"0.00"|floatformat:2 }}</td>
+                                    </TR>
                                     <tr>
                                         <td class="data-label">PO Number</td>
                                         <td class="data-value">{{ clin.po_number|default:"N/A" }}</td>
@@ -540,17 +545,12 @@
                                         <td class="data-value">{{ clin.get_ia_display|default:"N/A" }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="data-label">Order Quantity</td>
-                                        <td class="data-value">{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
                                         <td class="data-label">Due Date</td>
                                         <td class="data-value {% if clin.due_date_late %}value-late{% endif %}">
                                             {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                                             {% if clin.due_date_late %} (LATE){% endif %}
                                         </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label"></td>
-                                        <td class="data-value"></td>
+  
                                         <td class="data-label">Supplier Due Date</td>
                                         <td class="data-value {% if clin.supplier_due_date_late %}value-late{% endif %}">
                                             {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
@@ -575,12 +575,6 @@
                                         <td class="data-value">{{ clin.special_payment_terms_paid|yesno:"Yes,No,Unknown" }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="data-label">Price Per Unit</td>
-                                        <td class="data-value">${{ clin.price_per_unit|default:"0.00"|floatformat:2 }}</td>
-                                        <td class="data-label">CLIN Value (Sub PO)</td>
-                                        <td class="data-value">${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
-                                    </tr>
-                                    <tr>
                                         <td class="data-label">Paid Amount (Sub Paid)</td>
                                         <td class="data-value">${{ clin.paid_amount|default:"0.00"|floatformat:2 }}</td>
                                         <td class="data-label">Paid Date</td>
@@ -599,13 +593,6 @@
                                         <td class="data-value">{{ clin.wawf_invoice_date|date:"M d, Y"|default:"N/A" }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="data-label">Plan Gross</td>
-                                        <!-- <td class="data-value">${{ clin.plan_gross|default:"0.00"|floatformat:2 }}</td> -->
-                                        <td class="data-value">Need to move this plan_gross to contract</td>
-                                        <td class="data-label"></td>
-                                        <td class="data-value"></td>
-                                    </tr>
-                                    <tr>
                                         <td class="data-label">Created By</td>
                                         <td class="data-value">{{ clin.created_by|default:"N/A" }}</td>
                                         <td class="data-label">Created On</td>
@@ -616,10 +603,6 @@
                                         <td class="data-value">{{ clin.modified_by|default:"N/A" }}</td>
                                         <td class="data-label">Modified On</td>
                                         <td class="data-value">{{ clin.modified_on|date:"M d, Y H:i"|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Contract Value</td>
-                                        <td class="data-value">${{ clin.contract_value|default:"0.00"|floatformat:2 }}</td>
                                     </tr>
                                 </table>
                             </div>

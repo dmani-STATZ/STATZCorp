@@ -192,7 +192,7 @@
             <!-- CLIN Identification -->
             <div>
                 <h2 class="section-header">
-                    <span class="text-uppercase">CLIN</span> Identification
+                    CLIN Identification
                 </h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -220,45 +220,80 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-4">
-                        <div class="form-group">
-                            <label for="{{ form.po_number.id_for_label }}" class="form-label">
-                                <span class="text-uppercase">PO</span> Number
-                            </label>
-                            {{ form.po_number }}
-                            {% if form.po_number.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.po_number.errors }}</div>
-                            {% endif %}
-                            {% if form.po_number.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.po_number.help_text }}</div>
-                            {% endif %}
-                        </div>
+                        <!-- Empty cell for alignment -->
                     </div>
-                    
                     <div class="md:col-span-4">
                         <!-- Empty cell for alignment -->
                     </div>
                     
-                    <!-- Row 2 -->
-                    <div class="md:col-span-4">
-                        <div id="clin-type-field-container">
+                    <div class="md:col-span-3">
+                        <div class="item_number-field-container">
+                            <label for="{{ form.item_number.id_for_label }}" class="form-label">
+                                Item Number
+                            </label>
+                            {{ form.item_number }}
+                            {% if formitem_number.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.item_number.errors }}</div>
+                            {% endif %}
+                            {% if form.item_number.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.item_number.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="md:col-span-3">
+                        <div id="Item-type-field-container">
                             <div class="form-group">
-                                <label for="{{ form.clin_type.id_for_label }}" class="form-label">
-                                    <span class="text-uppercase">CLIN</span> Type
+                                <label for="{{ form.item_type.id_for_label }}" class="form-label">
+                                    Item Type
                                 </label>
                                 {{ form.clin_type }}
-                                {% if form.clin_type.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.clin_type.errors }}</div>
+                                {% if form.Item_type.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.Item_type.errors }}</div>
                                 {% endif %}
-                                {% if form.clin_type.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.clin_type.help_text }}</div>
+                                {% if form.item_type.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.Item_type.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div id="clin_po_num-field-container">
+                            <div class="form-group">
+                                <label for="{{ form.clin_po_num.id_for_label }}" class="form-label">
+                                    CLIN PO Number
+                                </label>
+                                {{ form.clin_po_num }}
+                                {% if form.clin_po_num.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.clin_po_num.errors }}</div>
+                                {% endif %}
+                                {% if form.clin_po_num.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.clin_po_num.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-3">
+                        <div id="tab_num-field-container">
+                            <div class="form-group">
+                                <label for="{{ form.tab_num.id_for_label }}" class="form-label">
+                                    Tab Number
+                                </label>
+                                {{ form.tab_num }}
+                                {% if form.tab_num.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.tab_num.errors }}</div>
+                                {% endif %}
+                                {% if form.tab_num.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.tab_num.help_text }}</div>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <!-- Row 3 -->                   
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.ia.id_for_label }}" class="form-label">
                                 <span class="text-uppercase">IA</span>
@@ -273,7 +308,7 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.fob.id_for_label }}" class="form-label">
                                 <span class="text-uppercase">FOB</span>
@@ -288,73 +323,11 @@
                         </div>
                     </div>
                     
-                    <!-- Row 3 -->
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <label for="{{ form.tab_num.id_for_label }}" class="form-label">
-                                <span class="text-uppercase">TAB</span> Number
-                            </label>
-                            {{ form.tab_num }}
-                            {% if form.tab_num.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.tab_num.errors }}</div>
-                            {% endif %}
-                            {% if form.tab_num.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.tab_num.help_text }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <label for="{{ form.po_num_ext.id_for_label }}" class="form-label">
-                                <span class="text-uppercase">PO</span> Number Extension
-                            </label>
-                            {{ form.po_num_ext }}
-                            {% if form.po_num_ext.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.po_num_ext.errors }}</div>
-                            {% endif %}
-                            {% if form.po_num_ext.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.po_num_ext.help_text }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-3">
                         <!-- Empty cell for alignment -->
                     </div>
-                    
-                    <!-- Row 4 -->
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <label for="{{ form.item_number.id_for_label }}" class="form-label">
-                                Item Number
-                            </label>
-                            {{ form.item_number }}
-                            {% if form.item_number.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.item_number.errors }}</div>
-                            {% endif %}
-                            {% if form.item_number.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.item_number.help_text }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <label for="{{ form.clin_po_num.id_for_label }}" class="form-label">
-                                <span class="text-uppercase">CLIN PO</span> Number
-                            </label>
-                            {{ form.clin_po_num }}
-                            {% if form.clin_po_num.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.clin_po_num.errors }}</div>
-                            {% endif %}
-                            {% if form.clin_po_num.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.clin_po_num.help_text }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-4">
+            
+                    <div class="md:col-span-3">
                         <!-- Empty cell for alignment -->
                     </div>
                 </div>
@@ -556,21 +529,7 @@
                 <div class="hidden" id="financial-details-section">
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <!-- Row 1 -->
-                        <div class="md:col-span-4">
-                            <div class="form-group">
-                                <label for="{{ form.special_payment_terms_paid.id_for_label }}" class="form-label">
-                                    Special Payment Terms Paid
-                                </label>
-                                {{ form.special_payment_terms_paid }}
-                                {% if form.special_payment_terms_paid.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.special_payment_terms_paid.errors }}</div>
-                                {% endif %}
-                                {% if form.special_payment_terms_paid.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.special_payment_terms_paid.help_text }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
+
                         <div class="md:col-span-4">
                             <div id="special-payment-terms-container">
                                 <div class="form-group">
@@ -587,6 +546,23 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="md:col-span-4">
+                            <div class="form-group">
+                                <label for="{{ form.special_payment_terms_paid.id_for_label }}" class="form-label">
+                                    Special Payment Terms Paid
+                                </label>
+                                {{ form.special_payment_terms_paid }}
+                                {% if form.special_payment_terms_paid.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.special_payment_terms_paid.errors }}</div>
+                                {% endif %}
+                                {% if form.special_payment_terms_paid.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.special_payment_terms_paid.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+
                         
                         <div class="md:col-span-4">
                             <!-- Empty cell for alignment -->
@@ -596,7 +572,7 @@
                         <div class="md:col-span-4">
                             <div class="form-group">
                                 <label for="{{ form.quote_value.id_for_label }}" class="form-label">
-                                    <span class="text-uppercase">PO</span> Amount
+                                    Quote Amount
                                 </label>
                                 {{ form.quote_value }}
                                 {% if form.quote_value.errors %}
@@ -663,18 +639,10 @@
                         </div>
                         
                         <!-- Row 4 -->
-                        <div class="md:col-span-4">
-                            <p>Need to move this plan_gross to contract</p>
-                            <!-- {{ form.plan_gross|as_crispy_field }} -->
-                        </div>
+
                         
                         <div class="md:col-span-4">
-                            <p>Need to move planned split to contract</p>
-                            <!-- {{ form.planned_split|as_crispy_field }} -->
-                        </div>
-                        
-                        <div class="md:col-span-4">
-                            {{ form.item_value|as_crispy_field }}
+                            {{ form.item_value }}
                         </div>
                     </div>
                 </div>
