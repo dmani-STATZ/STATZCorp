@@ -2,323 +2,406 @@
 {% load static %}
 {% load humanize %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+    /* Section headers */
+    .section-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #0f1216;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        padding-top: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-family: inherit;
+    }
+
+    .form-label {
+        text-transform: capitalize;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        display: block;
+        font-family: inherit;
+    }
+</style>
+{% endblock extra_head %}
+
+
+
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <!-- Header -->
-    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <div class="flex justify-between items-center mb-6">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800">CLIN Details</h1>
-                <p class="text-gray-600">Contract: 
-                    <a href="{% url 'contracts:contract_detail' clin.contract.id %}" class="text-blue-600 hover:text-blue-800">
-                        {{ clin.contract.contract_number }}
-                    </a>
-                </p>
-            </div>
-            <div class="flex space-x-4 items-center">
-                <a href="{% url 'contracts:clin_update' clin.id %}" class="btn-primary mr-2">
-                    Edit CLIN
-                </a>
-                <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
-                   class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                    </svg>
-                    Back to Contract
-                </a>
-            </div>
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+            CLIN Details: {{ clin.clin_po_num }}
+            {% if clin.contract %}
+                for Contract #{{ clin.contract.contract_number }}
+            {% endif %}
+        </h1>
+        <div class="flex space-x-4">
+            <a href="{% url 'contracts:clin_update' clin.id %}" class="bg-gray-400 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center">
+                Edit CLIN
+            </a>
+            <a href="{% url 'contracts:contract_detail' clin.contract.id %}" 
+               class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+                Back to Contract
+            </a>
         </div>
     </div>
 
-    <!-- CLIN Identification -->
-    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">CLIN Identification</h2>
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <!-- Row 1 -->
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">Contract</p>
-                <p class="font-medium">
-                    <a href="{% url 'contracts:contract_detail' clin.contract.id %}" class="text-blue-600 hover:text-blue-800">
-                        {{ clin.contract.contract_number|default:"N/A" }}
-                    </a>
-                </p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Item Type</p>
-                <p class="font-medium">{{ clin.item_type.description|default:clin.item_type }}</p>
-            </div>
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <!-- CLIN Identification -->
+        <div>
+            <h2 class="section-header">
+                CLIN Identification
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <!-- Row 1 -->
+                <div class="md:col-span-4">
+                    <div class="form-group">
+                        <label class="form-label">Contract</label>
+                        <p class="font-medium">
+                            <a href="{% url 'contracts:contract_detail' clin.contract.id %}" class="text-blue-600 hover:text-blue-800">
+                                {{ clin.contract.contract_number }}
+                            </a>
+                        </p>
+                    </div>
+                </div>
 
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Item Number</p>
-                <p class="font-medium">{{ clin.item_number|default:"0000" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">PO Number</p>
-                <p class="font-medium">{{ clin.po_number|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Item Type</p>
-                <p class="font-medium">{{ clin.item_type.description|default:clin.item_type }}</p>
-            </div>
-            
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">I&A</p>
-                <p class="font-medium">{{ clin.ia.description|default:clin.ia }}</p>
-            </div>
+                <div class="md:col-span-4">
+                    <!-- Empty cell for alignment -->
+                </div>
+                <div class="md:col-span-4">
+                    <!-- Empty cell for alignment -->
+                </div>
+                
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Item Number</label>
+                        <p class="font-medium">{{ clin.item_number|default:"0000" }}</p>
+                    </div>
+                </div>
 
-            <!-- Row 2 -->
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">FOB</p>
-                <p class="font-medium">{{ clin.fob.description|default:clin.fob }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">PO Number</p>
-                <p class="font-medium">{{ clin.po_number|default:"N/A" }}</p>
-            </div>
-             
-            <div class="md:col-span-4">
-                <p class="text-sm text-gray-600 capitalize">PO Number Extension</p>
-                <p class="font-medium">{{ clin.po_num_ext|default:"N/A" }}</p>
-            </div>
-                       <!-- Row 3 -->
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Tab Number</p>
-                <p class="font-medium">{{ clin.tab_num|default:"N/A" }}</p>
-            </div>
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Item Type</label>
+                        <p class="font-medium">{{ clin.get_item_type_display|default:clin.item_type }}</p>
+                    </div>
+                </div>
 
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">CLIN PO Number</p>
-                <p class="font-medium">{{ clin.clin_po_num|default:"N/A" }}</p>
-            </div>
-            
-        </div>
-    </div>
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">CLIN PO Number</label>
+                        <p class="font-medium">{{ clin.clin_po_num|default:"N/A" }}</p>
+                    </div>
+                </div>
 
-    <!-- Item Details -->
-    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Item Details</h2>
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <!-- Row 1 -->
-            <div class="md:col-span-6">
-                <p class="text-sm text-gray-600 capitalize">NSN</p>
-                <p class="font-medium relative group">
-                    {% if clin.nsn %}
-                        <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}?next={{ request.path|urlencode }}" 
-                           class="text-blue-600 hover:text-blue-800">
-                            {{ clin.nsn.nsn_code }}
-                        </a>
-                        <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
-                            {{ clin.nsn.description|default:"No description available" }}
-                        </span>
-                    {% else %}
-                        <span class="text-gray-500">N/A</span>
-                    {% endif %}
-                </p>
-            </div>
-            
-            <div class="md:col-span-6">
-                <p class="text-sm text-gray-600 capitalize">Supplier</p>
-                <p class="font-medium relative group">
-                    {% if clin.supplier %}
-                        <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
-                           class="text-blue-600 hover:text-blue-800">
-                            {{ clin.supplier.name }}
-                        </a>
-                        <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
-                            CAGE: {{ clin.supplier.cage_code|default:"N/A" }}
-                        </span>
-                    {% else %}
-                        <span class="text-gray-500">N/A</span>
-                    {% endif %}
-                </p>
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Tab Number</label>
+                        <p class="font-medium">{{ clin.tab_num|default:"N/A" }}</p>
+                    </div>
+                </div>
+                
+                <!-- Row 3 -->                   
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="text-uppercase">IA</span>
+                        </label>
+                        <p class="font-medium">{{ clin.get_ia_display|default:clin.ia }}</p>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="text-uppercase">FOB</span>
+                        </label>
+                        <p class="font-medium">{{ clin.get_fob_display|default:clin.fob }}</p>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-
-    <!-- Order Information -->
-    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Order Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
-            <!-- Row 1 -->
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">Order Qty</p>
-                <p class="font-medium">{{ clin.order_qty|floatformat:'0'|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">UOM</p>
-                <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
-            </div>
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">Unit Price</p>
-                <p class="font-medium">${{ clin.unit_price|floatformat:'2'|default:0.00 }}</p>
-            </div>
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">Amount</p>
-                <p class="font-medium">${{ clin.item_value|floatformat:'2'|default:0.00 }}</p>
-            </div>
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">Due Date</p>
-                <p class="font-medium {% if clin.due_date_late %}text-red-600{% endif %}">
-                    {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
-                </p>
-            </div>
-            
-            <div class="md:col-span-1">
-                <p class="text-sm text-gray-600 capitalize">Supplier Due Date</p>
-                <p class="font-medium {% if clin.supplier_due_date_late %}text-red-600{% endif %}">
-                    {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Shipping Information -->
-    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Shipping Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
-            <!-- Row 1 -->
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Ship Qty</p>
-                <p class="font-medium">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">UOM</p>
-                <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Ship Date</p>
-                <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
-                    {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
-                </p>
-            </div>
-            
-            <div class="md:col-span-3">
-                <!-- Empty cell for alignment -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Financial Information -->
-    <div class="bg-white shadow-lg rounded-lg p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-6 pb-2 border-b border-gray-200">Financial Information</h2>
-        <div class="grid grid-cols-1 md:grid-cols-8 gap-4">
-            <!-- Row 1 -->
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">PO Amount</p>
-                <p class="font-medium">${{ clin.quote_value|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
-
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Item Value</p>
-                <p class="font-medium">${{ clin.item_value|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
-
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">SPT Paid Status</p>
-                <p class="font-medium">
-                    {% if clin.special_payment_terms_paid %}
-                        <span class="text-green-600">Paid</span>
-                    {% else %}
-                        <span class="text-red-600">Unpaid</span>
-                    {% endif %}
-                </p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Payment Terms</p>
-                <p class="font-medium">{{ clin.special_payment_terms.terms|default:"N/A" }}</p>
-            </div>
-            
-            <!-- Row 2 -->
-
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Paid Amount</p>
-                <p class="font-medium">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Paid Date</p>
-                <p class="font-medium">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <!-- Empty cell for alignment -->
-            </div>
         
-            <div class="md:col-span-2">
-                <!-- Empty cell for alignment -->
+        <!-- Item Details -->
+        <div>
+            <h2 class="section-header">
+                Item Details (CLIN)
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <!-- Row 1 -->
+                <div class="md:col-span-6">
+                    <div class="form-group">
+                        <label class="form-label requiredField">
+                            <span class="text-uppercase">NSN</span>
+                        </label>
+                        <p class="font-medium relative group">
+                            {% if clin.nsn %}
+                                <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}?next={{ request.path|urlencode }}" 
+                                   class="text-blue-600 hover:text-blue-800">
+                                    {{ clin.nsn.nsn_code }} - {{ clin.nsn.description|default:"No description available" }}
+                                </a>
+                            {% else %}
+                                <span class="text-gray-500">N/A</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Due Date</label>
+                        <p class="font-medium {% if clin.due_date_late %}text-red-600{% endif %}">
+                            {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <!-- Empty cell for alignment -->
+                </div>
+
+                <div class="md:col-span-2">
+                    <div class="form-group">
+                        <label class="form-label">Order Qty</label>
+                        <p class="font-medium">{{ clin.order_qty|floatformat:'0'|default:"N/A" }}</p>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-1">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="text-uppercase">UOM</span>
+                        </label>
+                        <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Unit Price</label>
+                        <p class="font-medium">${{ clin.unit_price|floatformat:'2'|default:"0.00" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Item Value</label>
+                        <p class="font-medium">${{ clin.item_value|floatformat:'2'|default:"0.00" }}</p>
+                    </div>
+                </div>
             </div>
+        </div>
         
+        <!-- Order Information -->
+        <div>
+            <h2 class="section-header">
+                Order Information (Supplier)
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <!-- Row 1 -->
+                <div class="md:col-span-6">
+                    <div class="form-group">
+                        <label class="form-label requiredField">Supplier</label>
+                        <p class="font-medium relative group">
+                            {% if clin.supplier %}
+                                <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
+                                   class="text-blue-600 hover:text-blue-800">
+                                    {{ clin.supplier.name }}
+                                </a>
+                                <span class="invisible group-hover:visible absolute z-50 bg-black text-white text-sm rounded-lg py-2 px-3 -mt-12 left-0 min-w-max">
+                                    CAGE: {{ clin.supplier.cage_code|default:"N/A" }}
+                                </span>
+                            {% else %}
+                                <span class="text-gray-500">N/A</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
 
-            <!-- Row 3 -->
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">WAWF Payment</p>
-                <p class="font-medium">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Supplier Due Date</label>
+                        <p class="font-medium {% if clin.supplier_due_date_late %}text-red-600{% endif %}">
+                            {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <!-- Empty cell for alignment -->
+                </div>
+
+                <div class="md:col-span-2">
+                    <div class="form-group">
+                        <label class="form-label">Order Qty</label>
+                        <p class="font-medium">{{ clin.order_qty|floatformat:'0'|default:"N/A" }}</p>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-1">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="text-uppercase">UOM</span>
+                        </label>
+                        <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Price per unit</label>
+                        <p class="font-medium">${{ clin.price_per_unit|floatformat:'2'|default:"0.00" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Quote Value</label>
+                        <p class="font-medium">${{ clin.quote_value|floatformat:2|intcomma|default:"N/A" }}</p>
+                    </div>
+                </div>
             </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">WAWF Received</p>
-                <p class="font-medium">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">WAWF Invoice</p>
-                <p class="font-medium">{{ clin.wawf_invoice|default:"N/A" }}</p>
-            </div>
-            
-            <div class="md:col-span-2">
-                <!-- Empty cell for alignment -->
-            </div>
+        </div>
         
-            <!-- Row 4 -->
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Plan Gross</p>
-                <p>Need to move plan gross to contract</p>
-                <!-- <p class="font-medium">${{ clin.plan_gross|floatformat:2|intcomma|default:"N/A" }}</p> -->
+        <!-- Shipping Information -->
+        <div>
+            <h2 class="section-header mt-2 mb-2">
+                Shipping Information
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
+                <div class="md:col-span-2">
+                    <div class="form-group">
+                        <label class="form-label">Ship Qty</label>
+                        <p class="font-medium">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</p>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-1">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="text-uppercase">UOM</span>
+                        </label>
+                        <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Ship Date</label>
+                        <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
+                            {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
+                        </p>
+                    </div>
+                </div>
             </div>
-            
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">Planned Split</p>
-                <p>Need to move planned split to contract</p>
-                <!-- <p class="font-medium">{{ clin.planned_split|default:"N/A" }}</p> -->
-            </div>
-            
-            <div class="md:col-span-2">
-                <!-- Empty cell for alignment -->
-            </div>
-            <div class="md:col-span-2">
-                <!-- Empty cell for alignment -->
-            </div>
+        </div>
+        <!-- Financial Details -->
+        <div>
+            <h2 class="section-header cursor-pointer" id="financial-details-toggle">
+                Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
+            </h2>
+            <hr class="mt-2 mb-2">
+            <div class="hidden" id="financial-details-section">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">Special Payment Terms</label>
+                            <p class="font-medium">{{ clin.special_payment_terms|default:"N/A" }}</p>
+                        </div>
+                    </div>
 
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">STATZ Split</p>
-                <p>Move statz_split to a Splits Table</p>
-                <!-- <p class="font-medium">${{ clin.statz_split|floatformat:2|default:0.00 }}</p> -->
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">Special Payment Terms Paid</label>
+                            <p class="font-medium">
+                                {% if clin.special_payment_terms_paid %}
+                                    <span class="text-green-600">Paid</span>
+                                {% else %}
+                                    <span class="text-red-600">Unpaid</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <!-- Empty cell for alignment -->
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">Paid Amount</label>
+                            <p class="font-medium">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">Paid Date</label>
+                            <p class="font-medium">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <!-- Empty cell for alignment -->
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="text-uppercase">WAWF</span> Payment
+                            </label>
+                            <p class="font-medium">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="text-uppercase">WAWF</span> Received
+                            </label>
+                            <p class="font-medium">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="text-uppercase">WAWF</span> Invoice
+                            </label>
+                            <p class="font-medium">{{ clin.wawf_invoice|default:"N/A" }}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">STATZ Paid</p>
-                <p>Move statz_split_paid to a Splits Table</p>
-                <!-- <p class="font-medium">${{ clin.statz_split_paid|floatformat:2|default:0.00 }}</p> -->
-            </div>
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">PPI Split</p>
-                <p>Move to a Splits Table</p>
-                <!-- <p class="font-medium">${{ clin.ppi_split|floatformat:2|default:0.00 }}</p> -->
-            </div>
-            <div class="md:col-span-2">
-                <p class="text-sm text-gray-600 capitalize">PPI Paid</p>
-                <p>Move to a Splits Table</p>
-                <!-- <p class="font-medium">${{ clin.ppi_split_paid|floatformat:2|default:0.00 }}</p> -->
-            </div>
-
         </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock content %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle financial details section
+        const financialToggle = document.getElementById('financial-details-toggle');
+        const financialSection = document.getElementById('financial-details-section');
+        
+        if (financialToggle && financialSection) {
+            financialToggle.addEventListener('click', function() {
+                financialSection.classList.toggle('hidden');
+                const isHidden = financialSection.classList.contains('hidden');
+                const span = financialToggle.querySelector('span');
+                if (span) {
+                    span.textContent = isHidden ? '(Click to expand)' : '(Click to collapse)';
+                }
+            });
+        }
+    });
+</script>
+{% endblock extra_scripts %} 

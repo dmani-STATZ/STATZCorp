@@ -243,17 +243,17 @@
                         </div>
                     </div>
                     <div class="md:col-span-3">
-                        <div id="Item-type-field-container">
+                        <div id="item-type-field-container">
                             <div class="form-group">
                                 <label for="{{ form.item_type.id_for_label }}" class="form-label">
                                     Item Type
                                 </label>
-                                {{ form.clin_type }}
-                                {% if form.Item_type.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.Item_type.errors }}</div>
+                                {{ form.item_type }}
+                                {% if form.item_type.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.item_type.errors }}</div>
                                 {% endif %}
                                 {% if form.item_type.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.Item_type.help_text }}</div>
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.item_type.help_text }}</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -336,7 +336,7 @@
             <!-- Item Details -->
             <div>
                 <h2 class="section-header">
-                    Item Details
+                    Item Details  (CLIN)
                 </h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -363,38 +363,25 @@
                         </div>
                     </div>
                     
-                    <div class="md:col-span-6">
-                        <!-- Simplified Supplier Field -->
+                    <div class="md:col-span-3">
                         <div class="form-group">
-                            <label for="supplier_display" class="form-label requiredField">
-                                Supplier<span class="asteriskField">*</span>
+                            <label for="{{ form.due_date.id_for_label }}" class="form-label">
+                                Due Date
                             </label>
-                            <div class="flex">
-                                <input type="text" id="supplier_display" class="form-control flex-grow" 
-                                       value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% elif form.supplier_value %}{{ form.supplier_value.name }} ({{ form.supplier_value.cage_code }}){% endif %}" 
-                                       readonly placeholder="Click to select Supplier">
-                                <button type="button" id="select_supplier_btn" class="ml-2 bg-blue-500 text-white hover:bg-blue-600 px-3 py-2 rounded">
-                                    Select
-                                </button>
-                            </div>
-                            <!-- Hidden input to store the actual Supplier ID - critical for form submission -->
-                            <input type="hidden" name="supplier" id="id_supplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% elif form.supplier_value %}{{ form.supplier_value.id }}{% elif form.data.supplier %}{{ form.data.supplier }}{% endif %}">
-                            {% if form.supplier.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.supplier.errors }}</div>
+                            {{ form.due_date }}
+                            {% if form.due_date.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.due_date.errors }}</div>
+                            {% endif %}
+                            {% if form.due_date.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.due_date.help_text }}</div>
                             {% endif %}
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Order Information -->
-            <div>
-                <h2 class="section-header">
-                    Order Information
-                </h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
-                    <!-- Row 1 -->
+
+                    <div class="md:col-span-3">
+                        <!-- Empty cell for alignment -->
+                    </div>
+
                     <div class="md:col-span-2">
                         <div class="form-group">
                             <label for="{{ form.order_qty.id_for_label }}" class="form-label{% if form.order_qty.field.required %} requiredField{% endif %}">
@@ -429,22 +416,70 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
-                            <label for="{{ form.due_date.id_for_label }}" class="form-label">
-                                Due Date
+                            <label for="{{ form.unit_price.id_for_label }}" class="form-label">
+                                Unit Price
                             </label>
-                            {{ form.due_date }}
-                            {% if form.due_date.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.due_date.errors }}</div>
+                            {{ form.unit_price }}
+                            {% if form.unit_price.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.unit_price.errors }}</div>
                             {% endif %}
-                            {% if form.due_date.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.due_date.help_text }}</div>
+                            {% if form.unit_price.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.unit_price.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            <label for="{{ form.item_value.id_for_label }}" class="form-label">
+                                Item Value
+                            </label>
+                            {{ form.item_value }}
+                            {% if form.item_value.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.item_value.errors }}</div>
+                            {% endif %}
+                            {% if form.item_value.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.item_value.help_text }}</div>
                             {% endif %}
                         </div>
                     </div>
                     
+                </div>
+            </div>
+            
+            <!-- Order Information -->
+            <div>
+                <h2 class="section-header">
+                    Order Information (Supplier)
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Row 1 -->
+                    <div class="md:col-span-6">
+                        <!-- Simplified Supplier Field -->
+                        <div class="form-group">
+                            <label for="supplier_display" class="form-label requiredField">
+                                Supplier<span class="asteriskField">*</span>
+                            </label>
+                            <div class="flex">
+                                <input type="text" id="supplier_display" class="form-control flex-grow" 
+                                       value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% elif form.supplier_value %}{{ form.supplier_value.name }} ({{ form.supplier_value.cage_code }}){% endif %}" 
+                                       readonly placeholder="Click to select Supplier">
+                                <button type="button" id="select_supplier_btn" class="ml-2 bg-blue-500 text-white hover:bg-blue-600 px-3 py-2 rounded">
+                                    Select
+                                </button>
+                            </div>
+                            <!-- Hidden input to store the actual Supplier ID - critical for form submission -->
+                            <input type="hidden" name="supplier" id="id_supplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% elif form.supplier_value %}{{ form.supplier_value.id }}{% elif form.data.supplier %}{{ form.data.supplier }}{% endif %}">
+                            {% if form.supplier.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.supplier.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.supplier_due_date.id_for_label }}" class="form-label">
@@ -456,6 +491,62 @@
                             {% endif %}
                             {% if form.supplier_due_date.help_text %}
                                 <div class="text-gray-500 text-sm mt-1">{{ form.supplier_due_date.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <!-- Empty cell for alignment -->
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <div class="form-group">
+                            <label class="form-label">
+                                Order Qty
+                            </label>
+                            <input type="number"
+                                   class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50"
+                                   value="{{ form.order_qty.value|floatformat:'0' }}"
+                                   step="any" readonly disabled>
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-1">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="text-uppercase">UOM</span>
+                            </label>
+                            <input type="text" id="shipping_uom_display" class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50" 
+                                   value="{{ form.uom.value|default:'EA' }}" readonly disabled>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            <label for="{{ form.price_per_unit.id_for_label }}" class="form-label">
+                                Price per unit
+                            </label>
+                            {{ form.price_per_unit }}
+                            {% if form.price_per_unit.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.price_per_unit.errors }}</div>
+                            {% endif %}
+                            {% if form.price_per_unit.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.price_per_unit.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            <label for="{{ form.quote_value.id_for_label }}" class="form-label">
+                                Quote Value
+                            </label>
+                            {{ form.quote_value }}
+                            {% if form.quote_value.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.quote_value.errors }}</div>
+                            {% endif %}
+                            {% if form.quote_value.help_text %}
+                                <div class="text-gray-500 text-sm mt-1">{{ form.quote_value.help_text }}</div>
                             {% endif %}
                         </div>
                     </div>
@@ -495,7 +586,7 @@
                                 <span class="text-uppercase">UOM</span>
                             </label>
                             <input type="text" id="shipping_uom_display" class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50" 
-                                   value="{{ form.uom.value|default:'EA' }}" readonly>
+                                   value="{{ form.uom.value|default:'EA' }}" readonly disabled>
                         </div>
                     </div>
                     
@@ -561,9 +652,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        
-
-                        
+                                                
                         <div class="md:col-span-4">
                             <!-- Empty cell for alignment -->
                         </div>
@@ -571,25 +660,40 @@
                         <!-- Row 2 -->
                         <div class="md:col-span-4">
                             <div class="form-group">
-                                <label for="{{ form.quote_value.id_for_label }}" class="form-label">
-                                    Quote Amount
-                                </label>
-                                {{ form.quote_value }}
-                                {% if form.quote_value.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.quote_value.errors }}</div>
+                                <label for="{{ form.paid_amount.id_for_label }}" class="form-label">Paid Amount</label>
+                                <div class="relative">
+                                    {{ form.paid_amount }}
+                                    <input type="text" 
+                                           id="paid_amount_display" 
+                                           class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                                           readonly
+                                           onclick="openPaymentHistoryPopup(`{{ form.instance.id|default:'' }}`, 'paid_amount', 'clin_form', `{{ form.paid_amount.value|default:'' }}`)"
+                                           value="{{ form.paid_amount.value|default:'' }}",
+                                    >
+                                </div>
+                                {% if form.paid_amount.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.paid_amount.errors }}</div>
                                 {% endif %}
-                                {% if form.quote_value.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.quote_value.help_text }}</div>
+                                {% if form.paid_amount.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.paid_amount.help_text }}</div>
                                 {% endif %}
                             </div>
                         </div>
                         
                         <div class="md:col-span-4">
-                            {{ form.paid_amount|as_crispy_field }}
+                            <div class="form-group">
+                                <label for="{{ form.paid_date.id_for_label }}" class="form-label">Paid Date</label>
+                                {{ form.paid_date }}
+                                {% if form.paid_date.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.paid_date.errors }}</div>
+                                {% endif %}
+                                {% if form.paid_date.help_text %}
+                                    <div class="text-gray-500 text-sm mt-1">{{ form.paid_date.help_text }}</div>
+                                {% endif %} 
+                            </div>
                         </div>
-                        
                         <div class="md:col-span-4">
-                            {{ form.paid_date|as_crispy_field }}
+
                         </div>
                         
                         <!-- Row 3 -->
@@ -598,7 +702,16 @@
                                 <label for="{{ form.wawf_payment.id_for_label }}" class="form-label">
                                     <span class="text-uppercase">WAWF</span> Payment
                                 </label>
-                                {{ form.wawf_payment }}
+                                <div class="relative">
+                                    {{ form.wawf_payment }}
+                                    <input type="text" 
+                                           id="wawf_payment_display" 
+                                           class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                                           readonly
+                                           onclick="openPaymentHistoryPopup(`{{ form.instance.id|default:'' }}`, 'wawf_payment', 'clin_form', `{{ form.wawf_payment.value|default:'' }}`)"
+                                           value="{{ form.wawf_payment.value|default:'' }}",
+                                    >
+                                </div>
                                 {% if form.wawf_payment.errors %}
                                     <div class="text-red-500 text-sm mt-1">{{ form.wawf_payment.errors }}</div>
                                 {% endif %}
@@ -636,13 +749,6 @@
                                     <div class="text-gray-500 text-sm mt-1">{{ form.wawf_invoice.help_text }}</div>
                                 {% endif %}
                             </div>
-                        </div>
-                        
-                        <!-- Row 4 -->
-
-                        
-                        <div class="md:col-span-4">
-                            {{ form.item_value }}
                         </div>
                     </div>
                 </div>
@@ -792,6 +898,9 @@
         </div>
     </div>
 </div>
+
+<!-- Include the payment history popup -->
+{% include "contracts/includes/payment_history_popup.html" %}
 
 {% endblock content %}
 
@@ -1282,6 +1391,47 @@
                 }
             });
         }
+
+        // Function to update payment field values
+        function updatePaymentFieldValue(fieldId, newValue) {
+            const displayField = document.getElementById(`${fieldId}_display`);
+            const hiddenField = document.getElementById(`id_${fieldId}`);
+            if (displayField && hiddenField) {
+                const formattedValue = formatCurrency(newValue);
+                displayField.value = formattedValue;
+                hiddenField.value = newValue;
+            }
+        }
+
+        // Override the default form submission to handle payment history updates
+        const originalSubmit = document.getElementById('newHistoryForm').onsubmit;
+        document.getElementById('newHistoryForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const popup = document.getElementById('paymentHistoryPopup');
+            const fieldType = popup.dataset.fieldType;
+            
+            // Call the original submit handler
+            if (originalSubmit) {
+                await originalSubmit.call(this, e);
+            }
+
+            // Update the corresponding field value
+            if (fieldType === 'paid_amount' || fieldType === 'wawf_payment') {
+                const responseData = await response.json();
+                if (responseData.success) {
+                    updatePaymentFieldValue(fieldType, responseData.new_total);
+                }
+            }
+        };
+
+        // Hide the original form fields and style the display fields
+        const paymentFields = ['paid_amount', 'wawf_payment'];
+        paymentFields.forEach(fieldId => {
+            const originalField = document.getElementById(`id_${fieldId}`);
+            if (originalField) {
+                originalField.style.display = 'none';
+            }
+        });
     });
 </script>
 {% endblock extra_scripts %}

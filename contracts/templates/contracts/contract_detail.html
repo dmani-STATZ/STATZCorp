@@ -202,7 +202,7 @@
             {% endif %}
 
             <!-- Contract Details Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="p-2">
                     <p class="text-sm text-gray-600">PO Number</p>
                     <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
@@ -216,6 +216,8 @@
                         <p class="text-sm text-gray-600">Buyer</p>
                         <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
                     </div>
+                </div>
+                <div class="p-2">
                     {% if contract.files_url %}
                     <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')" 
                         class="flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-150">
@@ -225,7 +227,6 @@
                         </svg>
                         Files
                     </button>
-                    <a href="{{ contract.files_url }}" target="_blank">Files</a>
                     {% endif %}
                 </div>
                 <div class="p-2">
@@ -241,6 +242,10 @@
                 <div class="p-2">
                     <p class="text-sm text-gray-600">Sales Class</p>
                     <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+                </div>
+                <div class="p-2">
+                    <p class="text-sm text-gray-600">Solisitation Type</p>
+                    <p class="font-medium">{{ contract.solicitation_type|default:"N/A" }}</p>
                 </div>
             </div>
             <!-- Toast message for clipboard copy -->

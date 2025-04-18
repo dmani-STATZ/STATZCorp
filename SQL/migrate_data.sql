@@ -1871,4 +1871,22 @@ SET                closed = 1
 WHERE        (stack = N'CLOSE');
 
 
+-- Update Solicitation Type
+print ('##########################################')
+print 'Update Solicitation Type'
+print ('##########################################')
+
+UPDATE contracts_contract
+SET solicitation_type = 'SDVOSB'
+WHERE left(contract_number,3) = 'SPE';
+
+UPDATE contracts_contract
+SET solicitation_type = 'OTHER'
+WHERE left(contract_number,3) <> 'SPE';
+
+
+
+
+
+
 

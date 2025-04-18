@@ -317,11 +317,11 @@ class ClinForm(forms.ModelForm):
         model = Clin
         fields = [
             'contract', 'po_num_ext', 'tab_num', 
-            'clin_po_num', 'po_number', 'clin_type', 'supplier', 
+            'clin_po_num', 'po_number', 'supplier', 
             'nsn', 'ia', 'fob', 'order_qty', 'ship_qty', 
             'due_date', 'supplier_due_date', 'ship_date',
             'special_payment_terms', 'special_payment_terms_paid', 
-            'quote_value', 'paid_amount', 
+            'quote_value', 'paid_amount','unit_price', 'price_per_unit',
             'paid_date', 'wawf_payment', 'wawf_recieved', 
             'wawf_invoice', 'item_number', 'item_type', 'item_value'
         ]
@@ -348,9 +348,6 @@ class ClinForm(forms.ModelForm):
             'po_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter PO Number'
-            }),
-            'clin_type': forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
             }),
             'supplier': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none',
@@ -393,12 +390,13 @@ class ClinForm(forms.ModelForm):
             'quote_value': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter PO Amount',
-                'step': '0.0001'
+                'step': '0.01'
             }),
             'paid_amount': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter Paid Amount',
-                'step': '0.0001'
+                'placeholder': 'Click to open History',
+                'step': '0.01',
+                'readonly': True
             }),
             'paid_date': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -406,8 +404,9 @@ class ClinForm(forms.ModelForm):
             }),
             'wawf_payment': forms.NumberInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
-                'placeholder': 'Enter WAWF Payment',
-                'step': '0.0001'
+                'placeholder': 'Click to open History',
+                'step': '0.01',
+                'readonly': True
             }),
             'wawf_recieved': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -416,7 +415,37 @@ class ClinForm(forms.ModelForm):
             'wawf_invoice': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'placeholder': 'Enter WAWF Invoice'
-            })
+            }),
+            'item_number': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Item Number'
+            }),
+            'item_type': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px]'
+            }),
+            'item_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Item Value'
+            }),
+            'price_per_unit': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Price Per Unit'
+            }),
+            'quote_value': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Quote Value',
+                'step': '0.01'
+            }),
+            'unit_price': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Unit Price',
+                'step': '0.01'
+            }),
+            'price_per_unit': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Price Per Unit',
+                'step': '0.01'
+            }),
         }
         
     def __init__(self, *args, **kwargs):
@@ -436,7 +465,7 @@ class ClinForm(forms.ModelForm):
                 self.fields['contract'].queryset = Contract.objects.all().order_by('contract_number')
                 
             # Load all options for other foreign key fields
-            self.fields['clin_type'].queryset = ClinType.objects.all().order_by('description')
+            self.fields['item_type'].choices = self._meta.model.ITEM_TYPE_CHOICES
             self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.all().order_by('terms')
             
             # NSN and Supplier are handled via custom modal UI, so we keep them empty
@@ -474,8 +503,8 @@ class ClinForm(forms.ModelForm):
             # Load all contracts
             self.fields['contract'].queryset = Contract.objects.all().order_by('contract_number')
             
-            # Load all CLIN types
-            self.fields['clin_type'].queryset = ClinType.objects.all().order_by('description')
+            # Load all Item types
+            self.fields['item_type'].choices = self._meta.model.ITEM_TYPE_CHOICES
             
             # Load all special payment terms
             self.fields['special_payment_terms'].queryset = SpecialPaymentTerms.objects.all().order_by('terms')
