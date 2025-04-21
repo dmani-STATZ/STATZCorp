@@ -150,10 +150,10 @@
                     <tr class="hover:bg-gray-50 text-xs">
                         <td class="px-1.5 py-1">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                              {% if clin.contract.cancelled %}bg-red-100 text-red-800
+                                              {% if clin.contract.status.description == 'Cancelled' %}bg-red-100 text-red-800
                                               {% elif clin.contract.date_closed %}bg-yellow-100 text-yellow-800
                                               {% else %}bg-green-100 text-green-800{% endif %}">
-                                            {% if clin.contract.cancelled %}Cancelled
+                                            {% if clin.contract.status.description == 'Cancelled' %}Cancelled
                                             {% elif clin.contract.date_closed %}Closed
                                             {% else %}Open{% endif %}
                                 </span>

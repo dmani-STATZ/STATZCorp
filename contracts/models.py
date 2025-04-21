@@ -31,9 +31,7 @@ class Contract(AuditModel):
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     status = models.ForeignKey('ContractStatus', on_delete=models.CASCADE, null=True, blank=True)
     solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
-    open = models.BooleanField(null=True, blank=True)
     date_closed = models.DateTimeField(null=True, blank=True)
-    cancelled = models.BooleanField(null=True, blank=True)
     date_canceled = models.DateTimeField(null=True, blank=True)
     canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE, null=True, blank=True)
     po_number = models.CharField(max_length=10, null=True, blank=True) # maybe part of clin?
@@ -72,14 +70,11 @@ class Contract(AuditModel):
             models.Index(fields=['contract_number'], name='contract_number_idx'),
             models.Index(fields=['po_number'], name='contract_po_number_idx'),
             models.Index(fields=['tab_num'], name='contract_tab_num_idx'),
-            models.Index(fields=['open'], name='contract_open_idx'),
-            models.Index(fields=['cancelled'], name='contract_cancelled_idx'),
             models.Index(fields=['due_date'], name='contract_due_idx'),
             models.Index(fields=['award_date'], name='contract_award_idx'),
             models.Index(fields=['assigned_user'], name='contract_assigned_idx'),
             
             # Compound indexes for common query patterns
-            models.Index(fields=['open', 'due_date'], name='contract_open_due_idx'),
             models.Index(fields=['status', 'due_date'], name='contract_status_due_idx'),
             models.Index(fields=['due_date_late'], name='contract_due_late_idx'),
             models.Index(fields=['reviewed'], name='contract_reviewed_idx'),

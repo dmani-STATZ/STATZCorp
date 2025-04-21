@@ -261,10 +261,12 @@
                                 </p>
                             </div>
                             <div class="flex items-center space-x-2">
-                                {% if contract.open %}
+                                {% if contract.status.description == 'Open' %}
                                 <span class="status-badge success">Open</span>
-                                {% else %}
+                                {% elif contract.status.description == 'Closed' %}
                                 <span class="status-badge danger">Closed</span>
+                                {% elif contract.status.description == 'Cancelled' %}
+                                <span class="status-badge warning">Cancelled</span>
                                 {% endif %}
                             </div>
                         </div>

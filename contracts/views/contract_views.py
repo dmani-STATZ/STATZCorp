@@ -270,11 +270,9 @@ class ContractCancelView(UpdateView):
             cancelled_status = ContractStatus.objects.get(description='Cancelled')
             
             # Update contract
-            contract.cancelled = True
             contract.date_canceled = timezone.now()
             contract.cancelled_by = request.user
             contract.canceled_reason = cancel_reason
-            contract.open = False
             contract.status = cancelled_status
             contract.save()
             

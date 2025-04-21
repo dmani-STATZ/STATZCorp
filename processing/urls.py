@@ -1,14 +1,6 @@
 from django.urls import path
 from django.shortcuts import redirect
-from .views.queue_views import (
-    ContractQueueListView,
-    get_next_numbers,
-    download_csv_template,
-    download_test_data,
-    upload_csv,
-    cancel_processing as queue_cancel_processing,
-    initiate_processing
-)
+
 from .views.processing_views import (
     ProcessContractDetailView,
     ProcessContractUpdateView,
@@ -28,7 +20,14 @@ from .views.processing_views import (
     mark_ready_for_review,
     start_new_contract,
     finalize_and_email_contract,
-    save_contract_data
+    save_contract_data,
+    ContractQueueListView,
+    get_next_numbers,
+    download_csv_template,
+    download_test_data,
+    upload_csv,
+    cancel_processing as queue_cancel_processing,
+    initiate_processing
 )
 from .views.api_views import (
     get_processing_contract,

@@ -93,7 +93,7 @@
 
         <!-- Contract Header - Right Columns -->
         <div class="col-span-2 bg-white shadow-lg rounded-lg p-4">
-            {% if contract.cancelled %}
+            {% if contract.status.description == 'Cancelled' %}
                 <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
                     <h1 class="text-2xl font-bold text-gray-800">
                         Contract {{ contract.contract_number }}
@@ -109,7 +109,7 @@
                         </a>
                     </div>
                 </div>
-            {% elif not contract.open %}
+            {% elif contract.status.description == 'Closed' %}
                 <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
                     <h1 class="text-2xl font-bold text-gray-800">
                         Contract {{ contract.contract_number }}

@@ -118,7 +118,7 @@ class SupplierDetailView(DetailView):
         
         contract_stats = {
             'total_contracts': contracts.count(),
-            'active_contracts': contracts.filter(open=True).count(),
+            'active_contracts': contracts.filter(status__description='Open').count(),
             'total_value': Clin.objects.filter(supplier=supplier).aggregate(
                 total=Sum('quote_value', output_field=DecimalField())
             )['total'] or 0,

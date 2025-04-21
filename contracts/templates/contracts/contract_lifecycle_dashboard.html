@@ -169,7 +169,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for contract in contracts %}
-                        <tr class="{% if contract.cancelled %}bg-red-50{% elif not contract.open %}bg-gray-50{% endif %} hover:bg-gray-100">
+                        <tr class="{% if contract.status.description == 'Cancelled' %}bg-red-50{% elif contract.status.description == 'Open' %}bg-gray-50{% endif %} hover:bg-gray-100">
                             <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                     {% if contract.status.description == 'Cancelled' %}
@@ -206,7 +206,7 @@
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                                 {% if contract.due_date %}
                                     {{ contract.due_date|date:"M d, Y" }}
-                                    {% if contract.open and contract.due_date < today %}
+                                    {% if contract.status.description == 'Open' and contract.due_date < today %}
                                         <span class="text-red-600 font-medium">(Overdue)</span>
                                     {% endif %}
                                 {% else %}
@@ -287,7 +287,7 @@
                     </div>
                     <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
                         {% if metrics.open_contracts > 0 %}
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ metrics.on_time_percentage }}%">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: '{{ metrics.on_time_percentage }}%'">
                             </div>
                             <div class="text-xs text-center mt-1">{{ metrics.on_time_percentage }}%</div>
                         {% endif %}

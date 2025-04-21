@@ -55,16 +55,16 @@ class ContractLogView(ListView):
         if status_filter:
             if status_filter == 'open':
                 clins = clins.filter(
-                    Q(contract__cancelled=False) & 
+                    Q(contract__status__description='Open') &
                     Q(contract__date_closed__isnull=True)
                 )
             elif status_filter == 'closed':
                 clins = clins.filter(
-                    Q(contract__cancelled=False) & 
+                    Q(contract__status__description='Closed') &
                     Q(contract__date_closed__isnull=False)
                 )
             elif status_filter == 'cancelled':
-                clins = clins.filter(contract__cancelled=True)
+                clins = clins.filter(contract__status__description='Cancelled')
         
         if supplier_filter:
             # Get all contract IDs that have any CLIN with the specified supplier
@@ -197,7 +197,7 @@ def export_contract_log(request):
         acknowledgment = clin.clinacknowledgment_set.first()
         
         writer.writerow([
-            'Cancelled' if clin.contract.cancelled else 'Closed' if clin.contract.date_closed else 'Open',
+            'Cancelled' if clin.contract.status.description == 'Cancelled' else 'Closed' if clin.contract.date_closed else 'Open',
             clin.contract.tab_num,
             clin.contract.po_number,
             clin.contract.idiq_contract.contract_number if clin.contract.idiq_contract else '',

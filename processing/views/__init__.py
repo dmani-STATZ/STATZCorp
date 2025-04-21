@@ -1,4 +1,9 @@
-from .queue_views import (
+from .processing_views import (
+    ProcessContractDetailView,
+    ProcessContractUpdateView,
+    finalize_contract,
+    ProcessClinFormSet,
+    process_contract_form,
     ContractQueueListView,
     get_next_numbers,
     initiate_processing,
@@ -6,14 +11,6 @@ from .queue_views import (
     download_csv_template,
     download_test_data,
     upload_csv
-)
-
-from .processing_views import (
-    ProcessContractDetailView,
-    ProcessContractUpdateView,
-    finalize_contract,
-    ProcessClinFormSet,
-    process_contract_form
 )
 
 from .matching_views import (

@@ -127,7 +127,7 @@ def search_contracts(request):
         contracts = Contract.objects.filter(
             Q(contract_number__icontains=search_query) |
             Q(po_number__icontains=search_query),
-            open=True
+            status__description='Open'
         ).order_by('contract_number')[:10]  # Limit to 10 results for performance
     
     context = {

@@ -164,8 +164,8 @@ class ContractForm(forms.ModelForm):
     class Meta:
         model = Contract
         fields = [
-            'idiq_contract', 'contract_number', 'status', 'open', 'date_closed',
-            'cancelled', 'date_canceled', 'canceled_reason', 'po_number', 'tab_num',
+            'idiq_contract', 'contract_number', 'status', 'date_closed',
+            'date_canceled', 'canceled_reason', 'po_number', 'tab_num',
             'buyer', 'contract_type', 'award_date', 'due_date', 'due_date_late',
             'sales_class', 'survey_date', 'survey_type', 'assigned_user',
             'assigned_date', 'nist', 'files_url', 'reviewed', 'reviewed_by',
@@ -182,15 +182,9 @@ class ContractForm(forms.ModelForm):
             'status': forms.Select(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
-            'open': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-            }),
             'date_closed': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'type': 'datetime-local'
-            }),
-            'cancelled': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
             }),
             'date_canceled': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -287,10 +281,10 @@ class ContractForm(forms.ModelForm):
 class ContractCloseForm(forms.ModelForm):
     class Meta:
         model = Contract
-        fields = ['open', 'date_closed']
+        fields = ['status', 'date_closed']
         widgets = {
-            'open': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            'status': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'date_closed': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -301,10 +295,10 @@ class ContractCloseForm(forms.ModelForm):
 class ContractCancelForm(forms.ModelForm):
     class Meta:
         model = Contract
-        fields = ['cancelled', 'date_canceled', 'canceled_reason']
+        fields = ['status', 'date_canceled', 'canceled_reason']
         widgets = {
-            'cancelled': forms.CheckboxInput(attrs={
-                'class': 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+            'status': forms.Select(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
             }),
             'date_canceled': forms.DateTimeInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',

@@ -3,7 +3,6 @@ from django.contrib.auth.decorators import login_required
 
 # Import views from modular structure
 from .views.processing_views import process_contract_form
-from .views.queue_views import queue_view
 from .views.matching_views import match_buyer, match_supplier, match_nsn
 from .views.api_views import (
     save_and_return,
