@@ -8,6 +8,8 @@ Contract Details: {{ contract.contract_number }}
 
 {% block extra_head %}
 {{ block.super }}
+<!-- Add Toastify CSS for notifications -->
+<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 <style>
     /* Form label styling */
     .section-header {
@@ -27,6 +29,7 @@ Contract Details: {{ contract.contract_number }}
         font-size: 0.875rem;
         font-weight: 500;
         color: #4b5563;
+        margin-bottom: 0.5rem;
         display: block;
         font-family: inherit;
     }
@@ -72,6 +75,32 @@ Contract Details: {{ contract.contract_number }}
 
                 <div class="md:col-span-3">
                     <div class="form-group">
+                        <label class="form-label">IDIQ Contract</label>
+                        {% if contract.idiq_contract %}
+                            <a href="{% url 'contracts:idiq_contract_detail' contract.idiq_contract.id %}" class="font-medium">
+                                {{ contract.idiq_contract|default:"N/A" }}</a>
+                        {% else %}
+                            <p class="font-medium">N/A</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Prime</label>
+                        <p class="font-medium">{{ contract.prime|default:"N/A" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <label class="form-label">Prime PO Number</label>
+                        <p class="font-medium">{{ contract.prime_po_number|default:"N/A" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
                         <label class="form-label">Solicitation Type</label>
                         <p class="font-medium">{{ contract.solicitation_type }}</p>
                     </div>
@@ -92,6 +121,12 @@ Contract Details: {{ contract.contract_number }}
                             <span class="text-uppercase">TAB</span> Number
                         </label>
                         <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <div class="form-group">
+                        <!-- Empty -->
                     </div>
                 </div>
                 
@@ -144,10 +179,6 @@ Contract Details: {{ contract.contract_number }}
                 </div>
 
                 <div class="md:col-span-3">
-
-                </div>
-
-                <div class="md:col-span-4">
                     <div class="form-group">
                         <label class="form-label">
                             <span class="text-uppercase">NIST</span>
@@ -181,51 +212,7 @@ Contract Details: {{ contract.contract_number }}
         </div>
         
         <!-- Contract Splits -->
-        <div>
-            <h2 class="section-header">Contract Splits</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Value</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Paid</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for split in contract.splits.all %}
-                        <tr>
-                            <td class="px-4 py-3">
-                                <p class="font-medium">{{ split.company_name }}</p>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <p class="font-medium">${{ split.split_value|floatformat:2|intcomma|default:"0.00" }}</p>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <p class="font-medium">${{ split.split_paid|floatformat:2|intcomma|default:"0.00" }}</p>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="px-4 py-3 text-center text-gray-500">
-                                No splits found
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Total Split Value Display -->
-            <div class="mt-4 text-right">
-                {% if contract.total_split_value != contract.plan_gross %}
-                    <p class="text-sm text-red-600">Total Split Value: ${{ contract.total_split_value|floatformat:2|intcomma }}</p>
-                {% else %}
-                    <p class="text-sm text-gray-600">Total Split Value: ${{ contract.plan_gross|floatformat:2|intcomma }}</p>
-                {% endif %}
-                <p class="text-sm text-gray-600">Total Split Paid: ${{ contract.contract_value|floatformat:2|intcomma }}</p>
-            </div>
-        </div>
+        {% include "contracts/partials/contract_splits.html" with mode="detail" contract=contract %}
 
         <!-- Management Information -->
         <div class="border-t border-gray-200 pt-6">
@@ -283,4 +270,12 @@ Contract Details: {{ contract.contract_number }}
         </div>
     </div>
 </div>
-{% endblock content %} 
+{% endblock content %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<!-- Add Toastify JS for notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<!-- Add Contract Splits Component JS -->
+<script src="{% static 'contracts/js/contract_splits.js' %}"></script>
+{% endblock %} 

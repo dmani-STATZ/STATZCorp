@@ -9,6 +9,8 @@
 
 {% block extra_head %}
 {{ block.super }}
+<!-- Add Toastify CSS for notifications -->
+<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 <style>
     /* Form label styling */
     .form-label {
@@ -30,9 +32,11 @@
     .section-header {
         font-size: 1.125rem;
         font-weight: 600;
-        color: #374151;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
+        color: #0f1216;
+        background-color: #f0f0f0;
+        margin-top: 1rem;
+        padding: 0.5rem;
+        padding-top: 0.5rem;
         border-bottom: 1px solid #e5e7eb;
         font-family: inherit;
     }
@@ -137,6 +141,33 @@
 
                     <div class="md:col-span-3">
                         <div class="form-group">
+                            <label class="form-label">
+                                <span class="text-uppercase">IDIQ</span> Contract
+                            </label>
+                            {{ form.idiq_contract }}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            <label class="form-label">
+                                Prime
+                            </label>
+                            {{ form.prime }}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+                            <label class="form-label">
+                                Prime PO Number
+                            </label>
+                            {{ form.prime_po_number }}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
                             <label for="{{ form.solicitation_type.id_for_label }}" class="form-label">Solicitation Type</label>
                             {{ form.solicitation_type }}
                             {% if form.solicitation_type.errors %}
@@ -166,6 +197,12 @@
                             {% if form.tab_num.errors %}
                                 <div class="text-red-500 text-sm mt-1">{{ form.tab_num.errors }}</div>
                             {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+
                         </div>
                     </div>
                     
@@ -205,7 +242,13 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
+                    <div class="md:col-span-3">
+                        <div class="form-group">
+
+                        </div>
+                    </div>
+
                     <!-- Row 3 -->
                     <div class="md:col-span-3">
                         <div class="form-group">
@@ -294,89 +337,7 @@
             </div>
             
             <!-- Contract Splits -->
-            <div>
-                <div class="flex justify-between items-center mb-4">
-                <h2 class="section-header">Contract Splits</h2>
-                <button type="button" 
-                    onclick="addNewSplit()"
-                    class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
-                    Add New Split
-                    </button>
-                </div>
-                    <!-- Dynamic Splits Table -->
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200" id="splitsTable">
-                        <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Value</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Paid</th>
-                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% for split in form.instance.splits.all %}
-                                <tr class="split-row" data-id="{{ split.id }}">
-                                    <td class="px-4 py-3">
-                                        <input type="text" 
-                                               name="splits-{{ split.id }}-company" 
-                                               value="{{ split.company_name }}" 
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <input type="hidden" name="splits-{{ split.id }}-id" value="{{ split.id }}">
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <input type="number" 
-                                               step="0.01" 
-                                               name="splits-{{ split.id }}-value" 
-                                               value="{{ split.split_value }}" 
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <input type="number" 
-                                               step="0.01" 
-                                               name="splits-{{ split.id }}-paid" 
-                                               value="{{ split.split_paid }}" 
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="flex justify-center space-x-2">
-                                            <button type="button" 
-                                                    onclick="saveSplit(this)" 
-                                                    class="text-green-600 hover:text-green-900"
-                                                    title="Save Split">
-                                                <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
-                                                    <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
-                                                </svg>
-                                            </button>
-                                            <button type="button" 
-                                                    onclick="removeSplit(this)" 
-                                                    class="text-red-600 hover:text-red-900"
-                                                    title="Delete Split">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Total Split Value Display -->
-                    <div class="mt-4 text-right">
-                        {% if form.instance.total_split_value != form.instance.plan_gross %}
-                            <p class="text-sm text-red-600">Total Split Value: ${{ form.instance.total_split_value|floatformat:2|intcomma }}</p>
-                        {% else %}
-                            <p class="text-sm text-gray-600">Total Split Value: ${{ form.instance.plan_gross|floatformat:2|intcomma }}</p>
-                        {% endif %}
-                        {% if form.instance.total_split_paid != form.instance.contract_value %}
-                            <p class="text-sm text-gray-600">Total Split Paid: ${{ form.instance.total_split_paid|floatformat:2|intcomma }}</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            {% include "contracts/partials/contract_splits.html" with mode="form" contract=form.instance %}
 
             <!-- Management Information -->
             <div class="border-t border-gray-200 pt-6">
@@ -470,14 +431,13 @@
 
 {% block extra_scripts %}
 {{ block.super }}
-<script>
-    function showStatus(message, type) {
-        const statusDiv = document.getElementById('extraction-status');
-        statusDiv.className = `mt-4 p-4 rounded-md ${type === 'error' ? 'bg-red-100 text-red-700' : type === 'success' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`;
-        statusDiv.textContent = message;
-        statusDiv.classList.remove('hidden');
-    }
+<!-- Add Toastify JS for notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<!-- Add Contract Splits Component JS -->
+<script src="{% static 'contracts/js/contract_splits.js' %}"></script>
 
+<!-- DD1155 extraction script -->
+<script>
     document.addEventListener('DOMContentLoaded', function() {
         const extractButton = document.getElementById('extract-dd1155-btn');
         const fileInput = document.getElementById('dd1155-file');
@@ -626,193 +586,6 @@
                 }
             });
         }
-    });
-
-    function showMessage(message, type) {
-        // You can implement this to show feedback to users
-        console.log(`${type}: ${message}`);
-    }
-
-    function updateTotalSplitValue() {
-        const splitValues = document.querySelectorAll('input[name$="-value"]');
-        let total = 0;
-        splitValues.forEach(input => {
-            total += parseFloat(input.value || 0);
-        });
-        document.getElementById('totalSplitValue').textContent = total.toFixed(2);
-    }
-
-    function addNewSplit() {
-        const table = document.querySelector('#splitsTable tbody');
-        const timestamp = new Date().getTime(); // Use timestamp as temporary ID
-        
-        const newRow = document.createElement('tr');
-        newRow.className = 'split-row unsaved-split';
-        newRow.innerHTML = `
-            <td class="px-4 py-3 relative">
-                <div class="flex items-center gap-2">
-                    <input type="text" 
-                           name="splits-new-${timestamp}-company" 
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
-                    <span class="bg-yellow-200 text-yellow-800 text-xs font-medium px-2 py-1 rounded whitespace-nowrap">
-                        Unsaved
-                    </span>
-                </div>
-                <input type="hidden" name="splits-new-${timestamp}-id" value="">
-            </td>
-            <td class="px-4 py-3">
-                <input type="number" 
-                       step="0.01" 
-                       name="splits-new-${timestamp}-value" 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
-            </td>
-            <td class="px-4 py-3">
-                <input type="number" 
-                       step="0.01" 
-                       name="splits-new-${timestamp}-paid" 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
-            </td>
-            <td class="px-4 py-3">
-                <div class="flex justify-center space-x-2">
-                    <button type="button" 
-                            onclick="saveSplit(this)" 
-                            class="text-green-600 hover:text-green-900"
-                            title="Save Split">
-                        <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
-                            <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
-                        </svg>
-                    </button>
-                    <button type="button" 
-                            onclick="removeSplit(this)" 
-                            class="text-red-600 hover:text-red-900"
-                            title="Delete Split">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                    </button>
-                </div>
-            </td>
-        `;
-        
-        table.appendChild(newRow);
-        updateTotalSplitValue();
-    }
-
-    async function saveSplit(button) {
-        const row = button.closest('tr');
-        const contractId = "{{ form.instance.pk|default:'null' }}";
-        if (!contractId) {
-            showMessage('Please save the contract first before adding splits.', 'error');
-            return;
-        }
-
-        const splitId = row.querySelector('input[name$="-id"]').value;
-        const companyInput = row.querySelector('input[name$="-company"]');
-        const valueInput = row.querySelector('input[name$="-value"]');
-        const paidInput = row.querySelector('input[name$="-paid"]');
-
-        // Format the data according to the model fields
-        const splitData = {
-            company_name: companyInput.value.trim(),
-            split_value: parseFloat(valueInput.value) || 0.00,
-            split_paid: parseFloat(paidInput.value) || 0.00
-        };
-
-        try {
-            const url = splitId ? 
-                `/contracts/api/splits/update/${splitId}/` :
-                `/contracts/api/splits/create/`;
-            
-            // If creating new split, include contract_id
-            if (!splitId) {
-                splitData.contract_id = contractId;
-            }
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify(splitData)
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Update the row with the saved data
-                if (!splitId) {
-                    // Update the row with the new split ID
-                    row.querySelector('input[name$="-id"]').value = data.split_id;
-                    row.classList.remove('unsaved-split');
-                    
-                    // Update input names with the new ID
-                    companyInput.name = `splits-${data.split_id}-company`;
-                    valueInput.name = `splits-${data.split_id}-value`;
-                    paidInput.name = `splits-${data.split_id}-paid`;
-                    
-                    // Remove unsaved styling
-                    companyInput.classList.remove('bg-yellow-50');
-                    valueInput.classList.remove('bg-yellow-50');
-                    paidInput.classList.remove('bg-yellow-50');
-                    
-                    // Remove the "Unsaved" label
-                    const unsavedLabel = row.querySelector('.bg-yellow-200');
-                    if (unsavedLabel) {
-                        unsavedLabel.remove();
-                    }
-                }
-                
-                showMessage('Split saved successfully', 'success');
-                updateTotalSplitValue();
-            } else {
-                throw new Error(data.error || 'Failed to save split');
-            }
-        } catch (error) {
-            console.error('Save split error:', error);
-            showMessage('Error saving split: ' + error.message, 'error');
-        }
-    }
-
-    async function removeSplit(button) {
-        const row = button.closest('tr');
-        const splitId = row.querySelector('input[name$="-id"]').value;
-
-        if (!splitId) {
-            // If it's a new unsaved split, just remove from UI
-            row.remove();
-            updateTotalSplitValue();
-            return;
-        }
-
-        try {
-            const response = await fetch(`/contracts/api/splits/delete/${splitId}/`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                row.remove();
-                updateTotalSplitValue();
-                showMessage('Split deleted successfully', 'success');
-            } else {
-                throw new Error(data.error || 'Failed to delete split');
-            }
-        } catch (error) {
-            console.error('Delete split error:', error);
-            showMessage('Error deleting split: ' + error.message, 'error');
-        }
-    }
-
-    // Initialize total split value on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        updateTotalSplitValue();
     });
 </script>
 {% endblock %}

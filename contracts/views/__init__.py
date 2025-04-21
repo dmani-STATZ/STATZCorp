@@ -131,9 +131,10 @@ from .acknowledgment_views import (
 )
 
 from .split_views import (
-    create_split_view,
-    update_split_view,
-    delete_split_view,
+    create_split,
+    update_split,
+    delete_split,
+    get_contract_splits,
 )
 
 __all__ = [

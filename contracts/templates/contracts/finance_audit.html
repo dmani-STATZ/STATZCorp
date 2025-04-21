@@ -4,6 +4,11 @@
 
 {% block title %}Finance Audit{% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+    <link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <div class="w-full px-4 py-4">
     <div class="flex flex-col items-center mb-6">
@@ -47,42 +52,49 @@
             
             <!-- Contract Info -->
             <div class="p-4 space-y-2 bg-white">
-                <div class="grid grid-cols-2 gap-x-8 text-sm">
-                    <div class="flex">
+                <div class="grid grid-cols-2 gap-x-8 text-sm p-2">
+                    <div class="flex p-2">
                         <span class="font-medium w-32">Tab #</span>
                         <span>{{ contract.tab_num|default:"-" }}</span>
                     </div>
-                    <div class="flex">
+                    <div class="flex p-2">
                         <span class="font-medium w-32">PO #</span>
                         <span>{{ contract.po_number|default:"-" }}</span>
                     </div>
-                </div>
-                <div class="grid grid-cols-2 gap-x-8 text-sm">
-                    <div class="flex">
+                    <div class="flex p-2">
                         <span class="font-medium w-32">Buyer</span>
                         <span>{{ contract.buyer }}</span>
                     </div>
-                    <div class="flex">
+                    <div class="flex p-2">
                         <span class="font-medium w-32">Contract Type</span>
                         <span>{{ contract.contract_type }}</span>
                     </div>
-                </div>
-                <div class="grid grid-cols-2 gap-x-8 text-sm">
-                    <div class="flex">
+                    <div class="flex p-2">
                         <span class="font-medium w-32">Award Date</span>
                         <span>{{ contract.award_date|date:"m/d/Y" }}</span>
                     </div>
-                    <div class="flex justify-between">
-                        <div class="flex">
-                            <span class="font-medium w-32">Due Date</span>
-                            <span>{{ contract.due_date|date:"m/d/Y" }}</span>
-                        </div>
-                        <div class="flex">
-                            <span class="font-medium mr-2">Contract Value:</span>
-                            <span>${{ contract.contract_value|floatformat:2|intcomma }}</span>
-                        </div>
+                    <div class="flex p-2">
+                        <span class="font-medium w-32">Due Date</span>
+                        <span>{{ contract.due_date|date:"m/d/Y" }}</span>
+                    </div>
+                    <div class="flex p-2">
+                        <span class="font-medium w-32">Contract Value:</span>
+                        <span>${{ contract.contract_value|floatformat:2|intcomma }}</span>
+                    </div>
+                    <div class="flex p-2">
+                        <span class="font-medium w-32">Plan Gross:</span>
+                        <span>${{ contract.plan_gross|floatformat:2|intcomma }}</span>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Splits Table-->
+     <div class="w-full px-4 py-4">
+        <div class="flex flex-col items-center mb-6">
+            <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
+                {% include 'contracts/partials/contract_splits.html' with mode="detail" contract=contract %}
             </div>
         </div>
     </div>
@@ -182,14 +194,6 @@
                                     </div>
                                 </div>
                             </th>
-                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Plan Gross</span>
-                                    <div class="tooltip-text">
-                                        The amount we plan to make for this item
-                                    </div>
-                                </div>
-                            </th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 <div class="tooltip-container">
                                     <span>Terms</span>
@@ -214,30 +218,6 @@
                                     </div>
                                 </div>
                             </th>
-                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Paid PPI</span>
-                                    <div class="tooltip-text tooltip-text-right">
-                                        The amount we've paid paid PPI
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Paid STATZ</span>
-                                    <div class="tooltip-text tooltip-text-right">
-                                        The amount we've paid paid STATZ
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Split Per Bid</span>
-                                    <div class="tooltip-text tooltip-text-right">
-                                        The split we've negotiated for this item
-                                    </div>
-                                </div>
-                            </th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -254,8 +234,6 @@
                             <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}">${{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}</td>
                             <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}">${{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}</td>
                             <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="wawf_payment" data-value="{{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}">${{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="plan_gross" >Need to move this plan_gross to contract</td>
-                            <!-- <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="plan_gross" data-value="{{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}">${{ clin.plan_gross|floatformat:2|intcomma|default:"0.00" }}</td> -->
                             <td class="px-4 py-2 text-sm text-left">
                                 <div class="relative inline-block">
                                     <select class="w-30 appearance-none rounded border-gray-300 pr-8 pl-2 py-1 text-sm focus:border-blue-500 focus:ring-blue-500"
@@ -277,18 +255,6 @@
                                        value="{{ clin.special_payment_terms_party|default:'PPI' }}"
                                        data-clin="{{ clin.id }}" 
                                        data-field="special_payment_terms_party">
-                            </td>
-                            <td class="px-4 py-2 text-sm text-left">Move ppi_split_paid to a Splits Table</td>
-                            <td class="px-4 py-2 text-sm text-left">Move statz_split_paid to a Splits Table</td>
-                            <!-- <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="ppi_split_paid" data-value="{{ clin.ppi_split_paid|floatformat:2|default:"0.00" }}">${{ clin.ppi_split_paid|floatformat:2|default:"0.00"|intcomma }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="statz_split_paid" data-value="{{ clin.statz_split_paid|floatformat:2|default:"0.00" }}">${{ clin.statz_split_paid|floatformat:2|default:"0.00"|intcomma }}</td> -->
-                            <td class="px-4 py-2 text-sm text-left">
-                                <p>Need to move planned split to contract</p>
-                                    <!-- <input type="text" 
-                                        class="w-24 rounded border-gray-300 text-sm text-center focus:border-blue-500 focus:ring-blue-500"
-                                        value="{{ clin.planned_split|default:'50/50' }}"
-                                        data-clin="{{ clin.id }}" 
-                                        data-field="planned_split"> -->
                             </td>
                         </tr>
                         {% empty %}
@@ -318,6 +284,11 @@
 </div>
 
 {% block extra_js %}
+<!-- Add Toastify JS for notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<!-- Add Contract Splits Component JS -->
+<script src="{% static 'contracts/js/contract_splits.js' %}"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('contract-search');

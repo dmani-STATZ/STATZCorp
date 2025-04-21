@@ -105,9 +105,10 @@ from .views import (
     update_folder_field,
 
     # Split views
-    create_split_view,
-    update_split_view,
-    delete_split_view,
+    create_split,
+    update_split,
+    delete_split,
+    get_contract_splits,
 )
 
 from .views.contract_views import check_contract_number
@@ -268,7 +269,8 @@ urlpatterns = [
     path('acknowledgment-letter/<int:letter_id>/generate/', generate_acknowledgment_letter_doc, name='generate_acknowledgment_letter_doc'),
 
     # Split URLs
-    path('api/splits/create/', create_split_view, name='create_split'),
-    path('api/splits/update/<int:split_id>/', update_split_view, name='update_split'),
-    path('api/splits/delete/<int:split_id>/', delete_split_view, name='delete_split'),
+    path('api/splits/create/', create_split, name='create_split'),
+    path('api/splits/update/<int:split_id>/', update_split, name='update_split'),
+    path('api/splits/delete/<int:split_id>/', delete_split, name='delete_split'),
+    path('api/splits/<int:contract_id>/', get_contract_splits, name='get_contract_splits'),
 ] 

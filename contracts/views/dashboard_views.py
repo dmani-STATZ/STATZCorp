@@ -105,9 +105,9 @@ class ContractLifecycleDashboardView(TemplateView):
             if not end_date:
                 end_date = now
 
-            past_contracts = Contract.objects.filter(due_date__range=(start_date, end_date), status__description__ne='Cancelled')
-            contracts = Contract.objects.filter(award_date__range=(start_date, end_date), status__description___ne='Cancelled')
-            clins = Clin.objects.filter(contract__award_date__range=(start_date, end_date), contract__status__description__ne='Cancelled')
+            past_contracts = Contract.objects.filter(due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+            contracts = Contract.objects.filter(award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+            clins = Clin.objects.filter(contract__award_date__range=(start_date, end_date)).exclude(contract__status__description='Cancelled')
             
             return {
                 'contracts_due': past_contracts.distinct().count(),

@@ -169,7 +169,8 @@ class ContractForm(forms.ModelForm):
             'buyer', 'contract_type', 'award_date', 'due_date', 'due_date_late',
             'sales_class', 'survey_date', 'survey_type', 'assigned_user',
             'assigned_date', 'nist', 'files_url', 'reviewed', 'reviewed_by',
-            'reviewed_on', 'contract_value', 'plan_gross', 'solicitation_type'
+            'reviewed_on', 'contract_value', 'plan_gross', 'solicitation_type',
+            'prime', 'prime_po_number'
         ]
         widgets = {
             'idiq_contract': forms.Select(attrs={
@@ -258,6 +259,12 @@ class ContractForm(forms.ModelForm):
                 'step': '0.01'
             }),
             'solicitation_type': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'prime': forms.TextInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            }),
+            'prime_po_number': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
             }),
         }
