@@ -128,6 +128,8 @@ from .views.acknowledgment_views import (
     generate_acknowledgment_letter_doc
 )
 
+from .views import payment_history_views
+
 app_name = 'contracts'
 
 urlpatterns = [
@@ -254,8 +256,11 @@ urlpatterns = [
     path('finance-audit/<int:pk>/', FinanceAuditView.as_view(), name='finance_audit_detail'),
     
     # Payment History API
-    path('api/payment-history/<int:clin_id>/<str:payment_type>/', 
-         payment_history_api, 
+    path('api/payment-history/<str:entity_type>/<int:entity_id>/details/', 
+         payment_history_views.get_entity_details, 
+         name='payment_history_entity_details'),
+    path('api/payment-history/<str:entity_type>/<int:entity_id>/<str:payment_type>/', 
+         payment_history_views.payment_history_api, 
          name='payment_history_api'),
          
     # CLIN Field Update API

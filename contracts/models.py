@@ -57,6 +57,7 @@ class Contract(AuditModel):
     contract_value = models.FloatField(null=True, blank=True, default=0)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
     plan_gross = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    payment_history = GenericRelation('PaymentHistory', related_query_name='contract')
 
     class Meta:
         indexes = [
@@ -139,6 +140,7 @@ class Clin(AuditModel):
     ship_date = models.DateField(null=True, blank=True)
     ship_date_late = models.BooleanField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='clin')
+    payment_history = GenericRelation('PaymentHistory', related_query_name='clin')
 
     # CLIN_Finance
     special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True) # Moved to Contract
@@ -182,35 +184,89 @@ class Clin(AuditModel):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
 
 
-class PaymentHistory(models.Model):
+class PaymentHistory(AuditModel):
+    """
+    Model for tracking payment history for both Contracts and CLINs.
+    Uses ContentType framework to allow generic relations to different models.
+    """
     PAYMENT_TYPE_CHOICES = [
-        ('item_value', 'Item Value'),  # SubPO
-        ('quote_value', 'Quote Value'), # 2
-        ('paid_amount', 'Paid Amount'), # SubPaid
-        ('contract_value', 'Contract Value'), # Contract
-        ('wawf_payment', 'WAWF Payment'), # WAWFPayment
-        ('plan_gross', 'Plan Gross'), # PlanGross Moved to contract
-        ('statz_split_paid', 'STATZ Split Paid'), # PaidPPI
-        ('ppi_split_paid', 'PPI Split Paid'), # PaidSTATZ
-        ('special_payment_terms_interest', 'Special Payment Terms Interest'), # Interest
+        # Contract-level payment types
+        ('contract_value', 'Contract Value'),
+        ('plan_gross', 'Plan Gross'),
+        
+        # CLIN-level payment types
+        ('item_value', 'Item Value'),
+        ('quote_value', 'Quote Value'),
+        ('paid_amount', 'Paid Amount'),
+        ('wawf_payment', 'WAWF Payment'),
     ]
 
-    clin = models.ForeignKey(Clin, on_delete=models.CASCADE, related_name='payment_history')
+    # Generic relation fields
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    # Payment details
     payment_type = models.CharField(max_length=50, choices=PAYMENT_TYPE_CHOICES)
-    payment_amount = models.DecimalField(max_digits=15, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
+    payment_amount = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
     payment_date = models.DateField()
     payment_info = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_history_created_by')
-    updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_history_updated_by')
+    reference_number = models.CharField(max_length=50, blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-payment_date', '-created_on']
+        verbose_name_plural = 'Payment histories'
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['payment_type']),
+            models.Index(fields=['payment_date']),
+        ]
 
     def __str__(self):
-        return f"{self.clin} - {self.payment_type} - {self.payment_amount}"
+        return f"{self.content_object} - {self.get_payment_type_display()} - {self.payment_amount}"
 
-    class Meta:
-        ordering = ['-payment_date', '-created_at']
-        verbose_name_plural = 'Payment histories'
+    @property
+    def entity_type(self):
+        """Returns the type of entity this payment is associated with (e.g., 'contract' or 'clin')"""
+        return self.content_type.model
+
+    @classmethod
+    def get_contract_payment_types(cls):
+        """Returns payment types that are valid for contracts"""
+        return [
+            'contract_value',
+            'plan_gross',
+        ]
+
+    @classmethod
+    def get_clin_payment_types(cls):
+        """Returns payment types that are valid for CLINs"""
+        return [
+            'item_value',
+            'quote_value',
+            'paid_amount',
+            'wawf_payment',
+        ]
+
+    def clean(self):
+        """Validates that the payment type is appropriate for the content object"""
+        if self.content_type.model == 'contract' and self.payment_type not in self.get_contract_payment_types():
+            raise ValidationError({
+                'payment_type': f'Payment type {self.get_payment_type_display()} is not valid for contracts'
+            })
+        elif self.content_type.model == 'clin' and self.payment_type not in self.get_clin_payment_types():
+            raise ValidationError({
+                'payment_type': f'Payment type {self.get_payment_type_display()} is not valid for CLINs'
+            })
+        super().clean()
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 class IdiqContract(AuditModel):
     contract_number = models.CharField(max_length=50, null=True, blank=True)

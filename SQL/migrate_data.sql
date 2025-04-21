@@ -783,6 +783,21 @@ GO
 
 
 
+-- Update contract_contractstatus
+print ('##########################################')
+print 'Update contract_contractstatus'
+print ('##########################################')
+
+SET IDENTITY_INSERT [dbo].[contracts_contractstatus] ON;
+
+INSERT INTO contracts_contractstatus (id, description)
+VALUES (1, 'Open'),
+       (2, 'Closed'),
+       (3, 'Canceled');
+
+SET IDENTITY_INSERT [dbo].[contracts_contractstatus] OFF;
+
+
 -- Contract migration
 print ('##########################################')
 print 'Contract migration'
@@ -798,7 +813,7 @@ BEGIN TRY
     SET IDENTITY_INSERT [dbo].[contracts_contract] ON;
     
     INSERT INTO contracts_contract (
-        id, contract_number, status_id, [open], date_closed, cancelled,
+        id, contract_number, status_id, date_closed,
         date_canceled, canceled_reason_id, po_number, tab_num, buyer_id,
         contract_type_id, award_date, due_date, due_date_late, sales_class_id,
         survey_date, survey_type, assigned_user_id, assigned_date, nist,
@@ -808,10 +823,12 @@ BEGIN TRY
     SELECT 
         c.ID,
         c.ContractNum,
-        NULL, -- status_id will be derived
-        c.ContractOpen,
+        CASE
+            WHEN c.ContractCancelled = 1 THEN 3
+            WHEN c.ContractCancelled = 0 AND c.ContractOpen = 0 THEN 2
+            WHEN c.ContractCancelled = 0 AND c.ContractOpen = 1 THEN 1
+            END as status_id, -- status_id will be derived
         c.DateClosed,
-        c.ContractCancelled,
         c.DateCancelled,
         NULLIF(c.ReasonCancelled, 0) AS canceled_reason_id,
         c.PONumber,
@@ -1111,45 +1128,65 @@ SET plan_gross = sc.PlanGrossDol
 FROM [dbo].[contracts_contract] c
 INNER JOIN [ContractLog].[dbo].[STATZ_SUB_CONTRACTS_TBL] sc ON c.id = sc.Contract_ID;
 
+-- content_type_id
+-- clin = 12
+-- contract = 18
 
+-- object_id  
+--      clin = id
+--      contract = id
 
 -- Pay History migration
 -- Still need to convert the payment type to the new data.
 print ('##########################################')
 print 'Pay History migration'
 print ('##########################################')
-INSERT INTO [dbo].[contracts_paymenthistory]
-           ([payment_type]
-           ,[payment_amount]
-           ,[payment_date]
-           ,[payment_info]
-           ,[clin_id]
-           ,[created_at]
-           ,[updated_at]
-           ,[created_by_id]
-           ,[updated_by_id])
-SELECT case when [PaymentType] = 'SubPO' then 'quote_value'
-        when [PaymentType] = 'SubPaid' then 'paid_amount' 
-        when [PaymentType] = 'Contract' then 'contract_value' 
-        when [PaymentType] = 'WAWFPayment' then 'wawf_payment' 
-        when [PaymentType] = 'PlanGross' then 'plan_gross' 
-        when [PaymentType] = 'PaidPPI' then 'statz_split_paid' 
-        when [PaymentType] = 'PaidSTATZ' then 'ppi_split_paid'
-        when [PaymentType] = 'Interest' then 'special_payment_terms_interest' 
-        else null end as [payment_type]
-      ,[PaymentAmount]
-      ,[PaymentDate]
-      ,[PaymentInfo]
-	  ,[SubContract_ID]
-	  ,ISNULL(ph.CreatedOn, SYSDATETIME()) AS created_at
-	  ,ISNULL(ph.CreatedOn, SYSDATETIME()) AS updated_at
-      ,ISNULL(um_created.user_id, 1) AS created_by_id
-      ,ISNULL(um_created.user_id, 1) AS updated_by_id
-FROM [ContractLog].[dbo].[STATZ_PAY_HIST_TBL] ph
-JOIN contracts_clin c ON ph.[SubContract_ID] = c.id
-LEFT JOIN #UserMapping um_created ON ph.CreatedBy = um_created.username
-WHERE ph.[PaymentType] in ('SubPO', 'SubPaid', 'Contract', 'WAWFPayment', 'PlanGross', 'PaidPPI', 'PaidSTATZ', 'Interest');
+INSERT INTO contracts_paymenthistory
+                         (object_id
+                         , content_type_id
+                         , payment_type
+                         , payment_amount
+                         , payment_date
+                         , payment_info
+                         , created_on
+                         , modified_on
+                         , created_by_id
+                         , modified_by_id
+                         )
+SELECT        ph.SubContract_ID, 12 AS object_id, 
+                         CASE WHEN [PaymentType] = 'SubPO' THEN 'quote_value' WHEN [PaymentType] = 'SubPaid' THEN 'paid_amount' WHEN [PaymentType] = 'Contract' THEN 'contract_value' WHEN [PaymentType] = 'WAWFPayment' THEN 'wawf_payment'
+                          WHEN [PaymentType] = 'PlanGross' THEN 'plan_gross' WHEN [PaymentType] = 'PaidPPI' THEN 'statz_split_paid' WHEN [PaymentType] = 'PaidSTATZ' THEN 'ppi_split_paid' WHEN [PaymentType] = 'Interest' THEN 'special_payment_terms_interest'
+                          ELSE NULL END AS payment_type, ph.PaymentAmount, ph.PaymentDate, ph.PaymentInfo, ISNULL(ph.CreatedOn, SYSDATETIME()) AS created_on, ISNULL(ph.CreatedOn, SYSDATETIME()) AS updated_on, 
+                         ISNULL(um_created.user_id, 1) AS created_by_id, ISNULL(um_created.user_id, 1) AS updated_by_id
+FROM            ContractLog.dbo.STATZ_PAY_HIST_TBL AS ph INNER JOIN
+                         contracts_clin AS c ON ph.SubContract_ID = c.id LEFT OUTER JOIN
+                         [#UserMapping] AS um_created ON ph.CreatedBy = um_created.username
+WHERE        (ph.PaymentType IN ('SubPO', 'SubPaid', 'wawf_payment'));
 
+
+
+
+INSERT INTO contracts_paymenthistory
+                         (object_id
+                         , content_type_id
+                         , payment_type
+                         , payment_amount
+                         , payment_date
+                         , payment_info
+                         , created_on
+                         , modified_on
+                         , created_by_id
+                         , modified_by_id
+                         )
+SELECT        c.contract_id, 18 AS object_id, 
+                         CASE WHEN [PaymentType] = 'SubPO' THEN 'quote_value' WHEN [PaymentType] = 'SubPaid' THEN 'paid_amount' WHEN [PaymentType] = 'Contract' THEN 'contract_value' WHEN [PaymentType] = 'WAWFPayment' THEN 'wawf_payment'
+                          WHEN [PaymentType] = 'PlanGross' THEN 'plan_gross' WHEN [PaymentType] = 'PaidPPI' THEN 'statz_split_paid' WHEN [PaymentType] = 'PaidSTATZ' THEN 'ppi_split_paid' WHEN [PaymentType] = 'Interest' THEN 'special_payment_terms_interest'
+                          ELSE NULL END AS payment_type, ph.PaymentAmount, ph.PaymentDate, ph.PaymentInfo, ISNULL(ph.CreatedOn, SYSDATETIME()) AS created_on, ISNULL(ph.CreatedOn, SYSDATETIME()) AS updated_on, 
+                         ISNULL(um_created.user_id, 1) AS created_by_id, ISNULL(um_created.user_id, 1) AS updated_by_id
+FROM            ContractLog.dbo.STATZ_PAY_HIST_TBL AS ph INNER JOIN
+                         contracts_clin AS c ON ph.SubContract_ID = c.id LEFT OUTER JOIN
+                         [#UserMapping] AS um_created ON ph.CreatedBy = um_created.username
+WHERE        (ph.PaymentType IN ('Contract', 'PlanGross'))
 
 -- Add Quote Value to Payment History
 INSERT INTO [dbo].[contracts_paymenthistory]
@@ -1157,18 +1194,20 @@ INSERT INTO [dbo].[contracts_paymenthistory]
            ,[payment_amount]
            ,[payment_date]
            ,[payment_info]
-           ,[clin_id]
-           ,[created_at]
-           ,[updated_at]
+           ,[object_id]
+           ,[content_type_id]
+           ,[created_on]
+           ,[modified_on]
            ,[created_by_id]
-           ,[updated_by_id])
+           ,[modified_by_id])
 SELECT 'item_value' as [payment_type]
       ,isnull(sc.ContractDol,0.00) as ContractDol
       ,c.[Award Date]
       ,'migrated data'
 	  ,sc.[ID]
-	  ,ISNULL(sc.CreatedOn, SYSDATETIME()) AS created_at
-	  ,ISNULL(sc.CreatedOn, SYSDATETIME()) AS updated_at
+	  ,12 AS content_type_id
+	  ,ISNULL(sc.CreatedOn, SYSDATETIME()) AS created_on
+	  ,ISNULL(sc.CreatedOn, SYSDATETIME()) AS updated_on
       ,1 AS created_by_id
       ,1 AS updated_by_id
 FROM [ContractLog].[dbo].[STATZ_SUB_CONTRACTS_TBL] sc
@@ -1786,32 +1825,18 @@ FROM            (SELECT        Contract_ID, PlanSplit_per_PPIbid, Type_ID
                          contracts_contract ON subquery.Contract_ID = contracts_contract.id
 
 
--- Update contract_contractstatus
-print ('##########################################')
-print 'Update contract_contractstatus'
-print ('##########################################')
 
-SET IDENTITY_INSERT [dbo].[contracts_contractstatus] ON;
+-- -- Update contract status
+-- print ('##########################################')
+-- print 'Update contract status'
+-- print ('##########################################')
 
-INSERT INTO contracts_contractstatus (id, description)
-VALUES (1, 'Open'),
-       (2, 'Closed'),
-       (3, 'Canceled');
-
-SET IDENTITY_INSERT [dbo].[contracts_contractstatus] OFF;
-
-
--- Update contract status
-print ('##########################################')
-print 'Update contract status'
-print ('##########################################')
-
-UPDATE contracts_contract
-SET status_id = CASE
-    WHEN cancelled = 1 THEN 3
-    WHEN cancelled = 0 AND [open] = 0 THEN 2
-    WHEN cancelled = 0 AND [open] = 1 THEN 1
-END;
+-- UPDATE contracts_contract
+-- SET status_id = CASE
+--     WHEN cancelled = 1 THEN 3
+--     WHEN cancelled = 0 AND [open] = 0 THEN 2
+--     WHEN cancelled = 0 AND [open] = 1 THEN 1
+-- END;
 
 
 -- Update idiq contract id
