@@ -31,6 +31,8 @@ class Contract(AuditModel):
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     status = models.ForeignKey('ContractStatus', on_delete=models.CASCADE, null=True, blank=True)
     solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
+    prime = models.CharField(max_length=25, null=True, blank=True)
+    prime_po_number = models.CharField(max_length=10, null=True, blank=True)
     date_closed = models.DateTimeField(null=True, blank=True)
     date_canceled = models.DateTimeField(null=True, blank=True)
     canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE, null=True, blank=True)
@@ -68,6 +70,8 @@ class Contract(AuditModel):
             
             # Common search/filter fields
             models.Index(fields=['contract_number'], name='contract_number_idx'),
+            models.Index(fields=['prime'], name='contract_prime_idx'),
+            models.Index(fields=['prime_po_number'], name='contract_prime_po_number_idx'),
             models.Index(fields=['po_number'], name='contract_po_number_idx'),
             models.Index(fields=['tab_num'], name='contract_tab_num_idx'),
             models.Index(fields=['due_date'], name='contract_due_idx'),

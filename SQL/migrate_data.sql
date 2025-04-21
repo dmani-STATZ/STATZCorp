@@ -1884,8 +1884,14 @@ UPDATE contracts_contract
 SET solicitation_type = 'OTHER'
 WHERE left(contract_number,3) <> 'SPE';
 
+-- Update SequenceNumber
+print ('##########################################')
+print 'Update SequenceNumber'
+print ('##########################################')
 
-
+UPDATE processing_sequencenumber
+SET tab_number = (SELECT MAX(TAB) FROM ContractLog.dbo.STATZ_SEQ_NBR_TBL),
+    po_number = (SELECT MAX(PO) FROM ContractLog.dbo.STATZ_SEQ_NBR_TBL);
 
 
 
