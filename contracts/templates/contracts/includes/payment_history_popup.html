@@ -1,11 +1,16 @@
 {% load static %}
 
+<!-- Add Toastify CSS at the top -->
+<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+<!-- Add Toastify JS -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
 <div class="payment-history-modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
      id="paymentHistoryPopup" 
      data-source-page="" 
      data-entity-type="" 
      data-entity-id="" 
-     data-payment-type="">
+     data-field-type="">
     <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
         <div class="flex justify-between items-center mb-4">
             <div>
@@ -67,7 +72,7 @@ function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, 
     const popup = document.getElementById('paymentHistoryPopup');
     popup.dataset.entityType = entityType;
     popup.dataset.entityId = entityId;
-    popup.dataset.paymentType = paymentType;
+    popup.dataset.fieldType = paymentType;
     popup.dataset.sourcePage = sourcePage;
     
     // Fetch entity details
@@ -95,10 +100,86 @@ function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, 
     popup.classList.remove('hidden');
 }
 
-function closePaymentHistoryPopup() {
-    const popup = document.getElementById('paymentHistoryPopup');
-    popup.classList.add('hidden');
-    document.getElementById('newHistoryForm').reset();
+// Handle form submission
+const form = document.getElementById('newHistoryForm');
+if (form) {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const popup = document.getElementById('paymentHistoryPopup');
+        const entityId = popup.dataset.entityId;
+        const entityType = popup.dataset.entityType;
+        const fieldType = popup.dataset.fieldType;
+        const sourcePage = popup.dataset.sourcePage;
+
+        console.log('Form submission:', { entityId, entityType, fieldType, sourcePage });
+
+        // Convert FormData to JSON
+        const jsonData = {
+            payment_amount: parseFloat(formData.get('payment_amount')),
+            payment_date: formData.get('payment_date'),
+            payment_info: formData.get('payment_info') || '',
+            reference_number: formData.get('reference_number') || ''
+        };
+
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Submit to API
+        fetch(`/contracts/api/payment-history/${entityType}/${entityId}/${fieldType}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(jsonData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update the history table
+                loadPaymentHistory(entityType, entityId, fieldType);
+                
+                // Clear the form
+                this.reset();
+                
+                // Update the cell value and current value display
+                console.log('Updating values with new total:', data.new_total);
+                
+                // Update the current value display in the popup
+                const formattedValue = formatCurrency(data.new_total);
+                document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
+                
+                // Update the main form field
+                if (typeof window.updateCellValue === 'function') {
+                    window.updateCellValue(entityId, fieldType, data.new_total);
+                } else {
+                    console.error('updateCellValue function not found');
+                }
+                
+                // Show success notification
+                Toastify({
+                    text: "Payment history entry added successfully",
+                    duration: 3000,
+                    gravity: "top",
+                    position: 'right',
+                    backgroundColor: "#4CAF50",
+                }).showToast();
+            } else {
+                throw new Error(data.error || 'Failed to add payment history entry');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Toastify({
+                text: error.message || "Failed to add payment history entry",
+                duration: 3000,
+                gravity: "top",
+                position: 'right',
+                backgroundColor: "#f44336",
+            }).showToast();
+        });
+    });
 }
 
 function loadPaymentHistory(entityType, entityId, paymentType) {
@@ -109,7 +190,7 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
             if (data.history && data.history.length > 0) {
                 let html = `
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200 payment-history-table">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -119,7 +200,7 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Created By</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
+                            <tbody>
                 `;
 
                 data.history.forEach(entry => {
@@ -147,10 +228,25 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                     </div>
                 `;
                 historyContent.innerHTML = html;
+                
+                // Update the current value display and main form field
+                const formattedTotal = formatCurrency(data.total);
+                document.getElementById('currentValue').textContent = `Current Value: ${formattedTotal}`;
+                
+                // Update the main form field
+                if (typeof window.updateCellValue === 'function') {
+                    window.updateCellValue(entityId, paymentType, data.total);
+                }
             } else {
                 historyContent.innerHTML = '<p class="text-gray-500 text-center">No payment history found</p>';
             }
         });
+}
+
+function closePaymentHistoryPopup() {
+    const popup = document.getElementById('paymentHistoryPopup');
+    popup.classList.add('hidden');
+    document.getElementById('newHistoryForm').reset();
 }
 
 function formatFieldType(type) {
@@ -185,77 +281,4 @@ function formatCurrency(amount) {
 function formatDate(dateString) {
     return new Date(dateString).toLocaleDateString('en-US');
 }
-
-// Initialize form submission handler
-document.addEventListener('DOMContentLoaded', function() {
-    const historyForm = document.getElementById('newHistoryForm');
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-    historyForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const popup = document.getElementById('paymentHistoryPopup');
-        const formData = new FormData(historyForm);
-        const entityType = popup.dataset.entityType;
-        const entityId = popup.dataset.entityId;
-        const paymentType = popup.dataset.paymentType;
-        const sourcePage = popup.dataset.sourcePage;
-
-        try {
-            const data = {
-                payment_amount: parseFloat(formData.get('payment_amount')),
-                payment_date: formData.get('payment_date'),
-                payment_info: formData.get('payment_info') || '',
-                reference_number: formData.get('reference_number') || '',
-                payment_type: paymentType
-            };
-
-            const response = await fetch(`/contracts/api/payment-history/${entityType}/${entityId}/${paymentType}/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify(data)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save payment history');
-            }
-
-            const responseData = await response.json();
-            
-            if (responseData.success) {
-                // Update the main table cell if we're on a page with payment fields
-                if (sourcePage === 'finance_audit' || sourcePage === 'contract_detail') {
-                    const cell = document.querySelector(
-                        `[data-entity-type="${entityType}"][data-entity-id="${entityId}"][data-payment-type="${paymentType}"]`
-                    );
-                    if (cell) {
-                        const newTotal = responseData.new_total;
-                        cell.textContent = formatCurrency(newTotal);
-                        cell.dataset.value = newTotal;
-                    }
-                }
-                
-                // Reset form and reload history
-                historyForm.reset();
-                loadPaymentHistory(entityType, entityId, paymentType);
-                
-                // Update current value display
-                const currentValueElement = document.getElementById('currentValue');
-                if (currentValueElement) {
-                    currentValueElement.textContent = `Current Value: ${formatCurrency(responseData.new_total)}`;
-                }
-            } else {
-                throw new Error(responseData.error || 'Failed to save payment history');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to save payment history: ' + error.message);
-        }
-    });
-});
 </script> 

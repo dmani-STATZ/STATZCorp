@@ -100,6 +100,33 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                 object_id=entity_id,
                 payment_type=payment_type
             ).aggregate(total=Sum('payment_amount'))['total'] or 0
+
+        # Update the contract or CLIN total
+            if entity_type == 'contract':
+                try:
+                    contract = Contract.objects.get(id=entity_id)
+                    if payment_type == 'contract_value':
+                        contract.contract_value = new_total
+                    elif payment_type == 'plan_gross':
+                        contract.plan_gross = new_total
+                    contract.save()
+                except Contract.DoesNotExist:
+                    print(f"Contract with id {entity_id} not found.")  # Consider more robust error handling
+
+            elif entity_type == 'clin':
+                try:
+                    clin = Clin.objects.get(id=entity_id)
+                    if payment_type == 'item_value':
+                        clin.item_value = new_total
+                    elif payment_type == 'quote_value':
+                        clin.quote_value = new_total
+                    elif payment_type == 'paid_amount':
+                        clin.paid_amount = new_total
+                    elif payment_type == 'wawf_payment':
+                        clin.wawf_payment = new_total
+                    clin.save()
+                except Clin.DoesNotExist:
+                    print(f"Clin with id {entity_id} not found.")  # Consider more robust error handling
             
             return JsonResponse({
                 'success': True,

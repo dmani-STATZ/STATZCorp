@@ -301,9 +301,68 @@ document.addEventListener('DOMContentLoaded', function() {
             const clinId = this.dataset.clin;
             const fieldType = this.dataset.type;
             const currentValue = this.dataset.value || '0.00';
-            openPaymentHistoryPopup(clinId, fieldType, 'finance_audit', currentValue);
+            const popup = document.getElementById('paymentHistoryPopup');
+            
+            // Set the data attributes directly on the popup
+            popup.dataset.entityType = 'clin';
+            popup.dataset.entityId = clinId;
+            popup.dataset.fieldType = fieldType;
+            popup.dataset.sourcePage = 'finance_audit';
+            
+            // Call the popup's open function
+            if (typeof openPaymentHistoryPopup === 'function') {
+                openPaymentHistoryPopup('clin', clinId, fieldType, 'finance_audit', currentValue);
+            }
         });
     });
+
+    // Function to update cell display value - make it globally available
+    window.updateCellValue = function(clinId, fieldType, newValue) {
+        console.log('Updating cell value:', { clinId, fieldType, newValue });
+        const cell = document.querySelector(`[data-clin="${clinId}"][data-type="${fieldType}"]`);
+        if (cell) {
+            // Format the value for display
+            const formattedValue = parseFloat(newValue).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            
+            // Update both the display text and the data attribute
+            cell.textContent = `$${formattedValue}`;
+            cell.dataset.value = newValue;
+
+            // Add a brief highlight effect to show the update
+            cell.style.transition = 'background-color 0.5s ease';
+            cell.style.backgroundColor = '#e6ffe6';  // Light green
+            setTimeout(() => {
+                cell.style.backgroundColor = '';
+            }, 1000);
+            
+            // Show a success notification
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: `${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to $${formattedValue}`,
+                    duration: 3000,
+                    gravity: "top",
+                    position: 'right',
+                    backgroundColor: "#4CAF50",
+                }).showToast();
+            }
+            return true;
+        } else {
+            console.error(`Could not find cell for CLIN ${clinId} and field type ${fieldType}`);
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: "Error: Could not update display value",
+                    duration: 3000,
+                    gravity: "top",
+                    position: 'right',
+                    backgroundColor: "#f44336",
+                }).showToast();
+            }
+            return false;
+        }
+    };
 
     // Handle special payment terms changes
     document.querySelectorAll('select[data-field="special_payment_terms"]').forEach(select => {

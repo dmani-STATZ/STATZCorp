@@ -8,6 +8,8 @@
 
 {% block extra_head %}
 {{ block.super }}
+<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <style>
     /* NSN Modal Styles */
     .nsn-modal {
@@ -611,7 +613,7 @@
                 </div>
             </div>
 
-            <!-- Financial Details (Hidden by default) -->
+            <!-- Financial Details Section -->
             <div>
                 <h2 class="section-header cursor-pointer" id="financial-details-toggle">
                     Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
@@ -620,7 +622,6 @@
                 <div class="hidden" id="financial-details-section">
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <!-- Row 1 -->
-
                         <div class="md:col-span-4">
                             <div id="special-payment-terms-container">
                                 <div class="form-group">
@@ -630,9 +631,6 @@
                                     {{ form.special_payment_terms }}
                                     {% if form.special_payment_terms.errors %}
                                         <div class="text-red-500 text-sm mt-1">{{ form.special_payment_terms.errors }}</div>
-                                    {% endif %}
-                                    {% if form.special_payment_terms.help_text %}
-                                        <div class="text-gray-500 text-sm mt-1">{{ form.special_payment_terms.help_text }}</div>
                                     {% endif %}
                                 </div>
                             </div>
@@ -647,9 +645,6 @@
                                 {% if form.special_payment_terms_paid.errors %}
                                     <div class="text-red-500 text-sm mt-1">{{ form.special_payment_terms_paid.errors }}</div>
                                 {% endif %}
-                                {% if form.special_payment_terms_paid.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.special_payment_terms_paid.help_text }}</div>
-                                {% endif %}
                             </div>
                         </div>
                                                 
@@ -660,93 +655,57 @@
                         <!-- Row 2 -->
                         <div class="md:col-span-4">
                             <div class="form-group">
-                                <label for="{{ form.paid_amount.id_for_label }}" class="form-label">Paid Amount</label>
+                                <label for="paid_amount_display" class="form-label">Paid Amount</label>
                                 <div class="relative">
-                                    {{ form.paid_amount }}
+                                    <input type="hidden" name="paid_amount" id="id_paid_amount" value="{{ form.paid_amount.value|default:'' }}">
                                     <input type="text" 
                                            id="paid_amount_display" 
                                            class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                            readonly
-                                           onclick="openPaymentHistoryPopup(`{{ form.instance.id|default:'' }}`, 'paid_amount', 'clin_form', `{{ form.paid_amount.value|default:'' }}`)"
-                                           value="{{ form.paid_amount.value|default:'' }}",
-                                    >
+                                           onclick="openPaymentHistoryPopup('clin', `{{ form.instance.id|default:'' }}`, 'paid_amount', 'clin_form', document.getElementById('id_paid_amount').value);"
+                                           value="{% if form.paid_amount.value %}${{ form.paid_amount.value|floatformat:2 }}{% endif %}"
+                                           data-clin="{{ form.instance.id|default:'' }}"
+                                           data-type="paid_amount"
+                                           data-current-value="{{ form.paid_amount.value|default:'0.00' }}">
                                 </div>
                                 {% if form.paid_amount.errors %}
                                     <div class="text-red-500 text-sm mt-1">{{ form.paid_amount.errors }}</div>
-                                {% endif %}
-                                {% if form.paid_amount.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.paid_amount.help_text }}</div>
                                 {% endif %}
                             </div>
                         </div>
                         
                         <div class="md:col-span-4">
                             <div class="form-group">
-                                <label for="{{ form.paid_date.id_for_label }}" class="form-label">Paid Date</label>
+                                <label for="paid_date" class="form-label">Paid Date</label>
                                 {{ form.paid_date }}
                                 {% if form.paid_date.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.paid_date.errors }}</div>
+                                    <div class="text-red-500 text-sm mt-1">{{ form.paid_date.errors }}</div>
                                 {% endif %}
-                                {% if form.paid_date.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.paid_date.help_text }}</div>
-                                {% endif %} 
                             </div>
                         </div>
                         <div class="md:col-span-4">
-
                         </div>
                         
                         <!-- Row 3 -->
                         <div class="md:col-span-4">
                             <div class="form-group">
-                                <label for="{{ form.wawf_payment.id_for_label }}" class="form-label">
+                                <label for="wawf_payment_display" class="form-label">
                                     <span class="text-uppercase">WAWF</span> Payment
                                 </label>
                                 <div class="relative">
-                                    {{ form.wawf_payment }}
+                                    <input type="hidden" name="wawf_payment" id="id_wawf_payment" value="{{ form.wawf_payment.value|default:'' }}">
                                     <input type="text" 
                                            id="wawf_payment_display" 
                                            class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                            readonly
-                                           onclick="openPaymentHistoryPopup(`{{ form.instance.id|default:'' }}`, 'wawf_payment', 'clin_form', `{{ form.wawf_payment.value|default:'' }}`)"
-                                           value="{{ form.wawf_payment.value|default:'' }}",
-                                    >
+                                           onclick="openPaymentHistoryPopup('clin', `{{ form.instance.id|default:'' }}`, 'wawf_payment', 'clin_form', document.getElementById('id_wawf_payment').value);"
+                                           value="{% if form.wawf_payment.value %}${{ form.wawf_payment.value|floatformat:2 }}{% endif %}"
+                                           data-clin="{{ form.instance.id|default:'' }}"
+                                           data-type="wawf_payment"
+                                           data-current-value="{{ form.wawf_payment.value|default:'0.00' }}">
                                 </div>
                                 {% if form.wawf_payment.errors %}
                                     <div class="text-red-500 text-sm mt-1">{{ form.wawf_payment.errors }}</div>
-                                {% endif %}
-                                {% if form.wawf_payment.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.wawf_payment.help_text }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="md:col-span-4">
-                            <div class="form-group">
-                                <label for="{{ form.wawf_recieved.id_for_label }}" class="form-label">
-                                    <span class="text-uppercase">WAWF</span> Received
-                                </label>
-                                {{ form.wawf_recieved }}
-                                {% if form.wawf_recieved.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.wawf_recieved.errors }}</div>
-                                {% endif %}
-                                {% if form.wawf_recieved.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.wawf_recieved.help_text }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="md:col-span-4">
-                            <div class="form-group">
-                                <label for="{{ form.wawf_invoice.id_for_label }}" class="form-label">
-                                    <span class="text-uppercase">WAWF</span> Invoice
-                                </label>
-                                {{ form.wawf_invoice }}
-                                {% if form.wawf_invoice.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.wawf_invoice.errors }}</div>
-                                {% endif %}
-                                {% if form.wawf_invoice.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.wawf_invoice.help_text }}</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -1031,7 +990,173 @@
                 return true;
             });
         }
-        
+
+        // Make updateCellValue function globally available for payment history popup
+        window.updateCellValue = function(clinId, fieldType, newValue) {
+            console.log('Updating cell value:', { clinId, fieldType, newValue });
+            
+            // Get the display input field and hidden form field
+            const displayField = document.getElementById(`${fieldType}_display`);
+            const hiddenField = document.getElementById(`id_${fieldType}`);
+            
+            if (displayField && hiddenField) {
+                // Format the value for display
+                const numericValue = parseFloat(newValue);
+                const formattedValue = numericValue.toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                
+                // Update both the display and hidden fields
+                displayField.value = formattedValue;
+                hiddenField.value = numericValue.toFixed(2);
+                
+                // Update the data-current-value attribute
+                displayField.setAttribute('data-current-value', numericValue.toFixed(2));
+                
+                // Update the current value display in the popup header if it exists
+                const currentValueElement = document.querySelector('.payment-history-popup .current-value');
+                if (currentValueElement) {
+                    currentValueElement.textContent = formattedValue;
+                }
+
+                // Update the current value text in the popup header
+                const currentValueText = document.querySelector('.payment-history-popup .current-value-text');
+                if (currentValueText) {
+                    currentValueText.textContent = `Current Value: ${formattedValue}`;
+                }
+
+                // Add highlight effect
+                displayField.style.transition = 'background-color 0.5s ease';
+                displayField.style.backgroundColor = '#e6ffe6';
+                setTimeout(() => {
+                    displayField.style.backgroundColor = '';
+                }, 1000);
+                
+                // Show success notification
+                Toastify({
+                    text: `${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to ${formattedValue}`,
+                    duration: 3000,
+                    gravity: "top",
+                    position: 'right',
+                    backgroundColor: "#4CAF50",
+                }).showToast();
+                
+                return true;
+            }
+            
+            console.error(`Could not find fields for ${fieldType}`);
+            Toastify({
+                text: "Error: Could not update display value",
+                duration: 3000,
+                gravity: "top",
+                position: 'right',
+                backgroundColor: "#f44336",
+            }).showToast();
+            
+            return false;
+        };
+
+        // Function to update payment history total
+        window.updatePaymentHistoryTotal = function(fieldType) {
+            const table = document.querySelector('.payment-history-table');
+            if (!table) return;
+
+            let total = 0;
+            // Sum all amount cells in the table
+            table.querySelectorAll('tr:not(:first-child):not(:last-child) td:nth-child(2)').forEach(cell => {
+                const amount = parseFloat(cell.textContent.replace(/[^-\d.]/g, '')) || 0;
+                total += amount;
+            });
+
+            // Update the total row
+            const totalRow = table.querySelector('tr:last-child td:nth-child(2)');
+            if (totalRow) {
+                totalRow.textContent = total.toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            // Update the main form field
+            updateCellValue(null, fieldType, total);
+        };
+
+        // Add event listener for payment history form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const paymentHistoryForm = document.querySelector('.payment-history-form');
+            if (paymentHistoryForm) {
+                paymentHistoryForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    const fieldType = document.querySelector('.payment-history-popup').dataset.fieldType;
+                    
+                    fetch(this.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Refresh the payment history table
+                            const tableBody = document.querySelector('.payment-history-table tbody');
+                            if (tableBody && data.html) {
+                                tableBody.innerHTML = data.html;
+                            }
+                            
+                            // Update totals and field values
+                            updatePaymentHistoryTotal(fieldType);
+                            
+                            // Clear the form
+                            paymentHistoryForm.reset();
+                            
+                            Toastify({
+                                text: "Payment entry added successfully",
+                                duration: 3000,
+                                gravity: "top",
+                                position: 'right',
+                                backgroundColor: "#4CAF50",
+                            }).showToast();
+                        } else {
+                            Toastify({
+                                text: data.error || "Error adding payment entry",
+                                duration: 3000,
+                                gravity: "top",
+                                position: 'right',
+                                backgroundColor: "#f44336",
+                            }).showToast();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        Toastify({
+                            text: "Error adding payment entry",
+                            duration: 3000,
+                            gravity: "top",
+                            position: 'right',
+                            backgroundColor: "#f44336",
+                        }).showToast();
+                    });
+                });
+            }
+        });
+
+        // Hide the original form fields for payment fields
+        const paymentFields = ['paid_amount', 'wawf_payment'];
+        paymentFields.forEach(fieldId => {
+            const originalField = document.getElementById(`id_${fieldId}`);
+            if (originalField) {
+                originalField.style.display = 'none';
+            }
+        });
+
         // Initialize modals immediately - don't wait for setTimeout
         // NSN Modal Functionality
         const nsnModal = document.getElementById('nsn_modal');
@@ -1391,47 +1516,6 @@
                 }
             });
         }
-
-        // Function to update payment field values
-        function updatePaymentFieldValue(fieldId, newValue) {
-            const displayField = document.getElementById(`${fieldId}_display`);
-            const hiddenField = document.getElementById(`id_${fieldId}`);
-            if (displayField && hiddenField) {
-                const formattedValue = formatCurrency(newValue);
-                displayField.value = formattedValue;
-                hiddenField.value = newValue;
-            }
-        }
-
-        // Override the default form submission to handle payment history updates
-        const originalSubmit = document.getElementById('newHistoryForm').onsubmit;
-        document.getElementById('newHistoryForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const popup = document.getElementById('paymentHistoryPopup');
-            const fieldType = popup.dataset.fieldType;
-            
-            // Call the original submit handler
-            if (originalSubmit) {
-                await originalSubmit.call(this, e);
-            }
-
-            // Update the corresponding field value
-            if (fieldType === 'paid_amount' || fieldType === 'wawf_payment') {
-                const responseData = await response.json();
-                if (responseData.success) {
-                    updatePaymentFieldValue(fieldType, responseData.new_total);
-                }
-            }
-        };
-
-        // Hide the original form fields and style the display fields
-        const paymentFields = ['paid_amount', 'wawf_payment'];
-        paymentFields.forEach(fieldId => {
-            const originalField = document.getElementById(`id_${fieldId}`);
-            if (originalField) {
-                originalField.style.display = 'none';
-            }
-        });
     });
 </script>
 {% endblock extra_scripts %}

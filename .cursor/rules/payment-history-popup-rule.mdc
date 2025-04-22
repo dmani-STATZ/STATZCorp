@@ -1,49 +1,194 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
-[payment_history_popup.html](mdc:contracts/templates/contracts/includes/payment_history_popup.html)
+# Payment History Popup Implementation Rule
 
-Rule: Payment History Popup Interaction in Django Finance Audit
+## Overview
+This document outlines the key requirements and implementation details for the payment history popup functionality across the application. The popup allows users to view and add payment history entries while ensuring proper synchronization between the popup and the main form fields.
 
-Description:
-This rule describes the functionality of the payment history popup within the Django application, specifically focusing on the interaction between finance_audit.html and payment_history_popup.html. This popup allows users to view and add payment history entries for specific CLIN items.
+## Key Components
 
-Key Functionality:
+### 1. Required Dependencies
+```html
+<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+```
 
-1. Triggering the Popup:
-   - Clickable <td> elements in finance_audit.html, marked with 'data-type' attributes (e.g., item_value, paid_amount), trigger the popup.
-   - JavaScript event listeners on these elements capture click events.
-   - The openPaymentHistoryPopup function is called, passing the CLIN ID (data-clin), field type (data-type), and current value (data-value).
+### 2. Data Attributes
+The popup must maintain these data attributes for proper functionality:
+```html
+<div id="paymentHistoryPopup"
+     data-source-page=""
+     data-entity-type=""
+     data-entity-id=""
+     data-field-type="">
+```
 
-2. Popup Display (payment_history_popup.html):
-   - The openPaymentHistoryPopup function loads the popup modal.
-   - It displays the current value, title, and subtitle.
-   - It calls loadPaymentHistory to fetch and display existing payment history entries.
+### 3. Field Structure
+Main form fields must follow this structure:
+```html
+<!-- Hidden input for actual value -->
+<input type="hidden" name="field_name" id="id_field_name" value="{{ form.field_name.value|default:'' }}">
 
-3. Fetching Payment History:
-   - loadPaymentHistory sends a GET request to /contracts/api/payment-history/${clinId}/${fieldType}/ to retrieve history data.
-   - The API returns payment history entries and the total amount as JSON.
-   - The popup displays this data in a table.
+<!-- Display input -->
+<input type="text" 
+       id="field_name_display" 
+       class="form-control"
+       readonly
+       onclick="openPaymentHistoryPopup('entity_type', '{{ id }}', 'field_name', 'page_name', document.getElementById('id_field_name').value)"
+       data-current-value="{{ form.field_name.value|default:'0.00' }}">
+```
 
-4. Adding New Entries:
-   - The popup includes a form (newHistoryForm) for adding new payment entries.
-   - On form submission, JavaScript sends a POST request to /contracts/api/payment-history/${clinId}/${fieldType}/.
-   - The request includes payment details (amount, date, info) and the payment_type (fieldType).
-   - The API creates a new PaymentHistory record and updates the CLIN's total value.
-   - The popup refreshes the history table and updates the displayed total.
-   - The finance_audit.html table cell is also updated with the new total.
+## Required Functions
 
-5. Closing the Popup:
-   - The closePaymentHistoryPopup function hides the modal and resets the form.
+### 1. Opening the Popup
+```javascript
+function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, currentValue) {
+    // Set popup data attributes
+    // Fetch and display entity details
+    // Format and display current value
+    // Load payment history
+}
+```
 
-Key Elements:
-- [finance_audit.html](mdc:contracts/templates/contracts/finance_audit.html): Main page with the CLIN table and click triggers.
-- [payment_history_popup.html](mdc:contracts/templates/contracts/includes/payment_history_popup.html): Popup modal for viewing and adding payment history.
-- /contracts/api/payment-history/${clinId}/${fieldType}/: Backend API endpoint for data retrieval and submission.
-- openPaymentHistoryPopup, loadPaymentHistory, closePaymentHistoryPopup: JavaScript functions managing the popup's behavior.
-- data-clin, data-type, data-value: HTML attributes used to pass data.
-- newHistoryForm: Form for adding new payment entries.
+### 2. Form Submission Handler
+The form submission must:
+- Prevent default form submission
+- Convert form data to JSON
+- Include CSRF token
+- Make API call
+- Update both popup and main form on success
+- Show success/error notifications
 
-Use this rule to understand and modify the payment history popup functionality within the Django application. When asking questions about related functions, files, or API endpoints, reference this rule to provide context.
+### 3. Payment History Loading
+```javascript
+function loadPaymentHistory(entityType, entityId, paymentType) {
+    // Fetch payment history
+    // Display in table format
+    // Update current value display
+    // Update main form field
+}
+```
+
+### 4. Value Updates
+Both the popup and main form must be updated when:
+- New payment entry is added
+- Payment history is loaded
+- After any successful API call
+
+### 5. Main Page Synchronization
+The `updateCellValue` function must be globally available and properly implemented:
+```javascript
+window.updateCellValue = function(entityId, fieldType, newValue) {
+    // Get both display and hidden fields
+    const displayField = document.getElementById(`${fieldType}_display`);
+    const hiddenField = document.getElementById(`id_${fieldType}`);
+    
+    if (displayField && hiddenField) {
+        // Format the value for display (must match popup formatting)
+        const formattedValue = parseFloat(newValue).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        
+        // Update both fields
+        displayField.value = `$${formattedValue}`;  // Display field shows formatted value
+        hiddenField.value = newValue;               // Hidden field keeps raw number
+        
+        // Optional: Visual feedback
+        displayField.style.transition = 'background-color 0.5s ease';
+        displayField.style.backgroundColor = '#e6ffe6';
+        setTimeout(() => {
+            displayField.style.backgroundColor = '';
+        }, 1000);
+        
+        return true;
+    }
+    return false;
+}
+```
+
+**Critical Implementation Notes:**
+1. The `updateCellValue` function MUST be defined in the global scope (window object)
+2. Field IDs must follow the exact pattern:
+   - Hidden field: `id_${fieldType}`
+   - Display field: `${fieldType}_display`
+3. The function must be called after:
+   - Loading payment history
+   - Adding new payment entries
+   - Any API call that changes the total value
+4. The function should handle both the numeric value (hidden field) and formatted display value
+5. Error checking should verify both fields exist before attempting updates
+
+### 6. Helper Functions
+Required helper functions:
+```javascript
+function formatCurrency(amount) {
+    // Handle null/undefined/invalid values
+    // Format as USD currency
+}
+
+function formatDate(dateString) {
+    // Format date to local string
+}
+
+function formatFieldType(type) {
+    // Convert field_type to "Field Type"
+}
+```
+
+## Implementation Requirements
+
+1. **Value Synchronization**
+   - Main form field must be updated whenever payment history changes using `updateCellValue`
+   - Both hidden and display fields must be kept in sync
+   - Current value in popup must reflect the total from payment history
+   - Field naming conventions must be strictly followed for automatic updates to work
+   - The `updateCellValue` function must be included in the main page template
+   - All value updates should trigger visual feedback for user confirmation
+
+2. **Error Handling**
+   - All API calls must include proper error handling
+   - User-friendly error messages using Toastify
+   - Graceful handling of invalid/missing values
+
+3. **Currency Formatting**
+   - All monetary values must be formatted as USD
+   - Handle edge cases (null, undefined, NaN)
+   - Consistent formatting across popup and main form
+
+4. **API Integration**
+   - Use proper endpoints for:
+     - `/contracts/api/payment-history/${entityType}/${entityId}/details/`
+     - `/contracts/api/payment-history/${entityType}/${entityId}/${fieldType}/`
+   - Include CSRF token in POST requests
+   - Handle API responses appropriately
+
+5. **UI/UX Requirements**
+   - Readonly display fields
+   - Click-to-open popup functionality
+   - Clear success/error notifications
+   - Proper table formatting for history display
+
+## Testing Checklist
+
+- [ ] Popup opens with correct current value
+- [ ] New payment entries update both popup and main form
+- [ ] Currency formatting is consistent
+- [ ] Error messages are displayed properly
+- [ ] Form clears after successful submission
+- [ ] Hidden and display fields stay synchronized
+- [ ] Payment history table updates correctly
+- [ ] All API endpoints respond as expected
+
+## Common Issues and Solutions
+
+1. **Main Page Updates Not Working**
+   - Verify `updateCellValue` is defined in global scope
+   - Check field ID naming conventions match exactly
+   - Confirm both display and hidden fields exist
+   - Verify function is being called after API responses
+   - Check console for JavaScript errors
+   - Ensure proper value formatting in both popup and main page
