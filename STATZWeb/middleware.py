@@ -15,10 +15,13 @@ class LoginRequiredMiddleware:
             reverse('users:register'),
             reverse('users:logout'),
             reverse('landing'),
+            reverse('users:microsoft_login'),
+            reverse('users:microsoft_callback'),
             '/admin/',
             '/static/',
             '/media/',
             '/logout/',
+            '/users/microsoft/',  # Microsoft auth paths
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 
@@ -31,6 +34,12 @@ class LoginRequiredMiddleware:
             if not request.user.is_authenticated:
                 path = request.path_info
                 #logger.debug(f"User not authenticated, checking if path {path} is public")
+                
+                # Always allow Microsoft auth paths
+                if '/microsoft/' in path or 'microsoft' in path:
+                    logger.debug(f"Bypassing auth check for Microsoft path: {path}")
+                    return self.get_response(request)
+                    
                 if not self.is_public_url(path):
                     #logger.info(f"Redirecting unauthenticated user from {path} to login")
                     return redirect(settings.LOGIN_URL)
@@ -38,6 +47,11 @@ class LoginRequiredMiddleware:
             if request.user.is_authenticated and not request.user.is_superuser:
                 path = request.path_info
                 #logger.debug(f"User {request.user.username} (ID: {request.user.id}) is authenticated but not superuser")
+                
+                # Always allow Microsoft auth paths for authenticated users
+                if '/microsoft/' in path or 'microsoft' in path:
+                    logger.debug(f"Bypassing permission check for Microsoft path: {path}")
+                    return self.get_response(request)
                 
                 # Check if path is in public URLs
                 is_public = self.is_public_url(path)
@@ -103,6 +117,10 @@ class LoginRequiredMiddleware:
         Check if a path is in the public URLs list.
         Uses exact matching for exact paths and prefix matching for paths ending with '/'.
         """
+        # Check for Microsoft auth paths
+        if '/microsoft/' in path or 'microsoft' in path or '/users/microsoft/' in path:
+            return True
+            
         # Exact match
         if path in self.public_urls:
             return True

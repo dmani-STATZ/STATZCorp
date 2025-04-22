@@ -262,3 +262,19 @@ SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = 0
+
+# Microsoft Azure AD Authentication Settings
+AZURE_AD_CONFIG = {
+    'app_id': os.environ.get('MICROSOFT_APP_ID', 'b1c048a6-ece2-4bc2-a1fb-0db007a7e23a'),
+    'app_secret': os.environ.get('MICROSOFT_APP_SECRET', 'LhJ8Q~mDFyzWnzUofKVoBN8DGKRg.DYlnZJ4Jdbd'),
+    'tenant_id': os.environ.get('MICROSOFT_TENANT_ID', 'a6446842-5c7a-4655-aca7-2b819ecf2d64'),
+    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'http://localhost:8000/users/microsoft/callback/'),
+    'scopes': ['https://graph.microsoft.com/User.Read'],  # Use proper Graph API scopes, avoid reserved scopes
+    'auto_create_user': True,
+}
+
+# Add Microsoft Auth backend to authentication backends
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # Default Django backend
+    'users.azure_auth.MicrosoftAuthBackend',  # Microsoft Azure AD backend
+]

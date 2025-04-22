@@ -14,22 +14,70 @@ from django.views.decorators.http import require_http_methods
 import json
 from .user_settings import UserSettings
 from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, login as auth_login
+from .ms_views import get_microsoft_login_url
 
 logger = logging.getLogger(__name__)
 
-def register(request):
+def login_view(request):
+    """Custom login view that redirects to Microsoft authentication"""
+    # Clear previous auth errors
+    auth_error = None
+    microsoft_auth_success = request.session.get('microsoft_auth_success', False)
+    
+    # Check for auth errors
+    if 'microsoft_auth_error' in request.session:
+        auth_error = request.session.pop('microsoft_auth_error')
+        logger.warning(f"Microsoft auth error: {auth_error}")
+    
+    # Check if already authenticated
     if request.user.is_authenticated:
-        return redirect('index')  # redirect to main page if already logged in
-    if request.method == "POST":
-        form = UserRegisterForm(request.POST)
-        if form.is_valid():
-            form.save()
-            username = form.cleaned_data.get('username')
-            messages.success(request, f'Account created for {username}!')
-            return redirect('index')
-    else:
-        form = UserRegisterForm()
-    return render(request, 'users/register.html', {'form': form})
+        logger.debug(f"User {request.user.username} is already authenticated")
+        return redirect('index')
+    
+    # Check for Microsoft auth success
+    if microsoft_auth_success:
+        logger.debug("Microsoft auth successful, redirecting to index")
+        return redirect('index')
+    
+    # Get Microsoft login URL
+    microsoft_login_url = get_microsoft_login_url(request)
+    logger.debug(f"Microsoft login URL generated: {microsoft_login_url is not None}")
+    
+    # For admins only, still allow traditional form-based login
+    if request.method == 'POST' and 'admin_login' in request.POST:
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            logger.debug(f"Attempting traditional login for admin: {username}")
+            user = authenticate(request, username=username, password=password)
+            
+            if user is not None and user.is_staff:
+                logger.info(f"Traditional login successful for admin: {username}")
+                auth_login(request, user)
+                request.session['auth_method'] = 'django'
+                return redirect('index')
+            else:
+                logger.warning(f"Traditional login failed for admin: {username}")
+                auth_error = "Invalid username or password, or user is not an admin."
+    elif request.method == 'GET' and not microsoft_auth_success and not auth_error:
+        # For regular users, redirect immediately to Microsoft login
+        if not request.GET.get('admin_mode'):
+            return redirect('users:microsoft_login')
+    
+    # Render login form with Microsoft login button
+    # Only admins should see this page with the ?admin_mode=1 parameter
+    return render(request, 'users/login.html', {
+        'microsoft_login_url': microsoft_login_url,
+        'auth_error': auth_error,
+        'admin_mode': request.GET.get('admin_mode') == '1'
+    })
+
+def register(request):
+    """Redirect registration to Microsoft authentication"""
+    messages.info(request, 'New accounts are created through Microsoft authentication. Please sign in with Microsoft.')
+    return redirect('users:microsoft_login')
 
 
 @login_required
@@ -264,3 +312,24 @@ def ajax_get_setting_types(request):
             'success': False,
             'message': f"Error: {str(e)}"
         }, status=400)
+
+@login_required
+def check_auth_method(request):
+    """
+    Check and display the user's authentication method
+    For debugging purposes
+    """
+    auth_method = request.session.get('auth_method', 'unknown')
+    logger.info(f"User {request.user.username} authenticated via {auth_method}")
+    
+    # Check if microsoft token exists
+    ms_token = request.session.get('microsoft_token', None)
+    ms_token_status = "exists" if ms_token else "missing"
+    
+    return JsonResponse({
+        'username': request.user.username,
+        'email': request.user.email,
+        'auth_method': auth_method,
+        'microsoft_token_status': ms_token_status,
+        'is_authenticated': request.user.is_authenticated,
+    })
