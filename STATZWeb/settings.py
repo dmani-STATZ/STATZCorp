@@ -268,7 +268,7 @@ AZURE_AD_CONFIG = {
     'app_id': os.environ.get('MICROSOFT_APP_ID', 'b1c048a6-ece2-4bc2-a1fb-0db007a7e23a'),
     'app_secret': os.environ.get('MICROSOFT_APP_SECRET', 'LhJ8Q~mDFyzWnzUofKVoBN8DGKRg.DYlnZJ4Jdbd'),
     'tenant_id': os.environ.get('MICROSOFT_TENANT_ID', 'a6446842-5c7a-4655-aca7-2b819ecf2d64'),
-    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'http://localhost:8000/users/microsoft/callback/'),
+    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'http://servername/users/microsoft/callback/'),
     'scopes': ['https://graph.microsoft.com/User.Read'],  # Use proper Graph API scopes, avoid reserved scopes
     'auto_create_user': True,
 }
