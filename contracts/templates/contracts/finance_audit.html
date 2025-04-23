@@ -77,13 +77,31 @@
                         <span class="font-medium w-32">Due Date</span>
                         <span>{{ contract.due_date|date:"m/d/Y" }}</span>
                     </div>
-                    <div class="flex p-2">
+                    <div class="flex p-2 items-center">
                         <span class="font-medium w-32">Contract Value:</span>
-                        <span>${{ contract.contract_value|floatformat:2|intcomma }}</span>
+                        <!-- Hidden input for actual value -->
+                        <input type="hidden" name="contract_value" id="id_contract_value" value="{{ contract.contract_value|default:'0.00' }}">
+                        <!-- Display input -->
+                        <input type="text" 
+                               id="contract_value_display" 
+                               class="form-input text-sm ml-2 w-auto border-none bg-transparent p-0 cursor-pointer" 
+                               readonly
+                               onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'contract_value', 'finance_audit', document.getElementById('id_contract_value').value)"
+                               value="${{ contract.contract_value|floatformat:2|intcomma|default:'0.00' }}"
+                               data-current-value="{{ contract.contract_value|default:'0.00' }}">
                     </div>
-                    <div class="flex p-2">
+                    <div class="flex p-2 items-center">
                         <span class="font-medium w-32">Plan Gross:</span>
-                        <span>${{ contract.plan_gross|floatformat:2|intcomma }}</span>
+                        <!-- Hidden input for actual value -->
+                        <input type="hidden" name="plan_gross" id="id_plan_gross" value="{{ contract.plan_gross|default:'0.00' }}">
+                        <!-- Display input -->
+                        <input type="text" 
+                               id="plan_gross_display" 
+                               class="form-input text-sm ml-2 w-auto border-none bg-transparent p-0 cursor-pointer" 
+                               readonly
+                               onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'plan_gross', 'finance_audit', document.getElementById('id_plan_gross').value)"
+                               value="${{ contract.plan_gross|floatformat:2|intcomma|default:'0.00' }}"
+                               data-current-value="{{ contract.plan_gross|default:'0.00' }}">
                     </div>
                 </div>
             </div>
@@ -311,37 +329,63 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Call the popup's open function
             if (typeof openPaymentHistoryPopup === 'function') {
+                // Pass 'clin' as entityType for CLIN rows
                 openPaymentHistoryPopup('clin', clinId, fieldType, 'finance_audit', currentValue);
             }
         });
     });
 
     // Function to update cell display value - make it globally available
-    window.updateCellValue = function(clinId, fieldType, newValue) {
-        console.log('Updating cell value:', { clinId, fieldType, newValue });
-        const cell = document.querySelector(`[data-clin="${clinId}"][data-type="${fieldType}"]`);
-        if (cell) {
-            // Format the value for display
-            const formattedValue = parseFloat(newValue).toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-            
-            // Update both the display text and the data attribute
-            cell.textContent = `$${formattedValue}`;
-            cell.dataset.value = newValue;
+    // Modified to handle both Contract and CLIN level updates
+    window.updateCellValue = function(entityType, entityId, fieldType, newValue) {
+        console.log('Updating value:', { entityType, entityId, fieldType, newValue });
+        let targetElement;
+        let hiddenInput;
+        let isContractField = (entityType === 'contract');
 
+        // Format the value for display
+        const formattedValue = parseFloat(newValue).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+
+        if (isContractField) {
+            // Handle Contract fields (Contract Value, Plan Gross)
+            targetElement = document.getElementById(`${fieldType}_display`);
+            hiddenInput = document.getElementById(`id_${fieldType}`);
+            
+            if (targetElement && hiddenInput) {
+                targetElement.value = `$${formattedValue}`; // Input field uses .value
+                targetElement.dataset.currentValue = newValue;
+                hiddenInput.value = newValue;
+            } else {
+                console.error(`Could not find contract display or hidden field for type ${fieldType}`);
+                targetElement = null; // Ensure no update happens if elements aren't found
+            }
+        } else {
+            // Handle CLIN fields (existing logic)
+            targetElement = document.querySelector(`[data-clin="${entityId}"][data-type="${fieldType}"]`);
+            if (targetElement) {
+                targetElement.textContent = `$${formattedValue}`; // Table cell uses .textContent
+                targetElement.dataset.value = newValue;
+            } else {
+                console.error(`Could not find CLIN cell for ID ${entityId} and type ${fieldType}`);
+            }
+        }
+        
+        // Common logic for feedback and notification if an element was updated
+        if (targetElement) {
             // Add a brief highlight effect to show the update
-            cell.style.transition = 'background-color 0.5s ease';
-            cell.style.backgroundColor = '#e6ffe6';  // Light green
+            targetElement.style.transition = 'background-color 0.5s ease';
+            targetElement.style.backgroundColor = '#e6ffe6';  // Light green
             setTimeout(() => {
-                cell.style.backgroundColor = '';
+                targetElement.style.backgroundColor = '';
             }, 1000);
             
             // Show a success notification
             if (typeof Toastify === 'function') {
                 Toastify({
-                    text: `${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to $${formattedValue}`,
+                    text: `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} ${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to $${formattedValue}`,
                     duration: 3000,
                     gravity: "top",
                     position: 'right',
@@ -350,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             return true;
         } else {
-            console.error(`Could not find cell for CLIN ${clinId} and field type ${fieldType}`);
+            // Show error notification only if an update was attempted but failed
             if (typeof Toastify === 'function') {
                 Toastify({
                     text: "Error: Could not update display value",
