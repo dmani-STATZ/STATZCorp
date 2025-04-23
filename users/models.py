@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.apps import apps
 import logging
+from django.utils import timezone
+from django.conf import settings
 
 # Create your models here.
 
@@ -125,23 +127,18 @@ class UserSetting(models.Model):
         return self.name
 
 class UserSettingState(models.Model):
-    """Model to store user-specific setting states"""
+    """Stores the actual value of a UserSetting for a specific User."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='setting_states')
-    setting = models.ForeignKey(UserSetting, on_delete=models.CASCADE, related_name='user_states')
-    value = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    setting = models.ForeignKey(UserSetting, on_delete=models.CASCADE, related_name='states')
+    value = models.TextField(blank=True, null=True)  # Store value based on setting type
 
     class Meta:
-        verbose_name = 'User Setting State'
-        verbose_name_plural = 'User Setting States'
-        unique_together = ['user', 'setting']
-        indexes = [
-            models.Index(fields=['user', 'setting']),
-        ]
+        unique_together = ('user', 'setting')
+        verbose_name = "User Setting State"
+        verbose_name_plural = "User Setting States"
 
     def __str__(self):
-        return f"{self.user.username} - {self.setting.name}"
+        return f"{self.user.username} - {self.setting.name}: {self.value}"
 
     def get_value(self):
         """Convert the stored value to the appropriate type"""
@@ -166,3 +163,29 @@ class UserSettingState(models.Model):
         else:
             self.value = str(value)
         self.save()
+
+class UserOAuthToken(models.Model):
+    """Stores OAuth tokens for users."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='oauth_token')
+    provider = models.CharField(max_length=50, default='microsoft') # Identifies the OAuth provider
+    access_token = models.TextField()
+    refresh_token = models.TextField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True) # Store actual datetime when the access token expires
+    updated_at = models.DateTimeField(auto_now=True) # Track when the token was last updated
+
+    class Meta:
+        verbose_name = "User OAuth Token"
+        verbose_name_plural = "User OAuth Tokens"
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'provider'], name='unique_user_provider_token')
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.provider} Token"
+
+    @property
+    def is_expired(self):
+        """Check if the access token is expired."""
+        if not self.expires_at:
+            return False # Cannot determine expiry
+        return timezone.now() >= self.expires_at
