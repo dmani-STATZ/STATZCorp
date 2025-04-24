@@ -17,6 +17,7 @@ class LoginRequiredMiddleware:
             reverse('landing'),
             reverse('users:microsoft_login'),
             reverse('users:microsoft_callback'),
+            '/',  # Explicitly add root URL
             '/admin/',
             '/static/',
             '/media/',
@@ -30,10 +31,12 @@ class LoginRequiredMiddleware:
     def __call__(self, request):
         #logger.info(f"Middleware processing request: {request.path_info}")
         
-        # Always bypass auth for PWA resources
         path = request.path_info
-        if (path.startswith('/manifest.json') or 
-            path.startswith('/static/sw.js') or 
+        
+        # Always bypass auth for PWA resources and landing page
+        if (path == '/' or  # Root URL (landing page)
+            path.startswith('/manifest.json') or 
+            path.startswith('/static/') or 
             path == '/sw.js' or
             path.endswith('.png') or 
             path.endswith('.ico') or

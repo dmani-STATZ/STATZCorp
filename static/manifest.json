@@ -3,6 +3,7 @@
     "short_name": "STATZ",
     "description": "STATZ Corporation Web Application",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#004eb3",
     "theme_color": "#004eb3",
@@ -46,6 +47,34 @@
             "src": "/static/images/icons/icon-512x512.png",
             "sizes": "512x512",
             "type": "image/png"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/static/images/screenshots/desktop-landing.png",
+            "sizes": "1920x1080",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "STATZ Corporation Landing Page"
+        },
+        {
+            "src": "/static/images/screenshots/desktop-dashboard.png",
+            "sizes": "1920x1080",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "STATZ Dashboard"
+        },
+        {
+            "src": "/static/images/screenshots/mobile-landing.png",
+            "sizes": "390x844",
+            "type": "image/png",
+            "label": "STATZ Corporation Mobile Landing Page"
+        },
+        {
+            "src": "/static/images/screenshots/mobile-dashboard.png",
+            "sizes": "390x844",
+            "type": "image/png",
+            "label": "STATZ Mobile Dashboard"
         }
     ],
     "splash_pages": {
