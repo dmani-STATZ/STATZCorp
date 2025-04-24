@@ -36,6 +36,15 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = ["127.0.0.1","localhost"]
 
+# CORS settings for PWA
+CORS_ALLOW_ALL_ORIGINS = True  # In development, restrict in production
+CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ['*']
+CORS_ALLOW_HEADERS = ['*']
+CORS_ALLOW_METHODS = ['*']
+
+# PWA settings
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # Helps with PWA compatibility
 
 # Application definition
 
@@ -250,12 +259,6 @@ LOGGING = {
         },
     },
 }
-
-# CORS settings
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
-CORS_ALLOW_HEADERS = ['Content-Type', 'X-CSRFToken']
 
 # Security settings - ensure these are False for non-HTTPS
 SECURE_SSL_REDIRECT = False

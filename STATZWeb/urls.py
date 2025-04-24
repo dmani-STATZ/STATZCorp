@@ -19,12 +19,34 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
+from django.views.static import serve
+from django.views.generic import TemplateView
+import os
 from . import views
 from users import views as user_views
 
 def health_check(request):
     """Simple health check endpoint to test if the server is functioning correctly."""
     return HttpResponse("OK", content_type="text/plain")
+
+def manifest_json(request):
+    """Serve manifest.json with proper headers."""
+    manifest_path = os.path.join(settings.STATIC_ROOT if settings.STATIC_ROOT else os.path.join(settings.BASE_DIR, 'static'), 'manifest.json')
+    response = serve(request, os.path.basename(manifest_path), os.path.dirname(manifest_path))
+    response['Content-Type'] = 'application/manifest+json'
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = '*'
+    response['Access-Control-Allow-Headers'] = '*'
+    return response
+
+def service_worker(request):
+    """Serve service worker with proper headers."""
+    sw_path = os.path.join(settings.STATIC_ROOT if settings.STATIC_ROOT else os.path.join(settings.BASE_DIR, 'static'), 'sw.js')
+    response = serve(request, os.path.basename(sw_path), os.path.dirname(sw_path))
+    response['Content-Type'] = 'application/javascript'
+    response['Service-Worker-Allowed'] = '/'
+    response['Access-Control-Allow-Origin'] = '*'
+    return response
 
 urlpatterns = [
     path("__reload__/", include("django_browser_reload.urls")),
@@ -42,6 +64,10 @@ urlpatterns = [
     # Announcement URLs
     path('announcement/add/', views.add_announcement, name='add_announcement'),
     path('announcement/delete/<int:announcement_id>/', views.delete_announcement, name='delete_announcement'),
+    
+    # PWA URLs
+    path('manifest.json', manifest_json, name='manifest'),
+    path('sw.js', service_worker, name='service_worker'),
 ]
 
 # Always serve static/media files (even in production)

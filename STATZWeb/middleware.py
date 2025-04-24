@@ -22,17 +22,28 @@ class LoginRequiredMiddleware:
             '/media/',
             '/logout/',
             '/users/microsoft/',  # Microsoft auth paths
+            '/manifest.json',     # PWA manifest
+            '/sw.js',             # Service worker
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 
     def __call__(self, request):
         #logger.info(f"Middleware processing request: {request.path_info}")
         
+        # Always bypass auth for PWA resources
+        path = request.path_info
+        if (path.startswith('/manifest.json') or 
+            path.startswith('/static/sw.js') or 
+            path == '/sw.js' or
+            path.endswith('.png') or 
+            path.endswith('.ico') or
+            path.endswith('.js') and 'sw.js' in path):
+            return self.get_response(request)
+        
         if settings.REQUIRE_LOGIN:
             #logger.debug(f"REQUIRE_LOGIN is enabled")
             
             if not request.user.is_authenticated:
-                path = request.path_info
                 #logger.debug(f"User not authenticated, checking if path {path} is public")
                 
                 # Always allow Microsoft auth paths
@@ -45,7 +56,6 @@ class LoginRequiredMiddleware:
                     return redirect(settings.LOGIN_URL)
 
             if request.user.is_authenticated and not request.user.is_superuser:
-                path = request.path_info
                 #logger.debug(f"User {request.user.username} (ID: {request.user.id}) is authenticated but not superuser")
                 
                 # Always allow Microsoft auth paths for authenticated users
@@ -109,6 +119,17 @@ class LoginRequiredMiddleware:
                     pass
 
         response = self.get_response(request)
+        
+        # Set CORS headers for PWA resources
+        if path == '/manifest.json':
+            response['Content-Type'] = 'application/manifest+json'
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Methods'] = '*'
+            response['Access-Control-Allow-Headers'] = '*'
+        elif path.endswith('sw.js') or path == '/sw.js' or path.endswith('/sw.js'):
+            response['Service-Worker-Allowed'] = '/'
+            response['Access-Control-Allow-Origin'] = '*'
+        
         #logger.debug(f"Middleware completed for {request.path_info}")
         return response
         
@@ -117,6 +138,15 @@ class LoginRequiredMiddleware:
         Check if a path is in the public URLs list.
         Uses exact matching for exact paths and prefix matching for paths ending with '/'.
         """
+        # Check for PWA and static resources
+        if (path.startswith('/manifest.json') or
+            path.startswith('/static/') or
+            path.startswith('/media/') or
+            '/sw.js' in path or
+            path.endswith('.png') or
+            path.endswith('.ico')):
+            return True
+            
         # Check for Microsoft auth paths
         if '/microsoft/' in path or 'microsoft' in path or '/users/microsoft/' in path:
             return True

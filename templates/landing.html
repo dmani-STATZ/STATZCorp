@@ -1,18 +1,46 @@
 {% load static %}
 {% load custom_tags %}
+{% load tailwind_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#004eb3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="STATZ">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="{% static 'images/icons/icon-192x192.png' %}">
+    <link rel="apple-touch-icon" sizes="152x152" href="{% static 'images/icons/icon-152x152.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/icons/icon-192x192.png' %}">
+    <link rel="apple-touch-icon" sizes="167x167" href="{% static 'images/icons/icon-152x152.png' %}">
+    
+    <!-- Microsoft Tile Images -->
+    <meta name="msapplication-TileImage" content="{% static 'images/icons/icon-144x144.png' %}">
+    <meta name="msapplication-TileColor" content="#004eb3">
+    
+    <!-- Desktop PWA Support -->
+    <meta name="application-name" content="STATZ Corporation">
+    <meta name="msapplication-tooltip" content="STATZ Corporation Web Application">
+    <meta name="msapplication-starturl" content="/">
+    <meta name="msapplication-config" content="none">
+
+    {% tailwind_css %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     <title>Welcome to STATZ Corporation</title>
 </head>
 <body 
-    class="bg-cover bg-center bg-no-repeat min-h-screen bg-gray-100" 
-    style="background-attachment: fixed; -webkit-background-size: cover; -moz-background-size: cover; -o-background-size: cover;background-image: url('{% static 'images/gears-metal-stainless-technology.jpg' %}'); ">
+    class="bg-cover bg-center bg-no-repeat min-h-screen bg-gray-100 bg-fixed"
+    style="background-image: url('{% static "images/gears-metal-stainless-technology.jpg" %}');">
     <div class="min-h-screen flex items-start justify-center px-4 sm:px-6 lg:px-8 pt-8">
         <div class="max-w-2xl w-full space-y-8">
             <div class="text-center bg-white/80 rounded-lg p-8 backdrop-blur-sm shadow-xl">
@@ -39,5 +67,16 @@
             </div>
         </div>
     </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('Service worker registered successfully'))
+                    .catch(err => console.error('Service worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
-</html> 
+</html>
