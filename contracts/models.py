@@ -182,7 +182,33 @@ class Clin(AuditModel):
 
     def __str__(self):
         return f"CLIN {self.id} for Contract {self.contract.contract_number}"
+    
+    @property
+    def total_shipped(self):
+        return self.shipments.aggregate(Sum('ship_qty'))['ship_qty__sum'] or 0
 
+class ClinShipment(AuditModel):
+    """
+    Model for tracking individual shipments for a CLIN.
+    Allows multiple shipments to be recorded against a single CLIN.
+    """
+    clin = models.ForeignKey(Clin, on_delete=models.CASCADE, related_name='shipments')
+    ship_qty = models.FloatField(null=True, blank=True)
+    uom = models.CharField(max_length=10, null=True, blank=True)  # Unit of Measure
+    ship_date = models.DateField(null=True, blank=True)
+    comments = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-ship_date', '-created_on']
+        indexes = [
+            models.Index(fields=['clin'], name='clinship_clin_idx'),
+            models.Index(fields=['ship_date'], name='clinship_date_idx'),
+            # Compound index for common query patterns
+            models.Index(fields=['clin', 'ship_date'], name='clinship_clin_date_idx'),
+        ]
+
+    def __str__(self):
+        return f"Shipment of {self.ship_qty} {self.uom} on {self.ship_date} for CLIN {self.clin.id}"
 
 class PaymentHistory(AuditModel):
     """

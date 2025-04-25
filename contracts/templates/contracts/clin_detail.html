@@ -270,38 +270,12 @@
             </div>
         </div>
         
-        <!-- Shipping Information -->
-        <div>
-            <h2 class="section-header mt-2 mb-2">
-                Shipping Information
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
-                <div class="md:col-span-2">
-                    <div class="form-group">
-                        <label class="form-label">Ship Qty</label>
-                        <p class="font-medium">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</p>
-                    </div>
-                </div>
-                
-                <div class="md:col-span-1">
-                    <div class="form-group">
-                        <label class="form-label">
-                            <span class="text-uppercase">UOM</span>
-                        </label>
-                        <p class="font-medium">{{ clin.uom|default:"EA" }}</p>
-                    </div>
-                </div>
-                
-                <div class="md:col-span-3">
-                    <div class="form-group">
-                        <label class="form-label">Ship Date</label>
-                        <p class="font-medium {% if clin.ship_date_late %}text-red-600{% endif %}">
-                            {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
-                        </p>
-                    </div>
-                </div>
-            </div>
+
+        <!-- Shipments Component -->
+        <div class="mb-8">
+            {% include "contracts/partials/clin_shipments.html" with mode="detail" %}
         </div>
+
         <!-- Financial Details -->
         <div>
             <h2 class="section-header cursor-pointer" id="financial-details-toggle">
@@ -387,6 +361,9 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+<!-- Add Toastify JS for notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Toggle financial details section
@@ -403,6 +380,19 @@
                 }
             });
         }
+
+        // Initialize shipments toggle functionality
+        document.querySelectorAll('.toggle-shipments').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const shipmentsTable = button.closest('.section').querySelector('#shipments-table');
+                if (shipmentsTable) {
+                    shipmentsTable.classList.toggle('hidden');
+                    // Update button text
+                    button.textContent = shipmentsTable.classList.contains('hidden') ? 'Show Shipments' : 'Hide Shipments';
+                }
+            });
+        });
     });
 </script>
 {% endblock extra_scripts %} 

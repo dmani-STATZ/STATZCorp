@@ -8,6 +8,9 @@
 
 {% block extra_head %}
 {{ block.super }}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <style>
@@ -555,62 +558,9 @@
                 </div>
             </div>
             
-            <!-- Shipping Information -->
-            <div>
-                <h2 class="section-header">
-                    Shipping Information
-                </h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-9 gap-4">
-                    <!-- Row 1 -->
-                    <div class="md:col-span-2">
-                        <div class="form-group">
-                            <label for="{{ form.ship_qty.id_for_label }}" class="form-label{% if form.ship_qty.field.required %} requiredField{% endif %}">
-                                Ship Qty{% if form.ship_qty.field.required %}<span class="asteriskField">*</span>{% endif %}
-                            </label>
-                            <input type="number" name="{{ form.ship_qty.html_name }}" id="{{ form.ship_qty.id_for_label }}" 
-                                   class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                   placeholder="Enter Ship Quantity" 
-                                   value="{% if form.ship_qty.value %}{{ form.ship_qty.value|floatformat:'0' }}{% endif %}"
-                                   step="any">
-                            {% if form.ship_qty.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.ship_qty.errors }}</div>
-                            {% endif %}
-                            {% if form.ship_qty.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.ship_qty.help_text }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-1">
-                        <div class="form-group">
-                            <label class="form-label">
-                                <span class="text-uppercase">UOM</span>
-                            </label>
-                            <input type="text" id="shipping_uom_display" class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50" 
-                                   value="{{ form.uom.value|default:'EA' }}" readonly disabled>
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-3">
-                        <div class="form-group">
-                            <label for="{{ form.ship_date.id_for_label }}" class="form-label">
-                                Ship Date
-                            </label>
-                            {{ form.ship_date }}
-                            {% if form.ship_date.errors %}
-                                <div class="text-red-500 text-sm mt-1">{{ form.ship_date.errors }}</div>
-                            {% endif %}
-                            {% if form.ship_date.help_text %}
-                                <div class="text-gray-500 text-sm mt-1">{{ form.ship_date.help_text }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="md:col-span-3">
-                        <!-- Empty cell for alignment -->
-                    </div>
-                </div>
+            <!-- Shipments Component -->
+            <div class="mb-8">
+                {% include "contracts/partials/clin_shipments.html" with mode="form" %}
             </div>
 
             <!-- Financial Details Section -->
@@ -865,6 +815,9 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+<!-- Add Toastify JS for notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
 <script>
     // Execute code when the DOM is fully loaded
     document.addEventListener('DOMContentLoaded', function() {

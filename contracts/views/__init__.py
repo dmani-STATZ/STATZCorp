@@ -137,6 +137,13 @@ from .split_views import (
     get_contract_splits,
 )
 
+from .shipment_views import (
+    create_shipment,
+    update_shipment,
+    delete_shipment,
+    get_clin_shipments,
+)
+
 __all__ = [
     'folder_tracking',
     'add_folder_tracking',

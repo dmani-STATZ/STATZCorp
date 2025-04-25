@@ -109,6 +109,12 @@ from .views import (
     update_split,
     delete_split,
     get_contract_splits,
+
+    # Shipment views
+    create_shipment,
+    update_shipment,
+    delete_shipment,
+    get_clin_shipments,
 )
 
 from .views.contract_views import check_contract_number
@@ -133,6 +139,12 @@ from .views import payment_history_views
 app_name = 'contracts'
 
 urlpatterns = [
+    # CLIN Shipment URLs - Moving these to the top
+    path('api/shipments/create/', create_shipment, name='create_shipment'),
+    path('api/shipments/update/<int:shipment_id>/', update_shipment, name='update_shipment'),
+    path('api/shipments/delete/<int:shipment_id>/', delete_shipment, name='delete_shipment'),
+    path('api/shipments/<int:clin_id>/', get_clin_shipments, name='get_clin_shipments'),
+
     # Dashboard views
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
     path('log/', ContractLogView.as_view(), name='contract_log_view'),
