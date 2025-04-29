@@ -15,7 +15,7 @@
             <div class="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
                 <!-- Header -->
                 <div class="text-center">
-                    <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Logo" class="mx-auto h-24 w-auto mb-6">
+                    <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Logo" class="mx-auto h-18 w-auto mb-6">
                     <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                         Security Certificate Setup Required
                     </h2>
@@ -28,11 +28,18 @@
                 <div class="space-y-6">
                     <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Step 1: Download the Certificate</h3>
-                        <div class="flex justify-center">
-                            <a href="/download-cert/" 
-                               class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                Download Certificate
-                            </a>
+                        <div class="grid grid-cols-3 md:grid-cols-3 gap-6 items-center">
+                            <div>
+                                Click the button to download the certificate.
+                            </div>
+                            <div class="flex justify-center">
+                                <a href="/download-cert/" 
+                                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    Download Certificate
+                                </a>
+                            </div>
+                            <div>                              
+                            </div>
                         </div>
                     </div>
 
@@ -43,17 +50,32 @@
                                 <ol class="list-decimal list-inside text-gray-600 dark:text-gray-300 space-y-3">
                                     <li>Double-click the downloaded certificate file</li>
                                     <li>Click "Install Certificate"</li>
-                                    <li>Select "Local Machine"</li>
+                                    <li>Select "Current User" (recommended) or "Local Machine"</li>
                                     <li>Click "Next"</li>
+                                    <li>If you selected "Local Machine", click "Yes" when asked to allow changes to your device</li>
                                     <li>Select "Place all certificates in the following store"</li>
                                     <li>Click "Browse" and select "Trusted Root Certification Authorities"</li>
                                     <li>Click "Next" and then "Finish"</li>
                                 </ol>
                             </div>
                             <div>
-                                <img src="{% static 'images/screenshots/cert-install.png' %}" 
-                                     alt="Certificate Installation Steps" 
-                                     class="rounded-lg shadow-lg">
+                                <video 
+                                    class="rounded-lg shadow-lg w-full"
+                                    autoplay 
+                                    loop 
+                                    muted 
+                                    playsinline
+                                    poster="{% static 'images/screenshots/cert-install.png' %}"
+                                >
+                                    <source src="{% static 'videos/Screen Recording 2025-04-29 143557.mp4' %}" type="video/mp4">
+                                    <!-- Fallback to image if video fails to load -->
+                                    <img src="{% static 'images/screenshots/cert-install.png' %}" 
+                                         alt="Certificate Installation Wizard showing the store selection and Current User vs Local Machine options" 
+                                         class="rounded-lg shadow-lg">
+                                </video>
+                                <p class="mt-2 text-sm text-gray-500 italic">
+                                    Note: The actual screens may look slightly different depending on your Windows version.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -63,8 +85,7 @@
                         <div class="space-y-3 text-gray-600 dark:text-gray-300">
                             <p>To ensure the changes take effect:</p>
                             <ol class="list-decimal list-inside space-y-2">
-                                <li>Close all browser windows</li>
-                                <li>Open a new browser window</li>
+                                <li>Close all browser windows and tabs except this one</li>
                                 <li>Clear your browser cache (Ctrl+Shift+Delete)</li>
                                 <li>Select "Cached images and files"</li>
                                 <li>Click "Clear data"</li>
@@ -73,9 +94,9 @@
                     </div>
 
                     <div class="text-center pt-6">
-                        <button onclick="returnToLanding()" 
+                        <button onclick="closeWindow()" 
                                 class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                            I've Completed These Steps - Return to Login
+                            I've Completed These Steps - Close This Window
                         </button>
                     </div>
                 </div>
@@ -84,7 +105,7 @@
     </div>
 
     <script>
-        function returnToLanding() {
+        function closeWindow() {
             // Clear cache using Cache API
             if ('caches' in window) {
                 caches.keys().then(function(cacheNames) {
@@ -96,8 +117,8 @@
                 });
             }
             
-            // Redirect to landing page
-            window.location.href = '/';
+            // Close the window
+            window.close();
         }
     </script>
 </body>
