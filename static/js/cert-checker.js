@@ -58,6 +58,11 @@ class CertificateChecker {
         }
     }
 
+    handleCertificateError() {
+        // Redirect to the certificate error page
+        window.location.href = '/cert-error/';
+    }
+
     async downloadAndInstallCert() {
         try {
             // Trigger certificate download
@@ -102,6 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add click handler for certificate download button if it exists
     const downloadButton = document.getElementById('download-cert-button');
     if (downloadButton) {
-        downloadButton.addEventListener('click', () => certChecker.downloadAndInstallCert());
+        downloadButton.addEventListener('click', () => certChecker.handleCertificateError());
     }
 }); 

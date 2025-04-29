@@ -34,7 +34,6 @@
     <meta name="msapplication-config" content="none">
 
     {% tailwind_css %}
-    <link rel="stylesheet" href="{% static 'css/dist/cert-checker.css' %}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <script src="{% static 'js/cert-checker.js' %}"></script>
@@ -58,9 +57,9 @@
                 <div class="mt-8 max-w-xs mx-auto">
                     <!-- Certificate Error Button Container -->
                     <div id="cert-button-container" style="display: none;">
-                        <button id="download-cert-button" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
+                        <a href="{% url 'cert_error' %}" id="download-cert-button" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
                             Fix Certificate Error
-                        </button>
+                        </a>
                         <p class="mt-2 text-sm text-red-600 dark:text-red-400">
                             Your connection is not secure. Click above to fix this issue.
                         </p>
