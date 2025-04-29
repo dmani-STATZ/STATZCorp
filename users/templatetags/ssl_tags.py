@@ -2,17 +2,35 @@ from django import template
 import ssl
 import socket
 import OpenSSL
+import subprocess
+import platform
+import os
 from django.conf import settings
 from django.core.cache import cache
 from datetime import datetime, timedelta
 
 register = template.Library()
 
+def check_windows_cert_store(hostname):
+    """Check if the certificate is trusted in Windows certificate store"""
+    try:
+        # Use PowerShell to check certificate in Windows store
+        ps_command = f'Get-ChildItem -Path Cert:\\CurrentUser\\Root -Recurse | Where-Object {{ $_.Subject -like "*{hostname}*" -or $_.Issuer -like "*{hostname}*" }}'
+        result = subprocess.run(['powershell', '-Command', ps_command], 
+                              capture_output=True, 
+                              text=True)
+        return bool(result.stdout.strip())
+    except Exception as e:
+        print(f"Failed to check Windows certificate store: {str(e)}")
+        return False
+
 @register.simple_tag(takes_context=True)
 def is_cert_untrusted(context):
     """
-    Check if the certificate is untrusted by attempting to verify the connection.
-    Uses caching to prevent frequent rechecks and fluctuating results.
+    Check if the certificate is untrusted by:
+    1. Checking Windows certificate store
+    2. Attempting direct SSL connection
+    3. Verifying certificate dates
     """
     request = context['request']
     
@@ -28,6 +46,11 @@ def is_cert_untrusted(context):
     cached_status = cache.get(cache_key)
     if cached_status is not None:
         return cached_status
+
+    # First check Windows certificate store
+    if check_windows_cert_store(hostname):
+        cache.set(cache_key, False, 300)  # Cache for 5 minutes
+        return False
 
     try:
         # Create an SSL context with strict verification
@@ -47,19 +70,20 @@ def is_cert_untrusted(context):
                     now = datetime.utcnow()
                     
                     if now < not_before or now > not_after:
-                        cache.set(cache_key, True, 300)  # Cache for 5 minutes
+                        print(f"Certificate date validation failed for {hostname}")
+                        cache.set(cache_key, True, 300)
                         return True
                 
                 # Certificate is valid
-                cache.set(cache_key, False, 300)  # Cache for 5 minutes
+                cache.set(cache_key, False, 300)
                 return False
                 
     except (ssl.SSLError, ssl.CertificateError, socket.error, ValueError, KeyError) as e:
         # Log the error for debugging
-        print(f"Certificate verification failed: {str(e)}")
-        cache.set(cache_key, True, 300)  # Cache for 5 minutes
+        print(f"Certificate verification failed for {hostname}: {str(e)}")
+        cache.set(cache_key, True, 300)
         return True
     
     # Default to showing the error if verification fails
-    cache.set(cache_key, True, 300)  # Cache for 5 minutes
+    cache.set(cache_key, True, 300)
     return True
