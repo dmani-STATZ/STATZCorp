@@ -201,13 +201,13 @@
 
 {% block body %}
 
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Main Content -->
     <main>
         {% if messages %}
             {% for message in messages %}
                 <div class="w-[93%] mx-auto mb-4">
-                    <div class="p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700{% elif message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                    <div class="p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200{% elif message.tags == 'error' %}bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200{% else %}bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200{% endif %}">
                         {{ message }}
                     </div>
                 </div>
@@ -215,7 +215,7 @@
         {% endif %}
         
         <!-- Default width container that all pages will inherit -->
-        <div class="w-[75%] mx-auto">
+        <div class="w-[75%] mx-auto dark:bg-gray-800 dark:text-gray-100">
             {% block content %}
                 {% block contract_content %}{% endblock contract_content %}
             {% endblock content %}
@@ -587,7 +587,7 @@
 </div>
 
 <!-- Reminders Sidebar -->
-<div class="reminderbar bg-white text-gray-800 w-80 h-[calc(100vh-4rem)] fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar">
+<div class="reminderbar bg-white text-gray-800 w-80 h-[calc(100vh-4rem)] fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col dark:bg-gray-900 dark:text-gray-100" id="reminderbar">
     <div class="flex justify-between items-center p-4 border-b border-gray-200 {% if overdue_count > 0 %}bg-red-50{% else %}bg-green-50{% endif %} flex-shrink-0">
         <div>
             <h2 class="text-lg font-semibold {% if overdue_count > 0 %}text-red-800{% else %}text-green-800{% endif %}">My Reminders</h2>

@@ -97,18 +97,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 py-8 dark:bg-gray-900 dark:text-gray-100">
     <!-- Header -->
     <div class="mb-8">
         <div class="flex justify-between items-start">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">{{ supplier.name }}</h1>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ supplier.name }}</h1>
                 <div class="mt-2 flex items-center space-x-4">
                     {% if supplier.cage_code %}
-                    <span class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">CAGE: {{ supplier.cage_code }}</span>
+                    <span class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">CAGE: {{ supplier.cage_code }}</span>
                     {% endif %}
                     {% if supplier.supplier_type %}
-                    <span class="text-sm text-gray-500">{{ supplier.supplier_type.description }}</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-300">{{ supplier.supplier_type.description }}</span>
                     {% endif %}
                 </div>
                 <div class="mt-2 flex flex-wrap gap-2">

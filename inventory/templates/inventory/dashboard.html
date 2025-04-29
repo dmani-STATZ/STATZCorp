@@ -1,8 +1,8 @@
-{% extends 'base.html' %}
+{% extends 'base_template.html' %}
 {% load crispy_forms_tags %}
 {% load custom_filters %}
 
-{% block content %}
+{% block body %}
 <div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-6 w-full">
         <div class="w-[45%] flex justify-start">
@@ -101,7 +101,8 @@
         </div>
     </div>
 </div>
-
+{% endblock body %}
+{% block extra_scripts %}
 <script>
     let deleteItemId = null;
 
@@ -147,4 +148,4 @@
         }
     }
 </script>
-{% endblock %}
+{% endblock extra_scripts %}

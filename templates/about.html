@@ -1,29 +1,29 @@
-{% extends 'base.html' %}
+{% extends 'base_template.html' %}
 
-{% block content %}
-<div class="bg-grey-100">
+{% block body %}
+<div class="bg-grey-100 dark:bg-gray-900">
 	<!-- Header Section -->
-	<div class="bg-gray-500 text-white py-12 text-center max-w-7xl mx-auto rounded-xl">
+	<div class="bg-gray-500 text-white py-12 text-center max-w-7xl mx-auto rounded-xl dark:bg-gray-800">
 		<h1 class="text-4xl font-bold mb-4">ABOUT US</h1>
-		<p class="text-2xl max-w-2xl mx-auto px-4">
+		<p class="text-2xl max-w-2xl mx-auto px-4 dark:text-gray-300">
 			YOUR NEEDS ARE UNIQUE, AND SHOULD BE GIVEN
 			THE EXPERT INDIVIDUAL ATTENTION THEY DESERVE.
 		</p>
 	</div>
 
 	<!-- Red Title Bar -->
-	<div class="bg-gray-200 py-3 px-4 text-center max-w-7xl mx-auto rounded-t-xl">
+	<div class="bg-gray-200 py-3 px-4 text-center max-w-7xl mx-auto rounded-t-xl dark:bg-gray-700">
 		<div class="max-w-7xl mx-auto flex justify-end">
-			<div class="text-[#990000] font-medium">
+			<div class="text-[#990000] font-medium dark:text-red-300">
 				Your Friendly and Knowledgeable SDVOSB Dealer
 			</div>
 		</div>
 	</div>
 
 	<!-- Main Content -->
-	<div class="max-w-7xl mx-auto py-8 px-4 bg-white">
+	<div class="max-w-7xl mx-auto py-8 px-4 bg-white dark:bg-gray-800">
 		<!-- Highlighted Text -->
-		<div class="text-center mb-12 text-gray-700 text-xl bg-gray-300 border border-black rounded-lg p-6">
+		<div class="text-center mb-12 text-gray-700 text-xl bg-gray-300 border border-black rounded-lg p-6 dark:bg-gray-700 dark:text-gray-200">
 			<p>
 				IN TODAY'S GLOBAL <span class="font-semibold">MANUFACTURING ENVIRONMENT, QUALITY, TECHNICAL SUPPORT</span> 
 				AND DELIVERY ARE A GIVEN. THE ONLY ELEMENT LEFT TO IMPROVE ON IS VALUE!
@@ -31,7 +31,7 @@
 		</div>
 
 		<!-- Main Text Content -->
-		<div class="prose max-w-none">
+		<div class="prose max-w-none dark:text-gray-200">
 			<p class="mb-6">
 				STATZ Corporation is your Friendly and Knowledgeable "Service Disabled Veteran Owned Small Business". 
 				Our SDVOSB status has been verified by the VA-CVE and we focus on delivering superior supply chain support 
@@ -62,4 +62,4 @@
 		</div>
 	</div>
 </div>
-{% endblock content %}
+{% endblock body %}

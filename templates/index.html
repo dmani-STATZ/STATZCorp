@@ -1,7 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_template.html' %}
 
-{% block content %}
-<div class="bg-white rounded-lg p-6">
+{% block body %}
+<div class="bg-white rounded-lg p-6 dark:bg-gray-800 dark:text-gray-100">
     <h1 class="text-2xl font-semibold mb-6">Welcome to STATZ Corporation Portal</h1>
     
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -118,7 +118,7 @@
     </div>
 
 </div>
-{% endblock content %}
+{% endblock body %}
 
 {% block extra_scripts %}
 <script>

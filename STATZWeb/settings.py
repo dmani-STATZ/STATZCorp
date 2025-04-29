@@ -105,6 +105,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'contracts.context_processors.reminders_processor',
+                'users.context_processors.user_preferences',
             ],
         },
     },

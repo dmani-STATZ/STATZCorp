@@ -45,11 +45,13 @@
     {% endif %}
     <style>
         body {
-            padding-top: 40px;
+            margin-top: 48px;
+            margin-left: 5px;
+            margin-right: 5px;
+            margin-bottom: 5px;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            margin: 0;
             padding: 0;
         }
         header {
@@ -73,7 +75,7 @@
                 );
             background-blend-mode: multiply;
             background-color: #004eb3;
-            z-index: 1000;
+            z-index: 100;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             color: rgb(255, 255, 255);
             padding: 0.5rem 1rem;
@@ -123,7 +125,6 @@
             width: 100%;
             max-width: none;
             padding: 0.5rem;
-            margin-top: 48px; /* Match header height */
         }
         .content.active {
             margin-left: 0px;
@@ -146,11 +147,16 @@
         }
     </style>
 </head>
-<body>
+<body class="{% if request.user.settings.theme == 'dark' %}dark{% endif %}">
     <header id="header">
-        <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4"></a>
+        <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" style="height: 30px;"></a>
         <button class="toggle-btn bg-gray-800 text-white py-2 px-4 rounded" onclick="toggleSidebar()">☰ Menu</button>
         <div class="flex flex-col md:flex-row md:ml-auto justify-center items-center">
+            <button id="theme-toggle" class="ml-4 p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700" title="Toggle dark mode">
+                <svg id="theme-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800 dark:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+            </button>
             {% is_development as dev_mode %}
             {% if dev_mode %}
                 <p class="text-yellow-300 mr-4 font-medium">Development Environment</p>
@@ -209,6 +215,7 @@
             </ul>
         </div>
     </div>
+
     <div class="content flex-1 inactive" id="content">
         {% block body %}{% endblock %}
         {% block extra_scripts %}{% endblock %}
@@ -226,11 +233,29 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Service worker registered successfully'))
-                    .catch(err => console.error('Service worker registration failed:', err));
+                navigator.serviceWorker.register('/sw.js', {
+                    scope: '/',
+                    updateViaCache: 'none'
+                })
+                .then(reg => {
+                    console.log('Service worker registered successfully. Scope:', reg.scope);
+                })
+                .catch(err => {
+                    console.error('Service worker registration failed:', err);
+                    console.error('Error details:', {
+                        message: err.message,
+                        fileName: err.fileName,
+                        lineNumber: err.lineNumber
+                    });
+                });
             });
         }
     </script>
+    <script src="{% static 'js/theme_toggle.js' %}"></script>
+    {% if user.is_authenticated %}
+    <script>
+        window.CURRENT_USER_ID = "{{ user.id }}";
+    </script>
+    {% endif %}
 </body>
 </html> 

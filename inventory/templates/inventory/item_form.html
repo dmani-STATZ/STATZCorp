@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base_template.html' %}
 {% load crispy_forms_tags %}
 {% block extra_head %}
     <title>STATZ Corporation - Inventory - Add Item</title>
@@ -100,7 +100,7 @@
         }
     </style>
 {% endblock %}
-{% block content %}
+{% block body %}
 <div class="form-container">
     <div class="form-upper-container">
         <a href="{% url 'inventory:dashboard' %}" class="back-button">
@@ -154,7 +154,8 @@
         </div>
     </div>
 </div>
-
+{% endblock body %}
+{% block extra_scripts %}
 <script>
     $(document).ready(function() {
         $(".autocomplete-nsn").autocomplete({
@@ -173,4 +174,4 @@
         });
     });
 </script>
-{% endblock %}
+{% endblock extra_scripts %}

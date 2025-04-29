@@ -6,13 +6,13 @@
  */
 
 module.exports = {
+    darkMode: 'class',
     content: [
         /**
          * HTML. Paths to Django template files that will contain Tailwind CSS classes.
          */
 
         /*  Templates within theme app (<tailwind_app_name>/templates), e.g. base.html. */
-        '../templates/**/*.html',
 
         /*
          * Main templates directory of the project (BASE_DIR/templates).

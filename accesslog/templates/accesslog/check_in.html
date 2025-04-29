@@ -1,7 +1,7 @@
-{% extends "base.html" %}
+{% extends "base_template.html" %}
 {% load crispy_forms_tags %}
 
-{% block content %}
+{% block body %}
 <div class="bg-white shadow rounded-lg p-6 max-w-2xl mx-auto">
     <h2 class="text-2xl font-bold text-gray-800 mb-6">Check In Visitor</h2>
     <form method="POST" class="space-y-6" id="visitorForm">
@@ -61,7 +61,8 @@
         <input type="hidden" name="action" id="formAction" value="check_in">
     </form>
 </div>
-
+{% endblock body %}
+{% block extra_scripts %}
 <script>
 function fillVisitorInfo(select) {
     console.log('Selected value:', select.value); // Debug line
@@ -118,4 +119,4 @@ function stageVisitor() {
     document.getElementById('visitorForm').submit();
 }
 </script>
-{% endblock %} 
+{% endblock extra_scripts %} 

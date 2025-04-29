@@ -1,8 +1,8 @@
-{% extends "base.html" %}
+{% extends "base_template.html" %}
 {% load static %}
 {% block title %}Manage User Settings{% endblock %}
 
-{% block content %}
+{% block body %}
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold mb-8">User Settings Management</h1>
     
@@ -61,10 +61,13 @@
     <span id="toastMessage"></span>
 </div>
 
+{% endblock body %}
+{% block extra_scripts %}
+
 <script>
 // Global vars
 const csrfToken = '{{ csrf_token }}';
-const allPossibleSettings = {{ all_settings|safe }};
+const allPossibleSettings = '{{ all_settings|safe }}';
 // Get setting types from Django server
 const settingTypes = {};
 
@@ -446,4 +449,5 @@ document.addEventListener('DOMContentLoaded', function() {
     loadUserSettings();
 });
 </script>
-{% endblock %} 
+
+{% endblock extra_scripts %} 
