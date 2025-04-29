@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, JsonResponse
 from django.views.static import serve
 from django.views.generic import TemplateView
 import os
@@ -92,6 +92,9 @@ urlpatterns = [
     path('sw.js', service_worker, name='service_worker'),
     path('cert-error/', TemplateView.as_view(template_name='cert_error.html'), name='cert_error'),
     path('download-cert/', download_certificate, name='download_cert'),
+    
+    # Health check endpoint for certificate verification
+    path('api/health-check/', lambda request: JsonResponse({'status': 'ok'}), name='health_check'),
 ]
 
 # Always serve static/media files (even in production)

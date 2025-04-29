@@ -34,8 +34,10 @@
     <meta name="msapplication-config" content="none">
 
     {% tailwind_css %}
+    <link rel="stylesheet" href="{% static 'css/dist/cert-checker.css' %}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <script src="{% static 'js/cert-checker.js' %}"></script>
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     <title>Welcome to STATZ Corporation</title>
 </head>
@@ -54,16 +56,18 @@
                     <p>If you are an authorized employee, please click the button below to continue.</p>
                 </div>
                 <div class="mt-8 max-w-xs mx-auto">
-                    {% is_cert_untrusted as cert_untrusted %}
-                    {% if cert_untrusted %}
-                        <a href="{% url 'cert_error' %}" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
+                    <!-- Certificate Error Button Container -->
+                    <div id="cert-button-container" style="display: none;">
+                        <button id="download-cert-button" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
                             Fix Certificate Error
-                        </a>
+                        </button>
                         <p class="mt-2 text-sm text-red-600 dark:text-red-400">
                             Your connection is not secure. Click above to fix this issue.
                         </p>
-                    {% else %}
-                        <!-- Original login/continue buttons -->
+                    </div>
+                    
+                    <!-- Login/Continue Container -->
+                    <div id="login-container">
                         {% get_require_login as require_login %}
                         {% if require_login and not user.is_authenticated %}
                             <a href="{% url 'users:login' %}" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
@@ -74,7 +78,7 @@
                                 Accept & Continue
                             </a>
                         {% endif %}
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -101,24 +105,6 @@
                 });
             });
         }
-    </script>
-
-    <!-- Add this right after your existing PWA meta tags in landing.html -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check if we're on HTTPS and if there's a certificate error
-            if (window.location.protocol === 'https:') {
-                fetch('/sw.js')
-                    .catch(error => {
-                        if (error.message.includes('SSL') || 
-                            error.message.includes('certificate') || 
-                            !document.documentElement.classList.contains('https')) {
-                            // Redirect to cert error page
-                            window.location.href = '/cert-error/';
-                        }
-                    });
-            }
-        });
     </script>
 </body>
 </html>
