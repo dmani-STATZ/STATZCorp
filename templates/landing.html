@@ -90,5 +90,23 @@
             });
         }
     </script>
+
+    <!-- Add this right after your existing PWA meta tags in landing.html -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if we're on HTTPS and if there's a certificate error
+            if (window.location.protocol === 'https:') {
+                fetch('/sw.js')
+                    .catch(error => {
+                        if (error.message.includes('SSL') || 
+                            error.message.includes('certificate') || 
+                            !document.documentElement.classList.contains('https')) {
+                            // Redirect to cert error page
+                            window.location.href = '/cert-error/';
+                        }
+                    });
+            }
+        });
+    </script>
 </body>
 </html>

@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from django.views.static import serve
 from django.views.generic import TemplateView
 import os
@@ -48,6 +48,15 @@ def service_worker(request):
     response['Access-Control-Allow-Origin'] = '*'
     return response
 
+def download_certificate(request):
+    """Serve the SSL certificate for download"""
+    cert_path = os.path.join(settings.BASE_DIR, '..', 'Apache24', 'conf', 'ssl', 'server.crt')
+    response = FileResponse(open(cert_path, 'rb'),
+                          as_attachment=True,
+                          filename='statzutil01.crt')
+    response['Content-Type'] = 'application/x-x509-ca-cert'
+    return response
+
 urlpatterns = [
     path("__reload__/", include("django_browser_reload.urls")),
     path('admin/', admin.site.urls),
@@ -68,6 +77,8 @@ urlpatterns = [
     # PWA URLs
     path('manifest.json', manifest_json, name='manifest'),
     path('sw.js', service_worker, name='service_worker'),
+    path('cert-error/', TemplateView.as_view(template_name='cert_error.html'), name='cert_error'),
+    path('download-cert/', download_certificate, name='download_cert'),
 ]
 
 # Always serve static/media files (even in production)

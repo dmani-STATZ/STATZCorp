@@ -25,6 +25,8 @@ class LoginRequiredMiddleware:
             '/users/microsoft/',  # Microsoft auth paths
             '/manifest.json',     # PWA manifest
             '/sw.js',             # Service worker
+            '/cert-error/',
+            '/download-cert/',
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 

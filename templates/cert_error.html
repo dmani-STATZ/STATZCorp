@@ -1,0 +1,104 @@
+{% load static %}
+{% load tailwind_tags %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% tailwind_css %}
+    <title>STATZ Corporation - Certificate Setup Required</title>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+    <div class="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div class="max-w-3xl w-full space-y-8">
+            <div class="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
+                <!-- Header -->
+                <div class="text-center">
+                    <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Logo" class="mx-auto h-24 w-auto mb-6">
+                    <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                        Security Certificate Setup Required
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-300 mb-8">
+                        To ensure a secure connection, you need to install our security certificate.
+                    </p>
+                </div>
+
+                <!-- Steps -->
+                <div class="space-y-6">
+                    <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Step 1: Download the Certificate</h3>
+                        <div class="flex justify-center">
+                            <a href="/download-cert" 
+                               class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Download Certificate
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Step 2: Install the Certificate</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-4">
+                                <ol class="list-decimal list-inside text-gray-600 dark:text-gray-300 space-y-3">
+                                    <li>Double-click the downloaded certificate file</li>
+                                    <li>Click "Install Certificate"</li>
+                                    <li>Select "Local Machine"</li>
+                                    <li>Click "Next"</li>
+                                    <li>Select "Place all certificates in the following store"</li>
+                                    <li>Click "Browse" and select "Trusted Root Certification Authorities"</li>
+                                    <li>Click "Next" and then "Finish"</li>
+                                </ol>
+                            </div>
+                            <div>
+                                <img src="{% static 'images/screenshots/cert-install.png' %}" 
+                                     alt="Certificate Installation Steps" 
+                                     class="rounded-lg shadow-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Step 3: Clear Your Browser Data</h3>
+                        <div class="space-y-3 text-gray-600 dark:text-gray-300">
+                            <p>To ensure the changes take effect:</p>
+                            <ol class="list-decimal list-inside space-y-2">
+                                <li>Close all browser windows</li>
+                                <li>Open a new browser window</li>
+                                <li>Clear your browser cache (Ctrl+Shift+Delete)</li>
+                                <li>Select "Cached images and files"</li>
+                                <li>Click "Clear data"</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="text-center pt-6">
+                        <button onclick="returnToLanding()" 
+                                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            I've Completed These Steps - Return to Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function returnToLanding() {
+            // Clear cache using Cache API
+            if ('caches' in window) {
+                caches.keys().then(function(cacheNames) {
+                    return Promise.all(
+                        cacheNames.map(function(cacheName) {
+                            return caches.delete(cacheName);
+                        })
+                    );
+                });
+            }
+            
+            // Redirect to landing page
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>
