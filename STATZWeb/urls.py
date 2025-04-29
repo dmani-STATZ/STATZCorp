@@ -50,12 +50,20 @@ def service_worker(request):
 
 def download_certificate(request):
     """Serve the SSL certificate for download"""
-    cert_path = os.path.join(settings.BASE_DIR, '..', 'Apache24', 'conf', 'ssl', 'server.crt')
-    response = FileResponse(open(cert_path, 'rb'),
-                          as_attachment=True,
-                          filename='statzutil01.crt')
-    response['Content-Type'] = 'application/x-x509-ca-cert'
-    return response
+    cert_path = os.path.join('C:', 'Apache24', 'conf', 'ssl', 'server.crt')
+    try:
+        response = FileResponse(open(cert_path, 'rb'),
+                              as_attachment=True,
+                              filename='statzutil01.crt')
+        response['Content-Type'] = 'application/x-x509-ca-cert'
+        return response
+    except FileNotFoundError:
+        # Add some error handling in case the file isn't found
+        return HttpResponse(
+            "Certificate file not found. Please contact your system administrator.",
+            status=404,
+            content_type="text/plain"
+        )
 
 urlpatterns = [
     path("__reload__/", include("django_browser_reload.urls")),
