@@ -50,7 +50,13 @@ def service_worker(request):
 
 def download_certificate(request):
     """Serve the SSL certificate for download"""
-    cert_path = os.path.join('C:', 'Apache24', 'conf', 'ssl', 'server.crt')
+    # Try to find certificate in our static directory first
+    cert_path = os.path.join(settings.BASE_DIR, 'static', 'certificates', 'server.crt')
+    
+    # Fall back to Apache directory if not found in static
+    if not os.path.exists(cert_path):
+        cert_path = os.path.join('C:', 'Apache24', 'conf', 'ssl', 'server.crt')
+    
     try:
         response = FileResponse(open(cert_path, 'rb'),
                               as_attachment=True,
@@ -58,7 +64,6 @@ def download_certificate(request):
         response['Content-Type'] = 'application/x-x509-ca-cert'
         return response
     except FileNotFoundError:
-        # Add some error handling in case the file isn't found
         return HttpResponse(
             "Certificate file not found. Please contact your system administrator.",
             status=404,
