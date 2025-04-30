@@ -42,10 +42,10 @@ Retrieves the details of a processing contract and its associated CLINs.
     "success": true,
     "contract": {
         "id": 123,
-        "contract_number": "CONTRACT123",
+        "contract_number": "STATZ-25-D-1234",
         "solicitation_type": "SDVOSB",
-        "po_number": "PO123",
-        "tab_num": "TAB1",
+        "po_number": "12345",
+        "tab_num": "123789",
         "buyer": 1,  // Buyer ID if matched, null if not
         "buyer_text": "Original buyer text",
         "contract_type": 1,  // Contract type ID
@@ -59,7 +59,7 @@ Retrieves the details of a processing contract and its associated CLINs.
         {
             "id": 456,
             "item_number": "0001",
-            "nsn": 789,  // NSN ID if matched, null if not
+            "nsn": "7895-26-789-1234",  // NSN ID if matched, null if not
             "nsn_text": "Original NSN text",
             "supplier": 321,  // Supplier ID if matched, null if not
             "supplier_text": "Original supplier text",
@@ -84,10 +84,10 @@ Updates the details of a processing contract.
 **Request Body Example:**
 ```json
 {
-    "contract_number": "CONTRACT123",
-    "solicitation_type": "SDVOSB",
-    "po_number": "PO123",
-    "tab_num": "TAB1",
+    "contract_number": "STATZ-25-D-1234",
+    "solicitation_type": "WO",
+    "po_number": "123456",
+    "tab_num": "123123",
     "buyer": 1,
     "buyer_text": "Updated buyer text",
     "contract_type": 1,
@@ -120,7 +120,7 @@ Adds a new CLIN to a processing contract.
 ```json
 {
     "item_number": "0001",
-    "nsn": 789,
+    "nsn": "7890-12-345-6789",
     "nsn_text": "NSN description",
     "supplier": 321,
     "supplier_text": "Supplier name",
@@ -137,7 +137,7 @@ Adds a new CLIN to a processing contract.
     "clin": {
         "id": 456,
         "item_number": "0001",
-        "nsn": 789,
+        "nsn": "7890-12-345-6789",
         "nsn_text": "NSN description",
         "supplier": 321,
         "supplier_text": "Supplier name",
@@ -163,7 +163,7 @@ Updates an existing CLIN in a processing contract.
 ```json
 {
     "item_number": "0001",
-    "nsn": 789,
+    "nsn": "7890-12-345-6789",
     "nsn_text": "Updated NSN description",
     "supplier": 321,
     "supplier_text": "Updated supplier name",
@@ -228,11 +228,9 @@ Matches or creates a buyer for a processing contract.
 {
     "success": true,
     "buyer": {
-        "id": 123,
-        "name": "John Smith",
-        "email": "john.smith@example.com",
-        "phone": "123-456-7890",
-        "organization": "Procurement Office"
+        "id": 3,
+        "description": "DLA LAND",
+        "address": 123
     },
     "message": "Buyer matched successfully"
 }

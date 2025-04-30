@@ -21,6 +21,12 @@ import json
 from urllib.parse import quote
 import logging
 from decimal import Decimal
+import decimal
+from io import StringIO
+import random
+from datetime import datetime, timedelta
+from django.db.models import Count
+from django.utils.decorators import method_decorator
 
 logger = logging.getLogger(__name__)
 
@@ -580,110 +586,6 @@ def match_idiq(request, process_contract_id):
             'error': str(e)
         }, status=500)
 
-def download_csv_template(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="contract_template.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow([
-        'Contract Number',
-        'Buyer',
-        'Award Date',
-        'Due Date',
-        'Contract Value',
-        'Description',
-        'CLIN Number',
-        'NSN',
-        'NSN Description',
-        'Supplier',
-        'Quantity',
-        'Unit Price',
-        'Total Price',
-        'CLIN Description'
-    ])
-    
-    return response
-
-def download_test_data(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="test_contracts.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow([
-        'Contract Number',
-        'Buyer',
-        'Award Date',
-        'Due Date',
-        'Contract Value',
-        'Description',
-        'CLIN Number',
-        'NSN',
-        'NSN Description',
-        'Supplier',
-        'Quantity',
-        'Unit Price',
-        'Total Price',
-        'CLIN Description'
-    ])
-    
-    # Add some test data
-    writer.writerow([
-        'TEST-2024-001',
-        'Test Buyer 1',
-        '2024-01-01',
-        '2024-12-31',
-        '100000.00',
-        'Test Contract 1',
-        '0001',
-        '1234-56-789-0123',
-        'Test NSN Description 1',
-        'Test Supplier 1',
-        '10',
-        '1000.00',
-        '10000.00',
-        'Test CLIN Description 1'
-    ])
-    
-    return response
-
-def upload_csv(request):
-    if request.method == 'POST' and request.FILES.get('csv_file'):
-        csv_file = request.FILES['csv_file']
-        if not csv_file.name.endswith('.csv'):
-            return JsonResponse({'success': False, 'error': 'Please upload a CSV file'})
-        
-        try:
-            decoded_file = csv_file.read().decode('utf-8').splitlines()
-            reader = csv.DictReader(decoded_file)
-            
-            for row in reader:
-                # Create QueueContract entry
-                contract = QueueContract.objects.create(
-                    contract_number=row['Contract Number'],
-                    buyer=row['Buyer'],
-                    award_date=row['Award Date'],
-                    due_date=row['Due Date'],
-                    contract_value=row['Contract Value'],
-                    description=row['Description']
-                )
-                
-                # Create QueueClin entries
-                clin = contract.clins.create(
-                    item_number=row['CLIN Number'],
-                    nsn=row['NSN'],
-                    nsn_description=row['NSN Description'],
-                    supplier=row['Supplier'],
-                    quantity=row['Quantity'],
-                    unit_price=row['Unit Price'],
-                    total_price=row['Total Price'],
-                    description=row['CLIN Description']
-                )
-            
-            return JsonResponse({'success': True})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    
-    return JsonResponse({'success': False, 'error': 'Invalid request'})
 
 def get_process_contract(request, queue_id):
     """Get the process contract ID for a queue item to resume processing"""
@@ -710,76 +612,57 @@ def get_process_contract(request, queue_id):
 @login_required
 @require_POST
 @transaction.atomic
-def cancel_processing(request, process_contract_id):
-    """Cancel processing of a contract and reset its status"""
-    try:
-        with transaction.atomic():
-            process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
-            
-            # Get associated queue contract
-            queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
-            
-            # Reset queue contract status
-            queue_contract.is_being_processed = False
-            queue_contract.processed_by = None
-            queue_contract.processing_started = None
-            queue_contract.status = 'ready_for_processing'
-            queue_contract.save()
-            
-            # Delete the process contract
-            process_contract.delete()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Processing cancelled successfully'
-            })
-            
-    except ProcessContract.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'Process contract not found'
-        }, status=404)
-    except QueueContract.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'Queue contract not found'
-        }, status=404)
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-
-@login_required
-@require_POST
-@transaction.atomic
-def cancel_process_contract(request, process_contract_id):
+def cancel_process_contract(request, process_contract_id=None, queue_id=None):
     """
-    Cancel a process contract and return to queue
+    Cancel a process contract and return to queue.
+    
+    The primary use case is with process_contract_id, canceling from the process contract view.
+    The queue_id parameter is maintained for API compatibility but doesn't currently have UI elements.
     """
     try:
         with transaction.atomic():
-            process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+            # Case 1: Processing from process contract ID (primary use case)
+            if process_contract_id:
+                process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+                
+                # Only allow canceling if not already completed
+                if process_contract.status == 'completed':
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Cannot cancel a completed contract'
+                    }, status=400)
+                
+                # Get the queue contract
+                queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+                
+                # Reset queue contract status
+                queue_contract.is_being_processed = False
+                queue_contract.processed_by = None
+                queue_contract.processing_started = None
+                queue_contract.status = 'ready_for_processing'
+                queue_contract.save()
+                
+                # Delete the process contract
+                process_contract.delete()
+                
+            # Case 2: Processing from queue ID (not currently used in the UI)
+            elif queue_id:
+                queue_contract = get_object_or_404(QueueContract, id=queue_id)
+                
+                # Delete the ProcessContract if it exists
+                ProcessContract.objects.filter(queue_id=queue_id).delete()
+                
+                # Reset the queue contract status
+                queue_contract.is_being_processed = False
+                queue_contract.processed_by = None
+                queue_contract.processing_started = None
+                queue_contract.save()
             
-            # Only allow canceling if not already completed
-            if process_contract.status == 'completed':
+            else:
                 return JsonResponse({
                     'success': False,
-                    'error': 'Cannot cancel a completed contract'
+                    'error': 'Either process_contract_id or queue_id must be provided'
                 }, status=400)
-            
-            # Get the queue contract
-            queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
-            
-            # Reset queue contract status
-            queue_contract.is_being_processed = False
-            queue_contract.processed_by = None
-            queue_contract.processing_started = None
-            queue_contract.status = 'ready_for_processing'
-            queue_contract.save()
-            
-            # Delete the process contract
-            process_contract.delete()
             
             return JsonResponse({
                 'success': True,
@@ -801,6 +684,14 @@ def cancel_process_contract(request, process_contract_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+# Keep this function as a wrapper for backward compatibility
+@login_required
+@require_POST
+@transaction.atomic
+def cancel_processing(request, process_contract_id=None, queue_id=None):
+    """Cancel processing of a contract - wrapper for backward compatibility"""
+    return cancel_process_contract(request, process_contract_id=process_contract_id, queue_id=queue_id)
 
 @transaction.atomic
 def save_and_return_to_queue(request, process_contract_id):
@@ -1248,26 +1139,6 @@ def save_contract_data(request, process_contract_id):
         }, status=500)
     
 
-    # From the queue_views.py file
-    from django.shortcuts import render, redirect, get_object_or_404
-from django.views.generic import ListView
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.http import require_http_methods, require_POST
-from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
-from django.db import transaction
-from django.utils import timezone
-from ..models import QueueContract, QueueClin, SequenceNumber, ProcessContract, ProcessClin, ProcessContractSplit
-from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, ContractType
-import csv
-from io import StringIO
-import random
-from datetime import datetime, timedelta
-from django.conf import settings
-from django.core.exceptions import PermissionDenied
-from django.db.models import Count
-import decimal
-
 @method_decorator(login_required, name='dispatch')
 class ContractQueueListView(ListView):
     model = QueueContract
@@ -1276,6 +1147,39 @@ class ContractQueueListView(ListView):
     
     def get_queryset(self):
         return QueueContract.objects.all().order_by('award_date')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Add contract count info for debugging
+        contract_count = QueueContract.objects.count()
+        context['contract_count'] = contract_count
+        
+        if contract_count > 0:
+            # Get counts by status
+            processing_count = QueueContract.objects.filter(is_being_processed=True).count()
+            context['processing_count'] = processing_count
+            
+            # Get CLIN counts
+            total_clins = 0
+            for contract in context['queued_contracts']:
+                clin_count = contract.clins.count()
+                contract.clin_count = clin_count
+                total_clins += clin_count
+            
+            context['total_clins'] = total_clins
+            
+            # Add debug info for the first contract
+            if contract_count > 0:
+                first_contract = QueueContract.objects.first()
+                context['first_contract_debug'] = {
+                    'id': first_contract.id,
+                    'contract_number': first_contract.contract_number,
+                    'clins': first_contract.clins.count(),
+                    'created_on': first_contract.created_on
+                }
+        
+        return context
 
 @require_http_methods(["GET"])
 @login_required
@@ -1435,6 +1339,7 @@ def download_csv_template(request):
         'FOB',
         'Due Date',
         'Order Qty',
+        'UOM',
         'Item Value',
         'Unit Price',
         'Supplier',
@@ -1472,6 +1377,7 @@ def download_test_data(request):
         'FOB',
         'Due Date',
         'Order Qty',
+        'UOM',
         'Item Value',
         'Unit Price',
         'Supplier',
@@ -1527,6 +1433,7 @@ def download_test_data(request):
             # First CLIN must be Production
             item_number = "0001"
             item_type = "Production"
+            uom = "EA"
             
             # Generate CLIN data
             order_qty = random.randint(1, 100)
@@ -1583,6 +1490,7 @@ def download_test_data(request):
                 fob,
                 clin_due_date,
                 order_qty,
+                uom,
                 item_value,
                 unit_price,
                 supplier,
@@ -1659,6 +1567,7 @@ def download_test_data(request):
                     fob,
                     clin_due_date,
                     order_qty,
+                    uom,
                     item_value,
                     unit_price,
                     supplier,
@@ -1686,7 +1595,9 @@ def download_test_data(request):
 @login_required
 def upload_csv(request):
     """Upload and process a CSV file for contract queue"""
+    print("=== Starting CSV Upload Process ===")
     if 'csv_file' not in request.FILES:
+        print("No file uploaded")
         return JsonResponse({
             'success': False,
             'error': 'No file uploaded',
@@ -1695,9 +1606,11 @@ def upload_csv(request):
     
     try:
         csv_file = request.FILES['csv_file']
+        print(f"Processing file: {csv_file.name}")
         
         # Validate file type
         if not csv_file.name.endswith('.csv'):
+            print("Invalid file type")
             return JsonResponse({
                 'success': False,
                 'error': 'Invalid file type. Please upload a CSV file.',
@@ -1706,213 +1619,195 @@ def upload_csv(request):
         
         try:
             csv_data = csv_file.read().decode('utf-8')
-        except UnicodeDecodeError:
+            print("File successfully decoded as UTF-8")
+        except UnicodeDecodeError as e:
+            print(f"File decoding error: {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': 'Invalid file encoding. Please ensure the CSV file is saved with UTF-8 encoding.',
                 'error_type': 'encoding_error'
             })
-            
-        csv_reader = csv.DictReader(StringIO(csv_data))
+        
+        # Create a list to store all rows for processing
+        csv_rows = list(csv.DictReader(StringIO(csv_data)))
+        print(f"CSV Headers: {csv_rows[0].keys() if csv_rows else []}")
         
         # Validate required columns
         required_columns = [
             'Contract Number', 'Buyer', 'Award Date', 'Due Date', 'Contract Value',
             'Contract Type', 'Solicitation Type', 'Item Number', 'Item Type', 'NSN',
-            'NSN Description', 'Order Qty', 'Unit Price'
+            'NSN Description', 'Order Qty', 'UOM', 'Unit Price'
         ]
         
-        missing_columns = [col for col in required_columns if col not in csv_reader.fieldnames]
+        missing_columns = [col for col in required_columns if col not in (csv_rows[0].keys() if csv_rows else [])]
         if missing_columns:
+            print(f"Missing columns: {missing_columns}")
             return JsonResponse({
                 'success': False,
                 'error': f'Missing required columns: {", ".join(missing_columns)}',
                 'error_type': 'missing_columns',
                 'missing_columns': missing_columns
             })
+
+        # First, check all contract numbers and identify duplicates
+        print("\n=== Checking For Duplicate Contracts ===")
+        duplicate_contracts = set()
+        contract_numbers = set()
         
-        # Define required decimal fields and their validation
-        decimal_fields = {
-            'Contract Value': 'contract_value',
-            'Order Qty': 'order_qty',
-            'Item Value': 'item_value',
-            'Unit Price': 'unit_price',
-            'Supplier Unit Price': 'supplier_unit_price',
-            'Supplier Price': 'supplier_price'
-        }
+        # First pass: collect all unique contract numbers from CSV and check for duplicates
+        for contract_number in {row['Contract Number'] for row in csv_rows}:
+            # Check Contract table
+            if Contract.objects.filter(contract_number=contract_number).exists():
+                duplicate_contracts.add(contract_number)
+                print(f"Found duplicate in Contract table: {contract_number}")
+                continue
+            
+            # Check QueueContract table
+            if QueueContract.objects.filter(contract_number=contract_number).exists():
+                duplicate_contracts.add(contract_number)
+                print(f"Found duplicate in QueueContract table: {contract_number}")
         
-        # Define date fields for validation
-        date_fields = ['Award Date', 'Due Date', 'Supplier Due Date']
+        # Track statistics for final message
+        total_contracts = len({row['Contract Number'] for row in csv_rows})
+        duplicate_count = len(duplicate_contracts)
+        processed_count = 0
         
+        print(f"\nFound {duplicate_count} duplicate contracts out of {total_contracts} total")
+
+        # Continue with processing non-duplicate contracts
         with transaction.atomic():
             current_contract = None
-            row_number = 0
             
-            for row in csv_reader:
-                row_number += 1
+            for row_number, row in enumerate(csv_rows, 1):
+                contract_number = row['Contract Number']
                 
-                # Validate required fields
-                for field in required_columns:
-                    if not row.get(field):
-                        return JsonResponse({
-                            'success': False,
-                            'error': f'Missing required value in row {row_number}, column "{field}"',
-                            'error_type': 'missing_value',
-                            'row': row_number,
-                            'column': field
-                        })
+                # Skip this row if it's for a duplicate contract
+                if contract_number in duplicate_contracts:
+                    print(f"Skipping duplicate contract: {contract_number}")
+                    continue
                 
-                # Validate decimal fields
-                for field_name, model_field in decimal_fields.items():
-                    if field_name in row and row[field_name]:
+                print(f"\nProcessing row {row_number}")
+                print(f"Contract Number: {contract_number}")
+                
+                try:
+                    # If this is a new contract
+                    if not current_contract or current_contract.contract_number != contract_number:
+                        print(f"Creating new contract: {contract_number}")
+                        
+                        # Process date fields
                         try:
-                            value = row[field_name].strip()
-                            if value.startswith('$'):  # Handle dollar signs
-                                value = value[1:]
-                            if value.replace(',', '').replace('.', '').replace('-', '').isdigit():
-                                value = value.replace(',', '')  # Remove commas
-                                decimal.Decimal(value)
-                            else:
-                                raise decimal.InvalidOperation(f"Invalid characters in number: {value}")
-                        except (decimal.InvalidOperation, ValueError) as e:
+                            award_date = timezone.make_aware(datetime.strptime(row['Award Date'], '%Y-%m-%d')) if row['Award Date'] else None
+                            due_date = timezone.make_aware(datetime.strptime(row['Due Date'], '%Y-%m-%d')) if row['Due Date'] else None
+                            print(f"Dates processed - Award: {award_date}, Due: {due_date}")
+                        except ValueError as e:
+                            print(f"Date parsing error: {str(e)}")
                             return JsonResponse({
                                 'success': False,
-                                'error': f'Invalid decimal value in row {row_number}, column "{field_name}". Please enter a valid number.',
-                                'error_type': 'invalid_decimal',
-                                'row': row_number,
-                                'column': field_name,
-                                'value': row[field_name]
-                            })
-                
-                # Validate date fields
-                for field in date_fields:
-                    if field in row and row[field]:
-                        try:
-                            datetime.strptime(row[field], '%Y-%m-%d')
-                        except ValueError:
-                            return JsonResponse({
-                                'success': False,
-                                'error': f'Invalid date format in row {row_number}, column "{field}". Please use YYYY-MM-DD format.',
-                                'error_type': 'invalid_date',
-                                'row': row_number,
-                                'column': field,
-                                'value': row[field]
+                                'error': f'Invalid date format in row {row_number}. Please use YYYY-MM-DD format.',
+                                'error_type': 'date_format_error'
                             })
                         
-                # Validate contract number
-                contract_number = row['Contract Number']
-                validation_response = validate_contract_number(request, contract_number)
-                if not validation_response.get('success'):
-                    return validation_response
-                
-                # If this is a new contract (different contract number)
-                if not current_contract or current_contract.contract_number != row['Contract Number']:
+                        # Process contract value
+                        try:
+                            contract_value = decimal.Decimal(row['Contract Value'].replace(',', '').replace('$', '')) if row['Contract Value'] else None
+                            print(f"Contract value processed: {contract_value}")
+                        except decimal.InvalidOperation as e:
+                            print(f"Contract value parsing error: {str(e)}")
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Invalid contract value in row {row_number}. Please enter a valid number.',
+                                'error_type': 'decimal_format_error'
+                            })
+                        
+                        # Create contract
+                        try:
+                            current_contract = QueueContract.objects.create(
+                                contract_number=contract_number,
+                                buyer=row['Buyer'],
+                                award_date=award_date,
+                                due_date=due_date,
+                                contract_value=contract_value,
+                                contract_type=row['Contract Type'],
+                                solicitation_type=row['Solicitation Type'],
+                                created_by=request.user,
+                                modified_by=request.user
+                            )
+                            processed_count += 1
+                            print(f"Contract created successfully with ID: {current_contract.id}")
+                        except Exception as e:
+                            print(f"Contract creation error: {str(e)}")
+                            raise
+                    
+                    # Create CLIN
+                    print(f"Creating CLIN for contract {current_contract.contract_number}, Item Number: {row['Item Number']}")
                     try:
-                        # Create new contract queue entry
-                        current_contract = QueueContract.objects.create(
-                            contract_number=row['Contract Number'],
-                            buyer=row['Buyer'],
-                            award_date=datetime.strptime(row['Award Date'], '%Y-%m-%d') if row['Award Date'] else None,
-                            due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
-                            contract_value=decimal.Decimal(row['Contract Value'].replace(',', '').replace('$', '')) if row['Contract Value'] else None,
-                            contract_type=row['Contract Type'],
-                            solicitation_type=row['Solicitation Type'],
+                        QueueClin.objects.create(
+                            contract_queue=current_contract,
+                            item_number=row['Item Number'],
+                            item_type=row['Item Type'],
+                            nsn=row['NSN'],
+                            nsn_description=row['NSN Description'],
+                            ia=row.get('IA', ''),
+                            fob=row.get('FOB', ''),
+                            due_date=timezone.make_aware(datetime.strptime(row['Due Date'], '%Y-%m-%d')) if row['Due Date'] else None,
+                            order_qty=decimal.Decimal(row['Order Qty'].replace(',', '')) if row['Order Qty'] else None,
+                            uom=row['UOM'],
+                            item_value=decimal.Decimal(row['Item Value'].replace(',', '').replace('$', '')) if row.get('Item Value') else None,
+                            unit_price=decimal.Decimal(row['Unit Price'].replace(',', '').replace('$', '')) if row['Unit Price'] else None,
+                            supplier=row.get('Supplier', ''),
+                            supplier_due_date=timezone.make_aware(datetime.strptime(row['Supplier Due Date'], '%Y-%m-%d')) if row.get('Supplier Due Date') else None,
+                            supplier_unit_price=decimal.Decimal(row['Supplier Unit Price'].replace(',', '').replace('$', '')) if row.get('Supplier Unit Price') else None,
+                            supplier_price=decimal.Decimal(row['Supplier Price'].replace(',', '').replace('$', '')) if row.get('Supplier Price') else None,
+                            supplier_payment_terms=row.get('Supplier Payment Terms', ''),
                             created_by=request.user,
                             modified_by=request.user
                         )
+                        print("CLIN created successfully")
                     except Exception as e:
-                        return JsonResponse({
-                            'success': False,
-                            'error': f'Error creating contract in row {row_number}: {str(e)}',
-                            'error_type': 'contract_creation_error',
-                            'row': row_number,
-                            'contract_number': row['Contract Number']
-                        })
-                
-                try:
-                    # Handle supplier fields - convert empty strings to None
-                    supplier = row['Supplier'].strip() if row['Supplier'] else None
-                    supplier_due_date = datetime.strptime(row['Supplier Due Date'], '%Y-%m-%d') if row['Supplier Due Date'] else None
-                    supplier_unit_price = decimal.Decimal(row['Supplier Unit Price'].replace(',', '').replace('$', '')) if row['Supplier Unit Price'] else None
-                    supplier_price = decimal.Decimal(row['Supplier Price'].replace(',', '').replace('$', '')) if row['Supplier Price'] else None
-                    supplier_payment_terms = row['Supplier Payment Terms'].strip() if row['Supplier Payment Terms'] else None
-                    
-                    # Create CLIN queue entry
-                    QueueClin.objects.create(
-                        contract_queue=current_contract,
-                        item_number=row['Item Number'],
-                        item_type=row['Item Type'],
-                        nsn=row['NSN'],
-                        nsn_description=row['NSN Description'],
-                        ia=row['IA'],
-                        fob=row['FOB'],
-                        due_date=datetime.strptime(row['Due Date'], '%Y-%m-%d') if row['Due Date'] else None,
-                        order_qty=decimal.Decimal(row['Order Qty'].replace(',', '')) if row['Order Qty'] else None,
-                        item_value=decimal.Decimal(row['Item Value'].replace(',', '').replace('$', '')) if row['Item Value'] else None,
-                        unit_price=decimal.Decimal(row['Unit Price'].replace(',', '').replace('$', '')) if row['Unit Price'] else None,
-                        supplier=supplier,
-                        supplier_due_date=supplier_due_date,
-                        supplier_unit_price=supplier_unit_price,
-                        supplier_price=supplier_price,
-                        supplier_payment_terms=supplier_payment_terms,
-                        created_by=request.user,
-                        modified_by=request.user
-                    )
+                        print(f"CLIN creation error: {str(e)}")
+                        raise
+                        
                 except Exception as e:
+                    print(f"Error processing row {row_number}: {str(e)}")
+                    import traceback
+                    print(f"Traceback: {traceback.format_exc()}")
                     return JsonResponse({
                         'success': False,
-                        'error': f'Error creating CLIN in row {row_number}: {str(e)}',
-                        'error_type': 'clin_creation_error',
-                        'row': row_number,
-                        'item_number': row['Item Number']
+                        'error': f'Error processing row {row_number}: {str(e)}',
+                        'error_type': 'processing_error',
+                        'traceback': traceback.format_exc()
                     })
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'CSV file processed successfully'
-        })
-    except csv.Error as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'CSV file is malformed: {str(e)}',
-            'error_type': 'csv_format_error'
-        })
+            
+            # Prepare result message
+            result_message = f'CSV processing completed. '
+            if processed_count > 0:
+                result_message += f'Successfully imported {processed_count} contract(s). '
+            if duplicate_count > 0:
+                result_message += f'Skipped {duplicate_count} duplicate contract(s): \n'
+                for dup in duplicate_contracts:
+                    result_message += f"\n{dup}"
+            
+            print("\n=== CSV Upload Process Completed ===")
+            return JsonResponse({
+                'success': True,
+                'message': result_message,
+                'processed_count': processed_count,
+                'duplicate_count': duplicate_count,
+                'duplicate_contracts': list(duplicate_contracts)
+            })
+            
     except Exception as e:
+        print("\n=== CSV Upload Process Failed ===")
+        print(f"Error: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"Traceback: {tb}")
         return JsonResponse({
             'success': False,
             'error': f'Error processing CSV file: {str(e)}',
-            'error_type': 'general_error'
+            'error_type': 'general_error',
+            'traceback': tb
         })
-
-@login_required
-@require_POST
-def cancel_processing(request, queue_id):
-    """
-    Cancel the processing of a contract and reset its status
-    """
-    try:
-        queue_contract = get_object_or_404(QueueContract, id=queue_id)
-        
-        # Delete the ProcessContract if it exists
-        ProcessContract.objects.filter(queue_contract=queue_contract).delete()
-        
-        # Reset the queue contract status
-        queue_contract.is_being_processed = False
-        queue_contract.processed_by = None
-        queue_contract.processing_started = None
-        queue_contract.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Processing cancelled successfully'
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400) 
-    
 
 def validate_contract_number(request, contract_number):
     """
@@ -1920,26 +1815,81 @@ def validate_contract_number(request, contract_number):
     Returns a JSON response indicating whether the contract number is available.
     """
     try:
+        print(f"Validating contract number: {contract_number}")
         Contract.objects.get(contract_number=contract_number)
+        print(f"Contract number {contract_number} found in Contract table")
         return JsonResponse({
             'success': False,
-            'message': f'Contract number "{contract_number}" already exists in the Contract table.'
+            'message': f'Contract number "{contract_number}" already exists in the Contract table.',
+            'error_type': 'duplicate_contract'
         })
     except Contract.DoesNotExist:
         try:
             QueueContract.objects.get(contract_number=contract_number)
+            print(f"Contract number {contract_number} found in QueueContract table")
             return JsonResponse({
                 'success': False,
-                'message': f'Contract number "{contract_number}" already exists in the QueueContract table.'
+                'message': f'Contract number "{contract_number}" already exists in the QueueContract table.',
+                'error_type': 'duplicate_queue_contract'
             })
         except QueueContract.DoesNotExist:
+            print(f"Contract number {contract_number} is available")
             return JsonResponse({
                 'success': True,
                 'message': f'Contract number "{contract_number}" is available.'
             })
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"Error validating contract number: {str(e)}\nTraceback: {tb}")
         return JsonResponse({
             'success': False,
-            'message': f'An unexpected error occurred: {str(e)}'
+            'message': f'An unexpected error occurred: {str(e)}',
+            'error_type': 'validation_error',
+            'traceback': tb
         })
+
+@login_required
+@require_POST
+def delete_queue_contract(request, queue_id):
+    """Delete a contract from the queue"""
+    try:
+        queue_contract = get_object_or_404(QueueContract, id=queue_id)
+        
+        # Only superusers can delete contracts
+        if not request.user.is_superuser:
+            return JsonResponse({
+                'success': False,
+                'error': 'Only superusers can delete contracts'
+            }, status=403)
+            
+        # Check if contract is being processed
+        if queue_contract.is_being_processed:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot delete a contract that is being processed'
+            }, status=400)
+            
+        # Delete associated process contract if it exists
+        ProcessContract.objects.filter(queue_id=queue_id).delete()
+        
+        # Delete the queue contract
+        queue_contract.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Contract deleted successfully'
+        })
+        
+    except QueueContract.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Contract not found'
+        }, status=404)
+    except Exception as e:
+        logger.exception("Error deleting queue contract")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 

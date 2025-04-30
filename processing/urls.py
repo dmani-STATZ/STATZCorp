@@ -26,8 +26,8 @@ from .views.processing_views import (
     download_csv_template,
     download_test_data,
     upload_csv,
-    cancel_processing as queue_cancel_processing,
-    initiate_processing
+    initiate_processing,
+    delete_queue_contract
 )
 from .views.api_views import (
     get_processing_contract,
@@ -44,9 +44,10 @@ app_name = 'processing'
 urlpatterns = [
     # Queue Management
     path('queue/', ContractQueueListView.as_view(), name='queue'),
+    path('queue/delete/<int:queue_id>/', delete_queue_contract, name='delete_queue_contract'),
     path('start-new-contract/', start_new_contract, name='start_new_contract'),
     path('next-numbers/', get_next_numbers, name='get_next_numbers'),
-    path('queue/cancel/<int:queue_id>/', queue_cancel_processing, name='queue_cancel_processing'),
+    path('queue/cancel/<int:queue_id>/', cancel_process_contract, name='queue_cancel_processing'),
     
     # Contract Processing
     path('process/<int:process_contract_id>/', lambda request, process_contract_id: redirect('processing:process_contract_edit', pk=process_contract_id), name='process_contract'),
@@ -84,7 +85,7 @@ urlpatterns = [
     path('contract/split/<int:split_id>/update/', update_split_view, name='update_split'),
     path('contract/split/<int:split_id>/delete/', delete_split_view, name='delete_split'),
 
-    path('process-contract/<int:process_contract_id>/cancel/', cancel_processing, name='cancel_processing'),
+    path('process-contract/<int:process_contract_id>/cancel/', cancel_process_contract, name='cancel_processing'),
     path('process-contract/<int:process_contract_id>/mark-ready/', mark_ready_for_review, name='mark_ready_for_review'),
 
 ] 
