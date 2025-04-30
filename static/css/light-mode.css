@@ -1,0 +1,298 @@
+/**
+ * STATZ Corporation - Light Mode Stylesheet
+ * 
+ * This file contains all light mode specific styles that are applied when the 'dark' class
+ * is NOT present on the body element. The file is organized by UI component/area to mirror
+ * the structure of dark-mode.css for easy comparison and maintenance.
+ */
+
+/**
+ * MAIN BODY STYLES
+ * Controls the main background and text color for the entire application in light mode
+ */
+body {
+    background-color: #f9fafb; /* gray-50 - Main background color throughout the app */
+    color: #111827; /* gray-900 - Default text color for all content */
+}
+
+/**
+ * HEADER STYLES
+ * Controls the top navigation bar appearance
+ */
+header {
+    /* Blue header with pattern design for brand identity */
+    background: repeating-linear-gradient(
+        45deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    ),
+    repeating-linear-gradient(
+        90deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    );
+    background-blend-mode: multiply;
+    background-color: #004eb3; /* Brand blue color for header */
+    color: #ffffff; /* White text for contrast against blue background */
+}
+
+/**
+ * SIDEBAR STYLES
+ * Controls the appearance of the side navigation menu
+ */
+.sidebar {
+    /* Red sidebar with pattern design for brand identity */
+    background: repeating-linear-gradient(
+        45deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    ),
+    repeating-linear-gradient(
+        90deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    );
+    background-blend-mode: multiply;
+    background-color: #e00000; /* Brand red color for sidebar */
+    color: #ffffff; /* White text for contrast against red background */
+}
+
+/**
+ * MAIN CONTENT AREA
+ * Controls the background and text color for the primary content section
+ */
+.content {
+    background-color: #f9fafb; /* gray-50 - Main content area background */
+    color: #111827; /* gray-900 - Text in the main content area */
+}
+
+/**
+ * CARDS & CONTAINERS
+ * Controls backgrounds and text colors for card-like elements and other containers
+ */
+.bg-white {
+    background-color: #ffffff; /* white - Background for white containers */
+    color: #111827; /* gray-900 - Text in white containers */
+}
+
+/* Lighter gray containers */
+.bg-gray-50, 
+.bg-gray-100, 
+.bg-gray-200 {
+    /* These classes already have proper light mode styling in Tailwind */
+    /* Background colors maintained by Tailwind's default classes */
+    color: #111827; /* gray-900 - Text in gray containers */
+}
+
+/**
+ * TEXT COLORS
+ * Controls the color of text elements throughout the application
+ */
+/* Mid to dark gray text - already properly styled in light mode by default */
+.text-gray-600,
+.text-gray-700,
+.text-gray-800,
+.text-gray-900 {
+    /* Colors maintained by Tailwind's default classes */
+}
+
+/* Black text - already properly styled in light mode by default */
+.text-black {
+    color: #000000; /* Black text */
+}
+
+/**
+ * HEADINGS
+ * Controls the appearance of heading elements (h1, h2, h3, etc.)
+ */
+h1, h2, h3, h4, h5, h6,
+.text-gray-900 {
+    color: #111827; /* gray-900 - Heading text color */
+}
+
+/**
+ * TABLES
+ * Controls the appearance of tables, including headers, rows, and borders
+ */
+/* Table backgrounds and text */
+table,
+tbody,
+tr {
+    background-color: #ffffff; /* white - Table background */
+    color: #111827; /* gray-900 - Table text */
+}
+
+/* Table headers */
+th {
+    background-color: #f3f4f6; /* gray-100 - Table header background */
+    color: #111827; /* gray-900 - Table header text */
+}
+
+/* Table cell borders */
+td {
+    border-color: #e5e7eb; /* gray-200 - Table cell borders */
+}
+
+/* Divider lines */
+.divide-y > * {
+    border-color: #e5e7eb; /* gray-200 - Divider lines between items */
+}
+
+/**
+ * FORM CONTROLS
+ * Controls the appearance of form elements like inputs, selects, and textareas
+ */
+input,
+select,
+textarea {
+    background-color: #ffffff; /* white - Form control background */
+    color: #111827; /* gray-900 - Form control text */
+    border-color: #d1d5db; /* gray-300 - Form control borders */
+}
+
+/* Form control focus states */
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: #3b82f6; /* blue-500 - Focused form control borders */
+}
+
+/**
+ * BUTTONS
+ * Controls the appearance of buttons that don't have specific background classes
+ */
+button:not([class*="bg-"]) {
+    background-color: #f3f4f6; /* gray-100 - Default button background */
+    color: #111827; /* gray-900 - Default button text */
+}
+
+/**
+ * LINKS
+ * Controls the appearance of links that don't have specific text color classes
+ */
+a:not([class*="text-"]) {
+    color: #2563eb; /* blue-600 - Default link color */
+}
+
+/**
+ * SHADOWS
+ * Controls the appearance of shadows on elements
+ */
+.shadow,
+.shadow-md,
+.shadow-lg,
+.shadow-xl {
+    /* Shadow styles maintained by Tailwind's default classes */
+}
+
+/**
+ * BORDERS
+ * Controls the color of borders on elements
+ */
+.border,
+.border-gray-200,
+.border-gray-300 {
+    /* Border colors maintained by Tailwind's default classes */
+}
+
+/**
+ * HOVER STATES
+ * Controls the appearance of hover effects
+ */
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-100:hover {
+    /* Hover colors maintained by Tailwind's default classes */
+}
+
+/**
+ * NOTIFICATIONS AND ALERTS
+ * Controls the appearance of notification and alert elements of different types
+ */
+/* Red alerts/notifications (errors, warnings) */
+.bg-red-100 {
+    /* Colors maintained by Tailwind's default classes */
+}
+
+/* Green alerts/notifications (success messages) */
+.bg-green-100 {
+    /* Colors maintained by Tailwind's default classes */
+}
+
+/* Blue alerts/notifications (info messages) */
+.bg-blue-100 {
+    /* Colors maintained by Tailwind's default classes */
+}
+
+/* Yellow alerts/notifications (caution messages) */
+.bg-yellow-100 {
+    /* Colors maintained by Tailwind's default classes */
+}
+
+/**
+ * THEME TOGGLE BUTTON
+ * Controls the appearance of the theme toggle button and its icon
+ */
+#theme-toggle-icon {
+    color: #111827; /* gray-900 - Theme toggle icon color */
+}
+
+#theme-toggle-icon path {
+    stroke: #111827; /* gray-900 - Theme toggle icon stroke color */
+}
+
+/**
+ * REMINDERS PANEL
+ * Controls the appearance of the reminders panel and items shown in the screenshot
+ */
+.reminders-panel {
+    background-color: #ffffff; /* white - Reminders panel background */
+    border-color: #e5e7eb; /* gray-200 - Reminders panel border */
+}
+
+.reminder-item {
+    background-color: #f9fafb; /* gray-50 - Individual reminder background */
+    border-color: #e5e7eb; /* gray-200 - Individual reminder border */
+}
+
+.reminder-header {
+    color: #111827; /* gray-900 - Reminder panel header text */
+}
+
+.reminder-text {
+    color: #374151; /* gray-700 - Reminder text content */
+}
+
+.reminder-date {
+    color: #6b7280; /* gray-500 - Reminder date text */
+}
+
+.overdue-badge {
+    background-color: #ef4444; /* red-500 - Overdue badge background */
+    color: #ffffff; /* white - Overdue badge text */
+}
+
+/* Reminder action buttons */
+.reminder-button {
+    background-color: #f3f4f6; /* gray-100 - Reminder button background */
+    color: #374151; /* gray-700 - Reminder button text */
+}
+
+/* View All Reminders button */
+.view-all-reminders {
+    background-color: #3b82f6; /* blue-500 - View all reminders button background */
+    color: #ffffff; /* white - View all reminders button text */
+}
+
+/* New Reminder button */
+.new-reminder {
+    background-color: #3b82f6; /* blue-500 - New reminder button background */
+    color: #ffffff; /* white - New reminder button text */
+} 

@@ -1,0 +1,306 @@
+/**
+ * STATZ Corporation - Dark Mode Stylesheet
+ * 
+ * This file contains all dark mode specific styles that are applied when the 'dark' class
+ * is present on the body element. The file is organized by UI component/area.
+ */
+
+/**
+ * MAIN BODY STYLES
+ * Controls the main background and text color for the entire application in dark mode
+ */
+body.dark {
+    background-color: #1f2937; /* gray-800 - Main background color throughout the app */
+    color: #f3f4f6; /* gray-100 - Default text color for all content */
+}
+
+/**
+ * HEADER STYLES
+ * Controls the top navigation bar appearance, preserving brand identity while in dark mode
+ */
+body.dark header {
+    /* Preserve the blue header with original pattern design for brand consistency */
+    background: repeating-linear-gradient(
+        45deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    ),
+    repeating-linear-gradient(
+        90deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    );
+    background-blend-mode: multiply;
+    background-color: #004eb3; /* Brand blue color for header */
+    color: #f3f4f6; /* Light text for contrast against blue background */
+}
+
+/**
+ * SIDEBAR STYLES
+ * Controls the appearance of the side navigation menu, preserving brand identity
+ */
+body.dark .sidebar {
+    /* Preserve the red sidebar with original pattern design for brand consistency */
+    background: repeating-linear-gradient(
+        45deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    ),
+    repeating-linear-gradient(
+        90deg,
+        #3e3e4150,
+        #3e3e4150 2px,
+        #d0d1d450 4px,
+        #d0d1d450 6px
+    );
+    background-blend-mode: multiply;
+    background-color: #e00000; /* Brand red color for sidebar */
+    color: #f3f4f6; /* Light text for contrast against red background */
+}
+
+/**
+ * MAIN CONTENT AREA
+ * Controls the background and text color for the primary content section
+ */
+body.dark .content {
+    background-color: #1f2937; /* gray-800 - Main content area background */
+    color: #f3f4f6; /* gray-100 - Text in the main content area */
+}
+
+/**
+ * CARDS & CONTAINERS
+ * Controls backgrounds and text colors for card-like elements and other containers
+ */
+body.dark .bg-white {
+    background-color: #1f2937 !important; /* gray-800 - Background for white containers */
+    color: #f3f4f6 !important; /* gray-100 - Text in white containers */
+}
+
+/* Lighter gray containers */
+body.dark .bg-gray-50, 
+body.dark .bg-gray-100, 
+body.dark .bg-gray-200 {
+    background-color: #374151 !important; /* gray-700 - Background for gray containers */
+    color: #f3f4f6 !important; /* gray-100 - Text in gray containers */
+}
+
+/**
+ * TEXT COLORS
+ * Controls the color of text elements throughout the application
+ */
+/* Mid to dark gray text */
+body.dark .text-gray-600,
+body.dark .text-gray-700,
+body.dark .text-gray-800,
+body.dark .text-gray-900 {
+    color: #d1d5db !important; /* gray-300 - Makes dark gray text lighter in dark mode */
+}
+
+/* Black text */
+body.dark .text-black {
+    color: #f3f4f6 !important; /* gray-100 - Replaces black text with light gray */
+}
+
+/**
+ * HEADINGS
+ * Controls the appearance of heading elements (h1, h2, h3, etc.)
+ */
+body.dark h1, 
+body.dark h2, 
+body.dark h3, 
+body.dark h4, 
+body.dark h5, 
+body.dark h6,
+body.dark .text-gray-900 {
+    color: #f9fafb !important; /* gray-50 - Makes headings lighter for emphasis */
+}
+
+/**
+ * TABLES
+ * Controls the appearance of tables, including headers, rows, and borders
+ */
+/* Table backgrounds and text */
+body.dark table,
+body.dark tbody,
+body.dark tr {
+    background-color: #1f2937 !important; /* gray-800 - Table background */
+    color: #f3f4f6 !important; /* gray-100 - Table text */
+}
+
+/* Table headers */
+body.dark th {
+    background-color: #111827 !important; /* gray-900 - Table header background */
+    color: #f3f4f6 !important; /* gray-100 - Table header text */
+}
+
+/* Table cell borders */
+body.dark td {
+    border-color: #374151 !important; /* gray-700 - Table cell borders */
+}
+
+/* Divider lines */
+body.dark .divide-y > * {
+    border-color: #374151 !important; /* gray-700 - Divider lines between items */
+}
+
+/**
+ * FORM CONTROLS
+ * Controls the appearance of form elements like inputs, selects, and textareas
+ */
+body.dark input,
+body.dark select,
+body.dark textarea {
+    background-color: #374151 !important; /* gray-700 - Form control background */
+    color: #f3f4f6 !important; /* gray-100 - Form control text */
+    border-color: #4b5563 !important; /* gray-600 - Form control borders */
+}
+
+/* Form control focus states */
+body.dark input:focus,
+body.dark select:focus,
+body.dark textarea:focus {
+    border-color: #60a5fa !important; /* blue-400 - Focused form control borders */
+}
+
+/**
+ * BUTTONS
+ * Controls the appearance of buttons that don't have specific background classes
+ */
+body.dark button:not([class*="bg-"]) {
+    background-color: #374151 !important; /* gray-700 - Default button background */
+    color: #f3f4f6 !important; /* gray-100 - Default button text */
+}
+
+/**
+ * LINKS
+ * Controls the appearance of links that don't have specific text color classes
+ */
+body.dark a:not([class*="text-"]) {
+    color: #93c5fd !important; /* blue-300 - Default link color */
+}
+
+/**
+ * SHADOWS
+ * Controls the appearance of shadows on elements
+ */
+body.dark .shadow,
+body.dark .shadow-md,
+body.dark .shadow-lg,
+body.dark .shadow-xl {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 
+                0 2px 4px -2px rgba(0, 0, 0, 0.3) !important; /* Darker shadows for contrast */
+}
+
+/**
+ * BORDERS
+ * Controls the color of borders on elements
+ */
+body.dark .border,
+body.dark .border-gray-200,
+body.dark .border-gray-300 {
+    border-color: #4b5563 !important; /* gray-600 - Default border color */
+}
+
+/**
+ * HOVER STATES
+ * Controls the appearance of hover effects
+ */
+body.dark .hover\:bg-gray-50:hover,
+body.dark .hover\:bg-gray-100:hover {
+    background-color: #4b5563 !important; /* gray-600 - Hover background color */
+}
+
+/**
+ * NOTIFICATIONS AND ALERTS
+ * Controls the appearance of notification and alert elements of different types
+ */
+/* Red alerts/notifications (errors, warnings) */
+body.dark .bg-red-100 {
+    background-color: #7f1d1d !important; /* red-900 - Red alert background */
+    color: #fecaca !important; /* red-200 - Red alert text */
+}
+
+/* Green alerts/notifications (success messages) */
+body.dark .bg-green-100 {
+    background-color: #14532d !important; /* green-900 - Green alert background */
+    color: #bbf7d0 !important; /* green-200 - Green alert text */
+}
+
+/* Blue alerts/notifications (info messages) */
+body.dark .bg-blue-100 {
+    background-color: #1e3a8a !important; /* blue-900 - Blue alert background */
+    color: #bfdbfe !important; /* blue-200 - Blue alert text */
+}
+
+/* Yellow alerts/notifications (caution messages) */
+body.dark .bg-yellow-100 {
+    background-color: #713f12 !important; /* yellow-900 - Yellow alert background */
+    color: #fef08a !important; /* yellow-200 - Yellow alert text */
+}
+
+/**
+ * THEME TOGGLE BUTTON
+ * Controls the appearance of the theme toggle button and its icon
+ */
+body.dark #theme-toggle-icon {
+    color: #f3f4f6 !important; /* white - Theme toggle icon color */
+}
+
+body.dark #theme-toggle-icon path {
+    stroke: #f3f4f6 !important; /* white - Theme toggle icon stroke color */
+}
+
+/**
+ * REMINDERS PANEL
+ * Controls the appearance of the reminders panel and items shown in the screenshot
+ */
+body.dark .reminders-panel {
+    background-color: #1f2937 !important; /* gray-800 - Reminders panel background */
+    border-color: #4b5563 !important; /* gray-600 - Reminders panel border */
+}
+
+body.dark .reminder-item {
+    background-color: #374151 !important; /* gray-700 - Individual reminder background */
+    border-color: #4b5563 !important; /* gray-600 - Individual reminder border */
+}
+
+body.dark .reminder-header {
+    color: #f9fafb !important; /* gray-50 - Reminder panel header text */
+}
+
+body.dark .reminder-text {
+    color: #f3f4f6 !important; /* gray-100 - Reminder text content */
+}
+
+body.dark .reminder-date {
+    color: #d1d5db !important; /* gray-300 - Reminder date text */
+}
+
+body.dark .overdue-badge {
+    background-color: #b91c1c !important; /* red-700 - Overdue badge background */
+    color: #fecaca !important; /* red-200 - Overdue badge text */
+}
+
+/* Reminder action buttons */
+body.dark .reminder-button {
+    background-color: #4b5563 !important; /* gray-600 - Reminder button background */
+    color: #f3f4f6 !important; /* gray-100 - Reminder button text */
+}
+
+/* View All Reminders button */
+body.dark .view-all-reminders {
+    background-color: #2563eb !important; /* blue-600 - View all reminders button background */
+    color: #f3f4f6 !important; /* gray-100 - View all reminders button text */
+}
+
+/* New Reminder button */
+body.dark .new-reminder {
+    background-color: #2563eb !important; /* blue-600 - New reminder button background */
+    color: #f3f4f6 !important; /* gray-100 - New reminder button text */
+} 
