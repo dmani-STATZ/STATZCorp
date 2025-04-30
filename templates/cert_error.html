@@ -106,6 +106,9 @@
 
     <script>
         function closeWindow() {
+            // Set flag in session storage that cert was installed
+            sessionStorage.setItem('cert_installed', 'true');
+            
             // Clear cache using Cache API
             if ('caches' in window) {
                 caches.keys().then(function(cacheNames) {
@@ -117,8 +120,8 @@
                 });
             }
             
-            // Close the window
-            window.close();
+            // Redirect to landing page with cache-busting parameter
+            window.location.href = '/?cert_refresh=' + new Date().getTime();
         }
     </script>
 </body>

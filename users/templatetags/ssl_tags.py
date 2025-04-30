@@ -42,10 +42,17 @@ def is_cert_untrusted(context):
     hostname = request.get_host().split(':')[0]
     cache_key = f'cert_status_{hostname}'
     
-    # Check cache first
-    cached_status = cache.get(cache_key)
-    if cached_status is not None:
-        return cached_status
+    # If we have cert_refresh parameter in URL or cert_installed in session, bypass cache
+    cert_refresh = request.GET.get('cert_refresh') is not None
+    
+    # If refresh requested, invalidate cache
+    if cert_refresh:
+        cache.delete(cache_key)
+    # Otherwise check cache
+    else:
+        cached_status = cache.get(cache_key)
+        if cached_status is not None:
+            return cached_status
 
     # First check Windows certificate store
     if check_windows_cert_store(hostname):
