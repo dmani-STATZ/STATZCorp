@@ -9,8 +9,9 @@ from django.views.generic.edit import UpdateView
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import IdiqContract, IdiqContractDetails, Contract, Nsn, Supplier
+from contracts.models import IdiqContract, IdiqContractDetails, Contract, Nsn, Supplier, Note
 
 class IdiqContractDetailView(LoginRequiredMixin, DetailView):
     model = IdiqContract
@@ -27,6 +28,9 @@ class IdiqContractDetailView(LoginRequiredMixin, DetailView):
         context['idiq_details'] = IdiqContractDetails.objects.filter(
             idiq_contract=self.object
         ).select_related('nsn', 'supplier').order_by('nsn__nsn_code')
+        
+        # Add content type for notes functionality
+        context['content_type_id'] = ContentType.objects.get_for_model(IdiqContract).id
         
         return context
 

@@ -303,4 +303,119 @@ body.dark .view-all-reminders {
 body.dark .new-reminder {
     background-color: #2563eb !important; /* blue-600 - New reminder button background */
     color: #f3f4f6 !important; /* gray-100 - New reminder button text */
+}
+
+/**
+ * SECTION HEADERS
+ * Controls the appearance of section headers in forms and other content areas
+ */
+body.dark .section-header {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #f3f4f6 !important; /* gray-100 - Light text for dark mode */
+    background-color: #1f2937 !important; /* gray-800 - Dark background */
+    margin-top: 1rem;
+    padding: 0.5rem;
+    padding-top: 0.5rem;
+    border-bottom: 1px solid #374151 !important; /* gray-700 - Darker border */
+    font-family: inherit;
+}
+
+/**
+ * MODALS
+ * Controls the appearance of modal dialogs and popups in dark mode
+ */
+body.dark .modal-base {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+body.dark .modal-content-base {
+    background-color: #1f2937;
+    border: 1px solid #374151;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+}
+
+body.dark .modal-header {
+    border-bottom-color: #374151;
+}
+
+body.dark .modal-footer {
+    border-top-color: #374151;
+}
+
+body.dark .result-item {
+    border-bottom-color: #374151;
+}
+
+body.dark .result-item:hover {
+    background-color: #374151;
+}
+
+/* Form Styling */
+body.dark .form-label {
+    color: #d1d5db;
+}
+
+/* Section Headers */
+body.dark .section-header {
+    color: #f3f4f6;
+    border-bottom-color: #374151;
+}
+
+/**
+ * CONFIRMATION MODALS - DARK MODE
+ * Dark mode variants for confirmation dialogs
+ */
+body.dark .confirmation-modal {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+body.dark .confirmation-modal-content {
+    background-color: #1f2937;
+    border: 1px solid #374151;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+}
+
+body.dark .confirmation-title {
+    color: #f3f4f6;
+}
+
+body.dark .confirmation-message {
+    color: #d1d5db;
+}
+
+/**
+ * NSN SPECIFIC MODAL STYLES - DARK MODE
+ * Dark mode variants for NSN-specific modals
+ */
+body.dark .nsn-modal {
+    composes: modal-base;
+}
+
+body.dark .nsn-modal-content {
+    composes: modal-content-base;
+}
+
+body.dark .nsn-modal-header {
+    composes: modal-header;
+}
+
+body.dark .nsn-modal-body {
+    composes: modal-body;
+}
+
+body.dark .nsn-modal-footer {
+    composes: modal-footer;
+}
+
+body.dark .nsn-search-results {
+    composes: search-results;
+}
+
+body.dark .nsn-result-item {
+    composes: result-item;
+}
+
+body.dark .nsn-pagination {
+    composes: search-pagination;
 } 

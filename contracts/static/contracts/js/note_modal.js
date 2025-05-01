@@ -9,6 +9,37 @@
 document.addEventListener('DOMContentLoaded', function() {
     // console.log('DOM loaded, initializing note modal functionality');
     
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        console.error('CSRF token not found in cookies');
+        return;
+    }
+
+    // Set up CSRF token for all fetch requests
+    function fetchWithCSRF(url, options = {}) {
+        if (!options.headers) {
+            options.headers = {};
+        }
+        options.headers['X-CSRFToken'] = csrftoken;
+        return fetch(url, options);
+    }
+
     // Get modal elements
     const noteModal = document.getElementById('noteModal');
     const noteModalTitle = document.getElementById('noteModalTitle');
@@ -38,14 +69,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!cancelNoteModalBtn) console.error('cancelNoteModalBtn element not found');
     if (!saveNoteBtn) console.error('saveNoteBtn element not found');
     if (!noteModalBackdrop) console.error('noteModalBackdrop element not found');
-    
-    // Check for CSRF token
-    const csrfForm = document.getElementById('csrf-form');
-    if (!csrfForm) console.error('csrf-form element not found');
-    
-    const csrfToken = csrfForm ? csrfForm.querySelector('[name=csrfmiddlewaretoken]') : null;
-    if (!csrfToken) console.error('CSRF token not found');
-    else console.log('CSRF token found');
     
     // Find all add note buttons
     const addNoteButtons = document.querySelectorAll('[data-note-action="add"]');
@@ -85,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Set the referring URL
             const referringUrlField = document.getElementById('noteReferringUrl');
             if (referringUrlField) {
-                referringUrlField.value = window.location.href;
+                referringUrlField.value = window.location.pathname;
                 // console.log('Set referring URL:', referringUrlField.value);
             }
             
@@ -95,14 +118,14 @@ document.addEventListener('DOMContentLoaded', function() {
             reminderFields.classList.add('hidden');
             
             // Set form action for add
-            noteForm.action = '/contracts/api/add-note/';
+            noteForm.action = `/contracts/note/add/${contentTypeId}/${objectId}/`;
             noteForm.method = 'POST';
             
             // Re-set the hidden fields after form reset
             noteContentTypeId.value = contentTypeId;
             noteObjectId.value = objectId;
             if (referringUrlField) {
-                referringUrlField.value = window.location.href;
+                referringUrlField.value = window.location.pathname;
             }
             
             // Show modal
@@ -125,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
     noteModalBackdrop.addEventListener('click', closeModal);
     
     // Handle form submission
-    saveNoteBtn.addEventListener('click', function() {
+    saveNoteBtn.addEventListener('click', async function() {
         // console.log('Save Note button clicked');
         
         // Get form data
@@ -133,14 +156,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const noteText = formData.get('note');
         const contentTypeId = formData.get('content_type_id');
         const objectId = formData.get('object_id');
-        
-        // Debug form data
-        // console.log('Form data:', {
-        //     noteText,
-        //     contentTypeId,
-        //     objectId,
-        //     createReminder: formData.get('create_reminder')
-        // });
         
         // Validate note text
         if (!noteText || noteText.trim() === '') {
@@ -175,22 +190,49 @@ document.addEventListener('DOMContentLoaded', function() {
         saveNoteBtn.disabled = true;
         saveNoteBtn.textContent = 'Saving...';
         
-        // Get CSRF token
-        const csrfForm = document.getElementById('csrf-form');
-        const csrfToken = csrfForm ? csrfForm.querySelector('[name=csrfmiddlewaretoken]').value : '';
-        
-        if (!csrfToken) {
-            console.error('CSRF token not found');
-            showErrorMessage('CSRF token not found. Please refresh the page and try again.');
+        try {
+            // Submit form
+            const response = await fetch(noteForm.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest'  // Add this to indicate AJAX request
+                },
+                body: formData
+            });
+            
+            // Check if we got a redirect
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            
+            // Try to parse as JSON, but don't throw if it's not JSON
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+                if (data.success) {
+                    showSuccessMessage('Note added successfully');
+                    closeModal();
+                    window.location.reload();
+                } else {
+                    throw new Error(data.error || 'Failed to add note');
+                }
+            } else {
+                // If not JSON, just reload the page
+                showSuccessMessage('Note added successfully');
+                closeModal();
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('Error saving note:', error);
+            showErrorMessage(error.message || 'Failed to save note. Please try again.');
+        } finally {
+            // Reset button state
             saveNoteBtn.disabled = false;
             saveNoteBtn.textContent = 'Save Note';
-            return;
         }
-        
-        // console.log('CSRF token:', csrfToken ? 'Found' : 'Not found');
-        
-        // Submit form
-        noteForm.submit();
     });
     
     // Function to close the modal

@@ -1,9 +1,13 @@
 {% extends 'contracts/contract_base.html' %}
 {% load static %}
+{% load contract_tags %}
 
 {% block title %}IDIQ Contract {{ idiq_contract.contract_number }}{% endblock %}
 
-{% block extra_css %}
+{% block extra_head %}
+{{ block.super }}
+<!-- Add Toastify CSS for notifications -->
+<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 <style>
     .light-green-bg {
         background-color: #e8f5e9;
@@ -27,6 +31,11 @@
 {% endblock %}
 
 {% block content %}
+<!-- Add dedicated CSRF form -->
+<form id="csrf-form">
+    {% csrf_token %}
+</form>
+
 <div class="container mx-auto py-4">
     <!-- Main Content -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -113,7 +122,7 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for contract in contracts %}
                         <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2 text-sm">{{ contract.contract_number }}</td>
+                            <td class="px-4 py-2 text-sm"><a href="{% url 'contracts:contract_detail' contract.id %}">{{ contract.contract_number }}</a></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -121,48 +130,121 @@
             </div>
         </div>
 
-        <!-- NSNs and Supplier -->
-        <div class="col-span-3 border rounded-lg">
-            <div class="bg-gray-100 p-3 border-b flex justify-between items-center">
-                <h2 class="text-lg font-medium text-gray-800">NSNs and Supplier</h2>
-                <button id="addPairBtn" class="px-3 py-1 bg-green-300 text-green-900 rounded hover:bg-green-400 border border-green-900">
-                    Add Pair
-                </button>
+        <div class="col-span-3 flex flex-col gap-8">
+            <!-- NSNs and Supplier -->
+            <div class="border rounded-lg">
+                <div class="bg-gray-100 p-3 border-b flex justify-between items-center">
+                    <h2 class="text-lg font-medium text-gray-800">NSNs and Supplier</h2>
+                    <button id="addPairBtn" class="px-3 py-1 bg-green-300 text-green-900 rounded hover:bg-green-400 border border-green-900">
+                        Add Pair
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">NSN</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Item Description</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Middle</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">CageCode</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Supplier</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for detail in idiq_details %}
+                            <tr class="hover:bg-gray-50" data-detail-id="{{ detail.id }}">
+                                <td class="px-4 py-2 text-sm">{{ detail.nsn.nsn_code }}</td>
+                                <td class="px-4 py-2 text-sm">{{ detail.nsn.description }}</td>
+                                <td class="px-4 py-2 text-sm">-----------</td>
+                                <td class="px-4 py-2 text-sm">{{ detail.supplier.cage_code }}</td>
+                                <td class="px-4 py-2 text-sm">{{ detail.supplier.name }}</td>
+                                <td class="px-4 py-2 text-sm">
+                                    <button class="delete-pair" 
+                                            data-action="delete-pair"
+                                            data-id="{{ detail.id }}" 
+                                            title="Delete this pair">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">NSN</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Item Description</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Middle</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">CageCode</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Supplier</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for detail in idiq_details %}
-                        <tr class="hover:bg-gray-50" data-detail-id="{{ detail.id }}">
-                            <td class="px-4 py-2 text-sm">{{ detail.nsn.nsn_code }}</td>
-                            <td class="px-4 py-2 text-sm">{{ detail.nsn.description }}</td>
-                            <td class="px-4 py-2 text-sm">-----------</td>
-                            <td class="px-4 py-2 text-sm">{{ detail.supplier.cage_code }}</td>
-                            <td class="px-4 py-2 text-sm">{{ detail.supplier.name }}</td>
-                            <td class="px-4 py-2 text-sm">
-                                <button class="delete-pair" 
-                                        data-action="delete-pair"
-                                        data-id="{{ detail.id }}" 
-                                        title="Delete this pair">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </td>
-                        </tr>
+
+            <!-- Notes Section -->
+            <div class="border rounded-lg">
+                <div class="bg-gray-100 dark:bg-gray-700 p-3 border-b flex justify-between items-center">
+                    <h2 class="text-lg font-medium text-gray-800 dark:text-gray-200">Notes</h2>
+                    <button class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            data-note-action="add"
+                            data-content-type-id="{{ idiq_contract|content_type_id }}"
+                            data-object-id="{{ idiq_contract.id }}"
+                            data-entity-type="IDIQ Contract">
+                        Add Note
+                    </button>
+                </div>
+                <div class="overflow-y-auto max-h-[300px] p-4 bg-white dark:bg-gray-800">
+                    <div class="divide-y divide-gray-200 dark:divide-gray-600">
+                        {% for note in idiq_contract.notes.all %}
+                        <div class="border-l-4 border-indigo-500 dark:border-indigo-400 pl-4 py-2 mb-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-r">
+                            <!-- Fixed height container with absolute constraint -->
+                            <div class="relative" style="max-height: 100px;">
+                                <!-- Text content with fixed height and scroll -->
+                                <div class="note-content overflow-y-auto" style="max-height: 100px;">
+                                    <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ note.note|linebreaksbr }}</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 flex justify-between items-center">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                    Added by {{ note.created_by.username }} on {{ note.created_on|date:"M d, Y H:i" }}
+                                </div>
+                                <div class="flex space-x-2">
+                                    {% if note.note_reminders.exists %}
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Reminder
+                                        </span>
+                                    {% endif %}
+                                    <button 
+                                        class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 js-edit-note-btn" 
+                                        title="Edit"
+                                        data-note-action="edit"
+                                        data-content-type-id="{{ idiq_contract|content_type_id }}"
+                                        data-object-id="{{ idiq_contract.id }}"
+                                        data-note-id="{{ note.id }}"
+                                        data-note-text="{{ note.note|escapejs }}"
+                                        data-entity-type="IDIQ Contract"
+                                        onclick="openEditNoteModal(this); return false;"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                    </button>
+                                    <a href="{% url 'contracts:delete_note' note.id %}" 
+                                       class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300" 
+                                       title="Delete" 
+                                       onclick="return confirm('Are you sure you want to delete this note?');">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+                            No notes have been added yet.
+                        </div>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -216,359 +298,90 @@
     </div>
 </div>
 
-{% block extra_js %}
+<!-- Include note modal template -->
+{% include "contracts/partials/note_modal.html" %}
+
+{% block extra_scripts %}
 {{ block.super }}
+<!-- Add Toastify JS for notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<!-- Add note modal functionality -->
+<script src="{% static 'contracts/js/note_modal.js' %}"></script>
+
 <script>
-// Prevent multiple initializations with this flag
-if (typeof window.idiqDetailInitialized === 'undefined') {
-    window.idiqDetailInitialized = true;
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        // Debug element
-        const debugEl = document.createElement('div');
-        debugEl.className = 'debug-info';
-        debugEl.style.display = 'none';
-        document.body.appendChild(debugEl);
-        
-        function log(message) {
-            console.log(message);
-            debugEl.innerHTML += `<div>${message}</div>`;
-            debugEl.scrollTop = debugEl.scrollHeight;
-        }
-        
-        // Toggle debug info with Ctrl+D
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'd') {
-                e.preventDefault();
-                debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
-            }
-        });
-        
-        // Get CSRF token from a cookie
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-        
-        // Event delegation for all button actions
-        document.addEventListener('click', function(event) {
-            const button = event.target.closest('[data-action]');
-            if (!button) return;
+// Get CSRF token once at the start
+const csrftoken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
 
-            const action = button.dataset.action;
-            const id = button.dataset.id;
-            const modalId = button.dataset.modal;
-
-            switch(action) {
-                case 'delete-pair':
-                    deletePair(id);
-                    break;
-                case 'hide-modal':
-                    hideModal(modalId);
-                    break;
-            }
-        });
-        
-        // Use event delegation for delete buttons instead of attaching handlers to each button
-        const nsnsTable = document.querySelector('.col-span-3 table tbody');
-        nsnsTable.addEventListener('click', async function(e) {
-            const deleteBtn = e.target.closest('.delete-pair');
-            if (!deleteBtn) return; // Not clicking on a delete button
-            
-            const detailId = deleteBtn.dataset.id;
-            const row = deleteBtn.closest('tr');
-            
-            if (confirm('Are you sure you want to delete this NSN/Supplier pair?')) {
-                log(`Deleting pair with ID: ${detailId}`);
-                
-                try {
-                    const url = `{% url 'contracts:idiq_contract_detail_delete' idiq_contract.id 0 %}`.replace('/0/', `/${detailId}/`);
-                    log(`Delete URL: ${url}`);
-                    
-                    const csrftoken = getCookie('csrftoken');
-                    
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': csrftoken,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ detail_id: detailId })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    log(`Delete response: ${JSON.stringify(data)}`);
-                    
-                    if (data.success) {
-                        row.remove();
-                    } else {
-                        alert(data.error || 'Failed to delete pair');
-                    }
-                } catch (error) {
-                    log(`Error deleting pair: ${error.message}`);
-                    alert('Error deleting pair. Please try again.');
-                }
-            }
-        });
-        
-        // Modal handling
-        const modal = document.getElementById('addPairModal');
-        const addPairBtn = document.getElementById('addPairBtn');
-        const closeModal = document.getElementById('closeModal');
-        const cancelAddPair = document.getElementById('cancelAddPair');
-        
-        function showModal() {
-            modal.classList.remove('hidden');
-            log('Modal opened');
-            // Focus the NSN input when modal opens
-            setTimeout(() => document.getElementById('nsnSearch').focus(), 100);
-        }
-        
-        function hideModal(modalId) {
-            const modal = document.getElementById(modalId);
-            modal.classList.add('hidden');
-            document.getElementById('addPairForm').reset();
-            document.getElementById('nsnResults').classList.add('hidden');
-            document.getElementById('supplierResults').classList.add('hidden');
-            document.getElementById('selectedNsn').value = '';
-            document.getElementById('selectedSupplier').value = '';
-        }
-        
-        addPairBtn.addEventListener('click', showModal);
-        closeModal.addEventListener('click', hideModal);
-        cancelAddPair.addEventListener('click', hideModal);
-
-        // Autocomplete for NSN
-        let nsnTimeout = null;
-        const nsnSearch = document.getElementById('nsnSearch');
-        const nsnResults = document.getElementById('nsnResults');
-        
-        nsnSearch.addEventListener('input', function() {
-            log(`NSN search input: "${this.value}"`);
-            clearTimeout(nsnTimeout);
-            const query = this.value.trim();
-            
-            if (query.length >= 3) {
-                nsnTimeout = setTimeout(() => fetchNsnResults(query), 300);
-            } else {
-                nsnResults.classList.add('hidden');
-            }
-        });
-        
-        async function fetchNsnResults(query) {
-            const url = "{% url 'contracts:nsn_search' %}?q=" + encodeURIComponent(query);
-            log(`Fetching NSN results from: ${url}`);
-            
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                log(`NSN search received ${data.results ? data.results.length : 0} results`);
-                
-                if (data.results && data.results.length > 0) {
-                    nsnResults.innerHTML = data.results.map(result => `
-                        <div class="p-2 hover:bg-gray-100 cursor-pointer nsn-result" 
-                             data-id="${result.id}" 
-                             data-text="${result.text}">
-                            ${result.text}
-                        </div>
-                    `).join('');
-                    nsnResults.classList.remove('hidden');
-                } else {
-                    nsnResults.innerHTML = '<div class="p-2 text-gray-500">No results found</div>';
-                    nsnResults.classList.remove('hidden');
-                }
-            } catch (error) {
-                log(`Error fetching NSN results: ${error.message}`);
-                console.error('Error fetching NSN results:', error);
-                nsnResults.innerHTML = '<div class="p-2 text-red-500">Error loading results</div>';
-                nsnResults.classList.remove('hidden');
-            }
-        }
-        
-        nsnResults.addEventListener('click', function(e) {
-            const result = e.target.closest('.nsn-result');
-            if (result) {
-                log(`NSN selected: ${result.dataset.text}`);
-                nsnSearch.value = result.dataset.text;
-                document.getElementById('selectedNsn').value = result.dataset.id;
-                nsnResults.classList.add('hidden');
-                // Focus the supplier input after selecting NSN
-                document.getElementById('supplierSearch').focus();
-            }
-        });
-
-        // Autocomplete for Supplier
-        let supplierTimeout = null;
-        const supplierSearch = document.getElementById('supplierSearch');
-        const supplierResults = document.getElementById('supplierResults');
-        
-        supplierSearch.addEventListener('input', function() {
-            log(`Supplier search input: "${this.value}"`);
-            clearTimeout(supplierTimeout);
-            const query = this.value.trim();
-            
-            if (query.length >= 3) {
-                supplierTimeout = setTimeout(() => fetchSupplierResults(query), 300);
-            } else {
-                supplierResults.classList.add('hidden');
-            }
-        });
-        
-        async function fetchSupplierResults(query) {
-            const url = "{% url 'contracts:supplier_search' %}?q=" + encodeURIComponent(query);
-            log(`Fetching supplier results from: ${url}`);
-            
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                log(`Supplier search received ${data.results ? data.results.length : 0} results`);
-                
-                if (data.results && data.results.length > 0) {
-                    supplierResults.innerHTML = data.results.map(result => `
-                        <div class="p-2 hover:bg-gray-100 cursor-pointer supplier-result" 
-                             data-id="${result.id}" 
-                             data-text="${result.text}">
-                            ${result.text}
-                        </div>
-                    `).join('');
-                    supplierResults.classList.remove('hidden');
-                } else {
-                    supplierResults.innerHTML = '<div class="p-2 text-gray-500">No results found</div>';
-                    supplierResults.classList.remove('hidden');
-                }
-            } catch (error) {
-                log(`Error fetching supplier results: ${error.message}`);
-                console.error('Error fetching supplier results:', error);
-                supplierResults.innerHTML = '<div class="p-2 text-red-500">Error loading results</div>';
-                supplierResults.classList.remove('hidden');
-            }
-        }
-        
-        supplierResults.addEventListener('click', function(e) {
-            const result = e.target.closest('.supplier-result');
-            if (result) {
-                log(`Supplier selected: ${result.dataset.text}`);
-                supplierSearch.value = result.dataset.text;
-                document.getElementById('selectedSupplier').value = result.dataset.id;
-                supplierResults.classList.remove('hidden');
-            }
-        });
-
-        // Hide results when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#nsnSearch') && !e.target.closest('#nsnResults')) {
-                nsnResults.classList.add('hidden');
-            }
-            if (!e.target.closest('#supplierSearch') && !e.target.closest('#supplierResults')) {
-                supplierResults.classList.add('hidden');
-            }
-        });
-        
-        // Form submission
-        let isSubmitting = false; // Flag to prevent multiple submissions
-        document.getElementById('addPairForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            // Prevent duplicate submissions
-            if (isSubmitting) {
-                return;
-            }
-            
-            isSubmitting = true;
-            
-            const formData = new FormData(this);
-            const nsnId = document.getElementById('selectedNsn').value;
-            const supplierId = document.getElementById('selectedSupplier').value;
-
-            log(`Submitting form - NSN ID: ${nsnId}, Supplier ID: ${supplierId}`);
-
-            if (!nsnId || !supplierId) {
-                alert('Please select both an NSN and a Supplier');
-                isSubmitting = false;
-                return;
-            }
-            
-            try {
-                const url = "{% url 'contracts:idiq_contract_detail_create' idiq_contract.id %}";
-                log(`Submitting to: ${url}`);
-                
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                log(`Submission result: ${JSON.stringify(data)}`);
-                
-                if (data.success) {
-                    const newRow = `
-                        <tr class="hover:bg-gray-50" data-detail-id="${data.detail.id}">
-                            <td class="px-4 py-2 text-sm">${data.detail.nsn_code}</td>
-                            <td class="px-4 py-2 text-sm">${data.detail.nsn_description}</td>
-                            <td class="px-4 py-2 text-sm">-----------</td>
-                            <td class="px-4 py-2 text-sm">${data.detail.supplier_cage}</td>
-                            <td class="px-4 py-2 text-sm">${data.detail.supplier_name}</td>
-                            <td class="px-4 py-2 text-sm">
-                                <button class="delete-pair" 
-                                        data-action="delete-pair"
-                                        data-id="${data.detail.id}" 
-                                        title="Delete this pair">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                    
-                    // Make sure we're appending to the right table - the NSNs and Supplier table
-                    const targetTable = document.querySelector('.col-span-3 table tbody');
-                    targetTable.insertAdjacentHTML('beforeend', newRow);
-                    hideModal();
-                } else {
-                    alert(data.errors);
-                }
-            } catch (error) {
-                log(`Error submitting form: ${error.message}`);
-                alert('Error adding pair. Please try again.');
-            } finally {
-                isSubmitting = false;
-            }
-        });
-
-        // Log that initialization is complete
-        log('IDIQ Detail page initialized');
-    });
+// Helper function to show error notifications
+function showErrorNotification(message) {
+    Toastify({
+        text: message || "An error occurred",
+        duration: 3000,
+        gravity: "top",
+        position: 'right',
+        backgroundColor: "#f44336",
+    }).showToast();
 }
+
+// Helper function to show success notifications
+function showSuccessNotification(message) {
+    Toastify({
+        text: message,
+        duration: 3000,
+        gravity: "top",
+        position: 'right',
+        backgroundColor: "#4CAF50",
+    }).showToast();
+}
+
+// Helper function to add CSRF token to fetch headers
+function getRequestHeaders() {
+    return {
+        'X-CSRFToken': csrftoken,
+        'Content-Type': 'application/json'
+    };
+}
+
+// Function to open edit note modal
+function openEditNoteModal(button) {
+    const noteId = button.dataset.noteId;
+    const noteText = button.dataset.noteText;
+    const contentTypeId = button.dataset.contentTypeId;
+    const objectId = button.dataset.objectId;
+    const entityType = button.dataset.entityType;
+    
+    // Get modal elements
+    const modal = document.getElementById('noteModal');
+    const modalTitle = document.getElementById('noteModalTitle');
+    const noteForm = document.getElementById('noteForm');
+    const noteTextarea = document.getElementById('id_note');
+    const noteContentTypeId = document.getElementById('noteContentTypeId');
+    const noteObjectId = document.getElementById('noteObjectId');
+    
+    // Set modal title
+    modalTitle.textContent = `Edit ${entityType} Note`;
+    
+    // Set form values
+    noteTextarea.value = noteText;
+    noteContentTypeId.value = contentTypeId;
+    noteObjectId.value = objectId;
+    
+    // Set form action for edit
+    noteForm.action = `/contracts/note/update/${noteId}/`;
+    noteForm.method = 'POST';
+    
+    // Show modal
+    modal.classList.remove('hidden');
+}
+
+// Add event listeners when document loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Add error handling for failed requests
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        showErrorNotification('An error occurred while processing your request');
+    });
+});
 </script>
 {% endblock %}
 {% endblock %}
