@@ -44,6 +44,8 @@ DBCC CHECKIDENT ('processing_queueclin', RESEED, 0);
     DBCC CHECKIDENT ('contracts_paymenthistory', RESEED, 0);
     DELETE FROM contracts_contractsplit;
     DBCC CHECKIDENT ('contracts_contractsplit', RESEED, 0);
+	DELETE FROM contracts_clinshipment;
+    DBCC CHECKIDENT ('contracts_clinshipment', RESEED, 0);
 
 
 	-- Second Level

@@ -25,9 +25,53 @@ We've already added the form styles to `base.css` which defines:
 
 ### 2. Base Form Classes (Just Added)
 We've created base form classes that automatically apply these styles:
+The code example if from the contracts app and cen be applied in more app if needed.
 - `BaseFormMixin`: Core styling logic
 - `BaseModelForm`: For model-based forms
 - `BaseForm`: For regular forms
+
+```python
+class BaseFormMixin:
+    """
+    Base form mixin that provides consistent styling for all form widgets.
+    This implements the form-styling-rule for the application.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._style_fields()
+    
+    def _style_fields(self):
+        """Apply consistent styling to all form fields based on their widget type."""
+        for field_name, field in self.fields.items():
+            widget = field.widget
+            if isinstance(widget, (forms.TextInput, forms.NumberInput, 
+                                forms.EmailInput, forms.URLInput, forms.DateInput, 
+                                forms.DateTimeInput, forms.TimeInput)):
+                widget.attrs['class'] = 'form-input'
+            elif isinstance(widget, forms.Select):
+                widget.attrs['class'] = 'form-select'
+            elif isinstance(widget, forms.Textarea):
+                widget.attrs['class'] = 'form-input'
+                if 'rows' not in widget.attrs:
+                    widget.attrs['rows'] = 3
+            elif isinstance(widget, forms.CheckboxInput):
+                widget.attrs['class'] = 'form-checkbox'
+            
+            # Add placeholder if not present
+            if not widget.attrs.get('placeholder') and field.label:
+                widget.attrs['placeholder'] = f'Enter {field.label}'
+
+class BaseModelForm(BaseFormMixin, forms.ModelForm):
+    """Base ModelForm that implements the form-styling-rule."""
+    pass
+
+class BaseForm(BaseFormMixin, forms.Form):
+    """Base Form that implements the form-styling-rule."""
+    pass
+
+
+
 
 ### 3. Converting Existing Forms
 

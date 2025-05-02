@@ -32,46 +32,37 @@
     <meta name="msapplication-starturl" content="/">
     <meta name="msapplication-config" content="none">
     
+    <!-- Prevent FOUC (Flash of Unstyled Content) -->
+    <style>
+        .no-fouc { display: none; }
+    </style>
+    <script>
+        document.documentElement.className = 'no-fouc';
+        window.onload = function() {
+            document.documentElement.className = '';
+        }
+    </script>
+    
     {% tailwind_css %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     
-    <!-- Force CSS reloading -->
-    <script>
-        // Add timestamp to prevent caching issues
-        const timestamp = new Date().getTime();
-        const cssFiles = ['base.css', 'light-mode.css', 'dark-mode.css'];
-        
-        // Clean cached CSS by forcing reloads
-        if (performance && performance.getEntriesByType && caches) {
-            // Try to clear performance cache
-            try {
-                performance.getEntriesByType('resource').forEach(resource => {
-                    if (cssFiles.some(file => resource.name.includes(file))) {
-                        // Clear this resource if possible
-                        if (caches) {
-                            caches.keys().then(cacheNames => {
-                                cacheNames.forEach(cacheName => {
-                                    caches.open(cacheName).then(cache => {
-                                        cache.delete(resource.name);
-                                    });
-                                });
-                            });
-                        }
-                    }
-                });
-            } catch (e) {
-                console.log('Performance API not fully supported');
-            }
-        }
-    </script>
+    <!-- CSS Files with environment-aware caching -->
+    {% is_development as dev_mode %}
+    {% if dev_mode %}
+        <!-- Development: Force reload CSS -->
+        <link rel="stylesheet" href="{% static 'css/base.css' %}?v={{ cache_version }}-{{ request.id }}">
+        <link rel="stylesheet" href="{% static 'css/light-mode.css' %}?v={{ cache_version }}-{{ request.id }}">
+        <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}-{{ request.id }}">
+    {% else %}
+        <!-- Production: Normal caching -->
+        <link rel="stylesheet" href="{% static 'css/base.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/light-mode.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}">
+    {% endif %}
     
-    <!-- CSS Files - First base, then theme-specific -->
-    <link rel="stylesheet" href="{% static 'css/base.css' %}?v={{ cache_version }}">
-    <link rel="stylesheet" href="{% static 'css/light-mode.css' %}?v={{ cache_version }}">
-    <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}">
     {% block extra_head %}{% endblock %}
     {% if title %}
         <title>STATZ Corporation - {{ title }}</title>

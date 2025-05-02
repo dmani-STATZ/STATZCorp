@@ -3,7 +3,48 @@
  * 
  * This file contains all base styles that apply regardless of theme (light or dark).
  * These styles include layout, positioning, and other structural elements.
+
+Professional/Corporate
+font-family: "Arial", "Helvetica", sans-serif;
+
+Traditional/Formal 
+font-family: "Times New Roman", "Georgia", serif;
+
+Modern/Clean 
+font-family: "Segoe UI", "Roboto", "Oxygen", sans-serif;
+
+Monospace (for code) 
+font-family: "Courier New", "Consolas", monospace;
+
  */
+
+ :root {
+    --main-font: "Segoe UI", "Roboto", "Oxygen", sans-serif;
+  }
+
+/* Typography */
+body {
+    font-family: var(--main-font);
+}
+
+/* Reset specific elements that shouldn't inherit the Stencil font */
+input, 
+textarea, 
+select, 
+button {
+    font-family: inherit;
+}
+
+/* Optional class for text that should use a different font */
+.text-normal {
+    font-family: Arial, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, p, span, a, li, label, input, textarea, select, button, th, td {
+    font-family: var(--main-font);
+}
+
+
 
 /**
  * BASE LAYOUT STYLES
