@@ -12,14 +12,23 @@ from django.urls import reverse
 
 @login_required
 def dashboard(request):
-    total_courses = Course.objects.all().count()
-    total_completed_trainings = Tracker.objects.filter(user=request.user, completed_date__isnull=False).count()
+    user = request.user
+    active_user_accounts = UserAccount.objects.filter(user=user)
+    required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in active_user_accounts]).distinct()
+    total_required_cmmc_courses = required_matrix_entries.count()
+
+    completed_required_cmmc_trainings = Tracker.objects.filter(
+        user=user,
+        matrix__in=required_matrix_entries,
+        completed_date__isnull=False
+    ).count()
+
     arctic_wolf_courses = ArcticWolfCourse.objects.all().count()
-    arctic_wolf_completed = ArcticWolfCompletion.objects.filter(user=request.user).count()
+    arctic_wolf_completed = ArcticWolfCompletion.objects.filter(user=user).count()
 
     context = {
-        'cmmc_courses_count': total_courses,  # Renamed for clarity
-        'cmmc_completed_count': total_completed_trainings,  # Renamed for clarity
+        'cmmc_courses_count': total_required_cmmc_courses,
+        'cmmc_completed_count': completed_required_cmmc_trainings,
         'arctic_wolf_courses_count': arctic_wolf_courses,
         'arctic_wolf_completed_count': arctic_wolf_completed,
         'is_staff': request.user.is_staff,

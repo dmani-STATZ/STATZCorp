@@ -7,7 +7,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
             <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-xl font-medium mb-4">Overall Training Status</h2>
+                <h2 class="text-xl font-medium mb-4">CMMC Training and Document Review Status</h2>
                 <p class="text-gray-600 mb-2">You have completed {{ cmmc_completed_count }} out of {{ cmmc_courses_count }} total trainings.</p>
                 <a href="{% url 'training:user_requirements' %}" class="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 mt-2">View Requirements</a>
                 
@@ -21,7 +21,7 @@
             </div>
 
             <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-xl font-medium mb-4">Arctic Wolf Training</h2>
+                <h2 class="text-xl font-medium mb-4">Arctic Wolf Security Awareness Training</h2>
                 <p class="text-gray-600 mb-2">View and complete Arctic Wolf specific training courses.</p>
                 <p class="text-gray-600 mb-2">You have completed {{ arctic_wolf_completed_count }} out of {{ arctic_wolf_courses_count }} Arctic Wolf trainings.</p>
                 <a href="{% url 'training:user_arctic_wolf_courses' %}" class="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 mt-2">View My Courses</a>
