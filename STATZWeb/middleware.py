@@ -49,8 +49,10 @@ class LoginRequiredMiddleware:
                     return self.get_response(request)
                     
                 if not self.is_public_url(path):
-                    # Add the current path as the next parameter
-                    login_url = f"{settings.LOGIN_URL}?next={request.path}"
+                    # Properly construct the login URL using reverse()
+                    login_url = reverse('users:login')
+                    if request.path:
+                        login_url = f"{login_url}?next={request.path}"
                     return redirect(login_url)
 
             if request.user.is_authenticated and not request.user.is_superuser:
