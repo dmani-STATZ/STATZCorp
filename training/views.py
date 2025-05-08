@@ -13,24 +13,55 @@ from django.urls import reverse
 @login_required
 def dashboard(request):
     user = request.user
-    active_user_accounts = UserAccount.objects.filter(user=user)
-    required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in active_user_accounts]).distinct()
-    total_required_cmmc_courses = required_matrix_entries.count()
 
-    completed_required_cmmc_trainings = Tracker.objects.filter(
+    # User-specific CMMC data
+    user_accounts = UserAccount.objects.filter(user=user)
+    user_required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in user_accounts]).distinct()
+    user_completed_trainings = Tracker.objects.filter(
         user=user,
-        matrix__in=required_matrix_entries,
+        matrix__in=user_required_matrix_entries,
         completed_date__isnull=False
     ).count()
+    user_total_required_courses = user_required_matrix_entries.count()
 
-    arctic_wolf_courses = ArcticWolfCourse.objects.all().count()
-    arctic_wolf_completed = ArcticWolfCompletion.objects.filter(user=user).count()
+    # CMMC Data for Pie Chart (considering users with accounts)
+    users_with_accounts = UserAccount.objects.values_list('user_id', flat=True).distinct()
+    total_possible_cmmc_trainings = 0
+    total_completed_cmmc_trainings = 0
+
+    for user_id in users_with_accounts:
+        user_accounts = UserAccount.objects.filter(user_id=user_id)
+        required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in user_accounts]).distinct()
+        total_possible_cmmc_trainings += required_matrix_entries.count()
+
+        completed_required_trainings_for_user = Tracker.objects.filter(
+            user_id=user_id,
+            matrix__in=required_matrix_entries,
+            completed_date__isnull=False
+        ).count()
+        total_completed_cmmc_trainings += completed_required_trainings_for_user
+
+    uncompleted_cmmc_trainings = total_possible_cmmc_trainings - total_completed_cmmc_trainings if total_possible_cmmc_trainings > 0 else 0
+
+    # Arctic Wolf Data for Pie Chart (all active users)
+    active_users_count = User.objects.filter(is_active=True).count()
+    total_aw_courses = ArcticWolfCourse.objects.all().count()
+    total_possible_aw_completions = total_aw_courses * active_users_count
+    total_actual_aw_completions = ArcticWolfCompletion.objects.all().count()
+    uncompleted_aw_completions = total_possible_aw_completions - total_actual_aw_completions if total_possible_aw_completions > 0 else 0
 
     context = {
-        'cmmc_courses_count': total_required_cmmc_courses,
-        'cmmc_completed_count': completed_required_cmmc_trainings,
-        'arctic_wolf_courses_count': arctic_wolf_courses,
-        'arctic_wolf_completed_count': arctic_wolf_completed,
+        'cmmc_courses_count': user_completed_trainings,
+        'cmmc_total_courses_count': user_total_required_courses, # User specific total (all tracked)
+        'aw_completed_count': ArcticWolfCompletion.objects.filter(user=request.user).count(), # User specific completed
+        'aw_total_courses_count': ArcticWolfCourse.objects.all().count(), # User specific total
+
+        'total_possible_cmmc_trainings': total_possible_cmmc_trainings,
+        'total_completed_cmmc_trainings': total_completed_cmmc_trainings,
+        'uncompleted_cmmc_trainings': uncompleted_cmmc_trainings,
+        'total_possible_aw_completions': total_possible_aw_completions,
+        'total_actual_aw_completions': total_actual_aw_completions,
+        'uncompleted_aw_completions': uncompleted_aw_completions,
         'is_staff': request.user.is_staff,
     }
     return render(request, 'training/dashboard.html', context)
