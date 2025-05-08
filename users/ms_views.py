@@ -21,6 +21,11 @@ class MicrosoftAuthView(View):
         if 'microsoft_auth_error' in request.session:
             del request.session['microsoft_auth_error']
         
+        # Store the next URL if provided
+        next_url = request.GET.get('next')
+        if next_url:
+            request.session['microsoft_auth_next'] = next_url
+        
         # Initialize MSAL app
         app = msal.ConfidentialClientApplication(
             client_id=settings.AZURE_AD_CONFIG['app_id'],
@@ -127,9 +132,15 @@ class MicrosoftCallbackView(View):
             
             # Set success flag and save session
             request.session['microsoft_auth_success'] = True
+            
+            # Get the next URL if it was stored
+            next_url = request.session.pop('microsoft_auth_next', None)
             request.session.save()
             
-            # Redirect to success URL
+            # Redirect to next URL if it exists, otherwise to default
+            if next_url:
+                logger.info(f"Redirecting to stored next URL: {next_url}")
+                return redirect(next_url)
             return redirect(settings.LOGIN_REDIRECT_URL)
         else:
             # Authentication failed

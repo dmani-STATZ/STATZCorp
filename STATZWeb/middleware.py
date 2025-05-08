@@ -11,22 +11,14 @@ class LoginRequiredMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.public_urls = [
-            reverse('users:login'),
-            reverse('users:register'),
-            reverse('users:logout'),
-            reverse('landing'),
-            reverse('users:microsoft_login'),
-            reverse('users:microsoft_callback'),
-            '/',  # Explicitly add root URL
-            '/admin/',
-            '/static/',
-            '/media/',
-            '/logout/',
-            '/users/microsoft/',  # Microsoft auth paths
-            '/manifest.json',     # PWA manifest
-            '/sw.js',             # Service worker
-            '/cert-error/',
-            '/download-cert/',
+            '/users/login/',
+            '/users/logout/',
+            '/users/microsoft/login/',
+            '/users/microsoft/callback/',
+            '/users/password-reset/',
+            '/users/password-reset/done/',
+            '/users/password-reset-confirm/',
+            '/users/password-reset-complete/',
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 
@@ -57,8 +49,9 @@ class LoginRequiredMiddleware:
                     return self.get_response(request)
                     
                 if not self.is_public_url(path):
-                    #logger.info(f"Redirecting unauthenticated user from {path} to login")
-                    return redirect(settings.LOGIN_URL)
+                    # Add the current path as the next parameter
+                    login_url = f"{settings.LOGIN_URL}?next={request.path}"
+                    return redirect(login_url)
 
             if request.user.is_authenticated and not request.user.is_superuser:
                 #logger.debug(f"User {request.user.username} (ID: {request.user.id}) is authenticated but not superuser")

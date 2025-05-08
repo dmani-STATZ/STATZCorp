@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 from .models import AppPermission, UserSetting, UserSettingState
 from django.contrib.auth.models import User
-from django.urls import resolve
+from django.urls import resolve, reverse
 import logging
 from django.views.decorators.http import require_http_methods
 import json
@@ -40,39 +40,21 @@ def login_view(request):
         logger.debug("Microsoft auth successful, redirecting to index")
         return redirect('index')
     
+    # Get the next URL from query parameters
+    next_url = request.GET.get('next')
+    
     # Get Microsoft login URL
     microsoft_login_url = get_microsoft_login_url(request)
-    logger.debug(f"Microsoft login URL generated: {microsoft_login_url is not None}")
+    if next_url:
+        microsoft_login_url = f"{reverse('users:microsoft_login')}?next={next_url}"
     
-    # For admins only, still allow traditional form-based login
-    if request.method == 'POST' and 'admin_login' in request.POST:
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        
-        if username and password:
-            logger.debug(f"Attempting traditional login for admin: {username}")
-            user = authenticate(request, username=username, password=password)
-            
-            if user is not None and user.is_staff:
-                logger.info(f"Traditional login successful for admin: {username}")
-                auth_login(request, user)
-                request.session['auth_method'] = 'django'
-                return redirect('index')
-            else:
-                logger.warning(f"Traditional login failed for admin: {username}")
-                auth_error = "Invalid username or password, or user is not an admin."
-    elif request.method == 'GET' and not microsoft_auth_success and not auth_error:
-        # For regular users, redirect immediately to Microsoft login
-        if not request.GET.get('admin_mode'):
-            return redirect('users:microsoft_login')
-    
-    # Render login form with Microsoft login button
-    # Only admins should see this page with the ?admin_mode=1 parameter
-    return render(request, 'users/login.html', {
-        'microsoft_login_url': microsoft_login_url,
+    context = {
         'auth_error': auth_error,
-        'admin_mode': request.GET.get('admin_mode') == '1'
-    })
+        'microsoft_login_url': microsoft_login_url,
+        'admin_mode': request.GET.get('admin', False),
+    }
+    
+    return render(request, 'users/login.html', context)
 
 def register(request):
     """Redirect registration to Microsoft authentication"""
