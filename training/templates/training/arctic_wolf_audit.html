@@ -15,15 +15,31 @@
     }
     th {
         background-color: transparent;
-        border: 1px solid #000;
         height: 300px;
+        position: relative;
+        padding: 0;
+    }
+
+    /* New styles for rotated headers */
+    .rotated-header {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: rotate(-45deg) ;
+        transform-origin: left;
+        width: 400px; /* Increased width for text */
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 8px;
     }
 
     td {
         background-color: transparent;
         border: 1px solid #000;
         text-align: center;
-        width: 200px;
+        width: 100px; /* Reduced from 200px since we don't need as much width */
         height: 50px;
     }
 
@@ -39,14 +55,15 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="vertical-align: bottom;">Employee</th>
+                        <th style="vertical-align: bottom; width: 150px;">Employee</th>
                         {% for course in courses %}
-                        <th style="transform: rotate(-90deg); width: 400px; height: 200px;">
-                                {{ course.name }}
+                        <th>
+                            <div class="rotated-header">{{ course.name }}</div>
                         </th>
                         {% endfor %}
                     </tr>
                 </thead>
+                <tbody>
                 <tbody>
                     {% for user_data in audit_data %}
                     <tr>
