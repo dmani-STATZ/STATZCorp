@@ -1,0 +1,8 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block body %}
+<h1>Training Matrix Updated</h1>
+<p>The training matrix for the selected account has been updated successfully.</p>
+<p><a href="{% url 'training:manage_matrix' %}">Go back to manage matrix</a></p>
+{% endblock body %}

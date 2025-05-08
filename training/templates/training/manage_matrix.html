@@ -1,0 +1,109 @@
+{% extends 'training/training_base.html' %}
+{% load static %}
+{% load matrix_extras %}
+
+{% block body %}
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">Manage Training Matrix</h1>
+
+        <!-- Account Selection Form -->
+        <form method="GET" class="mb-8">
+            <div class="form-group">
+                <label for="id_account" class="form-label block mb-2">Select Account Type:</label>
+                <select name="account" id="id_account" class="form-select w-full md:w-1/2" onchange="this.form.submit()">
+                    <option value="">Select an Account</option>
+                    {% for account in accounts %}
+                        <option value="{{ account.id }}" {% if selected_account.id == account.id %}selected{% endif %}>
+                            {{ account.get_type_display }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        {% if selected_account %}
+            <!-- Course Matrix Form -->
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                <input type="hidden" name="account" value="{{ selected_account.id }}">
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Courses for: {{ selected_account.get_type_display }}</h2>
+                    
+                    <!-- Header Row -->
+                    <div class="grid grid-cols-12 gap-4 mb-4 px-4">
+                        <div class="col-span-7">
+                            <span class="font-semibold">Course Name</span>
+                        </div>
+                        <div class="col-span-5">
+                            <span class="font-semibold">Frequency</span>
+                        </div>
+                    </div>
+
+                    <!-- Course List -->
+                    <div class="space-y-2">
+                        {% for course in courses %}
+                            <div class="grid grid-cols-12 gap-4 items-center py-2 px-4 hover:bg-gray-50 border-b">
+                                <div class="col-span-7 flex items-center space-x-3">
+                                    <input type="checkbox"
+                                           name="selected_courses"
+                                           value="{{ course.id }}"
+                                           id="course_{{ course.id }}"
+                                           class="form-checkbox h-5 w-5"
+                                           {% if course.id in existing_matrix_entries|map_course_ids %}checked{% endif %}>
+                                    <label for="course_{{ course.id }}" class="truncate">{{ course.name }}</label>
+                                </div>
+                                <div class="col-span-5">
+                                    <select name="frequency_{{ course.id }}"
+                                            id="frequency_{{ course.id }}"
+                                            class="form-select w-full"
+                                            {% if course.id not in existing_matrix_entries|map_course_ids %}disabled{% endif %}>
+                                        <option value="">Select Frequency</option>
+                                        {% for value, label in frequency_choices %}
+                                            <option value="{{ value }}"
+                                                    {% if course.id in existing_matrix_entries|map_course_ids %}
+                                                        {% with matrix_entry=existing_matrix_entries|get_matrix_entry:course.id %}
+                                                            {% if matrix_entry.frequency == value %}selected{% endif %}
+                                                        {% endwith %}
+                                                    {% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end">
+                        <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                            Save Matrix
+                        </button>
+                    </div>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkboxes = document.querySelectorAll('input[name="selected_courses"]');
+            
+            checkboxes.forEach(checkbox => {
+                const courseId = checkbox.id.split('_')[1];
+                const frequencySelect = document.getElementById(`frequency_${courseId}`);
+                
+                // Initial state
+                frequencySelect.disabled = !checkbox.checked;
+                
+                // Change handler
+                checkbox.addEventListener('change', function() {
+                    frequencySelect.disabled = !this.checked;
+                    if (!this.checked) {
+                        frequencySelect.value = ''; // Reset frequency when unchecked
+                    }
+                });
+            });
+        });
+    </script>
+{% endblock %}

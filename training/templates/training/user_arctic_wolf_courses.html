@@ -1,0 +1,27 @@
+{% extends 'training/training_base.html' %}
+{% load static %}
+{% load training_filters %}
+
+{% block body %}
+    <div class="container mx-auto p-4">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-2xl font-bold mb-4">Welcome {{ request.user.first_name }}!</h1>
+            <a href="{% url 'training:dashboard' %}" class="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 mt-2">Back to Dashboard</a>
+        </div>
+        <h2 class="mb-4 text-xl font-bold">Here are your Arctic Wolf training courses:</h2>
+        <ul>
+            {% for course in courses %}
+                <li class="py-2 border-b border-gray-200">
+                    <span class="font-semibold">{{ course.name }}</span>
+                    {% if course.id in completed_courses %}
+                        <span class="text-green-500 ml-2">(Completed on: {{ completed_courses|get_item:course.id|date:"n/j/Y" }})</span>
+                    {% else %}
+                        <span class="text-gray-500 ml-2">(Not Completed) Check email for link to training</span>
+                    {% endif %}
+                </li>
+            {% empty %}
+                <li>No Arctic Wolf courses available.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

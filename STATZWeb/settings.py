@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_extensions',
     'processing.apps.ProcessingConfig',
+    'training.apps.TrainingConfig',
 ]
 
 MIDDLEWARE = [

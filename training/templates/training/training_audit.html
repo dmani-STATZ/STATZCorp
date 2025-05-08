@@ -1,0 +1,75 @@
+{% extends 'training/training_base.html' %}
+{% load static %}
+{% load training_filters %}
+
+{% block body %}
+<style>
+    table {
+        background-color: transparent;
+    }
+    thead {
+        background-color: transparent;
+    }
+    tbody {
+        background-color: transparent;
+    }
+    th {
+        background-color: transparent;
+        border: 1px solid #000;
+        height: 300px;
+    }
+
+    td {
+        background-color: transparent;
+        border: 1px solid #000;
+        text-align: center;
+        width: 200px;
+        height: 50px;
+    }
+
+    tr {
+        background-color: transparent;
+    }
+</style>
+
+
+    <div>
+        <h1 class="text-2xl font-bold mb-4">Training Completion Audit</h1>
+        <div style="overflow: auto;"> 
+            <table>
+                <thead>
+                    <tr>
+                        <th style="vertical-align: bottom;">Employee</th>
+                        {% for course in courses %}
+                        <th style="transform: rotate(-90deg); width: 400px; height: 200px;">
+                                {{ course.name }}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user_data in audit_data %}
+                        <tr>
+                            <td>{{ user_data.user.first_name }}&nbsp;{{ user_data.user.last_name }}</td>
+                            {% for course in courses %}
+                                {% with status=user_data.courses|get_item:course.id %}
+                                    <td class="{% if status.required %} {% if status.completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %} {% endif %}">
+                                        {% if status and status.completed_date %}
+                                            {% if status.document and status.tracker_id %}
+                                                <a href="{% url 'training:view_document' status.tracker_id %}" class="text-blue-500 hover:underline text-xs block">{{ status.completed_date|date:"n/j/Y" }}</a>
+                                            {% else %}
+                                                <span class="text-xs block">{{ status.completed_date|date:"n/j/Y" }}</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                {% endwith %}
+                            {% endfor %}
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="{% with total_cols=courses|length|add:1 %}{{ total_cols }}{% endwith %}" class="px-4 py-2 text-center">No users or training data available.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

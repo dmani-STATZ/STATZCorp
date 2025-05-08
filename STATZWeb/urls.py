@@ -82,11 +82,13 @@ urlpatterns = [
     path('contracts/', include('contracts.urls')),
     path('accesslog/', include('accesslog.urls')),
     path('processing/', include('processing.urls')),
+    path('training/', include('training.urls')),
     path('health/', health_check, name='health_check'),
+    
     # Announcement URLs
     path('announcement/add/', views.add_announcement, name='add_announcement'),
     path('announcement/delete/<int:announcement_id>/', views.delete_announcement, name='delete_announcement'),
-    
+
     # PWA URLs
     path('manifest.json', manifest_json, name='manifest'),
     path('sw.js', service_worker, name='service_worker'),

@@ -63,7 +63,7 @@
         <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}">
     {% endif %}
     
-    {% block extra_head %}{% endblock %}
+    {% block extra_head %}{% endblock extra_head %}
     {% if title %}
         <title>STATZ Corporation - {{ title }}</title>
     {% else %}
@@ -127,7 +127,7 @@
                     <a href="{% url 'about' %}" class= "px-3 py-2 rounded-md text-sm font-medium">About</a>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                    <a href="{% url 'accesslog:visitor_log' %}" class="px-3 py-2 rounded-md text-sm font-medium">Access Log</a>
+                    <a href="{% url 'training:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Training</a>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Inventory</a>
@@ -146,8 +146,8 @@
     </div>
 
     <div class="content flex-1 inactive" id="content">
-        {% block body %}{% endblock %}
-        {% block extra_scripts %}{% endblock %}
+        {% block body %}{% endblock body %}
+        {% block extra_scripts %}{% endblock extra_scripts %}
     </div>
     <script>
         function toggleSidebar() {

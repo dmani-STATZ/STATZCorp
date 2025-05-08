@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # Form Styling Rule
 
@@ -162,7 +162,5 @@ To implement this across your site:
 5. Keep only special widget attributes that differ from defaults
 
 Would you like me to help you convert more of your existing forms to use this new system? We can start with any form class you'd like to tackle first.
-
-
 
 
