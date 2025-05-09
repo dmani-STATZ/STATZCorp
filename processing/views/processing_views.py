@@ -20,13 +20,13 @@ from django.http import Http404
 import json
 from urllib.parse import quote
 import logging
-from decimal import Decimal
-import decimal
-from io import StringIO
+from decimal import Decimal, InvalidOperation
 import random
 from datetime import datetime, timedelta
 from django.db.models import Count
 from django.utils.decorators import method_decorator
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
 
 logger = logging.getLogger(__name__)
 
@@ -495,22 +495,26 @@ def finalize_contract(request, process_contract_id):
             Clin.objects.create(
                 contract=contract,
                 item_number=process_clin.item_number,
+                item_type=process_clin.item_type,
                 nsn=process_clin.nsn,
                 supplier=process_clin.supplier,
-                quantity=process_clin.order_qty,
+                order_qty=process_clin.order_qty,
                 unit_price=process_clin.unit_price,
-                total_price=process_clin.item_value,
-                description=process_clin.description,
+                item_value=process_clin.item_value,
+                po_num_ext=process_clin.po_num_ext,
+                tab_num=process_clin.tab_num,
+                clin_po_num=process_clin.clin_po_num,
+                po_number=process_clin.po_number,
+                clin_type=process_clin.clin_type,
                 ia=process_clin.ia,
                 fob=process_clin.fob,
                 due_date=process_clin.due_date,
                 supplier_due_date=process_clin.supplier_due_date,
                 price_per_unit=process_clin.price_per_unit,
                 quote_value=process_clin.quote_value,
+                special_payment_terms=process_clin.special_payment_terms,
                 created_by=request.user,
-                modified_by=request.user,
-                planned_split=process_clin.planned_split,
-                plan_gross=process_clin.plan_gross
+                modified_by=request.user
             )
         
         # Update queue item status
@@ -913,49 +917,45 @@ def mark_ready_for_review(request, process_contract_id):
 def finalize_and_email_contract(request, process_contract_id):
     try:
         process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+        process_clins = process_contract.clins.all()
         
-        # Validate required fields
-        validation_errors = {}
-        
-        # Contract-level validations
-        required_fields = [
-            'contract_number', 'po_number', 'tab_num', 'contract_type',
-            'buyer', 'award_date', 'contract_value'
-        ]
-        for field in required_fields:
-            if not getattr(process_contract, field):
-                validation_errors[field] = f'{field.replace("_", " ").title()} is required'
-        
-        # CLIN validations
-        clin_errors = []
-        process_clins = ProcessClin.objects.filter(process_contract=process_contract)
-        
-        if not process_clins.exists():
-            validation_errors['clins'] = 'At least one CLIN is required'
-        else:
-            for clin in process_clins:
-                clin_error = {}
-                required_clin_fields = [
-                    'item_value', 'quote_value', 'item_number',
-                    'nsn', 'supplier', 'order_qty', 'unit_price'
-                ]
-                for field in required_clin_fields:
-                    if not getattr(clin, field):
-                        clin_error[field] = f'{field.replace("_", " ").title()} is required'
-                if clin_error:
-                    clin_error['item_number'] = clin.item_number or 'Unknown CLIN'
-                    clin_errors.append(clin_error)
-        
-        if clin_errors:
-            validation_errors['clins'] = clin_errors
-            
+        # Validate all CLINs before processing
+        validation_errors = []
+        for process_clin in process_clins:
+            if not process_clin.nsn:
+                validation_errors.append(f"CLIN {process_clin.item_number} is missing NSN")
+            if not process_clin.supplier:
+                validation_errors.append(f"CLIN {process_clin.item_number} is missing supplier")
+            if not process_clin.item_value:
+                validation_errors.append(f"CLIN {process_clin.item_number} has no item value")
+            if not process_clin.quote_value and process_clin.quote_value != 0:
+                validation_errors.append(f"CLIN {process_clin.item_number} has no quote value")
+                
         if validation_errors:
             return JsonResponse({
                 'success': False,
-                'validation_errors': validation_errors
+                'error': "Validation failed:\n" + "\n".join(validation_errors)
+            }, status=400)
+
+        # Validate contract level data
+        if not process_contract.contract_value:
+            return JsonResponse({
+                'success': False,
+                'error': "Contract has no total value"
             }, status=400)
             
+        if not process_contract.plan_gross and process_contract.plan_gross != 0:
+            return JsonResponse({
+                'success': False,
+                'error': "Contract has no plan gross value"
+            }, status=400)
             
+        if not process_contract.award_date:
+            return JsonResponse({
+                'success': False,
+                'error': "Contract has no award date"
+            }, status=400)
+
         # Create the final contract with all relevant fields
         contract = Contract.objects.create(
             contract_number=process_contract.contract_number,
@@ -976,13 +976,35 @@ def finalize_and_email_contract(request, process_contract_id):
             modified_by=request.user,
             status=ContractStatus.objects.get(id=1)  # Use the ContractStatus instance with ID=1
         )
-        
+
+        # Create contract_value payment history
+        contract_content_type = ContentType.objects.get_for_model(Contract)
+        PaymentHistory.objects.create(
+            content_type=contract_content_type,
+            object_id=contract.id,
+            payment_type='contract_value',
+            payment_amount=process_contract.contract_value,
+            payment_date=process_contract.award_date.date(),
+            payment_info='Initial contract value',
+            created_by=request.user,
+            modified_by=request.user
+        )
+        # Create plan_gross payment history
+        PaymentHistory.objects.create(
+            content_type=contract_content_type,
+            object_id=contract.id,
+            payment_type='plan_gross',
+            payment_amount=process_contract.plan_gross,
+            payment_date=process_contract.award_date.date(),
+            payment_info='Initial plan gross',
+            created_by=request.user,
+            modified_by=request.user
+        )
+
         # Create CLINs and payment history with all relevant fields
         for process_clin in process_clins:
             clin = Clin.objects.create(
                 contract=contract,
-                open=True,
-                closed=False,
                 item_number=process_clin.item_number,
                 item_type=process_clin.item_type,
                 nsn=process_clin.nsn,
@@ -1006,26 +1028,34 @@ def finalize_and_email_contract(request, process_contract_id):
                 modified_by=request.user
             )
             
-            # Create payment history records
+            # Create payment history records using ContentType framework
+            clin_content_type = ContentType.objects.get_for_model(Clin)
+            
+            # Create item_value payment history
             PaymentHistory.objects.create(
-                clin=clin,
+                content_type=clin_content_type,
+                object_id=clin.id,
                 payment_type='item_value',
                 payment_amount=process_clin.item_value,
-                payment_date=process_contract.award_date,
+                payment_date=process_contract.award_date.date(),
                 payment_info='Initial item value',
                 created_by=request.user,
-                updated_by=request.user
-            )
-            PaymentHistory.objects.create(
-                clin=clin,
-                payment_type='quote_value',
-                payment_amount=process_clin.quote_value,
-                payment_date=process_contract.award_date,
-                payment_info='Initial quote value',
-                created_by=request.user,
-                updated_by=request.user
+                modified_by=request.user
             )
             
+            # Create quote_value payment history
+            PaymentHistory.objects.create(
+                content_type=clin_content_type,
+                object_id=clin.id,
+                payment_type='quote_value',
+                payment_amount=process_clin.quote_value,
+                payment_date=process_contract.award_date.date(),
+                payment_info='Initial quote value',
+                created_by=request.user,
+                modified_by=request.user
+            )
+            
+        
         # Create contract splits
         for process_split in ProcessContractSplit.objects.filter(process_contract=process_contract):
             ContractSplit.objects.create(
@@ -1035,17 +1065,7 @@ def finalize_and_email_contract(request, process_contract_id):
                 split_paid=process_split.split_paid or Decimal('0.00'),
             )
             
-        # Update queue contract status if it exists
-        if process_contract.queue_id:
-            try:
-                queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
-                queue_contract.status = 'completed'
-                queue_contract.is_being_processed = False
-                queue_contract.save()
-            except QueueContract.DoesNotExist:
-                pass  # Queue contract might have been deleted
             
-        
         email_subject = f"New Contract: {contract.contract_number}"
         email_body = (
             f"A new Contract has been created\n\n"
@@ -1062,8 +1082,13 @@ def finalize_and_email_contract(request, process_contract_id):
             f"to=dmani@statzcorp.com"
         )
         
+        queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+
         # Delete the process contract
         process_contract.delete()
+
+        # Delete the queue contract
+        queue_contract.delete()
         
         return JsonResponse({
             'success': True,
@@ -1072,72 +1097,140 @@ def finalize_and_email_contract(request, process_contract_id):
             'message': 'Contract finalized successfully'
         })
         
-    except Exception as e:
-        logger.exception("Error finalizing contract")
+    except ProcessContract.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'Process contract not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error finalizing contract {process_contract_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f"Database error: {str(e)}"
         }, status=500)
 
 @login_required
 @require_POST
-def save_contract_data(request, process_contract_id):
-    """
-    Simple view for auto-saving contract data without redirecting.
-    Used for background saves during editing.
-    """
+def save_contract(request):
+    """Save a ProcessContract with data from FormData."""
+    print("\n========== SAVE CONTRACT DEBUG ==========")
     try:
-        process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+        contract_id = request.POST.get('contract_id')
+        print(f"Contract ID from POST: {contract_id}")
+        print(f"All POST data: {request.POST}")
         
-        # Get the form data
-        form = ProcessContractForm(request.POST, instance=process_contract)
-        clin_formset = ProcessClinFormSet(request.POST, instance=process_contract)
+        if not contract_id:
+            return JsonResponse({'success': False, 'error': 'Contract ID is required'}, status=400)
+
+        try:
+            contract = ProcessContract.objects.get(id=contract_id)
+            print(f"Found contract: {contract.id} - {contract.contract_number}")
+        except ProcessContract.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Contract not found'}, status=404)
         
-        # Attempt to save even with partial data for autosave
-        # We don't do full validation for autosaves
-        is_autosave = request.POST.get('auto_save') == 'true'
-        
-        if is_autosave:
-            # For autosave, save what we can without strict validation
-            if form.is_valid():
-                process_contract = form.save()
+        changes_made = False
+        updated_fields = {}
+
+        # Helper function to safely update a field
+        def safe_update(field_name, value, field_type=None):
+            nonlocal changes_made
+            current = getattr(contract, field_name)
             
-            # For each valid CLIN in the formset, save it
-            for clin_form in clin_formset:
-                if clin_form.is_valid() and not clin_form.cleaned_data.get('DELETE', False):
-                    clin_form.save()
+            # Convert value based on field type
+            if value == '' or value is None:
+                if not contract._meta.get_field(field_name).null:
+                    if field_type == Decimal:
+                        value = Decimal('0.00')
+                    elif field_type == float:
+                        value = 0.0
+                    elif field_type == bool:
+                        value = False
+                    else:
+                        value = None
+                else:
+                    value = None
+            elif field_type == Decimal:
+                try:
+                    value = Decimal(str(value).replace(',', ''))
+                except (InvalidOperation, ValueError):
+                    print(f"Could not convert {value} to Decimal")
+                    return False
+            elif field_type == datetime.date:
+                try:
+                    value = datetime.strptime(value, '%Y-%m-%d').date()
+                except ValueError:
+                    print(f"Could not convert {value} to date")
+                    return False
             
+            if current != value:
+                print(f"Updating {field_name}: {current} -> {value}")
+                setattr(contract, field_name, value)
+                updated_fields[field_name] = value
+                changes_made = True
+            return True
+
+        # Process string fields
+        string_fields = ['contract_number', 'solicitation_type', 'po_number', 'tab_num', 
+                        'files_url', 'planned_split', 'description', 'status', 'buyer_text']
+        for field in string_fields:
+            if field in request.POST:
+                safe_update(field, request.POST.get(field))
+
+        # Process date fields
+        date_fields = ['award_date', 'due_date']
+        for field in date_fields:
+            if field in request.POST:
+                safe_update(field, request.POST.get(field), datetime.date)
+
+        # Process decimal fields
+        decimal_fields = ['contract_value', 'plan_gross']
+        for field in decimal_fields:
+            if field in request.POST:
+                safe_update(field, request.POST.get(field), Decimal)
+
+        # Process boolean fields
+        if 'nist' in request.POST:
+            safe_update('nist', request.POST['nist'].lower() in ['true', 'yes', 'on', '1'], bool)
+
+        # Process foreign key fields
+        fk_fields = {
+            'contract_type': ContractType,
+            'sales_class': SalesClass,
+            'buyer': Buyer
+        }
+        for field, model in fk_fields.items():
+            if field in request.POST and request.POST[field]:
+                try:
+                    instance = model.objects.get(id=request.POST[field])
+                    safe_update(field, instance)
+                except (ValueError, model.DoesNotExist):
+                    print(f"Could not find {model.__name__} with id {request.POST[field]}")
+
+        if changes_made:
+            contract.save()
+            print("Contract saved successfully")
             return JsonResponse({
                 'success': True,
-                'message': 'Data auto-saved'
+                'message': 'Contract saved successfully',
+                'updated_fields': {k: str(v) if v is not None else '' for k, v in updated_fields.items()}
             })
         else:
-            # For manual saves, use standard validation
-            if form.is_valid() and clin_formset.is_valid():
-                process_contract = form.save()
-                clin_formset.save()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Data saved successfully'
-                })
-            else:
-                errors = {
-                    'form_errors': form.errors,
-                    'clin_errors': clin_formset.errors
-                }
-                return JsonResponse({
-                    'success': False,
-                    'errors': errors
-                }, status=400)
-                
+            print("No changes detected")
+            return JsonResponse({
+                'success': True,
+                'message': 'No changes to save'
+            })
+
     except Exception as e:
-        logger.exception("Error saving contract data")
+        import traceback
+        print(f"Error saving contract: {str(e)}")
+        print(traceback.format_exc())
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': f'Error saving contract: {str(e)}'
         }, status=500)
-    
+    finally:
+        print("========== END SAVE CONTRACT DEBUG ==========\n")
 
 @method_decorator(login_required, name='dispatch')
 class ContractQueueListView(ListView):
@@ -1709,9 +1802,9 @@ def upload_csv(request):
                         
                         # Process contract value
                         try:
-                            contract_value = decimal.Decimal(row['Contract Value'].replace(',', '').replace('$', '')) if row['Contract Value'] else None
+                            contract_value = Decimal(row['Contract Value'].replace(',', '').replace('$', '')) if row['Contract Value'] else None
                             print(f"Contract value processed: {contract_value}")
-                        except decimal.InvalidOperation as e:
+                        except InvalidOperation as e:
                             print(f"Contract value parsing error: {str(e)}")
                             return JsonResponse({
                                 'success': False,
@@ -1750,14 +1843,14 @@ def upload_csv(request):
                             ia=row.get('IA', ''),
                             fob=row.get('FOB', ''),
                             due_date=timezone.make_aware(datetime.strptime(row['Due Date'], '%Y-%m-%d')) if row['Due Date'] else None,
-                            order_qty=decimal.Decimal(row['Order Qty'].replace(',', '')) if row['Order Qty'] else None,
+                            order_qty=Decimal(row['Order Qty'].replace(',', '')) if row['Order Qty'] else None,
                             uom=row['UOM'],
-                            item_value=decimal.Decimal(row['Item Value'].replace(',', '').replace('$', '')) if row.get('Item Value') else None,
-                            unit_price=decimal.Decimal(row['Unit Price'].replace(',', '').replace('$', '')) if row['Unit Price'] else None,
+                            item_value=Decimal(row['Item Value'].replace(',', '').replace('$', '')) if row.get('Item Value') else None,
+                            unit_price=Decimal(row['Unit Price'].replace(',', '').replace('$', '')) if row['Unit Price'] else None,
                             supplier=row.get('Supplier', ''),
                             supplier_due_date=timezone.make_aware(datetime.strptime(row['Supplier Due Date'], '%Y-%m-%d')) if row.get('Supplier Due Date') else None,
-                            supplier_unit_price=decimal.Decimal(row['Supplier Unit Price'].replace(',', '').replace('$', '')) if row.get('Supplier Unit Price') else None,
-                            supplier_price=decimal.Decimal(row['Supplier Price'].replace(',', '').replace('$', '')) if row.get('Supplier Price') else None,
+                            supplier_unit_price=Decimal(row['Supplier Unit Price'].replace(',', '').replace('$', '')) if row.get('Supplier Unit Price') else None,
+                            supplier_price=Decimal(row['Supplier Price'].replace(',', '').replace('$', '')) if row.get('Supplier Price') else None,
                             supplier_payment_terms=row.get('Supplier Payment Terms', ''),
                             created_by=request.user,
                             modified_by=request.user

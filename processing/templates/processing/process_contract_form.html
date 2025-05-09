@@ -1,7 +1,7 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
 {% load humanize %}
-
+f
 {% block title %}Edit Processing Contract{% endblock %}
 
 {% block content %}
@@ -44,6 +44,7 @@
     <form id="process-contract-form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="status" value="{{ process_contract.status|default:'in_progress' }}">
+        <input type="hidden" name="contract_id" value="{{ process_contract.id }}">
         
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -92,7 +93,7 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tab Number</label>
-                            <input type="text" name="tab_number" value="{{ process_contract.tab_num }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" name="tab_num" value="{{ process_contract.tab_num }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
 
                         <div>
@@ -177,6 +178,16 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="mt-4">
+                        <button type="button" 
+                                onclick="saveContract()"
+                                class="w-1/8 px-6 py-2 bg-green-400 text-black rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-300">
+                            <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+                                <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -232,11 +243,16 @@
 
                 <!-- Contract Calculations Card -->
                 <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-xl font-semibold mb-4">Contract Calculations</h2>
-                    <div class="space-y-4">
-                        <button type="button" 
-                                onclick="updateContractCalculations()"
-                                class="w-full px-4 py-2 bg-gray-100 text-green-500 border border-green-500 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200">
+                    <h2 class="text-xl font-semibold mb-4">Contract Actions</h2>
+                    <div class="space-y-4 pt-3">
+                        <button 
+                            type="button"
+                            id="update-values-button"
+                            onclick="updateContractValues()"
+                            class="w-full bg-blue-500 text-white hover:bg-blue-600 px-5 py-2 rounded flex items-center gap-2 justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
                             Update Value and Plan Gross
                         </button>
                     </div>
@@ -504,6 +520,7 @@
                                                     data-id="{{ clin_form.instance.id }}"
                                                     data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
                                                     data-description="{{ clin_form.instance.nsn_description_text|default:'' }}"
+                                                    onclick="saveAndOpenNsnMatch(this)"
                                                     class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                                 Match
                                             </button>
@@ -540,6 +557,7 @@
                                                name="order_qty" 
                                                value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               onchange="updateTotalValue(this)"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                     <div class="col-span-1">
@@ -558,6 +576,7 @@
                                                name="unit_price" 
                                                value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               onchange="updateTotalValue(this)"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                     <div class="col-span-3">
@@ -597,6 +616,7 @@
                                                     data-action="open-supplier"
                                                     data-id="{{ clin_form.instance.id }}"
                                                     data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
+                                                    onclick="saveAndOpenSupplierMatch(this)"
                                                     class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                                 Match
                                             </button>
@@ -645,7 +665,7 @@
                                                min="0"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                data-clin-id="{{ clin_form.instance.id }}"
-                                               onchange="handlePriceChange(this)">
+                                               onchange="updateQuoteValue(this)">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Quote Total</label>
@@ -659,7 +679,7 @@
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
                                             <button type="button" 
-                                                    onclick="recalculateTotal(this)"
+                                                    onclick="recalculateQuote(this)"
                                                     data-clin-id="{{ clin_form.instance.id }}"
                                                     class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
                                                 ReCalc
@@ -669,7 +689,15 @@
                                 </div>
                                 <div class="grid grid-cols-8 gap-4 mb-4">
 
-                                <div class="mt-4 flex justify-end">
+                                <div class="mt-4 flex justify-begining space-x-4">
+                                    <button type="button" 
+                                            onclick="saveClinDetails(this)" 
+                                            data-clin-id="{{ clin_form.instance.id }}"
+                                            class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded flex items-center gap-2">
+                                        <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+                                            <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
+                                        </svg>
+                                    </button>
                                     <button type="button" 
                                             onclick="showDeleteModal(this)" 
                                             data-clin-id="{{ clin_form.instance.id }}"
@@ -677,7 +705,6 @@
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
-                                        Delete CLIN
                                     </button>
                                 </div>
                             </td>
@@ -757,6 +784,127 @@
 
 <!-- JavaScript for form functionality -->
 <script>
+    // Function to save Contract
+    function saveContract() {
+        const form = document.getElementById('process-contract-form');
+        const formData = new FormData(form);
+        
+        // Store current select values
+        const selectValues = {};
+        form.querySelectorAll('select').forEach(select => {
+            selectValues[select.name] = select.value;
+        });
+        
+        // Show loading state
+        const saveBtn = form.querySelector('button[onclick="saveContract()"]');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24"><!-- Loading spinner --></svg> Saving...';
+        }
+
+        // Log what we're sending
+        console.log('Saving contract with data:', Object.fromEntries(formData));
+
+        fetch("{% url 'processing:save_contract' %}", {
+            method: "POST",
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: formData
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Save response:', data);
+            
+            // Reset button state
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = `
+                    <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+                        <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
+                    </svg>
+                `;
+            }
+
+            if (data.success) {
+                // Restore select values
+                form.querySelectorAll('select').forEach(select => {
+                    if (selectValues[select.name]) {
+                        select.value = selectValues[select.name];
+                    }
+                });
+
+                // Show success message
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded shadow-lg';
+                toast.textContent = data.message || "Contract saved successfully!";
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+
+                // Update form fields if needed
+                if (data.updated_fields) {
+                    for (const [field, value] of Object.entries(data.updated_fields)) {
+                        const input = form.querySelector(`[name="${field}"]`);
+                        if (input) {
+                            if (input.tagName === 'SELECT') {
+                                // For select elements, make sure the option exists before setting
+                                const option = input.querySelector(`option[value="${value}"]`);
+                                if (option) {
+                                    input.value = value;
+                                }
+                            } else {
+                                input.value = value;
+                            }
+                        }
+                    }
+                }
+            } else {
+                throw new Error(data.error || 'Unknown error occurred');
+            }
+        })
+        .catch(error => {
+            console.error('Save error:', error);
+            
+            // Reset button state
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = `
+                    <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+                        <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
+                    </svg>
+                `;
+            }
+
+            // Restore select values on error
+            form.querySelectorAll('select').forEach(select => {
+                if (selectValues[select.name]) {
+                    select.value = selectValues[select.name];
+                }
+            });
+
+            // Show error message
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg';
+            toast.textContent = error.message || "Failed to save contract";
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        });
+    }
+
+    // Add this to prevent form submission on enter key
+    document.getElementById('process-contract-form').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            return false;
+        }
+    });
+
     // Function to update Contract Value and Plan Gross
     async function updateContractCalculations() {
         let totalItemValue = 0;
@@ -914,24 +1062,35 @@
     // Global variables for modal functionality
     const processContractId = "{{ process_contract.id }}";
 
-    // Calculate total price when quantity or unit price changes
+    // Function to update total value when quantity or unit price changes
+    function updateTotalValue(input) {
+        const clinId = input.dataset.clinId;
+        const quantity = Math.max(0, parseFloat(document.getElementById(`order_qty_${clinId}`).value) || 0);
+        const unitPrice = Math.max(0, parseFloat(document.getElementById(`unit_price_${clinId}`).value) || 0);
+        const totalValue = quantity * unitPrice;
+        
+        // Update the total value field
+        document.getElementById(`item_value_${clinId}`).value = totalValue.toFixed(2);
+    }
+
+    // Simplified recalculate function
+    function recalculateTotal(button) {
+        const clinId = button.dataset.clinId;
+        updateTotalValue(document.getElementById(`order_qty_${clinId}`));
+    }
+
+    // Add event listeners when the document loads
     document.addEventListener('DOMContentLoaded', function() {
-        const forms = document.querySelectorAll('tr');
-        forms.forEach(form => {
-            const qtyInput = form.querySelector('[name$="-order_qty"]');
-            const priceInput = form.querySelector('[name$="-unit_price"]');
-            const totalInput = form.querySelector('[name$="-item_value"]');
-            
-            if (qtyInput && priceInput && totalInput) {
-                const calculateTotal = () => {
-                    const qty = parseFloat(qtyInput.value) || 0;
-                    const price = parseFloat(priceInput.value) || 0;
-                    totalInput.value = (qty * price).toFixed(2);
-                };
-                
-                qtyInput.addEventListener('input', calculateTotal);
-                priceInput.addEventListener('input', calculateTotal);
-            }
+        // Calculate initial values for all CLINs
+        document.querySelectorAll('input[name="order_qty"]').forEach(input => {
+            updateTotalValue(input);
+        });
+
+        // Add input event listeners for quantity and unit price
+        document.querySelectorAll('input[name="order_qty"], input[name="unit_price"]').forEach(input => {
+            input.addEventListener('input', function() {
+                updateTotalValue(this);
+            });
         });
     });
 
@@ -1219,60 +1378,6 @@
         updateTotalSplitValue();
     });
 
-    function recalculateTotal(button) {
-        const clinId = button.dataset.clinId;
-        const row = button.closest('.grid');
-        
-        // Check if this is a supplier calculation or CLIN calculation
-        const isSupplierCalc = row.querySelector('input[name="price_per_unit"]') !== null;
-        
-        if (isSupplierCalc) {
-            // Supplier calculation
-            const qtyInput = document.querySelector(`#order_qty_${clinId}`); // Get the main quantity input
-            const priceInput = row.querySelector('input[name="price_per_unit"]');
-            const totalInput = row.querySelector('input[name="quote_value"]');
-            
-            if (qtyInput && priceInput && totalInput) {
-                const qty = parseFloat(qtyInput.value) || 0;
-                const price = parseFloat(priceInput.value) || 0;
-                const total = qty * price;
-                totalInput.value = total.toFixed(2);
-                
-                // Save the recalculated values
-                saveClinField(priceInput, clinId);
-                saveClinField(totalInput, clinId);
-            }
-        } else {
-            // CLIN calculation
-            const qtyInput = row.querySelector('input[name="order_qty"]');
-            const priceInput = row.querySelector('input[name="unit_price"]');
-            const totalInput = row.querySelector('input[name="item_value"]');
-            
-            if (qtyInput && priceInput && totalInput) {
-                const qty = parseFloat(qtyInput.value) || 0;
-                const price = parseFloat(priceInput.value) || 0;
-                const total = qty * price;
-                totalInput.value = total.toFixed(2);
-                
-                // Save the recalculated values
-                saveClinField(qtyInput, clinId);
-                saveClinField(priceInput, clinId);
-                saveClinField(totalInput, clinId);
-            }
-        }
-        
-        // Update contract calculations after any value changes
-        // updateContractCalculations();
-    }
-
-    // Add function to format number inputs to 2 decimal places
-    function formatNumberInput(input) {
-        if (input && input.value) {
-            const value = parseFloat(input.value) || 0;
-            input.value = value.toFixed(2);
-        }
-    }
-
     // Add these new functions for price handling
     function handlePriceChange(input) {
         // Only format when the user is done typing (on change)
@@ -1287,59 +1392,6 @@
     // Add these new functions for auto-saving and CLIN deletion
     let saveTimeout;
 
-    function autoSave(element) {
-        clearTimeout(saveTimeout);
-        const form = document.querySelector('form');
-        const formData = new FormData(form);
-        
-        // Debug logs for form data
-        console.log('Element that triggered save:', element.name, element.value);
-        console.log('Form data entries:');
-        for (let [key, value] of formData.entries()) {
-            console.log(`${key}: ${value}`);
-        }
-        
-        // Ensure status is included
-        if (!formData.get('status')) {
-            formData.set('status', '{{ process_contract.status }}');
-        }
-
-        // Show saving indicator
-        showMessage('Saving changes...', 'info');
-        
-        saveTimeout = setTimeout(() => {
-            fetch(`{% url 'processing:save_and_return' process_contract_id=process_contract.id %}`, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                }
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                return response.json().then(data => {
-                    if (!response.ok) {
-                        console.error('Server response:', data);
-                        throw new Error(data.error || `Server error: ${response.status}`);
-                    }
-                    return data;
-                });
-            })
-            .then(data => {
-                if (data.success) {
-                    showMessage('Changes saved successfully', 'success');
-                } else {
-                    const errorMsg = data.errors ? Object.entries(data.errors).map(([field, errors]) => 
-                        `${field}: ${errors.join(', ')}`).join('\n') : data.error;
-                    throw new Error(errorMsg || 'Unknown error');
-                }
-            })
-            .catch(error => {
-                console.error('Save error:', error);
-                showMessage('Error saving changes: ' + error.message, 'error');
-            });
-        }, 1000); // Wait 1 second after last change before saving
-    }
 
     // Update the deleteClin function
     let clinToDelete = null;
@@ -1532,170 +1584,17 @@
         });
     }
 
-    // Update saveClinField to be more selective about showing messages
-    function saveClinField(element, clinId) {
-        const fieldName = element.name;
-        const fieldValue = element.value;
-        const processContractId = "{{ process_contract.id }}";
-        
-        // Don't show saving message for routine field changes
-        if (['item_value', 'quote_value'].includes(fieldName)) {
-            showMessage(`Saving CLIN ${clinId} ${fieldName}...`, 'info');
-        }
-        
-        const formData = new FormData();
-        formData.append('field_name', fieldName);
-        formData.append('field_value', fieldValue);
-        
-        fetch(`/processing/api/update-clin-field/${processContractId}/clin/${clinId}/`, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // Only show success messages for important fields
-                if (['item_value', 'quote_value'].includes(fieldName)) {
-                    showMessage(`CLIN ${clinId} ${fieldName} saved successfully`, 'success');
-                }
-                
-                // Update any related fields
-                if (data.related_updates) {
-                    Object.entries(data.related_updates).forEach(([relatedField, value]) => {
-                        const clinSection = element.closest('tr').nextElementSibling;
-                        if (clinSection) {
-                            const relatedInput = clinSection.querySelector(`[name$="${relatedField}"]`);
-                            if (relatedInput) {
-                                relatedInput.value = value;
-                                
-                                // Also update the display value in the main table row if it exists
-                                const mainRow = clinSection.previousElementSibling;
-                                const displaySpan = mainRow.querySelector(`[data-field="${relatedField}"]`);
-                                if (displaySpan) {
-                                    displaySpan.textContent = value;
-                                }
-                            }
-                        }
-                    });
-                }
-            } else {
-                throw new Error(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Save CLIN error:', error);
-            showMessage('Error saving: ' + error.message, 'error');
-            // Revert the field to its previous value if needed
-            if (element.dataset.previousValue) {
-                element.value = element.dataset.previousValue;
-            }
-        });
-    }
 
     // Update setupFieldSaving to handle both regular and CLIN fields
     function setupFieldSaving() {
-        // Special handling for NIST select
+        // We only need to handle the NIST select if it's still needed
         const nistSelect = document.querySelector('select[name="nist"]');
         if (nistSelect) {
             nistSelect.addEventListener('change', function() {
-                console.log('NIST changed:', this.value); // Debug log
-                saveField(this);
+                // Handle NIST change if needed
+                console.log('NIST changed:', this.value);
             });
         }
-
-        // Add specific handling for CLIN text fields
-        const clinTextFields = ['uom', 'clin_po_num', 'tab_num'];
-        clinTextFields.forEach(fieldName => {
-            document.querySelectorAll(`[name="${fieldName}"]`).forEach(element => {
-                const clinId = element.dataset.clinId;
-                if (clinId) {
-                    // Store the initial value
-                    element.dataset.previousValue = element.value;
-                    
-                    // Add input event listener with debounce
-                    let debounceTimer;
-                    element.addEventListener('input', function() {
-                        clearTimeout(debounceTimer);
-                        debounceTimer = setTimeout(() => {
-                            if (this.value !== this.dataset.previousValue) {
-                                console.log(`${fieldName} changed:`, this.value); // Debug log
-                                saveClinField(this, clinId);
-                                this.dataset.previousValue = this.value;
-                            }
-                        }, 1000);
-                    });
-
-                    // Add blur event listener
-                    element.addEventListener('blur', function() {
-                        if (this.value !== this.dataset.previousValue) {
-                            console.log(`${fieldName} blur:`, this.value); // Debug log
-                            clearTimeout(debounceTimer);
-                            saveClinField(this, clinId);
-                            this.dataset.previousValue = this.value;
-                        }
-                    });
-                }
-            });
-        });
-
-        document.querySelectorAll('input, select, textarea').forEach(element => {
-            // Skip elements that are part of hidden form management
-            if (element.name.includes('TOTAL_FORMS') || 
-                element.name.includes('INITIAL_FORMS') || 
-                element.name.includes('MIN_NUM_FORMS') || 
-                element.name.includes('MAX_NUM_FORMS')) {
-                return;
-            }
-            
-            // Skip NIST select and CLIN text fields as they're handled separately
-            if (element.name === 'nist' || clinTextFields.includes(element.name)) {
-                return;
-            }
-            
-            // Store the initial value
-            element.dataset.previousValue = element.value;
-            
-            // Check if this is a CLIN field
-            const clinId = element.dataset.clinId;
-            const saveFunction = clinId ? 
-                () => saveClinField(element, clinId) : 
-                () => saveField(element);
-            
-            // For select elements and checkboxes
-            if (element.tagName === 'SELECT' || element.type === 'checkbox') {
-                element.addEventListener('change', function() {
-                    console.log('Select/checkbox changed:', this.name); // Debug log
-                    saveFunction();
-                });
-            }
-            // For text/number inputs
-            else if (element.type === 'text' || element.type === 'number' || element.type === 'date') {
-                let debounceTimer;
-                element.addEventListener('input', function() {
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => {
-                        if (this.value !== this.dataset.previousValue) {
-                            console.log('Input changed:', this.name); // Debug log
-                            saveFunction();
-                            this.dataset.previousValue = this.value;
-                        }
-                    }, 1000); // Wait 1 second after last input before saving
-                });
-                
-                // Also save on blur (when input loses focus)
-                element.addEventListener('blur', function() {
-                    if (this.value !== this.dataset.previousValue) {
-                        console.log('Input blur:', this.name); // Debug log
-                        clearTimeout(debounceTimer);
-                        saveFunction();
-                        this.dataset.previousValue = this.value;
-                    }
-                });
-            }
-        });
     }
 
     // Make sure setupFieldSaving is called when the document loads
@@ -1733,33 +1632,59 @@
     `;
     document.head.appendChild(styles);
 
+    // Function to add a new CLIN
     async function addNewClin() {
         try {
             const processContractId = "{{ process_contract.id }}";
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // Show loading state
+            const addButton = document.querySelector('#add-clin-button');
+            if (addButton) {
+                const originalText = addButton.innerHTML;
+                addButton.disabled = true;
+                addButton.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Adding...
+                `;
+            }
+            
             const response = await fetch(`/processing/api/contract/${processContractId}/clin/create/`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify({})  // Empty object for default values
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                }
             });
 
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
 
+            const data = await response.json();
             if (data.success) {
                 // Reload the page to show the new CLIN
                 window.location.reload();
-                showMessage('New CLIN added successfully', 'success');
             } else {
-                throw new Error(data.error || 'Failed to add CLIN');
+                throw new Error(data.error || 'Unknown error occurred');
             }
         } catch (error) {
             console.error('Error adding CLIN:', error);
-            showMessage('Error adding CLIN: ' + error.message, 'error');
+            alert('Error adding CLIN: ' + error.message);
+            
+            // Reset button state if there was an error
+            const addButton = document.querySelector('#add-clin-button');
+            if (addButton) {
+                addButton.disabled = false;
+                addButton.innerHTML = 'Add New CLIN';
+            }
         }
     }
+
+    // ... existing code ...
 
     // Confirmation dialog for cancelling the contract
     function statusChange(status) {
@@ -1933,27 +1858,22 @@
         
         autoSaveTimer = setTimeout(async function() {
             try {
-                const form = document.querySelector('form');
-                const formData = new FormData(form);
-                
-                // Add silent parameter to indicate this is an autosave
-                formData.append('auto_save', 'true');
-                
-                // Get CSRF token
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                
-                // Perform the save quietly in the background
-                const response = await fetch('/processing/save-contract-data/{{ process_contract.id }}/', {
+                // Use the existing save contract endpoint
+                const response = await fetch('/processing/save-contract/', {
                     method: 'POST',
-                    body: formData,
                     headers: {
-                        'X-CSRFToken': csrfToken
-                    }
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify({
+                        contract_id: "{{ process_contract.id }}"
+                    })
                 });
                 
-                // Only show message if there's an error
-                if (!response.ok) {
-                    console.warn('Auto-save failed:', await response.text());
+                const data = await response.json();
+                
+                if (!data.success) {
+                    console.warn('Auto-save failed:', data.error);
                 } else {
                     console.log('Auto-save completed successfully');
                 }
@@ -1964,7 +1884,7 @@
             
             // Set up the next auto-save
             setupAutoSave();
-        }, 30000); // Auto-save every 30 seconds
+        }, 60000); // Auto-save every 60 seconds
     }
     
     // Start the auto-save when the page loads
@@ -1978,5 +1898,254 @@
             setupAutoSave();
         });
     });
+
+    // Add these new functions for price handling
+    function updateQuoteValue(input) {
+        const clinId = input.dataset.clinId;
+        // Use the same quantity as the main calculation
+        const quantity = Math.max(0, parseFloat(document.getElementById(`order_qty_${clinId}`).value) || 0);
+        const pricePerUnit = Math.max(0, parseFloat(document.getElementById(`price_per_unit_${clinId}`).value) || 0);
+        const quoteValue = quantity * pricePerUnit;
+        
+        // Update the quote value field
+        document.getElementById(`quote_value_${clinId}`).value = quoteValue.toFixed(2);
+    }
+
+    // Recalculate quote function
+    function recalculateQuote(button) {
+        const clinId = button.dataset.clinId;
+        updateQuoteValue(document.getElementById(`price_per_unit_${clinId}`));
+    }
+
+    // Update the DOMContentLoaded event listener to include quote calculations
+    document.addEventListener('DOMContentLoaded', function() {
+        // Calculate initial values for all CLINs
+        document.querySelectorAll('input[name="order_qty"]').forEach(input => {
+            updateTotalValue(input);
+            updateQuoteValue(input); // Add this line to calculate quote values
+        });
+
+        // Add input event listeners
+        document.querySelectorAll('input[name="order_qty"], input[name="unit_price"]').forEach(input => {
+            input.addEventListener('input', function() {
+                updateTotalValue(this);
+            });
+        });
+
+        // Add input event listeners for quote calculations
+        document.querySelectorAll('input[name="order_qty"], input[name="price_per_unit"]').forEach(input => {
+            input.addEventListener('input', function() {
+                updateQuoteValue(this);
+            });
+        });
+    });
+
+    // Function to save CLIN details
+    async function saveClinDetails(button) {
+        const clinId = button.dataset.clinId;
+        const form = document.querySelector('form');
+        const formData = new FormData();
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Get all inputs for this CLIN
+        const clinInputs = document.querySelectorAll(`[data-clin-id="${clinId}"]`);
+        
+        // Show loading state
+        button.disabled = true;
+        const originalText = button.innerHTML;
+        button.innerHTML = `
+            <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Saving...
+        `;
+        
+        try {
+            // Add all CLIN input values to formData
+            clinInputs.forEach(input => {
+                if (input.name) {
+                    formData.append(input.name, input.value);
+                }
+            });
+            
+            const response = await fetch(`/processing/save-clin/${clinId}/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showMessage('CLIN details saved successfully', 'success');
+                
+                // Update calculated values if they were returned
+                if (data.data) {
+                    if (data.data.item_value) {
+                        document.getElementById(`item_value_${clinId}`).value = data.data.item_value;
+                    }
+                    if (data.data.quote_value) {
+                        document.getElementById(`quote_value_${clinId}`).value = data.data.quote_value;
+                    }
+                }
+                
+                // Clear modified flags
+                clinInputs.forEach(input => {
+                    input.dataset.modified = 'false';
+                });
+            } else {
+                throw new Error(data.error || 'Failed to save CLIN details');
+            }
+        } catch (error) {
+            console.error('Error saving CLIN details:', error);
+            showMessage('Error saving CLIN details: ' + error.message, 'error');
+        } finally {
+            // Restore button state
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
+
+    // Add event listener for the form to prevent accidental navigation
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        
+        window.addEventListener('beforeunload', function(e) {
+            const unsavedChanges = document.querySelectorAll('input[data-modified="true"]').length > 0;
+            if (unsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Mark fields as modified when changed
+        form.addEventListener('input', function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                e.target.dataset.modified = 'true';
+            }
+        });
+    });
+
+    // Function to save CLIN and then open NSN match modal
+    async function saveAndOpenNsnMatch(button) {
+        try {
+            // First save the CLIN
+            const clinId = button.dataset.id;
+            const saveButton = document.querySelector(`button[onclick="saveClinDetails(this)"][data-clin-id="${clinId}"]`);
+            if (saveButton) {
+                await saveClinDetails(saveButton);
+            }
+
+            // Then open the NSN match modal
+            const nsnModal = document.querySelector('#nsnModal');
+            if (nsnModal && typeof openNsnModal === 'function') {
+                openNsnModal(button);
+            }
+        } catch (error) {
+            console.error('Error in saveAndOpenNsnMatch:', error);
+            showMessage('Error saving CLIN before NSN match: ' + error.message, 'error');
+        }
+    }
+
+    // Function to save CLIN and then open Supplier match modal
+    async function saveAndOpenSupplierMatch(button) {
+        try {
+            // First save the CLIN
+            const clinId = button.dataset.id;
+            const saveButton = document.querySelector(`button[onclick="saveClinDetails(this)"][data-clin-id="${clinId}"]`);
+            if (saveButton) {
+                await saveClinDetails(saveButton);
+            }
+
+            // Then open the Supplier match modal
+            const supplierModal = document.querySelector('#supplierModal');
+            if (supplierModal && typeof openSupplierModal === 'function') {
+                openSupplierModal(button);
+            }
+        } catch (error) {
+            console.error('Error in saveAndOpenSupplierMatch:', error);
+            showMessage('Error saving CLIN before Supplier match: ' + error.message, 'error');
+        }
+    }
+
+    // Function to update contract values and plan gross
+    async function updateContractValues() {
+        const updateButton = document.getElementById('update-values-button');
+        const originalButtonContent = updateButton ? updateButton.innerHTML : '';
+        
+        try {
+            const processContractId = "{{ process_contract.id }}";
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // Show loading state
+            if (updateButton) {
+                updateButton.disabled = true;
+                updateButton.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Updating...
+                `;
+            }
+
+            const response = await fetch(`/processing/contract/${processContractId}/update-values/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update contract values');
+            }
+
+            if (data.success) {
+                showMessage('Contract values updated successfully', 'success');
+                
+                // Update the form values if they were returned
+                if (data.data) {
+                    const contractValueInput = document.querySelector('input[name="contract_value"]');
+                    const planGrossInput = document.querySelector('input[name="plan_gross"]');
+                    
+                    if (contractValueInput && data.data.contract_value) {
+                        contractValueInput.value = data.data.contract_value;
+                    }
+                    if (planGrossInput && data.data.plan_gross) {
+                        planGrossInput.value = data.data.plan_gross;
+                    }
+                }
+                
+                // Reload the page to show all updated values including splits
+                window.location.reload();
+            } else {
+                throw new Error(data.error || 'Unknown error occurred');
+            }
+        } catch (error) {
+            console.error('Error updating contract values:', error);
+            showMessage('Error updating contract values: ' + error.message, 'error');
+        } finally {
+            // Reset button state
+            if (updateButton) {
+                updateButton.disabled = false;
+                updateButton.innerHTML = originalButtonContent;
+            }
+        }
+    }
+
+    // ... existing code ...
 </script>
 {% endblock %}

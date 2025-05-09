@@ -20,14 +20,14 @@ from .views.processing_views import (
     mark_ready_for_review,
     start_new_contract,
     finalize_and_email_contract,
-    save_contract_data,
     ContractQueueListView,
     get_next_numbers,
     download_csv_template,
     download_test_data,
     upload_csv,
     initiate_processing,
-    delete_queue_contract
+    delete_queue_contract,
+    save_contract
 )
 from .views.api_views import (
     get_processing_contract,
@@ -36,7 +36,9 @@ from .views.api_views import (
     update_processing_clin,
     delete_processing_clin,
     update_process_contract_field,
-    update_clin_field
+    update_clin_field,
+    save_clin,
+    update_contract_values
 )
 
 app_name = 'processing'
@@ -54,7 +56,6 @@ urlpatterns = [
     path('contract/<int:pk>/', ProcessContractDetailView.as_view(), name='process_contract_detail'),
     path('contract/<int:pk>/edit/', ProcessContractUpdateView.as_view(), name='process_contract_edit'),
     path('contract/<int:process_contract_id>/save/', save_and_return_to_queue, name='save_and_return'),
-    path('save-contract-data/<int:process_contract_id>/', save_contract_data, name='save_contract_data'),
     path('contract/<int:process_contract_id>/finalize/', finalize_contract, name='finalize_contract'),
     path('contract/<int:process_contract_id>/finalize-and-email/', finalize_and_email_contract, name='finalize_and_email_contract'),
     path('process-contract/cancel/<int:process_contract_id>/', cancel_process_contract, name='cancel_process_contract'),
@@ -75,7 +76,10 @@ urlpatterns = [
     path('api/processing/<int:id>/clins/<int:clin_id>/delete/', delete_processing_clin, name='api_delete_processing_clin'),
     path('api/update-field/<int:pk>/', update_process_contract_field, name='update_process_contract_field'),
     path('api/update-clin-field/<int:pk>/clin/<int:clin_id>/', update_clin_field, name='update_clin_field'),
-    
+    path('save-clin/<int:clin_id>/', save_clin, name='save_clin'),
+    path('contract/<int:id>/update-values/', update_contract_values, name='update_contract_values'),
+    path('save_contract/', save_contract, name='save_contract'),
+
     # File Management
     path('download-template/', download_csv_template, name='download_csv_template'),
     path('download-test-data/', download_test_data, name='download_test_data'),

@@ -171,6 +171,27 @@ class ProcessContract(models.Model):
     def __str__(self):
         return f"Processing Contract: {self.contract_number}"
 
+    def calculate_contract_value(self):
+        """Calculate contract value by summing all CLIN item values"""
+        total = self.clins.aggregate(
+            total=models.Sum('item_value', default=Decimal('0.00'))
+        )['total']
+        return total
+
+    def calculate_plan_gross(self):
+        """Calculate plan gross by subtracting total quote values from contract value"""
+        totals = self.clins.aggregate(
+            item_total=models.Sum('item_value', default=Decimal('0.00')),
+            quote_total=models.Sum('quote_value', default=Decimal('0.00'))
+        )
+        return totals['item_total'] - totals['quote_total']
+
+    def update_calculated_values(self):
+        """Update contract value and plan gross"""
+        self.contract_value = self.calculate_contract_value()
+        self.plan_gross = self.calculate_plan_gross()
+        self.save()
+
 class ProcessClin(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),

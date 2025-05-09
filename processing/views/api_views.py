@@ -1,12 +1,13 @@
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms
+from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms, ProcessContractSplit
 from ..forms import ProcessContractForm, ProcessClinForm
 import json
 from decimal import Decimal
+from django.db.models import Sum
 
 @login_required
 @require_http_methods(["GET"])
@@ -84,36 +85,51 @@ def update_processing_contract(request, id):
 @login_required
 @require_http_methods(["POST"])
 def add_processing_clin(request, id):
-    """Add a new CLIN to a processing contract"""
+    """Add a new CLIN to a processing contract by copying from CLIN 0001"""
     try:
         process_contract = get_object_or_404(ProcessContract, id=id)
         
-        # Create a new CLIN with default values
-        clin = ProcessClin.objects.create(
+        # Get the source CLIN (0001)
+        source_clin = ProcessClin.objects.filter(
             process_contract=process_contract,
-            status='draft',
-            order_qty=0,
-            unit_price=0,
-            item_value=0,
-            price_per_unit=0,
-            quote_value=0
-        )
+            item_number='0001'
+        ).first()
         
-        return JsonResponse({
-            'success': True,
-            'clin': {
-                'id': clin.id,
-                'item_number': clin.item_number,
-                'nsn': clin.nsn.id if clin.nsn else None,
-                'nsn_text': clin.nsn_text,
-                'supplier': clin.supplier.id if clin.supplier else None,
-                'supplier_text': clin.supplier_text,
-                'order_qty': clin.order_qty,
-                'unit_price': clin.unit_price,
-                'item_value': clin.item_value,
-                'description': clin.description
-            }
-        })
+        if source_clin:
+            # Create new CLIN by copying from source_clin
+            source_clin.pk = None  # This will create a new instance
+            source_clin.item_number = None  # Clear item number (will be auto-assigned)
+            # Reset numeric fields
+            source_clin.order_qty = 0
+            source_clin.unit_price = 0
+            source_clin.item_value = 0
+            source_clin.price_per_unit = 0
+            source_clin.quote_value = 0
+            # Keep special payment terms from source CLIN
+            source_clin.save()
+            
+            return JsonResponse({
+                'success': True,
+                'clin': {
+                    'id': source_clin.id,
+                    'item_number': source_clin.item_number
+                }
+            })
+        else:
+            # If no source CLIN exists, create a blank one
+            new_clin = ProcessClin.objects.create(
+                process_contract=process_contract,
+                status='draft',
+                special_payment_terms=None  # Explicitly set to None
+            )
+            return JsonResponse({
+                'success': True,
+                'clin': {
+                    'id': new_clin.id,
+                    'item_number': new_clin.item_number
+                }
+            })
+            
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -396,4 +412,148 @@ def update_clin_field(request, pk, clin_id):
         return JsonResponse({
             'status': 'error',
             'message': f'Error updating {field_name}: {str(e)}'
-        }, status=500) 
+        }, status=500)
+
+@login_required
+@require_POST
+def save_clin(request, clin_id):
+    """
+    Save CLIN details via AJAX request.
+    """
+    try:
+        clin = get_object_or_404(ProcessClin, id=clin_id)
+        
+        # Update CLIN fields from form data
+        fields_to_update = [
+            'item_number', 'item_type', 'clin_po_num', 'tab_num',
+            'order_qty', 'uom', 'unit_price', 'item_value',
+            'price_per_unit', 'quote_value',
+            'due_date', 'supplier_due_date', 'fob', 'ia'
+        ]
+        
+        with transaction.atomic():
+            # Handle special payment terms separately
+            special_terms_code = request.POST.get('special_payment_terms')
+            if special_terms_code:
+                try:
+                    special_terms = SpecialPaymentTerms.objects.get(code=special_terms_code)
+                    clin.special_payment_terms = special_terms
+                except SpecialPaymentTerms.DoesNotExist:
+                    clin.special_payment_terms = None
+            else:
+                clin.special_payment_terms = None
+            
+            # Handle other fields
+            for field in fields_to_update:
+                if field in request.POST:
+                    value = request.POST.get(field)
+                    
+                    # Handle numeric fields
+                    if field in ['order_qty', 'unit_price', 'price_per_unit', 'item_value', 'quote_value']:
+                        try:
+                            value = Decimal(value) if value else Decimal('0')
+                        except (ValueError, TypeError):
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'{field} must be a valid number'
+                            }, status=400)
+                    
+                    # Handle date fields
+                    elif field in ['due_date', 'supplier_due_date']:
+                        if not value:
+                            value = None
+                    
+                    setattr(clin, field, value)
+            
+            # Recalculate totals
+            if 'order_qty' in request.POST or 'unit_price' in request.POST:
+                clin.item_value = Decimal(str(clin.order_qty)) * clin.unit_price
+            
+            if 'order_qty' in request.POST or 'price_per_unit' in request.POST:
+                clin.quote_value = Decimal(str(clin.order_qty)) * clin.price_per_unit
+            
+            clin.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'CLIN details saved successfully',
+            'data': {
+                'item_value': str(clin.item_value),
+                'quote_value': str(clin.quote_value)
+            }
+        })
+        
+    except ProcessClin.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'CLIN not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+@login_required
+@require_POST
+def update_contract_values(request, id):
+    """Update contract value, plan gross, and handle splits for a process contract"""
+    try:
+        with transaction.atomic():
+            process_contract = get_object_or_404(ProcessContract, id=id)
+            
+            # Calculate new values
+            new_contract_value = process_contract.calculate_contract_value()
+            new_plan_gross = process_contract.calculate_plan_gross()
+            
+            if new_contract_value is None or new_plan_gross is None:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Failed to calculate contract values'
+                }, status=400)
+            
+            # Get old values for comparison
+            old_contract_value = process_contract.contract_value or Decimal('0.00')
+            old_plan_gross = process_contract.plan_gross or Decimal('0.00')
+            
+            # Update contract values
+            process_contract.contract_value = new_contract_value
+            process_contract.plan_gross = new_plan_gross
+            process_contract.save()
+            
+            # Handle splits if there's a difference
+            if old_contract_value != new_contract_value or old_plan_gross != new_plan_gross:
+                # Get total of existing splits
+                total_split = ProcessContractSplit.objects.filter(
+                    process_contract=process_contract
+                ).aggregate(split_value=Sum('split_value'))
+                
+                # Convert total_split to Decimal, default to 0 if None
+                current_total_splits = Decimal(str(total_split['split_value'] or '0.00'))
+                
+                # Calculate the difference between plan_gross and total splits
+                split_difference = new_plan_gross - current_total_splits
+                
+                # Only create a new split if there's a significant difference
+                # Using abs() to check if difference is greater than 0.01
+                if abs(split_difference) > Decimal('0.01'):
+                    split = ProcessContractSplit.objects.create(
+                        process_contract=process_contract,
+                        company_name='Calculation Difference',
+                        split_value=split_difference,  # This can be positive or negative
+                    )
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Contract values updated successfully',
+                'data': {
+                    'contract_value': str(new_contract_value),
+                    'plan_gross': str(new_plan_gross)
+                }
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
