@@ -10,6 +10,7 @@ class Course(models.Model):
     link = models.URLField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     date_created = models.DateTimeField(auto_now_add=True)
+    upload = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name

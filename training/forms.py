@@ -68,7 +68,7 @@ class BaseForm(BaseFormMixin, forms.Form):
 class CourseForm(BaseModelForm):
     class Meta:
         model = Course
-        fields = ['name', 'link', 'description']
+        fields = ['name', 'link', 'description', 'upload']
 
 class AccountForm(BaseModelForm):
     class Meta:
