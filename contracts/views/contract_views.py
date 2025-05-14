@@ -531,11 +531,11 @@ def mark_contract_reviewed(request, pk):
     return redirect('contracts:contract_management', pk=pk)
 
 
-class ContractLifecycleDashboardView(TemplateView):
-    template_name = 'contracts/contract_lifecycle_dashboard.html'
+# class ContractLifecycleDashboardView(TemplateView):
+#     template_name = 'contracts/contract_lifecycle_dashboard.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['cancel_reasons'] = CanceledReason.objects.all()
-        # ... rest of the context data ...
-        return context 
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         context['cancel_reasons'] = CanceledReason.objects.all()
+#         # ... rest of the context data ...
+#         return context 

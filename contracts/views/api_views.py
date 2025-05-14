@@ -195,7 +195,7 @@ def get_select_options(request, field_name):
                 
         elif field_name == 'nsn':
             # Use the NsnView model for better performance
-            queryset = NsnView.objects.all().order_by('nsn_code')
+            queryset = Nsn.objects.all().order_by('nsn_code')
             
             # Apply search if provided
             if search_term:

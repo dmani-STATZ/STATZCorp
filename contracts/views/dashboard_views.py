@@ -10,6 +10,7 @@ import calendar
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, Reminder, CanceledReason
+from users.user_settings import UserSettings
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -25,7 +26,7 @@ class ContractLifecycleDashboardView(TemplateView):
                 'clin_set',
                 'clin_set__supplier'
             ).order_by('-award_date')[:20]
-
+        
         # Prepare the data for rendering or serialization
         contracts_data = []
         for contract in last_20_contracts:
@@ -57,6 +58,18 @@ class ContractLifecycleDashboardView(TemplateView):
         context = super().get_context_data(**kwargs)
         context['cancel_reasons'] = CanceledReason.objects.all()
         now = timezone.now()
+
+        # Get user's dashboard view preference
+        dashboard_view = UserSettings.get_setting(
+            user=self.request.user,
+            name='dashboard_view_preference',
+            default='card'  # Default to card view if no preference set
+        )
+        context['dashboard_view'] = dashboard_view
+
+        # Get total contracts
+        total_contracts = Contract.objects.filter(date_canceled__isnull=True, status__description='Open').count()
+        context['total_contracts'] = total_contracts
         
         # Time periods
         this_week_start = now - timedelta(days=now.weekday())
@@ -265,7 +278,7 @@ class ContractLifecycleDashboardView(TemplateView):
             'on_time_contracts': on_time_contracts_count,
             'on_time_percentage': on_time_percentage,
             'upcoming_due_dates': upcoming_due_dates,
-            'upcoming_contracts': upcoming_contracts[:3],  # Limit to 3 for display
+            'upcoming_contracts': upcoming_contracts[:5],  # Limit to 5 for display
             'contract_types': buyer_breakdown,  # Renamed for template compatibility
             'total_contracts': Contract.objects.filter(date_canceled__isnull=True).count(),
             'active_supplier_count': active_supplier_count,

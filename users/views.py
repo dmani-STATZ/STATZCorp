@@ -132,10 +132,12 @@ def save_user_setting(request):
     
     try:
         data = json.loads(request.body)
+        print(f"Received setting data: {data}")  # Debug print
         setting_type = data.get('setting_type')
         value = data.get('value')
         
         if not setting_type or value is None:
+            print(f"Missing required fields: setting_type={setting_type}, value={value}")  # Debug print
             return JsonResponse({'success': False, 'error': 'Missing required fields'})
         
         success = UserSettings.save_setting(
@@ -144,14 +146,17 @@ def save_user_setting(request):
             value=value
         )
         
+        print(f"Save result: {success}")  # Debug print
         return JsonResponse({
             'success': success,
             'message': 'Setting saved successfully' if success else 'Failed to save setting'
         })
         
     except json.JSONDecodeError:
+        print("Invalid JSON data received")  # Debug print
         return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
     except Exception as e:
+        print(f"Error saving setting: {str(e)}")  # Debug print
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required

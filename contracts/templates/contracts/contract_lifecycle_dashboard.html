@@ -5,6 +5,7 @@
 {% block title %}Contract Dashboard{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container mx-auto px-4 py-4">
     <!-- Combined Header Section -->
     <div class="bg-white rounded-lg shadow-md p-4 mb-4">
@@ -38,95 +39,165 @@
     <!-- Main Dashboard Card -->
     <div class="bg-white rounded-lg shadow-lg overflow-hidden">
         <!-- Dashboard Header - Reduced padding -->
-        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2">
-            <h1 class="text-lg font-semibold text-white">Dashboard</h1>
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <h1 class="text-lg font-semibold text-white">Dashboard</h1>
+                <!-- View Toggle -->
+                <div class="flex items-center bg-blue-700 rounded-lg p-1">
+                    <button id="table-view-btn" 
+                            class="px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 {% if dashboard_view == 'table' %}bg-white text-blue-800{% else %}text-white hover:bg-blue-600{% endif %}"
+                            onclick="toggleView('table')">
+                        Table
+                    </button>
+                    <button id="card-view-btn" 
+                            class="px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 {% if dashboard_view == 'card' %}bg-white text-blue-800{% else %}text-white hover:bg-blue-600{% endif %}"
+                            onclick="toggleView('card')">
+                        Cards
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <!-- Stats Table -->
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100">Category</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Week</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Week</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Month</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Month</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Quarter</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Quarter</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Year</th>
-                        <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Year</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Date Range</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.date_range }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.date_range }}</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.contracts_due }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.contracts_due }}</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due Late</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_week.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_week.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_month.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_month.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_quarter.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_quarter.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.this_year.contracts_due_late }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600 font-medium">{{ periods.last_year.contracts_due_late }}</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due OnTime</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_week.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_week.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_month.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_month.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_quarter.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_quarter.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.this_year.contracts_due_ontime }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium">{{ periods.last_year.contracts_due_ontime }}</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contract Value</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contracts</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.new_contracts }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.new_contracts }}</td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Stats Views Container -->
+        <div id="stats-container">
+            <!-- Card View -->
+            <div id="card-view" class="{% if dashboard_view == 'card' or not dashboard_view %}block{% else %}hidden{% endif %}">
+                <div class="flex gap-4 p-4">
+                    <!-- Main Stats Section -->
+                    <div class="flex-1">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <!-- Contracts Due Card -->
+                            <div class="bg-white border-4 border-blue-400 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                                <h3 class="text-lg font-semibold text-gray-600 mb-2">Due</h3>
+                                <p class="text-4xl font-bold text-blue-600" id="contracts-due">{{ periods.this_week.contracts_due }}</p>
+                            </div>
+
+                            <!-- Contracts Due Late Card -->
+                            <div class="bg-white border-4 border-blue-500 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                                <h3 class="text-lg font-semibold text-gray-600 mb-2">Due Late</h3>
+                                <p class="text-4xl font-bold text-red-600" id="contracts-due-late">{{ periods.this_week.contracts_due_late }}</p>
+                            </div>
+
+                            <!-- Contracts Due OnTime Card -->
+                            <div class="bg-white border-4 border-blue-600 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                                <h3 class="text-lg font-semibold text-gray-600 mb-2">Due OnTime</h3>
+                                <p class="text-4xl font-bold text-green-600" id="contracts-due-ontime">{{ periods.this_week.contracts_due_ontime }}</p>
+                            </div>
+
+                            <!-- New Contracts Card -->
+                            <div class="bg-white border-4 border-blue-700 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                                <h3 class="text-lg font-semibold text-gray-600 mb-2">New Contracts</h3>
+                                <p class="text-4xl font-bold text-blue-600" id="new-contracts">{{ periods.this_week.new_contracts }}</p>
+                            </div>
+
+                            <!-- New Contract Value Card -->
+                            <div class="bg-white border-4 border-blue-800 rounded-lg shadow-lg pt-4 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                                <h3 class="text-lg font-semibold text-gray-600 mb-2">New Contracts Value</h3>
+                                <p class="text-2xl font-bold text-blue-600" id="new-contract-value">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Time Span Navigation -->
+                        <div class="flex justify-center items-center space-x-4 py-6">
+                            <button id="prev-period" class="text-blue-600 hover:text-blue-800 focus:outline-none transform transition-transform duration-200 hover:scale-110">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <h2 id="current-period" class="text-2xl font-bold text-gray-700 min-w-[200px] text-center">THIS WEEK</h2>
+                            <button id="next-period" class="text-blue-600 hover:text-blue-800 focus:outline-none transform transition-transform duration-200 hover:scale-110">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Total Contracts Card -->
+                    <div class="bg-white border-4 border-blue-800 rounded-lg shadow-lg p-2 transform transition-transform duration-200 hover:scale-105 w-64 flex flex-col justify-center">
+                        <h3 class="text-xl font-semibold text-gray-600 mb-4 text-center">Total Contracts</h3>
+                        <p class="text-5xl font-bold text-blue-600 text-center" id="total-contracts">{{ total_contracts }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table View -->
+            <div id="table-view" class="{% if dashboard_view == 'table' %}block{% else %}hidden{% endif %}">
+                <div class="overflow-x-auto p-4">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100">Category</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Week</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Week</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Month</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Month</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Quarter</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Quarter</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Year</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Year</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.contracts_due }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.contracts_due }}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due Late</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.this_week.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.last_week.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.this_month.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.last_month.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.this_quarter.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.last_quarter.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.this_year.contracts_due_late }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600">{{ periods.last_year.contracts_due_late }}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due OnTime</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.this_week.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.last_week.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.this_month.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.last_month.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.this_quarter.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.last_quarter.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.this_year.contracts_due_ontime }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600">{{ periods.last_year.contracts_due_ontime }}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contract Value</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contracts</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_week.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_week.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_month.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_month.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_quarter.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_quarter.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.this_year.new_contracts }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{{ periods.last_year.new_contracts }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- Contract List -->
@@ -134,7 +205,7 @@
             <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 flex justify-between items-center">
                 <h2 class="text-lg font-semibold text-white">Recent Contracts</h2>
                 <a href="{% url 'contracts:contract_log_view' %}" class="text-white hover:text-blue-100 text-sm font-medium">
-                    View All
+                    Master Log
                 </a>
             </div>
             <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto;">
@@ -388,6 +459,8 @@
 {% include "contracts/includes/cancel_contract_modal.html" %}
 
 {% block extra_js %}
+{{ periods|json_script:"period-data" }}
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('contract-search');
@@ -485,6 +558,144 @@ document.getElementById('cancelContractForm').addEventListener('submit', functio
         console.error('Error:', error);
         alert('An error occurred while cancelling the contract.');
     });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Get period data from Django template
+    const periodsData = JSON.parse(document.getElementById('period-data').textContent);
+    
+    const periodOrder = [
+        'this_week',
+        'last_week',
+        'this_month',
+        'last_month',
+        'this_quarter',
+        'last_quarter',
+        'this_year',
+        'last_year'
+    ];
+
+    const periodDisplayNames = {
+        'this_week': 'THIS WEEK',
+        'last_week': 'LAST WEEK',
+        'this_month': 'THIS MONTH',
+        'last_month': 'LAST MONTH',
+        'this_quarter': 'THIS QUARTER',
+        'last_quarter': 'LAST QUARTER',
+        'this_year': 'THIS YEAR',
+        'last_year': 'LAST YEAR'
+    };
+
+    let currentPeriodIndex = 0;
+
+    function updateDashboard(periodKey) {
+        // Add fade-out effect
+        const elements = document.querySelectorAll('.transform');
+        elements.forEach(el => el.style.opacity = '0');
+
+        setTimeout(() => {
+            const periodData = periodsData[periodKey];
+            document.getElementById('contracts-due').textContent = periodData.contracts_due || 0;
+            document.getElementById('contracts-due-late').textContent = periodData.contracts_due_late || 0;
+            document.getElementById('contracts-due-ontime').textContent = periodData.contracts_due_ontime || 0;
+            document.getElementById('new-contract-value').textContent = '$' + (periodData.new_contract_value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('new-contracts').textContent = periodData.new_contracts || 0;
+            document.getElementById('current-period').textContent = periodDisplayNames[periodKey];
+
+            // Add fade-in effect
+            elements.forEach(el => el.style.opacity = '1');
+        }, 150);
+    }
+
+    // Add transition styles to the cards
+    document.querySelectorAll('.transform').forEach(el => {
+        el.style.transition = 'opacity 0.15s ease-in-out';
+    });
+
+    document.getElementById('prev-period').addEventListener('click', function() {
+        currentPeriodIndex = (currentPeriodIndex - 1 + periodOrder.length) % periodOrder.length;
+        updateDashboard(periodOrder[currentPeriodIndex]);
+    });
+
+    document.getElementById('next-period').addEventListener('click', function() {
+        currentPeriodIndex = (currentPeriodIndex + 1) % periodOrder.length;
+        updateDashboard(periodOrder[currentPeriodIndex]);
+    });
+});
+
+
+// {% if dashboard_view == 'table' %}bg-white text-blue-800{% else %}text-white hover:bg-blue-600{% endif %}
+function toggleView(view) {
+    const cardView = document.getElementById('card-view');
+    const tableView = document.getElementById('table-view');
+    const cardBtn = document.getElementById('card-view-btn');
+    const tableBtn = document.getElementById('table-view-btn');
+    const activeBgClass = 'bg-white';
+    const activeTextClass = 'text-blue-800';
+    const inactiveTextClass = 'text-white';
+    const inactiveHoverClass = 'hover:bg-blue-600';
+
+    // First, reset both buttons to their unselected state
+    cardBtn.classList.remove(activeBgClass, activeTextClass);
+    tableBtn.classList.remove(activeBgClass, activeTextClass);
+    cardBtn.classList.add(inactiveTextClass, inactiveHoverClass);
+    tableBtn.classList.add(inactiveTextClass, inactiveHoverClass);
+
+    if (view === 'card') {
+        // Show card view
+        cardView.classList.remove('hidden');
+        cardView.classList.add('block');
+        tableView.classList.add('hidden');
+        tableView.classList.remove('block');
+        
+        // Style card button as selected
+        cardBtn.classList.add(activeBgClass, activeTextClass);
+        cardBtn.classList.remove(inactiveTextClass, inactiveHoverClass);
+    } else {
+        // Show table view
+        tableView.classList.remove('hidden');
+        tableView.classList.add('block');
+        cardView.classList.add('hidden');
+        cardView.classList.remove('block');
+        
+        // Style table button as selected
+        tableBtn.classList.add(activeBgClass, activeTextClass);
+        tableBtn.classList.remove(inactiveTextClass, inactiveHoverClass);
+    }
+
+    // Save user preference using the UserSettings API
+    fetch('/users/settings/save/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            setting_type: 'dashboard_view_preference',
+            value: view
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.success) {
+            console.error('Failed to save preference:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving preference:', error);
+    });
+}
+
+// Set initial view state on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const currentView = '{{ dashboard_view }}' || 'card';  // Default to card if no preference
+    toggleView(currentView);
 });
 </script>
 {% endblock %}
