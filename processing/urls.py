@@ -79,6 +79,7 @@ urlpatterns = [
     path('save-clin/<int:clin_id>/', save_clin, name='save_clin'),
     path('contract/<int:id>/update-values/', update_contract_values, name='update_contract_values'),
     path('save_contract/', save_contract, name='save_contract'),
+    path('save-contract/', save_contract, name='save_contract'),
 
     # File Management
     path('download-template/', download_csv_template, name='download_csv_template'),

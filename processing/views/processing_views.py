@@ -52,11 +52,30 @@ def start_new_contract(request):
                 'error': 'No contract number provided'
             }, status=400)
 
+        #Check if the contract number already exists in the ProcessContract table
+        if ProcessContract.objects.filter(contract_number=contract_number).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Contract number already exists'
+            }, status=400)
+        
+        #Check if the contract number already exists in the QueueContract table
+        if QueueContract.objects.filter(contract_number=contract_number).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Contract number already exists'
+            }, status=400)
+        
+        #Check if the contract number already exists in the Contract table
+        if Contract.objects.filter(contract_number=contract_number).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Contract number already exists'
+            }, status=400)
+
         #Get next po_number and tab_num from the sequence table
         new_po_number = SequenceNumber.get_po_number()
         new_tab_number = SequenceNumber.get_tab_number()
-        SequenceNumber.advance_po_number()
-        SequenceNumber.advance_tab_number()
         #print(f"Pulled new PO and Tab numbers: {new_po_number} and {new_tab_number}")
 
 
@@ -280,7 +299,7 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
         context['contract_types'] = ContractType.objects.all().order_by('description')
 
         # Add all special payment terms to the context
-        context['special_payment_terms'] = SpecialPaymentTerms.objects.all().order_by('code')
+        context['special_payment_terms'] = SpecialPaymentTerms.objects.all().order_by('terms')
 
         # Add all sales classes to the context
         context['sales_classes'] = SalesClass.objects.all().order_by('sales_team')
@@ -470,15 +489,46 @@ def finalize_contract(request, process_contract_id):
         # Create the Contract
         contract = Contract.objects.create(
             contract_number=process_contract.contract_number,
+            idiq_contract=process_contract.idiq_contract,
+            solicitation_type=process_contract.solicitation_type,
+            po_number=process_contract.po_number,
+            tab_num=process_contract.tab_num,
             buyer=process_contract.buyer,
+            contract_type=process_contract.contract_type,
             award_date=process_contract.award_date,
             due_date=process_contract.due_date,
+            sales_class=process_contract.sales_class,
+            nist=process_contract.nist,
+            files_url=process_contract.files_url,
             contract_value=process_contract.contract_value,
-            description=process_contract.description,
+            planned_split=process_contract.planned_split,
             created_by=request.user,
-            modified_by=request.user
+            modified_by=request.user,
+            status=ContractStatus.objects.get(id=1)  # Use the ContractStatus instance with ID=1
         )
         
+        # Update sequence numbers if necessary
+        po_number_current = SequenceNumber.get_po_number()
+        tab_number_current = SequenceNumber.get_tab_number()
+
+        # For PO number: Ensure sequence is at least one more than the contract's number
+        target_po_number = process_contract.po_number + 1
+        if po_number_current <= process_contract.po_number:
+            # Need to advance sequence to be one more than contract's number
+            sequence = SequenceNumber.objects.first()
+            if sequence:
+                sequence.po_number = target_po_number
+                sequence.save()
+
+        # For Tab number: Ensure sequence is at least one more than the contract's number
+        target_tab_number = process_contract.tab_num + 1
+        if tab_number_current <= process_contract.tab_num:
+            # Need to advance sequence to be one more than contract's number
+            sequence = SequenceNumber.objects.first()
+            if sequence:
+                sequence.tab_number = target_tab_number
+                sequence.save()
+
         # Create CLINs
         for process_clin in process_contract.clins.all():
             if not process_clin.nsn:
@@ -815,7 +865,7 @@ def process_contract_form(request, pk=None):
         'process_contract': instance,  # Add the process_contract instance to context
         'contract_types': ContractType.objects.all().order_by('description'),
         'sales_classes': SalesClass.objects.all().order_by('sales_team'),
-        'special_payment_terms': SpecialPaymentTerms.objects.all().order_by('code'),
+        'special_payment_terms': SpecialPaymentTerms.objects.all().order_by('terms'),
     }
     return render(request, 'processing/process_contract_form.html', context)
 
@@ -926,7 +976,7 @@ def finalize_and_email_contract(request, process_contract_id):
                 validation_errors.append(f"CLIN {process_clin.item_number} is missing NSN")
             if not process_clin.supplier:
                 validation_errors.append(f"CLIN {process_clin.item_number} is missing supplier")
-            if not process_clin.item_value:
+            if not process_clin.item_value and process_clin.item_value != 0:
                 validation_errors.append(f"CLIN {process_clin.item_number} has no item value")
             if not process_clin.quote_value and process_clin.quote_value != 0:
                 validation_errors.append(f"CLIN {process_clin.item_number} has no quote value")
@@ -956,6 +1006,19 @@ def finalize_and_email_contract(request, process_contract_id):
                 'error': "Contract has no award date"
             }, status=400)
 
+
+        # Update sequence numbers if necessary
+        po_number_current = SequenceNumber.get_po_number()
+        tab_number_current = SequenceNumber.get_tab_number()
+
+        if po_number_current == int(process_contract.po_number):
+            SequenceNumber.advance_po_number()
+
+        # For Tab number: Ensure sequence is at least one more than the contract's number
+        if tab_number_current == int(process_contract.tab_num):
+            SequenceNumber.advance_tab_number()
+
+
         # Create the final contract with all relevant fields
         contract = Contract.objects.create(
             contract_number=process_contract.contract_number,
@@ -972,6 +1035,7 @@ def finalize_and_email_contract(request, process_contract_id):
             files_url=process_contract.files_url,
             contract_value=process_contract.contract_value,
             planned_split=process_contract.planned_split,
+            plan_gross=process_contract.plan_gross,
             created_by=request.user,
             modified_by=request.user,
             status=ContractStatus.objects.get(id=1)  # Use the ContractStatus instance with ID=1
@@ -1023,6 +1087,7 @@ def finalize_and_email_contract(request, process_contract_id):
                 supplier_due_date=process_clin.supplier_due_date,
                 price_per_unit=process_clin.price_per_unit,
                 quote_value=process_clin.quote_value,
+                uom=process_clin.uom,
                 special_payment_terms=process_clin.special_payment_terms,
                 created_by=request.user,
                 modified_by=request.user
@@ -1074,12 +1139,13 @@ def finalize_and_email_contract(request, process_contract_id):
             f"Contract #: {contract.contract_number}\n"
             f"{contract.files_url}"
         )
-        
+
+        from urllib.parse import quote
+
         # Create mailto URL
         mailto_url = (
-            f"mailto:?subject={quote(email_subject)}&"
+            f"mailto:dmani@statzcorp.com?subject={quote(email_subject)}&"
             f"body={quote(email_body)}"
-            f"to=dmani@statzcorp.com"
         )
         
         queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
@@ -1113,109 +1179,106 @@ def finalize_and_email_contract(request, process_contract_id):
 @require_POST
 def save_contract(request):
     """Save a ProcessContract with data from FormData."""
-    print("\n========== SAVE CONTRACT DEBUG ==========")
+    #print("\n========== SAVE CONTRACT DEBUG ==========")
+    #print(f"All POST data: {request.POST}")
+
+    from decimal import Decimal, InvalidOperation
+    from datetime import datetime
+
     try:
         contract_id = request.POST.get('contract_id')
-        print(f"Contract ID from POST: {contract_id}")
-        print(f"All POST data: {request.POST}")
-        
         if not contract_id:
             return JsonResponse({'success': False, 'error': 'Contract ID is required'}, status=400)
 
-        try:
-            contract = ProcessContract.objects.get(id=contract_id)
-            print(f"Found contract: {contract.id} - {contract.contract_number}")
-        except ProcessContract.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Contract not found'}, status=404)
-        
+        contract = ProcessContract.objects.get(id=contract_id)
         changes_made = False
         updated_fields = {}
 
-        # Helper function to safely update a field
-        def safe_update(field_name, value, field_type=None):
-            nonlocal changes_made
-            current = getattr(contract, field_name)
-            
-            # Convert value based on field type
-            if value == '' or value is None:
-                if not contract._meta.get_field(field_name).null:
-                    if field_type == Decimal:
-                        value = Decimal('0.00')
-                    elif field_type == float:
-                        value = 0.0
-                    elif field_type == bool:
-                        value = False
-                    else:
-                        value = None
-                else:
-                    value = None
-            elif field_type == Decimal:
-                try:
-                    value = Decimal(str(value).replace(',', ''))
-                except (InvalidOperation, ValueError):
-                    print(f"Could not convert {value} to Decimal")
-                    return False
-            elif field_type == datetime.date:
-                try:
-                    value = datetime.strptime(value, '%Y-%m-%d').date()
-                except ValueError:
-                    print(f"Could not convert {value} to date")
-                    return False
-            
-            if current != value:
-                print(f"Updating {field_name}: {current} -> {value}")
-                setattr(contract, field_name, value)
-                updated_fields[field_name] = value
-                changes_made = True
-            return True
-
-        # Process string fields
-        string_fields = ['contract_number', 'solicitation_type', 'po_number', 'tab_num', 
-                        'files_url', 'planned_split', 'description', 'status', 'buyer_text']
-        for field in string_fields:
-            if field in request.POST:
-                safe_update(field, request.POST.get(field))
-
-        # Process date fields
-        date_fields = ['award_date', 'due_date']
-        for field in date_fields:
-            if field in request.POST:
-                safe_update(field, request.POST.get(field), datetime.date)
-
-        # Process decimal fields
-        decimal_fields = ['contract_value', 'plan_gross']
-        for field in decimal_fields:
-            if field in request.POST:
-                safe_update(field, request.POST.get(field), Decimal)
-
-        # Process boolean fields
-        if 'nist' in request.POST:
-            safe_update('nist', request.POST['nist'].lower() in ['true', 'yes', 'on', '1'], bool)
-
-        # Process foreign key fields
-        fk_fields = {
+        # --- CONTRACT FIELDS ---
+        contract_prefix = "cont_"
+        # Map of field name to type for contract fields
+        contract_field_types = {
+            'contract_number': str,
+            'solicitation_type': str,
+            'po_number': str,
+            'tab_num': str,
+            'files_url': str,
+            'planned_split': str,
+            'description': str,
+            'status': str,
+            'buyer_text': str,
+            'award_date': 'date',
+            'due_date': 'date',
+            'contract_value': Decimal,
+            'plan_gross': Decimal,
+            'nist': 'bool',
+            'idiq_contract': 'fk',
+            'contract_type': 'fk',
+            'sales_class': 'fk',
+            'buyer': 'fk'
+        }
+        
+        fk_models = {
+            'idiq_contract': IdiqContract,
             'contract_type': ContractType,
             'sales_class': SalesClass,
             'buyer': Buyer
         }
-        for field, model in fk_fields.items():
-            if field in request.POST and request.POST[field]:
+
+        #print("\nProcessing contract fields:")
+        for key, value in request.POST.items():
+            if key.startswith(contract_prefix):
+                model_field = key[len(contract_prefix):]  # Remove cont_ prefix
+                #print(f"Processing field: {model_field} = {value}")
+                
+                if not hasattr(contract, model_field):
+                    #print(f"Skipping field {model_field} - not found in model")
+                    continue
+                
+                field_type = contract_field_types.get(model_field, str)
+                current = getattr(contract, model_field)
+                new_value = value
+
+                # Type conversion
                 try:
-                    instance = model.objects.get(id=request.POST[field])
-                    safe_update(field, instance)
-                except (ValueError, model.DoesNotExist):
-                    print(f"Could not find {model.__name__} with id {request.POST[field]}")
+                    if field_type == Decimal:
+                        new_value = Decimal(str(value).replace(',', '')) if value else None
+                    elif field_type == 'date':
+                        new_value = datetime.strptime(value, '%Y-%m-%d').date() if value else None
+                    elif field_type == 'bool':
+                        new_value = value.lower() in ['true', 'yes', 'on', '1']
+                    elif field_type == 'fk':
+                        if value:
+                            model = fk_models[model_field]
+                            try:
+                                new_value = model.objects.get(id=value)
+                            except model.DoesNotExist:
+                                print(f"Foreign key {model_field} with id {value} not found")
+                                continue
+                        else:
+                            new_value = None
+                except (InvalidOperation, ValueError) as e:
+                    print(f"Error converting {model_field}: {str(e)}")
+                    continue
+
+                # Only update if changed
+                if current != new_value:
+                    #print(f"Updating {model_field}: {current} -> {new_value}")
+                    setattr(contract, model_field, new_value)
+                    updated_fields[model_field] = str(new_value) if new_value is not None else ''
+                    changes_made = True
 
         if changes_made:
             contract.save()
-            print("Contract saved successfully")
+            #print("Contract saved successfully")
+            #print("Updated fields:", updated_fields)
             return JsonResponse({
                 'success': True,
                 'message': 'Contract saved successfully',
-                'updated_fields': {k: str(v) if v is not None else '' for k, v in updated_fields.items()}
+                'updated_fields': updated_fields
             })
         else:
-            print("No changes detected")
+            #print("No changes detected")
             return JsonResponse({
                 'success': True,
                 'message': 'No changes to save'
@@ -1223,14 +1286,16 @@ def save_contract(request):
 
     except Exception as e:
         import traceback
-        print(f"Error saving contract: {str(e)}")
-        print(traceback.format_exc())
+        #print(f"Error saving contract: {str(e)}")
+        #print(traceback.format_exc())
         return JsonResponse({
             'success': False,
             'error': f'Error saving contract: {str(e)}'
         }, status=500)
-    finally:
-        print("========== END SAVE CONTRACT DEBUG ==========\n")
+    #finally:
+        #print("========== END SAVE CONTRACT DEBUG ==========")
+
+
 
 @method_decorator(login_required, name='dispatch')
 class ContractQueueListView(ListView):
@@ -1964,7 +2029,9 @@ def delete_queue_contract(request, queue_id):
             }, status=400)
             
         # Delete associated process contract if it exists
-        ProcessContract.objects.filter(queue_id=queue_id).delete()
+        p_contract = ProcessContract.objects.filter(queue_id=queue_id).first()
+        if p_contract:
+            p_contract.delete()
         
         # Delete the queue contract
         queue_contract.delete()

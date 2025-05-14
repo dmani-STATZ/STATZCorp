@@ -12,7 +12,7 @@ from datetime import timedelta, datetime, time
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinAcknowledgment, Contract, ClinView, Note, Reminder, Nsn, Supplier
+from ..models import Clin, ClinAcknowledgment, Contract, Note, Reminder, Nsn, Supplier
 from ..forms import ClinForm, ClinAcknowledgmentForm
 
 
@@ -31,7 +31,7 @@ class ClinDetailView(DetailView):
         
         try:
             # Try to get the data from the optimized view
-            clin_view = ClinView.objects.get(pk=pk)
+            clin_view = Clin.objects.get(pk=pk)
             
             # Create a Clin object with the data from ClinView
             clin = Clin(
@@ -60,6 +60,8 @@ class ClinDetailView(DetailView):
                 special_payment_terms_paid=clin_view.special_payment_terms_paid,
                 quote_value=clin_view.quote_value,
                 paid_amount=clin_view.paid_amount,
+                unit_price=clin_view.unit_price,
+                price_per_unit=clin_view.price_per_unit,
                 created_by_id=clin_view.created_by_id,
                 created_on=clin_view.created_on,
                 modified_by_id=clin_view.modified_by_id,
@@ -67,20 +69,20 @@ class ClinDetailView(DetailView):
             )
             
             # Add additional attributes from the view for convenience
-            clin.contract_number = clin_view.contract_number
-            clin.clin_type_description = clin_view.clin_type_description
-            clin.supplier_name = clin_view.supplier_name
-            clin.supplier_cage_code = clin_view.supplier_cage_code
-            clin.nsn_code = clin_view.nsn_code
-            clin.nsn_description = clin_view.nsn_description
-            clin.special_payment_terms_code = clin_view.special_payment_terms_code
-            clin.special_payment_terms_description = clin_view.special_payment_terms_description
-            clin.created_by_username = clin_view.created_by_username
-            clin.modified_by_username = clin_view.modified_by_username
+            clin.contract_number = clin_view.contract.contract_number
+            clin.item_type_description = clin_view.item_type
+            clin.supplier_name = clin_view.supplier.name
+            clin.supplier_cage_code = clin_view.supplier.cage_code
+            clin.nsn_code = clin_view.nsn.nsn_code
+            clin.nsn_description = clin_view.nsn.description
+            clin.special_payment_terms_code = clin_view.special_payment_terms.code
+            clin.special_payment_terms_description = clin_view.special_payment_terms.terms
+            clin.created_by_username = clin_view.created_by.username
+            clin.modified_by_username = clin_view.modified_by.username
             
             return clin
             
-        except ClinView.DoesNotExist:
+        except Clin.DoesNotExist:
             # Fall back to the regular Clin model with select_related
             return get_object_or_404(
                 Clin.objects.select_related(

@@ -368,16 +368,18 @@ def update_clin_field(request, pk, clin_id):
             # Handle special payment terms selection
             if field_value:
                 try:
-                    # Try to get the SpecialPaymentTerms instance
-                    special_terms = SpecialPaymentTerms.objects.get(code=field_value)
+                    # Try to get the SpecialPaymentTerms instance by ID
+                    special_terms = SpecialPaymentTerms.objects.get(id=field_value)
                     clin.special_payment_terms = special_terms
+                    clin.special_payment_terms_text = special_terms.terms
                 except SpecialPaymentTerms.DoesNotExist:
                     return JsonResponse({
                         'status': 'error',
-                        'message': f'Invalid special payment terms code: {field_value}'
+                        'message': f'Invalid special payment terms ID: {field_value}'
                     }, status=400)
             else:
                 clin.special_payment_terms = None
+                clin.special_payment_terms_text = None
 
         # Handle text fields that don't need special processing
         elif field_name in ['clin_po_num', 'tab_num', 'item_number', 'nsn_text', 'supplier_text', 'uom', 'fob', 'ia']:
@@ -433,20 +435,25 @@ def save_clin(request, clin_id):
         
         with transaction.atomic():
             # Handle special payment terms separately
-            special_terms_code = request.POST.get('special_payment_terms')
-            if special_terms_code:
+            special_terms_field = f'special_payment_terms_{clin_id}'
+            special_terms_id = request.POST.get(special_terms_field)
+            if special_terms_id:
                 try:
-                    special_terms = SpecialPaymentTerms.objects.get(code=special_terms_code)
+                    special_terms = SpecialPaymentTerms.objects.get(id=special_terms_id)
                     clin.special_payment_terms = special_terms
+                    clin.special_payment_terms_text = special_terms.terms
                 except SpecialPaymentTerms.DoesNotExist:
                     clin.special_payment_terms = None
+                    clin.special_payment_terms_text = None
             else:
                 clin.special_payment_terms = None
+                clin.special_payment_terms_text = None
             
             # Handle other fields
             for field in fields_to_update:
-                if field in request.POST:
-                    value = request.POST.get(field)
+                field_name = f'{field}_{clin_id}'
+                if field_name in request.POST:
+                    value = request.POST.get(field_name)
                     
                     # Handle numeric fields
                     if field in ['order_qty', 'unit_price', 'price_per_unit', 'item_value', 'quote_value']:
@@ -466,10 +473,14 @@ def save_clin(request, clin_id):
                     setattr(clin, field, value)
             
             # Recalculate totals
-            if 'order_qty' in request.POST or 'unit_price' in request.POST:
+            order_qty_field = f'order_qty_{clin_id}'
+            unit_price_field = f'unit_price_{clin_id}'
+            price_per_unit_field = f'price_per_unit_{clin_id}'
+            
+            if order_qty_field in request.POST or unit_price_field in request.POST:
                 clin.item_value = Decimal(str(clin.order_qty)) * clin.unit_price
             
-            if 'order_qty' in request.POST or 'price_per_unit' in request.POST:
+            if order_qty_field in request.POST or price_per_unit_field in request.POST:
                 clin.quote_value = Decimal(str(clin.order_qty)) * clin.price_per_unit
             
             clin.save()
@@ -539,7 +550,7 @@ def update_contract_values(request, id):
                 if abs(split_difference) > Decimal('0.01'):
                     split = ProcessContractSplit.objects.create(
                         process_contract=process_contract,
-                        company_name='Calculation Difference',
+                        company_name='STATZ',
                         split_value=split_difference,  # This can be positive or negative
                     )
 

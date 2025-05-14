@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 import json
 
 from ..models import (
-    Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, NsnView, Buyer, IdiqContract
+    Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, Buyer, IdiqContract
 )
 
 @login_required

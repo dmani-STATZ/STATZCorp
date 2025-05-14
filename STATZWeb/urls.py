@@ -25,6 +25,12 @@ import os
 from . import views
 from users import views as user_views
 
+# --- Add these lines ---
+admin.site.site_header = "STATZ Corporation Administration" # Header shown on admin pages
+admin.site.site_title = "STATZ Corporation Admin Portal"             # Title in the browser tab
+admin.site.index_title = "Welcome to STATZ Corporation Administration" # Title on the main admin index page
+# --- End of added lines ---
+
 def health_check(request):
     """Simple health check endpoint to test if the server is functioning correctly."""
     return HttpResponse("OK", content_type="text/plain")

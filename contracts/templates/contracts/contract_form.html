@@ -25,7 +25,7 @@
         </h1>
         <div>
             {% if form.instance.pk %}
-                <a href="{% url 'contracts:contract_management' form.instance.pk %}" class="btn-secondary">
+                <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn-secondary">
                     Cancel
                 </a>
             {% else %}
@@ -379,7 +379,7 @@
             
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 {% if form.instance.pk %}
-                    <a href="{% url 'contracts:contract_management' form.instance.pk %}" class="btn-secondary">
+                    <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn-secondary">
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
