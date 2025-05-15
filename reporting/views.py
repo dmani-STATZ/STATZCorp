@@ -15,6 +15,7 @@ from openpyxl.styles import Font, PatternFill
 from datetime import datetime
 import logging
 from django.utils import timezone
+from django.core.serializers.json import DjangoJSONEncoder
 
 # Create your views here.
 
@@ -58,12 +59,13 @@ class ReportCreationView(LoginRequiredMixin, FormView):
             # Ensure all data is properly serialized
             initial.update({
                 'report_name': self.report.name,
-                'selected_tables': json.dumps(self.report.selected_tables or []),
-                'selected_fields': json.dumps(self.report.selected_fields or {}),
-                'filters': json.dumps(self.report.filters or []),
-                'sort_by': json.dumps(self.report.sort_by or {}),
+                'selected_tables': json.dumps(self.report.selected_tables or [], cls=DjangoJSONEncoder),
+                'selected_fields': json.dumps(self.report.selected_fields or {}, cls=DjangoJSONEncoder),
+                'filters': json.dumps(self.report.filters or [], cls=DjangoJSONEncoder),
+                'sort_by': json.dumps(self.report.sort_by or {}, cls=DjangoJSONEncoder),
                 'sort_direction': self.report.sort_direction or 'asc',
-                'aggregations': json.dumps(self.report.aggregations if isinstance(self.report.aggregations, dict) else {})
+                'aggregations': json.dumps(self.report.aggregations or {}, cls=DjangoJSONEncoder),
+                'group_by': json.dumps(self.report.group_by or {}, cls=DjangoJSONEncoder)
             })
             
             # Log the processed data
@@ -102,7 +104,6 @@ class ReportCreationView(LoginRequiredMixin, FormView):
     def form_valid(self, form):
         cleaned = form.cleaned_data
         
-        # Ensure proper data structure
         try:
             # Parse and validate selected_tables
             selected_tables = cleaned['selected_tables']
@@ -159,11 +160,19 @@ class ReportCreationView(LoginRequiredMixin, FormView):
             if sort_direction not in ['asc', 'desc']:
                 sort_direction = 'asc'
             
-            # Parse and validate aggregations
+            # Parse and validate aggregations with better error handling
             aggregations = cleaned.get('aggregations', '{}')
+            print("Raw aggregations data:", aggregations)  # Debug log
+            
             if isinstance(aggregations, str):
-                aggregations = json.loads(aggregations)
+                try:
+                    aggregations = json.loads(aggregations)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding aggregations JSON: {e}")
+                    aggregations = {}
+            
             if not isinstance(aggregations, dict):
+                print(f"Invalid aggregations type: {type(aggregations)}")
                 aggregations = {}
             
             # Validate each aggregation configuration
@@ -176,6 +185,31 @@ class ReportCreationView(LoginRequiredMixin, FormView):
                             'label': config.get('label', '')
                         }
             
+            # Parse and validate group by with better error handling
+            group_by = cleaned.get('group_by', '{}')
+            print("Raw group_by data:", group_by)  # Debug log
+            
+            if isinstance(group_by, str):
+                try:
+                    group_by = json.loads(group_by)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding group_by JSON: {e}")
+                    group_by = {}
+            
+            if not isinstance(group_by, dict):
+                print(f"Invalid group_by type: {type(group_by)}")
+                group_by = {}
+            
+            # Validate group by configuration
+            validated_group_by = {}
+            for table, fields in group_by.items():
+                if isinstance(fields, list):
+                    validated_group_by[table] = [str(field) for field in fields]
+            
+            print("Final validated data:")  # Debug log
+            print("Aggregations:", validated_aggregations)
+            print("Group By:", validated_group_by)
+            
             report_data = {
                 'name': cleaned['report_name'],
                 'selected_tables': selected_tables,
@@ -183,8 +217,8 @@ class ReportCreationView(LoginRequiredMixin, FormView):
                 'filters': validated_filters,
                 'sort_by': sort_by,
                 'sort_direction': sort_direction,
-                'group_by': {},  # Placeholder for now
-                'aggregations': validated_aggregations
+                'aggregations': validated_aggregations,
+                'group_by': validated_group_by
             }
             
             if self.report:
@@ -196,10 +230,11 @@ class ReportCreationView(LoginRequiredMixin, FormView):
                 # Create new report
                 report_data['user'] = self.request.user
                 SavedReport.objects.create(**report_data)
-                
+            
             return super().form_valid(form)
             
         except Exception as e:
+            print(f"Error in form_valid: {e}")  # Debug log
             form.add_error(None, f"Error processing form data: {str(e)}")
             return self.form_invalid(form)
 
@@ -301,10 +336,6 @@ class ReportDisplayView(LoginRequiredMixin, ListView):
             id=kwargs.get('report_id'),
             user=request.user
         )
-        print("Report loaded in setup:", {
-            'id': self.report.id,
-            'aggregations': self.report.aggregations
-        })
     
     def get_queryset(self):
         """
@@ -334,78 +365,9 @@ class ReportDisplayView(LoginRequiredMixin, ListView):
                     relationship_map[table] = path
                     related_fields.add(path)
         
-        print("Relationship mapping for tables:")
-        print("Primary table:", primary_table)
-        print("Relationship map:", relationship_map)
-        print("Related fields:", related_fields)
-        
         # Apply select_related for all related tables
         if related_fields:
             queryset = queryset.select_related(*related_fields)
-            print("Applied select_related with:", related_fields)
-        
-        # Build the list of fields to select
-        fields_to_select = []
-        selected_fields = self.report.selected_fields
-        
-        if isinstance(selected_fields, dict):
-            # Add primary table fields
-            if primary_table in selected_fields:
-                for field in selected_fields[primary_table]:
-                    try:
-                        field_obj = model_class._meta.get_field(field)
-                        if isinstance(field_obj, ForeignKey):
-                            # For foreign keys, get the string representation
-                            fields_to_select.append(field)
-                            # Also get the string representation field if available
-                            related_model = field_obj.related_model
-                            if hasattr(related_model, '_meta') and hasattr(related_model._meta, 'display_field'):
-                                fields_to_select.append(f"{field}__{related_model._meta.display_field}")
-                            else:
-                                # Default to 'name' or 'title' if available, otherwise use pk
-                                for default_field in ['name', 'title', 'number', 'code']:
-                                    if default_field in [f.name for f in related_model._meta.fields]:
-                                        fields_to_select.append(f"{field}__{default_field}")
-                                        break
-                        else:
-                            fields_to_select.append(field)
-                    except Exception as e:
-                        print(f"Error processing field {field}: {e}")
-                        fields_to_select.append(field)
-            
-            # Add related table fields with proper prefixes
-            for table, fields in selected_fields.items():
-                if table != primary_table and table in relationship_map:
-                    path = relationship_map[table]
-                    for field in fields:
-                        try:
-                            model = form.AVAILABLE_MODELS[table]
-                            field_obj = model._meta.get_field(field)
-                            if isinstance(field_obj, ForeignKey):
-                                # For foreign keys, get the string representation
-                                fields_to_select.append(f"{path}__{field}")
-                                # Also get the string representation field if available
-                                related_model = field_obj.related_model
-                                if hasattr(related_model, '_meta') and hasattr(related_model._meta, 'display_field'):
-                                    fields_to_select.append(f"{path}__{field}__{related_model._meta.display_field}")
-                                else:
-                                    # Default to 'name' or 'title' if available, otherwise use pk
-                                    for default_field in ['name', 'title', 'number', 'code']:
-                                        if default_field in [f.name for f in related_model._meta.fields]:
-                                            fields_to_select.append(f"{path}__{field}__{default_field}")
-                                            break
-                            else:
-                                fields_to_select.append(f"{path}__{field}")
-                        except Exception as e:
-                            print(f"Error processing related field {field}: {e}")
-                            fields_to_select.append(f"{path}__{field}")
-        
-        print("Fields to select:", fields_to_select)
-        
-        # Apply field selection
-        if fields_to_select:
-            queryset = queryset.values(*fields_to_select)
-            print("Final query SQL:", queryset.query)
         
         # Apply filters
         filters = self.report.filters
@@ -439,19 +401,128 @@ class ReportDisplayView(LoginRequiredMixin, ListView):
                 queryset = queryset.filter(q_objects)
         
         # Apply sorting
-        sort_config = self.report.sort_by
-        if isinstance(sort_config, dict):
-            for table, config in sort_config.items():
-                sort_field = config.get('field')
-                if sort_field:
-                    if table != primary_table and table in relationship_map:
-                        sort_field = f"{relationship_map[table]}__{sort_field}"
+        sort_by = self.report.sort_by
+        if sort_by:
+            sort_fields = []
+            for table, config in sort_by.items():
+                if isinstance(config, dict) and 'field' in config:
+                    field = config['field']
+                    if table == primary_table:
+                        field_path = field
+                    elif table in relationship_map:
+                        field_path = f"{relationship_map[table]}__{field}"
+                    else:
+                        continue
+                    
                     if self.report.sort_direction == 'desc':
-                        sort_field = f'-{sort_field}'
-                    queryset = queryset.order_by(sort_field)
-                    break  # Only apply the first sort configuration
+                        field_path = f"-{field_path}"
+                    sort_fields.append(field_path)
+            
+            if sort_fields:
+                queryset = queryset.order_by(*sort_fields)
         
+        # Handle group by and aggregations
+        group_by = self.report.group_by
+        aggregations = self.report.aggregations
+        
+        if group_by and isinstance(group_by, dict):
+            # Build list of fields to group by
+            group_fields = []
+            for table, fields in group_by.items():
+                if isinstance(fields, list):
+                    for field in fields:
+                        if table == primary_table:
+                            group_fields.append(field)
+                        elif table in relationship_map:
+                            group_fields.append(f"{relationship_map[table]}__{field}")
+            
+            if group_fields and aggregations:
+                # Build aggregation configuration
+                aggregation_config = {}
+                for field_path, config in aggregations.items():
+                    if isinstance(config, dict) and 'type' in config:
+                        agg_type = config['type']
+                        if agg_type == 'sum':
+                            aggregation_config[f"{field_path}__{agg_type}"] = Sum(field_path)
+                        elif agg_type == 'avg':
+                            aggregation_config[f"{field_path}__{agg_type}"] = Avg(field_path)
+                        elif agg_type == 'min':
+                            aggregation_config[f"{field_path}__{agg_type}"] = Min(field_path)
+                        elif agg_type == 'max':
+                            aggregation_config[f"{field_path}__{agg_type}"] = Max(field_path)
+                        elif agg_type == 'count':
+                            aggregation_config[f"{field_path}__{agg_type}"] = Count(field_path)
+                
+                # Apply group by with aggregations
+                queryset = queryset.values(*group_fields).annotate(**aggregation_config)
+                
+                # Store group by fields for template
+                self.group_fields = group_fields
+                
+                # Store aggregation info for template
+                self.aggregation_info = {
+                    field_path: config
+                    for field_path, config in aggregations.items()
+                }
+                
+                return queryset.order_by(*group_fields)
+        
+        # If no grouping, just return all fields
         return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Add group by and aggregation information to context
+        if hasattr(self, 'group_fields'):
+            context['group_fields'] = self.group_fields
+        if hasattr(self, 'aggregation_info'):
+            context['aggregation_info'] = self.aggregation_info
+        
+        # Add field labels
+        field_labels = []
+        primary_table = self.report.selected_tables[0]
+        form = ReportCreationForm()
+        
+        if primary_table in form.AVAILABLE_MODELS:
+            model_class = form.AVAILABLE_MODELS[primary_table]
+            
+            # Build relationship paths
+            relationship_map = {}
+            for table in self.report.selected_tables:
+                if table != primary_table:
+                    path = self._find_relationship_path(model_class, table, form.AVAILABLE_MODELS)
+                    if path:
+                        relationship_map[table] = path
+            
+            # Add field labels
+            selected_fields = self.report.selected_fields
+            if isinstance(selected_fields, dict):
+                for table, fields in selected_fields.items():
+                    if table in form.AVAILABLE_MODELS:
+                        model_class = form.AVAILABLE_MODELS[table]
+                        
+                        for field_name in fields:
+                            try:
+                                field = model_class._meta.get_field(field_name)
+                                # For related tables, prefix the field name with the relationship path
+                                if table != primary_table and table in relationship_map:
+                                    field_name = f"{relationship_map[table]}__{field_name}"
+                                
+                                field_labels.append({
+                                    'name': field_name,
+                                    'label': f"{model_class._meta.verbose_name.title()} {field.verbose_name.title()}"
+                                })
+                            except Exception as e:
+                                print(f"Error getting field label for {field_name}: {e}")
+                                field_labels.append({
+                                    'name': field_name,
+                                    'label': field_name.replace('_', ' ').title()
+                                })
+            
+            context['field_labels'] = field_labels
+        
+        return context
     
     def _find_relationship_path(self, start_model, target_table, available_models, visited_tables=None):
         """
@@ -552,133 +623,6 @@ class ReportDisplayView(LoginRequiredMixin, ListView):
         if op_config.get('negate'):
             return {f"{lookup}": op_config['value'], '_negated': True}
         return {lookup: op_config['value']}
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['report'] = self.report
-        
-        # Get field labels for all selected fields
-        field_labels = []
-        form = ReportCreationForm()
-        
-        # Build relationship paths for all tables
-        relationship_map = {}
-        if self.report.selected_tables:
-            primary_table = self.report.selected_tables[0]
-            model_class = form.AVAILABLE_MODELS.get(primary_table)
-            
-            if model_class:
-                # Build relationship map for all tables
-                for table in self.report.selected_tables:
-                    if table != primary_table:
-                        path = self._find_relationship_path(model_class, table, form.AVAILABLE_MODELS)
-                        if path:
-                            relationship_map[table] = path
-        
-        print("Relationship map for aggregations:", relationship_map)
-        
-        # Process fields from all selected tables
-        selected_fields = self.report.selected_fields
-        if isinstance(selected_fields, dict):
-            for table, fields in selected_fields.items():
-                if table in form.AVAILABLE_MODELS:
-                    model_class = form.AVAILABLE_MODELS[table]
-                    
-                    for field_name in fields:
-                        try:
-                            field = model_class._meta.get_field(field_name)
-                            # For related tables, prefix the field name with the relationship path
-                            if table != primary_table and table in relationship_map:
-                                field_name = f"{relationship_map[table]}__{field_name}"
-                            
-                            field_labels.append({
-                                'name': field_name,
-                                'label': f"{model_class._meta.verbose_name.title()} {field.verbose_name.title()}"
-                            })
-                        except Exception as e:
-                            print(f"Error getting field label for {field_name}: {e}")
-                            field_labels.append({
-                                'name': field_name,
-                                'label': field_name.replace('_', ' ').title()
-                            })
-        
-        context['field_labels'] = field_labels
-        
-        # Calculate aggregations
-        print("Starting aggregation calculation")
-        aggregations = self.report.aggregations
-        print("Raw aggregations from report:", aggregations)
-        
-        if isinstance(aggregations, dict) and aggregations:
-            print("Processing aggregations:", aggregations)
-            aggregation_results = {}
-            queryset = self.get_queryset()
-            
-            # Map aggregation types to Django functions
-            aggregation_map = {
-                'sum': Sum,
-                'avg': Avg,
-                'min': Min,
-                'max': Max,
-                'count': Count
-            }
-            
-            # Build aggregation dictionary for Django
-            django_aggregations = {}
-            for field_path, config in aggregations.items():
-                print(f"Processing field: {field_path}, config: {config}")
-                
-                # Split the field path into table and field
-                table, field = field_path.split('.')
-                
-                # Determine the actual field path based on relationships
-                if table == primary_table:
-                    actual_field_path = field
-                elif table in relationship_map:
-                    actual_field_path = f"{relationship_map[table]}__{field}"
-                else:
-                    print(f"Warning: Table {table} not found in relationship map")
-                    continue
-                
-                print(f"Mapped field path from {field_path} to {actual_field_path}")
-                
-                if config['type'] in aggregation_map:
-                    # For count, we don't need the actual field value
-                    if config['type'] == 'count':
-                        django_aggregations[field_path] = Count('id')
-                    else:
-                        django_aggregations[field_path] = aggregation_map[config['type']](actual_field_path)
-                    print(f"Added aggregation for {field_path}: {django_aggregations[field_path]}")
-            
-            # Perform aggregations
-            if django_aggregations:
-                try:
-                    print("Executing aggregation query with:", django_aggregations)
-                    results = queryset.aggregate(**django_aggregations)
-                    print("Aggregation results:", results)
-                    
-                    # Format results with labels
-                    for field_path, value in results.items():
-                        if field_path in aggregations:
-                            aggregation_results[field_path] = {
-                                'label': aggregations[field_path]['label'],
-                                'value': value
-                            }
-                    print("Final aggregation_results:", aggregation_results)
-                except Exception as e:
-                    print(f"Error calculating aggregations: {e}")
-                    print("Query that caused error:", queryset.query)
-            else:
-                print("No django_aggregations to process")
-            
-            context['aggregation_results'] = aggregation_results
-        else:
-            print("No valid aggregations found in report")
-        
-        # Add total count to context
-        context['total_count'] = self.get_queryset().count()
-        
-        return context
 
 class ExportReportToExcelView(LoginRequiredMixin, ListView):
     template_name = 'reporting/report_display.html'

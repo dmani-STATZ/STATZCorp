@@ -60,6 +60,11 @@ class ReportCreationForm(forms.Form):
         required=False
     )
     
+    group_by = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=False
+    )
+    
     report_name = forms.CharField(
         max_length=100,
         required=True,
@@ -129,69 +134,43 @@ class ReportCreationForm(forms.Form):
         """
         Get all available fields from the selected tables.
         Returns a dict where keys are table names and values are lists of field information.
+        Only includes direct fields from each selected table, no nested relationships.
         """
         fields = {}
         numeric_types = (IntegerField, FloatField, DecimalField)
         
-        # First, process each table's own fields
         for table in selected_tables:
             if table in self.AVAILABLE_MODELS:
                 model_class = self.AVAILABLE_MODELS[table]
                 fields[table] = []
                 
-                # Add regular fields
+                # Only process direct fields
                 for field in model_class._meta.fields:
-                    # Skip primary keys of related models to avoid confusion
-                    if field.is_relation and field.primary_key:
+                    # Skip primary keys
+                    if field.primary_key:
                         continue
-                        
+                    
                     field_info = {
                         'name': field.name,
                         'verbose_name': field.verbose_name.title(),
                         'type': field.get_internal_type(),
-                        'supports_aggregation': isinstance(field, numeric_types)
+                        'supports_aggregation': isinstance(field, numeric_types),
+                        'is_relation': isinstance(field, ForeignKey)
                     }
                     
+                    # For ForeignKey fields, add related model info but keep the field
                     if isinstance(field, ForeignKey):
-                        field_info['related_model'] = field.related_model._meta.model_name
-                    
-                    fields[table].append(field_info)
-        
-        # Then, process related fields in a separate pass
-        for table in selected_tables:
-            if table in self.AVAILABLE_MODELS:
-                model_class = self.AVAILABLE_MODELS[table]
-                
-                # Add related fields
-                for field in model_class._meta.get_fields():
-                    if field.is_relation and not field.many_to_many and not field.one_to_many:
-                        # Get the related model name
                         related_model_name = None
                         for model_key, model_val in self.AVAILABLE_MODELS.items():
                             if model_val == field.related_model:
                                 related_model_name = model_key
                                 break
-                        
-                        if related_model_name and related_model_name in selected_tables:
-                            # Add the relation field itself
-                            field_info = {
-                                'name': field.name,
-                                'verbose_name': field.verbose_name.title(),
-                                'type': 'RelatedField',
-                                'related_model': related_model_name
-                            }
-                            fields[table].append(field_info)
-                            
-                            # Add fields from the related model
-                            for related_field in field.related_model._meta.fields:
-                                if not related_field.is_relation or not related_field.primary_key:
-                                    field_info = {
-                                        'name': f"{field.name}__{related_field.name}",
-                                        'verbose_name': f"{field.verbose_name.title()} - {related_field.verbose_name.title()}",
-                                        'type': related_field.get_internal_type(),
-                                        'supports_aggregation': isinstance(related_field, numeric_types)
-                                    }
-                                    fields[table].append(field_info)
+                        if related_model_name:
+                            field_info['related_model'] = related_model_name
+                            # Update verbose name to indicate it's a relationship
+                            field_info['verbose_name'] = f"{field.verbose_name.title()} (→ {related_model_name.title()})"
+                    
+                    fields[table].append(field_info)
         
         return fields
 
@@ -296,5 +275,34 @@ class ReportCreationForm(forms.Form):
             self.add_error('aggregations', f'Invalid aggregations configuration: {str(e)}')
             aggregations = {}
         cleaned_data['aggregations'] = aggregations
+
+        # Parse group_by
+        group_by_raw = cleaned_data.get('group_by')
+        print("Form cleaning - Raw group_by:", group_by_raw)  # Debug log
+        try:
+            group_by = json.loads(group_by_raw) if group_by_raw else {}
+            print("Form cleaning - Parsed group_by:", group_by)  # Debug log
+            
+            # Validate group_by structure
+            if not isinstance(group_by, dict):
+                self.add_error('group_by', 'Invalid group by format.')
+                group_by = {}
+            else:
+                # Validate each table's group by config
+                for table, fields in group_by.items():
+                    if not isinstance(fields, list):
+                        self.add_error('group_by', f'Invalid group by configuration for table: {table}')
+                        group_by = {}
+                        break
+                    # Validate that the table exists in selected tables
+                    if table not in selected_tables:
+                        self.add_error('group_by', f'Group by configuration contains invalid table: {table}')
+                        group_by = {}
+                        break
+        except Exception as e:
+            self.add_error('group_by', f'Invalid group by configuration: {str(e)}')
+            group_by = {}
+        cleaned_data['group_by'] = group_by
+        print("Form cleaning - Final group_by:", cleaned_data['group_by'])  # Debug log
 
         return cleaned_data 

@@ -243,32 +243,37 @@ Here's a list of tasks to break down the development of your Django reporting ap
 
     Deliverable: Improved user experience with dynamic field updates and relationship handling.
 
-* **Task 10: Totals and Subtotals (Basic)** ✓
+* **Task 10: Totals and Subtotals (Basic)**
 
-    ✓ Add fields to the SavedReport model to store information about desired aggregations (e.g., aggregations as a JSONField).
+    xAdd fields to the SavedReport model to store information about desired aggregations (e.g., aggregations as a JSONField).
 
-    ✓ Update the form to allow users to specify which fields they want totals/subtotals for and what type of aggregation (sum, average, etc.).
+    xUpdate the form to allow users to specify which fields they want totals/subtotals for and what type of aggregation (sum, average, etc.).
 
-    ✓ Modify the report view to perform the aggregations using Django's aggregation functions (Sum, Avg, etc.).
+    xModify the report view to perform the aggregations using Django's aggregation functions (Sum, Avg, etc.).
 
-    ✓ Display the totals in the report template.
+    xDisplay the totals in the report template.
 
     Implementation Notes:
-    - Added aggregations JSONField to SavedReport model with proper JSON schema validation
+    - Added aggregations JSONField to SavedReport model for storing aggregation configurations
     - Enhanced report creation form with comprehensive aggregation UI:
-      * Added field selection for aggregation with type detection
+      * Added field selection for aggregatable fields (numeric fields)
       * Implemented aggregation type selection (sum, avg, min, max, count)
       * Added custom label support for each aggregation
-      * Added validation for aggregation configurations
+      * Added edit and remove functionality for existing aggregations
     - Updated ReportDisplayView to handle aggregations:
-      * Implemented proper aggregation calculation with relationship handling
-      * Added support for multiple aggregation types
-      * Enhanced error handling and logging
-      * Added proper field path mapping for related tables
+      * Implemented proper aggregation calculation using Django's aggregation functions
+      * Added support for multiple aggregation types on different fields
+      * Enhanced error handling for invalid aggregation configurations
+      * Added type-specific aggregation handling
     - Enhanced report display template:
-      * Added aggregation results section with responsive design
-      * Implemented proper formatting for different value types
-      * Added clear visual separation between aggregations and data
+      * Added aggregation results section with proper formatting
+      * Implemented responsive design for aggregation display
+      * Added proper labeling and value formatting
+    - Added JavaScript enhancements:
+      * Dynamic field type detection for aggregation eligibility
+      * Real-time UI updates when adding/editing aggregations
+      * Proper state management for aggregation configurations
+      * Form validation for aggregation settings
     
     Key Files Modified:
     - reporting/models.py: Added and configured aggregations JSONField
@@ -276,17 +281,18 @@ Here's a list of tasks to break down the development of your Django reporting ap
     - reporting/views.py: Updated ReportDisplayView with aggregation handling
     - reporting/templates/reporting/report_creation.html: Added aggregation UI section
     - reporting/templates/reporting/report_display.html: Added aggregation results display
-    - reporting/static/reporting/js/report_creation.js: Added client-side aggregation handling
+    - reporting/static/reporting/js/report_creation.js: Added aggregation handling logic
 
-    Deliverable: Basic totals functionality with support for multiple aggregation types and proper handling of related fields.
+    Deliverable: Comprehensive aggregation functionality with support for:
+    - Multiple aggregation types (sum, average, min, max, count)
+    - Custom labels for aggregated values
+    - Type-aware field selection
+    - Edit and remove capabilities
+    - Proper display in both edit and view modes
 
-* **Task 11: Subtotals Grouping** (Next Task)
+**Phase 3: Advanced Features**
 
-    This task will implement what you're looking for:
-    - Grouping by fields like Supplier Name
-    - Calculating totals within each group
-    - Displaying hierarchical data with subtotals
-    - Supporting multiple grouping levels
+* **Task 11: Subtotals Grouping**
 
     Extend the totals/subtotals functionality to support grouping for subtotals.
 
@@ -296,7 +302,34 @@ Here's a list of tasks to break down the development of your Django reporting ap
 
     Update the template to display the grouped data and subtotals.
 
-**Phase 3: Advanced Features**
+    1. Added a Group By section to the report creation form that allows users to:
+    - Select fields to group by
+    - Add multiple grouping fields
+    - Remove grouping fields
+
+    2. Enhanced the report display view to:
+    - Handle group by fields from the SavedReport model
+    - Apply grouping using Django's values() and annotate()
+    - Calculate aggregations (sum, avg, min, max, count) for each group
+    - Pass group by and aggregation information to the template
+
+    3. Updated the report display template to:
+    - Show grouped data in a table format
+    - Display group by fields as columns
+    - Show aggregated values for each group
+    - Include a grand total row at the bottom
+    - Format numbers appropriately (2 decimal places for numeric values)
+
+    4. Added template filters to:
+    - Get field labels for display
+    - Calculate totals across all results
+    - Format values based on their type`
+
+
+
+    Goal:  Be able to add total fields for things like add up values, or counts to count the number of things to the report output.
+
+    Deliverable: Subtotals with grouping.
 
 * **Task 12: User Interface Polish**
 

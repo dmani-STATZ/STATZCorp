@@ -2,6 +2,7 @@
 let availableModels = {};
 let currentSort = null;
 let fieldSearchTimeout = null;
+let groupByFields = [];
 
 console.log('Report creation script loading...');
 
@@ -23,16 +24,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedFieldsInput = document.getElementById('id_selected_fields');
     const messagesDiv = document.getElementById('messages');
     const messagesContent = messagesDiv.querySelector('div');
+    
+    // Group By elements
+    const groupByField = document.getElementById('groupByField');
+    const addGroupByBtn = document.getElementById('addGroupByBtn');
+    const currentGroupBy = document.getElementById('currentGroupBy');
+    const removeGroupByBtn = document.getElementById('removeGroupByBtn');
+    const groupByInput = document.getElementById('id_group_by');
 
-    console.log('Elements found:', {
-        availableTables: !!availableTables,
-        selectedTables: !!selectedTables,
-        addTableBtn: !!addTableBtn,
-        removeTableBtn: !!removeTableBtn,
-        selectedTablesInput: !!selectedTablesInput,
-        selectedFieldsInput: !!selectedFieldsInput,
-        filterField: !!filterField,
-        sortField: !!sortField
+    console.log('Group By elements found:', {
+        groupByField: !!groupByField,
+        addGroupByBtn: !!addGroupByBtn,
+        currentGroupBy: !!currentGroupBy,
+        removeGroupByBtn: !!removeGroupByBtn,
+        groupByInput: !!groupByInput
     });
 
     // Log initial state
@@ -46,12 +51,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize filter and sort fields if we have initial data
     if (window.initialData) {
         console.log('Initializing with data:', window.initialData);
+        
+        // Initialize group by fields if present
+        if (window.initialData.groupBy) {
+            console.log('Initializing group by fields:', window.initialData.groupBy);
+            Object.entries(window.initialData.groupBy).forEach(([table, fields]) => {
+                fields.forEach(field => {
+                    groupByFields.push(`${table}.${field}`);
+                });
+            });
+            renderGroupByFields();
+        }
+        
         // First update available fields which will trigger filter and sort updates
         updateAvailableFields();
     } else {
         // Just initialize empty filter and sort fields
         updateFilterFields();
         updateSortFields();
+        updateGroupByFields();
     }
 
     // Function to show loading state
@@ -116,6 +134,18 @@ document.addEventListener('DOMContentLoaded', function() {
             : 'bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4';
     }
 
+    // Helper function to format field display text
+    function formatFieldDisplay(tableName, fieldInfo) {
+        const tableDisplay = tableName.charAt(0).toUpperCase() + tableName.slice(1);
+        if (fieldInfo.is_relation && fieldInfo.name.includes('__')) {
+            // For related fields, use the arrow format from the verbose name
+            return fieldInfo.verbose_name;
+        } else {
+            // For direct fields, use standard format
+            return `${tableDisplay} - ${fieldInfo.verbose_name}`;
+        }
+    }
+
     // Update available fields based on selected tables
     function updateAvailableFields() {
         const selectedTablesList = Array.from(selectedTables.options).map(opt => opt.value);
@@ -130,7 +160,8 @@ document.addEventListener('DOMContentLoaded', function() {
             updateFilterFields();
             updateSortFields();
             updateAggregationFields();
-            return Promise.resolve(); // Return a resolved promise for consistency
+            updateGroupByFields();
+            return Promise.resolve();
         }
         
         showFieldsLoading(true);
@@ -157,12 +188,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         groupLabel.label = tableName.charAt(0).toUpperCase() + tableName.slice(1);
                         availableFields.appendChild(groupLabel);
                         
+                        // Sort fields: direct fields first, then related fields
+                        const sortedFields = [...tableFields].sort((a, b) => {
+                            if (a.is_relation === b.is_relation) {
+                                return a.verbose_name.localeCompare(b.verbose_name);
+                            }
+                            return a.is_relation ? 1 : -1;
+                        });
+                        
                         // Add fields for this table
-                        tableFields.forEach(field => {
+                        sortedFields.forEach(field => {
                             const option = document.createElement('option');
                             option.value = `${tableName}.${field.name}`;
-                            option.textContent = field.verbose_name;
+                            option.textContent = formatFieldDisplay(tableName, field);
                             option.title = `Type: ${field.type}\n${field.verbose_name}`;
+                            if (field.is_relation) {
+                                option.classList.add('text-blue-600');
+                            }
                             groupLabel.appendChild(option);
                         });
                     }
@@ -173,10 +215,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     showMessage(data.message, 'info');
                 }
                 
-                // Update filter and sort fields
+                // Update all dependent fields
                 updateFilterFields();
                 updateSortFields();
                 updateAggregationFields();
+                updateGroupByFields();
             })
             .catch(error => {
                 console.error('Error fetching fields:', error);
@@ -201,6 +244,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const option = document.createElement('option');
                 option.value = opt.value;
                 option.textContent = opt.textContent;
+                if (opt.classList.contains('text-blue-600')) {
+                    option.classList.add('text-blue-600');
+                }
                 filterField.appendChild(option);
                 allFields.add(opt.value);
             }
@@ -212,6 +258,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const option = document.createElement('option');
                 option.value = opt.value;
                 option.textContent = opt.textContent;
+                if (opt.classList.contains('text-blue-600')) {
+                    option.classList.add('text-blue-600');
+                }
                 filterField.appendChild(option);
                 allFields.add(opt.value);
             }
@@ -316,7 +365,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             selectedFieldsByTable[table].push(field);
         });
-        selectedFieldsInput.value = JSON.stringify(selectedFieldsByTable);
+        
+        // Convert to JSON string
+        const jsonStr = JSON.stringify(selectedFieldsByTable);
+        
+        // Update hidden input
+        selectedFieldsInput.value = jsonStr;
+        
+        // Update debug textarea
+        const debugTextarea = document.getElementById('selectedFieldsDebug');
+        if (debugTextarea) {
+            debugTextarea.value = jsonStr;
+        }
     }
 
     // Form validation
@@ -327,7 +387,40 @@ document.addEventListener('DOMContentLoaded', function() {
             showMessage('Please select at least one field for the report.', 'error');
             return;
         }
+        
+        // Update all hidden inputs before submission
         updateSelectedFieldsInput();
+        
+        // CRITICAL: Update aggregations input
+        const aggregationsStr = JSON.stringify(aggregations);
+        aggregationsInput.value = aggregationsStr;
+        
+        // CRITICAL: Update group by input
+        const groupByConfig = {};
+        groupByFields.forEach(fieldPath => {
+            const [table, field] = fieldPath.split('.');
+            if (!groupByConfig[table]) {
+                groupByConfig[table] = [];
+            }
+            groupByConfig[table].push(field);
+        });
+        const groupByStr = JSON.stringify(groupByConfig);
+        groupByInput.value = groupByStr;
+        
+        // Set form properties directly
+        this.aggregations.value = aggregationsStr;
+        this.group_by.value = groupByStr;
+        
+        // Log form data before submission
+        console.log('Form submission data:', {
+            selectedTables: selectedTablesInput.value,
+            selectedFields: selectedFieldsInput.value,
+            filters: filtersInput.value,
+            sortBy: document.getElementById('sort_by').value,
+            sortDirection: document.getElementById('sort_direction').value,
+            aggregations: aggregationsStr,
+            groupBy: groupByStr
+        });
     });
 
     // Also update fields if user manually changes selected tables
@@ -808,6 +901,9 @@ function updateSortFields() {
             const option = document.createElement('option');
             option.value = opt.value;
             option.textContent = opt.textContent;
+            if (opt.classList.contains('text-blue-600')) {
+                option.classList.add('text-blue-600');
+            }
             sortField.appendChild(option);
             allFields.add(opt.value);
         }
@@ -819,6 +915,9 @@ function updateSortFields() {
             const option = document.createElement('option');
             option.value = opt.value;
             option.textContent = opt.textContent;
+            if (opt.classList.contains('text-blue-600')) {
+                option.classList.add('text-blue-600');
+            }
             sortField.appendChild(option);
             allFields.add(opt.value);
         }
@@ -834,7 +933,7 @@ function updateSortFields() {
             if (Array.from(sortField.options).some(opt => opt.value === fullFieldName)) {
                 sortField.value = fullFieldName;
                 sortDirection.value = window.initialData.sortDirection || 'asc';
-                applySortBtn.click(); // Trigger sort application
+                applySortBtn.click();
             }
         }
     }
@@ -1026,4 +1125,188 @@ function clearAggregationBuilder() {
     aggregationLabel.value = '';
     editingAggregation = null;
     addAggregationBtn.textContent = 'Add Aggregation';
+}
+
+// --- Group By Logic ---
+const groupByField = document.getElementById('groupByField');
+const addGroupByBtn = document.getElementById('addGroupByBtn');
+const currentGroupBy = document.getElementById('currentGroupBy');
+const removeGroupByBtn = document.getElementById('removeGroupByBtn');
+const groupByInput = document.getElementById('id_group_by');
+
+// Update group by fields dropdown
+function updateGroupByFields() {
+    console.log('Updating group by fields');
+    groupByField.innerHTML = '<option value="">Select a field...</option>';
+    
+    // Define types that can be grouped by
+    const groupableTypes = [
+        'CharField',
+        'TextField',
+        'DateField',
+        'DateTimeField',
+        'BooleanField',
+        'IntegerField',
+        'FloatField',
+        'DecimalField',
+        'ForeignKey',
+        'RelatedField'
+    ];
+    
+    // Add all available fields to the group by dropdown
+    const allFields = new Set();
+    
+    // Function to check if a field is groupable
+    const isFieldGroupable = (table, fieldPath) => {
+        const fields = availableModels[table] || [];
+        const fieldName = fieldPath.split('.').pop();
+        const fieldInfo = fields.find(f => f.name === fieldName);
+        
+        if (!fieldInfo) return false;
+        
+        // Check if field type is groupable
+        return groupableTypes.includes(fieldInfo.type);
+    };
+    
+    // Add from available fields
+    Array.from(availableFields.options).forEach(opt => {
+        const [table, field] = opt.value.split('.');
+        if (!allFields.has(opt.value) && !groupByFields.includes(opt.value) && isFieldGroupable(table, field)) {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.textContent;
+            groupByField.appendChild(option);
+            allFields.add(opt.value);
+        }
+    });
+    
+    // Add from selected fields
+    Array.from(selectedFields.options).forEach(opt => {
+        const [table, field] = opt.value.split('.');
+        if (!allFields.has(opt.value) && !groupByFields.includes(opt.value) && isFieldGroupable(table, field)) {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.textContent;
+            groupByField.appendChild(option);
+            allFields.add(opt.value);
+        }
+    });
+    
+    console.log('Group by field options after update:', Array.from(groupByField.options).map(opt => ({ value: opt.value, text: opt.textContent })));
+}
+
+// Add group by field
+addGroupByBtn.addEventListener('click', function() {
+    const field = groupByField.value;
+    if (!field) {
+        showMessage('Please select a field to group by', 'error');
+        return;
+    }
+    
+    // Add to group by fields array
+    groupByFields.push(field);
+    
+    // Update UI
+    renderGroupByFields();
+    updateGroupByFields();
+    
+    // Update hidden input
+    updateGroupByInput();
+});
+
+// Remove group by field
+removeGroupByBtn.addEventListener('click', function() {
+    const selectedIndex = currentGroupBy.selectedIndex;
+    if (selectedIndex === -1) {
+        showMessage('Please select a group by field to remove', 'error');
+        return;
+    }
+    
+    // Remove from array
+    groupByFields.splice(selectedIndex, 1);
+    
+    // Update UI
+    renderGroupByFields();
+    updateGroupByFields();
+    
+    // Update hidden input
+    updateGroupByInput();
+});
+
+// Render group by fields
+function renderGroupByFields() {
+    console.log('Rendering group by fields:', groupByFields);
+    
+    // Clear existing options
+    currentGroupBy.innerHTML = '';
+    
+    // Add each field
+    groupByFields.forEach(fieldPath => {
+        const [table, field] = fieldPath.split('.');
+        const option = document.createElement('option');
+        option.value = fieldPath;
+        
+        // Find verbose name from available fields
+        const fields = availableModels[table] || [];
+        const fieldInfo = fields.find(f => f.name === field);
+        option.textContent = fieldInfo ? 
+            `${table} - ${fieldInfo.verbose_name}` : 
+            `${table} - ${field}`;
+            
+        currentGroupBy.appendChild(option);
+    });
+}
+
+// Update group by input
+function updateGroupByInput() {
+    console.log('Updating group by input with fields:', groupByFields);
+    
+    const groupByConfig = {};
+    groupByFields.forEach(fieldPath => {
+        const [table, field] = fieldPath.split('.');
+        if (!groupByConfig[table]) {
+            groupByConfig[table] = [];
+        }
+        groupByConfig[table].push(field);
+    });
+    
+    // Convert to JSON string
+    const jsonStr = JSON.stringify(groupByConfig);
+    
+    // Update hidden input
+    groupByInput.value = jsonStr;
+    
+    // Update debug textarea
+    const debugTextarea = document.getElementById('groupByDebug');
+    if (debugTextarea) {
+        debugTextarea.value = jsonStr;
+    }
+    
+    console.log('Generated group by config:', groupByConfig);
+    console.log('Updated group by input value:', groupByInput.value);
+    
+    // Force an update of the actual form field
+    const formElement = document.getElementById('reportForm');
+    if (formElement) {
+        // Create or update the hidden input
+        let hiddenInput = formElement.querySelector('input[name="group_by"]');
+        if (!hiddenInput) {
+            hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'group_by';
+            formElement.appendChild(hiddenInput);
+        }
+        hiddenInput.value = jsonStr;
+    }
+}
+
+// Initialize group by if in edit mode
+if (window.initialData && window.initialData.groupBy) {
+    const groupByConfig = window.initialData.groupBy;
+    Object.entries(groupByConfig).forEach(([table, fields]) => {
+        fields.forEach(field => {
+            groupByFields.push(`${table}.${field}`);
+        });
+    });
+    renderGroupByFields();
 } 
