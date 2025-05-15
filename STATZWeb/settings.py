@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'processing.apps.ProcessingConfig',
     'training.apps.TrainingConfig',
+    'reporting.apps.ReportingConfig',
 ]
 
 MIDDLEWARE = [
