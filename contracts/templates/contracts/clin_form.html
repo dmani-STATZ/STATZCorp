@@ -1216,6 +1216,68 @@
             });
         }
         
+        // Fetch Supplier results from API
+        function fetchSupplierResults() {
+            supplierSearchResults.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
+            
+            fetch(`/contracts/api/options/supplier/?search=${encodeURIComponent(supplierSearchTerm)}&page=${supplierCurrentPage}&page_size=10`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update pagination
+                        supplierTotalPages = data.pagination.total_pages;
+                        updateSupplierPagination();
+                        
+                        // Display results
+                        if (data.options.length > 0) {
+                            let resultsHtml = '';
+                            data.options.forEach(option => {
+                                resultsHtml += `
+                                    <div class="supplier-result-item cursor-pointer hover:bg-gray-100 p-2" data-supplier-id="${option.value}" data-supplier-text="${option.label}">
+                                        <div class="font-medium">${option.label}</div>
+                                    </div>
+                                `;
+                            });
+                            supplierSearchResults.innerHTML = resultsHtml;
+                            
+                            // Add click event to result items
+                            document.querySelectorAll('.supplier-result-item').forEach(item => {
+                                item.addEventListener('click', function() {
+                                    const supplierId = this.getAttribute('data-supplier-id');
+                                    const supplierText = this.getAttribute('data-supplier-text');
+                                    
+                                    // Update the form fields
+                                    supplierIdInput.value = supplierId;
+                                    supplierDisplay.value = supplierText;
+                                    
+                                    // Close the modal
+                                    closeSupplierModal();
+                                });
+                            });
+                        } else {
+                            supplierSearchResults.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
+                        }
+                    } else {
+                        supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching supplier data:', error);
+                    supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
+                });
+        }
+        
+        function updateSupplierPagination() {
+            if (supplierTotalPages > 1) {
+                supplierPagination.classList.remove('hidden');
+                supplierPageInfo.textContent = `Page ${supplierCurrentPage} of ${supplierTotalPages}`;
+                supplierPrevPage.disabled = supplierCurrentPage <= 1;
+                supplierNextPage.disabled = supplierCurrentPage >= supplierTotalPages;
+            } else {
+                supplierPagination.classList.add('hidden');
+            }
+        }
+        
         // Search for Supplier
         function searchSupplier() {
             supplierSearchTerm = supplierSearch.value.trim();
@@ -1260,68 +1322,6 @@
                     fetchSupplierResults();
                 }
             });
-        }
-        
-        // Fetch Supplier results from API
-        function fetchSupplierResults() {
-            supplierSearchResults.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
-            
-            fetch(`/contracts/api/options/supplier/?search=${encodeURIComponent(supplierSearchTerm)}&page=${supplierCurrentPage}&page_size=10`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Update pagination
-                        supplierTotalPages = data.pagination.total_pages;
-                        updateSupplierPagination();
-                        
-                        // Display results
-                        if (data.options.length > 0) {
-                            let resultsHtml = '';
-                            data.options.forEach(option => {
-                                resultsHtml += `
-                                    <div class="nsn-result-item" data-supplier-id="${option.value}" data-supplier-text="${option.label}">
-                                        <div class="font-medium">${option.label}</div>
-                                    </div>
-                                `;
-                            });
-                            supplierSearchResults.innerHTML = resultsHtml;
-                            
-                            // Add click event to result items
-                            document.querySelectorAll('.nsn-result-item[data-supplier-id]').forEach(item => {
-                                item.addEventListener('click', function() {
-                                    const supplierId = this.getAttribute('data-supplier-id');
-                                    const supplierText = this.getAttribute('data-supplier-text');
-                                    
-                                    // Update the form fields
-                                    supplierIdInput.value = supplierId;
-                                    supplierDisplay.value = supplierText;
-                                    
-                                    // Close the modal
-                                    closeSupplierModal();
-                                });
-                            });
-                        } else {
-                            supplierSearchResults.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
-                        }
-                    } else {
-                        supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching supplier data:', error);
-                    supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
-                });
-        }
-        
-        function updateSupplierPagination() {
-            if (supplierTotalPages > 1) {
-                supplierPagination.classList.remove('hidden');
-                supplierPageInfo.textContent = `Page ${supplierCurrentPage} of ${supplierTotalPages}`;
-                supplierPrevPage.disabled = supplierCurrentPage <= 1;
-                supplierNextPage.disabled = supplierCurrentPage >= supplierTotalPages;
-            } else {
-                supplierPagination.classList.add('hidden');
-            }
         }
 
         // Toggle financial details section

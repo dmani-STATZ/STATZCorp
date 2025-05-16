@@ -167,31 +167,30 @@ def get_select_options(request, field_name):
                     Q(cage_code__icontains=search_term)
                 )
             
-            # Check if we need to include a specific supplier
-            if specific_contract_id:
-                try:
-                    specific_supplier = Supplier.objects.get(id=specific_contract_id)
-                    # Make sure this specific supplier is included in the results
-                    if not queryset.filter(id=specific_contract_id).exists():
-                        # Create a new queryset with the specific item first
-                        queryset = list(queryset)
-                        queryset.insert(0, specific_supplier)
-                except Exception as e:
-                    print(f"Error getting specific supplier: {str(e)}")
+            # Get total count for pagination
+            total_count = queryset.count()
+            total_pages = (total_count + page_size - 1) // page_size
             
             # Apply pagination
-            if isinstance(queryset, list):
-                total_count = len(queryset)
-                queryset = queryset[offset:offset+limit]
-            else:
-                total_count = queryset.count()
-                queryset = queryset[offset:offset+limit]
+            queryset = queryset[offset:offset+limit]
             
+            # Format options
             for item in queryset:
                 options.append({
                     'value': item.id,
                     'label': f"{item.name or 'Unknown'} ({item.cage_code or 'No CAGE'})"
                 })
+            
+            return JsonResponse({
+                'success': True,
+                'options': options,
+                'pagination': {
+                    'total_pages': total_pages,
+                    'current_page': page,
+                    'total_count': total_count,
+                    'page_size': page_size
+                }
+            })
                 
         elif field_name == 'nsn':
             # Use the NsnView model for better performance
@@ -204,36 +203,31 @@ def get_select_options(request, field_name):
                     Q(description__icontains=search_term)
                 )
             
-            # Check if we need to include a specific NSN
-            if specific_contract_id:
-                try:
-                    specific_nsn = Nsn.objects.get(id=specific_contract_id)
-                    # Make sure this specific NSN is included in the results
-                    if not queryset.filter(id=specific_contract_id).exists():
-                        # For NSN, we need to handle this differently since we're using NsnView
-                        # We'll add the specific NSN to the options at the end
-                        options.append({
-                            'value': specific_nsn.id,
-                            'label': f"{specific_nsn.nsn_code or 'Unknown'} - {specific_nsn.description or 'No description'}"
-                        })
-                except Exception as e:
-                    print(f"Error getting specific NSN: {str(e)}")
+            # Get total count for pagination
+            total_count = queryset.count()
+            total_pages = (total_count + page_size - 1) // page_size
             
-            try:
-                # Apply pagination
-                total_count = queryset.count()
-                queryset = queryset[offset:offset+limit]
-                
-                for item in queryset:
-                    options.append({
-                        'value': item.id,
-                        'label': f"{item.nsn_code or 'Unknown'} - {item.description or 'No description'}"
-                    })
-            except Exception as e:
-                print(f"Error processing NSN results: {str(e)}")
-                # Return empty results on error
-                total_count = 0
-                
+            # Apply pagination
+            queryset = queryset[offset:offset+limit]
+            
+            # Format options
+            for item in queryset:
+                options.append({
+                    'value': item.id,
+                    'label': f"{item.nsn_code or 'Unknown'} - {item.description or 'No description'}"
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'options': options,
+                'pagination': {
+                    'total_pages': total_pages,
+                    'current_page': page,
+                    'total_count': total_count,
+                    'page_size': page_size
+                }
+            })
+        
         elif field_name == 'special_payment_terms':
             # Get special payment terms
             queryset = SpecialPaymentTerms.objects.all().order_by('terms')
@@ -276,10 +270,18 @@ def get_select_options(request, field_name):
         })
         
     except Exception as e:
+        print(f"Error in get_select_options: {str(e)}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
-        }, status=400)
+            'error': str(e),
+            'options': [],
+            'pagination': {
+                'total_pages': 1,
+                'current_page': 1,
+                'total_count': 0,
+                'page_size': page_size
+            }
+        })
 
 @login_required
 @require_http_methods(["POST"])

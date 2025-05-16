@@ -3,6 +3,7 @@ let availableModels = {};
 let currentSort = null;
 let fieldSearchTimeout = null;
 let groupByFields = [];
+let filters = [];
 
 console.log('Report creation script loading...');
 
@@ -52,15 +53,61 @@ document.addEventListener('DOMContentLoaded', function() {
     if (window.initialData) {
         console.log('Initializing with data:', window.initialData);
         
-        // Initialize group by fields if present
+        // Parse selectedTables
+        try {
+            window.initialData.selectedTables = JSON.parse(window.initialData.selectedTables);
+        } catch (error) {
+            console.error('Error parsing selectedTables:', error);
+            window.initialData.selectedTables = [];
+        }
+
+        // Parse selectedFields
+        try {
+            window.initialData.selectedFields = JSON.parse(window.initialData.selectedFields);
+        } catch (error) {
+            console.error('Error parsing selectedFields:', error);
+            window.initialData.selectedFields = {};
+        }
+
+        // Parse filters
+        try {
+            window.initialData.filters = JSON.parse(window.initialData.filters);
+            filters = window.initialData.filters;
+        } catch (error) {
+            console.error('Error parsing filters:', error);
+            window.initialData.filters = [];
+            filters = [];
+        }
+
+        // Parse sortBy
+        try {
+            window.initialData.sortBy = JSON.parse(window.initialData.sortBy);
+        } catch (error) {
+            console.error('Error parsing sortBy:', error);
+            window.initialData.sortBy = {};
+        }
+
+        // Parse groupBy
         if (window.initialData.groupBy) {
             console.log('Initializing group by fields:', window.initialData.groupBy);
-            Object.entries(window.initialData.groupBy).forEach(([table, fields]) => {
-                fields.forEach(field => {
-                    groupByFields.push(`${table}.${field}`);
-                });
-            });
-            renderGroupByFields();
+            try {
+                const groupByData = typeof window.initialData.groupBy === 'string' ? 
+                    JSON.parse(window.initialData.groupBy) : window.initialData.groupBy;
+                    
+                if (typeof groupByData === 'object' && groupByData !== null) {
+                    Object.entries(groupByData).forEach(([table, fields]) => {
+                        if (Array.isArray(fields)) {
+                            fields.forEach(field => {
+                                groupByFields.push(`${table}.${field}`);
+                            });
+                        }
+                    });
+                }
+                renderGroupByFields();
+            } catch (error) {
+                console.error('Error parsing group by data:', error);
+                groupByFields = [];
+            }
         }
         
         // First update available fields which will trigger filter and sort updates
@@ -180,8 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 availableFields.innerHTML = '';
                 
                 // Add new options with tooltips, grouped by table
-                selectedTablesList.forEach(tableName => {
-                    const tableFields = data.fields[tableName];
+                Object.entries(data.fields).forEach(([tableName, tableFields]) => {
                     if (tableFields && tableFields.length > 0) {
                         // Add table group
                         const groupLabel = document.createElement('optgroup');
@@ -240,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add from available fields
         Array.from(availableFields.options).forEach(opt => {
-            if (!allFields.has(opt.value)) {
+            if (!opt.parentElement.tagName === 'OPTGROUP' && !allFields.has(opt.value)) {
                 const option = document.createElement('option');
                 option.value = opt.value;
                 option.textContent = opt.textContent;
@@ -531,7 +577,6 @@ const editFilterBtn = document.getElementById('editFilterBtn');
 const removeFilterBtn = document.getElementById('removeFilterBtn');
 const filtersInput = document.getElementById('id_filters');
 
-let filters = [];
 let editingIndex = null;
 let autocompleteTimeout = null;
 let currentFieldType = 'text';
@@ -721,13 +766,19 @@ addFilterBtn.addEventListener('click', function() {
 // Render current filters in the listbox
 function renderFilters() {
     currentFilters.innerHTML = '';
-    filters.forEach((f, idx) => {
-        const option = document.createElement('option');
-        option.value = idx;
-        option.textContent = `${f.table}.${f.field} ${operatorLabel(f.operator)} ${formatFilterValue(f)}`;
-        currentFilters.appendChild(option);
-    });
-    filtersInput.value = JSON.stringify(filters);
+    if (Array.isArray(filters)) {
+        filters.forEach((f, idx) => {
+            const option = document.createElement('option');
+            option.value = idx;
+            option.textContent = `${f.table}.${f.field} ${operatorLabel(f.operator)} ${formatFilterValue(f)}`;
+            currentFilters.appendChild(option);
+        });
+        filtersInput.value = JSON.stringify(filters);
+    } else {
+        console.error('Filters is not an array:', filters);
+        filters = [];
+        filtersInput.value = '[]';
+    }
 }
 
 function operatorLabel(op) {
@@ -1005,9 +1056,6 @@ let editingAggregation = null;
 // Function to update aggregation fields
 function updateAggregationFields() {
     console.log('Updating aggregation fields');
-    console.log('Current availableModels:', availableModels);
-    console.log('Current aggregations:', aggregations);
-    
     aggregationField.innerHTML = '<option value="">Select a field...</option>';
     
     // Add all numeric fields to the aggregation dropdown
@@ -1015,8 +1063,7 @@ function updateAggregationFields() {
     
     // Function to add field to dropdown if it supports aggregation
     const addFieldIfAggregatable = (table, fieldInfo) => {
-        console.log('Checking field:', table, fieldInfo);
-        if (fieldInfo.supports_aggregation || aggregationType.value === 'count') {
+        if (fieldInfo && (fieldInfo.supports_aggregation || aggregationType.value === 'count')) {
             const fieldPath = `${table}.${fieldInfo.name}`;
             if (!allFields.has(fieldPath)) {
                 const option = document.createElement('option');
@@ -1025,17 +1072,18 @@ function updateAggregationFields() {
                 option.dataset.type = fieldInfo.type;
                 aggregationField.appendChild(option);
                 allFields.add(fieldPath);
-                console.log('Added aggregatable field:', fieldPath);
             }
         }
     };
     
     // Add from available models
-    if (availableModels) {
-        Object.entries(availableModels).forEach(([table, fields]) => {
-            fields.forEach(fieldInfo => {
-                addFieldIfAggregatable(table, fieldInfo);
-            });
+    if (availableModels && typeof availableModels === 'object') {
+        Object.entries(availableModels).forEach(([table, tableData]) => {
+            if (Array.isArray(tableData)) {
+                tableData.forEach(fieldInfo => {
+                    addFieldIfAggregatable(table, fieldInfo);
+                });
+            }
         });
     }
     
@@ -1043,8 +1091,6 @@ function updateAggregationFields() {
     if (!window.initialData || !window.initialData.aggregations) {
         clearAggregationBuilder();
     }
-    
-    console.log('Aggregation fields updated, current options:', Array.from(aggregationField.options).map(opt => opt.value));
 }
 
 // Add or update aggregation
@@ -1302,11 +1348,22 @@ function updateGroupByInput() {
 
 // Initialize group by if in edit mode
 if (window.initialData && window.initialData.groupBy) {
-    const groupByConfig = window.initialData.groupBy;
-    Object.entries(groupByConfig).forEach(([table, fields]) => {
-        fields.forEach(field => {
-            groupByFields.push(`${table}.${field}`);
-        });
-    });
-    renderGroupByFields();
+    try {
+        const groupByData = typeof window.initialData.groupBy === 'string' ? 
+            JSON.parse(window.initialData.groupBy) : window.initialData.groupBy;
+            
+        if (typeof groupByData === 'object' && groupByData !== null) {
+            Object.entries(groupByData).forEach(([table, fields]) => {
+                if (Array.isArray(fields)) {
+                    fields.forEach(field => {
+                        groupByFields.push(`${table}.${field}`);
+                    });
+                }
+            });
+        }
+        renderGroupByFields();
+    } catch (error) {
+        console.error('Error parsing group by data:', error);
+        groupByFields = [];
+    }
 } 
