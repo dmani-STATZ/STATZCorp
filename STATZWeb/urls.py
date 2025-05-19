@@ -89,9 +89,8 @@ urlpatterns = [
     path('accesslog/', include('accesslog.urls')),
     path('processing/', include('processing.urls')),
     path('training/', include('training.urls')),
-    path('reporting/', include('reporting.urls')),
     path('health/', health_check, name='health_check'),
-    
+    path('reports/', include('reports.urls')),
     # Announcement URLs
     path('announcement/add/', views.add_announcement, name='add_announcement'),
     path('announcement/delete/<int:announcement_id>/', views.delete_announcement, name='delete_announcement'),
