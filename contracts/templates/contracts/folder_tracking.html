@@ -1,26 +1,105 @@
 {% extends "base_template.html" %}
 {% load static %}
+{% load contract_tags %}
 
 {% block extra_head %}
 <style>
-    /* Stack background colors - dynamically generated from model */
-    {% for stack_key, colors in stack_colors.items %}
-    select.stack-{{ stack_key }} {
-        background-color: {{ colors.bg }} !important;
-        color: {{ colors.text }} !important;
+    /* Stack background colors - dynamically generated from FolderStack model */
+    {% for stack in stacks %}
+    select.stack-{{ stack.id }} {
+        background-color: {{ stack.color }} !important;
+        color: {{ stack_colors|get_item:stack.id|get_item:'text' }} !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    /* Dark mode specific overrides for stack colors */
+    .dark select.stack-{{ stack.id }} {
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background-color: {{ stack.color }} !important;
+        color: {{ stack_colors|get_item:stack.id|get_item:'text' }} !important;
+    }
+
+    /* Ensure stack colors remain in highlighted rows for both modes */
+    tr.highlight-row select.stack-{{ stack.id }},
+    .dark tr.highlight-row select.stack-{{ stack.id }} {
+        background-color: {{ stack.color }} !important;
+        color: {{ stack_colors|get_item:stack.id|get_item:'text' }} !important;
     }
     {% endfor %}
     
-    /* Make highlight more vibrant */
-    tr.highlight-row {
-        background-color: #ffff00 !important;
+    /* Make highlight more vibrant but exclude first cell */
+    tr.highlight-row > td:not(:first-child) {
+        background-color: #ffeb3b !important;
+        color: #000000 !important;
     }
-    tr.highlight-row td:not(:first-child) {
-        background-color: #ffff00 !important;
+    
+    /* Dark mode highlight adjustments */
+    .dark tr.highlight-row > td:not(:first-child) {
+        background-color: #ffd700 !important;
+        color: #000000 !important;
     }
-    tr.highlight-row input:not([type="checkbox"]) {
-        background-color: #ffff00 !important;
+    
+    /* Ensure inputs and selects in highlighted rows maintain visibility */
+    tr.highlight-row > td:not(:first-child) input:not([type="checkbox"]),
+    tr.highlight-row > td:not(:first-child) select:not([class*="stack-"]) {
+        background-color: inherit !important;
+        color: inherit !important;
     }
+    
+    /* Ensure select elements maintain their colors in dark mode */
+    .dark select.editable-select {
+        color-scheme: dark;
+    }
+    
+    /* Input and select base styles */
+    .editable-input,
+    .editable-select {
+        background-color: transparent !important;
+        border: 1px solid rgba(156, 163, 175, 0.2) !important;
+    }
+    
+    /* Dark mode input/select adjustments */
+    .dark .editable-input,
+    .dark .editable-select {
+        border-color: rgba(156, 163, 175, 0.3) !important;
+        color: #e5e7eb !important;
+    }
+    
+    /* Dark mode specific adjustments */
+    .dark .editable-cell:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    /* Checkbox styling for both modes */
+    .checkbox-input {
+        border-color: rgba(156, 163, 175, 0.4) !important;
+    }
+    
+    .dark .checkbox-input {
+        border-color: rgba(156, 163, 175, 0.6) !important;
+        background-color: transparent !important;
+    }
+    
+    /* Table compact styles with dark mode support */
+    .table-compact td, 
+    .table-compact th {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        font-size: 0.75rem !important;
+    }
+    
+    .dark .table-compact th {
+        color: #e5e7eb !important;
+    }
+    
+    /* Preserve stack colors in dark mode */
+    .dark select.editable-select:not(.highlight-row select) {
+        background-color: var(--original-bg-color, inherit) !important;
+        color: var(--original-text-color, inherit) !important;
+    }
+    
     .compact-table th, .compact-table td {
         padding: 0.5rem;
         font-size: 0.875rem;
@@ -234,7 +313,7 @@
         <table class="w-full divide-y divide-gray-200 table-compact">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="w-30">Stack</th>
+                    <th class="w-30 cursor-pointer hover:bg-blue-100 underline" onclick="openFolderStackModal()">Stack</th>
                     <th class="w-32">Contract</th>
                     <th class="w-16">PO</th>
                     <th class="w-36">Partial</th>
@@ -255,14 +334,14 @@
                 {% for folder in folders %}
                 <tr class="{% if folder.highlight %}highlight-row{% endif %}" data-id="{{ folder.id }}">
                     <td class="whitespace-nowrap">
-                        <select class="editable-select stack-{{ folder.stack|slice:'4:'|lower|cut:' ' }}" 
+                        <select class="editable-select stack-{{ folder.stack_id.id }}" 
                                 data-id="{{ folder.id }}" 
-                                data-field="stack" 
+                                data-field="stack_id" 
                                 onchange="updateField(this)">
-                            {% for choice in folder.STACK_CHOICES %}
-                            <option value="{{ choice.0 }}" 
-                                    {% if folder.stack == choice.0 %}selected{% endif %}>
-                                {{ choice.1 }}
+                            {% for stack in stacks %}
+                            <option value="{{ stack.id }}" 
+                                    {% if folder.stack_id.id == stack.id %}selected{% endif %}>
+                                {{ stack.name }}
                             </option>
                             {% endfor %}
                         </select>
@@ -418,6 +497,7 @@
         </div>
     </div>
 </div>
+{% include 'contracts/includes/folderstack_modal.html' %}
 {% endblock %}
 
 {% block extra_scripts %}
@@ -485,6 +565,13 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('HTMX initialized');
         htmx.logAll(); // Enable HTMX logging
     }
+
+    // Store original colors for dark mode
+    document.querySelectorAll('.editable-select').forEach(select => {
+        const computedStyle = window.getComputedStyle(select);
+        select.style.setProperty('--original-bg-color', computedStyle.backgroundColor);
+        select.style.setProperty('--original-text-color', computedStyle.color);
+    });
 });
 
 function handleSearch(event) {
@@ -579,10 +666,11 @@ function updateField(element) {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            if (field === 'stack') {
-                // Update the select element's class
-                const stackName = value.split(' - ')[1].toLowerCase(); // Get the part after the dash
-                element.className = `editable-select stack-${stackName}`;
+            if (field === 'stack_id') {
+                // Update the select element's class and colors
+                element.className = `editable-select stack-${value}`;
+                element.style.backgroundColor = data.color;
+                element.style.color = data.text_color;
             }
         } else {
             alert('Error updating field: ' + (data.message || 'Unknown error'));

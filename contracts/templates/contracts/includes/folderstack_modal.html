@@ -1,0 +1,175 @@
+{% load static %}
+<style>
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+}
+
+.modal.show {
+  display: block !important;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 600px;
+  border-radius: 8px;
+  position: relative;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+}
+</style>
+
+<div id="folderStackModal" class="modal hidden z-50">
+  <div class="modal-content">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold">Manage Folder Stacks</h2>
+      <button onclick="closeFolderStackModal()" class="text-gray-500 hover:text-gray-800">&times;</button>
+    </div>
+    <table class="w-full border border-gray-200 rounded-lg text-sm mb-4">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="w-8"></th>
+          <th>Name</th>
+          <th>Color</th>
+          <th>Order</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="folderStackTableBody">
+        <!-- FolderStack rows will be dynamically loaded here -->
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" class="text-center">
+            <button onclick="addNewFolderStackRow()" class="bg-blue-500 text-white px-2 py-1 rounded flex items-center mx-auto mt-2">
+              <span class="mr-1">+</span> Add New
+            </button>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="flex justify-end space-x-2">
+      <button onclick="closeFolderStackModal()" class="bg-gray-300 text-gray-800 px-4 py-1 rounded">Cancel</button>
+      <button onclick="saveFolderStacks()" class="bg-green-600 text-white px-4 py-1 rounded">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openFolderStackModal() {
+  console.log('Opening FolderStack modal...');
+  const modal = document.getElementById('folderStackModal');
+  console.log('Modal element:', modal);
+  modal.classList.remove('hidden');
+  modal.classList.add('show');
+  console.log('Modal classes after opening:', modal.className);
+  loadFolderStacks();
+}
+
+function closeFolderStackModal() {
+  console.log('Closing FolderStack modal...');
+  const modal = document.getElementById('folderStackModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('show');
+  console.log('Modal classes after closing:', modal.className);
+}
+
+function loadFolderStacks() {
+  console.log('Loading folder stacks...');
+  fetch('/contracts/folder-stack/list/')
+    .then(response => {
+      console.log('Response received:', response);
+      return response.json();
+    })
+    .then(data => {
+      console.log('Folder stacks data:', data);
+      const tbody = document.getElementById('folderStackTableBody');
+      tbody.innerHTML = '';
+      data.stacks.forEach((stack, idx) => {
+        tbody.appendChild(renderFolderStackRow(stack, idx, data.stacks.length));
+      });
+    })
+    .catch(error => {
+      console.error('Error loading folder stacks:', error);
+    });
+}
+
+function renderFolderStackRow(stack, idx, total) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="text-center align-middle">
+      <button type="button" class="move-up" ${idx === 0 ? 'disabled' : ''} title="Move Up" onclick="moveStackRow(${stack.id}, 'up')">&#8593;</button>
+      <button type="button" class="move-down" ${idx === total-1 ? 'disabled' : ''} title="Move Down" onclick="moveStackRow(${stack.id}, 'down')">&#8595;</button>
+    </td>
+    <td><input type="text" class="form-input w-full" value="${stack.name}" data-id="${stack.id}" data-field="name"></td>
+    <td><input type="color" class="form-input" value="${stack.color}" data-id="${stack.id}" data-field="color"></td>
+    <td class="text-center">${stack.order ?? ''}</td>
+    <td><button type="button" class="text-red-600" onclick="deleteFolderStack(${stack.id})">&#128465;</button></td>
+  `;
+  return tr;
+}
+
+function addNewFolderStackRow() {
+  const tbody = document.getElementById('folderStackTableBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td></td>
+    <td><input type="text" class="form-input w-full" placeholder="New Name" data-id="new" data-field="name"></td>
+    <td><input type="color" class="form-input" value="#ffffff" data-id="new" data-field="color"></td>
+    <td class="text-center"></td>
+    <td></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function moveStackRow(id, direction) {
+  fetch(`/contracts/folder-stack/${id}/move/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken')},
+    body: new URLSearchParams({direction})
+  }).then(() => loadFolderStacks());
+}
+
+function deleteFolderStack(id) {
+  if (confirm('Delete this stack?')) {
+    fetch(`/contracts/folder-stack/${id}/delete/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': getCookie('csrftoken')}
+    }).then(() => loadFolderStacks());
+  }
+}
+
+function saveFolderStacks() {
+  const rows = document.querySelectorAll('#folderStackTableBody tr');
+  const data = [];
+  rows.forEach(row => {
+    const name = row.querySelector('input[data-field="name"]').value;
+    const color = row.querySelector('input[data-field="color"]').value;
+    const id = row.querySelector('input[data-field="name"]').dataset.id;
+    data.push({id, name, color});
+  });
+  fetch('/contracts/folder-stack/save/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+    body: JSON.stringify({stacks: data})
+  }).then(() => {
+    loadFolderStacks();
+    closeFolderStackModal();
+  });
+}
+</script> 

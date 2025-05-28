@@ -4,7 +4,7 @@ from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.template.loader import render_to_string
-from ..models import FolderTracking, Contract
+from ..models import FolderTracking, Contract, FolderStack
 from users.models import UserSetting, UserSettingState
 from ..forms import FolderTrackingForm, ContractSearchForm
 import json
@@ -12,6 +12,9 @@ import csv
 from datetime import datetime
 from contracts.utils.excel_utils import Workbook, get_column_letter, PatternFill, Font, Alignment, Border, Side
 import webcolors
+from django.views.decorators.http import require_POST
+from django.forms.models import model_to_dict
+import re
 
 def color_to_argb(color):
     """Convert color names or RGB values to ARGB hex format required by openpyxl"""
@@ -32,12 +35,44 @@ def color_to_argb(color):
         # Return white if color is not recognized
         return 'FFFFFFFF'
 
+def get_contrast_color(hex_color):
+    """
+    Calculate whether black or white text should be used based on background color.
+    Using W3C recommended contrast calculation.
+    """
+    # Remove the hash if present
+    hex_color = hex_color.lstrip('#')
+    
+    # Convert hex to RGB
+    try:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+    except (ValueError, IndexError):
+        return 'black'  # Default to black text if invalid hex
+    
+    # Calculate relative luminance
+    # Using sRGB relative luminance calculation
+    def get_luminance(value):
+        value = value / 255
+        return value / 12.92 if value <= 0.03928 else ((value + 0.055) / 1.055) ** 2.4
+    
+    r_luminance = get_luminance(r)
+    g_luminance = get_luminance(g)
+    b_luminance = get_luminance(b)
+    
+    # Calculate relative luminance using W3C formula
+    luminance = 0.2126 * r_luminance + 0.7152 * g_luminance + 0.0722 * b_luminance
+    
+    # Return white for dark backgrounds (low luminance)
+    return 'white' if luminance < 0.5 else 'black'
+
 @login_required
 def folder_tracking(request):
-    # Get all non-closed records and sort by numeric stack value
-    folders = FolderTracking.objects.filter(closed=False).extra(
-        select={'stack_num': "CAST(SUBSTRING(stack, 1, CHARINDEX(' -', stack) - 1) AS INTEGER)"}
-    ).order_by('stack_num', 'contract__contract_number')
+    # Get all non-closed records and sort by stack order
+    folders = FolderTracking.objects.filter(closed=False).select_related(
+        'contract', 'stack_id'
+    ).order_by('stack_id__order', 'contract__contract_number')
     
     # Search functionality
     search_query = request.GET.get('search', '')
@@ -98,21 +133,22 @@ def folder_tracking(request):
         folders = paginator.get_page(page)
         print(f"Pagination enabled - returning page {page} with {len(folders)} records")
 
-    # Get stack colors from model - simplified key format
-    stack_colors = {}
-    for key, value in FolderTracking.STACK_COLORS.items():
-        # Extract the name part (e.g., 'NONE', 'COS', 'PAID', etc.)
-        name = key.split(' - ')[1]
-        stack_colors[name.lower()] = {
-            'bg': value,
-            'text': 'white' if value.lower() in ['blue', 'green', 'grey', 'teal', 'red'] else 'black'
+    # Get stack colors from FolderStack model
+    stacks = FolderStack.objects.order_by('order')
+    stack_colors = {
+        stack.id: {
+            'bg': stack.color,
+            'text': get_contrast_color(stack.color)
         }
+        for stack in stacks
+    }
 
     context = {
         'folders': folders,
         'search_form': ContractSearchForm(),
         'search_query': search_query,
         'stack_colors': stack_colors,
+        'stacks': stacks,
         'pagination_disabled': pagination_disabled,
     }
     return render(request, 'contracts/folder_tracking.html', context)
@@ -300,7 +336,7 @@ def update_folder_field(request, pk):
     field = request.POST.get('field')
     value = request.POST.get('value')
     
-    if field not in ['stack', 'partial', 'rts_email', 'qb_inv', 'wawf', 'wawf_qar', 
+    if field not in ['stack_id', 'partial', 'rts_email', 'qb_inv', 'wawf', 'wawf_qar', 
                     'vsm_scn', 'sir_scn', 'tracking', 'tracking_number', 'note']:
         return JsonResponse({'status': 'error', 'message': 'Invalid field'})
     
@@ -308,16 +344,107 @@ def update_folder_field(request, pk):
     if field in ['rts_email', 'wawf', 'wawf_qar']:
         value = value.lower() == 'true'
     
-    # Update the field value
-    setattr(folder, field, value)
+    # Handle stack_id field
+    if field == 'stack_id':
+        try:
+            stack = FolderStack.objects.get(id=value)
+            folder.stack_id = stack
+            # Update the legacy stack field for backward compatibility
+            folder.stack = f"{stack.order} - {stack.name}"
+            response_data = {
+                'status': 'success',
+                'value': value
+            }
+            response_data.update({
+                'color': stack.color,
+                'text_color': get_contrast_color(stack.color)
+            })
+        except FolderStack.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Invalid stack'})
+    else:
+        setattr(folder, field, value)
     
     # Update audit fields
     folder.modified_by = request.user
-    # modified_on will be automatically updated by Django's auto_now=True
-    
     folder.save()
     
-    return JsonResponse({
-        'status': 'success',
-        'value': value if field not in ['rts_email', 'wawf', 'wawf_qar'] else bool(value)
-    }) 
+    return JsonResponse(response_data)
+
+# --- FolderStack AJAX Endpoints ---
+@login_required
+def folderstack_list(request):
+    stacks = FolderStack.objects.order_by('order', 'id')
+    data = [
+        {
+            'id': stack.id,
+            'name': stack.name,
+            'color': stack.color,
+            'order': stack.order,
+        }
+        for stack in stacks
+    ]
+    return JsonResponse({'stacks': data})
+
+@login_required
+@require_POST
+def folderstack_save(request):
+    data = json.loads(request.body)
+    stacks = data.get('stacks', [])
+    updated_ids = set()
+    order_counter = 1
+    for stack in stacks:
+        stack_id = stack.get('id')
+        name = stack.get('name', '').strip()
+        color = stack.get('color', '#ffffff')
+        if not name:
+            continue
+        if stack_id == 'new':
+            FolderStack.objects.create(name=name, color=color, order=order_counter)
+        else:
+            try:
+                fs = FolderStack.objects.get(id=stack_id)
+                fs.name = name
+                fs.color = color
+                fs.order = order_counter
+                fs.save()
+                updated_ids.add(fs.id)
+            except FolderStack.DoesNotExist:
+                continue
+        order_counter += 1
+    # Remove stacks not in the list (optional, for full sync)
+    # FolderStack.objects.exclude(id__in=updated_ids).delete()
+    return JsonResponse({'status': 'success'})
+
+@login_required
+@require_POST
+def folderstack_move(request, pk):
+    direction = request.POST.get('direction')
+    try:
+        stack = FolderStack.objects.get(pk=pk)
+    except FolderStack.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Stack not found'})
+    all_stacks = list(FolderStack.objects.order_by('order', 'id'))
+    idx = next((i for i, s in enumerate(all_stacks) if s.id == stack.id), None)
+    if idx is None:
+        return JsonResponse({'status': 'error', 'message': 'Stack not found in list'})
+    if direction == 'up' and idx > 0:
+        prev = all_stacks[idx-1]
+        stack.order, prev.order = prev.order, stack.order
+        stack.save()
+        prev.save()
+    elif direction == 'down' and idx < len(all_stacks)-1:
+        nxt = all_stacks[idx+1]
+        stack.order, nxt.order = nxt.order, stack.order
+        stack.save()
+        nxt.save()
+    return JsonResponse({'status': 'success'})
+
+@login_required
+@require_POST
+def folderstack_delete(request, pk):
+    try:
+        stack = FolderStack.objects.get(pk=pk)
+        stack.delete()
+        return JsonResponse({'status': 'success'})
+    except FolderStack.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Stack not found'}) 

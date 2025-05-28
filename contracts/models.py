@@ -667,6 +667,7 @@ class FolderTracking(AuditModel):
     }
 
     # Visible Fields
+    stack_id = models.ForeignKey('FolderStack', on_delete=models.CASCADE, related_name='folder_tracking')
     stack = models.CharField(max_length=20, choices=STACK_CHOICES)
     contract = models.ForeignKey('Contract', on_delete=models.CASCADE, related_name='folder_tracking')
     partial = models.CharField(max_length=20, null=True, blank=True)

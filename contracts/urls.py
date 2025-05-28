@@ -135,6 +135,12 @@ from .views.acknowledgment_views import (
 )
 
 from .views import payment_history_views
+from .views.folder_tracking_views import (
+    folderstack_list,
+    folderstack_save,
+    folderstack_move,
+    folderstack_delete,
+)
 
 app_name = 'contracts'
 
@@ -290,4 +296,10 @@ urlpatterns = [
     path('api/splits/update/<int:split_id>/', update_split, name='update_split'),
     path('api/splits/delete/<int:split_id>/', delete_split, name='delete_split'),
     path('api/splits/<int:contract_id>/', get_contract_splits, name='get_contract_splits'),
+
+    # FolderStack AJAX endpoints
+    path('folder-stack/list/', folderstack_list, name='folderstack_list'),
+    path('folder-stack/save/', folderstack_save, name='folderstack_save'),
+    path('folder-stack/<int:pk>/move/', folderstack_move, name='folderstack_move'),
+    path('folder-stack/<int:pk>/delete/', folderstack_delete, name='folderstack_delete'),
 ] 
