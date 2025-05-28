@@ -1,0 +1,142 @@
+{% extends "base_template.html" %}
+{% load static %}
+{% load user_tags %}
+
+{% block title %}System Messages{% endblock %}
+
+{% block body %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">System Messages</h1>
+        <div class="flex space-x-4">
+            <a href="{% url 'users:create-message' %}" 
+               class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Create Message
+            </a>
+            {% if unread_count > 0 %}
+            <button id="markAllReadBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Mark All as Read
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="space-y-4">
+        {% for message in messages %}
+        <div class="bg-white shadow rounded-lg p-6 {% if not message.is_read %}border-l-4 border-blue-500{% endif %}"
+             data-message-id="{{ message.id }}">
+            <div class="flex justify-between items-start">
+                <div class="flex-grow">
+                    <div class="flex items-center space-x-2">
+                        <h3 class="text-lg font-medium text-gray-900">{{ message.title }}</h3>
+                        <span class="{% if message.priority == 'critical' %}text-red-600
+                                    {% elif message.priority == 'high' %}text-orange-600
+                                    {% elif message.priority == 'medium' %}text-yellow-600
+                                    {% else %}text-green-600{% endif %}
+                                    text-sm font-medium">
+                            ({{ message.get_priority_display }})
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-500">
+                        {% if message.source_model == 'User' %}
+                            From: {{ message.source_id|get_username }}
+                        {% else %}
+                            From: System
+                        {% endif %}
+                        - {{ message.created_at|date:"M d, Y H:i" }}
+                    </p>
+                </div>
+                {% if not message.is_read %}
+                <button class="mark-read-btn bg-gray-100 text-gray-600 px-3 py-1 rounded hover:bg-gray-200">
+                    Mark as Read
+                </button>
+                {% endif %}
+            </div>
+            <div class="mt-4">
+                <p class="text-gray-700 whitespace-pre-wrap">{{ message.message }}</p>
+                {% if message.action_url %}
+                <a href="{{ message.action_url }}" class="inline-block mt-4 text-blue-600 hover:text-blue-800">
+                    View Details →
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white shadow rounded-lg p-8 text-center">
+        <p class="text-gray-600">No system messages found.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mark single message as read
+    document.querySelectorAll('.mark-read-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const messageDiv = this.closest('[data-message-id]');
+            const messageId = messageDiv.dataset.messageId;
+            
+            fetch(`/users/messages/mark-read/${messageId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    messageDiv.classList.remove('border-l-4', 'border-blue-500');
+                    this.remove();
+                    updateUnreadCount();
+                }
+            });
+        });
+    });
+
+    // Mark all messages as read
+    const markAllBtn = document.getElementById('markAllReadBtn');
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function() {
+            fetch('/users/messages/mark-all-read/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            });
+        });
+    }
+
+    function updateUnreadCount() {
+        fetch('/users/messages/unread-count/')
+        .then(response => response.json())
+        .then(data => {
+            const count = data.count;
+            // Update any UI elements showing the unread count
+            const countElement = document.querySelector('#unreadMessageCount');
+            if (countElement) {
+                countElement.textContent = count;
+                if (count === 0) {
+                    countElement.classList.add('hidden');
+                }
+            }
+            
+            // Hide the "Mark All as Read" button if no unread messages
+            if (count === 0 && markAllBtn) {
+                markAllBtn.remove();
+            }
+        });
+    }
+});
+</script>
+{% endblock %} 

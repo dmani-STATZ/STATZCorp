@@ -626,6 +626,17 @@ class Expedite(models.Model):
     def __str__(self):
         return f"Expedite {self.contract.contract_number}"
 
+class FolderStack(models.Model):
+    name = models.CharField(max_length=20)
+    description = models.TextField(null=True, blank=True)
+    color = models.CharField(max_length=20)
+    order = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
 class FolderTracking(AuditModel):
     STACK_CHOICES = [
         ('0 - NONE', 'NONE'),

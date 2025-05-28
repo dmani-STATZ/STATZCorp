@@ -72,10 +72,26 @@
 </head>
 <body class="{% if user_preferences.theme == 'dark' %}dark{% endif %}">
     <header id="header">
+        <div class="flex items-center space-x-4">
         <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" style="height: 30px;"></a>
-        &nbsp;&nbsp;
-        <button class="toggle-btn bg-gray-100 text-black py-2 px-4 rounded-md" onclick="toggleSidebar()">☰ Menu</button>
-        <div class="flex flex-col md:flex-row md:ml-auto justify-center items-center">
+        <!-- Menu Toggle Button -->
+        <button onclick="toggleSidebar()" class="text-white p-2 hover:bg-gray-700 rounded-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+        {% if user.is_authenticated %}
+        <a href="{% url 'users:messages' %}" class="relative">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span id="unreadMessageCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center {% if not unread_messages_count %}hidden{% endif %}">
+                {{ unread_messages_count }}
+            </span>
+        </a>
+        {% endif %}
+    </div>
+        <div class="flex items-center space-x-4">
             <button id="theme-toggle" class="ml-4 p-2 rounded-lg bg-white border border-gray-300 shadow-sm hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600" title="Toggle dark mode">
                 <svg id="theme-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800 dark:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     {% if user_preferences.theme == 'dark' %}
@@ -87,10 +103,12 @@
                     {% endif %}
                 </svg>
             </button>
+            
             {% is_development as dev_mode %}
             {% if dev_mode %}
                 &nbsp;&nbsp;<p class="text-yellow-300 mr-4 font-medium">Development Environment</p>
             {% endif %}
+            
             {% get_require_login as require_login %}
             {% if require_login %}
                 {% if user.is_authenticated %}
@@ -113,28 +131,32 @@
                     </div>
                 {% endif %}
             {% endif %}
+        </div>
     </header>
-    <!-- Sidebar -->
+
+    <!-- Sidebar Menu -->
     <div class="sidebar inactive" id="sidebar">
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corp" class="h-12 w-18 m-8">
-
-        <div class="px-4 pb-8 "> 
+        <div class="px-4 pb-8">
             <ul class="mt-10 space-y-1">
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'index' %}" class="px-3 py-2 rounded-md text-sm font-medium">Home</a>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                    <a href="{% url 'about' %}" class= "px-3 py-2 rounded-md text-sm font-medium">About</a>
+                    <a href="{% url 'about' %}" class="px-3 py-2 rounded-md text-sm font-medium">About</a>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'training:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Training</a>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Inventory</a>
-                </li> 
+                </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Contracts</a>
-                </li> 
+                </li>
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="{% url 'reports:user-reports' %}" class="px-3 py-2 rounded-md text-sm font-medium">Reports</a>
+                </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-2 rounded-md text-sm font-medium">Folder Tracking</a>
                 </li>
@@ -149,6 +171,7 @@
         {% block body %}{% endblock body %}
         {% block extra_scripts %}{% endblock extra_scripts %}
     </div>
+
     <script>
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('active');
@@ -186,6 +209,30 @@
         window.CURRENT_USER_ID = "{{ user.id }}";
     </script>
     {% endif %}
-    {% block extra_js %}{% endblock %}
+    {% block extra_js %}
+    <script>
+    function updateUnreadMessageCount() {
+        fetch('/users/messages/unread-count/')
+        .then(response => response.json())
+        .then(data => {
+            const countElement = document.querySelector('#unreadMessageCount');
+            if (countElement) {
+                countElement.textContent = data.count;
+                if (data.count > 0) {
+                    countElement.classList.remove('hidden');
+                } else {
+                    countElement.classList.add('hidden');
+                }
+            }
+        });
+    }
+
+    // Update count every minute
+    setInterval(updateUnreadMessageCount, 60000);
+
+    // Initial update
+    updateUnreadMessageCount();
+    </script>
+    {% endblock %}
 </body>
 </html> 

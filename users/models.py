@@ -4,6 +4,9 @@ from django.apps import apps
 import logging
 from django.utils import timezone
 from django.conf import settings
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 # Create your models here.
 
@@ -189,3 +192,59 @@ class UserOAuthToken(models.Model):
         if not self.expires_at:
             return False # Cannot determine expiry
         return timezone.now() >= self.expires_at
+
+class SystemMessage(models.Model):
+    """Model for storing system-wide notifications."""
+    
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('critical', 'Critical')
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='system_messages')
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    source_app = models.CharField(max_length=50, help_text="The app that generated this message")
+    source_model = models.CharField(max_length=50, help_text="The model that generated this message")
+    source_id = models.CharField(max_length=50, help_text="The ID of the record that generated this message")
+    action_url = models.CharField(max_length=255, blank=True, help_text="URL to relevant action/page")
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'read_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} - {self.user.username}"
+    
+    def mark_as_read(self):
+        """Mark the message as read."""
+        self.read_at = timezone.now()
+        self.save()
+    
+    @property
+    def is_read(self):
+        """Check if the message has been read."""
+        return self.read_at is not None
+    
+    @classmethod
+    def get_unread_count(cls, user):
+        """Get count of unread messages for a user."""
+        return cls.objects.filter(user=user, read_at__isnull=True).count()
+    
+    @classmethod
+    def create_message(cls, user, title, message, **kwargs):
+        """Create a new system message."""
+        return cls.objects.create(
+            user=user,
+            title=title,
+            message=message,
+            **kwargs
+        )

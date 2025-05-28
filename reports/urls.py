@@ -7,16 +7,15 @@ from . import views
 app_name = 'reports'
 
 urlpatterns = [
-    path('nli/', views.NLQueryView.as_view(), name='nli_query'),
-    path('nli/training/', views.NLITrainingView.as_view(), name='nli_training'),
-    path('nli/training/queries/', views.NLITrainingAPIView.as_view(), {'action': 'queries'}, name='nli_training_queries'),
-    path('nli/training/stats/', views.NLITrainingAPIView.as_view(), {'action': 'stats'}, name='nli_training_stats'),
-    path('nli/training/query/<int:query_id>/', views.NLITrainingAPIView.as_view(), {'action': 'query'}, name='nli_training_query'),
-    path('nli/training/query/<int:query_id>/update/', views.NLITrainingAPIView.as_view(), {'action': 'update'}, name='nli_training_query_update'),
-    path('nli/training/query/<int:query_id>/mark-correct/', views.NLITrainingAPIView.as_view(), {'action': 'mark-correct'}, name='nli_training_query_mark_correct'),
-    path('nli/training/query/<int:query_id>/verify-sql/', 
-         views.NLITrainingAPIView.as_view(), 
-         {'action': 'verify-sql'}, 
-         name='nli_training_query_verify_sql'),
-    path('nli/training/delete-all/', views.NLITrainingAPIView.as_view(), {'action': 'delete-all'}, name='nli_training_delete_all'),
+    # User facing URLs
+    path('', views.UserReportListView.as_view(), name='user-reports'),
+    path('request/', views.ReportRequestCreateView.as_view(), name='request-report'),
+    path('view/<uuid:pk>/', views.ReportViewView.as_view(), name='report-view'),
+    path('change/<uuid:report_pk>/', views.ReportChangeCreateView.as_view(), name='request-change'),
+    path('export/<uuid:pk>/', views.export_report, name='export-report'),
+    path('generate-report/', views.ai_generate_report_view, name='ai-generate-report'),
+
+    # Report creator URLs
+    path('creator/', views.ReportCreatorListView.as_view(), name='creator-list'),
+    path('creator/<uuid:pk>/', views.ReportCreatorDetailView.as_view(), name='creator-detail'),
 ]

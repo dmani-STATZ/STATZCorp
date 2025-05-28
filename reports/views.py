@@ -8,300 +8,274 @@ import time
 import json
 from typing import Dict, Any
 from datetime import datetime
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
-from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import TemplateView, ListView, DetailView, CreateView, UpdateView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.core.exceptions import FieldDoesNotExist
 import openpyxl
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from io import BytesIO
 from django.views.generic import View
 from django.db.models import Count
 from django.utils import timezone
 import re
+from django.urls import reverse, reverse_lazy
+from django.contrib import messages
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.conf import settings
+import requests
+from .models import ReportRequest, Report, ReportChange
+from django.apps import apps
+from contracts.utils.contracts_schema import generate_contracts_schema_description, generate_condensed_contracts_schema
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
-from .nli_reporting.metadata_reader import ORMMetadataReader
-from .nli_reporting.nlp_engine import NLPEngine
-from .nli_reporting.query_builder import QueryBuilder
-from .nli_reporting.learning_engine import LearningEngine
-from .models import QueryLog
 
-logger = logging.getLogger(__name__)
-
-class NLQueryView(LoginRequiredMixin, TemplateView):
-    """View for handling natural language queries."""
+class UserReportListView(LoginRequiredMixin, ListView):
+    """View for users to see their report requests and completed reports."""
     
-    template_name = 'reports/nli/query.html'
+    model = ReportRequest
+    template_name = 'reports/user_reports.html'
+    context_object_name = 'reports'
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Initialize components
-        self.metadata_reader = ORMMetadataReader(['contracts'])
-        self.nlp_engine = NLPEngine(self.metadata_reader)
-        self.query_builder = QueryBuilder(self.metadata_reader)
-        self.learning_engine = LearningEngine()
-        
-        # Connect NLP engine to query builder for field name normalization
-        self.query_builder.set_nlp_engine(self.nlp_engine)
+    def get_queryset(self):
+        return ReportRequest.objects.filter(user=self.request.user, status__in=['in_progress', 'pending']).order_by('-created_at')
     
-    def get_context_data(self, **kwargs) -> Dict[str, Any]:
-        """Get context data for rendering the template."""
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['completed_reports'] = Report.objects.filter(
+            report_request__user=self.request.user
+        ).select_related('report_request')
+        return context
+
+class ReportRequestCreateView(LoginRequiredMixin, CreateView):
+    """View for users to create new report requests."""
+    
+    model = ReportRequest
+    fields = ['request_text']
+    template_name = 'reports/report_request_form.html'
+    success_url = reverse_lazy('reports:user-reports')
+    
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        response = super().form_valid(form)
         
-        # Add available models and fields to context
-        context['models'] = {}
-        for model_key, model_metadata in self.metadata_reader.models.items():
-            app_label, model_name = model_key.split('.')
-            if app_label not in context['models']:
-                context['models'][app_label] = {}
+        from users.models import SystemMessage
+        
+        # Get the user from the email address in settings
+        try:
+            # Create a message for the report creator
+            SystemMessage.create_message(
+                user=User.objects.get(email=settings.REPORT_CREATOR_EMAIL),
+                title="Report Request Submitted",
+                message=f"A new report request '{self.object.generated_name}' has been submitted.",
+                priority="medium",
+                source_app="reports",
+                source_model="ReportRequest",
+                source_id=str(self.object.id),
+                action_url=reverse('reports:creator-reports')
+            )
+            messages.success(self.request, 'Your report request has been submitted successfully.')
+            return response
+        except User.DoesNotExist:
+            messages.error(self.request, f'Report creator with email {settings.REPORT_CREATOR_EMAIL} not found. Please contact your administrator.')
+            return redirect('reports:user-reports')
+
+class ReportCreatorListView(UserPassesTestMixin, ListView):
+    """View for report creators to see all report requests."""
+    
+    model = ReportRequest
+    template_name = 'reports/creator_reports.html'
+    context_object_name = 'reports'
+    
+    def test_func(self):
+        return self.request.user.is_staff
+    
+    def get_queryset(self):
+        status = self.request.GET.get('status', '')
+        queryset = ReportRequest.objects.all().select_related('user', 'assigned_to')
+        
+        if status:
+            queryset = queryset.filter(status=status)
             
-            # Get field mappings for this model
-            field_variations = {}
-            for natural_name, field_name in self.nlp_engine.FIELD_MAPPINGS.items():
-                if field_name in model_metadata.fields:
-                    if field_name not in field_variations:
-                        field_variations[field_name] = []
-                    field_variations[field_name].append(natural_name)
-            
-            context['models'][app_label][model_name] = {
-                'fields': model_metadata.fields,
-                'relationships': model_metadata.relationships,
-                'field_variations': field_variations,  # Add field variations to context
-            }
-        
-        # Add field mappings from learning engine
-        context['field_mappings'] = self.learning_engine.get_improved_field_mappings()
-        
-        # Add common error patterns
-        context['error_patterns'] = self.learning_engine.analyze_error_patterns()
-        
+        return queryset.order_by('-created_at')
+
+class ReportCreatorDetailView(UserPassesTestMixin, UpdateView):
+    """View for report creators to update report requests and add SQL."""
+    
+    model = ReportRequest
+    template_name = 'reports/creator_detail.html'
+    fields = ['status', 'assigned_to']
+    
+    def test_func(self):
+        return self.request.user.is_staff
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['report_form'] = self.get_report_form()
         return context
     
+    def get_report_form(self):
+        report = getattr(self.object, 'completed_report', None)
+        if report:
+            return {'sql_query': report.sql_query, 'description': report.description}
+        return {'sql_query': '', 'description': ''}
+    
     def post(self, request, *args, **kwargs):
-        """Handle POST requests with natural language queries."""
-        # Check if this is a JSON request
-        if request.headers.get('Content-Type') == 'application/json':
-            try:
-                data = json.loads(request.body)
-                feedback = data.get('feedback', '')
-                query_id = data.get('query_id')
-                if feedback and query_id:
-                    return self._handle_feedback(request, query_id, feedback)
-            except json.JSONDecodeError:
-                return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
+        self.object = self.get_object()
         
-        # Handle regular form data
-        query_text = request.POST.get('query', '')
-        page_number = request.POST.get('page', 1)
-        export = request.POST.get('export', '')
-        
-        # Regular query processing
-        logger.debug(f"Processing query: {query_text}")
-        start_time = time.time()
-        error_message = None
-        result_count = 0
-        
-        try:
-            # Parse the query
-            parsed_query = self.nlp_engine.parse_query(query_text)
-            logger.debug(f"Parsed query: {parsed_query}")
-            
-            # Build and execute the query
-            queryset, query_context = self.query_builder.build_query(parsed_query)
-            
-            # If exporting to Excel, return Excel file
-            if export == 'excel':
-                return self._export_to_excel(queryset, query_text)
-            
-            # Paginate results for normal view
-            paginator = Paginator(queryset, 10)  # Show 10 items per page
-            page_obj = paginator.get_page(page_number)
-            
-            # Convert queryset to list for serialization
-            results = []
-            for obj in page_obj:
-                if isinstance(obj, dict):
-                    results.append(obj)
-                else:
-                    # Convert model instance to dict
-                    results.append({
-                        field.name: getattr(obj, field.name)
-                        for field in obj._meta.fields
-                    })
-            
-            result_count = paginator.count
-            was_successful = True
-            
-            # Prepare the response
-            response_data = {
-                'success': True,
-                'results': results,
-                'total_pages': paginator.num_pages,
-                'current_page': page_obj.number,
-                'has_next': page_obj.has_next(),
-                'has_previous': page_obj.has_previous(),
-                'total_count': paginator.count,
-                'query_context': {
-                    'type': parsed_query.query_type.name,  # Convert enum to string
-                    'fields': parsed_query.fields,
-                    'group_by': parsed_query.group_by,
-                    'aggregations': [
-                        (agg_type.name, field) for agg_type, field in (parsed_query.aggregations or [])
-                    ],
-                },
-            }
-            
-            # Log the query for learning
-            execution_time = time.time() - start_time
-            query_log = self.learning_engine.log_query(
-                raw_query=query_text,
-                normalized_query=query_text.lower().strip(),
-                parsed_fields={
-                    field: field for field in (parsed_query.fields if 'parsed_query' in locals() else [])
-                },
-                query_type=parsed_query.query_type.name if 'parsed_query' in locals() else 'UNKNOWN',
-                execution_time=execution_time,
-                was_successful=was_successful,
-                error_message=error_message,
-                result_count=result_count,
-                user=request.user
+        # Handle report creation/update
+        if 'sql_query' in request.POST:
+            report, created = Report.objects.update_or_create(
+                report_request=self.object,
+                defaults={
+                    'sql_query': request.POST['sql_query'],
+                    'description': request.POST.get('description', '')
+                }
             )
             
-            # Add query_id to response for feedback reference
-            response_data['query_id'] = query_log.id
-            
-            # Add query suggestions
-            response_data['suggestions'] = self.learning_engine.get_query_suggestions(query_text)
-            
-        except FieldDoesNotExist as e:
-            logger.warning(f"Invalid field in query: {str(e)}")
-            error_message = f"Invalid field: {str(e)}"
-            response_data = {
-                'success': False,
-                'error': error_message,
-            }
-            was_successful = False
-            
-        except ValueError as e:
-            logger.warning(f"Value error in query: {str(e)}")
-            error_message = str(e)
-            response_data = {
-                'success': False,
-                'error': error_message,
-            }
-            was_successful = False
-            
-        except Exception as e:
-            logger.error(f"Error processing query: {str(e)}", exc_info=True)
-            error_message = f"An error occurred: {str(e)}"
-            response_data = {
-                'success': False,
-                'error': error_message,
-            }
-            was_successful = False
-        
-        finally:
-            # Log the query for learning if not already logged
-            if 'query_log' not in locals():
-                execution_time = time.time() - start_time
-                self.learning_engine.log_query(
-                    raw_query=query_text,
-                    normalized_query=query_text.lower().strip(),
-                    parsed_fields={},
-                    query_type='UNKNOWN',
-                    execution_time=execution_time,
-                    was_successful=was_successful,
-                    error_message=error_message,
-                    result_count=result_count,
-                    user=request.user
-                )
-        
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse(response_data)
-        else:
-            context = self.get_context_data()
-            context.update(response_data)
-            return render(request, self.template_name, context)
-
-    def _handle_feedback(self, request, query_id, feedback):
-        """Handle user feedback about query results."""
-        try:
-            query_log = QueryLog.objects.get(id=query_id)
-            
-            # Update the query log with feedback
-            query_log.was_helpful = False
-            query_log.user_feedback = feedback
-            query_log.save()
-            
-            # Let the learning engine process the feedback
-            self.learning_engine.process_feedback(query_log, feedback)
-            
-            # Return only serializable data
-            return JsonResponse({
-                'success': True,
-                'message': 'Thank you for your feedback. The system will learn from this.',
-                'query_id': query_log.id,
-                'feedback_saved': True,
-                'timestamp': datetime.now().isoformat()
-            })
-            
-        except QueryLog.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'Query log not found',
-                'query_id': query_id
-            }, status=404)
-        except Exception as e:
-            logger.error(f"Error processing feedback: {str(e)}", exc_info=True)
-            return JsonResponse({
-                'success': False,
-                'error': 'An error occurred while processing your feedback',
-                'details': str(e)
-            }, status=500)
-
-    def _export_to_excel(self, queryset, query_text):
-        """Export queryset to Excel file."""
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Query Results"
-        
-        # Add query info
-        ws['A1'] = "Query:"
-        ws['B1'] = query_text
-        ws['A1'].font = Font(bold=True)
-        ws['A2'] = "Generated:"
-        ws['B2'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ws['A2'].font = Font(bold=True)
-        
-        # Get headers
-        if queryset:
-            first_item = queryset[0]
-            if isinstance(first_item, dict):
-                headers = list(first_item.keys())
+            if created:
+                messages.success(request, 'Report has been created successfully.')
             else:
-                headers = [field.name for field in first_item._meta.fields]
+                messages.success(request, 'Report has been updated successfully.')
+                
+            return redirect('reports:creator-detail', pk=self.object.pk)
+        
+        return super().post(request, *args, **kwargs)
+
+class ReportViewView(LoginRequiredMixin, DetailView):
+    """View for users to view their completed reports."""
+    
+    model = Report
+    template_name = 'reports/report_view.html'
+    
+    def get_queryset(self):
+        return Report.objects.filter(report_request__user=self.request.user)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['change_requests'] = self.object.change_requests.all().order_by('-created_at')
+        
+        # Get page size from request or user settings
+        page_size = self.request.GET.get('page_size', '25')
+        page_number = self.request.GET.get('page', 1)
+        
+        # Execute the SQL query and get results
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(self.object.sql_query)
+                context['columns'] = [col[0] for col in cursor.description]
+                all_results = cursor.fetchall()
+                
+                # Handle pagination
+                if page_size.upper() != 'ALL':
+                    paginator = Paginator(list(all_results), int(page_size))
+                    page_obj = paginator.get_page(page_number)
+                    context['results'] = page_obj.object_list
+                    context['page_obj'] = page_obj
+                else:
+                    context['results'] = all_results
+                
+                context['total_records'] = len(all_results)
+                context['page_size'] = page_size
+                context['available_page_sizes'] = ['25', '50', '100', 'ALL']
+                
+        except Exception as e:
+            context['error'] = str(e)
+            context['columns'] = []
+            context['results'] = []
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error executing report query for report {self.object.pk}: {str(e)}")
             
-            # Write headers
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=4, column=col, value=header)
-                cell.font = Font(bold=True)
-                cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        return context
+
+class ReportChangeCreateView(LoginRequiredMixin, CreateView):
+    """View for users to request changes to a report."""
+    
+    model = ReportChange
+    fields = ['change_text']
+    template_name = 'reports/report_change_form.html'
+    
+    def get_report(self):
+        return get_object_or_404(Report, pk=self.kwargs['report_pk'], report_request__user=self.request.user)
+    
+    def form_valid(self, form):
+        report = self.get_report()
+        form.instance.report = report
+        form.instance.user = self.request.user
+        response = super().form_valid(form)
+        messages.success(self.request, 'Your change request has been submitted.')
+        return response
+    
+    def get_success_url(self):
+        return reverse_lazy('reports:report-view', kwargs={'pk': self.kwargs['report_pk']})
+
+@login_required
+def export_report(request, pk):
+    """Export a report to Excel."""
+    report = get_object_or_404(Report, pk=pk, report_request__user=request.user)
+    
+    # Create a new workbook and select the active sheet
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Report Data"
+    
+    # Define styles
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Add report metadata
+    ws.merge_cells('A1:D1')
+    ws['A1'] = report.report_request.generated_name
+    ws['A1'].font = Font(size=14, bold=True)
+    ws['A1'].alignment = Alignment(horizontal='center')
+    
+    ws.merge_cells('A2:D2')
+    ws['A2'] = report.description or "No description provided"
+    ws['A2'].alignment = Alignment(horizontal='center')
+    
+    ws['A3'] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    ws['A3'].font = Font(italic=True)
+    
+    # Add a blank row
+    current_row = 5
+    
+    try:
+        # Execute the SQL query and get results
+        with connection.cursor() as cursor:
+            cursor.execute(report.sql_query)
+            columns = [col[0] for col in cursor.description]
+            results = cursor.fetchall()
+        
+        # Write headers
+        for col_num, column in enumerate(columns, 1):
+            cell = ws.cell(row=current_row, column=col_num, value=column)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
             
             # Write data
-            for row, obj in enumerate(queryset, 5):
-                for col, header in enumerate(headers, 1):
-                    if isinstance(obj, dict):
-                        value = obj.get(header)
-                    else:
-                        value = getattr(obj, header)
-                    ws.cell(row=row, column=col, value=value)
+        for row in results:
+            current_row += 1
+            for col_num, value in enumerate(row, 1):
+                cell = ws.cell(row=current_row, column=col_num, value=value)
+                cell.border = border
         
-        # Auto-adjust column widths
+        # Adjust column widths
         for column in ws.columns:
             max_length = 0
-            column = [cell for cell in column]
+            column = list(column)
             for cell in column:
                 try:
                     if len(str(cell.value)) > max_length:
@@ -311,222 +285,163 @@ class NLQueryView(LoginRequiredMixin, TemplateView):
             adjusted_width = (max_length + 2)
             ws.column_dimensions[column[0].column_letter].width = adjusted_width
         
-        # Save to buffer and return
-        buffer = BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-        
+    except Exception as e:
+        # If there's an error executing the query, create an error sheet
+        ws['A5'] = "Error executing report"
+        ws['A6'] = str(e)
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error exporting report {pk}: {str(e)}")
+    
+    # Create the response
         response = HttpResponse(
-            buffer.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = f'attachment; filename=query_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        return response
-
-class NLITrainingView(LoginRequiredMixin, TemplateView):
-    """View for the NLI training interface."""
+    response['Content-Disposition'] = f'attachment; filename="{report.report_request.generated_name}.xlsx"'
     
-    template_name = 'reports/nli/training.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return context
-
-class NLITrainingAPIView(LoginRequiredMixin, View):
-    """API view for the NLI training interface."""
+    # Save the workbook to the response
+    wb.save(response)
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.learning_engine = LearningEngine()
-    
-    def get(self, request, *args, **kwargs):
-        """Handle GET requests."""
-        action = kwargs.get('action')
-        query_id = kwargs.get('query_id')
-        
-        if action == 'queries':
-            return JsonResponse(self._get_queries())
-        elif action == 'stats':
-            return JsonResponse(self._get_stats())
-        elif action == 'query' and query_id:
-            return JsonResponse(self._get_query_details(query_id))
-        
-        return JsonResponse({'error': 'Invalid action'}, status=400)
-    
-    def post(self, request, *args, **kwargs):
-        """Handle POST requests."""
-        action = kwargs.get('action')
-        query_id = kwargs.get('query_id')
-        
-        if action == 'update' and query_id:
-            return self._update_query(request, query_id)
-        elif action == 'mark-correct' and query_id:
-            return self._mark_query_correct(query_id)
-        elif action == 'verify-sql' and query_id:
-            return self._verify_sql(request, query_id)
-        elif action == 'delete-all':
-            return self._delete_all_queries(request)
-        
-        return JsonResponse({'error': 'Invalid action'}, status=400)
+    return response
 
-    def _delete_all_queries(self, request):
-        """Delete all query logs."""
-        try:
-            # Delete all QueryLog records
-            QueryLog.objects.all().delete()
-            return JsonResponse({'success': True, 'message': 'All queries deleted successfully'})
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Failed to delete queries: {str(e)}'
-            }, status=500)
+def ai_easy_call(request):
+    if request.method == 'POST':
+        user_query = request.POST.get('query') # This will be something like "what day is today?"
 
-    def _get_queries(self):
-        """Get list of recent queries."""
-        queries = QueryLog.objects.all().order_by('-timestamp')[:50]
-        return {
-            'success': True,
-            'queries': [{
-                'id': q.id,
-                'raw_query': q.raw_query,
-                'normalized_query': q.normalized_query,
-                'parsed_fields': q.parsed_fields,
-                'query_type': q.query_type,
-                'was_successful': q.was_successful,
-                'error_message': q.error_message,
-                'timestamp': q.timestamp.isoformat(),
-                'status': 'success' if q.was_successful else 'error'
-            } for q in queries]
+        # SLIMMED DOWN PROMPT FOR TESTING CONNECTION
+        prompt = f"""
+        Answer the following question directly and concisely.
+
+        User's question: "{user_query}"
+        """
+
+        api_key = "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"  # Replace with your actual OpenRouter API key
+        ai_url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
         }
-    
-    def _get_stats(self):
-        """Get learning statistics."""
-        total_queries = QueryLog.objects.count()
-        successful_queries = QueryLog.objects.filter(was_successful=True).count()
-        success_rate = (successful_queries / total_queries * 100) if total_queries > 0 else 0
-        
-        # Get common errors
-        error_patterns = QueryLog.objects.filter(
-            was_successful=False,
-            error_message__isnull=False
-        ).values('error_message').annotate(
-            count=Count('id')
-        ).order_by('-count')[:5]
-        
-        # Get learned field mappings
-        field_mappings = self.learning_engine.get_improved_field_mappings()
-        
-        return {
-            'success_rate': round(success_rate, 2),
-            'total_queries': total_queries,
-            'common_errors': [
-                f"{error['error_message']} ({error['count']} times)"
-                for error in error_patterns
-            ],
-            'field_mappings': field_mappings
+        data = {
+            "model": "mistralai/devstral-small:free",  # Or another free model from OpenRouter
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ]
         }
-    
-    def _get_query_details(self, query_id):
-        """Get details for a specific query."""
+
         try:
-            query = QueryLog.objects.get(id=query_id)
-            return {
-                'raw_query': query.raw_query,
-                'normalized_query': query.normalized_query,
-                'parsed_fields': query.parsed_fields,
-                'query_type': query.query_type,
-                'was_successful': query.was_successful,
-                'error_message': query.error_message,
-                'corrected_query': query.corrected_query,
-                'field_mappings': query.field_mappings,
-                'notes': query.notes,
-                'generated_sql': query.generated_sql,
-                'verified_sql': query.verified_sql,
-                'sql_verified': query.sql_verified,
-                'orm_translation': query.orm_translation
+            response = requests.post(ai_url, headers=headers, data=json.dumps(data))
+            response.raise_for_status()
+
+            # OpenRouter returns the response in choices[0]['message']['content']
+            llm_response_text = response.json()['choices'][0]['message']['content']
+
+            context = {
+                'query': user_query,
+                'generated_report': llm_response_text, # Just display the LLM's raw response
+                'generated_sql': "N/A for simple query", # Indicate SQL is not expected
+                'error': None
             }
-        except QueryLog.DoesNotExist:
-            return {'error': 'Query not found'}
-    
-    def _update_query(self, request, query_id):
-        """Update a query with corrections and field mappings."""
-        try:
-            query = QueryLog.objects.get(id=query_id)
-            
-            # Update query with corrections
-            query.corrected_query = request.POST.get('corrected_query', '')
-            query.field_mappings = json.loads(request.POST.get('field_mappings', '{}'))
-            query.notes = request.POST.get('notes', '')
-            query.save()
-            
-            # Let the learning engine process the corrections
-            self.learning_engine.process_corrections(query)
-            
-            return JsonResponse({'success': True})
-            
-        except QueryLog.DoesNotExist:
-            return JsonResponse({'error': 'Query not found'}, status=404)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid field mappings format'}, status=400)
+        except requests.exceptions.ConnectionError:
+            context = {'error': "Could not connect to OpenRouter.ai. Is your internet connection working?"}
+        except requests.exceptions.RequestException as e:
+            # Print error details for debugging
+            error_text = getattr(e.response, 'text', str(e))
+            context = {'error': f"Error communicating with OpenRouter.ai: {e}\n{error_text}"}
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-    
-    def _mark_query_correct(self, query_id):
-        """Mark a query as correct."""
-        try:
-            query = QueryLog.objects.get(id=query_id)
-            query.was_successful = True
-            query.save()
-            
-            # Let the learning engine know this query was actually correct
-            self.learning_engine.process_correct_query(query)
-            
-            return JsonResponse({'success': True})
-            
-        except QueryLog.DoesNotExist:
-            return JsonResponse({'error': 'Query not found'}, status=404)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            context = {'error': f"An unexpected error occurred: {e}"}
 
-    def _verify_sql(self, request, query_id):
+        return render(request, 'reports/report_results.html', context)
+    
+    return render(request, 'reports/generate_report_form.html')
+
+def ai_generate_report_view(request):
+    if request.method == 'POST':
+        user_query = request.POST.get('query')
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+        database_schema = generate_contracts_schema_description()
+        prompt = f"""
+Given the following database schema:
+{database_schema}
+
+User's request: \"{user_query}\"
+
+Generate:
+1. A concise, human-friendly report name (max 8 words, title case, no punctuation except dashes or spaces).
+2. A valid SQL Server SQL query to answer the user's request. Select queries only. Anyone asking for an Update, Delete, or Insert query should be rejected.
+
+Your output should strictly follow this format:
+REPORT_NAME:
+<your generated report name here>
+SQL_QUERY:
+```sql
+-- Your generated SQL query here
+```
+        """
+        api_key = "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"
         try:
-            data = json.loads(request.body)
-            query = QueryLog.objects.get(id=query_id)
-            verified_sql = data.get('verified_sql')
-            
-            if not verified_sql:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No SQL provided'
-                }, status=400)
-            
-            # Let the learning engine process the verification
-            result = self.learning_engine.process_sql_verification(query, verified_sql)
-            
-            if result['success']:
+            ai_url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "mistralai/devstral-small:free",
+                "messages": [
+                    {"role": "system", "content": "You are an AI assistant that can generate SQL queries and concise report names from the user's input."},
+                    {"role": "user", "content": prompt}
+                ]
+            }
+            response = requests.post(ai_url, headers=headers, data=json.dumps(data))
+            response.raise_for_status()
+            llm_response_text = response.json()['choices'][0]['message']['content']
+
+            # Parse report name
+            report_name = None
+            sql_start = llm_response_text.find('SQL_QUERY:')
+            if llm_response_text.startswith('REPORT_NAME:'):
+                # AI followed the format
+                name_section = llm_response_text[len('REPORT_NAME:'):sql_start].strip() if sql_start != -1 else llm_response_text[len('REPORT_NAME:'):].strip()
+                report_name = name_section.split('\n')[0].strip()
+            else:
+                # Fallback: try to find the first line as the name
+                report_name = llm_response_text.split('\n')[0].strip()
+
+            # Parse SQL
+            sql_code_start = llm_response_text.find('```sql')
+            sql_code_end = llm_response_text.find('```', sql_code_start + 1)
+            generated_sql = ""
+            if sql_code_start != -1 and sql_code_end != -1:
+                generated_sql = llm_response_text[sql_code_start + len('```sql'):sql_code_end].strip()
+
+            from .models import ReportRequest, Report
+            user = request.user
+            report_request = ReportRequest.objects.create(
+                user=user,
+                request_text=user_query,
+                status='completed',
+            )
+            # Override generated_name if AI provided one
+            if report_name:
+                report_request.generated_name = report_name[:100]
+                report_request.save(update_fields=['generated_name'])
+            report = Report.objects.create(
+                report_request=report_request,
+                sql_query=generated_sql,
+                description=f"AI-generated report for: {user_query}"
+            )
+            if is_ajax:
                 return JsonResponse({
                     'success': True,
-                    'message': result.get('message', 'SQL verification saved successfully'),
-                    'orm_translation': result.get('orm_translation', '')
+                    'report_id': str(report.id),
+                    'report_request_id': str(report_request.id),
+                    'generated_name': report_request.generated_name,
+                    'redirect_url': reverse('reports:report-view', kwargs={'pk': report.id})
                 })
             else:
-                return JsonResponse({
-                    'success': False,
-                    'error': result.get('error', 'Failed to verify SQL')
-                }, status=500)
-            
-        except QueryLog.DoesNotExist:
-            return JsonResponse({'error': 'Query not found'}, status=404)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+                return redirect('reports:user-reports')
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
-    def _translate_sql_to_orm(self, sql):
-        """
-        Translate SQL to Django ORM.
-        This is a complex task that will need to be implemented based on your specific needs.
-        """
-        # This is a placeholder - we'll need to implement the actual translation logic
-        # based on your specific SQL patterns and needs
-        return "# SQL to ORM translation will be implemented here"
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            else:
+                return render(request, 'reports/report_results.html', {'error': str(e)})
+    return render(request, 'reports/generate_report_form.html')

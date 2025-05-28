@@ -6,7 +6,7 @@ from django.dispatch import receiver
 from STATZWeb.decorators import login_required
 from django.http import JsonResponse
 from django.contrib.auth.decorators import user_passes_test
-from .models import AppPermission, UserSetting, UserSettingState
+from .models import AppPermission, UserSetting, UserSettingState, SystemMessage
 from django.contrib.auth.models import User
 from django.urls import resolve, reverse
 import logging
@@ -16,6 +16,8 @@ from .user_settings import UserSettings
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate, login as auth_login
 from .ms_views import get_microsoft_login_url
+from django.views.generic import ListView, View
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 logger = logging.getLogger(__name__)
 
@@ -320,3 +322,112 @@ def check_auth_method(request):
         'microsoft_token_status': ms_token_status,
         'is_authenticated': request.user.is_authenticated,
     })
+
+class SystemMessageListView(LoginRequiredMixin, ListView):
+    """View for displaying all system messages for a user."""
+    
+    model = SystemMessage
+    template_name = 'users/system_messages.html'
+    context_object_name = 'messages'
+    
+    def get_queryset(self):
+        return SystemMessage.objects.filter(user=self.request.user)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['unread_count'] = SystemMessage.get_unread_count(self.request.user)
+        return context
+
+class MarkMessageReadView(LoginRequiredMixin, View):
+    """View for marking a message as read."""
+    
+    def post(self, request, *args, **kwargs):
+        message_id = kwargs.get('pk')
+        try:
+            message = SystemMessage.objects.get(id=message_id, user=request.user)
+            message.mark_as_read()
+            return JsonResponse({'status': 'success'})
+        except SystemMessage.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Message not found'}, status=404)
+
+class MarkAllMessagesReadView(LoginRequiredMixin, View):
+    """View for marking all messages as read."""
+    
+    def post(self, request, *args, **kwargs):
+        messages = SystemMessage.objects.filter(user=request.user, read_at__isnull=True)
+        for message in messages:
+            message.mark_as_read()
+        return JsonResponse({'status': 'success'})
+
+class GetUnreadCountView(LoginRequiredMixin, View):
+    """View for getting the count of unread messages."""
+    
+    def get(self, request, *args, **kwargs):
+        count = SystemMessage.get_unread_count(request.user)
+        return JsonResponse({'count': count})
+
+class CreateMessageView(LoginRequiredMixin, View):
+    """View for creating and sending system messages to other users."""
+    
+    template_name = 'users/create_message.html'
+    
+    def get(self, request):
+        # Get all active users except the current user
+        available_users = User.objects.filter(is_active=True)
+        #available_users = User.objects.filter(is_active=True).exclude(id=request.user.id)
+        
+        return render(request, self.template_name, {
+            'available_users': available_users
+        })
+    
+    def post(self, request):
+        try:
+            # Get recipients from comma-separated string
+            recipients_str = request.POST.get('recipients', '')
+            if not recipients_str:
+                messages.error(request, 'Please select at least one recipient.')
+                return redirect('users:create-message')
+            
+            # Split the string into a list of IDs
+            recipient_ids = [int(id_str) for id_str in recipients_str.split(',') if id_str.strip()]
+            
+            # Get message details
+            title = request.POST.get('title')
+            message_content = request.POST.get('message')
+            priority = request.POST.get('priority', 'medium')
+            
+            # Create message for each recipient
+            recipients = User.objects.filter(id__in=recipient_ids)
+            for recipient in recipients:
+                SystemMessage.create_message(
+                    user=recipient,
+                    title=title,
+                    message=message_content,
+                    priority=priority,
+                    source_app='users',
+                    source_model='User',
+                    source_id=str(request.user.id)
+                )
+            
+            messages.success(request, f'Message sent to {len(recipients)} recipient(s).')
+            return redirect('users:messages')
+            
+        except Exception as e:
+            messages.error(request, f'Error sending message: {str(e)}')
+            return redirect('users:create-message')
+
+@login_required
+def user_settings_view(request):
+    """View for displaying and managing user settings."""
+    # Get all settings for the current user
+    current_user_settings = UserSettings.get_all_settings(request.user)
+    
+    # Get all possible setting types
+    setting_types = UserSetting.objects.values_list('setting_type', flat=True).distinct()
+    
+    context = {
+        'settings': current_user_settings,
+        'setting_types': list(setting_types),
+    }
+    
+    return render(request, 'users/settings_view.html', context)

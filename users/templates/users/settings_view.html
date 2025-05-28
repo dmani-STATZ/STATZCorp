@@ -1,0 +1,119 @@
+{% extends "base_template.html" %}
+{% load static %}
+
+{% block title %}User Settings{% endblock %}
+
+{% block body %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-3xl mx-auto">
+        <div class="bg-white shadow rounded-lg p-6">
+            <h1 class="text-2xl font-bold mb-6">User Settings</h1>
+            
+            <div class="space-y-6">
+                {% for setting_name, value in settings.items %}
+                <div class="border-b pb-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-900">{{ setting_name|title }}</h3>
+                            <p class="text-sm text-gray-500">Current value: {{ value }}</p>
+                        </div>
+                        <button onclick="editSetting('{{ setting_name }}')"
+                                class="text-blue-600 hover:text-blue-800">
+                            Edit
+                        </button>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-center py-4">No settings configured yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Setting Modal -->
+<div id="editSettingModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modalTitle">Edit Setting</h3>
+            <form id="settingForm" class="mt-4">
+                {% csrf_token %}
+                <input type="hidden" id="settingName" name="setting_name">
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="settingValue">
+                        Value
+                    </label>
+                    <input type="text" id="settingValue" name="value"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                
+                <div class="mt-4 flex justify-end space-x-3">
+                    <button type="button" 
+                            onclick="closeModal()"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editSetting(settingName) {
+    const modal = document.getElementById('editSettingModal');
+    const form = document.getElementById('settingForm');
+    const titleEl = document.getElementById('modalTitle');
+    const nameInput = document.getElementById('settingName');
+    const valueInput = document.getElementById('settingValue');
+    
+    // Set up the modal
+    titleEl.textContent = `Edit ${settingName}`;
+    nameInput.value = settingName;
+    valueInput.value = '{{ settings|get:settingName }}';
+    
+    // Show the modal
+    modal.classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('editSettingModal').classList.add('hidden');
+}
+
+document.getElementById('settingForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch("{% url 'users:settings-save' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                setting_type: formData.get('setting_name'),
+                value: formData.get('value')
+            })
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert('Failed to save setting');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving setting');
+    }
+});
+</script>
+{% endblock %} 

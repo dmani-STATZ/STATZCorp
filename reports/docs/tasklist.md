@@ -46,7 +46,6 @@
      ├── api/              # API views and serializers
      ├── core/             # Core business logic
      ├── forms/            # Form classes
-     ├── models/           # Database models
      ├── services/         # Business logic services
      ├── templates/        # Template files
      ├── tests/            # Test files

@@ -1,0 +1,89 @@
+{% extends "reports/base.html" %}
+{% load static %}
+
+{% block reports_title %}Report Requests{% endblock %}
+
+{% block reports_subtitle %}
+<p class="text-gray-600 mt-2">Manage and process report requests from users</p>
+{% endblock %}
+
+{% block reports_content %}
+<!-- Status Filter -->
+<div class="mb-8">
+    <div class="inline-flex rounded-md shadow-sm" role="group">
+        <a href="{% url 'reports:creator-list' %}" 
+           class="px-4 py-2 text-sm font-medium {% if not request.GET.status %}bg-blue-500 text-white{% else %}bg-white text-gray-700{% endif %} border border-gray-200 rounded-l-lg hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700">
+            All
+        </a>
+        <a href="{% url 'reports:creator-list' %}?status=pending" 
+           class="px-4 py-2 text-sm font-medium {% if request.GET.status == 'pending' %}bg-blue-500 text-white{% else %}bg-white text-gray-700{% endif %} border-t border-b border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700">
+            Pending
+        </a>
+        <a href="{% url 'reports:creator-list' %}?status=in_progress" 
+           class="px-4 py-2 text-sm font-medium {% if request.GET.status == 'in_progress' %}bg-blue-500 text-white{% else %}bg-white text-gray-700{% endif %} border-t border-b border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700">
+            In Progress
+        </a>
+        <a href="{% url 'reports:creator-list' %}?status=completed" 
+           class="px-4 py-2 text-sm font-medium {% if request.GET.status == 'completed' %}bg-blue-500 text-white{% else %}bg-white text-gray-700{% endif %} border border-gray-200 rounded-r-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700">
+            Completed
+        </a>
+    </div>
+</div>
+
+<!-- Report Requests Table -->
+{% if reports %}
+<div class="bg-white shadow overflow-hidden rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Request</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for request in reports %}
+            <tr>
+                <td class="px-6 py-4">
+                    <div class="text-sm font-medium text-gray-900">{{ request.generated_name }}</div>
+                    <div class="text-sm text-gray-500">{{ request.request_text|truncatechars:100 }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">{{ request.user.get_full_name|default:request.user.username }}</div>
+                    <div class="text-sm text-gray-500">{{ request.user.email }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        {% if request.status == 'completed' %}bg-green-100 text-green-800
+                        {% elif request.status == 'in_progress' %}bg-blue-100 text-blue-800
+                        {% elif request.status == 'rejected' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ request.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ request.assigned_to.get_full_name|default:"Not Assigned" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ request.created_at|date:"M d, Y" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <a href="{% url 'reports:creator-detail' pk=request.pk %}" 
+                       class="text-blue-600 hover:text-blue-900">
+                        Process
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white shadow rounded-lg p-6">
+    <p class="text-gray-600">No report requests found.</p>
+</div>
+{% endif %}
+{% endblock %} 

@@ -70,7 +70,6 @@ INSTALLED_APPS = [
     'processing.apps.ProcessingConfig',
     'training.apps.TrainingConfig',
     'reports.apps.ReportsConfig',
-    'reports.nli_reporting.apps.NLIReportingConfig',
 ]
 
 MIDDLEWARE = [
@@ -109,6 +108,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'contracts.context_processors.reminders_processor',
                 'users.context_processors.user_preferences',
+                'users.context_processors.unread_messages',
             ],
         },
     },
@@ -188,7 +188,8 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static'
 ]
 
-
+# Reports app settings
+REPORT_CREATOR_EMAIL = os.environ.get('REPORT_CREATOR_EMAIL', 'dmani@statzcorp.com')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -198,13 +199,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
 CRISPY_TEMPLATE_PACK = "tailwind"
 
-# Email settings for password reset
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+# Email settings removed - using Windows authentication instead
 
 # Authentication settings
 LOGIN_REDIRECT_URL = 'index'

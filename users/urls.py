@@ -24,14 +24,22 @@ urlpatterns = [
     path('permission-denied/', views.permission_denied, name='permission_denied'),
     path('test-app-name/', views.test_app_name, name='test_app_name'),
     path('debug/permissions/', views.debug_app_permissions, name='debug_permissions'),
-    path('settings/save/', views.save_user_setting, name='save_user_setting'),
-    path('settings/view/', views.manage_settings, name='manage_settings'),
-    path('settings/ajax/save/', views.ajax_save_setting, name='ajax_save_setting'),
-    path('settings/ajax/get/', views.ajax_get_user_setting, name='ajax_get_user_setting'),
-    path('settings/ajax/types/', views.ajax_get_setting_types, name='ajax_get_setting_types'),
+    
+    # User settings URLs
+    path('settings/view/', views.user_settings_view, name='settings-view'),
+    path('settings/ajax/get/', views.ajax_get_user_setting, name='settings-get'),
+    path('settings/ajax/save/', views.ajax_save_setting, name='settings-save'),
+    path('settings/ajax/types/', views.ajax_get_setting_types, name='settings-types'),
     
     # Microsoft Authentication URLs
     path('microsoft/login/', MicrosoftAuthView.as_view(), name='microsoft_login'),
     path('microsoft/callback/', MicrosoftCallbackView.as_view(), name='microsoft_callback'),
     path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
+    
+    # System Messages URLs
+    path('messages/', views.SystemMessageListView.as_view(), name='messages'),
+    path('messages/create/', views.CreateMessageView.as_view(), name='create-message'),
+    path('messages/mark-read/<int:pk>/', views.MarkMessageReadView.as_view(), name='mark-message-read'),
+    path('messages/mark-all-read/', views.MarkAllMessagesReadView.as_view(), name='mark-all-messages-read'),
+    path('messages/unread-count/', views.GetUnreadCountView.as_view(), name='unread-message-count'),
 ] 

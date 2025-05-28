@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 Here's a comprehensive writeup for the user-settings-rule that explains how the user settings system works and how to implement it:
 

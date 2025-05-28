@@ -1,0 +1,6 @@
+<form method="post">
+    {% csrf_token %}
+    <label for="query">Enter your report request:</label><br>
+    <textarea id="query" name="query" rows="4" cols="50"></textarea><br>
+    <button type="submit">Generate Report</button>
+</form>
