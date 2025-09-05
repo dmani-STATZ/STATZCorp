@@ -265,15 +265,17 @@ SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = 0
 
-# Microsoft Azure AD Authentication Settings
 AZURE_AD_CONFIG = {
-    'app_id': os.environ.get('MICROSOFT_APP_ID', 'b1c048a6-ece2-4bc2-a1fb-0db007a7e23a'),
-    'app_secret': os.environ.get('MICROSOFT_APP_SECRET', 'LhJ8Q~mDFyzWnzUofKVoBN8DGKRg.DYlnZJ4Jdbd'),
-    'tenant_id': os.environ.get('MICROSOFT_TENANT_ID', 'a6446842-5c7a-4655-aca7-2b819ecf2d64'),
-    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'http://servername/users/microsoft/callback/'),
-    'scopes': ['https://graph.microsoft.com/User.Read'],  # Use proper Graph API scopes, avoid reserved scopes
+    'app_id': os.environ.get('MICROSOFT_AUTH_CLIENT_ID', 'YOUR_CLIENT_ID_HERE'),
+    'app_secret': os.environ.get('MICROSOFT_AUTH_CLIENT_SECRET', 'YOUR_CLIENT_SECRET_HERE'),
+    'tenant_id': os.environ.get('MICROSOFT_AUTH_TENANT_ID', 'YOUR_TENANT_ID_HERE'),
+    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'http://localhost:8000/microsoft/auth-callback/'),
+    'authority': os.environ.get('MICROSOFT_AUTH_AUTHORITY', 'https://login.microsoftonline.us'),
+    'graph_endpoint': os.environ.get('MICROSOFT_AUTH_GRAPH_ENDPOINT', 'https://graph.microsoft.us'),
+    'scopes': ['https://graph.microsoft.us/User.Read'],  # Gov Graph endpoint
     'auto_create_user': True,
 }
+
 
 # Add Microsoft Auth backend to authentication backends
 AUTHENTICATION_BACKENDS = [

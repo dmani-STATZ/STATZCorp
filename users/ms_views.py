@@ -30,7 +30,7 @@ class MicrosoftAuthView(View):
         app = msal.ConfidentialClientApplication(
             client_id=settings.AZURE_AD_CONFIG['app_id'],
             client_credential=settings.AZURE_AD_CONFIG['app_secret'],
-            authority=f"https://login.microsoftonline.com/{settings.AZURE_AD_CONFIG['tenant_id']}"
+            authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
         )
         
         # Generate auth URL with correct scope handling
@@ -161,7 +161,7 @@ def get_microsoft_login_url(request):
         app = msal.ConfidentialClientApplication(
             client_id=settings.AZURE_AD_CONFIG['app_id'],
             client_credential=settings.AZURE_AD_CONFIG['app_secret'],
-            authority=f"https://login.microsoftonline.com/{settings.AZURE_AD_CONFIG['tenant_id']}"
+            authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
         )
         
         # Generate auth URL using correct scopes

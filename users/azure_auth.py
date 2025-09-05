@@ -28,10 +28,13 @@ class MicrosoftAuthBackend(ModelBackend):
             app = msal.ConfidentialClientApplication(
                 client_id=settings.AZURE_AD_CONFIG['app_id'],
                 client_credential=settings.AZURE_AD_CONFIG['app_secret'],
-                authority=f"https://login.microsoftonline.com/{settings.AZURE_AD_CONFIG['tenant_id']}"
+                authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
             )
             
             # Get token from authorization code
+            logger.debug(f"Requesting token with scopes: {settings.AZURE_AD_CONFIG['scopes']}")
+            logger.debug(f"Using redirect URI: {settings.AZURE_AD_CONFIG['redirect_uri']}")
+            
             result = app.acquire_token_by_authorization_code(
                 code=auth_code,
                 scopes=settings.AZURE_AD_CONFIG['scopes'],
@@ -39,6 +42,8 @@ class MicrosoftAuthBackend(ModelBackend):
             )
             
             logger.debug(f"Auth token result keys: {result.keys()}")
+            logger.debug(f"Token result contains access_token: {'access_token' in result}")
+            logger.debug(f"Token result contains id_token: {'id_token' in result}")
             
             if "error" in result:
                 logger.error(f"Error getting Microsoft auth token: {result.get('error')} - {result.get('error_description')}")
@@ -59,7 +64,7 @@ class MicrosoftAuthBackend(ModelBackend):
             app = msal.ConfidentialClientApplication(
                 client_id=settings.AZURE_AD_CONFIG['app_id'],
                 client_credential=settings.AZURE_AD_CONFIG['app_secret'],
-                authority=f"https://login.microsoftonline.com/{settings.AZURE_AD_CONFIG['tenant_id']}"
+                authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
             )
             
             # Get user info from Microsoft Graph API
@@ -89,8 +94,13 @@ class MicrosoftAuthBackend(ModelBackend):
             
         # Get token from auth code
         token_result = self.get_microsoft_auth_token(auth_code)
-        if not token_result or "access_token" not in token_result:
-            logger.error("Failed to get access token")
+        if not token_result:
+            logger.error("Failed to get token result from Microsoft")
+            return None
+        if "access_token" not in token_result:
+            logger.error(f"Token result missing access_token. Keys: {token_result.keys()}")
+            if "error" in token_result:
+                logger.error(f"Microsoft token error: {token_result.get('error')} - {token_result.get('error_description')}")
             return None
             
         # Extract user info from ID token claims
@@ -114,7 +124,9 @@ class MicrosoftAuthBackend(ModelBackend):
             try:
                 # Get user info using the access token with Microsoft Graph
                 headers = {'Authorization': f'Bearer {token_result["access_token"]}'}
-                graph_response = requests.get('https://graph.microsoft.com/v1.0/me', headers=headers)
+                graph_endpoint = settings.AZURE_AD_CONFIG.get('graph_endpoint', 'https://graph.microsoft.us/')
+                graph_url = f"{graph_endpoint.rstrip('/')}/v1.0/me"
+                graph_response = requests.get(graph_url, headers=headers)
                 if graph_response.status_code == 200:
                     user_data = graph_response.json()
                     email = user_data.get("userPrincipalName", user_data.get("mail"))
@@ -226,7 +238,7 @@ def _get_msal_app():
         return msal.ConfidentialClientApplication(
             client_id=settings.AZURE_AD_CONFIG['app_id'],
             client_credential=settings.AZURE_AD_CONFIG['app_secret'],
-            authority=f"https://login.microsoftonline.com/{settings.AZURE_AD_CONFIG['tenant_id']}"
+            authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
         )
     except KeyError as e:
         logger.error(f"Missing Azure AD config setting: {e}")

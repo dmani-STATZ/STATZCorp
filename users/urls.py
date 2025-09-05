@@ -2,6 +2,7 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from .ms_views import MicrosoftAuthView, MicrosoftCallbackView
+from .debug_auth import DebugAuthView
 
 app_name = 'users'
 
@@ -33,7 +34,7 @@ urlpatterns = [
     
     # Microsoft Authentication URLs
     path('microsoft/login/', MicrosoftAuthView.as_view(), name='microsoft_login'),
-    path('microsoft/callback/', MicrosoftCallbackView.as_view(), name='microsoft_callback'),
+    path('microsoft/auth-callback/', MicrosoftCallbackView.as_view(), name='microsoft_callback'),
     path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
     
     # System Messages URLs
@@ -42,4 +43,7 @@ urlpatterns = [
     path('messages/mark-read/<int:pk>/', views.MarkMessageReadView.as_view(), name='mark-message-read'),
     path('messages/mark-all-read/', views.MarkAllMessagesReadView.as_view(), name='mark-all-messages-read'),
     path('messages/unread-count/', views.GetUnreadCountView.as_view(), name='unread-message-count'),
+    
+    # Debug URLs
+    path('debug/auth-config/', DebugAuthView.as_view(), name='debug_auth_config'),
 ] 

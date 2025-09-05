@@ -129,6 +129,12 @@
                 <img src="{% static 'users/img/ms-logo.svg' %}" alt="Microsoft logo" class="microsoft-logo">
                 Sign in with Microsoft
             </a>
+
+            <!-- Microsoft Login Button -->
+            <a href="{% url 'users:microsoft_login' %}" class="microsoft-button">
+                <img src="{% static 'users/img/ms-logo.svg' %}" alt="Microsoft logo" class="microsoft-logo">
+                Sign in with Microsoft
+            </a>
             
             {% if admin_mode %}
             <div class="ms-divider">Admin Login</div>

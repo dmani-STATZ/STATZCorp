@@ -24,6 +24,7 @@ from django.views.generic import TemplateView
 import os
 from . import views
 from users import views as user_views
+from users.ms_views import MicrosoftAuthView, MicrosoftCallbackView
 
 # --- Add these lines ---
 admin.site.site_header = "STATZ Corporation Administration" # Header shown on admin pages
@@ -84,6 +85,12 @@ urlpatterns = [
     path('about/', views.about, name='about'),
     path('permission_denied/', user_views.permission_denied, name='permission_denied'),
     path('users/', include('users.urls')),
+    
+    # Microsoft Authentication URLs (at root level for OAuth callbacks)
+    path('microsoft/login/', MicrosoftAuthView.as_view(), name='microsoft_login'),
+    path('microsoft/auth-callback/', MicrosoftCallbackView.as_view(), name='microsoft_callback'),
+    #path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
+    
     path('inventory/', include('inventory.urls')),
     path('contracts/', include('contracts.urls')),
     path('accesslog/', include('accesslog.urls')),
