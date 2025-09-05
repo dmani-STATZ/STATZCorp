@@ -36,10 +36,6 @@ class Migration(migrations.Migration):
         ),
         migrations.RemoveField(
             model_name='processcontract',
-            name='queue_id',
-        ),
-        migrations.RemoveField(
-            model_name='processcontract',
             name='sales_class',
         ),
         migrations.DeleteModel(

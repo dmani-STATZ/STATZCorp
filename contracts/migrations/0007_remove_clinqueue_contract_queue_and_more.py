@@ -12,10 +12,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RemoveField(
             model_name='clinqueue',
-            name='contract_queue',
-        ),
-        migrations.RemoveField(
-            model_name='clinqueue',
             name='created_by',
         ),
         migrations.RemoveField(
