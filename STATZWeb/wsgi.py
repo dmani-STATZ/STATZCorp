@@ -24,7 +24,7 @@ try:
     
     # Build paths inside the project
     BASE_DIR = Path(__file__).resolve().parent.parent
-    env_file = os.path.join(BASE_DIR, '.env.production')
+    env_file = os.path.join(BASE_DIR, '.env')
     #print(f"Loading environment from: {env_file}")
     load_dotenv(env_file)
     #print(f"SECRET_KEY loaded: {'DJANGO_SECRET_KEY' in os.environ}")

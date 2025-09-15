@@ -7,7 +7,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # Update ALLOWED_HOSTS with your production domain
 ALLOWED_HOSTS = [
-    'statzutil01',
+    'statzweb.azurewebsites.us',
     '10.103.10.13',
     '127.0.0.1',
     'localhost',
@@ -61,7 +61,7 @@ SECURE_HSTS_PRELOAD = True
 
 # Make sure these are set correctly
 ALLOWED_HOSTS = ['statzutil01', 'localhost', '127.0.0.1']
-CSRF_TRUSTED_ORIGINS = ['https://statzutil01']
+CSRF_TRUSTED_ORIGINS = ['https://statzweb.azurewebsites.us']
 
 # Session Security
 SESSION_COOKIE_HTTPONLY = True
@@ -130,7 +130,7 @@ AZURE_AD_CONFIG = {
     'app_id': os.environ.get('MICROSOFT_APP_ID', 'b1c048a6-ece2-4bc2-a1fb-0db007a7e23a'),
     'app_secret': os.environ.get('MICROSOFT_APP_SECRET', 'LhJ8Q~mDFyzWnzUofKVoBN8DGKRg.DYlnZJ4Jdbd'),
     'tenant_id': os.environ.get('MICROSOFT_TENANT_ID', 'a6446842-5c7a-4655-aca7-2b819ecf2d64'),
-    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'https://statzutil01/users/microsoft/callback/'),
+    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'https://statzweb.azurewebsites.us/microsoft/auth-callback/'),
     'scopes': ['https://graph.microsoft.com/User.Read'],  # Use proper Graph API scopes, avoid reserved scopes
     'auto_create_user': True,
 }
