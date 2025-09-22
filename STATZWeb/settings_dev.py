@@ -148,7 +148,8 @@ AZURE_AD_CONFIG = {
 }
 
 # Development-specific settings
-REQUIRE_LOGIN = os.getenv('REQUIRE_LOGIN', 'False').lower() == 'true'
+# Set to True to require login in development, False to bypass login
+REQUIRE_LOGIN = os.getenv('REQUIRE_LOGIN', 'True').lower() == 'true'
 
 # Development file upload limits (more permissive)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
