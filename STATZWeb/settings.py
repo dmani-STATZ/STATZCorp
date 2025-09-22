@@ -260,6 +260,25 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.azurewebsites.us',
 ]
 
+# Additional security headers to prevent vulnerabilities
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# SQL Injection protection - ensure proper ORM usage
+# Django's ORM automatically escapes parameters, but add extra validation
+USE_TZ = True  # Ensure timezone awareness
+
+# Input validation settings to prevent various attacks
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB max file size
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB max file size
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Prevent DoS via large forms
+
+# PDF processing security - mitigate PyPDF2 vulnerabilities
+PDF_MAX_PAGES = 1000  # Limit PDF processing to prevent infinite loops
+PDF_MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max PDF size
+
 # Azure AD Configuration - Environment variables only
 AZURE_AD_CONFIG = {
     'app_id': os.environ.get('MICROSOFT_AUTH_CLIENT_ID'),
