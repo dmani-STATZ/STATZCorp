@@ -4,7 +4,7 @@ import json
 import tempfile
 import logging
 # Import lazy-loaded modules from our utility
-from contracts.utils.image_processing import np, fitz, PyPDF2, pytesseract, pdf2image, Image, ImageDraw
+from contracts.utils.image_processing import np, fitz, pypdf, pytesseract, pdf2image, Image, ImageDraw
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.shortcuts import render, redirect
@@ -225,7 +225,7 @@ def extract_dd1155_data(request):
 def extract_text_from_pdf(pdf_path):
     """
     Extract text from a PDF file using PyMuPDF's coordinate-based approach.
-    Falls back to PyPDF2 and OCR if needed.
+    Falls back to pypdf and OCR if needed.
     """
     # Initialize results dictionary with all fields
     results = {key: {'value': 'Not found', 'source': None} for key in DD1155_FIELDS.keys()}
@@ -291,16 +291,16 @@ def extract_text_from_pdf(pdf_path):
     except Exception as e:
         logger.error(f"Error extracting text with PyMuPDF: {str(e)}")
     
-    # Fallback to PyPDF2 if PyMuPDF fails
+    # Fallback to pypdf if PyMuPDF fails
     full_text = ""
     try:
         with open(pdf_path, 'rb') as file:
-            reader = PyPDF2().PdfReader(file, strict=False)
+            reader = pypdf().PdfReader(file, strict=False)
             
             for page in range(len(reader.pages)):
                 full_text += reader.pages[page].extract_text() + "\n"
     except Exception as e:
-        logger.error(f"Error extracting text with PyPDF2: {str(e)}")
+        logger.error(f"Error extracting text with pypdf: {str(e)}")
     
     # If we got meaningful text, return it
     if len(full_text.strip()) > 100:  # Assuming a form should have more than 100 chars of text
@@ -309,7 +309,7 @@ def extract_text_from_pdf(pdf_path):
             'full_text': full_text
         }
     
-    # If PyPDF2 didn't extract enough text, try OCR
+    # If pypdf didn't extract enough text, try OCR
     try:
         # Check if pytesseract is properly configured
         try:

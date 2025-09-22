@@ -2,7 +2,8 @@
 PDF Security Utilities
 
 This module provides secure PDF processing functions to mitigate
-PyPDF2 vulnerabilities and prevent infinite loops.
+PDF processing vulnerabilities and prevent infinite loops.
+Note: Migrated from PyPDF2 to pypdf for better security and maintenance.
 """
 
 import os

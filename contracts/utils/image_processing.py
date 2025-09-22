@@ -21,9 +21,9 @@ def fitz():
     """Get PyMuPDF module"""
     return get_module('fitz')
 
-def PyPDF2():
-    """Get PyPDF2 module"""
-    return get_module('PyPDF2')
+def pypdf():
+    """Get pypdf module (modern replacement for PyPDF2)"""
+    return get_module('pypdf')
 
 def pytesseract():
     """Get pytesseract module"""

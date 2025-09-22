@@ -18,7 +18,7 @@ Instead of importing these libraries directly in your views or other modules:
 
 ```python
 import numpy as np
-import PyPDF2
+import pypdf
 import pytesseract
 import pdf2image
 import fitz  # PyMuPDF
@@ -28,7 +28,7 @@ from PIL import Image, ImageDraw
 Import the lazy-loading functions and call them when needed:
 
 ```python
-from contracts.utils.image_processing import np, fitz, PyPDF2, pytesseract, pdf2image, Image, ImageDraw
+from contracts.utils.image_processing import np, fitz, pypdf, pytesseract, pdf2image, Image, ImageDraw
 
 # Use as functions
 numpy_array = np().array([1, 2, 3])

@@ -275,7 +275,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB max file size
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB max file size
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Prevent DoS via large forms
 
-# PDF processing security - mitigate PyPDF2 vulnerabilities
+# PDF processing security - mitigate PDF processing vulnerabilities (migrated to pypdf)
 PDF_MAX_PAGES = 1000  # Limit PDF processing to prevent infinite loops
 PDF_MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max PDF size
 
