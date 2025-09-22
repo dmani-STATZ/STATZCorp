@@ -181,26 +181,41 @@
         }
     </script>
 
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration - Development Mode Aware -->
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js', {
-                    scope: '/',
-                    updateViaCache: 'none'
-                })
-                .then(reg => {
-                    console.log('Service worker registered successfully. Scope:', reg.scope);
-                })
-                .catch(err => {
-                    console.error('Service worker registration failed:', err);
-                    console.error('Error details:', {
-                        message: err.message,
-                        fileName: err.fileName,
-                        lineNumber: err.lineNumber
+        {% is_development as dev_mode %}
+        if ({{ dev_mode|yesno:"true,false" }}) {
+            // Development mode - aggressively unregister any existing service workers
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                        console.log('Development mode: Unregistered service worker:', registration.scope);
+                    }
+                });
+                console.log('PWA Service Worker disabled in development mode');
+            }
+        } else {
+            // Production mode - register service worker
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js', {
+                        scope: '/',
+                        updateViaCache: 'none'
+                    })
+                    .then(reg => {
+                        console.log('Service worker registered successfully. Scope:', reg.scope);
+                    })
+                    .catch(err => {
+                        console.error('Service worker registration failed:', err);
+                        console.error('Error details:', {
+                            message: err.message,
+                            fileName: err.fileName,
+                            lineNumber: err.lineNumber
+                        });
                     });
                 });
-            });
+            }
         }
     </script>
     <script src="{% static 'js/theme_toggle.js' %}"></script>

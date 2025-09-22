@@ -72,6 +72,12 @@ logs/*.log
 .env.test.local
 .env.production.local
 .env.production
+.env
+.env.dev
+
+# Development files
+*.dev.log
+django_dev.log
 
 # Database
 *.sqlite3
