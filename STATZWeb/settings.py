@@ -21,7 +21,7 @@ ALLOWED_HOSTS = [
     'statzweb.azurewebsites.us',
     '127.0.0.1',
     'localhost',
-    '.azurewebsites.us',  # Allow all Azure subdomains
+    'statzweb.azurewebsites.us',  # Allow all Azure subdomains
 ]
 
 # CORS settings for PWA

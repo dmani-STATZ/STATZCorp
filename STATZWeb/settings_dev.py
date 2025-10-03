@@ -14,6 +14,7 @@ DEBUG = True
 
 # Development-specific ALLOWED_HOSTS
 ALLOWED_HOSTS = [
+    'statzweb.azurewebsites.us',
     '127.0.0.1',
     'localhost',
     '0.0.0.0',  # For Docker if needed
