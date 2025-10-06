@@ -13,7 +13,6 @@ from .views.api_views import (
 # Make views available at package level
 __all__ = [
     'process_contract_form',
-    'queue_view',
     'match_buyer',
     'match_supplier',
     'match_nsn',

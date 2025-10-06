@@ -51,7 +51,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    'django_browser_reload',
     'tailwind',
     'theme_tw',
     'corsheaders',
@@ -71,9 +70,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_browser_reload.middleware.BrowserReloadMiddleware',
     'STATZWeb.middleware.LoginRequiredMiddleware',
 ]
+
+if os.getenv('DJANGO_DEBUG', 'False').lower() == 'true':
+    MIDDLEWARE.append('django_browser_reload.middleware.BrowserReloadMiddleware')
+    INSTALLED_APPS.append('django_browser_reload')
 
 # Session settings
 SESSION_COOKIE_AGE = 3600  # seconds
