@@ -29,7 +29,6 @@ from .api_views import (
 )
 __all__ = [
     'process_contract_form',
-    'queue_view',
     'match_buyer',
     'match_supplier',
     'match_nsn',
