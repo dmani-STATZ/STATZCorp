@@ -17,12 +17,13 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1%a(rwepqwcb3)
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
 # Azure App Service configuration
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', [
     'statzweb.azurewebsites.us',
     '127.0.0.1',
     'localhost',
-    'statzweb.azurewebsites.us',  # Allow all Azure subdomains
-]
+    '169.254.130.1','169.254.130.2','169.254.130.5',
+    '.azurewebsites.us',
+]).split(',')
 
 # CORS settings for PWA
 CORS_ALLOW_ALL_ORIGINS = not DEBUG  # Restrict in production
@@ -284,7 +285,7 @@ AZURE_AD_CONFIG = {
     'app_id': os.environ.get('MICROSOFT_AUTH_CLIENT_ID'),
     'app_secret': os.environ.get('MICROSOFT_AUTH_CLIENT_SECRET'),
     'tenant_id': os.environ.get('MICROSOFT_AUTH_TENANT_ID'),
-    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'https://statzweb.azurewebsites.us/microsoft/auth-callback/'),
+    'redirect_uri': os.environ.get('MICROSOFT_AUTH_REDIRECT_URI', 'https://statzweb.azurewebsites.us/microsoft/auth-callback/'),
     'authority': os.environ.get('MICROSOFT_AUTH_AUTHORITY', 'https://login.microsoftonline.us'),
     'graph_endpoint': os.environ.get('MICROSOFT_AUTH_GRAPH_ENDPOINT', 'https://graph.microsoft.us'),
     'scopes': ['https://graph.microsoft.us/User.Read'],

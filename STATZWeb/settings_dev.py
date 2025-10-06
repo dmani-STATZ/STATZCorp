@@ -17,13 +17,13 @@ load_dotenv()
 DEBUG = True
 
 # Development-specific ALLOWED_HOSTS
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', [
     'statzweb.azurewebsites.us',
     'statzutil01',
     '127.0.0.1',
     'localhost',
     '0.0.0.0',  # For Docker if needed
-]
+]).split(',')
 
 # Development database - SQLite for simplicity
 DATABASES = {
@@ -158,7 +158,7 @@ AZURE_AD_CONFIG = {
     'app_id': os.environ.get('MICROSOFT_AUTH_CLIENT_ID', ''),
     'app_secret': os.environ.get('MICROSOFT_AUTH_CLIENT_SECRET', ''),
     'tenant_id': os.environ.get('MICROSOFT_AUTH_TENANT_ID', ''),
-    'redirect_uri': os.environ.get('MICROSOFT_REDIRECT_URI', 'http://localhost:8000/microsoft/auth-callback/'),
+    'redirect_uri': os.environ.get('MICROSOFT_AUTH_REDIRECT_URI', 'http://localhost:8000/microsoft/auth-callback/'),
     'authority': os.environ.get('MICROSOFT_AUTH_AUTHORITY', 'https://login.microsoftonline.us'),
     'graph_endpoint': os.environ.get('MICROSOFT_AUTH_GRAPH_ENDPOINT', 'https://graph.microsoft.us'),
     'scopes': ['https://graph.microsoft.us/User.Read'],
