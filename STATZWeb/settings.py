@@ -17,13 +17,9 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1%a(rwepqwcb3)
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
 # Azure App Service configuration
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', [
-    'statzweb.azurewebsites.us',
-    '127.0.0.1',
-    'localhost',
-    '169.254.130.1','169.254.130.2','169.254.130.5',
-    '.azurewebsites.us',
-]).split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 
+    'statzweb.azurewebsites.us,127.0.0.1,localhost,169.254.130.1,169.254.130.2,169.254.130.5,.azurewebsites.us'
+).split(',')
 
 # CORS settings for PWA
 CORS_ALLOW_ALL_ORIGINS = not DEBUG  # Restrict in production

@@ -17,13 +17,9 @@ load_dotenv()
 DEBUG = True
 
 # Development-specific ALLOWED_HOSTS
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', [
-    'statzweb.azurewebsites.us',
-    'statzutil01',
-    '127.0.0.1',
-    'localhost',
-    '0.0.0.0',  # For Docker if needed
-]).split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 
+    'statzweb.azurewebsites.us,statzutil01,127.0.0.1,localhost,0.0.0.0'
+).split(',')
 
 # Development database - SQLite for simplicity
 DATABASES = {
