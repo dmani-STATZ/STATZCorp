@@ -1,7 +1,4 @@
 {% load static %}
-{% load custom_tags %}
-{% load tailwind_tags %}
-{% load ssl_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -33,86 +30,105 @@
     <meta name="msapplication-starturl" content="/">
     <meta name="msapplication-config" content="none">
 
-    {% tailwind_css %}
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-    <script src="{% static 'js/cert-checker.js' %}"></script>
+    <style>
+        .logo-container {
+            text-align: center;
+            margin-top: 2vh;
+            margin-bottom: -0.5rem; /* keeps logo snug with content box */
+        }
+
+        .logo {
+            max-width: 650px;  /* go big or go home */
+            height: auto;
+            display: inline-block;
+            filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25)); /* gives weight and presence */
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.35));
+        }
+
+        .content-box {
+            max-width: 650px;
+            margin: -0.75rem auto 0 auto; /* pulls the text box closer */
+            padding: 2.25rem 2.75rem;
+            background-color: #ffffffee;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
+            text-align: center;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            color: #222;
+        }
+
+        .title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #800000; /* Or match your logo’s red */
+        }
+
+        .text p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+
+        .button {
+            display: inline-block;
+            background-color: #0056d2;
+            color: #fff;
+            padding: 0.75rem 1.75rem;
+            font-size: 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .button:hover {
+            background-color: #0041a3;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: url('{% static "images/gears-metal-stainless-technology.jpg" %}') center/cover no-repeat fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+    </style>
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     <title>Welcome to STATZ Corporation</title>
 </head>
-<body 
-    class="bg-cover bg-center bg-no-repeat min-h-screen bg-gray-100 bg-fixed dark:bg-gray-900"
-    style="background-image: url('{% static "images/gears-metal-stainless-technology.jpg" %}');">
-    <div class="min-h-screen flex items-start justify-center px-4 sm:px-6 lg:px-8 pt-8">
-        <div class="max-w-2xl w-full space-y-8">
-            <div class="text-center bg-white/80 rounded-lg p-8 backdrop-blur-sm shadow-xl dark:bg-gray-800/90 dark:text-gray-100">
-                <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Logo" class="mx-auto h-48 w-auto">
-                <h1 class="mt-6 text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome to STATZ Corporation</h1>
-                <div class="mt-4 space-y-4 text-gray-600 dark:text-gray-300">
-                    <p>You are entering a STATZ Corporation system. <br>
-                    This system could contain sensitive information that is not for public access.</p>
-                    <p>If you are not an authorized employee, please exit the system immediately.</p>
-                    <p>If you are an authorized employee, please click the button below to continue.</p>
-                </div>
-                <div class="mt-8 max-w-xs mx-auto">
-                    <!-- Certificate Success Notification -->
-                    <div id="cert-success-container" style="display: none;" class="mb-4">
-                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                            <strong class="font-bold">Success!</strong>
-                            <span class="block sm:inline">Certificate installed successfully.</span>
-                        </div>
-                    </div>
-                
-                    <!-- Certificate Error Button Container -->
-                    <div id="cert-button-container" style="display: none;">
-                        <a href="{% url 'cert_error' %}" id="download-cert-button" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
-                            Fix Certificate Error
-                        </a>
-                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">
-                            Your connection is not secure. Click above to fix this issue.
-                            (If you see this message, And you have already fixed the certificate error, Press Ctrl+F5 to refresh the page.)
-                        </p>
-                    </div>
-                    
-                    <!-- Login/Continue Container -->
-                    <div id="login-container">
-                        {% get_require_login as require_login %}
-                        {% if require_login and not user.is_authenticated %}
-                            <a href="{% url 'users:login' %}" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                                Accept & Login
-                            </a>
-                        {% else %}
-                            <a href="{% url 'index' %}" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                                Accept & Continue
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+<body>
+    <!-- Logo at the top, centered -->
+    <div class="logo-container">
+        <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Logo" class="logo">
     </div>
+    
+    <!-- White box with text and button -->
+    <div class="content-box">
+        <h1 class="title">Welcome to the STATZ Corporation Web Application</h1>
+        <div class="text">
+            <p>
+                You are accessing a STATZ Corporation information system.
+                Use of this system is restricted to authorized personnel only.
+                Unauthorized access, use, or disclosure of information on this system is prohibited and may result in disciplinary action or legal consequences.
+            </p>
+            <p>
+                If you are not an authorized STATZ employee, please exit immediately.
+                By clicking <strong>Accept & Continue</strong>, you acknowledge and consent to monitoring and compliance with STATZ Corporation security policies.
+            </p>
+        </div>
+        <a href="{% url 'users:login' %}" class="button">Accept & Continue</a>
+    </div>
+    
 
-    <!-- PWA Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js', {
-                    scope: '/',
-                    updateViaCache: 'none'
-                })
-                .then(reg => {
-                    console.log('Service worker registered successfully. Scope:', reg.scope);
-                })
-                .catch(err => {
-                    console.error('Service worker registration failed:', err);
-                    console.error('Error details:', {
-                        message: err.message,
-                        fileName: err.fileName,
-                        lineNumber: err.lineNumber
-                    });
-                });
-            });
-        }
-    </script>
 </body>
 </html>
