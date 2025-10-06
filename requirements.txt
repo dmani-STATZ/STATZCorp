@@ -1,5 +1,5 @@
 # Core Django and Azure dependencies
-Django==4.2.24  # Latest LTS with security fixes
+Django==4.2.25  # Latest LTS with security fixes
 gunicorn==23.0.0  # Latest version with security fixes
 whitenoise==6.6.0
 
