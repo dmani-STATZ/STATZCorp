@@ -8,6 +8,10 @@ Use this for local development with runserver.
 from .settings import *
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file for development
+load_dotenv()
 
 # Override DEBUG for development
 DEBUG = True
@@ -50,7 +54,7 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 # Development CORS settings (more permissive for local development)
 CORS_ALLOW_ALL_ORIGINS = True
 
-# Development logging (more verbose)
+# Development logging (cleaner output)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -63,12 +67,16 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'clean': {
+            'format': '{levelname}: {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'clean',
         },
         'file': {
             'level': 'DEBUG',
@@ -79,28 +87,33 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.autoreload': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
         },
         'STATZWeb': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
         'users': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
         'contracts': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
         'processing': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
     },
@@ -138,6 +151,9 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Development-specific Azure AD settings (can be overridden by environment)
+# For development, you can either:
+# 1. Set up Azure AD credentials (recommended for testing)
+# 2. Set REQUIRE_LOGIN=False to bypass authentication entirely
 AZURE_AD_CONFIG = {
     'app_id': os.environ.get('MICROSOFT_AUTH_CLIENT_ID', ''),
     'app_secret': os.environ.get('MICROSOFT_AUTH_CLIENT_SECRET', ''),
@@ -148,6 +164,14 @@ AZURE_AD_CONFIG = {
     'scopes': ['https://graph.microsoft.us/User.Read'],
     'auto_create_user': True,
 }
+
+# Debug Azure AD configuration
+print(f"🔍 Azure AD Debug Info:")
+print(f"   App ID: {'SET' if AZURE_AD_CONFIG['app_id'] else 'NOT SET'}")
+print(f"   Tenant ID: {'SET' if AZURE_AD_CONFIG['tenant_id'] else 'NOT SET'}")
+print(f"   Client Secret: {'SET' if AZURE_AD_CONFIG['app_secret'] else 'NOT SET'}")
+print(f"   Authority: {AZURE_AD_CONFIG['authority']}")
+print(f"   Redirect URI: {AZURE_AD_CONFIG['redirect_uri']}")
 
 # Development-specific settings
 # Set to True to require login in development, False to bypass login

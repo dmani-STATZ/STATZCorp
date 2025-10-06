@@ -21,17 +21,28 @@ class MicrosoftAuthView(View):
         if 'microsoft_auth_error' in request.session:
             del request.session['microsoft_auth_error']
         
+        # Check if Azure AD is properly configured
+        if not settings.AZURE_AD_CONFIG.get('app_id') or not settings.AZURE_AD_CONFIG.get('tenant_id'):
+            logger.error("Microsoft authentication is not properly configured. Missing app_id or tenant_id.")
+            request.session['microsoft_auth_error'] = 'Microsoft authentication is not properly configured. Please contact your administrator.'
+            return redirect('users:login')
+        
         # Store the next URL if provided
         next_url = request.GET.get('next')
         if next_url:
             request.session['microsoft_auth_next'] = next_url
         
-        # Initialize MSAL app
-        app = msal.ConfidentialClientApplication(
-            client_id=settings.AZURE_AD_CONFIG['app_id'],
-            client_credential=settings.AZURE_AD_CONFIG['app_secret'],
-            authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
-        )
+        try:
+            # Initialize MSAL app
+            app = msal.ConfidentialClientApplication(
+                client_id=settings.AZURE_AD_CONFIG['app_id'],
+                client_credential=settings.AZURE_AD_CONFIG['app_secret'],
+                authority=f"{settings.AZURE_AD_CONFIG.get('authority', 'https://login.microsoftonline.us')}/{settings.AZURE_AD_CONFIG['tenant_id']}"
+            )
+        except Exception as e:
+            logger.error(f"Error initializing MSAL app: {str(e)}")
+            request.session['microsoft_auth_error'] = 'Authentication service is temporarily unavailable. Please try again later.'
+            return redirect('users:login')
         
         # Generate auth URL with correct scope handling
         auth_url = app.get_authorization_request_url(
@@ -157,6 +168,11 @@ def get_microsoft_login_url(request):
     Generate Microsoft login URL for template use
     """
     try:
+        # Check if Azure AD is properly configured
+        if not settings.AZURE_AD_CONFIG.get('app_id') or not settings.AZURE_AD_CONFIG.get('tenant_id'):
+            logger.error("Microsoft authentication is not properly configured. Missing app_id or tenant_id.")
+            return None
+        
         # Initialize MSAL app
         app = msal.ConfidentialClientApplication(
             client_id=settings.AZURE_AD_CONFIG['app_id'],

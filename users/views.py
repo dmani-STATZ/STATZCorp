@@ -51,6 +51,7 @@ def login_view(request):
         microsoft_login_url = f"{reverse('users:microsoft_login')}?next={next_url}"
     
     context = {
+        'title': 'Login',
         'auth_error': auth_error,
         'microsoft_login_url': microsoft_login_url,
         'admin_mode': request.GET.get('admin', False),
