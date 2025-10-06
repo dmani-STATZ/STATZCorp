@@ -9,6 +9,7 @@ from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFo
 from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
 import csv
 import os
+from io import StringIO
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
