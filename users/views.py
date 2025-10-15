@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .forms import UserRegisterForm, BaseForm, AdminLoginForm, PasswordChangeForm, PasswordSetForm
+from .forms import UserRegisterForm, BaseForm, AdminLoginForm, PasswordChangeForm, PasswordSetForm, EmailLookupForm, OAuthPasswordSetForm
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
 from STATZWeb.decorators import login_required
@@ -506,3 +506,95 @@ def password_set_view(request):
     }
     
     return render(request, 'users/password_set.html', context)
+
+
+def oauth_migration_view(request):
+    """View for OAuth users to set passwords - email lookup step"""
+    if request.method == 'POST':
+        form = EmailLookupForm(data=request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            user = User.objects.get(email=email)
+            # Store user ID in session for next step
+            request.session['oauth_migration_user_id'] = user.id
+            return redirect('users:oauth_password_set')
+    else:
+        form = EmailLookupForm()
+    
+    context = {
+        'title': 'Set Your Password',
+        'form': form,
+    }
+    
+    return render(request, 'users/oauth_migration.html', context)
+
+
+def oauth_password_set_view(request):
+    """View for OAuth users to set passwords - password entry step"""
+    # Check if user ID is in session
+    user_id = request.session.get('oauth_migration_user_id')
+    if not user_id:
+        messages.error(request, 'Please start the password setup process from the beginning.')
+        return redirect('users:oauth_migration')
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, 'Invalid user. Please start over.')
+        return redirect('users:oauth_migration')
+    
+    # Check if user already has a password
+    if user.has_usable_password():
+        messages.info(request, 'This account already has a password set.')
+        del request.session['oauth_migration_user_id']
+        return redirect('users:login')
+    
+    if request.method == 'POST':
+        form = OAuthPasswordSetForm(user, data=request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['new_password1']
+            user.set_password(new_password)
+            user.save()
+            # Clear session
+            del request.session['oauth_migration_user_id']
+            # Log the user in
+            auth_login(request, user)
+            messages.success(request, f'Welcome back, {user.first_name or user.username}! Your password has been set successfully.')
+            return redirect('index')
+    else:
+        form = OAuthPasswordSetForm(user)
+    
+    context = {
+        'title': 'Set Your Password',
+        'form': form,
+        'user': user,
+    }
+    
+    return render(request, 'users/oauth_password_set.html', context)
+
+
+def custom_password_reset(request):
+    """Custom password reset that redirects OAuth users to migration flow"""
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        if email:
+            try:
+                user = User.objects.get(email=email)
+                if not user.has_usable_password():
+                    # OAuth user - redirect to migration flow
+                    request.session['oauth_migration_user_id'] = user.id
+                    messages.info(request, 'OAuth user detected. Redirecting to password setup...')
+                    return redirect('users:oauth_password_set')
+                else:
+                    # Regular user - use standard password reset
+                    return redirect('users:password_reset')
+            except User.DoesNotExist:
+                messages.error(request, 'No account found with this email address.')
+    
+    # Show email form
+    form = EmailLookupForm()
+    context = {
+        'title': 'Password Reset',
+        'form': form,
+    }
+    return render(request, 'users/custom_password_reset.html', context)

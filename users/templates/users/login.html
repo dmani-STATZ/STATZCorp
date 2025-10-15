@@ -111,7 +111,7 @@
                 </form>
                 <div class="text-center mt-4">
                     <p class="text-sm text-gray-300">
-                        <a href="{% url 'users:password_reset' %}" class="text-blue-300 hover:text-blue-200">Forgot your password?</a>
+                        <a href="{% url 'users:custom_password_reset' %}" class="text-blue-300 hover:text-blue-200">Forgot your password?</a>
                     </p>
                 </div>
             </div>
@@ -119,6 +119,11 @@
             <div class="text-center mt-6">
                 <p class="text-sm text-gray-300">
                     Need an account? Contact your administrator.
+                </p>
+                <p class="text-sm text-gray-300 mt-2">
+                    <a href="{% url 'users:oauth_migration' %}" class="text-blue-300 hover:text-blue-200 underline">
+                        OAuth user? Set your password here
+                    </a>
                 </p>
             </div>
         </div>

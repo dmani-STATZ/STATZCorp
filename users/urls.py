@@ -37,6 +37,11 @@ urlpatterns = [
     path('password-change/', views.password_change_view, name='password_change'),
     path('password-set/', views.password_set_view, name='password_set'),
     
+    # OAuth migration URLs
+    path('oauth-migration/', views.oauth_migration_view, name='oauth_migration'),
+    path('oauth-password-set/', views.oauth_password_set_view, name='oauth_password_set'),
+    path('custom-password-reset/', views.custom_password_reset, name='custom_password_reset'),
+    
     # Microsoft Authentication URLs
     path('microsoft/login/', MicrosoftAuthView.as_view(), name='microsoft_login'),
     path('microsoft/auth-callback/', MicrosoftCallbackView.as_view(), name='microsoft_callback'),

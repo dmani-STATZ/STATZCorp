@@ -104,3 +104,42 @@ class PasswordSetForm(BaseFormMixin, forms.Form):
                 raise forms.ValidationError('Password must be at least 8 characters long.')
 
         return cleaned_data
+
+
+class EmailLookupForm(BaseFormMixin, forms.Form):
+    """Email lookup form for OAuth users to set passwords"""
+    email = forms.EmailField(label='Email Address', help_text='Enter the email address associated with your account')
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        try:
+            user = User.objects.get(email=email)
+            # Check if user doesn't have a usable password (OAuth user)
+            if user.has_usable_password():
+                raise forms.ValidationError('This account already has a password set. Please use the regular login.')
+            return email
+        except User.DoesNotExist:
+            raise forms.ValidationError('No account found with this email address. Please contact your administrator.')
+
+
+class OAuthPasswordSetForm(BaseFormMixin, forms.Form):
+    """Password set form specifically for OAuth users"""
+    new_password1 = forms.CharField(widget=forms.PasswordInput, label='New Password')
+    new_password2 = forms.CharField(widget=forms.PasswordInput, label='Confirm New Password')
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        new_password1 = cleaned_data.get('new_password1')
+        new_password2 = cleaned_data.get('new_password2')
+
+        if new_password1 and new_password2:
+            if new_password1 != new_password2:
+                raise forms.ValidationError('Passwords do not match.')
+            if len(new_password1) < 8:
+                raise forms.ValidationError('Password must be at least 8 characters long.')
+
+        return cleaned_data
