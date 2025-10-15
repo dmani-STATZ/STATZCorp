@@ -80,7 +80,7 @@ def download_certificate(request):
 urlpatterns = [
     path("__reload__/", include("django_browser_reload.urls")),
     path('admin/', admin.site.urls),
-    path('', views.landing_page, name='landing'),
+    path('', views.landing, name='landing'),
     path('home/', views.index, name='index'),
     path('about/', views.about, name='about'),
     path('permission_denied/', user_views.permission_denied, name='permission_denied'),
@@ -110,6 +110,10 @@ urlpatterns = [
     
     # Health check endpoint for certificate verification
     path('api/health-check/', lambda request: JsonResponse({'status': 'ok'}), name='health_check'),
+    
+    # System test URLs
+    path('system-test/', views.system_test, name='system_test'),
+    path('api/system-test/', views.system_test_api, name='system_test_api'),
 ]
 
 # Always serve static/media files (even in production)

@@ -126,7 +126,10 @@
                 By clicking <strong>Accept & Continue</strong>, you acknowledge and consent to monitoring and compliance with STATZ Corporation security policies.
             </p>
         </div>
-        <a href="{% url 'users:login' %}" class="button">Accept & Continue</a>
+        <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 1rem;">
+            <a href="{% url 'users:login' %}" class="button">Accept & Continue</a>
+            <a href="{% url 'system_test' %}" class="button" style="background-color: #6b7280; text-decoration: none;">System Test</a>
+        </div>
         
         <!-- Version Information -->
         <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; font-size: 0.85rem; color: #666;">
