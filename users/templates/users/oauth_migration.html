@@ -59,6 +59,11 @@
                 <p class="text-sm text-gray-300">
                     Need help? Contact your administrator.
                 </p>
+                {% if debug_info %}
+                <p class="text-xs text-gray-400 mt-2">
+                    Debug: {{ debug_info }}
+                </p>
+                {% endif %}
             </div>
         </div>
     </div>

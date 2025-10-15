@@ -114,9 +114,7 @@ class EmailLookupForm(BaseFormMixin, forms.Form):
         email = self.cleaned_data.get('email')
         try:
             user = User.objects.get(email=email)
-            # Check if user doesn't have a usable password (OAuth user)
-            if user.has_usable_password():
-                raise forms.ValidationError('This account already has a password set. Please use the regular login.')
+            # Allow both OAuth users (no password) and users who want to change their password
             return email
         except User.DoesNotExist:
             raise forms.ValidationError('No account found with this email address. Please contact your administrator.')

@@ -19,6 +19,9 @@ class LoginRequiredMiddleware:
             '/users/password-reset/done/',
             '/users/password-reset-confirm/',
             '/users/password-reset-complete/',
+            '/users/oauth-migration/',
+            '/users/oauth-password-set/',
+            '/users/custom-password-reset/',
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 

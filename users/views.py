@@ -514,16 +514,30 @@ def oauth_migration_view(request):
         form = EmailLookupForm(data=request.POST)
         if form.is_valid():
             email = form.cleaned_data['email']
-            user = User.objects.get(email=email)
-            # Store user ID in session for next step
-            request.session['oauth_migration_user_id'] = user.id
-            return redirect('users:oauth_password_set')
+            try:
+                user = User.objects.get(email=email)
+                # Store user ID in session for next step
+                request.session['oauth_migration_user_id'] = user.id
+                messages.success(request, f'Account found for {email}. Please set your password.')
+                return redirect('users:oauth_password_set')
+            except User.DoesNotExist:
+                messages.error(request, f'No account found with email: {email}')
+        else:
+            # Form has validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = EmailLookupForm()
+    
+    # Debug: Show all users with emails for testing
+    all_users = User.objects.filter(email__isnull=False).exclude(email='')
+    debug_info = f"Available emails: {', '.join([u.email for u in all_users[:5]])}"  # Show first 5
     
     context = {
         'title': 'Set Your Password',
         'form': form,
+        'debug_info': debug_info,
     }
     
     return render(request, 'users/oauth_migration.html', context)
@@ -543,12 +557,6 @@ def oauth_password_set_view(request):
         messages.error(request, 'Invalid user. Please start over.')
         return redirect('users:oauth_migration')
     
-    # Check if user already has a password
-    if user.has_usable_password():
-        messages.info(request, 'This account already has a password set.')
-        del request.session['oauth_migration_user_id']
-        return redirect('users:login')
-    
     if request.method == 'POST':
         form = OAuthPasswordSetForm(user, data=request.POST)
         if form.is_valid():
@@ -561,13 +569,25 @@ def oauth_password_set_view(request):
             auth_login(request, user)
             messages.success(request, f'Welcome back, {user.first_name or user.username}! Your password has been set successfully.')
             return redirect('index')
+        else:
+            # Form has validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = OAuthPasswordSetForm(user)
+    
+    # Show appropriate message based on whether user already has a password
+    if user.has_usable_password():
+        password_status = "update your password"
+    else:
+        password_status = "set your password"
     
     context = {
         'title': 'Set Your Password',
         'form': form,
         'user': user,
+        'password_status': password_status,
     }
     
     return render(request, 'users/oauth_password_set.html', context)
