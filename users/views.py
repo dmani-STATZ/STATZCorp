@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .forms import UserRegisterForm
+from .forms import UserRegisterForm, BaseForm, AdminLoginForm, PasswordChangeForm, PasswordSetForm
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
 from STATZWeb.decorators import login_required
@@ -18,6 +18,7 @@ from django.contrib.auth import authenticate, login as auth_login
 from .ms_views import get_microsoft_login_url
 from django.views.generic import ListView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.forms import AuthenticationForm
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +51,31 @@ def login_view(request):
     if next_url:
         microsoft_login_url = f"{reverse('users:microsoft_login')}?next={next_url}"
     
+    # Handle password login form
+    password_form = None
+    
+    if request.method == 'POST' and 'password_login' in request.POST:
+        password_form = AdminLoginForm(data=request.POST)
+        if password_form.is_valid():
+            username = password_form.cleaned_data.get('username')
+            password = password_form.cleaned_data.get('password')
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                auth_login(request, user)
+                messages.success(request, f'Welcome back, {user.username}!')
+                return redirect(next_url or 'index')
+            else:
+                auth_error = 'Invalid username or password.'
+        else:
+            auth_error = 'Please correct the errors below.'
+    else:
+        password_form = AdminLoginForm()
+    
     context = {
         'title': 'Login',
         'auth_error': auth_error,
         'microsoft_login_url': microsoft_login_url,
-        'admin_mode': request.GET.get('admin', False),
+        'form': password_form,
     }
     
     return render(request, 'users/login.html', context)
@@ -67,7 +88,11 @@ def register(request):
 
 @login_required
 def profile(request):
-    return render(request, 'users/profile.html')
+    """User profile page showing account information and password management"""
+    context = {
+        'title': 'User Profile',
+    }
+    return render(request, 'users/profile.html', context)
 
 
 @receiver(user_logged_out)
@@ -432,3 +457,52 @@ def user_settings_view(request):
     }
     
     return render(request, 'users/settings_view.html', context)
+
+
+@login_required
+def password_change_view(request):
+    """View for changing user password"""
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, data=request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['new_password1']
+            request.user.set_password(new_password)
+            request.user.save()
+            messages.success(request, 'Your password has been changed successfully.')
+            return redirect('users:profile')
+    else:
+        form = PasswordChangeForm(request.user)
+    
+    context = {
+        'title': 'Change Password',
+        'form': form,
+    }
+    
+    return render(request, 'users/password_change.html', context)
+
+
+@login_required
+def password_set_view(request):
+    """View for setting initial password for users without one"""
+    # Check if user already has a password
+    if request.user.has_usable_password():
+        messages.info(request, 'You already have a password set.')
+        return redirect('users:profile')
+    
+    if request.method == 'POST':
+        form = PasswordSetForm(data=request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['new_password1']
+            request.user.set_password(new_password)
+            request.user.save()
+            messages.success(request, 'Your password has been set successfully.')
+            return redirect('users:profile')
+    else:
+        form = PasswordSetForm()
+    
+    context = {
+        'title': 'Set Password',
+        'form': form,
+    }
+    
+    return render(request, 'users/password_set.html', context)

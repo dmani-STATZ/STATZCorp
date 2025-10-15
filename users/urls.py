@@ -10,6 +10,7 @@ urlpatterns = [
     path('register/', views.register, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(template_name='users/logout.html'), name='logout'),
+    path('profile/', views.profile, name='profile'),
     path('password-reset/', 
          auth_views.PasswordResetView.as_view(template_name='users/password_reset.html'), 
          name='password_reset'),
@@ -31,6 +32,10 @@ urlpatterns = [
     path('settings/ajax/get/', views.ajax_get_user_setting, name='settings-get'),
     path('settings/ajax/save/', views.ajax_save_setting, name='settings-save'),
     path('settings/ajax/types/', views.ajax_get_setting_types, name='settings-types'),
+    
+    # Password management URLs
+    path('password-change/', views.password_change_view, name='password_change'),
+    path('password-set/', views.password_set_view, name='password_set'),
     
     # Microsoft Authentication URLs
     path('microsoft/login/', MicrosoftAuthView.as_view(), name='microsoft_login'),

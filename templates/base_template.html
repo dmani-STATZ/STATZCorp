@@ -116,7 +116,7 @@
                         {% if user.is_superuser %}
                         <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">Welcome, {{ user.first_name }}</a>
                     {% else %}
-                        <a href="#" class="nav-item nav-link text-white px-3 py-2">Welcome, {{ user.first_name }}</a>
+                        <a href="{% url 'users:profile' %}" class="nav-item nav-link text-white px-3 py-2">Welcome, {{ user.first_name }}</a>
                     {% endif %}
                     
                     <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
