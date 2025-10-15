@@ -78,8 +78,10 @@ class SystemTester:
                         'database_engine': settings.DATABASES['default']['ENGINE'],
                         'database_name': settings.DATABASES['default']['NAME'],
                         'database_host': settings.DATABASES['default'].get('HOST', 'N/A'),
+                        'database_user': settings.DATABASES['default'].get('USER', 'N/A'),
                         'version': version[0] if version else 'Unknown',
                         'table_count': table_count[0] if table_count else 0,
+                        'connection_timeout': settings.DATABASES['default'].get('OPTIONS', {}).get('timeout', 'Default'),
                     }
                     
                     self.add_result(test_name, True, "Database connection successful", details)
@@ -89,7 +91,42 @@ class SystemTester:
                     return self.results[-1]
                     
         except Exception as e:
-            self.add_result(test_name, False, f"Database connection failed: {str(e)}")
+            error_msg = str(e)
+            details = {
+                'database_engine': settings.DATABASES['default']['ENGINE'],
+                'database_name': settings.DATABASES['default']['NAME'],
+                'database_host': settings.DATABASES['default'].get('HOST', 'N/A'),
+                'database_user': settings.DATABASES['default'].get('USER', 'N/A'),
+                'error_type': type(e).__name__,
+                'error_details': error_msg,
+            }
+            
+            # Provide specific troubleshooting advice based on error type
+            troubleshooting = []
+            if 'timeout' in error_msg.lower():
+                troubleshooting.extend([
+                    "Check if Azure SQL Server firewall allows your IP",
+                    "Verify server name and port (usually 1433)",
+                    "Ensure Azure SQL Server is running and accessible",
+                    "Check if connection string parameters are correct"
+                ])
+            elif 'login' in error_msg.lower():
+                troubleshooting.extend([
+                    "Verify database username and password",
+                    "Check if user has proper permissions",
+                    "Ensure user exists in the database"
+                ])
+            elif 'server' in error_msg.lower():
+                troubleshooting.extend([
+                    "Verify server name is correct",
+                    "Check if server is accessible from your network",
+                    "Ensure DNS resolution works for server name"
+                ])
+            
+            if troubleshooting:
+                details['troubleshooting_steps'] = troubleshooting
+            
+            self.add_result(test_name, False, f"Database connection failed: {error_msg}", details)
             return self.results[-1]
     
     def test_environment_variables(self) -> SystemTestResult:

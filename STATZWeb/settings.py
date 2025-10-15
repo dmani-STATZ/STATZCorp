@@ -6,6 +6,7 @@ Optimized for Azure App Service deployment.
 
 from pathlib import Path
 import os
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,6 +16,10 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1%a(rwepqwcb3)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
+
+# Validate secret key in production
+if not DEBUG and SECRET_KEY == 'django-insecure-1%a(rwepqwcb3)76hxfr*ino^y84977usbdg36h(f--o-s3s(=':
+    raise ImproperlyConfigured("SECRET_KEY must be set to a secure value in production!")
 
 # Azure App Service configuration
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 
@@ -121,6 +126,9 @@ if os.environ.get('WEBSITE_SITE_NAME'):  # Running on Azure App Service
             'HOST': os.environ.get('DB_HOST'),
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
+                'timeout': 30,  # Connection timeout in seconds
+                'autocommit': True,
+                'extra_params': 'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;',
             },
         },
     }
@@ -253,6 +261,14 @@ CSRF_COOKIE_SECURE = not DEBUG  # Force HTTPS for CSRF cookies in production
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0  # 1 year in production
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
+
+# Additional security headers
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Database connection security will be handled in the database configuration section above
 
 # CSRF settings for Azure
 CSRF_TRUSTED_ORIGINS = [
