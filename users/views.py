@@ -19,6 +19,7 @@ from .ms_views import get_microsoft_login_url
 from django.views.generic import ListView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import AuthenticationForm
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -565,8 +566,9 @@ def oauth_password_set_view(request):
             user.save()
             # Clear session
             del request.session['oauth_migration_user_id']
-            # Log the user in
-            auth_login(request, user)
+            # Log the user in with the first available backend
+            backend = settings.AUTHENTICATION_BACKENDS[0] if settings.AUTHENTICATION_BACKENDS else 'django.contrib.auth.backends.ModelBackend'
+            auth_login(request, user, backend=backend)
             messages.success(request, f'Welcome back, {user.first_name or user.username}! Your password has been set successfully.')
             return redirect('index')
         else:

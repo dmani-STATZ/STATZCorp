@@ -97,6 +97,7 @@ TEMPLATES = [
                 'contracts.context_processors.reminders_processor',
                 'users.context_processors.user_preferences',
                 'users.context_processors.unread_messages',
+                'STATZWeb.context_processors.version_context',
             ],
         },
     },

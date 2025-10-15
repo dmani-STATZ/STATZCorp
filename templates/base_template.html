@@ -109,6 +109,11 @@
                 &nbsp;&nbsp;<p class="text-yellow-300 mr-4 font-medium">Development Environment</p>
             {% endif %}
             
+            <!-- Version Information -->
+            <div class="text-xs text-gray-400 mr-4">
+                <span title="Full version info: {{ detailed_version }}">{{ display_version }}</span>
+            </div>
+            
             {% get_require_login as require_login %}
             {% if require_login %}
                 {% if user.is_authenticated %}
