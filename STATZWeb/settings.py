@@ -128,7 +128,7 @@ if os.environ.get('WEBSITE_SITE_NAME'):  # Running on Azure App Service
                 'driver': 'ODBC Driver 17 for SQL Server',
                 'timeout': 30,  # Connection timeout in seconds
                 'autocommit': True,
-                'extra_params': 'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;',
+                'extra_params': 'Encrypt=yes;TrustServerCertificate=yes;Connection Timeout=30;',
             },
         },
     }
