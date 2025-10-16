@@ -22,6 +22,8 @@ class LoginRequiredMiddleware:
             '/users/oauth-migration/',
             '/users/oauth-password-set/',
             '/users/custom-password-reset/',
+            '/system-test/',  # System test page for troubleshooting
+            '/api/system-test/',  # System test API endpoint
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 
