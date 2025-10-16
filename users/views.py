@@ -39,13 +39,13 @@ def login_view(request):
         logger.debug(f"User {request.user.username} is already authenticated")
         return redirect('index')
     
-    # Check for Microsoft auth success
-    if microsoft_auth_success:
-        logger.debug("Microsoft auth successful, redirecting to index")
-        return redirect('index')
-    
     # Get the next URL from query parameters
     next_url = request.GET.get('next')
+    
+    # Check for Microsoft auth success
+    if microsoft_auth_success:
+        logger.debug(f"Microsoft auth successful, redirecting to: {next_url or 'index'}")
+        return redirect(next_url or 'index')
     
     # Get Microsoft login URL
     microsoft_login_url = get_microsoft_login_url(request)

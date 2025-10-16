@@ -82,7 +82,7 @@
             
             <!-- Microsoft Login Content -->
             <div id="microsoft-content" class="login-content active">
-                <a href="{% url 'users:microsoft_login' %}" class="microsoft-button">
+                <a href="{{ microsoft_login_url }}" class="microsoft-button">
                     <img src="{% static 'users/img/ms-logo.svg' %}" alt="Microsoft logo" class="microsoft-logo">
                     Sign in with Microsoft
                 </a>
