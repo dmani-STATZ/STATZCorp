@@ -57,11 +57,11 @@ python dev_commands.py shell
 
 ## Environment Configuration
 
-### Development Settings
-- **Default**: Uses `STATZWeb.settings_dev` (development-optimized)
-- **Database**: SQLite (for easy development)
-- **Debug**: Enabled with verbose logging
-- **Login**: Required by default (can be disabled)
+### Consolidated Settings
+- **Single Settings File**: `STATZWeb.settings` handles both development and production
+- **Auto-Detection**: Automatically detects environment based on `WEBSITE_SITE_NAME` variable
+- **Development**: Uses `.env` file, SQLite database, debug enabled
+- **Production**: Uses Azure environment variables, SQL Server database, debug disabled
 
 ### Environment Variables
 Create a `.env` file from `env.dev.example`:
@@ -72,21 +72,25 @@ cp env.dev.example .env
 Key settings:
 - `REQUIRE_LOGIN=True/False` - Enable/disable login requirement
 - `DJANGO_DEBUG=True/False` - Enable/disable debug mode
+- `DB_HOST`, `DB_NAME`, etc. - Optional SQL Server for development
 
-## Production vs Development
+## Development vs Production
 
 ### Development Mode (Default)
-- Uses `STATZWeb.settings_dev`
-- SQLite database
-- Debug enabled
-- Verbose logging
-- Login required by default
+- **Environment**: Detected by absence of `WEBSITE_SITE_NAME`
+- **Database**: SQLite (can be overridden with DB_* environment variables)
+- **Debug**: Enabled with verbose logging
+- **Login**: Optional (set `REQUIRE_LOGIN=False` in .env)
+- **Static Files**: Standard Django static files
+- **Security**: Relaxed for development
 
 ### Production Mode
-To run in production mode:
-```bash
-DJANGO_SETTINGS_MODULE=STATZWeb.settings python manage.py runserver
-```
+- **Environment**: Detected by presence of `WEBSITE_SITE_NAME` (Azure App Service)
+- **Database**: Azure SQL Server (requires DB_* environment variables)
+- **Debug**: Disabled
+- **Login**: Required (set `REQUIRE_LOGIN=True`)
+- **Static Files**: WhiteNoise for Azure
+- **Security**: Full production security settings
 
 ## Troubleshooting
 
@@ -102,18 +106,16 @@ DJANGO_SETTINGS_MODULE=STATZWeb.settings python manage.py runserver
 
 ### Database Issues
 - Development uses SQLite by default
-- If you need SQL Server for development, update `STATZWeb/settings_dev.py`
+- If you need SQL Server for development, set DB_* environment variables in .env file
 
 ## File Structure
 
 ```
 STATZWeb/
-├── settings.py          # Production settings
-├── settings_dev.py      # Development settings
-├── manage.py            # Django management (uses dev settings by default)
+├── settings.py          # Consolidated settings (dev + production)
+├── manage.py            # Django management (uses consolidated settings)
 ├── dev_commands.py      # Development helper script
-├── requirements.txt     # Production dependencies
-├── requirements-dev.txt # Development dependencies
+├── requirements.txt     # All dependencies
 ├── env.dev.example     # Environment variables template
 └── .env                # Your local environment variables (not in git)
 ```

@@ -6,8 +6,8 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    # Use development settings by default, but allow override via environment variable
-    settings_module = os.environ.get('DJANGO_SETTINGS_MODULE', 'STATZWeb.settings_dev')
+    # Use consolidated settings that handle both development and production
+    settings_module = os.environ.get('DJANGO_SETTINGS_MODULE', 'STATZWeb.settings')
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', settings_module)
     
     try:

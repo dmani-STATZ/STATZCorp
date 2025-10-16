@@ -39,6 +39,7 @@ webcolors==1.13
 # Development tools (optional)
 django-extensions==3.2.3
 django-browser-reload==1.15.0
+python-dotenv==1.0.1
 
 # Security
 cryptography==44.0.1
