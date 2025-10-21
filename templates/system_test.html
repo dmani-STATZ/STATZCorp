@@ -65,7 +65,10 @@
                 </div>
                 <div class="text-right">
                     <p class="text-sm text-gray-500">Version: {{ display_version }}</p>
-                    <p class="text-sm text-gray-500">Build: {{ version_info.date }}</p>
+                    {% if version_info.build_number %}
+                    <p class="text-sm text-gray-500">Build: {{ version_info.build_number }}</p>
+                    {% endif %}
+                    <p class="text-sm text-gray-500">Date: {{ version_info.date }}</p>
                     {% if user_authenticated %}
                     <p class="text-sm text-gray-500">User: {{ user.username }}</p>
                     {% else %}

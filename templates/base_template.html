@@ -112,6 +112,9 @@
             <!-- Version Information -->
             <div class="text-xs text-gray-400 mr-4">
                 <span title="Full version info: {{ detailed_version }}">{{ display_version }}</span>
+                {% if version_info.build_number %}
+                <br><span class="text-xs text-gray-500">Build: {{ version_info.build_number }}</span>
+                {% endif %}
             </div>
             
             {% get_require_login as require_login %}

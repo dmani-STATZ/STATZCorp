@@ -1,0 +1,39 @@
+# Azure DevOps Pipeline Step for Setting Version Information
+# Add this step to your deployment pipeline before the main deployment
+
+- task: PythonScript@0
+  displayName: 'Set Production Version Information'
+  inputs:
+    scriptSource: 'filePath'
+    scriptPath: 'scripts/set_production_version.py'
+    pythonInterpreter: 'python3'
+  env:
+    # Set these variables in your pipeline or Azure App Service
+    BUILD_COMMIT_HASH: $(Build.SourceVersion)
+    BUILD_SHORT_HASH: $(Build.SourceVersion.Substring(0,7))
+    BUILD_BRANCH: $(Build.SourceBranchName)
+    BUILD_TAG: $(Build.SourceBranchName)
+    BUILD_DATE: $(Build.BuildDate)
+    BUILD_NUMBER: $(Build.BuildNumber)
+    WEBSITE_DEPLOYMENT_ID: $(Build.BuildId)
+
+# Alternative: Use Azure CLI to set environment variables
+- task: AzureCLI@2
+  displayName: 'Set Build Environment Variables'
+  inputs:
+    azureSubscription: 'your-azure-subscription'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Set build information as environment variables
+      az webapp config appsettings set \
+        --name $(AppServiceName) \
+        --resource-group $(ResourceGroupName) \
+        --settings \
+        BUILD_COMMIT_HASH="$(Build.SourceVersion)" \
+        BUILD_SHORT_HASH="$(Build.SourceVersion.Substring(0,7))" \
+        BUILD_BRANCH="$(Build.SourceBranchName)" \
+        BUILD_TAG="$(Build.SourceBranchName)" \
+        BUILD_DATE="$(Build.BuildDate)" \
+        BUILD_NUMBER="$(Build.BuildNumber)" \
+        WEBSITE_DEPLOYMENT_ID="$(Build.BuildId)"

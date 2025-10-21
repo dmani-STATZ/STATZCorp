@@ -131,6 +131,9 @@
         <!-- Version Information -->
         <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; font-size: 0.85rem; color: #666;">
             <p style="margin: 0.25rem 0;">Version: {{ display_version }}</p>
+            {% if version_info.build_number %}
+            <p style="margin: 0.25rem 0;">Build: {{ version_info.build_number }}</p>
+            {% endif %}
             <p style="margin: 0.25rem 0;">Build Date: {{ version_info.date }}</p>
             <p style="margin: 0.25rem 0;">Branch: {{ version_info.branch }}</p>
         </div>
