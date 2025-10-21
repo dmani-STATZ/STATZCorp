@@ -55,17 +55,27 @@ class Command(BaseCommand):
         """Automatically generate build information from current state."""
         self.stdout.write('Generating build information automatically...')
         
-        # Get current version info
-        version_info = version_manager.get_version_info()
+        # Start fresh with Git info if available
+        version_info = {
+            'commit_hash': version_manager.get_commit_hash() or '',
+            'short_hash': version_manager.get_short_hash() or '',
+            'branch': version_manager.get_branch_name() or '',
+            'tag': version_manager.get_tag_info() or 'none',
+            'date': '',
+            'build_number': '',
+            'deployment_id': '',
+        }
         
-        # Generate build number if not present
-        if not version_info.get('build_number'):
-            timestamp = datetime.now().strftime('%Y%m%d%H%M')
-            version_info['build_number'] = f"build-{timestamp}"
-        
-        # Set date if not present
-        if version_info.get('date') == 'unknown':
+        # Set commit date if available
+        commit_date = version_manager.get_commit_date()
+        if commit_date:
+            version_info['date'] = commit_date.strftime('%Y-%m-%d')
+        else:
             version_info['date'] = datetime.now().strftime('%Y-%m-%d')
+        
+        # Generate new build number
+        timestamp = datetime.now().strftime('%Y%m%d%H%M')
+        version_info['build_number'] = f"build-{timestamp}"
         
         # Save the version info
         version_manager._save_version_info(version_info)
