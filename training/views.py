@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .forms import MatrixManagementForm, ArcticWolfCourseForm
+from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
 from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion
 from django.utils import timezone
 from django.core.files.base import ContentFile
@@ -315,3 +315,67 @@ def arctic_wolf_audit(request):
         'audit_data': audit_data,
     }
     return render(request, 'training/arctic_wolf_audit.html', context)
+
+@login_required
+def admin_cmmc_upload(request):
+    """
+    Administrator view for uploading CMMC training documents.
+    Restricted to staff users only.
+    """
+    if not request.user.is_staff:
+        messages.error(request, "You do not have permission to access this page.")
+        return redirect('training:dashboard')
+    
+    if request.method == 'POST':
+        form = CmmcDocumentUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                user = form.cleaned_data['user']
+                course = form.cleaned_data['course']
+                uploaded_file = form.cleaned_data['file']
+                
+                # Find the relevant Matrix entry for this user/course combination
+                user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+                matrix_entry = Matrix.objects.filter(
+                    account__in=user_accounts,
+                    course=course
+                ).first()
+                
+                if not matrix_entry:
+                    messages.error(request, "No valid matrix entry found for the selected user/course combination.")
+                    return render(request, 'training/admin_cmmc_upload.html', {'form': form})
+                
+                # Create or update the Tracker entry
+                tracker_entry, created = Tracker.objects.get_or_create(
+                    user=user,
+                    matrix=matrix_entry,
+                    defaults={'completed_date': timezone.now().date()}
+                )
+                
+                # Store the uploaded file
+                tracker_entry.document = uploaded_file.read()
+                tracker_entry.document_name = get_valid_filename(uploaded_file.name)
+                tracker_entry.save()
+                
+                action = "created" if created else "updated"
+                messages.success(
+                    request, 
+                    f"Document successfully {action} for {user.get_full_name() or user.username} - {course.name}"
+                )
+                return redirect('training:admin_cmmc_upload')
+                
+            except Exception as e:
+                messages.error(request, f"Error uploading document: {str(e)}")
+    else:
+        form = CmmcDocumentUploadForm()
+    
+    # Get existing uploads for context (optional display)
+    existing_uploads = Tracker.objects.filter(
+        document__isnull=False
+    ).select_related('user', 'matrix__course').order_by('-completed_date')[:10]
+    
+    context = {
+        'form': form,
+        'existing_uploads': existing_uploads,
+    }
+    return render(request, 'training/admin_cmmc_upload.html', context)

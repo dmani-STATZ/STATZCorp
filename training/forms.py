@@ -1,5 +1,6 @@
 from django import forms
-from .models import Course, Account, Matrix, ArcticWolfCourse
+from django.contrib.auth.models import User
+from .models import Course, Account, Matrix, ArcticWolfCourse, UserAccount
 
 class BaseFormMixin:
     """
@@ -95,3 +96,50 @@ class ArcticWolfCourseForm(BaseModelForm):
     class Meta:
         model = ArcticWolfCourse
         fields = ['name', 'description']
+
+class CmmcDocumentUploadForm(BaseForm):
+    """
+    Form for administrators to upload CMMC training documents for users.
+    Validates that the selected user/course combination is valid according to the CMMC matrix.
+    """
+    user = forms.ModelChoiceField(
+        queryset=User.objects.filter(is_active=True).order_by('username'),
+        label="User",
+        empty_label="Select a user"
+    )
+    course = forms.ModelChoiceField(
+        queryset=Course.objects.all().order_by('name'),
+        label="Course",
+        empty_label="Select a course"
+    )
+    file = forms.FileField(
+        label="Document",
+        help_text="Upload supporting document for this training completion"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Apply specific styling for file input
+        self.fields['file'].widget.attrs['class'] = 'form-input'
+        self.fields['file'].widget.attrs['accept'] = '.pdf,.doc,.docx,.jpg,.jpeg,.png'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        user = cleaned_data.get('user')
+        course = cleaned_data.get('course')
+
+        if user and course:
+            # Check if the user has any account types that require this course
+            user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+            valid_matrix = Matrix.objects.filter(
+                account__in=user_accounts,
+                course=course
+            ).exists()
+
+            if not valid_matrix:
+                raise forms.ValidationError(
+                    f"The selected user '{user.username}' is not required to complete the course '{course.name}' "
+                    "according to the CMMC matrix. Please select a valid user/course combination."
+                )
+
+        return cleaned_data
