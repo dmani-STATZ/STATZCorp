@@ -24,12 +24,15 @@ def dashboard(request):
     ).count()
     user_total_required_courses = user_required_matrix_entries.count()
 
-    # CMMC Data for Pie Chart (considering users with accounts)
-    users_with_accounts = UserAccount.objects.values_list('user_id', flat=True).distinct()
+    # CMMC Data for Pie Chart (considering non-staff users with accounts)
+    # CMMC Training Matrix: Shows users where is_active=True AND is_staff=False
+    cmmc_users_with_accounts = UserAccount.objects.filter(
+        user__is_active=True
+    ).values_list('user_id', flat=True).distinct()
     total_possible_cmmc_trainings = 0
     total_completed_cmmc_trainings = 0
 
-    for user_id in users_with_accounts:
+    for user_id in cmmc_users_with_accounts:
         user_accounts = UserAccount.objects.filter(user_id=user_id)
         required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in user_accounts]).distinct()
         total_possible_cmmc_trainings += required_matrix_entries.count()
@@ -43,11 +46,15 @@ def dashboard(request):
 
     uncompleted_cmmc_trainings = total_possible_cmmc_trainings - total_completed_cmmc_trainings if total_possible_cmmc_trainings > 0 else 0
 
-    # Arctic Wolf Data for Pie Chart (all active users)
-    active_users_count = User.objects.filter(is_active=True).count()
+    # Arctic Wolf Data for Pie Chart (staff users only)
+    # Arctic Wolf Training Matrix: Shows users where is_active=True AND is_staff=True
+    staff_users_count = User.objects.filter(is_active=True, is_staff=True).count()
     total_aw_courses = ArcticWolfCourse.objects.all().count()
-    total_possible_aw_completions = total_aw_courses * active_users_count
-    total_actual_aw_completions = ArcticWolfCompletion.objects.all().count()
+    total_possible_aw_completions = total_aw_courses * staff_users_count
+    total_actual_aw_completions = ArcticWolfCompletion.objects.filter(
+        user__is_active=True, 
+        user__is_staff=True
+    ).count()
     uncompleted_aw_completions = total_possible_aw_completions - total_actual_aw_completions if total_possible_aw_completions > 0 else 0
 
     context = {
@@ -202,7 +209,7 @@ def view_document(request, tracker_id):
     
 
 @login_required
-def training_audit(request):
+def training_audit(request):  # This audit is for non-staff users and is the CMMC training
     users = User.objects.filter(is_active=True).order_by('username')
     courses = Course.objects.all().order_by('name')
     audit_data = []
@@ -299,7 +306,7 @@ def arctic_wolf_audit(request):
     ).distinct()
 
     courses = recent_courses.union(older_courses).order_by('name')
-    active_users = User.objects.filter(is_active=True).order_by('username')
+    active_users = User.objects.filter(is_active=True, is_staff=True).order_by('username')
     audit_data = []
 
     for user in active_users:
