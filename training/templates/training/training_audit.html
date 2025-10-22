@@ -51,6 +51,8 @@
 
     <div>
         <h1 class="text-2xl font-bold mb-4">Training Completion Audit</h1>
+        
+        
         <div style="overflow: auto;"> 
             <table>
                 <thead>
@@ -72,9 +74,18 @@
                                     <td class="{% if status.required %} {% if status.completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %} {% endif %}">
                                         {% if status and status.completed_date %}
                                             {% if status.document and status.tracker_id %}
-                                                <a href="{% url 'training:view_document' status.tracker_id %}" class="text-blue-500 hover:underline text-xs block">{{ status.completed_date|date:"n/j/Y" }}</a>
+                                                <a href="{% url 'training:view_document' status.tracker_id %}" 
+                                                   class="text-blue-600 hover:text-blue-800 hover:underline text-xs block font-medium cursor-pointer" 
+                                                   title="Click to view uploaded document: {{ status.document_name|default:'Document' }}">
+                                                    📄 {{ status.completed_date|date:"n/j/Y" }}
+                                                </a>
                                             {% else %}
-                                                <span class="text-xs block">{{ status.completed_date|date:"n/j/Y" }}</span>
+                                                <span class="text-xs block text-gray-700">
+                                                    {{ status.completed_date|date:"n/j/Y" }}
+                                                    {% if status.tracker_id %}
+                                                        <br><small class="text-gray-500">(No doc)</small>
+                                                    {% endif %}
+                                                </span>
                                             {% endif %}
                                         {% endif %}
                                     </td>

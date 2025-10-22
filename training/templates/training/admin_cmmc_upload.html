@@ -144,4 +144,51 @@
         </ul>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const userSelect = document.getElementById('id_user');
+        const courseSelect = document.getElementById('id_course');
+        const userCourseMap = JSON.parse('{{ user_course_map_json|escapejs }}');
+
+        const placeholderOption = courseSelect.querySelector('option[value=""]');
+
+        function buildCourseOption(value, label, selectedValue) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            if (String(value) === String(selectedValue)) {
+                option.selected = true;
+            }
+            return option;
+        }
+
+        function updateCourseOptions() {
+            const selectedUserId = userSelect.value;
+            const selectedCourse = courseSelect.value;
+            const allowedCourses = userCourseMap[selectedUserId] || [];
+
+            courseSelect.innerHTML = '';
+
+            if (placeholderOption) {
+                courseSelect.appendChild(buildCourseOption('', placeholderOption.textContent, selectedCourse));
+            }
+
+            allowedCourses.forEach((course) => {
+                courseSelect.appendChild(buildCourseOption(course.id, course.name, selectedCourse));
+            });
+
+            if (!courseSelect.value) {
+                courseSelect.selectedIndex = 0;
+            }
+
+            courseSelect.disabled = !selectedUserId || allowedCourses.length === 0;
+        }
+
+        if (userSelect && courseSelect) {
+            updateCourseOptions();
+            userSelect.addEventListener('change', updateCourseOptions);
+        }
+    });
+</script>
 {% endblock %}

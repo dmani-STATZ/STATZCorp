@@ -1,14 +1,18 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+import json
+from collections import defaultdict
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.http import HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import get_valid_filename
+
 from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
 from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion
-from django.utils import timezone
-from django.core.files.base import ContentFile
-from django.utils.text import get_valid_filename
-from django.http import HttpResponse
-from django.contrib.auth.models import User
-from django.urls import reverse
 
 @login_required
 def dashboard(request):
@@ -226,10 +230,15 @@ def training_audit(request):  # This audit is for non-staff users and is the CMM
             is_required = course.id in required_courses_for_user
             completion_info = completion_dict.get(course.id)
 
+            # Check if document exists and is not empty
+            has_document = False
+            if completion_info and completion_info['document']:
+                has_document = True
+
             status = {
                 'required': is_required,
                 'completed_date': completion_info['completed_date'] if completion_info else None,
-                'document': completion_info['document'] if completion_info else None,
+                'document': completion_info['document'] if completion_info and has_document else None,
                 'document_name': completion_info['document_name'] if completion_info else None,
                 'tracker_id': completion_info['id'] if completion_info else None,
             }
@@ -381,8 +390,27 @@ def admin_cmmc_upload(request):
         document__isnull=False
     ).select_related('user', 'matrix__course').order_by('-completed_date')[:10]
     
+    account_courses = defaultdict(dict)
+    for entry in Matrix.objects.select_related('course').values('account_id', 'course_id', 'course__name'):
+        account_courses[entry['account_id']][entry['course_id']] = entry['course__name']
+
+    user_course_map = defaultdict(dict)
+    for user_id, account_id in UserAccount.objects.values_list('user_id', 'account_id'):
+        for course_id, course_name in account_courses.get(account_id, {}).items():
+            user_course_map[user_id][course_id] = course_name
+
+    user_course_map_json = json.dumps({
+        str(user_id): [
+            {'id': course_id, 'name': course_name}
+            for course_id, course_name in sorted(courses.items(), key=lambda item: item[1].lower())
+        ]
+        for user_id, courses in user_course_map.items()
+    })
+
+
     context = {
         'form': form,
         'existing_uploads': existing_uploads,
+        'user_course_map_json': user_course_map_json,
     }
     return render(request, 'training/admin_cmmc_upload.html', context)
