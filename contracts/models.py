@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -10,6 +11,39 @@ from django.dispatch import receiver
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 from django.conf import settings
+
+
+class Company(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    slug = models.SlugField(max_length=150, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name) or "company"
+            slug = base_slug
+            index = 1
+            while Company.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                index += 1
+                slug = f"{base_slug}-{index}"
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_default_company(cls):
+        company, _ = cls.objects.get_or_create(
+            slug="company-a",
+            defaults={"name": "Company A", "is_active": True},
+        )
+        return company
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -27,6 +61,7 @@ class AuditModel(models.Model):
         super().save(*args, **kwargs)
 
 class Contract(AuditModel):
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, related_name='contracts', null=False, blank=True)
     idiq_contract = models.ForeignKey('IdiqContract', on_delete=models.CASCADE, null=True, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     status = models.ForeignKey('ContractStatus', on_delete=models.CASCADE, null=True, blank=True)
@@ -87,6 +122,11 @@ class Contract(AuditModel):
 
     def __str__(self):
         return f"Contract {self.contract_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
     
     @property
     def total_split_value(self):
@@ -103,6 +143,7 @@ class ContractStatus(models.Model):
         return self.description
 
 class Clin(AuditModel):
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, related_name='clins', null=False, blank=True)
     ORIGIN_DESTINATION_CHOICES = [
         ('O', 'Origin'),
         ('D', 'Destination'),
@@ -181,7 +222,16 @@ class Clin(AuditModel):
         ]
 
     def __str__(self):
-        return f"CLIN {self.id} for Contract {self.contract.contract_number}"
+        contract_number = self.contract.contract_number if self.contract else 'No Contract'
+        return f"CLIN {self.id} for Contract {contract_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            if self.contract and self.contract.company_id:
+                self.company_id = self.contract.company_id
+            else:
+                self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
     
     @property
     def total_shipped(self):

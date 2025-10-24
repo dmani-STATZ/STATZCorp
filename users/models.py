@@ -19,6 +19,29 @@ class Announcement(models.Model):
     def __str__(self):
         return self.title
 
+
+class UserCompanyMembership(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='company_memberships')
+    company = models.ForeignKey('contracts.Company', on_delete=models.CASCADE, related_name='user_memberships')
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'company')
+        verbose_name = 'User Company Membership'
+        verbose_name_plural = 'User Company Memberships'
+
+    def __str__(self):
+        return f"{self.user} → {self.company}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_default:
+            UserCompanyMembership.objects.filter(user=self.user).exclude(pk=self.pk).update(is_default=False)
+        elif not UserCompanyMembership.objects.filter(user=self.user, is_default=True).exists():
+            UserCompanyMembership.objects.filter(pk=self.pk).update(is_default=True)
+
 class AppRegistry(models.Model):
     """Registry of all apps that can be managed in permissions"""
     app_name = models.CharField(max_length=100, unique=True)

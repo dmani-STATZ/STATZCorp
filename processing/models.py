@@ -4,12 +4,13 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 from contracts.models import (
-    AuditModel, Buyer, Nsn, Supplier, ContractType, Contract, 
+    AuditModel, Buyer, Company, Nsn, Supplier, ContractType, Contract,
     Clin, IdiqContract, SalesClass, ClinType, SpecialPaymentTerms
 )
 
 class QueueContract(AuditModel):
     """Model for storing queued contracts before they become live contracts"""
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='queue_contracts', null=False, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True)
     buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
     award_date = models.DateTimeField(null=True, blank=True)
@@ -39,8 +40,14 @@ class QueueContract(AuditModel):
     def __str__(self):
         return f"Queued Contract {self.contract_number}"
 
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
+
 class QueueClin(AuditModel):
     """Model for storing queued CLINs before they become live CLINs"""
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='queue_clins', null=False, blank=True)
     contract_queue = models.ForeignKey(QueueContract, on_delete=models.CASCADE, related_name='clins')
     item_number = models.CharField(max_length=20, null=True, blank=True)
     item_type = models.CharField(max_length=20, null=True, blank=True)  # FAT, PVT, Production
@@ -78,6 +85,14 @@ class QueueClin(AuditModel):
 
     def __str__(self):
         return f"Queued CLIN {self.item_number} for Contract {self.contract_queue.contract_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            if self.contract_queue and self.contract_queue.company_id:
+                self.company_id = self.contract_queue.company_id
+            else:
+                self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
 
 class SequenceNumber(models.Model):
     """Model to store and manage auto-incrementing sequence numbers"""
@@ -131,6 +146,7 @@ class ProcessContract(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='processing_contracts', null=False, blank=True)
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE, null=True, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
@@ -170,6 +186,11 @@ class ProcessContract(models.Model):
 
     def __str__(self):
         return f"Processing Contract: {self.contract_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
 
     def calculate_contract_value(self):
         """Calculate contract value by summing all CLIN item values"""
@@ -214,6 +235,7 @@ class ProcessClin(models.Model):
         ('M', 'Miscellaneous')
     ]
 
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='processing_clins', null=False, blank=True)
     process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, null=True, blank=True, related_name='clins')
     item_number = models.CharField(max_length=20, null=True, blank=True)
     item_type = models.CharField(max_length=20, null=True, blank=True, choices=ITEM_TYPE_CHOICES)
@@ -263,7 +285,16 @@ class ProcessClin(models.Model):
         verbose_name_plural = 'Processing CLINs'
 
     def __str__(self):
-        return f"Processing CLIN: {self.item_number} for {self.process_contract.contract_number}"
+        contract_number = self.process_contract.contract_number if self.process_contract else 'No Contract'
+        return f"Processing CLIN: {self.item_number} for {contract_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            if self.process_contract and self.process_contract.company_id:
+                self.company_id = self.process_contract.company_id
+            else:
+                self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
 
 class ProcessContractSplit(models.Model):
     """Model for storing dynamic contract splits between different companies"""

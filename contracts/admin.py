@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from .models import Contract, Clin, Note, Reminder
+from .models import Company, Contract, Clin, Note, Reminder
 
 User = get_user_model()
 
@@ -15,6 +15,13 @@ class ContractAdmin(ActiveUserAdminMixin, admin.ModelAdmin):
     list_display = ['contract_number', 'po_number', 'status', 'assigned_user', 'reviewed_by']
     search_fields = ['contract_number', 'po_number']
     list_filter = ['status', 'assigned_user', 'reviewed_by']
+
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active')
+    search_fields = ('name', 'slug')
+    list_filter = ('is_active',)
 
 @admin.register(Reminder)
 class ReminderAdmin(ActiveUserAdminMixin, admin.ModelAdmin):

@@ -1,6 +1,6 @@
 # users/admin.py
 from django.contrib import admin
-from .models import AppPermission, Announcement, AppRegistry
+from .models import AppPermission, Announcement, AppRegistry, UserCompanyMembership
 from django import forms
 from django.contrib.auth.models import User
 from django.apps import apps
@@ -167,4 +167,12 @@ class AppPermissionAdmin(admin.ModelAdmin):
 admin.site.register(AppPermission, AppPermissionAdmin)
 admin.site.register(Announcement)
 admin.site.register(AppRegistry)
+
+
+@admin.register(UserCompanyMembership)
+class UserCompanyMembershipAdmin(admin.ModelAdmin):
+    list_display = ('user', 'company', 'is_default', 'created_at')
+    list_filter = ('is_default', 'company')
+    search_fields = ('user__username', 'company__name')
+    autocomplete_fields = ('user', 'company')
 
