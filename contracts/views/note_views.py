@@ -14,7 +14,12 @@ from ..forms import NoteForm, ReminderForm
 @conditional_login_required
 def add_note(request, content_type_id, object_id):
     content_type = get_object_or_404(ContentType, id=content_type_id)
-    content_object = get_object_or_404(content_type.model_class(), id=object_id)
+    model_cls = content_type.model_class()
+    qs = model_cls.objects
+    # If model has company, scope by active company
+    if any(f.name == 'company' for f in model_cls._meta.fields):
+        qs = qs.filter(company=request.active_company)
+    content_object = get_object_or_404(qs, id=object_id)
     
     if request.method == 'POST':
         form = NoteForm(request.POST)
@@ -189,7 +194,10 @@ def api_add_note(request):
             return redirect(referring_url)
         
         try:
-            content_object = model_class.objects.get(id=object_id)
+            qs = model_class.objects
+            if any(f.name == 'company' for f in model_class._meta.fields):
+                qs = qs.filter(company=request.active_company)
+            content_object = qs.get(id=object_id)
             print(f"Found content object: {content_object}")
             if content_object is None:
                 error_msg = f'Object with id {object_id} does not exist'
@@ -233,7 +241,8 @@ def api_add_note(request):
                         reminder_date=reminder_date,
                         reminder_user=request.user,
                         reminder_completed=False,
-                        note=note
+                        note=note,
+                        company=getattr(request, 'active_company', None)
                     )
                     print(f"Created reminder: {reminder.id}")
                 except Exception as e:

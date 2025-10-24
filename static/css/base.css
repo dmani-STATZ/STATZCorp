@@ -20,7 +20,40 @@ font-family: "Courier New", "Consolas", monospace;
 
  :root {
     --main-font: "Segoe UI", "Roboto", "Oxygen", sans-serif;
+    --company-primary: #004eb3;
+    --company-secondary: #e5e7eb;
   }
+
+/* Brand utility classes powered by company variables */
+.brand-bg { background-color: var(--company-primary) !important; }
+.brand-text { color: var(--company-primary) !important; }
+.brand-border { border-color: var(--company-primary) !important; }
+
+.brand-secondary-bg { background-color: var(--company-secondary) !important; }
+.brand-secondary-text { color: var(--company-secondary) !important; }
+.brand-secondary-border { border-color: var(--company-secondary) !important; }
+
+/* Buttons using brand colors */
+.btn-brand {
+    background-color: var(--company-primary) !important;
+    color: #ffffff !important;
+}
+.btn-brand:hover, .btn-brand:focus { filter: brightness(0.92); }
+
+.btn-outline-brand {
+    background-color: transparent !important;
+    color: var(--company-primary) !important;
+    border: 1px solid var(--company-primary) !important;
+}
+.btn-outline-brand:hover, .btn-outline-brand:focus {
+    background-color: var(--company-primary) !important;
+    color: #ffffff !important;
+}
+
+/* Hover helpers */
+.hover-brand-border:hover { border-color: var(--company-primary) !important; }
+.hover-brand-text:hover { color: var(--company-primary) !important; }
+.hover-brand-bg:hover { background-color: var(--company-primary) !important; }
 
 /* Typography */
 body {
@@ -150,7 +183,7 @@ header {
     bottom: 20px;  /* Lower position */
     left: 20px;    /* Changed from right to left */
     z-index: 50;
-    background-color: #1d4ed8;  /* Blue color */
+    background-color: var(--company-primary);
     color: white;
     border-radius: 9999px;
     padding: 0.75rem;
@@ -160,7 +193,7 @@ header {
 }
 
 .floating-menu-btn:hover {
-    background-color: #1e40af;
+    filter: brightness(0.92);
     transform: scale(1.05);
 }
 
@@ -199,12 +232,12 @@ header {
 
 .menu-item:hover {
     background-color: #f3f4f6;
-    color: #1d4ed8;
+    color: var(--company-primary);
 }
 
 .menu-item.active {
     background-color: #e0e7ff;
-    color: #1d4ed8;
+    color: var(--company-primary);
 }
 
 .menu-item svg {
@@ -578,7 +611,7 @@ input[type="datetime-local"] {
     );
     background-blend-mode: multiply;
     background-color: #b30000;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 5px hsla(0, 0%, 0%, 0.1);
     color: rgb(255, 255, 255);
     padding: 2rem;
     height: 430px;
@@ -590,7 +623,7 @@ input[type="datetime-local"] {
 /* Microsoft button style */
 .microsoft-button {
     background-color: #2f2f2f;
-    color: white;
+    color: #e0dddd;
     border: none;
     display: flex;
     align-items: center;

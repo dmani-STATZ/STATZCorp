@@ -36,7 +36,7 @@ header {
         #d0d1d450 6px
     );
     background-blend-mode: multiply;
-    background-color: #004eb3; /* Brand blue color for header */
+    background-color: var(--company-primary); /* Brand-specific header color */
     color: #ffffff; /* White text for contrast against blue background */
 }
 
@@ -305,11 +305,12 @@ a:not([class*="text-"]) {
     font-size: 1.125rem;
     font-weight: 600;
     color: #0f1216;
-    background-color: #f0f0f0;
+    background-color: var(--company-secondary);
     margin-top: 1rem;
     padding: 0.5rem;
     padding-top: 0.5rem;
     border-bottom: 1px solid #e5e7eb;
+    border-left: 4px solid var(--company-primary);
     font-family: inherit;
 }
 

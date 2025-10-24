@@ -35,7 +35,7 @@ body.dark header {
         #d0d1d450 6px
     );
     background-blend-mode: multiply;
-    background-color: #004eb3; /* Brand blue color for header */
+    background-color: var(--company-primary); /* Brand-specific header color */
     color: #f3f4f6; /* Light text for contrast against blue background */
 }
 
@@ -318,6 +318,7 @@ body.dark .section-header {
     padding: 0.5rem;
     padding-top: 0.5rem;
     border-bottom: 1px solid #374151 !important; /* gray-700 - Darker border */
+    border-left: 4px solid var(--company-primary);
     font-family: inherit;
 }
 

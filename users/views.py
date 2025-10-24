@@ -7,10 +7,12 @@ from STATZWeb.decorators import login_required
 from django.http import JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 from .models import AppPermission, UserSetting, UserSettingState, SystemMessage
+from contracts.models import Company
 from django.contrib.auth.models import User
 from django.urls import resolve, reverse
 import logging
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_POST
 import json
 from .user_settings import UserSettings
 from django.contrib.auth import get_user_model
@@ -102,6 +104,36 @@ def on_user_logged_out(sender, request, **kwargs):
 
 def permission_denied(request):
     return render(request, 'users/permission_denied.html')
+
+@login_required
+@require_POST
+def switch_company(request):
+    """Endpoint to switch the active company for the session.
+    - Superusers can select any active company
+    - Non-superusers must have membership in the selected company
+    """
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or 'index'
+    company_id = request.POST.get('company_id')
+    if not company_id:
+        messages.error(request, 'No company selected.')
+        return redirect(next_url)
+    try:
+        company = Company.objects.get(pk=company_id, is_active=True)
+    except Company.DoesNotExist:
+        messages.error(request, 'Selected company not found or inactive.')
+        return redirect(next_url)
+
+    # Enforce membership for non-superusers
+    if not request.user.is_superuser:
+        from users.models import UserCompanyMembership
+        allowed = UserCompanyMembership.objects.filter(user=request.user, company=company).exists()
+        if not allowed:
+            messages.error(request, 'You do not have access to the selected company.')
+            return redirect(next_url)
+
+    request.session['active_company_id'] = company.id
+    messages.success(request, f'Active company set to {company.name}.')
+    return redirect(next_url)
 
 def is_staff(user):
     return user.is_staff

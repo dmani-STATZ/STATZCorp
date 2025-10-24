@@ -23,6 +23,11 @@ def add_reminder(request, note_id=None):
         if form.is_valid():
             reminder = form.save(commit=False)
             reminder.reminder_user = request.user
+            # Set company from note or active company
+            if note and hasattr(note, 'company') and note.company_id:
+                reminder.company_id = note.company_id
+            elif getattr(request, 'active_company', None):
+                reminder.company = request.active_company
             
             if note:
                 reminder.note = note
@@ -72,6 +77,9 @@ class ReminderListView(ListView):
         ).select_related(
             'reminder_user', 'reminder_completed_user', 'note'
         ).order_by('reminder_date')
+        # Scope by company if available
+        if getattr(self.request, 'active_company', None):
+            queryset = queryset.filter(company=self.request.active_company)
         
         # Filter by completion status if specified
         status_filter = self.request.GET.get('status')
@@ -119,6 +127,8 @@ class ReminderListView(ListView):
         
         # Add counts for different reminder categories
         all_reminders = Reminder.objects.filter(reminder_user=user)
+        if getattr(self.request, 'active_company', None):
+            all_reminders = all_reminders.filter(company=self.request.active_company)
         
         context['total_count'] = all_reminders.count()
         context['completed_count'] = all_reminders.filter(reminder_completed=True).count()

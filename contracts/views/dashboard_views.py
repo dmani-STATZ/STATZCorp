@@ -21,6 +21,7 @@ class ContractLifecycleDashboardView(TemplateView):
         # Get the last 20 contracts entered that have cancelled=False
         last_20_contracts = Contract.objects.filter(
                 status__description__in=['Open']
+            , company=self.request.active_company
             ).prefetch_related(
                 'idiq_contract',
                 'clin_set',
@@ -68,7 +69,7 @@ class ContractLifecycleDashboardView(TemplateView):
         context['dashboard_view'] = dashboard_view
 
         # Get total contracts
-        total_contracts = Contract.objects.filter(date_canceled__isnull=True, status__description='Open').count()
+        total_contracts = Contract.objects.filter(date_canceled__isnull=True, status__description='Open', company=self.request.active_company).count()
         context['total_contracts'] = total_contracts
         
         # Time periods
@@ -118,9 +119,9 @@ class ContractLifecycleDashboardView(TemplateView):
             if not end_date:
                 end_date = now
 
-            past_contracts = Contract.objects.filter(due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
-            contracts = Contract.objects.filter(award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
-            clins = Clin.objects.filter(contract__award_date__range=(start_date, end_date)).exclude(contract__status__description='Cancelled')
+            past_contracts = Contract.objects.filter(company=self.request.active_company, due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+            contracts = Contract.objects.filter(company=self.request.active_company, award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+            clins = Clin.objects.filter(company=self.request.active_company, contract__award_date__range=(start_date, end_date)).exclude(contract__status__description='Cancelled')
             
             return {
                 'contracts_due': past_contracts.distinct().count(),
@@ -148,7 +149,7 @@ class ContractLifecycleDashboardView(TemplateView):
         
         # Get all active contracts (not cancelled and not closed)
         active_contracts = Contract.objects.filter(
-            ~Q(status__description='Cancelled') & ~Q(status__description='Closed'))
+            ~Q(status__description='Cancelled') & ~Q(status__description='Closed'), company=self.request.active_company)
         
         # Contracts by stage
         context['new_contracts'] = active_contracts.filter(
@@ -158,26 +159,29 @@ class ContractLifecycleDashboardView(TemplateView):
         # Contracts with CLINs that have acknowledgments pending
         contracts_with_pending_acks = Contract.objects.filter(
             clin__clinacknowledgment__po_to_supplier_bool=True,
-            clin__clinacknowledgment__clin_reply_bool=False
+            clin__clinacknowledgment__clin_reply_bool=False,
+            company=self.request.active_company
         ).distinct().count()
         context['pending_acknowledgment'] = contracts_with_pending_acks
         
         # Contracts with CLINs that are in production (acknowledged but not shipped)
         contracts_in_production = Contract.objects.filter(
             clin__clinacknowledgment__clin_reply_bool=True,
-            clin__ship_date=None
+            clin__ship_date=None,
+            company=self.request.active_company
         ).distinct().count()
         context['in_production'] = contracts_in_production
         
         # Contracts with CLINs that are shipped but not paid
         contracts_shipped_not_paid = Contract.objects.filter(
             clin__ship_date__isnull=False,
-            clin__paid_date=None
+            clin__paid_date=None,
+            company=self.request.active_company
         ).distinct().count()
         context['shipped_not_paid'] = contracts_shipped_not_paid
         
         # Contracts with all CLINs paid
-        contracts_all_paid = Contract.objects.annotate(
+        contracts_all_paid = Contract.objects.filter(company=self.request.active_company).annotate(
             total_clins=Count('clin'),
             paid_clins=Count('clin', filter=Q(clin__paid_date__isnull=False))
         ).filter(
@@ -208,7 +212,8 @@ class ContractLifecycleDashboardView(TemplateView):
         # Get open contracts
         open_contracts = Contract.objects.filter(
             status__description='Open',  # Using the status relation with description='Open'
-            date_canceled__isnull=True  # Ensure we exclude cancelled contracts
+            date_canceled__isnull=True,  # Ensure we exclude cancelled contracts
+            company=self.request.active_company
         )
 
         # Count total open contracts
@@ -253,7 +258,8 @@ class ContractLifecycleDashboardView(TemplateView):
         # Get suppliers with open contracts and specific CLIN conditions
         active_suppliers = Clin.objects.filter(
             contract__status__description='Open',
-            contract__date_canceled__isnull=True
+            contract__date_canceled__isnull=True,
+            company=self.request.active_company
         ).annotate(
             numeric_item=Cast('item_number', output_field=IntegerField())
         ).filter(
@@ -280,7 +286,7 @@ class ContractLifecycleDashboardView(TemplateView):
             'upcoming_due_dates': upcoming_due_dates,
             'upcoming_contracts': upcoming_contracts[:5],  # Limit to 5 for display
             'contract_types': buyer_breakdown,  # Renamed for template compatibility
-            'total_contracts': Contract.objects.filter(date_canceled__isnull=True).count(),
+            'total_contracts': Contract.objects.filter(date_canceled__isnull=True, company=self.request.active_company).count(),
             'active_supplier_count': active_supplier_count,
             'top_suppliers': top_suppliers
         }

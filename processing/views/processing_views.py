@@ -31,6 +31,16 @@ from django.db import models
 
 logger = logging.getLogger(__name__)
 
+
+def get_default_contract_status():
+    """
+    Retrieve or create the default 'Open' contract status.
+    Ensures finalised contracts don't fail because the status table is empty.
+    """
+    status, _ = ContractStatus.objects.get_or_create(description='Open')
+    return status
+
+
 @login_required
 @require_POST
 def start_new_contract(request):
@@ -505,7 +515,7 @@ def finalize_contract(request, process_contract_id):
             planned_split=process_contract.planned_split,
             created_by=request.user,
             modified_by=request.user,
-            status=ContractStatus.objects.get(id=1)  # Use the ContractStatus instance with ID=1
+            status=get_default_contract_status()
         )
         
         # Update sequence numbers if necessary
@@ -588,10 +598,11 @@ def finalize_contract(request, process_contract_id):
             'error': 'Process contract not found'
         })
     except Exception as e:
+        logger.exception("Error finalizing process contract %s", process_contract_id)
         return JsonResponse({
             'success': False,
-            'error': str(e)
-        })
+            'error': f'Contract could not be finalized. {str(e)}'
+        }, status=500)
 
 @login_required
 def match_idiq(request, process_contract_id):
@@ -735,9 +746,10 @@ def cancel_process_contract(request, process_contract_id=None, queue_id=None):
             'error': 'Queue contract not found'
         }, status=404)
     except Exception as e:
+        logger.exception("Error finalizing and emailing process contract %s", process_contract_id)
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': f'Contract could not be finalized. {str(e)}'
         }, status=500)
 
 # Keep this function as a wrapper for backward compatibility
@@ -1039,7 +1051,7 @@ def finalize_and_email_contract(request, process_contract_id):
             plan_gross=process_contract.plan_gross,
             created_by=request.user,
             modified_by=request.user,
-            status=ContractStatus.objects.get(id=1)  # Use the ContractStatus instance with ID=1
+            status=get_default_contract_status()
         )
 
         # Create contract_value payment history

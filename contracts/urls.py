@@ -87,6 +87,7 @@ from .views import (
     # Contract log views
     ContractLogView,
     export_contract_log,
+    export_contract_log_xlsx,
     open_export_folder,
     get_export_estimate,
     
@@ -115,10 +116,13 @@ from .views import (
     update_shipment,
     delete_shipment,
     get_clin_shipments,
+
+    # Code table views
+    code_table_admin,
 )
 
 from .views.contract_views import check_contract_number
-from .views.api_views import get_select_options, update_clin_field
+from .views.api_views import get_select_options, update_clin_field, create_buyer, create_supplier
 from .views.idiq_views import (
     IdiqContractDetailView,
     IdiqContractUpdateView,
@@ -141,6 +145,12 @@ from .views.folder_tracking_views import (
     folderstack_move,
     folderstack_delete,
 )
+from .views.company_views import (
+    CompanyListView,
+    CompanyCreateView,
+    CompanyUpdateView,
+    CompanyDeleteView,
+)
 
 app_name = 'contracts'
 
@@ -155,6 +165,7 @@ urlpatterns = [
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
     path('log/', ContractLogView.as_view(), name='contract_log_view'),
     path('log/export/', export_contract_log, name='export_contract_log'),
+    path('log/export-xlsx/', export_contract_log_xlsx, name='export_contract_log_xlsx'),
     path('log/get-export-estimate/', get_export_estimate, name='get_export_estimate'),
     path('open-export-folder/', open_export_folder, name='open_export_folder'),
 
@@ -230,6 +241,8 @@ urlpatterns = [
     path('api/options/<str:field_name>/', get_select_options, name='get_select_options'),
     path('contract/<int:contract_id>/combined-notes/', get_combined_notes, name='get_combined_notes'),
     path('contract/<int:contract_id>/clin/<int:clin_id>/combined-notes/', get_combined_notes, name='get_combined_notes_with_clin'),
+    path('api/buyers/create/', create_buyer, name='api_buyer_create'),
+    path('api/suppliers/create/', create_supplier, name='api_supplier_create'),
     path('api/nsn/create/', views.api_views.create_nsn, name='api_nsn_create'),
     
     # Test
@@ -302,4 +315,13 @@ urlpatterns = [
     path('folder-stack/save/', folderstack_save, name='folderstack_save'),
     path('folder-stack/<int:pk>/move/', folderstack_move, name='folderstack_move'),
     path('folder-stack/<int:pk>/delete/', folderstack_delete, name='folderstack_delete'),
+
+    # Company management (superuser-only)
+    path('companies/', CompanyListView.as_view(), name='company_list'),
+    path('companies/create/', CompanyCreateView.as_view(), name='company_create'),
+    path('companies/<int:pk>/edit/', CompanyUpdateView.as_view(), name='company_edit'),
+    path('companies/<int:pk>/delete/', CompanyDeleteView.as_view(), name='company_delete'),
+
+    # Code table management (superuser-only)
+    path('code-tables/', code_table_admin, name='code_table_admin'),
 ] 

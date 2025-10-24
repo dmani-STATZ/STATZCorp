@@ -1,0 +1,145 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="py-6">
+  <h1 class="text-2xl font-semibold mb-4">{% if form.instance.pk %}Edit Company{% else %}New Company{% endif %}</h1>
+
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+      {% for error in form.non_field_errors %}
+        <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-md p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Name</label>
+        {{ form.name }}
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-200">Active</label>
+        {{ form.is_active }}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Logo</label>
+        {% if form.instance.logo_url %}
+          <div class="mb-2">
+            <img src="{{ form.instance.logo_url }}" alt="{{ form.instance.name }} Logo" class="h-10">
+          </div>
+        {% endif %}
+        {{ form.logo }}
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Primary Color</label>
+          <div class="flex items-center space-x-3">
+            {{ form.primary_color }}
+            <span id="primary-color-swatch" class="h-8 w-8 rounded border border-gray-300" style="background-color: {{ form.instance.get_primary_color }};"></span>
+            <span id="primary-color-value" class="text-xs text-gray-600 dark:text-gray-300 select-all">{{ form.instance.get_primary_color }}</span>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#004EB3" style="background-color:#004EB3" title="#004EB3"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#2563EB" style="background-color:#2563EB" title="#2563EB"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#7C3AED" style="background-color:#7C3AED" title="#7C3AED"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#10B981" style="background-color:#10B981" title="#10B981"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#EF4444" style="background-color:#EF4444" title="#EF4444"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#06B6D4" style="background-color:#06B6D4" title="#06B6D4"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="primary" data-color="#F59E0B" style="background-color:#F59E0B" title="#F59E0B"></button>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Pick the main accent color for this company's header and highlights.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Secondary Color</label>
+          <div class="flex items-center space-x-3">
+            {{ form.secondary_color }}
+            <span id="secondary-color-swatch" class="h-8 w-8 rounded border border-gray-300" style="background-color: {{ form.instance.get_secondary_color }};"></span>
+            <span id="secondary-color-value" class="text-xs text-gray-600 dark:text-gray-300 select-all">{{ form.instance.get_secondary_color }}</span>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="secondary" data-color="#E5E7EB" style="background-color:#E5E7EB" title="#E5E7EB"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="secondary" data-color="#F3F4F6" style="background-color:#F3F4F6" title="#F3F4F6"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="secondary" data-color="#D1D5DB" style="background-color:#D1D5DB" title="#D1D5DB"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="secondary" data-color="#CBD5E1" style="background-color:#CBD5E1" title="#CBD5E1"></button>
+            <button type="button" class="h-6 w-6 rounded-full border border-gray-300 color-preset" data-target="secondary" data-color="#FEF3C7" style="background-color:#FEF3C7" title="#FEF3C7"></button>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Pick supporting color used for subtle backgrounds or borders.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-md p-6 space-y-3">
+      <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100">User Access</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Check the users who should have access to this company. The first membership created becomes the user&rsquo;s default company.</p>
+      {% if form.members.errors %}
+        <ul class="text-sm text-red-600 space-y-1">
+          {% for error in form.members.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {% for checkbox in form.members %}
+          <label class="flex items-center space-x-2 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 hover-brand-border">
+            {{ checkbox.tag }}
+            <span class="text-sm text-gray-700 dark:text-gray-200">{{ checkbox.choice_label }}</span>
+          </label>
+        {% empty %}
+          <p class="text-sm text-gray-500">No active users found.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <button type="submit" class="px-4 py-2 rounded-md btn-brand">Save</button>
+      <a href="{% url 'contracts:company_list' %}" class="ml-2 px-4 py-2 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200">Cancel</a>
+    </div>
+  </form>
+</div>
+<script>
+  (function() {
+    const primaryInput = document.getElementById('id_primary_color');
+    const secondaryInput = document.getElementById('id_secondary_color');
+    const primarySwatch = document.getElementById('primary-color-swatch');
+    const secondarySwatch = document.getElementById('secondary-color-swatch');
+    const primaryValue = document.getElementById('primary-color-value');
+    const secondaryValue = document.getElementById('secondary-color-value');
+
+    const handleInput = (input, swatch) => {
+      if (!input || !swatch) return;
+      input.addEventListener('input', () => {
+        const val = (input.value || '').toUpperCase();
+        swatch.style.backgroundColor = val || '#FFFFFF';
+        if (input === primaryInput && primaryValue) primaryValue.textContent = val;
+        if (input === secondaryInput && secondaryValue) secondaryValue.textContent = val;
+      });
+    };
+
+    handleInput(primaryInput, primarySwatch);
+    handleInput(secondaryInput, secondarySwatch);
+
+    // Preset handlers
+    document.querySelectorAll('.color-preset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const color = btn.getAttribute('data-color');
+        const target = btn.getAttribute('data-target');
+        if (target === 'primary' && primaryInput) {
+          primaryInput.value = color;
+          primaryInput.dispatchEvent(new Event('input'));
+        }
+        if (target === 'secondary' && secondaryInput) {
+          secondaryInput.value = color;
+          secondaryInput.dispatchEvent(new Event('input'));
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

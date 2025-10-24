@@ -2,13 +2,14 @@ from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from users.models import UserCompanyMembership
 from .models import (
     Nsn, Supplier, Contract, Clin, Note, Reminder,
     ClinAcknowledgment, AcknowledgementLetter, Contact, Address,
     Buyer, ContractType, ClinType, CanceledReason, SalesClass,
     SpecialPaymentTerms, IdiqContract, IdiqContractDetails, SupplierType, SupplierCertification,
     CertificationType, SupplierClassification,
-    ClassificationType, FolderTracking
+    ClassificationType, FolderTracking, Company
 )
 
 User = get_user_model()
@@ -203,6 +204,157 @@ class ContractCloseForm(BaseModelForm):
                 'type': 'datetime-local'
             })
         }
+
+
+class CompanyForm(BaseModelForm):
+    members = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(is_active=True).order_by('username'),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text='Select the users who should have access to this company.'
+    )
+
+    class Meta:
+        model = Company
+        fields = ['name', 'is_active', 'logo', 'primary_color', 'secondary_color']
+        widgets = {
+            'logo': forms.ClearableFileInput(attrs={
+                'class': 'form-input'
+            })
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Style the color inputs
+        if 'primary_color' in self.fields:
+            self.fields['primary_color'].widget.attrs.update({
+                'type': 'color',
+                'class': 'h-10 w-20 rounded border border-gray-300 cursor-pointer'
+            })
+        if 'secondary_color' in self.fields:
+            self.fields['secondary_color'].widget.attrs.update({
+                'type': 'color',
+                'class': 'h-10 w-20 rounded border border-gray-300 cursor-pointer'
+            })
+
+        # Members field initial data
+        if 'members' in self.fields:
+            self.fields['members'].widget.attrs.setdefault('class', 'space-y-2')
+            if self.instance.pk:
+                self.fields['members'].initial = list(
+                    self.instance.user_memberships.values_list('user_id', flat=True)
+                )
+            else:
+                self.fields['members'].initial = []
+
+        self._pending_members = None
+
+    def clean_logo(self):
+        file = self.cleaned_data.get('logo')
+        if not file:
+            return file
+
+        # Validate content type
+        content_type = getattr(file, 'content_type', None)
+        allowed_types = {
+            'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'
+        }
+        if content_type and content_type.lower() not in allowed_types:
+            raise forms.ValidationError('Unsupported file type. Please upload PNG, JPEG, or SVG.')
+
+        # Validate file extension as a fallback if content_type missing
+        name = getattr(file, 'name', '')
+        if name and not name.lower().endswith(('.png', '.jpg', '.jpeg', '.svg')):
+            raise forms.ValidationError('Unsupported file type. Please upload PNG, JPEG, or SVG.')
+
+        # Optional: validate dimensions for raster images if Pillow is available
+        if content_type and content_type.lower() in {'image/png', 'image/jpeg', 'image/jpg'}:
+            try:
+                from PIL import Image
+                file.seek(0)
+                img = Image.open(file)
+                width, height = img.size
+                # Basic sanity caps (too small or too large)
+                if width < 64 or height < 32:
+                    raise forms.ValidationError('Logo is too small. Minimum size is 64x32.')
+                if width > 4096 or height > 4096:
+                    raise forms.ValidationError('Logo is too large. Maximum size is 4096x4096.')
+                file.seek(0)
+            except ImportError:
+                # Pillow not installed; skip dimension validation gracefully
+                pass
+            except Exception:
+                # If Pillow fails to read, reject as invalid image
+                raise forms.ValidationError('Invalid image file.')
+
+        # Optional: file size limit (e.g., 2 MB)
+        if hasattr(file, 'size') and file.size > 2 * 1024 * 1024:
+            raise forms.ValidationError('Logo file is too large (max 2 MB).')
+
+        return file
+
+    def _clean_hex(self, value, field_label):
+        if value:
+            v = value.strip()
+            import re
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+                raise forms.ValidationError(f'{field_label} must be a hex color like #004eb3.')
+            return v
+        return value
+
+    def clean_primary_color(self):
+        return self._clean_hex(self.cleaned_data.get('primary_color'), 'Primary color')
+
+    def clean_secondary_color(self):
+        return self._clean_hex(self.cleaned_data.get('secondary_color'), 'Secondary color')
+
+    def save(self, commit=True):
+        company = super().save(commit=commit)
+        self._pending_members = self.cleaned_data.get('members', [])
+        if commit:
+            self._sync_memberships()
+        return company
+
+    def save_m2m(self):
+        self._sync_memberships()
+
+    def _sync_memberships(self):
+        if not hasattr(self, '_pending_members'):
+            return
+
+        company = self.instance
+        if not company.pk:
+            return
+
+        members = self._pending_members
+        if members is None:
+            members = []
+
+        if hasattr(members, 'values_list'):
+            selected_ids = {int(pk) for pk in members.values_list('id', flat=True)}
+        else:
+            selected_ids = {int(pk) for pk in members}
+
+        current_memberships = UserCompanyMembership.objects.filter(company=company)
+        current_ids = {int(pk) for pk in current_memberships.values_list('user_id', flat=True)}
+
+        # Remove memberships that are no longer selected
+        for user_id in current_ids - selected_ids:
+            UserCompanyMembership.objects.filter(company=company, user_id=user_id).delete()
+            remaining = UserCompanyMembership.objects.filter(user_id=user_id)
+            if remaining.exists() and not remaining.filter(is_default=True).exists():
+                first = remaining.first()
+                first.is_default = True
+                first.save(update_fields=['is_default'])
+
+        # Add or ensure memberships for selected users
+        for user_id in selected_ids:
+            membership, created = UserCompanyMembership.objects.get_or_create(company=company, user_id=user_id)
+            if created and not UserCompanyMembership.objects.filter(user_id=user_id, is_default=True).exclude(pk=membership.pk).exists():
+                membership.is_default = True
+                membership.save(update_fields=['is_default'])
+
+        self._pending_members = None
 
 class ContractCancelForm(BaseModelForm):
     class Meta:
@@ -517,4 +669,28 @@ class IdiqContractDetailsForm(forms.ModelForm):
         widgets = {
             'nsn': forms.Select(attrs={'class': 'select2'}),
             'supplier': forms.Select(attrs={'class': 'select2'}),
-        } 
+        }
+
+
+class ContractTypeForm(BaseModelForm):
+    class Meta:
+        model = ContractType
+        fields = ['description']
+
+
+class SalesClassForm(BaseModelForm):
+    class Meta:
+        model = SalesClass
+        fields = ['sales_team']
+
+
+class SpecialPaymentTermsForm(BaseModelForm):
+    class Meta:
+        model = SpecialPaymentTerms
+        fields = ['code', 'terms']
+
+
+class ClinTypeForm(BaseModelForm):
+    class Meta:
+        model = ClinType
+        fields = ['description', 'raw_text']

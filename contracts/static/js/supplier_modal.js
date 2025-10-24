@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(this);
         const supplierData = Object.fromEntries(formData.entries());
 
-        fetch('/api/suppliers/create/', {
+        fetch('/contracts/api/suppliers/create/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -145,13 +145,17 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.id) {
-                selectSupplier(data.id, data.name);
+            if (data.success) {
+                const supplierId = data.supplier_id || data.id;
+                selectSupplier(supplierId, data.name || supplierData.name);
                 closeSupplierCreateModal();
                 // Refresh the search results
                 performSupplierSearch();
+                if (data.duplicate && data.message) {
+                    alert(data.message);
+                }
             } else {
-                throw new Error('Failed to create supplier');
+                throw new Error(data.error || 'Failed to create supplier');
             }
         })
         .catch(error => {

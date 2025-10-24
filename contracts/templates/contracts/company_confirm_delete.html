@@ -1,0 +1,32 @@
+{% extends "contracts/contract_base.html" %}
+
+{% block content %}
+<div class="py-6">
+  <h1 class="text-2xl font-semibold mb-4">Delete Company</h1>
+  <div class="bg-white dark:bg-gray-800 shadow sm:rounded-md p-6">
+    <p class="mb-4">Are you sure you want to delete <strong>{{ company.name }}</strong>?</p>
+    <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">This action is permanent. Deletion is only allowed when there is no related data.</p>
+
+    <div class="mb-4">
+      <h2 class="text-sm font-semibold mb-2">Related Data</h2>
+      <ul class="list-disc ml-6 text-sm">
+        <li>Contracts: {{ related_counts.contracts }}</li>
+        <li>CLINs: {{ related_counts.clins }}</li>
+        <li>Queue Contracts: {{ related_counts.queue_contracts }}</li>
+        <li>Queue CLINs: {{ related_counts.queue_clins }}</li>
+        <li>Processing Contracts: {{ related_counts.process_contracts }}</li>
+        <li>Processing CLINs: {{ related_counts.process_clins }}</li>
+        <li>User Memberships: {{ related_counts.memberships }}</li>
+      </ul>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Delete</button>
+      <a href="{% url 'contracts:company_list' %}" class="ml-2 px-4 py-2 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200">Cancel</a>
+    </form>
+  </div>
+  
+</div>
+{% endblock %}
+

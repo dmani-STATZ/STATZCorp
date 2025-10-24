@@ -50,7 +50,7 @@ def get_select_options(request, field_name):
 
         elif field_name == 'contract':
             # Existing contract search logic
-            queryset = Contract.objects.all()
+            queryset = Contract.objects.filter(company=request.active_company)
             
             if search_term:
                 queryset = queryset.filter(
@@ -60,7 +60,7 @@ def get_select_options(request, field_name):
             
             if specific_contract_id:
                 try:
-                    specific_contract = Contract.objects.get(id=specific_contract_id)
+                    specific_contract = Contract.objects.get(id=specific_contract_id, company=request.active_company)
                     # Add the specific contract to the start of the list
                     options.append({
                         'value': specific_contract.id,
@@ -89,7 +89,7 @@ def get_select_options(request, field_name):
                 # If there was an error but we have a specific contract ID, try to include just that
                 if specific_contract_id:
                     try:
-                        specific_contract = Contract.objects.get(id=specific_contract_id)
+                        specific_contract = Contract.objects.get(id=specific_contract_id, company=request.active_company)
                         options.append({
                             'value': specific_contract.id,
                             'label': f"{specific_contract.contract_number or 'Unknown'}"
@@ -288,7 +288,7 @@ def get_select_options(request, field_name):
 def update_clin_field(request, clin_id):
     """API endpoint to update a single CLIN field"""
     try:
-        clin = get_object_or_404(Clin, id=clin_id)
+        clin = get_object_or_404(Clin, id=clin_id, company=request.active_company)
         data = json.loads(request.body)
         
         field = data.get('field')
@@ -381,3 +381,142 @@ def create_nsn(request):
             'success': False,
             'error': str(e)
         }, status=500) 
+
+
+@login_required
+@require_http_methods(["POST"])
+def create_buyer(request):
+    """
+    API endpoint to create a new Buyer record.
+    Expects JSON data with:
+    - buyer_text: buyer name/description
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Invalid JSON data',
+            },
+            status=400,
+        )
+
+    buyer_text = (data.get('buyer_text') or '').strip()
+
+    if not buyer_text:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Buyer name is required',
+            },
+            status=400,
+        )
+
+    # Re-use existing Buyers when the description matches (case-insensitive)
+    existing_buyer = Buyer.objects.filter(description__iexact=buyer_text).first()
+    if existing_buyer:
+        return JsonResponse(
+            {
+                'success': True,
+                'id': existing_buyer.id,
+                'description': existing_buyer.description,
+                'duplicate': True,
+                'message': 'Buyer already exists; using the existing record.',
+            }
+        )
+
+    try:
+        buyer = Buyer.objects.create(description=buyer_text)
+    except Exception as exc:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(exc),
+            },
+            status=500,
+        )
+
+    return JsonResponse(
+        {
+            'success': True,
+            'id': buyer.id,
+            'description': buyer.description,
+        }
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def create_supplier(request):
+    """
+    API endpoint to create a new Supplier record.
+    Expects JSON data with:
+    - name: supplier name (required)
+    - cage_code: supplier CAGE code (required)
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Invalid JSON data',
+            },
+            status=400,
+        )
+
+    name = (data.get('name') or '').strip()
+    cage_code = (data.get('cage_code') or '').strip()
+
+    if not name or not cage_code:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Supplier name and CAGE code are required',
+            },
+            status=400,
+        )
+
+    existing_supplier = Supplier.objects.filter(
+        cage_code__iexact=cage_code
+    ).first()
+    if existing_supplier:
+        return JsonResponse(
+            {
+                'success': True,
+                'id': existing_supplier.id,
+                'supplier_id': existing_supplier.id,
+                'name': existing_supplier.name,
+                'duplicate': True,
+                'message': 'Supplier with this CAGE code already exists.',
+            }
+        )
+
+    supplier = Supplier(
+        name=name,
+        cage_code=cage_code.upper(),
+        created_by=request.user,
+        modified_by=request.user,
+    )
+
+    try:
+        supplier.save()
+    except Exception as exc:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(exc),
+            },
+            status=500,
+        )
+
+    return JsonResponse(
+        {
+            'success': True,
+            'id': supplier.id,
+            'supplier_id': supplier.id,
+            'name': supplier.name,
+            'cage_code': supplier.cage_code,
+        }
+    )

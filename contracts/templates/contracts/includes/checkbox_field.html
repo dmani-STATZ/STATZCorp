@@ -1,0 +1,11 @@
+<div class="flex items-center space-x-2">
+    {{ field }}
+    <label for="{{ field.id_for_label }}" class="text-sm font-medium text-gray-700">
+        {{ field.label }}
+    </label>
+</div>
+{% if field.errors %}
+    <p class="mt-1 text-sm text-red-600 md:col-span-3">{{ field.errors|join:", " }}</p>
+{% elif field.help_text %}
+    <p class="mt-1 text-sm text-gray-500 md:col-span-3">{{ field.help_text }}</p>
+{% endif %}

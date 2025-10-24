@@ -17,6 +17,9 @@ class Company(models.Model):
     name = models.CharField(max_length=150, unique=True)
     slug = models.SlugField(max_length=150, unique=True)
     is_active = models.BooleanField(default=True)
+    logo = models.FileField(upload_to='company-logos/', null=True, blank=True)
+    primary_color = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color like #004eb3")
+    secondary_color = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color like #e5e7eb")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -44,6 +47,19 @@ class Company(models.Model):
             defaults={"name": "Company A", "is_active": True},
         )
         return company
+
+    @property
+    def logo_url(self):
+        try:
+            return self.logo.url if self.logo else None
+        except Exception:
+            return None
+
+    def get_primary_color(self):
+        return self.primary_color or "#004eb3"
+
+    def get_secondary_color(self):
+        return self.secondary_color or "#e5e7eb"
 
 class AuditModel(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created')
@@ -92,6 +108,8 @@ class Contract(AuditModel):
     contract_value = models.FloatField(null=True, blank=True, default=0)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
     plan_gross = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    # Contract-level Special Payment Terms (single source of truth)
+    special_payment_terms = models.ForeignKey('SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
     payment_history = GenericRelation('PaymentHistory', related_query_name='contract')
 
     class Meta:
@@ -488,6 +506,7 @@ class Note(AuditModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
     note = models.TextField(null=True, blank=True)
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='notes')
 
     class Meta:
         indexes = [
@@ -496,6 +515,11 @@ class Note(AuditModel):
 
     def __str__(self):
         return f"Note for {self.content_type.name} {self.object_id}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id and self.content_object is not None and hasattr(self.content_object, 'company_id'):
+            self.company_id = getattr(self.content_object, 'company_id', None)
+        super().save(*args, **kwargs)
     
 
 
@@ -642,6 +666,7 @@ class Reminder(models.Model):
     reminder_completed_date = models.DateTimeField(null=True, blank=True)
     reminder_completed_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='completed_reminders')
     note = models.ForeignKey('Note', on_delete=models.CASCADE, null=True, blank=True, related_name='note_reminders')
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='reminders')
     
     class Meta:
         indexes = [

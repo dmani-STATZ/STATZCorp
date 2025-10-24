@@ -50,7 +50,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Export Contracts
+                    Export to Excel
                 </button>
             </div>
         </div>
@@ -116,6 +116,7 @@
                         <th class="px-1.5 py-1">Type</th>
                         <th class="px-1.5 py-1">CLIN #</th>
                         <th class="px-1.5 py-1">Supplier</th>
+                        <th class="px-1.5 py-1">Cage Code</th>
                         <th class="px-1.5 py-1">Award Date</th>
                         <th class="px-1.5 py-1">Contract Status</th>
                         <th class="px-1.5 py-1">NSN</th>
@@ -182,12 +183,13 @@
                                 {{ clin.supplier.name }}
                             </a>
                         </td>
+                        <td class="px-1.5 py-1">{{ clin.supplier.cage_code|default:"" }}</td>
                         <td class="px-1.5 py-1">{{ clin.contract.award_date|date:"m/d/Y"|default:"-" }}</td>
-                        <td class="px-1.5 py-1">{{ clin.contract.status.description|default:"" }}</td>
+                        <td class="px-1.5 py-1">{{ clin.contract_status_text|default:"" }}</td>
                         <td class="px-1.5 py-1">
                             <a href="{% url 'contracts:nsn_edit' clin.nsn.id %}" 
                                class="text-blue-600 hover:text-blue-800">
-                                {{ clin.nsn.nsn_code|default:"" }}
+                               {{ clin.nsn.nsn_code|default:"" }}
                             </a>
                         </td>
                         <td class="px-1.5 py-1">{{ clin.nsn.description|default:"" }}</td>
@@ -207,18 +209,48 @@
                         <td class="px-1.5 py-1">${{ clin.contract.contract_value|floatformat:2|default:"0.00" }}</td>
                         <td class="px-1.5 py-1">${{ clin.wawf_payment|floatformat:2|default:"0.00" }}</td>
                         <td class="px-1.5 py-1">{{ clin.wawf_recieved|date:"m/d/Y"|default:"-" }}</td>
-                        <td class="px-1.5 py-1">Need to move this plan_gross to contract</td>
-                        <!-- <td class="px-1.5 py-1">${{ clin.plan_gross|floatformat:2|default:"0.00" }}</td> -->
-                        <td class="px-1.5 py-1">Move to a Splits Table</td>
-                        <!-- <td class="px-1.5 py-1">${{ clin.contract.ppi_split_paid|floatformat:2|default:"0.00" }}</td> -->
-                        <td class="px-1.5 py-1">Move to a Splits Table</td>
-                        <!-- <td class="px-1.5 py-1">${{ clin.contract.statz_split_paid|floatformat:2|default:"0.00" }}</td> -->
-                        <td class="px-1.5 py-1">Need to move planned split to contract</td>
-                        <!-- <td class="px-1.5 py-1">{{ clin.contract.planned_split|default:"-" }}</td> -->
-                        <td class="px-1.5 py-1">Move to a Splits Table</td>
-                        <!-- <td class="px-1.5 py-1">${{ clin.contract.ppi_split|floatformat:2|default:"0.00" }}</td> -->
-                        <td class="px-1.5 py-1">Move to a Splits Table</td>
-                        <!-- <td class="px-1.5 py-1">${{ clin.contract.statz_split|floatformat:2|default:"0.00" }}</td> -->
+                        <td class="px-1.5 py-1">
+                            {% if clin.is_first_for_contract %}
+                                ${{ clin.contract.plan_gross|floatformat:2|default:"0.00" }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        </td>
+                        <td class="px-1.5 py-1">
+                            {% if clin.is_first_for_contract %}
+                                ${{ clin.ppi_split_paid|floatformat:2|default:"0.00" }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        </td>
+                        <td class="px-1.5 py-1">
+                            {% if clin.is_first_for_contract %}
+                                ${{ clin.statz_split_paid|floatformat:2|default:"0.00" }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        </td>
+                        <td class="px-1.5 py-1">
+                            {% if clin.is_first_for_contract %}
+                                {{ clin.contract.planned_split|default:"-" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="px-1.5 py-1">
+                            {% if clin.is_first_for_contract %}
+                                ${{ clin.ppi_split_value|floatformat:2|default:"0.00" }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        </td>
+                        <td class="px-1.5 py-1">
+                            {% if clin.is_first_for_contract %}
+                                ${{ clin.statz_split_value|floatformat:2|default:"0.00" }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        </td>
                         <td class="px-1.5 py-1"></td>
                         </tr>
                         {% empty %}
@@ -417,7 +449,7 @@
                     }, updateInterval);
                     
                     // Perform the actual export
-                    const response = await fetch('{% url "contracts:export_contract_log" %}?' + new URLSearchParams(window.location.search));
+                    const response = await fetch('{% url "contracts:export_contract_log_xlsx" %}?' + new URLSearchParams(window.location.search));
                     clearInterval(progressTimer);
                     
                     if (!response.ok) throw new Error('Export failed');
@@ -434,7 +466,7 @@
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'contract_log.csv';
+                    a.download = 'contract_log.xlsx';
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);

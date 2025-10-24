@@ -10,7 +10,11 @@
     
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json">
+    {% if active_company %}
+    <meta name="theme-color" content="{{ active_company.get_primary_color }}">
+    {% else %}
     <meta name="theme-color" content="#004eb3">
+    {% endif %}
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -48,7 +52,7 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
-    
+
     <!-- CSS Files with environment-aware caching -->
     {% is_development as dev_mode %}
     {% if dev_mode %}
@@ -62,18 +66,33 @@
         <link rel="stylesheet" href="{% static 'css/light-mode.css' %}?v={{ cache_version }}">
         <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}">
     {% endif %}
-    
+
+    {% if active_company %}
+    <style>
+        :root {
+            --company-primary: {{ active_company.get_primary_color }};
+            --company-secondary: {{ active_company.get_secondary_color }};
+        }
+    </style>
+    {% endif %}
+
     {% block extra_head %}{% endblock extra_head %}
     {% if title %}
-        <title>STATZ Corporation - {{ title }}</title>
+        <title>STATZ Corporation - {{ title }}{% if active_company %} - {{ active_company.name }}{% endif %}</title>
     {% else %}
-        <title>STATZ Corporation</title>
+        <title>STATZ Corporation{% if active_company %} - {{ active_company.name }}{% endif %}</title>
     {% endif %}
 </head>
-<body class="{% if user_preferences.theme == 'dark' %}dark{% endif %}">
+<body class="{% if user_preferences.theme == 'dark' %}dark{% endif %}" {% if active_company %}style="--company-primary: {{ active_company.get_primary_color }}; --company-secondary: {{ active_company.get_secondary_color }};"{% endif %}>
     <header id="header">
         <div class="flex items-center space-x-4">
-        <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" style="height: 30px;"></a>
+        <a href="{% url 'landing' %}">
+            {% if active_company and active_company.logo_url %}
+                <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" style="height: 30px;">
+            {% else %}
+                <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" style="height: 30px;">
+            {% endif %}
+        </a>
         <!-- Menu Toggle Button -->
         <button onclick="toggleSidebar()" class="text-white p-2 hover:bg-gray-700 rounded-md">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -90,6 +109,31 @@
             </span>
         </a>
         {% endif %}
+        <!-- Company Selector -->
+        {% if active_company %}
+            {% with section=request.resolver_match.app_name %}
+            <div class="ml-3 flex items-center bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 text-white text-sm">
+                {% if user.is_authenticated and available_companies|length > 1 %}
+                <form method="post" action="{% url 'users:switch_company' %}" class="relative flex items-center">
+                    {% csrf_token %}
+                    <label for="header-company-switcher" class="sr-only">Switch company</label>
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <select name="company_id" id="header-company-switcher" class="appearance-none bg-transparent text-white font-semibold cursor-pointer px-2 pr-6 focus:outline-none focus:ring-2 focus:ring-white/70" onchange="this.form.submit()">
+                        {% for c in available_companies %}
+                            <option class="bg-white text-blue-800" value="{{ c.id }}" {% if c.id == active_company.id %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <svg class="pointer-events-none absolute right-1 w-4 h-4 text-white/80" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M10 12a1 1 0 01-.707-.293l-3-3a1 1 0 011.414-1.414L10 9.586l2.293-2.293a1 1 0 111.414 1.414l-3 3A1 1 0 0110 12z" clip-rule="evenodd" />
+                    </svg>
+                </form>
+                {% else %}
+                <span class="px-2 font-semibold">{{ active_company.name }}</span>
+                {% endif %}
+            </div>
+            {% endwith %}
+        {% endif %}
+
     </div>
         <div class="flex items-center space-x-4">
             <button id="theme-toggle" class="ml-4 p-2 rounded-lg bg-white border border-gray-300 shadow-sm hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600" title="Toggle dark mode">
@@ -103,6 +147,8 @@
                     {% endif %}
                 </svg>
             </button>
+
+            {# company switcher moved near badge #}
             
             {% is_development as dev_mode %}
             {% if dev_mode %}
@@ -162,6 +208,11 @@
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Contracts</a>
                 </li>
+                {% if user.is_authenticated and user.is_superuser %}
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <a href="{% url 'contracts:company_list' %}" class="px-3 py-2 rounded-md text-sm font-medium">Companies</a>
+                </li>
+                {% endif %}
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'reports:user-reports' %}" class="px-3 py-2 rounded-md text-sm font-medium">Reports</a>
                 </li>
@@ -259,3 +310,11 @@
     {% endblock %}
 </body>
 </html> 
+
+
+
+
+
+
+
+

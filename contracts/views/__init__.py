@@ -87,6 +87,7 @@ from .dashboard_views import (
 from .contract_log_views import (
     ContractLogView,
     export_contract_log,
+    export_contract_log_xlsx,
     open_export_folder,
     get_export_estimate,
 )
@@ -123,6 +124,8 @@ from .finance_views import (
 from .api_views import (
     get_select_options,
     update_clin_field,
+    create_buyer,
+    create_supplier,
 )
 
 from .acknowledgment_views import (
@@ -144,6 +147,10 @@ from .shipment_views import (
     get_clin_shipments,
 )
 
+from .code_table_views import (
+    code_table_admin,
+)
+
 __all__ = [
     'folder_tracking',
     'add_folder_tracking',
@@ -156,5 +163,6 @@ __all__ = [
     'PaymentHistoryView',
     'get_acknowledgment_letter',
     'update_acknowledgment_letter',
+    'code_table_admin',
 ]
 

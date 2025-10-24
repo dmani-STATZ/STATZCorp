@@ -140,8 +140,12 @@ async function createNewSupplier() {
         
         const data = await response.json();
         if (data.success) {
-            // After creating, select the new supplier
-            selectSupplier(data.supplier_id, name);
+            const supplierName = data.name || name;
+            if (data.duplicate && data.message) {
+                alert(data.message);
+            }
+            // After creating, select the new or existing supplier
+            selectSupplier(data.supplier_id, supplierName);
         } else {
             alert(data.error || 'Error creating supplier');
         }

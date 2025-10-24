@@ -13,11 +13,12 @@ import json
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, ClinAcknowledgment, Contract, Note, Reminder, Nsn, Supplier
+from .mixins import ActiveCompanyQuerysetMixin
 from ..forms import ClinForm, ClinAcknowledgmentForm
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ClinDetailView(DetailView):
+class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
     model = Clin
     template_name = 'contracts/clin_detail.html'
     context_object_name = 'clin'
@@ -93,7 +94,7 @@ class ClinDetailView(DetailView):
                     'special_payment_terms',
                     'created_by',
                     'modified_by'
-                ),
+                ).filter(company=self.request.active_company),
                 pk=pk
             )
     
@@ -120,7 +121,7 @@ class ClinDetailView(DetailView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ClinCreateView(CreateView):
+class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
     model = Clin  # Using the actual Clin model, not the view
     form_class = ClinForm
     template_name = 'contracts/clin_form.html'
@@ -129,7 +130,7 @@ class ClinCreateView(CreateView):
         initial = super().get_initial()
         contract_id = self.kwargs.get('contract_id')
         if contract_id:
-            contract_data = Contract.objects.get(id=contract_id)
+            contract_data = Contract.objects.filter(company=self.request.active_company).get(id=contract_id)
             initial['contract'] = contract_id
             initial['contract_number'] = contract_data.contract_number
             initial['po_number'] = contract_data.po_number
@@ -171,7 +172,9 @@ class ClinCreateView(CreateView):
             # Set the created_by and modified_by fields
             self.object.created_by = self.request.user
             self.object.modified_by = self.request.user
-            
+            if not self.object.company_id and getattr(self.request, 'active_company', None):
+                self.object.company = self.request.active_company
+
             # Save the Clin instance directly
             self.object.save()
             
@@ -249,7 +252,7 @@ class ClinAcknowledgmentUpdateView(UpdateView):
 @conditional_login_required
 def get_clin_notes(request, clin_id):
     try:
-        clin = get_object_or_404(Clin, id=clin_id)
+        clin = get_object_or_404(Clin, id=clin_id, company=request.active_company)
         
         # Get notes for this CLIN
         clin_type = ContentType.objects.get_for_model(Clin)
@@ -305,7 +308,7 @@ def get_clin_notes(request, clin_id):
 @require_http_methods(["POST"])
 def toggle_clin_acknowledgment(request, clin_id):
     try:
-        clin = get_object_or_404(Clin, id=clin_id)
+        clin = get_object_or_404(Clin, id=clin_id, company=request.active_company)
         data = json.loads(request.body)
         field = data.get('field')
         initial_state = data.get('initial_state', False)

@@ -19,12 +19,13 @@ from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus
 from processing.models import SequenceNumber
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
+from .mixins import ActiveCompanyQuerysetMixin
 
 logger = logging.getLogger(__name__)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractManagementView(DetailView):
+class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
     model = Contract
     template_name = 'contracts/contract_management.html'
     context_object_name = 'contract'
@@ -128,7 +129,7 @@ class ContractManagementView(DetailView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractDetailView(DetailView):
+class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
     model = Contract
     template_name = 'contracts/contract_detail.html'
     context_object_name = 'contract'
@@ -156,6 +157,8 @@ class ContractCreateView(CreateView):
     
     def form_valid(self, form): # Save
         form.instance.created_by = self.request.user
+        if hasattr(form.instance, 'company') and getattr(self.request, 'active_company', None):
+            form.instance.company = self.request.active_company
         response = super().form_valid(form)
         
         # Advance the sequence numbers after successful creation
@@ -222,7 +225,7 @@ class ContractCreateView(CreateView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractUpdateView(UpdateView):
+class ContractUpdateView(ActiveCompanyQuerysetMixin, UpdateView):
     model = Contract
     form_class = ContractForm
     template_name = 'contracts/contract_form.html'
@@ -236,7 +239,7 @@ class ContractUpdateView(UpdateView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractCloseView(UpdateView):
+class ContractCloseView(ActiveCompanyQuerysetMixin, UpdateView):
     model = Contract
     form_class = ContractCloseForm
     template_name = 'contracts/contract_close_form.html'
@@ -253,7 +256,7 @@ class ContractCloseView(UpdateView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractCancelView(UpdateView):
+class ContractCancelView(ActiveCompanyQuerysetMixin, UpdateView):
     model = Contract
     form_class = ContractCancelForm
     template_name = 'contracts/contract_cancel_form.html'

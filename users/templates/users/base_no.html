@@ -13,9 +13,9 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     {% if title %}
-    <title>STATZ Corporation - {{ title }}</title>
+    <title>STATZ Corporation - {{ title }}{% if active_company %} - {{ active_company.name }}{% endif %}</title>
     {% else %}
-    <title>STATZ Corporation</title>
+    <title>STATZ Corporation{% if active_company %} - {{ active_company.name }}{% endif %}</title>
     {% endif %}
 
     <style>
@@ -27,9 +27,9 @@
     }
 
     *, *::before, *::after {
-    box-sizing: inherit; /* And this */
+        box-sizing: inherit;
     }
-/* ... rest of your styles ... */
+
     header {
         position: fixed;
         top: 0;
@@ -41,24 +41,23 @@
             #3e3e4150 2px,
             #d0d1d450 4px,
             #d0d1d450 6px
-            ),
-            repeating-linear-gradient(
+        ), repeating-linear-gradient(
             90deg,
             #3e3e4150,
             #3e3e4150 2px,
             #d0d1d450 4px,
             #d0d1d450 6px
-            );
+        );
         background-blend-mode: multiply;
         background-color: #b30000;
         z-index: 1000;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        color: rgb(255, 255, 255);
+        color: #ffffff;
         padding: 0.5rem 1rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        height: 48px; /* Reduced from 60px */
+        height: 48px;
     }
 
     .main-background {
@@ -75,29 +74,58 @@
     </style>
 
     {% block extra_head %}{% endblock %}
-</head>
+    </head>
 <body>
     <header id="header">
-        <a href="{% url 'landing' %}"><img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4"></a>
-            {% if user.is_authenticated %}
-            <div class="flex flex-col md:flex-row md:ml-auto">
-                {% if user.is_superuser %}
-                    <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+        <div class="flex items-center">
+            <a href="{% url 'landing' %}">
+                {% if active_company and active_company.logo_url %}
+                <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" class="h-8 w-18 mr-4">
                 {% else %}
-                    <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
                 {% endif %}
-                
-                <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
-                </form>
-            </div>
-            {% else %}
-            <div class="flex flex-col md:flex-row md:ml-auto">
-                <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
-                <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
-            </div>
+            </a>
+            {% if active_company %}
+            {% with section=request.resolver_match.app_name %}
+            <span class="ml-3 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-white/20 text-white">
+                {% if section %}{{ section|title }} - {% endif %}{{ active_company.name }}
+            </span>
+            {% endwith %}
             {% endif %}
+        </div>
+
+        {% if user.is_authenticated %}
+        <div class="flex items-center space-x-3">
+            {% if available_companies|length > 1 %}
+            <form method="post" action="{% url 'users:switch_company' %}" class="inline-flex items-center space-x-2">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <label for="company_id" class="text-white text-sm">Company</label>
+                <select name="company_id" id="company_id" class="bg-white text-gray-800 text-sm rounded-md px-2 py-1" onchange="this.form.submit()">
+                    {% for c in available_companies %}
+                        <option value="{{ c.id }}" {% if active_company and c.id == active_company.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
+
+            {% if user.is_superuser %}
+                <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+            {% else %}
+                <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+            {% endif %}
+
+            <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="flex flex-col md:flex-row md:ml-auto">
+            <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
+            <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
+        </div>
+        {% endif %}
     </header>   
     <div class="main-background">
         {% if messages %}
@@ -111,4 +139,4 @@
     </div>
     {% block extra_scripts %}{% endblock %}
 </body>
-</html> 
+</html>

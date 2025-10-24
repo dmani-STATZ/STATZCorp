@@ -23,11 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const isDarkMode = document.body.classList.contains('dark');
     console.log('Initial dark mode:', isDarkMode);
     
-    // Force apply correct theme immediately to avoid flicker
-    applyThemeStyles(isDarkMode);
-    
-    // Force reload CSS files on initial page load
-    updateCssVersions();
+    // Initialize the toggle icon to match current theme
+    updateThemeIcon(isDarkMode);
     
     btn.addEventListener('click', function() {
         console.log('Theme toggle clicked');
@@ -56,14 +53,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newIsDark = document.body.classList.contains('dark');
                 console.log('Dark mode after toggle:', newIsDark);
                 
-                // Apply immediate styling
-                applyThemeStyles(newIsDark);
-                
                 // Update the icon based on new theme
                 updateThemeIcon(newIsDark);
-                
-                // Force reload of CSS files by updating their version
-                updateCssVersions();
+                // Rely on CSS cascade and variables; no forced CSS reload
             } else {
                 console.error('Failed to save theme preference');
             }
@@ -124,17 +116,7 @@ function getCookie(name) {
  * Updates the version parameter in CSS file URLs to force a refresh
  */
 function updateCssVersions() {
-    const cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
-    const newVersion = Date.now(); // Use timestamp as version
-    
-    cssLinks.forEach(link => {
-        const href = link.getAttribute('href');
-        if (href && (href.includes('base.css') || href.includes('light-mode.css') || href.includes('dark-mode.css'))) {
-            // Remove any existing version parameter
-            const baseUrl = href.split('?')[0];
-            link.setAttribute('href', `${baseUrl}?v=${newVersion}`);
-        }
-    });
+    // No-op: CSS files are already loaded and versioned server-side.
 }
 
 /**
@@ -142,26 +124,15 @@ function updateCssVersions() {
  * @param {boolean} isDark - Whether to apply dark mode
  */
 function applyThemeStyles(isDark) {
-    // Get key elements that need immediate styling
+    // Rely entirely on CSS (`body.dark`) and CSS variables for styling.
+    // Clear any inline overrides to allow brand colors to flow.
     const header = document.getElementById('header');
     const sidebar = document.getElementById('sidebar');
     const content = document.getElementById('content');
-    
-    if (isDark) {
-        // Apply dark mode styles
-        document.body.style.backgroundColor = '#1f2937'; // dark gray
-        document.body.style.color = '#f9fafb'; // white
-        
-        if (header) header.style.backgroundColor = '#004eb3'; // Keep blue header
-        if (sidebar) sidebar.style.backgroundColor = '#e00000'; // Keep red sidebar
-        if (content) content.style.backgroundColor = '#1f2937'; // dark gray
-    } else {
-        // Apply light mode styles
-        document.body.style.backgroundColor = '#f9fafb'; // light gray
-        document.body.style.color = '#111827'; // dark gray
-        
-        if (header) header.style.backgroundColor = '#004eb3'; // Keep blue header
-        if (sidebar) sidebar.style.backgroundColor = '#e00000'; // Keep red sidebar
-        if (content) content.style.backgroundColor = '#f9fafb'; // light gray
-    }
+
+    document.body.style.backgroundColor = '';
+    document.body.style.color = '';
+    if (header) header.style.backgroundColor = '';
+    if (sidebar) sidebar.style.backgroundColor = '';
+    if (content) content.style.backgroundColor = '';
 } 
