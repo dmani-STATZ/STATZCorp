@@ -14,7 +14,7 @@ from decimal import Decimal
 import time
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, ClinAcknowledgment, Supplier, ExportTiming
+from ..models import Contract, Clin, ClinAcknowledgment, Supplier, ExportTiming, ContractSplit
 
 
 class ContractLogView(ListView):
@@ -37,12 +37,36 @@ class ContractLogView(ListView):
             'clinacknowledgment_set',
             'contract__splits',
         ).annotate(
-            # Aggregated split values for PPI and STATZ at the contract level
-            ppi_split_value=Sum('contract__splits__split_value', filter=Q(contract__splits__company_name__iexact='PPI')),
-            ppi_split_paid=Sum('contract__splits__split_paid', filter=Q(contract__splits__company_name__iexact='PPI')),
-            statz_split_value=Sum('contract__splits__split_value', filter=Q(contract__splits__company_name__iexact='STATZ')),
-            statz_split_paid=Sum('contract__splits__split_paid', filter=Q(contract__splits__company_name__iexact='STATZ')),
-            # Flag first CLIN per contract via subquery (SQLite-safe)
+            # Aggregated split values via correlated subqueries (SQL Server safe)
+            ppi_split_value=Subquery(
+                ContractSplit.objects
+                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+                .values('contract_id')
+                .annotate(total=Sum('split_value'))
+                .values('total')[:1]
+            ),
+            ppi_split_paid=Subquery(
+                ContractSplit.objects
+                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+                .values('contract_id')
+                .annotate(total=Sum('split_paid'))
+                .values('total')[:1]
+            ),
+            statz_split_value=Subquery(
+                ContractSplit.objects
+                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+                .values('contract_id')
+                .annotate(total=Sum('split_value'))
+                .values('total')[:1]
+            ),
+            statz_split_paid=Subquery(
+                ContractSplit.objects
+                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+                .values('contract_id')
+                .annotate(total=Sum('split_paid'))
+                .values('total')[:1]
+            ),
+            # Flag first CLIN per contract via subquery (SQLite/SQL Server safe)
             is_first_for_contract=Case(
                 When(
                     id=Subquery(
