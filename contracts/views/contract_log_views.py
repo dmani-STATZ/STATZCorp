@@ -41,6 +41,7 @@ class ContractLogView(ListView):
             ppi_split_value=Subquery(
                 ContractSplit.objects
                 .filter(contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+                .order_by()
                 .values('contract_id')
                 .annotate(total=Sum('split_value'))
                 .values('total')[:1]
@@ -48,6 +49,7 @@ class ContractLogView(ListView):
             ppi_split_paid=Subquery(
                 ContractSplit.objects
                 .filter(contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+                .order_by()
                 .values('contract_id')
                 .annotate(total=Sum('split_paid'))
                 .values('total')[:1]
@@ -55,6 +57,7 @@ class ContractLogView(ListView):
             statz_split_value=Subquery(
                 ContractSplit.objects
                 .filter(contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+                .order_by()
                 .values('contract_id')
                 .annotate(total=Sum('split_value'))
                 .values('total')[:1]
@@ -62,6 +65,7 @@ class ContractLogView(ListView):
             statz_split_paid=Subquery(
                 ContractSplit.objects
                 .filter(contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+                .order_by()
                 .values('contract_id')
                 .annotate(total=Sum('split_paid'))
                 .values('total')[:1]
