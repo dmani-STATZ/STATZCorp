@@ -220,7 +220,22 @@ USE_TZ = True
 STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-MEDIA_ROOT = BASE_DIR / 'media'
+
+# Uploaded media storage
+# In production, avoid storing uploads inside the app folder (wwwroot),
+# since deployments overwrite that directory. Use a persistent path instead.
+if IS_PRODUCTION:
+    _default_media_root = Path('D:/home/media') if os.name == 'nt' else Path('/home/site/media')
+    MEDIA_ROOT = Path(os.environ.get('APP_MEDIA_ROOT', _default_media_root))
+else:
+    MEDIA_ROOT = BASE_DIR / 'media'
+
+# Ensure the media directory exists to prevent runtime errors on first write
+try:
+    Path(MEDIA_ROOT).mkdir(parents=True, exist_ok=True)
+except Exception:
+    # Don't fail settings import if directory cannot be created
+    pass
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 if IS_PRODUCTION:
