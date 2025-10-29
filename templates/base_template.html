@@ -214,7 +214,7 @@
                 </li>
                 {% endif %}
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                    <a href="{% url 'reports:user-reports' %}" class="px-3 py-2 rounded-md text-sm font-medium">Reports</a>
+                    <a href="{% url 'reports:my_requests' %}" class="px-3 py-2 rounded-md text-sm font-medium">Reports</a>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-2 rounded-md text-sm font-medium">Folder Tracking</a>
@@ -227,6 +227,21 @@
     </div>
 
     <div class="content flex-1 inactive" id="content">
+        {% if messages %}
+        <div class="container mx-auto px-4 py-2">
+            {% for message in messages %}
+                {% if 'error' in message.tags %}
+                    <div class="mb-2 px-3 py-2 rounded bg-red-600 text-white">{{ message }}</div>
+                {% elif 'warning' in message.tags %}
+                    <div class="mb-2 px-3 py-2 rounded bg-yellow-500 text-black">{{ message }}</div>
+                {% elif 'success' in message.tags %}
+                    <div class="mb-2 px-3 py-2 rounded bg-green-600 text-white">{{ message }}</div>
+                {% else %}
+                    <div class="mb-2 px-3 py-2 rounded bg-blue-600 text-white">{{ message }}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
         {% block body %}{% endblock body %}
         {% block extra_scripts %}{% endblock extra_scripts %}
     </div>

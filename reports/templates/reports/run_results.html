@@ -1,0 +1,36 @@
+{% extends "base_template.html" %}
+
+{% block body %}
+<div class="container mx-auto px-4 reports-scope">
+  <h1 class="text-2xl font-semibold text-gray-900 dark:text-white mt-4 mb-4">Report Results: {{ request_obj.title }}</h1>
+  <div class="mb-4">
+    <a class="px-3 py-2 bg-blue-600 text-white rounded" href="{% url 'reports:export_report' request_obj.id %}">Export CSV</a>
+    <a class="px-3 py-2 bg-gray-700 text-white rounded ml-2" href="{% url 'reports:my_requests' %}">Back</a>
+  </div>
+  {% if error %}
+    <div class="bg-red-900 text-red-100 p-3 rounded mb-4">{{ error }}</div>
+  {% endif %}
+  <div style="max-height: 70vh; overflow:auto;" class="panel-box p-3 rounded">
+    <table class="w-full text-sm border-collapse">
+      <thead>
+        <tr>
+          {% for c in columns %}
+            <th class="border px-2 py-1 text-left">{{ c }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {% for v in row %}
+              <td class="border px-2 py-1">{{ v }}</td>
+            {% endfor %}
+          </tr>
+        {% empty %}
+          <tr><td class="empty" colspan="99">No results.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

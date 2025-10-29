@@ -1,42 +1,90 @@
-Here's a breakdown of my thoughts and how you might approach this:
+AI-Driven Reports (Natural Language → Query → Results)
 
-**Core Feasibility:**
+Goal
+- Enable users to ask for reports in plain English and receive tabular results and an Excel export, with smart follow‑ups that add fields/joins (e.g., CLIN lines, suppliers, NSNs) without rebuilding from scratch.
 
-* **Selecting Tables/Fields:** Django's ORM (Object-Relational Mapper) makes it possible to dynamically query your database tables and select specific fields. You can build forms or interfaces that allow users to choose which models and fields they want to include in their reports.
-* **Adding Criteria/Filters:** Django's querysets provide powerful filtering capabilities. You can translate user-defined criteria (e.g., "where status is 'active'", "where date is within the last month") into Django queryset filters.
-* **Sorting:** Django's `order_by()` method on querysets allows you to sort the results based on any field the user selects.
-* **Saving Reports:** You can create a Django model to store the configuration of saved reports, including the selected tables/fields, filters, and sorting options.
-* **Running Saved Reports:** Retrieving the saved configuration and executing the corresponding database query is straightforward.
-* **Exporting to Excel:** Python has excellent libraries like `openpyxl` or `xlsxwriter` that can be used to generate Excel files from your query results. You can create a view that generates the Excel file and serves it as a download.
-* **Table View:** Rendering the query results in a simple HTML table is a standard Django template task.
+Scope
+- Primary data domain: the contracts app (models in `contracts/models.py`). If you meant “contacts,” this design still applies; the introspection targets any app label and is set to `contracts` by default.
 
-**Challenges and Considerations (Especially Totals/Subtotals):**
+Current State
+- Models: `reports/models.py` has `ReportRequest`, `Report`, `ReportChange` for request, output, and follow‑ups.
+- Views: `reports/views.py` already renders a landing page, runs raw SQL, and exports to Excel.
+- Schema support: `contracts/utils/contracts_schema.py` builds a schema description for LLM prompts.
+- UI: `reports/templates/reports/user_reports.html` is a suitable landing page with a modal to “Request New Report.”
 
-* **Dynamic Aggregations (Totals/Subtotals):** This is the most complex part. While Django's aggregation functions (`Sum`, `Count`, etc.) are powerful, applying them dynamically based on user selection can be tricky. You might need to:
-    * **Restrict aggregation to specific field types:** It only makes sense to sum or average numerical fields.
-    * **Design a user interface for specifying aggregations:** Users would need a way to indicate which fields they want totals or subtotals for and how they want them calculated (sum, average, etc.).
-    * **Handle grouping for subtotals:** If a user wants subtotals, they'll likely want to group the data by one or more fields. This adds another layer of complexity to the query and the display logic. You might need to use Django's `annotate()` and `values()` in combination.
-* **Security:** Be cautious about allowing users to directly select tables and fields. You'll need to implement security measures to prevent them from accessing sensitive data or constructing malicious queries. You might want to provide a predefined list of available models and fields.
-* **Performance:** Dynamically building and executing complex queries based on user input could potentially impact database performance, especially with large datasets. You might need to consider indexing and optimizing your queries.
-* **User Interface/User Experience (UI/UX):** Designing an intuitive and user-friendly interface for selecting tables, fields, filters, sorting, and potentially aggregations will be crucial for the success of this feature.
+Design Overview
+- NLQ pipeline
+  - Schema introspection: Build a graph of tables/fields/relations for the `contracts` app via Django introspection (reuse `generate_condensed_contracts_schema(user_query)` for tighter prompts).
+  - LLM planning: Prompt the model to produce a structured QueryPlan (JSON), not ad‑hoc SQL. The plan contains base model, filters, selected fields, joins, grouping, order, and limits.
+  - Validation: Validate the plan against the Django model graph (whitelist models/fields; check ops/types; cap limits; forbid DML/DDL).
+  - Execution: Compile the plan to Django ORM (preferred) or controlled SQL. Paginate and cap row counts. Log/audit queries.
+  - Rendering: Show tabular results with column labels; provide immediate Excel export.
+  - Follow‑ups: Merge the new instruction into the prior plan (add fields/joins/filters) and re‑execute.
 
-**Potential Approach:**
+Key Data Model (contracts)
+- Contract → Clin (1‑to‑many): `Clin.contract`.
+- Clin → Supplier (FK): `Clin.supplier`.
+- Clin → Nsn (FK): `Clin.nsn`.
+- Additional useful tables: `IdiqContract`, `PaymentHistory`, etc.
+  - This supports “new contracts this month,” and follow‑ups like “add CLIN lines, suppliers, NSNs.”
 
-1.  **Models:**
-    * `SavedReport`: Stores the report's name, user who created it, selected model(s), selected fields, filters (potentially as JSON), sorting fields, and possibly aggregation configurations (also potentially as JSON).
-2.  **Forms:**
-    * Forms to allow users to select models, fields, define filters, and specify sorting. You might need dynamic forms that adapt based on the selected model.
-3.  **Views:**
-    * A view to display the report creation/editing interface.
-    * A view to save new reports and update existing ones.
-    * A view to list saved reports.
-    * A view to run a saved report:
-        * Retrieve the saved configuration.
-        * Dynamically construct the Django queryset based on the selected model, fields, filters, and sorting.
-        * Handle optional aggregations.
-        * Render the data in an HTML table.
-    * A view to export the report data to an Excel file using a library like `openpyxl`.
+LLM Contract (Structured Output)
+- Require a strict JSON object from the LLM:
+  - base_model: "contracts.Contract"
+  - selects: [{ model: "contracts.Contract", field: "contract_number", alias: "Contract" }, ...]
+  - filters: [{ model: "contracts.Contract", field: "award_date", op: "this_month" }]
+  - joins: [{ from_model: "contracts.Contract", to_model: "contracts.Clin" }, { from_model: "contracts.Clin", to_model: "contracts.Supplier" }, { from_model: "contracts.Clin", to_model: "contracts.Nsn" }]
+  - group_by, order_by, limit, result_mode: "flat" | "nested"
+- Only after server validation do we compile to ORM or generate SQL. Optional: also ask the LLM to return an explanation string for UI transparency.
 
-**In summary, building this reporting app is definitely achievable with Django. The core functionalities of selecting data, filtering, sorting, saving, and exporting are well within Django's capabilities. The dynamic totals and subtotals will be the most challenging aspect and will require careful design and implementation.**
+Example Query → Plan
+- User: “Can you give me a report for all the new contracts from this month?”
+  - Plan: base_model=Contract; filters=[award_date this_month]; selects=[contract_number, award_date].
+- Follow‑up: “Add CLIN lines, the suppliers and the NSNs.”
+  - Plan update: joins append Clin→Supplier/Nsn; selects append fields for CLIN id/qty/price and Supplier name and NSN code; result_mode may switch to flat for Excel.
 
-Go for it! It sounds like a valuable feature for your users. Start with the basic functionalities and then tackle the more complex aggregation requirements. Let me know if you have more specific questions as you start building.
+Execution Strategy
+- Compile to ORM
+  - Build QuerySet from `base_model`.
+  - Apply filters (interpret helpers like this_month/last_30_days/year=YYYY).
+  - Apply joins via `select_related`/`prefetch_related` and `values()` for a flat output.
+  - Use annotations for aggregates when requested.
+- Guardrails
+  - Whitelist models/fields scoped to `contracts`.
+  - Enforce SELECT‑only semantics and row caps (e.g., 10k default).
+  - Validate ops/field types; reject ambiguous plans.
+  - Timeouts and pagination.
+
+UX Flow
+- Landing page (in place): `reports:user-reports` lists requests and completed reports; “Request New Report” opens a modal.
+- AI creation tool (modal or dedicated page)
+  - Step 1: user asks a question; we call the LLM with condensed schema.
+  - Step 2: show preview table and column list; “Export to Excel” link.
+  - Step 3: follow‑ups create diffed plan updates and rerender.
+
+Storage & Reproducibility
+- Save the final QueryPlan JSON with each `Report` for reproducibility and reruns; store the originating question and follow‑ups on `ReportRequest` and `ReportChange`.
+- Optionally also save the executed SQL as a snapshot for auditing.
+
+Security & Privacy
+- No direct execution of LLM‑provided SQL. Always validate a structured plan.
+- Hide credentials; route keys via settings/env. Never hardcode tokens.
+- Add role‑based access to restrict sensitive fields/tables.
+
+Excel Export
+- Reuse existing `export_report` view; extend it to consume the same compiled dataset (from the QueryPlan) so UI and export are consistent.
+
+Implementation Plan (phased)
+- Phase 1: Core plumbing
+  - Add `reports/services/nlq.py` with `QueryPlan` dataclasses, validator, and a basic compiler to ORM (Contract/Clin path).
+  - Add a JSON field to `Report` (or use a related config model) to persist the QueryPlan.
+  - Switch `ai_generate_report_view` to request JSON plans from the LLM and compile them server‑side.
+- Phase 2: Follow‑ups & UX polish
+  - Add a “Continue refining” chat strip on `report_view.html` to apply `ReportChange` as deltas to the saved plan.
+  - Add column chips/toggles and quick filters UI.
+- Phase 3: Aggregations & caching
+  - Support group_by/aggregations in the planner and compiler.
+  - Cache compiled results for re‑downloads.
+
+Notes
+- This design deliberately centers ORM compilation to minimize SQL‑injection risk and keep cross‑DB portability. When raw SQL is necessary, validate with a parser and strict whitelists.

@@ -1,80 +1,56 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.utils.text import slugify
 import uuid
 
 User = get_user_model()
 
+
 class ReportRequest(models.Model):
-    """Model for storing user report requests."""
-    
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('rejected', 'Rejected')
-    ]
-    
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='report_requests')
-    request_text = models.TextField(help_text="Describe what you need in this report")
-    generated_name = models.CharField(max_length=100, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    assigned_to = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='assigned_reports'
-    )
-    
-    def save(self, *args, **kwargs):
-        if not self.generated_name:
-            # Generate a name based on first 5 words of request
-            words = self.request_text.split()[:5]
-            name = ' '.join(words)
-            self.generated_name = f"{slugify(name)}-{str(self.id)[:8]}"
-        super().save(*args, **kwargs)
-    
-    def __str__(self):
-        return self.generated_name
+    """Simple request-driven reporting model.
 
-class Report(models.Model):
-    """Model for storing completed reports."""
-    
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    report_request = models.OneToOneField(
-        ReportRequest, 
-        on_delete=models.CASCADE,
-        related_name='completed_report'
-    )
-    sql_query = models.TextField(help_text="The SQL query that generates this report")
-    description = models.TextField(help_text="Description of what this report shows", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Report for {self.report_request.generated_name}"
+    Lifecycle:
+    - User creates a request (status=pending)
+    - Admin provides SQL (status=completed -> ready to run)
+    - User can run/export results; or request changes (status=change)
+    """
 
-class ReportChange(models.Model):
-    """Model for tracking requested changes to reports."""
-    
+    STATUS_PENDING = "pending"
+    STATUS_COMPLETED = "completed"  # SQL provided and ready to run
+    STATUS_CHANGE = "change"  # user requested changes
+
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('rejected', 'Rejected')
+        (STATUS_PENDING, "Pending"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_CHANGE, "Change Requested"),
     ]
-    
+
+    CATEGORY_CHOICES = [
+        ("contract", "Contract"),
+        ("supplier", "Supplier"),
+        ("nsn", "NSN"),
+        ("other", "Other"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    report = models.ForeignKey(Report, on_delete=models.CASCADE, related_name='change_requests')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    change_text = models.TextField(help_text="Describe what changes you need")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="report_requests")
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="other")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+
+    sql_query = models.TextField(blank=True)
+    context_notes = models.TextField(blank=True)
+    ai_prompt = models.TextField(blank=True)
+    ai_result = models.TextField(blank=True)
+
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    last_run_rowcount = models.IntegerField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Change request for {self.report.report_request.generated_name}"
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:  # pragma: no cover - representation only
+        return f"{self.title} ({self.get_status_display()})"

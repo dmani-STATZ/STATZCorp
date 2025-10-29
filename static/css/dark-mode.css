@@ -420,3 +420,23 @@ body.dark .nsn-result-item {
 body.dark .nsn-pagination {
     composes: search-pagination;
 } 
+
+/* ===== Reports: Admin (dark overrides) ===== */
+body.dark .reports-admin .panel { border-color: #1f2937; }
+body.dark .reports-admin .panel h2 { background: #111827; }
+body.dark .reports-admin .panel-body { background: #0b1220; color: #ddd; }
+body.dark .reports-admin .req-item { border-color: #1f2937; }
+body.dark .reports-admin .req-item a { color: #93c5fd; }
+body.dark .reports-admin table.preview th,
+body.dark .reports-admin table.preview td { border-color: #374151; }
+body.dark .reports-admin .btn { background: #111827; color: #e5e7eb; }
+body.dark .reports-admin .muted { color: #9ca3af; }
+
+/* ===== Reports: User dashboard (dark overrides) ===== */
+body.dark .reports-scope .panel-box { background: #0b1220; color: #e5e7eb; }
+body.dark .reports-scope label { color: #e5e7eb; }
+body.dark .reports-scope input,
+body.dark .reports-scope select,
+body.dark .reports-scope textarea { background: #111827; color: #e5e7eb; border: 1px solid #374151; }
+body.dark .reports-scope .section .item { border-bottom-color: #1f2937; }
+body.dark .reports-scope .empty { color: #9ca3af; }

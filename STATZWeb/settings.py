@@ -1,4 +1,4 @@
-"""
+﻿"""
 Django settings for STATZWeb project.
 
 Handles both development and production environments.
@@ -17,12 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 try:
     from dotenv import load_dotenv
     load_dotenv()
-    print("✅ .env file loaded successfully")
+    #print("Check: .env file loaded successfully")
 except ImportError:
-    print("⚠️  python-dotenv not installed, install it with: pip install python-dotenv")
+    print("Warning: python-dotenv not installed, install it with: pip install python-dotenv")
     print("   Continuing without .env file - using environment variables")
 except Exception as e:
-    print(f"⚠️  Could not load .env file: {e}")
+    print(f"Warning: Could not load .env file: {e}")
     print("   Continuing with environment variables")
 
 # SECURITY WARNING: keep the secret key used in production secret!
@@ -159,7 +159,7 @@ if IS_PRODUCTION:
 else:
     # Development: SQLite (default) or SQL Server (if environment variables are set)
     if os.environ.get('DB_HOST') and os.environ.get('DB_NAME'):
-        print("🔧 Using SQL Server for development (from environment variables)")
+        print("Using SQL Server for development (from environment variables)")
         DATABASES = {
             'default': {
                 'ENGINE': 'mssql',
@@ -176,7 +176,7 @@ else:
             },
         }
     else:
-        print("🔧 Using SQLite for development")
+        print("Using SQLite for development")
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',
@@ -247,8 +247,19 @@ else:
     # Development: Standard static files storage
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
-# Reports app settings
 REPORT_CREATOR_EMAIL = os.environ.get('REPORT_CREATOR_EMAIL', 'dmani@statzcorp.com')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+OPENROUTER_HTTP_REFERER = os.environ.get('OPENROUTER_HTTP_REFERER', 'http://localhost:8000/')
+OPENROUTER_X_TITLE = os.environ.get('OPENROUTER_X_TITLE', 'STATZCorp Reports')
+# Default model can be overridden via env; switch to minimax free by default
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'minimax/minimax-m2:free')
+# Allow overriding base URL in case of proxy or routing issues
+OPENROUTER_BASE_URL = os.environ.get('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
+
+# Optional: a comma-separated list of fallback models to try if the primary
+# model is not available for this API key/providers.
+_fallbacks = os.environ.get('OPENROUTER_MODEL_FALLBACKS', '')
+OPENROUTER_MODEL_FALLBACKS = [m.strip() for m in _fallbacks.split(',') if m.strip()]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -448,12 +459,12 @@ AZURE_AD_CONFIG = {
 }
 
 # Debug Azure AD configuration
-print(f"🔍 Azure AD Debug Info:")
-print(f"   App ID: {'SET' if AZURE_AD_CONFIG['app_id'] else 'NOT SET'}")
-print(f"   Tenant ID: {'SET' if AZURE_AD_CONFIG['tenant_id'] else 'NOT SET'}")
-print(f"   Client Secret: {'SET' if AZURE_AD_CONFIG['app_secret'] else 'NOT SET'}")
-print(f"   Authority: {AZURE_AD_CONFIG['authority']}")
-print(f"   Redirect URI: {AZURE_AD_CONFIG['redirect_uri']}")
+#print(f"   Azure AD Debug Info:")
+#print(f"   App ID: {'SET' if AZURE_AD_CONFIG['app_id'] else 'NOT SET'}")
+#print(f"   Tenant ID: {'SET' if AZURE_AD_CONFIG['tenant_id'] else 'NOT SET'}")
+#print(f"   Client Secret: {'SET' if AZURE_AD_CONFIG['app_secret'] else 'NOT SET'}")
+#print(f"   Authority: {AZURE_AD_CONFIG['authority']}")
+#print(f"   Redirect URI: {AZURE_AD_CONFIG['redirect_uri']}")
 
 
 # Add Microsoft Auth backend to authentication backends
@@ -484,8 +495,8 @@ else:
     SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # Print environment summary
-print(f"🔧 Settings loaded - Environment: {'PRODUCTION' if IS_PRODUCTION else 'DEVELOPMENT'}")
-print(f"   Debug: {DEBUG}")
-print(f"   Database: {'SQL Server' if IS_PRODUCTION or os.environ.get('DB_HOST') else 'SQLite'}")
-print(f"   Login Required: {REQUIRE_LOGIN}")
-print(f"   Azure AD: {'CONFIGURED' if AZURE_AD_CONFIG['app_id'] else 'NOT CONFIGURED'}")
+#print(f"   Settings loaded - Environment: {'PRODUCTION' if IS_PRODUCTION else 'DEVELOPMENT'}")
+#print(f"   Debug: {DEBUG}")
+#print(f"   Database: {'SQL Server' if IS_PRODUCTION or os.environ.get('DB_HOST') else 'SQLite'}")
+#print(f"   Login Required: {REQUIRE_LOGIN}")
+#print(f"   Azure AD: {'CONFIGURED' if AZURE_AD_CONFIG['app_id'] else 'NOT CONFIGURED'}")

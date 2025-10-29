@@ -1,447 +1,356 @@
-"""
-Views for the reports app.
-
-This module provides views for handling natural language queries and displaying results.
-"""
-import logging
-import time
-import json
-from typing import Dict, Any
-from datetime import datetime
+from typing import Optional
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponse
-from django.views.generic import TemplateView, ListView, DetailView, CreateView, UpdateView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.core.paginator import Paginator
-from django.core.exceptions import FieldDoesNotExist
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from io import BytesIO
-from django.views.generic import View
-from django.db.models import Count
-from django.utils import timezone
-import re
-from django.urls import reverse, reverse_lazy
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.contrib import messages
-from django.db import connection
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.utils import timezone
+from django.urls import reverse
+
+from .models import ReportRequest
+from .forms import ReportRequestForm, SQLUpdateForm
+from .utils import run_select, rows_to_csv, generate_db_schema_snapshot
+from django.http import StreamingHttpResponse
 from django.conf import settings
+from django.db import connection
+import os
+import json
 import requests
-from .models import ReportRequest, Report, ReportChange
-from django.apps import apps
-from contracts.utils.contracts_schema import generate_contracts_schema_description, generate_condensed_contracts_schema
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
+import re
+
+CORE_TABLES = [
+    'contracts_buyer',
+    'contracts_clin',
+    'contracts_clinshipment',
+    'contracts_clintype',
+    'contracts_company',
+    'contracts_contract',
+    'contracts_contractsplit',
+    'contracts_contractstatus',
+    'contracts_contracttype',
+    'contracts_idiqcontract',
+    'contracts_idiqcontractdetails',
+    'contracts_nsn',
+    'contracts_paymenthistory',
+    'contracts_salesclass',
+    'contracts_specialpaymentterms',
+    'contracts_supplier',
+    'contracts_suppliertype',
+]
+
+@login_required
+def user_dashboard(request):
+    """User page to view requests, statuses, run ready reports, and export."""
+    my_requests = ReportRequest.objects.filter(user=request.user).order_by("-created_at")
+    pending = my_requests.filter(status=ReportRequest.STATUS_PENDING)
+    completed = my_requests.filter(status=ReportRequest.STATUS_COMPLETED)
+    changes = my_requests.filter(status=ReportRequest.STATUS_CHANGE)
+    return render(
+        request,
+        "reports/user_dashboard.html",
+        {
+            "pending_requests": pending,
+            "completed_requests": completed,
+            "change_requests": changes,
+            "form": ReportRequestForm(),
+        },
+    )
 
 
-class UserReportListView(LoginRequiredMixin, ListView):
-    """View for users to see their report requests and completed reports."""
-    
-    model = ReportRequest
-    template_name = 'reports/user_reports.html'
-    context_object_name = 'reports'
-    
-    def get_queryset(self):
-        return ReportRequest.objects.filter(user=self.request.user, status__in=['in_progress', 'pending']).order_by('-created_at')
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['completed_reports'] = Report.objects.filter(
-            report_request__user=self.request.user
-        ).select_related('report_request')
-        return context
+@login_required
+def request_report(request):
+    if request.method == "POST":
+        form = ReportRequestForm(request.POST)
+        if form.is_valid():
+            rr = form.save(commit=False)
+            rr.user = request.user
+            rr.save()
+            messages.success(request, "Your request has been submitted and is pending.")
+            return redirect("reports:my_requests")
+    else:
+        form = ReportRequestForm()
+    return render(request, "reports/request_form.html", {"form": form})
 
-class ReportRequestCreateView(LoginRequiredMixin, CreateView):
-    """View for users to create new report requests."""
-    
-    model = ReportRequest
-    fields = ['request_text']
-    template_name = 'reports/report_request_form.html'
-    success_url = reverse_lazy('reports:user-reports')
-    
-    def form_valid(self, form):
-        form.instance.user = self.request.user
-        response = super().form_valid(form)
-        
-        from users.models import SystemMessage
-        
-        # Get the user from the email address in settings
-        try:
-            # Create a message for the report creator
-            SystemMessage.create_message(
-                user=User.objects.get(email=settings.REPORT_CREATOR_EMAIL),
-                title="Report Request Submitted",
-                message=f"A new report request '{self.object.generated_name}' has been submitted.",
-                priority="medium",
-                source_app="reports",
-                source_model="ReportRequest",
-                source_id=str(self.object.id),
-                action_url=reverse('reports:creator-reports')
-            )
-            messages.success(self.request, 'Your report request has been submitted successfully.')
-            return response
-        except User.DoesNotExist:
-            messages.error(self.request, f'Report creator with email {settings.REPORT_CREATOR_EMAIL} not found. Please contact your administrator.')
-            return redirect('reports:user-reports')
 
-class ReportCreatorListView(UserPassesTestMixin, ListView):
-    """View for report creators to see all report requests."""
-    
-    model = ReportRequest
-    template_name = 'reports/creator_reports.html'
-    context_object_name = 'reports'
-    
-    def test_func(self):
-        return self.request.user.is_staff
-    
-    def get_queryset(self):
-        status = self.request.GET.get('status', '')
-        queryset = ReportRequest.objects.all().select_related('user', 'assigned_to')
-        
-        if status:
-            queryset = queryset.filter(status=status)
-            
-        return queryset.order_by('-created_at')
+@login_required
+def run_report(request, pk):
+    rr = get_object_or_404(ReportRequest, pk=pk)
+    if not (request.user.is_superuser or rr.user_id == request.user.id):
+        return HttpResponseBadRequest("Not allowed")
+    if rr.status != ReportRequest.STATUS_COMPLETED or not rr.sql_query:
+        messages.error(request, "Report is not ready to run.")
+        return redirect("reports:my_requests")
 
-class ReportCreatorDetailView(UserPassesTestMixin, UpdateView):
-    """View for report creators to update report requests and add SQL."""
-    
-    model = ReportRequest
-    template_name = 'reports/creator_detail.html'
-    fields = ['status', 'assigned_to']
-    
-    def test_func(self):
-        return self.request.user.is_staff
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['report_form'] = self.get_report_form()
-        return context
-    
-    def get_report_form(self):
-        report = getattr(self.object, 'completed_report', None)
-        if report:
-            return {'sql_query': report.sql_query, 'description': report.description}
-        return {'sql_query': '', 'description': ''}
-    
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        
-        # Handle report creation/update
-        if 'sql_query' in request.POST:
-            report, created = Report.objects.update_or_create(
-                report_request=self.object,
-                defaults={
-                    'sql_query': request.POST['sql_query'],
-                    'description': request.POST.get('description', '')
-                }
-            )
-            
-            if created:
-                messages.success(request, 'Report has been created successfully.')
-            else:
-                messages.success(request, 'Report has been updated successfully.')
-                
-            return redirect('reports:creator-detail', pk=self.object.pk)
-        
-        return super().post(request, *args, **kwargs)
+    try:
+        cols, rows = run_select(rr.sql_query, limit=1000)
+    except Exception as e:
+        # Show the error inline so the user sees what happened
+        return render(
+            request,
+            "reports/run_results.html",
+            {"request_obj": rr, "columns": [], "rows": [], "error": str(e)},
+        )
 
-class ReportViewView(LoginRequiredMixin, DetailView):
-    """View for users to view their completed reports."""
-    
-    model = Report
-    template_name = 'reports/report_view.html'
-    
-    def get_queryset(self):
-        return Report.objects.filter(report_request__user=self.request.user)
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['change_requests'] = self.object.change_requests.all().order_by('-created_at')
-        
-        # Get page size from request or user settings
-        page_size = self.request.GET.get('page_size', '25')
-        page_number = self.request.GET.get('page', 1)
-        
-        # Execute the SQL query and get results
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(self.object.sql_query)
-                context['columns'] = [col[0] for col in cursor.description]
-                all_results = cursor.fetchall()
-                
-                # Handle pagination
-                if page_size.upper() != 'ALL':
-                    paginator = Paginator(list(all_results), int(page_size))
-                    page_obj = paginator.get_page(page_number)
-                    context['results'] = page_obj.object_list
-                    context['page_obj'] = page_obj
-                else:
-                    context['results'] = all_results
-                
-                context['total_records'] = len(all_results)
-                context['page_size'] = page_size
-                context['available_page_sizes'] = ['25', '50', '100', 'ALL']
-                
-        except Exception as e:
-            context['error'] = str(e)
-            context['columns'] = []
-            context['results'] = []
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error executing report query for report {self.object.pk}: {str(e)}")
-            
-        return context
+    rr.last_run_at = timezone.now()
+    rr.last_run_rowcount = len(rows)
+    rr.save(update_fields=["last_run_at", "last_run_rowcount", "updated_at"])
 
-class ReportChangeCreateView(LoginRequiredMixin, CreateView):
-    """View for users to request changes to a report."""
-    
-    model = ReportChange
-    fields = ['change_text']
-    template_name = 'reports/report_change_form.html'
-    
-    def get_report(self):
-        return get_object_or_404(Report, pk=self.kwargs['report_pk'], report_request__user=self.request.user)
-    
-    def form_valid(self, form):
-        report = self.get_report()
-        form.instance.report = report
-        form.instance.user = self.request.user
-        response = super().form_valid(form)
-        messages.success(self.request, 'Your change request has been submitted.')
-        return response
-    
-    def get_success_url(self):
-        return reverse_lazy('reports:report-view', kwargs={'pk': self.kwargs['report_pk']})
+    return render(
+        request,
+        "reports/run_results.html",
+        {"request_obj": rr, "columns": cols, "rows": rows},
+    )
+
 
 @login_required
 def export_report(request, pk):
-    """Export a report to Excel."""
-    report = get_object_or_404(Report, pk=pk, report_request__user=request.user)
-    
-    # Create a new workbook and select the active sheet
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Report Data"
-    
-    # Define styles
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-    border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
+    rr = get_object_or_404(ReportRequest, pk=pk)
+    if not (request.user.is_superuser or rr.user_id == request.user.id):
+        return HttpResponseBadRequest("Not allowed")
+    if rr.status != ReportRequest.STATUS_COMPLETED or not rr.sql_query:
+        messages.error(request, "Report is not ready to export.")
+        return redirect("reports:my_requests")
+
+    cols, rows = run_select(rr.sql_query, limit=50000)
+    data = rows_to_csv(cols, rows)
+    resp = HttpResponse(data, content_type="text/csv")
+    filename = f"report_{str(rr.id)[:8]}.csv"
+    resp["Content-Disposition"] = f"attachment; filename={filename}"
+    return resp
+
+
+@login_required
+def request_change(request, pk):
+    rr = get_object_or_404(ReportRequest, pk=pk, user=request.user)
+    to_status = request.POST.get("to") or ReportRequest.STATUS_CHANGE
+    if to_status not in {ReportRequest.STATUS_CHANGE, ReportRequest.STATUS_PENDING}:
+        return HttpResponseBadRequest("Invalid status")
+    message = (request.POST.get("message") or "").strip()
+    if message:
+        stamp = timezone.now().strftime("%Y-%m-%d %H:%M")
+        user_line = f"[Change requested by {request.user.get_username()} at {stamp}]\n{message}\n\n"
+        rr.context_notes = (rr.context_notes or "") + user_line
+    rr.status = to_status
+    rr.save(update_fields=["status", "updated_at", "context_notes"])
+    messages.success(request, f"Request status updated to {rr.get_status_display()}.")
+    return redirect("reports:my_requests")
+
+
+def _is_admin(user) -> bool:
+    return bool(user and user.is_authenticated and user.is_superuser)
+
+
+@login_required
+@user_passes_test(_is_admin)
+def admin_dashboard(request):
+    pending = ReportRequest.objects.filter(status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE])
+    selected_id: Optional[str] = request.GET.get("id")
+    selected = None
+    sql_form = None
+    if selected_id:
+        selected = get_object_or_404(ReportRequest, pk=selected_id)
+        sql_form = SQLUpdateForm(instance=selected)
+
+    return render(
+        request,
+        "reports/admin_dashboard.html",
+        {
+            "pending": pending,
+            "selected": selected,
+            "sql_form": sql_form,
+        },
     )
-    
-    # Add report metadata
-    ws.merge_cells('A1:D1')
-    ws['A1'] = report.report_request.generated_name
-    ws['A1'].font = Font(size=14, bold=True)
-    ws['A1'].alignment = Alignment(horizontal='center')
-    
-    ws.merge_cells('A2:D2')
-    ws['A2'] = report.description or "No description provided"
-    ws['A2'].alignment = Alignment(horizontal='center')
-    
-    ws['A3'] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    ws['A3'].font = Font(italic=True)
-    
-    # Add a blank row
-    current_row = 5
-    
+
+
+@login_required
+@user_passes_test(_is_admin)
+def admin_save_sql(request, pk):
+    rr = get_object_or_404(ReportRequest, pk=pk)
+    form = SQLUpdateForm(request.POST or None, instance=rr)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        sql_text = (data.get("sql_query") or "").strip()
+        if not sql_text:
+            messages.error(request, "SQL is required to mark as Completed.")
+            return redirect(f"{reverse('reports:admin_dashboard')}?id={rr.id}")
+        rr = form.save(commit=False)
+        rr.status = ReportRequest.STATUS_COMPLETED
+        rr.save()
+        messages.success(request, "SQL saved and request marked Completed.")
+        return redirect(reverse('reports:admin_dashboard'))
+    messages.error(request, "Invalid data.")
+    return redirect(f"{reverse('reports:admin_dashboard')}?id={rr.id}")
+
+
+@login_required
+@user_passes_test(_is_admin)
+def admin_delete_request(request, pk):
+    rr = get_object_or_404(ReportRequest, pk=pk)
+    rr.delete()
+    messages.success(request, "Request deleted.")
+    return redirect("reports:admin_dashboard")
+
+
+@login_required
+@user_passes_test(_is_admin)
+def admin_preview_sql(request, pk):
+    rr = get_object_or_404(ReportRequest, pk=pk)
+    sql = request.POST.get("sql_query") or rr.sql_query
+    if not sql:
+        messages.error(request, "Provide SQL to preview.")
+        return redirect(f"{reverse('reports:admin_dashboard')}?id={rr.id}")
     try:
-        # Execute the SQL query and get results
-        with connection.cursor() as cursor:
-            cursor.execute(report.sql_query)
-            columns = [col[0] for col in cursor.description]
-            results = cursor.fetchall()
-        
-        # Write headers
-        for col_num, column in enumerate(columns, 1):
-            cell = ws.cell(row=current_row, column=col_num, value=column)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center')
-            
-            # Write data
-        for row in results:
-            current_row += 1
-            for col_num, value in enumerate(row, 1):
-                cell = ws.cell(row=current_row, column=col_num, value=value)
-                cell.border = border
-        
-        # Adjust column widths
-        for column in ws.columns:
-            max_length = 0
-            column = list(column)
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = (max_length + 2)
-            ws.column_dimensions[column[0].column_letter].width = adjusted_width
-        
+        cols, rows = run_select(sql, limit=200)
     except Exception as e:
-        # If there's an error executing the query, create an error sheet
-        ws['A5'] = "Error executing report"
-        ws['A6'] = str(e)
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error exporting report {pk}: {str(e)}")
-    
-    # Create the response
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-    response['Content-Disposition'] = f'attachment; filename="{report.report_request.generated_name}.xlsx"'
-    
-    # Save the workbook to the response
-    wb.save(response)
-    
-    return response
+        messages.error(request, f"Preview error: {e}")
+        return redirect(f"{reverse('reports:admin_dashboard')}?id={rr.id}")
 
-def ai_easy_call(request):
-    if request.method == 'POST':
-        user_query = request.POST.get('query') # This will be something like "what day is today?"
+    # Re-render dashboard with preview data and keep typed SQL/notes
+    pending = ReportRequest.objects.filter(status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE])
+    form = SQLUpdateForm(
+        data={
+            "sql_query": sql,
+            "context_notes": request.POST.get("context_notes", rr.context_notes or ""),
+        },
+        instance=rr,
+    )
+    return render(
+        request,
+        "reports/admin_dashboard.html",
+        {
+            "pending": pending,
+            "selected": rr,
+            "sql_form": form,
+            "preview_columns": cols,
+            "preview_rows": rows,
+        },
+    )
 
-        # SLIMMED DOWN PROMPT FOR TESTING CONNECTION
-        prompt = f"""
-        Answer the following question directly and concisely.
 
-        User's question: "{user_query}"
-        """
+@login_required
+@user_passes_test(_is_admin)
+def admin_ai_stream(request):
+    """Stream AI-generated SQL for a request and category.
 
-        api_key = "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"  # Replace with your actual OpenRouter API key
-        ai_url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": "mistralai/devstral-small:free",  # Or another free model from OpenRouter
-            "messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ]
-        }
+    Query params:
+      - prompt: user/admin natural language description
+      - category: contract|supplier|nsn|other
+    """
+    prompt_text = (request.GET.get("prompt") or "").strip()
+    category = (request.GET.get("category") or "other").lower()
 
+    if not prompt_text:
+        return StreamingHttpResponse("data: {\"error\":\"Missing prompt\"}\n\n", content_type="text/event-stream")
+
+    def sse(data: dict) -> bytes:
+        return f"data: {json.dumps(data)}\n\n".encode("utf-8")
+
+    # Build schema context using DB introspection
+    # Default: send a curated allowlist of core tables
+    # If `full=1`, send all tables; if `extra=a,b,c` is provided, include those as well.
+    core_tables = CORE_TABLES.copy()
+    only_tables = None
+    if request.GET.get("full") in {"1", "true", "yes"}:
+        only_tables = None  # all tables
+    else:
+        extras = [s.strip() for s in (request.GET.get("extra") or "").split(",") if s.strip()]
+        only_tables = list({t for t in core_tables + extras}) if core_tables else None
+    schema_text = generate_db_schema_snapshot(None, only_tables=only_tables)
+
+    # SQL dialect guidance based on DB engine
+    engine = connection.settings_dict.get("ENGINE", "")
+    if "mssql" in engine or "sql_server" in engine or connection.vendor == "microsoft":
+        dialect = "SQL Server (T-SQL)"
+        date_rules = "Use YEAR(date_col)=YYYY or DATEFROMPARTS, not EXTRACT; use TOP N, not LIMIT."
+        limit_hint = "Use TOP for limiting rows; do not use LIMIT."
+    elif connection.vendor == "sqlite":
+        dialect = "SQLite"
+        date_rules = "Use strftime('%Y', date_col)='YYYY' style; use LIMIT N."
+        limit_hint = "Use LIMIT for limiting rows."
+    else:
+        dialect = connection.vendor or "SQL (generic)"
+        date_rules = "Prefer ANSI SQL functions and a single SELECT statement."
+        limit_hint = "Use appropriate limit syntax for the dialect."
+
+    sys_prompt = (
+        "You are a helpful SQL assistant. You write safe, read-only SQL for our database. "
+        "Return exactly one SELECT statement; no comments or explanations. Avoid multiple statements. "
+        "Never join by human-readable names; use foreign keys and id columns only."
+    )
+    usr_prompt = (
+        f"SQL dialect: {dialect}. {date_rules} {limit_hint}\n\n"
+        f"Database schema (tables and constraints):\n{schema_text}\n\n"
+        f"Category: {category}\n\n"
+        f"User request: {prompt_text}\n"
+    )
+
+    api_key = getattr(settings, "OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY", ""))
+    base_url = getattr(settings, "OPENROUTER_BASE_URL", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")).rstrip("/")
+    model = getattr(settings, "OPENROUTER_MODEL", os.environ.get("OPENROUTER_MODEL", "mistralai/mistral-small:free"))
+
+    if not api_key:
+        # Fallback: mock stream so UI still works in dev
+        def fake():
+            yield sse({"type": "status", "message": "Using local mock AI (no API key)."})
+            mock = f"SELECT TOP 100 * FROM contracts_contract; -- mock for {category}"
+            for ch in mock:
+                yield sse({"type": "token", "text": ch})
+            yield sse({"type": "done"})
+        return StreamingHttpResponse(fake(), content_type="text/event-stream")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+    }
+    req_payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": usr_prompt},
+        ],
+        "temperature": 0.1,
+        "stream": True,
+    }
+
+    ai_url = f"{base_url}/chat/completions"
+
+    def event_stream():
         try:
-            response = requests.post(ai_url, headers=headers, data=json.dumps(data))
-            response.raise_for_status()
-
-            # OpenRouter returns the response in choices[0]['message']['content']
-            llm_response_text = response.json()['choices'][0]['message']['content']
-
-            context = {
-                'query': user_query,
-                'generated_report': llm_response_text, # Just display the LLM's raw response
-                'generated_sql': "N/A for simple query", # Indicate SQL is not expected
-                'error': None
-            }
-        except requests.exceptions.ConnectionError:
-            context = {'error': "Could not connect to OpenRouter.ai. Is your internet connection working?"}
+            resp = requests.post(ai_url, headers=headers, json=req_payload, stream=True, timeout=(10, 120))
         except requests.exceptions.RequestException as e:
-            # Print error details for debugging
-            error_text = getattr(e.response, 'text', str(e))
-            context = {'error': f"Error communicating with OpenRouter.ai: {e}\n{error_text}"}
-        except Exception as e:
-            context = {'error': f"An unexpected error occurred: {e}"}
+            yield sse({"type": "error", "message": str(e)})
+            return
 
-        return render(request, 'reports/report_results.html', context)
-    
-    return render(request, 'reports/generate_report_form.html')
+        if not resp.ok:
+            try:
+                err = resp.json()
+            except Exception:
+                err = {"raw": resp.text}
+            yield sse({"type": "error", "message": f"HTTP {resp.status_code}: {err}"})
+            return
 
-def ai_generate_report_view(request):
-    if request.method == 'POST':
-        user_query = request.POST.get('query')
-        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
-        database_schema = generate_contracts_schema_description()
-        prompt = f"""
-Given the following database schema:
-{database_schema}
+        for raw in resp.iter_lines(decode_unicode=True):
+            if not raw:
+                continue
+            if raw.startswith(":"):
+                continue
+            if raw.startswith("data:"):
+                chunk = raw[5:].strip()
+                if chunk == "[DONE]":
+                    break
+                try:
+                    part = json.loads(chunk)
+                except Exception:
+                    text = chunk
+                else:
+                    chs = part.get("choices") if isinstance(part, dict) else None
+                    if chs:
+                        delta = chs[0].get("delta") or {}
+                        text = delta.get("content") or chs[0].get("message", {}).get("content") or ""
+                    else:
+                        text = ""
+                if text:
+                    yield sse({"type": "token", "text": text})
+        yield sse({"type": "done"})
 
-User's request: \"{user_query}\"
-
-Generate:
-1. A concise, human-friendly report name (max 8 words, title case, no punctuation except dashes or spaces).
-2. A valid SQL Server SQL query to answer the user's request. Select queries only. Anyone asking for an Update, Delete, or Insert query should be rejected.
-
-Your output should strictly follow this format:
-REPORT_NAME:
-<your generated report name here>
-SQL_QUERY:
-```sql
--- Your generated SQL query here
-```
-        """
-        api_key = "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"
-        try:
-            ai_url = "https://openrouter.ai/api/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "model": "mistralai/devstral-small:free",
-                "messages": [
-                    {"role": "system", "content": "You are an AI assistant that can generate SQL queries and concise report names from the user's input."},
-                    {"role": "user", "content": prompt}
-                ]
-            }
-            response = requests.post(ai_url, headers=headers, data=json.dumps(data))
-            response.raise_for_status()
-            llm_response_text = response.json()['choices'][0]['message']['content']
-
-            # Parse report name
-            report_name = None
-            sql_start = llm_response_text.find('SQL_QUERY:')
-            if llm_response_text.startswith('REPORT_NAME:'):
-                # AI followed the format
-                name_section = llm_response_text[len('REPORT_NAME:'):sql_start].strip() if sql_start != -1 else llm_response_text[len('REPORT_NAME:'):].strip()
-                report_name = name_section.split('\n')[0].strip()
-            else:
-                # Fallback: try to find the first line as the name
-                report_name = llm_response_text.split('\n')[0].strip()
-
-            # Parse SQL
-            sql_code_start = llm_response_text.find('```sql')
-            sql_code_end = llm_response_text.find('```', sql_code_start + 1)
-            generated_sql = ""
-            if sql_code_start != -1 and sql_code_end != -1:
-                generated_sql = llm_response_text[sql_code_start + len('```sql'):sql_code_end].strip()
-
-            from .models import ReportRequest, Report
-            user = request.user
-            report_request = ReportRequest.objects.create(
-                user=user,
-                request_text=user_query,
-                status='completed',
-            )
-            # Override generated_name if AI provided one
-            if report_name:
-                report_request.generated_name = report_name[:100]
-                report_request.save(update_fields=['generated_name'])
-            report = Report.objects.create(
-                report_request=report_request,
-                sql_query=generated_sql,
-                description=f"AI-generated report for: {user_query}"
-            )
-            if is_ajax:
-                return JsonResponse({
-                    'success': True,
-                    'report_id': str(report.id),
-                    'report_request_id': str(report_request.id),
-                    'generated_name': report_request.generated_name,
-                    'redirect_url': reverse('reports:report-view', kwargs={'pk': report.id})
-                })
-            else:
-                return redirect('reports:user-reports')
-        except Exception as e:
-            if is_ajax:
-                return JsonResponse({'success': False, 'error': str(e)}, status=500)
-            else:
-                return render(request, 'reports/report_results.html', {'error': str(e)})
-    return render(request, 'reports/generate_report_form.html')
+    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")

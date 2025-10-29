@@ -1,0 +1,81 @@
+{% extends "base_template.html" %}
+
+{% block extra_head %}{% endblock %}
+
+{% block body %}
+<div class="container mx-auto px-4 reports-scope">
+  <h1 class="text-2xl font-semibold text-gray-900 dark:text-white mt-4 mb-6">My Reports</h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div>
+      <h2 class="text-xl text-gray-900 dark:text-white mb-2">Request New</h2>
+      <form method="post" action="{% url 'reports:request_report' %}" class="panel-box p-4 rounded section">
+        {% csrf_token %}
+        <div class="mb-2">{{ form.title.label_tag }} {{ form.title }}</div>
+        <div class="mb-2">{{ form.category.label_tag }} {{ form.category }}</div>
+        <div class="mb-2">{{ form.description.label_tag }} {{ form.description }}</div>
+        <button class="px-3 py-2 bg-blue-600 text-white rounded" type="submit">Submit Request</button>
+      </form>
+    </div>
+
+    <div>
+      <h2 class="text-xl text-gray-900 dark:text-white mb-2">Pending</h2>
+      <div class="panel-box p-3 rounded section">
+        {% for r in pending_requests %}
+          <div class="item py-2">
+            <div class="text-gray-900 dark:text-gray-100">{{ r.title }}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400">{{ r.get_category_display }} · {{ r.created_at|date:'Y-m-d H:i' }}</div>
+          </div>
+        {% empty %}
+          <p class="empty">No pending requests.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <h2 class="text-xl text-gray-900 dark:text-white mb-2">Completed (Ready)</h2>
+      <div class="panel-box p-3 rounded section">
+        {% for r in completed_requests %}
+          <div class="item py-2">
+            <div class="text-gray-900 dark:text-gray-100">{{ r.title }}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">{{ r.get_category_display }} · last run: {% if r.last_run_at %}{{ r.last_run_at|date:'Y-m-d H:i' }}{% else %}never{% endif %}</div>
+            <a href="{% url 'reports:run_report' r.id %}" class="px-2 py-1 bg-green-600 text-white rounded mr-2">Run</a>
+            <a href="{% url 'reports:export_report' r.id %}" class="px-2 py-1 bg-blue-600 text-white rounded">Export CSV</a>
+
+            <button class="px-2 py-1 bg-yellow-600 text-white rounded ml-2" type="button" onclick="document.getElementById('chg-{{ r.id }}').classList.toggle('hidden')">Request Changes</button>
+            <div id="chg-{{ r.id }}" class="mt-2 hidden">
+              <form method="post" action="{% url 'reports:request_change' r.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="to" value="change">
+                <textarea name="message" rows="3" class="w-full mt-1" placeholder="Describe what to change..."></textarea>
+                <button class="mt-2 px-2 py-1 bg-yellow-700 text-white rounded" type="submit">Submit Change Request</button>
+              </form>
+            </div>
+          </div>
+        {% empty %}
+          <p class="empty">No completed reports yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6">
+    <h2 class="text-xl text-gray-900 dark:text-white mb-2">Change Requested</h2>
+    <div class="panel-box p-3 rounded section">
+      {% for r in change_requests %}
+        <div class="item py-2">
+          <div class="text-gray-900 dark:text-gray-100">{{ r.title }}</div>
+          <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">{{ r.get_category_display }} · {{ r.updated_at|date:'Y-m-d H:i' }}</div>
+          <form method="post" action="{% url 'reports:request_change' r.id %}" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="to" value="pending">
+            <button class="px-2 py-1 bg-gray-700 text-white rounded">Mark Back to Pending</button>
+          </form>
+        </div>
+      {% empty %}
+        <p class="empty">No change requests.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -679,3 +679,30 @@ input[type="datetime-local"] {
     margin-bottom: 1rem;
     color: white;
 }
+
+/* ===== Reports: Admin split workspace (light defaults) ===== */
+.reports-admin .split-layout { display: grid; grid-template-columns: 1fr 2fr 1.2fr; gap: 16px; height: calc(100vh - 180px); }
+.reports-admin .panel { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+.reports-admin .panel h2 { padding: 10px 12px; font-weight: 600; background: #1f2937; color: #fff; }
+.reports-admin .panel-body { padding: 12px; overflow: auto; flex: 1; background: #f8fafc; color: #111827; }
+.reports-admin .req-item { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+.reports-admin .req-item a { color: #1d4ed8; text-decoration: none; }
+.reports-admin .btn { padding: 6px 10px; border: 1px solid #334155; border-radius: 4px; margin-right: 6px; background: #ffffff; color: #111827; }
+.reports-admin .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.reports-admin .btn.danger { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.reports-admin .btn[disabled] { opacity: .6; cursor: not-allowed; }
+.reports-admin textarea { width: 100%; }
+.reports-admin table.preview { width: 100%; border-collapse: collapse; }
+.reports-admin table.preview th, .reports-admin table.preview td { border: 1px solid #e5e7eb; padding: 6px; font-size: 12px; }
+.reports-admin .muted { color: #6b7280; }
+
+/* ===== Reports: User dashboard panels ===== */
+.reports-scope .panel-box { background: #ffffff; color: #111827; }
+.reports-scope label { color: #111827; }
+.reports-scope input, .reports-scope select, .reports-scope textarea { background: #ffffff; color: #111827; border: 1px solid #e5e7eb; }
+.reports-scope .section .item { border-bottom: 1px solid #e5e7eb; }
+.reports-scope .empty { color: #6b7280; }
+
+/* ===== Toasts ===== */
+.toast { position: fixed; right: 16px; bottom: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast-item { background: rgba(17,24,39,.95); color: #fff; padding: 8px 12px; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: 14px; }

@@ -1,0 +1,227 @@
+{% extends "base_template.html" %}
+{% load static %}
+
+{% block extra_head %}{% endblock %}
+
+{% block body %}
+<div class="container mx-auto px-4 reports-admin">
+  <h1 class="text-2xl font-semibold text-white mt-4 mb-4">Reports Admin Workspace</h1>
+  <div class="split-layout">
+    <!-- Left: Pending list -->
+    <div class="panel">
+      <h2>Requests</h2>
+      <div class="panel-body">
+        {% if pending %}
+          {% for r in pending %}
+            <div class="req-item">
+              <a href="?id={{ r.id }}">{{ r.title }}</a>
+              <div class="muted">{{ r.user }} · {{ r.get_status_display }} · {{ r.created_at|date:'Y-m-d H:i' }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted">No pending requests.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Middle: Selected + SQL form -->
+    <div class="panel">
+      <h2>SQL Report</h2>
+      <div class="panel-body">
+        {% if selected %}
+          <div class="mb-2">
+            <div class="text-lg">{{ selected.title }}</div>
+            <div class="muted">Category: {{ selected.get_category_display }} · From: {{ selected.user }}</div>
+            <p class="mt-2">{{ selected.description }}</p>
+          </div>
+          <form id="previewForm" method="post" action="{% url 'reports:admin_preview_sql' selected.id %}">
+            {% csrf_token %}
+            {{ sql_form.sql_query.label_tag }}
+            {{ sql_form.sql_query }}
+            <input type="hidden" name="context_notes" id="preview_context_notes" value="">
+            <div class="mt-2">
+              <button class="btn" type="submit">Preview</button>
+              <a class="btn danger" href="{% url 'reports:admin_delete_request' selected.id %}" onclick="return confirm('Delete this request?');">Delete</a>
+            </div>
+          </form>
+
+          <form id="saveForm" method="post" action="{% url 'reports:admin_save_sql' selected.id %}" class="mt-3">
+            {% csrf_token %}
+            <input type="hidden" name="sql_query" id="save_sql_query" value="">
+            {{ sql_form.context_notes.label_tag }}
+            {{ sql_form.context_notes }}
+            <div class="mt-2">
+              <button class="btn primary" type="submit">Save SQL (mark Completed)</button>
+            </div>
+          </form>
+
+          {% if preview_columns %}
+            <div class="mt-4">
+              <h3 class="text-white mb-2">Preview Results (first rows)</h3>
+              <div style="max-height: 300px; overflow:auto;">
+                <table class="preview">
+                  <thead>
+                    <tr>
+                      {% for c in preview_columns %}<th>{{ c }}</th>{% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in preview_rows %}
+                      <tr>
+                        {% for v in row %}<td>{{ v }}</td>{% endfor %}
+                      </tr>
+                    {% empty %}
+                    <tr><td class="muted" colspan="99">No rows</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% endif %}
+        {% else %}
+          <p class="muted">Select a request on the left to begin.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right: AI prompts / streaming -->
+    <div class="panel">
+      <h2>AI Prompts</h2>
+      <div class="panel-body">
+        <div class="mt-2">
+          <div class="mb-1">Query type</div>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="contract" checked> Contract</label>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="supplier"> Supplier</label>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="nsn"> NSN</label>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="other"> Other</label>
+          <div class="mt-2">
+            <label><input id="aiFullSchema" type="checkbox"> Use full DB schema</label>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="block mb-1">User prompt</label>
+          <textarea id="aiPrompt" rows="6" placeholder="Describe the report to generate SQL..."></textarea>
+        </div>
+        <div class="mt-3">
+          <button id="aiStart" class="btn primary" type="button">Start AI</button>
+          <button id="aiStop" class="btn" type="button" disabled>Stop</button>
+          <button id="aiCopy" class="btn" type="button" disabled>Copy SQL to editor</button>
+          <span id="aiStatus" class="muted ml-2"></span>
+        </div>
+        <div class="mt-3">
+          <label class="block mb-1">AI Stream</label>
+          <textarea id="aiStream" rows="8" readonly placeholder="Streaming..."></textarea>
+        </div>
+        <div class="mt-3">
+          <label class="block mb-1">Extracted SQL</label>
+          <textarea id="aiSql" rows="6" placeholder="Parsed SQL will appear here if detected."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function(){
+    let es = null;
+    const startBtn = document.getElementById('aiStart');
+    const stopBtn = document.getElementById('aiStop');
+    const copyBtn = document.getElementById('aiCopy');
+    const statusEl = document.getElementById('aiStatus');
+    function category(){
+      const el = document.querySelector('input[name="aiCategory"]:checked');
+      return el ? el.value : 'other';
+    }
+    function extractSQL(text){
+      const fence = text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+      if (fence) return fence[1].trim();
+      const sel = text.match(/(select[\s\S]+?)(?:;|$)/i);
+      return sel ? sel[1].trim() : '';
+    }
+    function setRunning(running){
+      if(running){
+        startBtn.setAttribute('disabled','disabled');
+        stopBtn.removeAttribute('disabled');
+        statusEl.textContent = 'Running...';
+      } else {
+        startBtn.removeAttribute('disabled');
+        stopBtn.setAttribute('disabled','disabled');
+        statusEl.textContent = '';
+      }
+    }
+    function start(){
+      const prompt = document.getElementById('aiPrompt').value.trim();
+      const streamEl = document.getElementById('aiStream');
+      const sqlEl = document.getElementById('aiSql');
+      streamEl.value = '';
+      sqlEl.value = '';
+      if(!prompt){ alert('Enter a prompt'); return; }
+      setRunning(true);
+      const url = new URL('{% url 'reports:admin_ai_stream' %}', window.location.origin);
+      url.searchParams.set('prompt', prompt);
+      url.searchParams.set('category', category());
+      if(document.getElementById('aiFullSchema').checked){ url.searchParams.set('full','1'); }
+      es = new EventSource(url);
+      es.onmessage = (e) => {
+        try { var data = JSON.parse(e.data); } catch{ return; }
+        if(data.type === 'token'){
+          streamEl.value += data.text;
+          streamEl.scrollTop = streamEl.scrollHeight;
+          const maybe = extractSQL(streamEl.value);
+          if(maybe){ sqlEl.value = maybe; copyBtn.removeAttribute('disabled'); }
+        } else if(data.type === 'status'){ /* status */ }
+        else if(data.type === 'done'){ es && es.close(); es=null; setRunning(false); }
+        else if(data.error){ streamEl.value += "\n[Error] " + data.error; }
+      };
+      es.onerror = () => { es && es.close(); es=null; setRunning(false); };
+    }
+    function stop(){ if(es){ es.close(); es=null; } setRunning(false); }
+    function ensureToastRoot(){
+      let root = document.getElementById('toast-root');
+      if(!root){
+        root = document.createElement('div');
+        root.id = 'toast-root';
+        root.className = 'toast';
+        document.body.appendChild(root);
+      }
+      return root;
+    }
+    function showToast(msg){
+      const root = ensureToastRoot();
+      const el = document.createElement('div');
+      el.className = 'toast-item';
+      el.textContent = msg;
+      root.appendChild(el);
+      setTimeout(()=>{ el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, 1200);
+      setTimeout(()=>{ root.removeChild(el); }, 1700);
+    }
+    function copy(){
+      const sql = document.getElementById('aiSql').value.trim();
+      const editor = document.getElementById('id_sql_query');
+      if(editor){ editor.value = sql || document.getElementById('aiStream').value; showToast('SQL copied to editor'); }
+    }
+    // Copy context notes into hidden field when previewing to preserve text
+    const previewForm = document.getElementById('previewForm');
+    if(previewForm){
+      previewForm.addEventListener('submit', function(){
+        const src = document.getElementById('id_context_notes');
+        const dest = document.getElementById('preview_context_notes');
+        if(src && dest){ dest.value = src.value; }
+      });
+    }
+
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+    copyBtn.addEventListener('click', copy);
+
+    // Ensure SQL from the editor is included when saving
+    const saveForm = document.getElementById('saveForm');
+    if(saveForm){
+      saveForm.addEventListener('submit', function(){
+        const editor = document.getElementById('id_sql_query');
+        const hidden = document.getElementById('save_sql_query');
+        if(editor && hidden){ hidden.value = editor.value; }
+      });
+    }
+  })();
+</script>
+{% endblock %}

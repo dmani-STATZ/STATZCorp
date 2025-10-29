@@ -1,0 +1,14 @@
+{% extends "base_template.html" %}
+
+{% block body %}
+<div class="container mx-auto px-4">
+  <h1 class="text-2xl font-semibold text-white mt-4 mb-4">Request a Report</h1>
+  <form method="post" class="bg-gray-900 p-4 rounded">
+    {% csrf_token %}
+    <div class="mb-2">{{ form.title.label_tag }} {{ form.title }}</div>
+    <div class="mb-2">{{ form.category.label_tag }} {{ form.category }}</div>
+    <div class="mb-2">{{ form.description.label_tag }} {{ form.description }}</div>
+    <button class="px-3 py-2 bg-blue-600 text-white rounded" type="submit">Submit</button>
+  </form>
+</div>
+{% endblock %}
