@@ -10,6 +10,7 @@ from .models import (
     PortalSection,
     WorkCalendarEvent,
     WorkCalendarTask,
+    EventAttachment,
 )
 
 
@@ -166,16 +167,41 @@ class WorkCalendarEventForm(BaseModelForm):
         fields = [
             'title',
             'description',
+            'kind',
             'start_at',
             'end_at',
             'location',
             'priority',
+            'is_private',
         ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
             'start_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'end_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
+
+
+class EventAttachmentForm(BaseModelForm):
+    link_url = forms.CharField(required=False)
+
+    class Meta:
+        model = EventAttachment
+        fields = ['title', 'attachment_type', 'file', 'link_url']
+
+    def clean(self):
+        cleaned = super().clean()
+        att_type = cleaned.get('attachment_type')
+        file = cleaned.get('file')
+        link_url = (cleaned.get('link_url') or '').strip()
+        if att_type == 'file':
+            if not file:
+                raise forms.ValidationError('Please upload a file.')
+        elif att_type == 'link':
+            if not link_url:
+                raise forms.ValidationError('Please provide a URL for the link.')
+        else:
+            raise forms.ValidationError('Invalid attachment type.')
+        return cleaned
 
 
 class AdminLoginForm(BaseFormMixin, forms.Form):

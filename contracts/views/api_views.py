@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 import json
 
@@ -520,3 +520,51 @@ def create_supplier(request):
             'cage_code': supplier.cage_code,
         }
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def contract_day_counts(request):
+    """
+    Per-day counts of contracts in a date range:
+    - awards: count of contracts with award_date == day
+    - dues: count of contracts with due_date == day
+    Params: start=YYYY-MM-DD, end=YYYY-MM-DD (inclusive)
+    """
+    start = request.GET.get('start')
+    end = request.GET.get('end')
+    from datetime import datetime
+    if not start or not end:
+        return JsonResponse({'error': 'start and end are required'}, status=400)
+    try:
+        start_date = datetime.fromisoformat(start[:10]).date()
+        end_date = datetime.fromisoformat(end[:10]).date()
+    except Exception:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+    if end_date < start_date:
+        return JsonResponse({'error': 'end must be after start'}, status=400)
+
+    awards = (
+        Contract.objects
+        .filter(award_date__date__gte=start_date, award_date__date__lte=end_date)
+        .values('award_date__date')
+        .annotate(c=Count('id'))
+    )
+    dues = (
+        Contract.objects
+        .filter(due_date__date__gte=start_date, due_date__date__lte=end_date)
+        .values('due_date__date')
+        .annotate(c=Count('id'))
+    )
+
+    result = {}
+    for row in awards:
+        key = row['award_date__date'].isoformat()
+        result.setdefault(key, {'awards': 0, 'dues': 0})
+        result[key]['awards'] = row['c']
+    for row in dues:
+        key = row['due_date__date'].isoformat()
+        result.setdefault(key, {'awards': 0, 'dues': 0})
+        result[key]['dues'] = row['c']
+
+    return JsonResponse({'counts': result})

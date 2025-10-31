@@ -96,6 +96,173 @@
         {% endfor %}
     </div>
 
+    <!-- Calendar Section -->
+    <div class="mt-8 p-4 border rounded-lg">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-xl font-medium text-gray-800">Calendar</h2>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="changeMonth(-1)" class="px-2 py-1 border rounded hover:bg-gray-100">Prev</button>
+                <div id="calendarMonthLabel" class="text-gray-600 min-w-[10rem] text-center"></div>
+                <button type="button" onclick="changeMonth(1)" class="px-2 py-1 border rounded hover:bg-gray-100">Next</button>
+                <button type="button" onclick="goToToday()" class="px-2 py-1 border rounded hover:bg-gray-100">Today</button>
+                <button type="button" onclick="openAddEventModal()" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Add Event</button>
+            </div>
+        </div>
+        <div class="grid grid-cols-7 text-xs font-medium text-gray-500 mb-2">
+            <div class="text-center">Sun</div>
+            <div class="text-center">Mon</div>
+            <div class="text-center">Tue</div>
+            <div class="text-center">Wed</div>
+            <div class="text-center">Thu</div>
+            <div class="text-center">Fri</div>
+            <div class="text-center">Sat</div>
+        </div>
+        <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
+    </div>
+
+    <!-- Add Event Modal -->
+    <div id="addEventModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-lg">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-semibold">Add Event</h3>
+                <button onclick="closeAddEventModal()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <form onsubmit="return submitAddEvent(event)" class="p-4 space-y-3">
+                {% csrf_token %}
+                <input type="hidden" id="eventIdHidden" value="" />
+                <div>
+                    <label class="block text-sm text-gray-600">Type</label>
+                    <select id="eventCategory" class="w-full border rounded p-2" onchange="onCategoryChange()">
+                        <option value="custom">Custom</option>
+                        <option value="Work From Home">Work From Home</option>
+                        <option value="Vacation">Vacation</option>
+                        <option value="Sick">Sick</option>
+                        <option value="Conference">Conference</option>
+                        <option value="Pot Luck">Pot Luck</option>
+                        <option value="Visitor">Visitor</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">Title</label>
+                    <input id="eventTitle" class="w-full border rounded p-2" placeholder="Event title" required />
+                </div>
+                <div class="flex items-center gap-6">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input id="eventAllDay" type="checkbox" class="form-checkbox" onchange="onAllDayChange()" /> All day
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700" title="By checking this box you will be the only one that can see this event.">
+                        <input id="eventPrivate" type="checkbox" class="form-checkbox" /> Private
+                    </label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm text-gray-600">Date</label>
+                        <input id="eventDate" type="date" class="w-full border rounded p-2" required />
+                    </div>
+                    <div id="startTimeWrap">
+                        <label class="block text-sm text-gray-600">Start</label>
+                        <input id="eventStartTime" type="time" class="w-full border rounded p-2" value="09:00" />
+                    </div>
+                    <div id="endTimeWrap">
+                        <label class="block text-sm text-gray-600">End</label>
+                        <input id="eventEndTime" type="time" class="w-full border rounded p-2" value="17:00" />
+                    </div>
+                </div>
+                <div id="endDateWrap" class="hidden">
+                    <label class="block text-sm text-gray-600 mt-2">End Date</label>
+                    <input id="eventEndDate" type="date" class="w-full border rounded p-2" />
+                </div>
+                <div class="mt-3">
+                    <label class="block text-sm text-gray-600">Repeat</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <select id="recurrenceFreq" class="border rounded p-2 text-sm">
+                            <option value="none">Does not repeat</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="daily">Daily</option>
+                        </select>
+                        <input id="recurrenceInterval" type="number" min="1" value="1" class="w-20 border rounded p-2 text-sm" title="Every N weeks/days" />
+                        <div id="recurrenceWeekdays" class="hidden ml-2 text-xs">
+                            <label class="mr-2"><input type="checkbox" value="0" class="align-middle"> Mon</label>
+                            <label class="mr-2"><input type="checkbox" value="1" class="align-middle"> Tue</label>
+                            <label class="mr-2"><input type="checkbox" value="2" class="align-middle"> Wed</label>
+                            <label class="mr-2"><input type="checkbox" value="3" class="align-middle"> Thu</label>
+                            <label class="mr-2"><input type="checkbox" value="4" class="align-middle"> Fri</label>
+                            <label class="mr-2"><input type="checkbox" value="5" class="align-middle"> Sat</label>
+                            <label class="mr-2"><input type="checkbox" value="6" class="align-middle"> Sun</label>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">Location (optional)</label>
+                    <input id="eventLocation" class="w-full border rounded p-2" />
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">Description (optional)</label>
+                    <textarea id="eventDescription" class="w-full border rounded p-2" rows="3"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeAddEventModal()" class="px-3 py-1 border rounded">Cancel</button>
+                    <button type="submit" class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Event Details Modal -->
+    <div id="eventDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-semibold" id="detailTitle">Event</h3>
+                <button onclick="closeEventDetails()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <div class="p-4 space-y-2">
+                <div class="text-sm text-gray-600" id="detailWhen"></div>
+                <div class="text-sm text-gray-600" id="detailLocation"></div>
+                <div class="text-sm" id="detailDescription"></div>
+                <div class="text-xs text-gray-500" id="detailPrivate" style="display:none;">🔒 Private event</div>
+                <div class="mt-3">
+                    <div class="text-sm font-medium">Attachments</div>
+                    <div id="attachmentList" class="mt-1 space-y-1"></div>
+                    <div id="attachmentActions" class="mt-2 space-y-2 hidden">
+                        <form onsubmit="return addAttachmentLink(event)" class="flex gap-2 items-center">
+                            {% csrf_token %}
+                            <input type="text" name="title" placeholder="Link title" class="border rounded p-1 text-sm w-40" />
+                            <input type="text" name="link_url" placeholder="https://example.com" class="border rounded p-1 text-sm flex-1" required />
+                            <input type="hidden" name="attachment_type" value="link" />
+                            <button type="submit" class="px-2 py-1 text-xs bg-blue-600 text-white rounded">Add Link</button>
+                        </form>
+                        <form onsubmit="return uploadAttachmentFile(event)" enctype="multipart/form-data" class="flex gap-2 items-center">
+                            {% csrf_token %}
+                            <input type="text" name="title" placeholder="File title (optional)" class="border rounded p-1 text-sm w-40" />
+                            <input type="file" name="file" accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="text-sm" required />
+                            <input type="hidden" name="attachment_type" value="file" />
+                            <button type="submit" class="px-2 py-1 text-xs bg-green-600 text-white rounded">Upload</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 border-t flex justify-end gap-2">
+                <button id="detailEditBtn" class="hidden px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700" onclick="editEventFromDetails()">Edit</button>
+                <button id="detailDeleteBtn" class="hidden px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700" onclick="deleteEventFromDetails()">Delete</button>
+                <button class="px-3 py-1 border rounded" onclick="closeEventDetails()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Events Modal -->
+    <div id="dayEventsModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-semibold" id="dayEventsDate">Events</h3>
+                <button onclick="closeDayEvents()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <div class="p-4 max-h-96 overflow-auto" id="dayEventsList"></div>
+            <div class="p-4 border-t flex justify-end">
+                <button class="px-3 py-1 border rounded" onclick="closeDayEvents()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Announcements Section -->
     <div class="mt-8 p-4 border rounded-lg">
         <h2 class="text-xl font-medium mb-4 text-gray-800">Recent Announcements</h2>
@@ -283,6 +450,744 @@
         } catch (e) {
             console.error(e);
         }
+    }
+
+    // Simple month calendar rendering
+    let calendarPointer = new Date();
+
+    function ymd(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function renderCalendarFor(date) {
+        const monthNames = [
+            'January','February','March','April','May','June',
+            'July','August','September','October','November','December'
+        ];
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstOfMonth = new Date(year, month, 1);
+        const startWeekday = firstOfMonth.getDay(); // 0=Sun..6=Sat
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const grid = document.getElementById('calendarGrid');
+        const label = document.getElementById('calendarMonthLabel');
+        if (!grid || !label) return;
+        grid.innerHTML = '';
+        label.textContent = `${monthNames[month]} ${year}`;
+
+        // Leading days from previous month
+        for (let i = 0; i < startWeekday; i++) {
+            const prevDate = new Date(year, month, -(startWeekday - 1 - i));
+            const pYear = prevDate.getFullYear();
+            const pMonth = prevDate.getMonth() + 1;
+            const pDay = prevDate.getDate();
+            const cell = document.createElement('div');
+            let classes = 'p-2 text-xs border rounded h-28 text-left flex flex-col bg-gray-50 text-gray-400';
+            cell.className = classes;
+            const topRow = document.createElement('div');
+            topRow.className = 'flex items-start justify-between';
+            const counts = document.createElement('div');
+            const dateKey = `${pYear}-${String(pMonth).padStart(2,'0')}-${String(pDay).padStart(2,'0')}`; // previous month
+            counts.id = `counts-${dateKey}`;
+            counts.className = 'text-[10px] leading-none';
+            counts.innerHTML = '';
+            topRow.appendChild(counts);
+            const header = document.createElement('div');
+            header.className = 'text-right text-sm';
+            header.textContent = pDay;
+            topRow.appendChild(header);
+            cell.appendChild(topRow);
+            const list = document.createElement('div');
+            list.className = 'mt-1 space-y-1';
+            list.setAttribute('data-event-list', '');
+            cell.id = `cal-day-${dateKey}`;
+            cell.appendChild(list);
+            grid.appendChild(cell);
+        }
+
+        const today = new Date();
+        const isTodayMonth = (today.getFullYear() === year && today.getMonth() === month);
+        for (let d = 1; d <= daysInMonth; d++) {
+            const cell = document.createElement('div');
+            let classes = 'p-2 text-xs border rounded h-28 text-left flex flex-col';
+            if (isTodayMonth && d === today.getDate()) {
+                classes += ' bg-blue-600 text-white font-semibold';
+            } else {
+                classes += ' bg-white dark:bg-gray-700';
+            }
+            cell.className = classes;
+            const topRow = document.createElement('div');
+            topRow.className = 'flex items-start justify-between';
+            const counts = document.createElement('div');
+            const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            counts.id = `counts-${dateKey}`;
+            counts.className = 'text-[10px] leading-none';
+            counts.innerHTML = '';
+            topRow.appendChild(counts);
+            const header = document.createElement('div');
+            header.className = 'text-right text-sm';
+            header.textContent = d;
+            topRow.appendChild(header);
+            cell.appendChild(topRow);
+
+            const list = document.createElement('div');
+            list.className = 'mt-1 space-y-1';
+            list.setAttribute('data-event-list', '');
+            const idKey = `cal-day-${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            cell.id = idKey;
+            cell.appendChild(list);
+            grid.appendChild(cell);
+        }
+
+        // Trailing days from next month to complete the grid
+        const totalCells = startWeekday + daysInMonth;
+        const trailing = (7 - (totalCells % 7)) % 7;
+        for (let i = 0; i < trailing; i++) {
+            const nextDate = new Date(year, month + 1, i + 1);
+            const nYear = nextDate.getFullYear();
+            const nMonth = nextDate.getMonth() + 1;
+            const nDay = nextDate.getDate();
+            const cell = document.createElement('div');
+            let classes = 'p-2 text-xs border rounded h-28 text-left flex flex-col bg-gray-50 text-gray-400';
+            cell.className = classes;
+            const topRow = document.createElement('div');
+            topRow.className = 'flex items-start justify-between';
+            const counts = document.createElement('div');
+            const dateKey = `${nYear}-${String(nMonth).padStart(2,'0')}-${String(nDay).padStart(2,'0')}`; // next month
+            counts.id = `counts-${dateKey}`;
+            counts.className = 'text-[10px] leading-none';
+            counts.innerHTML = '';
+            topRow.appendChild(counts);
+            const header = document.createElement('div');
+            header.className = 'text-right text-sm';
+            header.textContent = nDay;
+            topRow.appendChild(header);
+            cell.appendChild(topRow);
+            const list = document.createElement('div');
+            list.className = 'mt-1 space-y-1';
+            list.setAttribute('data-event-list', '');
+            cell.id = `cal-day-${dateKey}`;
+            cell.appendChild(list);
+            grid.appendChild(cell);
+        }
+    }
+
+    // Render current month on load
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            calendarPointer = new Date();
+            renderCalendarFor(calendarPointer);
+            fetchAndPaintEvents(calendarPointer);
+            fetchAndPaintContractCounts(calendarPointer);
+        } catch (e) {
+            console.error('Calendar render error', e);
+        }
+    });
+
+    
+
+    function changeMonth(delta) {
+        calendarPointer = new Date(calendarPointer.getFullYear(), calendarPointer.getMonth() + delta, 1);
+        renderCalendarFor(calendarPointer);
+        fetchAndPaintEvents(calendarPointer);
+        fetchAndPaintContractCounts(calendarPointer);
+    }
+
+    async function fetchAndPaintEvents(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const start = new Date(year, month, 1, 0, 0, 0);
+        const end = new Date(year, month + 1, 0, 23, 59, 59);
+        function toISO(dt) {
+            // Ensure timezone offset is preserved in ISO
+            const tzOffsetMs = dt.getTimezoneOffset() * 60000;
+            return new Date(dt.getTime() - tzOffsetMs).toISOString().slice(0,19);
+        }
+        const url = `{% url 'users:portal_event_feed' %}?start=${encodeURIComponent(toISO(start))}&end=${encodeURIComponent(toISO(end))}`;
+        const MAX_PER_DAY = 3;
+        window.dayEventsData = {};
+        try {
+            const resp = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data || !Array.isArray(data.events)) return;
+
+            // Aggregate events per visible day
+            for (const ev of data.events) {
+                const styles = styleForEvent(ev);
+                const startDt = new Date(ev.start);
+                const endDt = new Date(ev.end);
+                const startDay = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate());
+                const endDay = new Date(endDt.getFullYear(), endDt.getMonth(), endDt.getDate());
+                for (let d = new Date(startDay); d <= endDay; d.setDate(d.getDate() + 1)) {
+                    const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    const segStart = (d.getTime() === startDay.getTime());
+                    const segEnd = (d.getTime() === endDay.getTime());
+                    let segClasses = '';
+                    if (startDay.getTime() === endDay.getTime()) {
+                        segClasses = 'rounded';
+                    } else if (segStart && segEnd) {
+                        segClasses = 'rounded';
+                    } else if (segStart) {
+                        segClasses = 'rounded-l-md rounded-r-none';
+                    } else if (segEnd) {
+                        segClasses = 'rounded-l-none rounded-r-md';
+                    } else {
+                        segClasses = 'rounded-none';
+                    }
+                    const icon = styles.icon ? styles.icon + ' ' : '';
+                    const lock = ev.is_private ? '🔒 ' : '';
+                    const prefix = ev.organizer_name ? (ev.organizer_name + ' - ') : '';
+                    let label;
+                    let sortKey;
+                    if (segStart) {
+                        if (ev.all_day) {
+                            label = `${lock}${icon}${prefix}${ev.title}`;
+                            sortKey = '00:00';
+                        } else {
+                            const time = new Date(ev.start);
+                            const hh = String(time.getHours()).padStart(2,'0');
+                            const mm = String(time.getMinutes()).padStart(2,'0');
+                            label = `${lock}${icon}${hh}:${mm} ${prefix}${ev.title}`;
+                            sortKey = `${hh}:${mm}`;
+                        }
+                    } else if (segEnd && !ev.all_day) {
+                        const time = new Date(ev.end);
+                        const hh = String(time.getHours()).padStart(2,'0');
+                        const mm = String(time.getMinutes()).padStart(2,'0');
+                        label = `${lock}${icon}${prefix}${ev.title} (${hh}:${mm})`;
+                        sortKey = `${hh}:${mm}`;
+                    } else {
+                        label = `${lock}${icon}${prefix}${ev.title}`;
+                        sortKey = '00:00';
+                    }
+
+                    const rec = {
+                        id: ev.id,
+                        label,
+                        title: ev.title || '',
+                        can_edit: !!ev.can_edit,
+                        start: ev.start,
+                        end: ev.end,
+                        location: ev.location || '',
+                        description: ev.description || '',
+                        all_day: !!ev.all_day,
+                        kind: ev.kind || '',
+                        priority: ev.priority || '',
+                        is_private: !!ev.is_private,
+                        segClasses,
+                        styles,
+                        sortKey,
+                    };
+                    (window.dayEventsData[dateKey] ||= []).push(rec);
+                }
+            }
+
+            // Paint limited items + more link
+            for (const [dateKey, items] of Object.entries(window.dayEventsData)) {
+                const cell = document.getElementById(`cal-day-${dateKey}`);
+                if (!cell) continue;
+                const list = cell.querySelector('[data-event-list]');
+                if (!list) continue;
+                items.sort((a,b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));
+                const toShow = items.slice(0, MAX_PER_DAY);
+                for (const it of toShow) {
+                    const div = document.createElement('div');
+                    div.className = `truncate text-xs px-1 py-0.5 cursor-pointer ${it.segClasses} ${it.styles.bg} ${it.styles.fg}`;
+                    div.title = it.title;
+                    div.dataset.eventId = it.id;
+                    div.dataset.canEdit = it.can_edit ? '1' : '0';
+                    div.dataset.start = it.start;
+                    div.dataset.end = it.end;
+                    div.dataset.location = it.location;
+                    div.dataset.description = it.description;
+                    div.dataset.title = it.title;
+                    div.dataset.allDay = it.all_day ? '1' : '0';
+                    div.dataset.isPrivate = it.is_private ? '1' : '0';
+                    div.textContent = it.label;
+                    div.addEventListener('click', () => openEventDetails(div));
+                    list.appendChild(div);
+                }
+                if (items.length > MAX_PER_DAY) {
+                    const more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'text-[11px] text-blue-600 hover:text-blue-800';
+                    more.textContent = `Show all (${items.length})`;
+                    more.addEventListener('click', () => openDayEvents(dateKey));
+                    list.appendChild(more);
+                }
+            }
+        } catch (e) {
+            console.error('Failed loading events', e);
+        }
+    }
+
+    async function fetchAndPaintContractCounts(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstOfMonth = new Date(year, month, 1);
+        const start = new Date(year, month, 1 - firstOfMonth.getDay()); // visible grid start (Sunday)
+        const lastOfMonth = new Date(year, month + 1, 0);
+        const end = new Date(year, month + 1, 0 + (6 - lastOfMonth.getDay())); // visible grid end (Saturday)
+        const startStr = `${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`;
+        const endStr = `${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`;
+        const url = `{% url 'contracts:contract_day_counts' %}?start=${startStr}&end=${endStr}`;
+        try {
+            const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const counts = (data && data.counts) || {};
+            for (const [key, obj] of Object.entries(counts)) {
+                const el = document.getElementById(`counts-${key}`);
+                if (!el) continue;
+                const awards = obj.awards || 0;
+                const dues = obj.dues || 0;
+                if (awards || dues) {
+                    el.innerHTML = `<span class=\"text-green-600\">${awards}</span><span class=\"text-red-600 ml-1\">${dues}</span>`;
+                } else {
+                    el.innerHTML = '';
+                }
+            }
+        } catch (e) {
+            console.error('Failed loading contract counts', e);
+        }
+    }
+
+    function goToToday() {
+        calendarPointer = new Date();
+        renderCalendarFor(calendarPointer);
+        fetchAndPaintEvents(calendarPointer);
+        fetchAndPaintContractCounts(calendarPointer);
+    }
+
+    function styleForEvent(ev) {
+        // Map by kind; fallback by title keywords
+        const map = {
+            meeting: { bg: 'bg-blue-100 dark:bg-blue-900', fg: 'text-blue-800 dark:text-blue-100', icon: '📅' },
+            training: { bg: 'bg-purple-100 dark:bg-purple-900', fg: 'text-purple-800 dark:text-purple-100', icon: '🎓' },
+            focus: { bg: 'bg-yellow-100 dark:bg-yellow-900', fg: 'text-yellow-800 dark:text-yellow-100', icon: '🎯' },
+            travel: { bg: 'bg-lime-100 dark:bg-lime-900', fg: 'text-lime-800 dark:text-lime-100', icon: '✈️' },
+            personal: { bg: 'bg-pink-100 dark:bg-pink-900', fg: 'text-pink-800 dark:text-pink-100', icon: '🏷️' },
+            break: { bg: 'bg-gray-200 dark:bg-gray-700', fg: 'text-gray-800 dark:text-gray-100', icon: '☕' },
+        };
+        if (ev.kind && map[ev.kind]) return map[ev.kind];
+        const t = (ev.title || '').toLowerCase();
+        if (t.includes('vacation') || t.includes('sick') || t.includes('work from home') || t.includes('wfh')) return map.personal;
+        if (t.includes('conference') || t.includes('training')) return map.training;
+        if (t.includes('visitor') || t.includes('pot luck') || t.includes('potluck')) return map.meeting;
+        return map.meeting;
+    }
+
+    function openAddEventModal(prefill) {
+        const modal = document.getElementById('addEventModal');
+        if (!modal) return;
+        const idHidden = document.getElementById('eventIdHidden');
+        idHidden.value = '';
+        // Reset controls
+        document.getElementById('eventCategory').value = 'custom';
+        document.getElementById('eventTitle').readOnly = false;
+        document.getElementById('eventTitle').value = '';
+        document.getElementById('eventLocation').value = '';
+        document.getElementById('eventDescription').value = '';
+        document.getElementById('eventAllDay').checked = false;
+        document.getElementById('eventPrivate').checked = false;
+        onAllDayChange();
+        // Default date to the current pointer's visible month today if matches, else first of month
+        const dateInput = document.getElementById('eventDate');
+        const endDateInput = document.getElementById('eventEndDate');
+        const today = new Date();
+        const d = (calendarPointer.getFullYear() === today.getFullYear() && calendarPointer.getMonth() === today.getMonth()) ? today : new Date(calendarPointer.getFullYear(), calendarPointer.getMonth(), 1);
+        dateInput.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        endDateInput.value = dateInput.value;
+        document.getElementById('eventStartTime').value = '09:00';
+        document.getElementById('eventEndTime').value = '17:00';
+
+        // Apply prefill if provided
+        if (prefill && typeof prefill === 'object') {
+            if (prefill.id) idHidden.value = String(prefill.id);
+            if (prefill.title) {
+                document.getElementById('eventTitle').value = prefill.title;
+                document.getElementById('eventTitle').readOnly = false;
+                document.getElementById('eventCategory').value = 'custom';
+            }
+            if (prefill.location) document.getElementById('eventLocation').value = prefill.location;
+            if (prefill.description) document.getElementById('eventDescription').value = prefill.description;
+            if (prefill.start) {
+                const st = new Date(prefill.start);
+                dateInput.value = `${st.getFullYear()}-${String(st.getMonth()+1).padStart(2,'0')}-${String(st.getDate()).padStart(2,'0')}`;
+                document.getElementById('eventStartTime').value = `${String(st.getHours()).padStart(2,'0')}:${String(st.getMinutes()).padStart(2,'0')}`;
+            }
+            if (prefill.end) {
+                const en = new Date(prefill.end);
+                document.getElementById('eventEndTime').value = `${String(en.getHours()).padStart(2,'0')}:${String(en.getMinutes()).padStart(2,'0')}`;
+            }
+            if (prefill.allDay) {
+                document.getElementById('eventAllDay').checked = true;
+                onAllDayChange();
+                // Fill end date for all-day prefill
+                if (prefill.end) {
+                    const en = new Date(prefill.end);
+                    endDateInput.value = `${en.getFullYear()}-${String(en.getMonth()+1).padStart(2,'0')}-${String(en.getDate()).padStart(2,'0')}`;
+                }
+            }
+            if (typeof prefill.isPrivate !== 'undefined') {
+                document.getElementById('eventPrivate').checked = !!prefill.isPrivate;
+            }
+        }
+        modal.classList.remove('hidden');
+    }
+
+    // Day events modal
+    function openDayEvents(dateKey) {
+        const list = (window.dayEventsData && window.dayEventsData[dateKey]) || [];
+        const modal = document.getElementById('dayEventsModal');
+        const title = document.getElementById('dayEventsDate');
+        const body = document.getElementById('dayEventsList');
+        if (!modal || !title || !body) return;
+        title.textContent = new Date(dateKey).toDateString();
+        body.innerHTML = '';
+        for (const it of list) {
+            const row = document.createElement('div');
+            row.className = `mb-1 px-2 py-1 rounded ${it.styles.bg} ${it.styles.fg} cursor-pointer`;
+            row.textContent = it.label;
+            // Build a synthetic element for openEventDetails
+            const el = document.createElement('div');
+            el.dataset.eventId = it.id;
+            el.dataset.canEdit = it.can_edit ? '1' : '0';
+            el.dataset.start = it.start;
+            el.dataset.end = it.end;
+            el.dataset.location = it.location;
+            el.dataset.description = it.description;
+            el.dataset.title = it.title;
+            el.dataset.allDay = it.all_day ? '1' : '0';
+            el.dataset.isPrivate = it.is_private ? '1' : '0';
+            row.addEventListener('click', () => {
+                closeDayEvents();
+                openEventDetails(el);
+            });
+            body.appendChild(row);
+        }
+        modal.classList.remove('hidden');
+    }
+    function closeDayEvents() {
+        const modal = document.getElementById('dayEventsModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function closeAddEventModal() {
+        const modal = document.getElementById('addEventModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function onCategoryChange() {
+        const sel = document.getElementById('eventCategory');
+        const title = document.getElementById('eventTitle');
+        if (!sel || !title) return;
+        if (sel.value === 'custom') {
+            title.readOnly = false;
+            title.value = '';
+            title.placeholder = 'Event title';
+        } else {
+            title.readOnly = true;
+            title.value = sel.value;
+        }
+    }
+
+    function onAllDayChange() {
+        const allDay = document.getElementById('eventAllDay');
+        const startWrap = document.getElementById('startTimeWrap');
+        const endWrap = document.getElementById('endTimeWrap');
+        const endDateWrap = document.getElementById('endDateWrap');
+        if (!allDay || !startWrap || !endWrap) return;
+        const hideClass = 'hidden';
+        if (allDay.checked) {
+            startWrap.classList.add(hideClass);
+            endWrap.classList.add(hideClass);
+            endDateWrap.classList.remove(hideClass);
+            // Default end date to start date
+            const dateInput = document.getElementById('eventDate');
+            const endDateInput = document.getElementById('eventEndDate');
+            endDateInput.value = dateInput.value;
+        } else {
+            startWrap.classList.remove(hideClass);
+            endWrap.classList.remove(hideClass);
+            endDateWrap.classList.add(hideClass);
+        }
+    }
+
+    // Recurrence UI toggle
+    document.addEventListener('change', function(e){
+        if (e.target && e.target.id === 'recurrenceFreq') {
+            const val = e.target.value;
+            const wk = document.getElementById('recurrenceWeekdays');
+            if (val === 'weekly') {
+                wk.classList.remove('hidden');
+            } else {
+                wk.classList.add('hidden');
+            }
+        }
+    });
+
+    function mapCategoryToKind(cat) {
+        const c = (cat || '').toLowerCase();
+        if (c === 'work from home' || c === 'vacation' || c === 'sick' || c === 'visitor' || c === 'pot luck') return 'personal';
+        if (c === 'conference') return 'training';
+        return 'meeting';
+    }
+
+    function toLocalDateTimeString(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth()+1).padStart(2,'0');
+        const d = String(dateObj.getDate()).padStart(2,'0');
+        const hh = String(dateObj.getHours()).padStart(2,'0');
+        const mm = String(dateObj.getMinutes()).padStart(2,'0');
+        return `${y}-${m}-${d}T${hh}:${mm}`;
+    }
+
+    async function submitAddEvent(e) {
+        e.preventDefault();
+        const idHidden = document.getElementById('eventIdHidden');
+        const sel = document.getElementById('eventCategory');
+        const title = document.getElementById('eventTitle');
+        const allDay = document.getElementById('eventAllDay');
+        const dateInput = document.getElementById('eventDate');
+        const startTime = document.getElementById('eventStartTime');
+        const endTime = document.getElementById('eventEndTime');
+        const endDateInput = document.getElementById('eventEndDate');
+        const location = document.getElementById('eventLocation');
+        const description = document.getElementById('eventDescription');
+
+        const dateParts = (dateInput.value || '').split('-');
+        if (dateParts.length !== 3) { alert('Please choose a date'); return false; }
+
+        let start, end;
+        if (allDay.checked) {
+            start = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]), 0, 0, 0);
+            const endParts = (endDateInput.value || dateInput.value || '').split('-');
+            const ey = Number(endParts[0]||dateParts[0]);
+            const em = Number((endParts[1]||dateParts[1]));
+            const ed = Number((endParts[2]||dateParts[2]));
+            end = new Date(ey, em - 1, ed, 23, 59, 0);
+            if (end < start) { alert('End date must be on or after start date.'); return false; }
+        } else {
+            const st = (startTime.value || '09:00').split(':');
+            const et = (endTime.value || '17:00').split(':');
+            start = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]), Number(st[0]||9), Number(st[1]||0), 0);
+            end = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]), Number(et[0]||17), Number(et[1]||0), 0);
+            if (end <= start) { alert('End time must be after start time.'); return false; }
+        }
+
+        const category = sel.value;
+        const payload = {
+            title: title.value.trim() || category,
+            description: (description.value || ''),
+            start_at: toLocalDateTimeString(start),
+            end_at: toLocalDateTimeString(end),
+            location: (location.value || ''),
+            priority: 'normal',
+            kind: mapCategoryToKind(category),
+            is_private: document.getElementById('eventPrivate').checked ? 'on' : '',
+            recurrence_freq: (document.getElementById('recurrenceFreq').value || 'none'),
+            recurrence_interval: (document.getElementById('recurrenceInterval').value || '1'),
+            recurrence_byweekday: Array.from(document.querySelectorAll('#recurrenceWeekdays input[type=checkbox]:checked')).map(cb => cb.value).join(',')
+        };
+
+        try {
+            const isUpdate = idHidden.value && idHidden.value.length > 0;
+            const endpoint = isUpdate ? `{% url 'users:portal_event_update' 0 %}`.replace('/0/', `/${idHidden.value}/`) : `{% url 'users:portal_event_create' %}`;
+            const resp = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+                closeAddEventModal();
+                renderCalendarFor(calendarPointer);
+                fetchAndPaintEvents(calendarPointer);
+            } else {
+                let msg = 'Failed to create event.';
+                try {
+                    const data = await resp.json();
+                    if (data && (data.error || data.errors)) msg = data.error || JSON.stringify(data.errors);
+                } catch(_) {}
+                alert(msg);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Unexpected error creating event.');
+        }
+        return false;
+    }
+
+    function openEventDetails(el) {
+        const modal = document.getElementById('eventDetailsModal');
+        if (!modal) return;
+        // Populate
+        document.getElementById('detailTitle').textContent = el.dataset.title || '';
+        const st = new Date(el.dataset.start);
+        const en = new Date(el.dataset.end);
+        let range = '';
+        if (el.dataset.allDay === '1') {
+            if (st.toDateString() === en.toDateString()) {
+                range = st.toLocaleDateString();
+            } else {
+                range = `${st.toLocaleDateString()} - ${en.toLocaleDateString()}`;
+            }
+        } else {
+            range = `${st.toLocaleString()} - ${en.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        }
+        document.getElementById('detailWhen').textContent = range;
+        document.getElementById('detailLocation').textContent = el.dataset.location ? `Location: ${el.dataset.location}` : '';
+        document.getElementById('detailDescription').textContent = el.dataset.description || '';
+        const privacy = document.getElementById('detailPrivate');
+        privacy.style.display = (el.dataset.isPrivate === '1') ? '' : 'none';
+        const delBtn = document.getElementById('detailDeleteBtn');
+        const editBtn = document.getElementById('detailEditBtn');
+        delBtn.dataset.eventId = el.dataset.eventId;
+        delBtn.dataset.start = el.dataset.start;
+        delBtn.dataset.end = el.dataset.end;
+        delBtn.dataset.location = el.dataset.location;
+        delBtn.dataset.description = el.dataset.description;
+        delBtn.dataset.title = el.dataset.title;
+        delBtn.dataset.allDay = el.dataset.allDay;
+        editBtn.dataset.eventId = el.dataset.eventId;
+        editBtn.dataset.start = el.dataset.start;
+        editBtn.dataset.end = el.dataset.end;
+        editBtn.dataset.location = el.dataset.location;
+        editBtn.dataset.description = el.dataset.description;
+        editBtn.dataset.title = el.dataset.title;
+        editBtn.dataset.allDay = el.dataset.allDay;
+        editBtn.dataset.isPrivate = el.dataset.isPrivate;
+        if (el.dataset.canEdit === '1') {
+            delBtn.classList.remove('hidden');
+            editBtn.classList.remove('hidden');
+            document.getElementById('attachmentActions').classList.remove('hidden');
+        } else {
+            delBtn.classList.add('hidden');
+            editBtn.classList.add('hidden');
+            document.getElementById('attachmentActions').classList.add('hidden');
+        }
+        // Load attachments
+        loadAttachments(el.dataset.eventId);
+        modal.classList.remove('hidden');
+    }
+
+    function closeEventDetails() {
+        const modal = document.getElementById('eventDetailsModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    async function loadAttachments(eventId) {
+        const list = document.getElementById('attachmentList');
+        if (list) list.innerHTML = '';
+        try {
+            const resp = await fetch(`{% url 'users:portal_event_detail' 0 %}`.replace('/0/', `/${eventId}/`));
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const attachments = (data.event && data.event.attachments) || [];
+            for (const a of attachments) {
+                const row = document.createElement('div');
+                row.className = 'text-xs flex items-center justify-between bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded';
+                const left = document.createElement('a');
+                left.href = a.url; left.target = '_blank';
+                left.textContent = a.title;
+                left.className = 'text-blue-600 hover:text-blue-800 truncate';
+                row.appendChild(left);
+                if (document.getElementById('detailDeleteBtn') && !document.getElementById('detailDeleteBtn').classList.contains('hidden')) {
+                    const btn = document.createElement('button');
+                    btn.className = 'text-red-600 text-[11px]';
+                    btn.textContent = 'Delete';
+                    btn.addEventListener('click', async () => {
+                        const resp = await fetch(`{% url 'users:portal_event_attachment_delete' 0 %}`.replace('/0/', `/${a.id}/`), {
+                            method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                        });
+                        if (resp.ok) loadAttachments(eventId);
+                    });
+                    row.appendChild(btn);
+                }
+                list.appendChild(row);
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function addAttachmentLink(e) {
+        e.preventDefault();
+        const form = e.target;
+        const eventId = document.getElementById('detailDeleteBtn').dataset.eventId;
+        const fd = new FormData(form);
+        try {
+            const resp = await fetch(`{% url 'users:portal_event_attachment_upsert' 0 %}`.replace('/0/', `/${eventId}/`), {
+                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: fd
+            });
+            if (resp.ok) {
+                form.reset();
+                loadAttachments(eventId);
+            }
+        } catch (e) { console.error(e); }
+        return false;
+    }
+
+    async function uploadAttachmentFile(e) {
+        e.preventDefault();
+        const form = e.target;
+        const eventId = document.getElementById('detailDeleteBtn').dataset.eventId;
+        const fd = new FormData(form);
+        try {
+            const resp = await fetch(`{% url 'users:portal_event_attachment_upsert' 0 %}`.replace('/0/', `/${eventId}/`), {
+                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: fd
+            });
+            if (resp.ok) {
+                form.reset();
+                loadAttachments(eventId);
+            }
+        } catch (e) { console.error(e); }
+        return false;
+    }
+
+    async function deleteEventFromDetails() {
+        const btn = document.getElementById('detailDeleteBtn');
+        const eventId = btn.dataset.eventId;
+        if (!eventId) return;
+        if (!confirm('Delete this event?')) return;
+        try {
+            const resp = await fetch(`{% url 'users:portal_event_delete' 0 %}`.replace('/0/', `/${eventId}/`), {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            if (resp.ok) {
+                closeEventDetails();
+                renderCalendarFor(calendarPointer);
+                fetchAndPaintEvents(calendarPointer);
+            } else {
+                alert('Failed to delete event.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Unexpected error deleting event.');
+        }
+    }
+
+    function editEventFromDetails() {
+        const btn = document.getElementById('detailEditBtn');
+        const payload = {
+            id: btn.dataset.eventId,
+            start: btn.dataset.start,
+            end: btn.dataset.end,
+            location: btn.dataset.location,
+            description: btn.dataset.description,
+            title: btn.dataset.title,
+            allDay: btn.dataset.allDay === '1',
+            isPrivate: btn.dataset.isPrivate === '1'
+        };
+        closeEventDetails();
+        openAddEventModal(payload);
     }
 </script>
 

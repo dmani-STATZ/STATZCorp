@@ -267,6 +267,55 @@ class WorkCalendarEvent(models.Model):
         return self.title
 
 
+class EventAttachment(models.Model):
+    """File or link attached to a calendar event (e.g., flyer images or signup sheets)."""
+
+    ATTACHMENT_TYPE_CHOICES = [
+        ('file', 'File'),
+        ('link', 'Link'),
+    ]
+
+    event = models.ForeignKey(WorkCalendarEvent, on_delete=models.CASCADE, related_name='attachments')
+    title = models.CharField(max_length=200, blank=True)
+    attachment_type = models.CharField(max_length=10, choices=ATTACHMENT_TYPE_CHOICES, default='file')
+    file = models.FileField(upload_to='calendar/attachments/%Y/%m/%d', null=True, blank=True)
+    link_url = models.URLField(blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='event_attachments')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title or (self.file.name if self.file else self.link_url)
+
+    def get_absolute_url(self):
+        if self.attachment_type == 'file' and self.file:
+            return self.file.url
+        return self.link_url
+
+
+class RecurrenceRule(models.Model):
+    """Simple recurrence rule attached to an event (initial support: weekly)."""
+
+    FREQ_CHOICES = [
+        ('weekly', 'Weekly'),
+        ('daily', 'Daily'),
+        ('monthly', 'Monthly'),  # reserved for future
+        ('yearly', 'Yearly'),    # reserved for future
+    ]
+
+    event = models.OneToOneField(WorkCalendarEvent, on_delete=models.CASCADE, related_name='recurrence')
+    freq = models.CharField(max_length=10, choices=FREQ_CHOICES)
+    interval = models.PositiveIntegerField(default=1)
+    byweekday = models.JSONField(default=list, blank=True, help_text='List of weekdays 0=Mon..6=Sun for weekly rules')
+    count = models.PositiveIntegerField(null=True, blank=True)
+    until = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"RRULE {self.freq}/{self.interval} for {self.event}"
+
+
 class EventAttendance(models.Model):
     """Track attendance behaviour to fuel contextual insights."""
 

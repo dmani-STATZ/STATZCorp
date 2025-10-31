@@ -122,7 +122,7 @@ from .views import (
 )
 
 from .views.contract_views import check_contract_number
-from .views.api_views import get_select_options, update_clin_field, create_buyer, create_supplier
+from .views.api_views import get_select_options, update_clin_field, create_buyer, create_supplier, contract_day_counts
 from .views.idiq_views import (
     IdiqContractDetailView,
     IdiqContractUpdateView,
@@ -244,6 +244,7 @@ urlpatterns = [
     path('api/buyers/create/', create_buyer, name='api_buyer_create'),
     path('api/suppliers/create/', create_supplier, name='api_supplier_create'),
     path('api/nsn/create/', views.api_views.create_nsn, name='api_nsn_create'),
+    path('api/day-counts/', contract_day_counts, name='contract_day_counts'),
     
     # Test
     path('test-app-name/', test_app_name, name='test_app_name'),

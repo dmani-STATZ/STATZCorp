@@ -12,6 +12,7 @@ from .forms import (
     PortalResourceForm,
     WorkCalendarEventForm,
     WorkCalendarTaskForm,
+    EventAttachmentForm,
 )
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
@@ -32,6 +33,8 @@ from .models import (
     UserSettingState,
     WorkCalendarEvent,
     WorkCalendarTask,
+    EventAttachment,
+    RecurrenceRule,
 )
 from contracts.models import Company
 from django.contrib.auth.models import User
@@ -1052,6 +1055,8 @@ def portal_event_create(request):
         if event.predicted_attendance is None:
             event.predicted_attendance = _calculate_predicted_attendance(request.user, event.kind)
         event.save()
+        # Optional recurrence payload
+        _upsert_recurrence_for_event(event, payload)
         return JsonResponse({'event': serialize_event(event, user=request.user)}, status=201)
     return JsonResponse({'errors': form.errors}, status=400)
 
@@ -1059,7 +1064,40 @@ def portal_event_create(request):
 @login_required
 @require_http_methods(["GET"])
 def portal_event_feed(request):
-    """Retrieve upcoming events for the calendar widget."""
+    """Retrieve events for the calendar widget.
+    If 'start' and 'end' query params are provided, returns events overlapping that range.
+    Otherwise, falls back to 'days' ahead from now (default 14).
+    """
+    start_param = request.GET.get('start')
+    end_param = request.GET.get('end')
+
+    if start_param and end_param:
+        try:
+            start_dt = _parse_datetime_string(start_param)
+            end_dt = _parse_datetime_string(end_param)
+        except Exception:
+            return JsonResponse({'error': 'Invalid start or end datetime.'}, status=400)
+
+        base_qs = WorkCalendarEvent.objects.select_related('organizer', 'section').prefetch_related('tasks', 'attendance_records', 'attachments')
+        from django.db.models import Q
+        # Company-wide visibility: show all non-private events, plus the user's own private events
+        visibility = Q(is_private=False) | Q(organizer=request.user)
+        qs = base_qs.filter(
+            visibility,
+            recurrence__isnull=True,  # non-recurring base events here
+            end_at__gte=start_dt,
+            start_at__lte=end_dt,
+        ).distinct().order_by('start_at')
+        # Recurring events -> expand occurrences
+        rr = WorkCalendarEvent.objects.select_related('organizer', 'section', 'recurrence').prefetch_related('attachments').filter(
+            visibility,
+            recurrence__isnull=False,
+        )
+        events_payload = [serialize_event(ev, user=request.user) for ev in qs]
+        for ev in rr:
+            events_payload.extend(_expand_recurrences(ev, start_dt, end_dt, user=request.user))
+        return JsonResponse({'events': events_payload})
+
     days = request.GET.get('days', 14)
     try:
         days = int(days)
@@ -1074,9 +1112,163 @@ def portal_event_feed(request):
 def portal_event_delete(request, event_id):
     """Delete a calendar event (creator or superuser only)."""
     event = get_object_or_404(WorkCalendarEvent, pk=event_id)
-    if not (request.user.is_superuser or event.organizer_id == request.user.id):
+    # Only the organizer can delete their own events (superusers cannot delete others)
+    if event.organizer_id != request.user.id:
         return JsonResponse({'error': 'Permission denied.'}, status=403)
     event.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_event_update(request, event_id):
+    """Update a calendar event — only the organizer can edit."""
+    event = get_object_or_404(WorkCalendarEvent, pk=event_id)
+    if event.organizer_id != request.user.id:
+        return JsonResponse({'error': 'Permission denied.'}, status=403)
+
+    data = _request_data(request)
+    payload = data.copy() if isinstance(data, QueryDict) else dict(data)
+
+    # Ensure organizer and immutable bits remain correct
+    form = WorkCalendarEventForm(data=payload, instance=event)
+    if form.is_valid():
+        updated = form.save(commit=False)
+        updated.organizer_id = event.organizer_id
+        updated.save()
+        _upsert_recurrence_for_event(updated, payload)
+        return JsonResponse({'event': serialize_event(updated, user=request.user)})
+    return JsonResponse({'errors': form.errors}, status=400)
+
+
+def _upsert_recurrence_for_event(event, payload):
+    """Create/update a simple recurrence rule for the event if provided.
+    Supports freq 'weekly' (with byweekday list 0=Mon..6=Sun) and 'daily'.
+    """
+    freq = (payload.get('recurrence_freq') or '').strip().lower()
+    if not freq or freq == 'none':
+        # Remove existing rule if any
+        try:
+            if hasattr(event, 'recurrence') and event.recurrence:
+                event.recurrence.delete()
+        except RecurrenceRule.DoesNotExist:
+            pass
+        return
+    interval = int(payload.get('recurrence_interval') or 1)
+    byweekday = payload.get('recurrence_byweekday') or []
+    if isinstance(byweekday, str):
+        # Accept comma-separated values
+        byweekday = [int(x) for x in byweekday.split(',') if x.strip().isdigit()]
+    try:
+        rule, _ = RecurrenceRule.objects.update_or_create(
+            event=event,
+            defaults={
+                'freq': freq,
+                'interval': max(1, interval),
+                'byweekday': byweekday if isinstance(byweekday, (list, tuple)) else [],
+            }
+        )
+    except Exception:
+        # Be defensive; do not break event creation if recurrence invalid
+        pass
+
+
+def _expand_recurrences(event, range_start, range_end, user=None):
+    """Generate occurrence payloads for a recurring event within the requested range."""
+    rule = getattr(event, 'recurrence', None)
+    if not rule:
+        return []
+    occurrences = []
+    from datetime import datetime, timedelta
+    start = event.start_at
+    end = event.end_at
+    # Normalize to start of the day for iteration
+    cur_date = range_start.date()
+    last_date = range_end.date()
+    # Map Python weekday: Monday=0..Sunday=6; our byweekday uses same
+    if rule.freq == 'weekly':
+        # Iterate each day in range, include when weekday matches and step matches interval
+        # Anchor interval against the event start week number
+        from datetime import date
+        def weeks_between(d1, d2):
+            return int((d2 - d1).days // 7)
+        anchor_monday = (start.date() - timedelta(days=start.weekday()))
+        d = cur_date
+        while d <= last_date:
+            if rule.byweekday and d.weekday() in rule.byweekday:
+                weeks = weeks_between(anchor_monday, d - timedelta(days=d.weekday()))
+                if weeks % max(1, rule.interval) == 0:
+                    # occurrence datetime spans
+                    occ_start = timezone.make_aware(datetime.combine(d, start.timetz())) if timezone.is_naive(start) else start.replace(year=d.year, month=d.month, day=d.day)
+                    duration = end - start
+                    occ_end = occ_start + duration
+                    if occ_end >= range_start and occ_start <= range_end:
+                        ev = serialize_event(event, user=user)
+                        ev['start'] = occ_start.isoformat()
+                        ev['end'] = occ_end.isoformat()
+                        occurrences.append(ev)
+            d += timedelta(days=1)
+    elif rule.freq == 'daily':
+        d = cur_date
+        step = max(1, rule.interval)
+        delta_days = 0
+        from datetime import datetime, timedelta
+        while d <= last_date:
+            if delta_days % step == 0:
+                occ_start = timezone.make_aware(datetime.combine(d, start.timetz())) if timezone.is_naive(start) else start.replace(year=d.year, month=d.month, day=d.day)
+                duration = end - start
+                occ_end = occ_start + duration
+                if occ_end >= range_start and occ_start <= range_end:
+                    ev = serialize_event(event, user=user)
+                    ev['start'] = occ_start.isoformat()
+                    ev['end'] = occ_end.isoformat()
+                    occurrences.append(ev)
+            d += timedelta(days=1)
+            delta_days += 1
+    return occurrences
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_event_detail(request, event_id):
+    """Return serialized event with attachments (visibility-checked)."""
+    ev = get_object_or_404(WorkCalendarEvent.objects.select_related('organizer').prefetch_related('attachments'), pk=event_id)
+    if ev.is_private and ev.organizer_id != request.user.id:
+        return JsonResponse({'error': 'Permission denied.'}, status=403)
+    return JsonResponse({'event': serialize_event(ev, user=request.user)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_event_attachment_upsert(request, event_id):
+    """Create a new attachment (file or link) for an event (organizer only)."""
+    event = get_object_or_404(WorkCalendarEvent, pk=event_id)
+    if event.organizer_id != request.user.id:
+        return JsonResponse({'error': 'Permission denied.'}, status=403)
+    data = request.POST if request.method == 'POST' else _request_data(request)
+    files = request.FILES if hasattr(request, 'FILES') else None
+    form = EventAttachmentForm(data, files)
+    if form.is_valid():
+        att = form.save(commit=False)
+        att.event = event
+        att.uploaded_by = request.user
+        att.save()
+        return JsonResponse({'attachment': {
+            'id': att.id,
+            'title': att.title or (att.file.name.split('/')[-1] if att.file else att.link_url),
+            'attachment_type': att.attachment_type,
+            'url': att.get_absolute_url(),
+        }})
+    return JsonResponse({'errors': form.errors}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_event_attachment_delete(request, attachment_id):
+    att = get_object_or_404(EventAttachment.objects.select_related('event'), pk=attachment_id)
+    if att.event.organizer_id != request.user.id:
+        return JsonResponse({'error': 'Permission denied.'}, status=403)
+    att.delete()
     return JsonResponse({'success': True})
 
 

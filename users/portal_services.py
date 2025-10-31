@@ -70,7 +70,7 @@ def upcoming_events_for_user(user, days_ahead=14):
 
     now = timezone.now()
     horizon = now + timedelta(days=days_ahead)
-    base_queryset = WorkCalendarEvent.objects.select_related('organizer', 'section').prefetch_related('tasks', 'attendance_records')
+    base_queryset = WorkCalendarEvent.objects.select_related('organizer', 'section').prefetch_related('tasks', 'attendance_records', 'attachments')
 
     return base_queryset.filter(
         Q(organizer=user) | Q(attendance_records__user=user),
@@ -84,7 +84,8 @@ def serialize_event(event, user=None):
     if user and user.is_authenticated:
         attendance = next((record for record in event.attendance_records.all() if record.user_id == user.id), None)
 
-    can_edit = bool(user and user.is_authenticated and (event.organizer_id == user.id or user.is_staff or user.is_superuser))
+    # Only the organizer can edit/delete — not even superusers
+    can_edit = bool(user and user.is_authenticated and (event.organizer_id == user.id))
 
     all_day = (
         event.start_at.hour == 0 and event.start_at.minute == 0 and event.start_at.second == 0 and
@@ -99,6 +100,7 @@ def serialize_event(event, user=None):
         'end': event.end_at.isoformat(),
         'all_day': all_day,
         'priority': event.priority,
+        'is_private': event.is_private,
         'energy_required': event.energy_required,
         'focus_block': event.focus_block,
         'predicted_attendance': float(event.predicted_attendance or 0),
@@ -110,6 +112,15 @@ def serialize_event(event, user=None):
         'confidence': float(attendance.confidence_score) if attendance and attendance.confidence_score is not None else None,
         'organizer_name': event.organizer.get_full_name() or event.organizer.username,
         'can_edit': can_edit,
+        'attachments': [
+            {
+                'id': a.id,
+                'title': a.title or (a.file.name.split('/')[-1] if a.file else a.link_url),
+                'attachment_type': a.attachment_type,
+                'url': a.get_absolute_url(),
+            }
+            for a in getattr(event, 'attachments').all() if True
+        ],
     }
 
 
