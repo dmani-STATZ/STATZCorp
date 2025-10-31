@@ -1,6 +1,20 @@
 # users/admin.py
 from django.contrib import admin
-from .models import AppPermission, Announcement, AppRegistry, UserCompanyMembership
+from .models import (
+    AppPermission,
+    Announcement,
+    AppRegistry,
+    CalendarAnalyticsSnapshot,
+    EventAttendance,
+    EventReminder,
+    NaturalLanguageScheduleRequest,
+    PortalResource,
+    PortalSection,
+    ScheduledMicroBreak,
+    UserCompanyMembership,
+    WorkCalendarEvent,
+    WorkCalendarTask,
+)
 from django import forms
 from django.contrib.auth.models import User
 from django.apps import apps
@@ -65,18 +79,19 @@ class AppPermissionAdmin(admin.ModelAdmin):
             has_access = user_permissions.get(app.app_name, False)
             # Using Tailwind colors: green-500 for success, red-500 for denied
             bg_color = '#10b981' if has_access else '#ef4444'
+            indicator = 'granted' if has_access else 'blocked'
             display_items.append(
                 f'<span style="'
                 f'background-color: {bg_color};'
                 f'color: white;'
                 f'padding: 2px 8px;'
-                f'border-radius: 9999px;'  # Tailwind's full rounded
+                f'border-radius: 9999px;'
                 f'margin: 0 2px;'
                 f'display: inline-block;'
-                f'font-size: 0.875rem;'    # Tailwind's text-sm
-                f'font-weight: 500;'       # Tailwind's font-medium
-                f'line-height: 1.25rem;'   # Tailwind's leading-5
-                f'">{app.app_name} {"✓" if has_access else "✗"}</span>'
+                f'font-size: 0.875rem;'
+                f'font-weight: 500;'
+                f'line-height: 1.25rem;'
+                f'">{app.app_name} {indicator}</span>'
             )
         return mark_safe(''.join(display_items))
     get_permissions_display.short_description = 'App Permissions'
@@ -162,6 +177,99 @@ class AppPermissionAdmin(admin.ModelAdmin):
 
     class Media:
         js = ('admin/js/app_permissions.js',)
+
+
+class PortalResourceInline(admin.TabularInline):
+    model = PortalResource
+    extra = 0
+    fields = ('title', 'resource_type', 'display_order', 'is_featured', 'external_url', 'file', 'icon')
+    show_change_link = True
+
+
+@admin.register(PortalSection)
+class PortalSectionAdmin(admin.ModelAdmin):
+    list_display = ('title', 'visibility', 'layout', 'order', 'is_active', 'is_pinned')
+    list_filter = ('visibility', 'layout', 'is_active', 'is_pinned')
+    search_fields = ('title', 'slug', 'description')
+    inlines = [PortalResourceInline]
+    filter_horizontal = ('editors',)
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-is_pinned', 'order', 'title')
+
+
+@admin.register(PortalResource)
+class PortalResourceAdmin(admin.ModelAdmin):
+    list_display = ('title', 'section', 'resource_type', 'is_featured', 'display_order', 'uploaded_by', 'updated_at')
+    list_filter = ('resource_type', 'is_featured', 'section')
+    search_fields = ('title', 'description', 'external_url')
+    autocomplete_fields = ('section', 'uploaded_by')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('section', 'display_order', 'title')
+
+
+class EventAttendanceInline(admin.TabularInline):
+    model = EventAttendance
+    extra = 0
+    autocomplete_fields = ('user',)
+    fields = ('user', 'status', 'confidence_score', 'auto_detected', 'responded_at', 'attendance_marked_at')
+
+
+class EventReminderInline(admin.TabularInline):
+    model = EventReminder
+    extra = 0
+    fields = ('reminder_type', 'offset_minutes', 'message')
+
+
+@admin.register(WorkCalendarTask)
+class WorkCalendarTaskAdmin(admin.ModelAdmin):
+    list_display = ('title', 'owner', 'importance', 'energy_required', 'status', 'due_date', 'estimated_minutes')
+    list_filter = ('importance', 'energy_required', 'status')
+    search_fields = ('title', 'description', 'owner__username')
+    autocomplete_fields = ('owner',)
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('status', '-importance', 'due_date')
+
+
+@admin.register(WorkCalendarEvent)
+class WorkCalendarEventAdmin(admin.ModelAdmin):
+    list_display = ('title', 'organizer', 'start_at', 'end_at', 'kind', 'priority', 'energy_required', 'focus_block')
+    list_filter = ('kind', 'priority', 'energy_required', 'focus_block', 'is_private')
+    search_fields = ('title', 'description', 'organizer__username', 'location')
+    autocomplete_fields = ('organizer', 'section')
+    filter_horizontal = ('tasks',)
+    inlines = [EventAttendanceInline, EventReminderInline]
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('start_at',)
+
+
+@admin.register(NaturalLanguageScheduleRequest)
+class NaturalLanguageScheduleRequestAdmin(admin.ModelAdmin):
+    list_display = ('user', 'raw_text', 'status', 'interpreted_start', 'interpreted_end', 'created_at')
+    list_filter = ('status',)
+    search_fields = ('raw_text', 'normalized_text', 'user__username')
+    autocomplete_fields = ('user', 'associated_event')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(CalendarAnalyticsSnapshot)
+class CalendarAnalyticsSnapshotAdmin(admin.ModelAdmin):
+    list_display = ('user', 'range_start', 'range_end', 'meeting_hours', 'focus_hours', 'ghost_meeting_rate')
+    list_filter = ('range_start', 'range_end')
+    search_fields = ('user__username',)
+    autocomplete_fields = ('user',)
+    readonly_fields = ('created_at',)
+    ordering = ('-range_end',)
+
+
+@admin.register(ScheduledMicroBreak)
+class ScheduledMicroBreakAdmin(admin.ModelAdmin):
+    list_display = ('user', 'label', 'start_at', 'end_at', 'insertion_mode', 'related_event')
+    list_filter = ('insertion_mode',)
+    search_fields = ('label', 'notes', 'user__username')
+    autocomplete_fields = ('user', 'related_event')
+    readonly_fields = ('created_at',)
+    ordering = ('start_at',)
 
 # Register your models here.
 admin.site.register(AppPermission, AppPermissionAdmin)

@@ -1,7 +1,13 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Announcement
+from .models import (
+    Announcement,
+    PortalResource,
+    PortalSection,
+    WorkCalendarEvent,
+    WorkCalendarTask,
+)
 
 
 class BaseFormMixin:
@@ -56,6 +62,66 @@ class AnnouncementForm(BaseModelForm):
     class Meta:
         model = Announcement
         fields = ['title', 'content']
+
+
+class PortalSectionForm(BaseModelForm):
+    class Meta:
+        model = PortalSection
+        fields = ['title', 'description']
+
+
+class PortalResourceForm(BaseModelForm):
+    class Meta:
+        model = PortalResource
+        fields = [
+            'section',
+            'title',
+            'description',
+            'resource_type',
+            'file',
+            'external_url',
+        ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+class WorkCalendarTaskForm(BaseModelForm):
+    class Meta:
+        model = WorkCalendarTask
+        fields = [
+            'title',
+            'description',
+            'due_date',
+            'importance',
+            'energy_required',
+            'estimated_minutes',
+            'status',
+            'source_app',
+            'metadata',
+        ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+            'metadata': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+class WorkCalendarEventForm(BaseModelForm):
+    class Meta:
+        model = WorkCalendarEvent
+        fields = [
+            'title',
+            'description',
+            'start_at',
+            'end_at',
+            'location',
+            'priority',
+        ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+            'start_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'end_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        }
 
 
 class AdminLoginForm(BaseFormMixin, forms.Form):

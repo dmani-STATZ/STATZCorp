@@ -1,12 +1,38 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
-from .forms import UserRegisterForm, BaseForm, AdminLoginForm, PasswordChangeForm, PasswordSetForm, EmailLookupForm, OAuthPasswordSetForm
+from .forms import (
+    UserRegisterForm,
+    BaseForm,
+    AdminLoginForm,
+    PasswordChangeForm,
+    PasswordSetForm,
+    EmailLookupForm,
+    OAuthPasswordSetForm,
+    PortalSectionForm,
+    PortalResourceForm,
+    WorkCalendarEventForm,
+    WorkCalendarTaskForm,
+)
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
 from STATZWeb.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, QueryDict
 from django.contrib.auth.decorators import user_passes_test
-from .models import AppPermission, UserSetting, UserSettingState, SystemMessage
+from .models import (
+    Announcement,
+    AppPermission,
+    CalendarAnalyticsSnapshot,
+    EventAttendance,
+    NaturalLanguageScheduleRequest,
+    PortalResource,
+    PortalSection,
+    ScheduledMicroBreak,
+    SystemMessage,
+    UserSetting,
+    UserSettingState,
+    WorkCalendarEvent,
+    WorkCalendarTask,
+)
 from contracts.models import Company
 from django.contrib.auth.models import User
 from django.urls import resolve, reverse
@@ -22,9 +48,239 @@ from django.views.generic import ListView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import AuthenticationForm
 from django.conf import settings
+from datetime import datetime, timedelta
+from django.utils import timezone
+from django.db import transaction
+from django.db.models import Avg, Q
+from .portal_services import (
+    build_portal_context,
+    get_visible_sections,
+    serialize_resource,
+    serialize_section,
+    serialize_event,
+    upcoming_events_for_user,
+    active_tasks_for_user,
+    serialize_task,
+    upcoming_microbreaks,
+    serialize_microbreak,
+    outstanding_nlp_requests,
+    serialize_nlp_request,
+)
 
 logger = logging.getLogger(__name__)
 
+
+def _is_portal_admin(user):
+    return bool(user and user.is_authenticated and (user.is_superuser or user.is_staff))
+
+
+def _is_section_editor(user, section):
+    if not user or not user.is_authenticated:
+        return False
+    if _is_portal_admin(user):
+        return True
+    return section.editors.filter(pk=user.pk).exists()
+
+
+def _request_data(request):
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            payload = json.loads(request.body.decode('utf-8'))
+            return payload if isinstance(payload, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+    if request.method in ('GET', 'DELETE'):
+        return request.GET
+    return request.POST
+
+
+def _as_int_list(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [int(v) for v in value if str(v).isdigit()]
+    if isinstance(value, str):
+        parts = [item.strip() for item in value.split(',') if item.strip()]
+        return [int(v) for v in parts if v.isdigit()]
+    return []
+
+
+try:
+    from dateutil import parser as date_parser
+except ImportError:  # pragma: no cover - defensive fallback
+    date_parser = None
+
+
+def _parse_natural_language_request(text, user):
+    """
+    Basic natural language parsing tailored to scheduling intents.
+    Returns dict with success flag, proposed start/end, attendees, diagnostics.
+    """
+    lowered = text.lower()
+    now = timezone.now()
+    diagnostics = {'source': 'rule-based-v1'}
+
+    # Duration detection (default 60 minutes)
+    duration = 60
+    import re
+
+    duration_match = re.search(r'(\d+)\s*(minute|min|hour|hr)', lowered)
+    if duration_match:
+        value = int(duration_match.group(1))
+        unit = duration_match.group(2)
+        duration = value * 60 if unit.startswith('hour') or unit.startswith('hr') else value
+    diagnostics['duration_detected'] = duration
+
+    # Determine base date
+    base_date = now
+    if 'tomorrow' in lowered:
+        base_date = now + timedelta(days=1)
+    elif 'next week' in lowered:
+        days_until_monday = (7 - now.weekday()) % 7 or 7
+        base_date = now + timedelta(days=days_until_monday)
+    elif 'next ' in lowered:
+        days_lookup = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        for offset, day_name in enumerate(days_lookup):
+            token = f'next {day_name}'
+            if token in lowered:
+                days_ahead = (offset - now.weekday()) % 7
+                days_ahead = days_ahead + (7 if days_ahead == 0 else 0)
+                base_date = now + timedelta(days=days_ahead)
+                break
+    else:
+        days_lookup = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        for offset, day_name in enumerate(days_lookup):
+            if day_name in lowered:
+                days_ahead = (offset - now.weekday()) % 7
+                base_date = now + timedelta(days=days_ahead)
+                break
+
+    # Time of day heuristics
+    default_time = 9
+    if 'before lunch' in lowered:
+        default_time = 11
+    elif 'after lunch' in lowered:
+        default_time = 13
+    elif 'lunch' in lowered:
+        default_time = 12
+    elif 'morning' in lowered:
+        default_time = 9
+    elif 'afternoon' in lowered:
+        default_time = 14
+    elif 'evening' in lowered:
+        default_time = 18
+
+    proposed_start = base_date.replace(hour=default_time, minute=0, second=0, microsecond=0)
+
+    # Explicit time parsing
+    time_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', lowered)
+    if time_match:
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2) or 0)
+        meridiem = time_match.group(3)
+        if meridiem:
+            if meridiem == 'pm' and hour < 12:
+                hour += 12
+            if meridiem == 'am' and hour == 12:
+                hour = 0
+        proposed_start = proposed_start.replace(hour=hour, minute=minute)
+    elif date_parser:
+        try:
+            parsed_dt = date_parser.parse(text, fuzzy=True, default=now.replace(hour=default_time, minute=0, second=0, microsecond=0))
+            if parsed_dt:
+                proposed_start = timezone.make_aware(parsed_dt) if timezone.is_naive(parsed_dt) else parsed_dt
+        except (ValueError, OverflowError):
+            diagnostics['dateutil_parse'] = 'failed'
+
+    proposed_end = proposed_start + timedelta(minutes=duration)
+
+    # Attendee detection (naive)
+    attendee_names = []
+    name_match = re.search(r'with\s+([A-Z][a-zA-Z]+(?:[\s,&]+[A-Z][a-zA-Z]+)*)', text)
+    if name_match:
+        raw_names = re.split(r'[\s,&]+', name_match.group(1).strip())
+        attendee_names = [name for name in raw_names if name]
+
+    diagnostics['attendees_raw'] = attendee_names
+
+    return {
+        'success': True,
+        'start': proposed_start,
+        'end': proposed_end,
+        'duration': duration,
+        'attendees': attendee_names,
+        'diagnostics': diagnostics,
+    }
+
+
+def _next_available_slot(user, proposed_start, duration_minutes, buffer_minutes=15):
+    """
+    Given a proposed start time, return a slot that avoids conflicts.
+    """
+    candidate_start = proposed_start
+    candidate_end = candidate_start + timedelta(minutes=duration_minutes)
+    conflicts = WorkCalendarEvent.objects.filter(
+        organizer=user,
+        start_at__lt=candidate_end,
+        end_at__gt=candidate_start,
+    ).order_by('start_at')
+
+    for event in conflicts:
+        candidate_start = event.end_at + timedelta(minutes=buffer_minutes)
+        candidate_end = candidate_start + timedelta(minutes=duration_minutes)
+    return candidate_start, candidate_end, bool(conflicts)
+
+
+def _calculate_predicted_attendance(user, kind):
+    aggregate = EventAttendance.objects.filter(
+        event__organizer=user,
+        event__kind=kind,
+        confidence_score__isnull=False,
+    ).aggregate(avg_conf=Avg('confidence_score'))
+    avg_conf = aggregate.get('avg_conf')
+    if avg_conf is None:
+        return 0.75  # optimistic default until data accumulates
+    return max(0.0, min(1.0, float(avg_conf)))
+
+
+def _auto_insert_microbreak(user, event, duration_minutes=10):
+    break_start = event.end_at
+    break_end = break_start + timedelta(minutes=duration_minutes)
+    has_conflict = WorkCalendarEvent.objects.filter(
+        organizer=user,
+        start_at__lt=break_end,
+        end_at__gt=break_start,
+    ).exists()
+    if has_conflict:
+        return None
+    overlap_break = ScheduledMicroBreak.objects.filter(
+        user=user,
+        start_at__lt=break_end,
+        end_at__gt=break_start,
+    ).exists()
+    if overlap_break:
+        return None
+    return ScheduledMicroBreak.objects.create(
+        user=user,
+        start_at=break_start,
+        end_at=break_end,
+        label='Recovery Break',
+        insertion_mode='auto',
+        related_event=event,
+        notes='Auto-inserted after scheduling to prevent burnout.',
+    )
+
+
+def _parse_datetime_string(value):
+    if not value:
+        raise ValueError("No datetime provided")
+    if date_parser:
+        dt = date_parser.parse(value)
+    else:
+        dt = datetime.fromisoformat(value)
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
 def login_view(request):
     """Custom login view that redirects to Microsoft authentication"""
     # Clear previous auth errors
@@ -625,6 +881,304 @@ def oauth_password_set_view(request):
     }
     
     return render(request, 'users/oauth_password_set.html', context)
+
+
+# ---------------------------------------------------------------------------
+# Portal dashboard APIs
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_dashboard_data(request):
+    """Return the aggregated portal context for async refreshes."""
+    portal_context = build_portal_context(request.user)
+    announcements = [
+        {
+            'id': announcement.id,
+            'title': announcement.title,
+            'content': announcement.content,
+            'posted_at': announcement.posted_at.isoformat(),
+            'posted_by': announcement.posted_by.get_full_name() or announcement.posted_by.username,
+        }
+        for announcement in Announcement.objects.select_related('posted_by').order_by('-posted_at')[:10]
+    ]
+    portal_context['announcements'] = announcements
+    return JsonResponse(portal_context)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def portal_sections_api(request):
+    """List or create/update portal sections."""
+    if request.method == "GET":
+        sections = [serialize_section(section, request.user) for section in get_visible_sections(request.user)]
+        return JsonResponse({'sections': sections})
+
+    if not _is_portal_admin(request.user):
+        return JsonResponse({'error': 'Only portal admins can modify sections.'}, status=403)
+
+    data = _request_data(request)
+    instance = None
+    section_id = data.get('id') or data.get('section_id')
+    if section_id:
+        instance = get_object_or_404(PortalSection, pk=section_id)
+
+    payload = data.copy() if isinstance(data, (dict, QueryDict)) else dict(data)
+    if isinstance(payload, QueryDict):
+        payload = payload.copy()
+
+    editor_ids = _as_int_list(payload.get('editors'))
+    if isinstance(payload, QueryDict):
+        payload.setlist('editors', [str(pk) for pk in editor_ids])
+    else:
+        payload['editors'] = editor_ids
+
+    form = PortalSectionForm(payload, instance=instance)
+    if form.is_valid():
+        section = form.save(commit=False)
+        if not section.pk:
+            section.created_by = request.user
+        section.save()
+        form.save_m2m()
+        if request.user.is_authenticated:
+            section.editors.add(request.user)
+        return JsonResponse({'section': serialize_section(section, request.user)})
+    return JsonResponse({'errors': form.errors}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_section_delete(request, section_id):
+    """Delete an existing portal section."""
+    if not _is_portal_admin(request.user):
+        return JsonResponse({'error': 'Only portal admins can delete sections.'}, status=403)
+    section = get_object_or_404(PortalSection, pk=section_id)
+    section.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_resource_upsert(request):
+    """Create or update a resource inside a portal section."""
+    data = request.POST.copy() if request.POST else _request_data(request)
+    files = request.FILES if request.FILES else None
+    resource_id = data.get('id') or data.get('resource_id')
+    section_id = data.get('section') or data.get('section_id')
+
+    if not section_id and not resource_id:
+        return JsonResponse({'error': 'Section is required to add resources.'}, status=400)
+
+    instance = None
+    if resource_id:
+        instance = get_object_or_404(PortalResource, pk=resource_id)
+        section = instance.section
+    else:
+        section = get_object_or_404(PortalSection, pk=section_id)
+
+    if not _is_section_editor(request.user, section):
+        return JsonResponse({'error': 'You do not have permission to manage this section.'}, status=403)
+
+    payload = data.copy() if isinstance(data, QueryDict) else dict(data)
+    if isinstance(payload, QueryDict):
+        payload = payload.copy()
+        payload['section'] = str(section.id)
+    else:
+        payload['section'] = section.id
+
+    form = PortalResourceForm(payload, files, instance=instance)
+    if form.is_valid():
+        resource = form.save(commit=False)
+        resource.uploaded_by = request.user
+        resource.save()
+        form.save_m2m()
+        return JsonResponse({'resource': serialize_resource(resource), 'section_id': section.id})
+    return JsonResponse({'errors': form.errors}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_resource_delete(request, resource_id):
+    """Delete a portal resource."""
+    resource = get_object_or_404(PortalResource, pk=resource_id)
+    if not _is_section_editor(request.user, resource.section):
+        return JsonResponse({'error': 'You do not have permission to delete this resource.'}, status=403)
+    resource.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_task_create(request):
+    """Create a task that can later be dropped onto the calendar."""
+    data = _request_data(request)
+    payload = data.copy() if isinstance(data, QueryDict) else dict(data)
+    form = WorkCalendarTaskForm(payload)
+    if form.is_valid():
+        task = form.save(commit=False)
+        task.owner = request.user
+        task.save()
+        return JsonResponse({'task': serialize_task(task)}, status=201)
+    return JsonResponse({'errors': form.errors}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_event_create(request):
+    """Create a work calendar event from structured input."""
+    data = request.POST.copy() if request.POST else _request_data(request)
+    payload = data.copy() if isinstance(data, QueryDict) else dict(data)
+
+    form = WorkCalendarEventForm(data=payload)
+    if form.is_valid():
+        event = form.save(commit=False)
+        event.organizer = request.user
+        if event.predicted_attendance is None:
+            event.predicted_attendance = _calculate_predicted_attendance(request.user, event.kind)
+        event.save()
+        return JsonResponse({'event': serialize_event(event, user=request.user)}, status=201)
+    return JsonResponse({'errors': form.errors}, status=400)
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_event_feed(request):
+    """Retrieve upcoming events for the calendar widget."""
+    days = request.GET.get('days', 14)
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        days = 14
+    events = upcoming_events_for_user(request.user, days_ahead=days)
+    return JsonResponse({'events': [serialize_event(event, user=request.user) for event in events]})
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_event_delete(request, event_id):
+    """Delete a calendar event (creator or superuser only)."""
+    event = get_object_or_404(WorkCalendarEvent, pk=event_id)
+    if not (request.user.is_superuser or event.organizer_id == request.user.id):
+        return JsonResponse({'error': 'Permission denied.'}, status=403)
+    event.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_nlp_schedule(request):
+    """Parse natural language scheduling requests and optionally auto-schedule."""
+    data = _request_data(request)
+    query = (data.get('query') or '').strip()
+    if not query:
+        return JsonResponse({'error': 'Describe what you want to schedule.'}, status=400)
+
+    auto_schedule = data.get('auto_schedule', False)
+    request_record = NaturalLanguageScheduleRequest.objects.create(user=request.user, raw_text=query)
+    parse_result = _parse_natural_language_request(query, request.user)
+
+    candidate_start, candidate_end, adjusted = _next_available_slot(
+        request.user,
+        parse_result['start'],
+        parse_result['duration'],
+        buffer_minutes=data.get('buffer_minutes', 15),
+    )
+
+    response_payload = {
+        'query': query,
+        'suggested_start': candidate_start.isoformat(),
+        'suggested_end': candidate_end.isoformat(),
+        'attendees': parse_result['attendees'],
+        'duration': parse_result['duration'],
+        'adjusted_for_conflicts': adjusted,
+        'diagnostics': parse_result['diagnostics'],
+    }
+
+    request_record.status = 'parsed'
+    request_record.interpreted_start = candidate_start
+    request_record.interpreted_end = candidate_end
+    request_record.duration_minutes = parse_result['duration']
+    request_record.attendees = parse_result['attendees']
+    request_record.diagnostics = parse_result['diagnostics']
+    request_record.save(update_fields=['status', 'interpreted_start', 'interpreted_end', 'duration_minutes', 'attendees', 'diagnostics', 'updated_at'])
+
+    if auto_schedule:
+        title = data.get('title') or query[:120]
+        description = data.get('description', '')
+        kind = data.get('kind', 'meeting')
+        priority = data.get('priority', 'normal')
+        energy_required = data.get('energy_required', 'moderate')
+        focus_block = data.get('focus_block', False)
+
+        event = WorkCalendarEvent.objects.create(
+            title=title,
+            description=description,
+            kind=kind,
+            start_at=candidate_start,
+            end_at=candidate_end,
+            organizer=request.user,
+            priority=priority,
+            energy_required=energy_required,
+            focus_block=focus_block,
+            focus_reason=data.get('focus_reason', ''),
+            requires_travel=data.get('requires_travel', False),
+            created_via_nlp=True,
+            metadata={
+                'nlp_query': query,
+                'attendee_names': parse_result['attendees'],
+                'adjusted_for_conflicts': adjusted,
+            },
+        )
+        event.predicted_attendance = _calculate_predicted_attendance(request.user, kind)
+        event.save()
+        request_record.mark_scheduled(event, diagnostics=parse_result['diagnostics'])
+        microbreak = _auto_insert_microbreak(request.user, event)
+
+        response_payload['event'] = serialize_event(event, user=request.user)
+        response_payload['microbreak'] = serialize_microbreak(microbreak) if microbreak else None
+
+    return JsonResponse(response_payload, status=201 if auto_schedule else 200)
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_microbreak_create(request):
+    """Allow users to manually insert a micro-break."""
+    data = _request_data(request)
+    try:
+        start = _parse_datetime_string(data.get('start'))
+        end = _parse_datetime_string(data.get('end'))
+    except Exception:
+        return JsonResponse({'error': 'Invalid start or end time for micro-break.'}, status=400)
+
+    if end <= start:
+        return JsonResponse({'error': 'Micro-break end must be after start.'}, status=400)
+
+    label = data.get('label') or 'Micro-break'
+    related_event_id = data.get('related_event_id')
+    related_event = None
+    if related_event_id:
+        related_event = get_object_or_404(WorkCalendarEvent, pk=related_event_id)
+
+    microbreak = ScheduledMicroBreak.objects.create(
+        user=request.user,
+        start_at=start,
+        end_at=end,
+        label=label,
+        insertion_mode='manual',
+        related_event=related_event,
+        notes=data.get('notes', ''),
+    )
+    return JsonResponse({'microbreak': serialize_microbreak(microbreak)}, status=201)
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_microbreak_feed(request):
+    """Return upcoming micro-breaks for the current user."""
+    upcoming = upcoming_microbreaks(request.user)
+    return JsonResponse({'microbreaks': [serialize_microbreak(break_obj) for break_obj in upcoming]})
 
 
 def custom_password_reset(request):

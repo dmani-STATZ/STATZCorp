@@ -58,4 +58,18 @@ urlpatterns = [
     
     # Debug URLs
     path('debug/auth-config/', DebugAuthView.as_view(), name='debug_auth_config'),
+
+    # Portal APIs
+    path('portal/dashboard/', views.portal_dashboard_data, name='portal_dashboard_data'),
+    path('portal/sections/', views.portal_sections_api, name='portal_sections_api'),
+    path('portal/sections/<int:section_id>/delete/', views.portal_section_delete, name='portal_section_delete'),
+    path('portal/resources/upsert/', views.portal_resource_upsert, name='portal_resource_upsert'),
+    path('portal/resources/<int:resource_id>/delete/', views.portal_resource_delete, name='portal_resource_delete'),
+    path('portal/tasks/create/', views.portal_task_create, name='portal_task_create'),
+    path('portal/events/create/', views.portal_event_create, name='portal_event_create'),
+    path('portal/events/feed/', views.portal_event_feed, name='portal_event_feed'),
+    path('portal/events/<int:event_id>/delete/', views.portal_event_delete, name='portal_event_delete'),
+    path('portal/nlp-schedule/', views.portal_nlp_schedule, name='portal_nlp_schedule'),
+    path('portal/microbreaks/create/', views.portal_microbreak_create, name='portal_microbreak_create'),
+    path('portal/microbreaks/feed/', views.portal_microbreak_feed, name='portal_microbreak_feed'),
 ] 
