@@ -1,4 +1,7 @@
 from django import forms
+from django.core.validators import URLValidator
+from django.core.exceptions import ValidationError
+from django.forms.models import construct_instance
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from .models import (
@@ -71,6 +74,9 @@ class PortalSectionForm(BaseModelForm):
 
 
 class PortalResourceForm(BaseModelForm):
+    # Allow non-HTTP schemes like mailto:, tel:, etc. at the form level
+    external_url = forms.CharField(required=False)
+
     class Meta:
         model = PortalResource
         fields = [
@@ -84,6 +90,54 @@ class PortalResourceForm(BaseModelForm):
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def clean_external_url(self):
+        value = (self.cleaned_data.get('external_url') or '').strip()
+        # Determine intended resource type from cleaned_data or raw data
+        rtype = (self.cleaned_data.get('resource_type')
+                 or self.data.get('resource_type')
+                 or '').strip().lower()
+
+        if rtype == 'link':
+            if not value:
+                raise ValidationError('External URL is required for link resources.')
+            # Permit common non-HTTP schemes explicitly
+            allowed_prefixes = (
+                'mailto:', 'tel:', 'sms:', 'callto:', 'skype:', 'teams:', 'msteams:'
+            )
+            if value.startswith(allowed_prefixes):
+                return value
+            # Otherwise validate as a standard URL (http/https/ftp etc.)
+            validator = URLValidator()
+            validator(value)
+            return value
+
+        # Not a link resource; leave as provided
+        return value
+
+    def _post_clean(self):
+        """
+        Override to skip model-level URLField validation for external_url, since
+        we allow additional schemes (mailto:, tel:, etc.) at the form level.
+        """
+        opts = self._meta
+        # Sync form data to instance
+        self.instance = construct_instance(self, self.instance, opts.fields, opts.exclude)
+
+        # Run model validation excluding external_url so the model URLField
+        # validator does not reject non-HTTP schemes. We already validated it.
+        try:
+            exclude = self._get_validation_exclusions()
+            exclude.add('external_url')
+            self.instance.full_clean(exclude=exclude, validate_unique=False)
+        except ValidationError as e:
+            self._update_errors(e)
+
+        # Validate uniqueness separately as Django normally does
+        try:
+            self.instance.validate_unique()
+        except ValidationError as e:
+            self._update_errors(e)
 
 
 class WorkCalendarTaskForm(BaseModelForm):

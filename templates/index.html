@@ -4,90 +4,96 @@
 <div class="bg-white rounded-lg p-6 dark:bg-gray-800 dark:text-gray-100">
     <h1 class="text-2xl font-semibold mb-6">Welcome to STATZ Corporation Portal</h1>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- HR Documents Section -->
-        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow">
-            <h2 class="text-xl font-medium mb-4 text-gray-800">HR Resources</h2>
-            <ul class="space-y-2">
-                <li>
-                    <a href="#" 
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Employee Handbook
-                    </a>
-                </li>
-                <li>
-                    <a href="https://statzcorp.sharepoint.com/Shared%20Documents/Helpful%20Files/Statz%20Corp%20Contact%20List.pdf" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Phone Tree
-                    </a>
-                </li>
-            </ul>
-        </div>
+    <div class="mb-4 flex justify-between items-center">
+        <h2 class="text-xl font-medium text-gray-800">Resources</h2>
+        {% if user.is_superuser %}
+        <button onclick="toggleNewSection()" class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+            New Section
+        </button>
+        {% endif %}
+    </div>
 
-        <!-- Common Forms Section -->
-        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow">
-            <h2 class="text-xl font-medium mb-4 text-gray-800">Common Forms</h2>
-            <ul class="space-y-2">
-                <li>
-                    <a href="https://statzcorp.sharepoint.com/Shared%20Documents/Helpful%20Files/R36%20Employee%20Time%20Off%20Request.docx?d=wc653271ab0344b8ba9f5f7609b581df1" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Time Off Request Form
-                    </a>
-                </li>
-            </ul>
-        </div>
+    {% if user.is_superuser %}
+    <div id="newSectionForm" class="hidden mb-6 p-4 border rounded-lg bg-gray-50">
+        <form onsubmit="return addSection(event)">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600">Title</label>
+                    <input name="title" class="w-full border rounded p-2" required />
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm text-gray-600">Description</label>
+                    <input name="description" class="w-full border rounded p-2" />
+                </div>
+            </div>
+            <div class="mt-3 flex gap-2">
+                <button type="submit" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">Create</button>
+                <button type="button" onclick="toggleNewSection(false)" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
 
-        <!-- IT Support Section -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="portalSections">
+        {% for section in portal_context.sections %}
         <div class="p-4 border rounded-lg hover:shadow-md transition-shadow">
-            <h2 class="text-xl font-medium mb-4 text-gray-800">IT Support</h2>
-            <ul class="space-y-2">
-                <li>
-                    <a href="mailto:support@capital-data.com?subject=STATZ Help Request" 
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Submit Help Desk Ticket
-                    </a>
-                </li>
-                <li>
-                    <a href="https://statzcorp.sharepoint.com/Shared%20Documents/Helpful%20Files/Installing%20and%20Configureing%20VMWare%20Horizon.docx?d=w989b217e4c0f44a88d89201372716327" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Setting up VM Horizon
-                    </a>
-                </li>
-                <li>
-                    <a href="https://statzcorp.sharepoint.com/:w:/g/Ebju5J7af6RFpab8ZpGfvfYBOeHX1Q6S6TPdIcderF6FOg" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Sharing Files securely with SharePoint
-                    </a>
-                </li>
-                <li>
-                    <a href="https://statzcorp.sharepoint.com/Shared%20Documents/Helpful%20Files/Setting%20Up%20Private%20Print%20In%20Windows%2011.docx?d=wcdba3986de714d4694267f2ed6bdea7a" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
-                        </svg>
-                        Setting Up Private Print In Windows 11
-                    </a>
-                </li>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">{{ section.title }}</h3>
+                    {% if section.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ section.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2">
+                    {% if user.is_superuser %}
+                    <button title="Delete Section" onclick="deleteSection({{ section.id }})" class="text-red-600 hover:text-red-800">
+                        &#128465;
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <ul class="space-y-2 mt-4">
+                {% if section.resources %}
+                    {% for res in section.resources %}
+                    <li class="flex items-center justify-between">
+                        <a href="{{ res.url }}" target="_blank" class="text-blue-600 hover:text-blue-800 flex-1">
+                            {{ res.title }}
+                        </a>
+                        {% if section.can_edit and user.is_superuser %}
+                        <button title="Remove" onclick="deleteResource({{ res.id }})" class="ml-2 text-xs text-red-600 hover:text-red-800">Remove</button>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="text-sm text-gray-500">No resources yet.</li>
+                {% endif %}
             </ul>
+
+            {% if section.can_edit %}
+            {% if user.is_superuser %}
+            <div class="mt-4 border-t pt-3">
+                <details>
+                    <summary class="cursor-pointer text-sm text-gray-700 hover:text-gray-900">Add Link here</summary>
+                    <form class="mt-2" onsubmit="return addLink(event, {{ section.id }})">
+                        {% csrf_token %}
+                        <input type="hidden" name="section" value="{{ section.id }}" />
+                        <input type="hidden" name="resource_type" value="link" />
+                        <div class="grid grid-cols-1 gap-2">
+                            <input name="title" placeholder="Link title" class="border rounded p-2" required />
+                            <input name="external_url" placeholder="https://example.com or mailto:support@example.com?subject=Hello" class="border rounded p-2" type="text" required />
+                        </div>
+                        <div class="mt-2">
+                            <button type="submit" class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Add Link this</button>
+                        </div>
+                    </form>
+                </details>
+            </div>
+            {% endif %}
+            {% endif %}
         </div>
+        {% endfor %}
     </div>
 
     <!-- Announcements Section -->
@@ -152,9 +158,130 @@
 
             if (response.ok) {
                 window.location.reload();
+            } else {
+                let msg = 'Failed to post announcement.';
+                try {
+                    const data = await response.json();
+                    if (data && (data.error || data.errors)) {
+                        msg = (data.error || JSON.stringify(data.errors));
+                    }
+                } catch(_) {}
+                alert(msg);
             }
         } catch (error) {
             console.error('Error:', error);
+            alert('Unexpected error posting announcement.');
+        }
+    }
+
+    // Toggle New Section form
+    function toggleNewSection(forceState) {
+        const el = document.getElementById('newSectionForm');
+        if (!el) return;
+        if (typeof forceState === 'boolean') {
+            el.classList.toggle('hidden', !forceState);
+        } else {
+            el.classList.toggle('hidden');
+        }
+    }
+
+    // Create a new section (admin only)
+    async function addSection(event) {
+        event.preventDefault();
+        const form = event.target;
+        const title = form.querySelector('[name="title"]').value.trim();
+        const description = form.querySelector('[name="description"]').value.trim();
+        if (!title) return false;
+        try {
+            const resp = await fetch("{% url 'users:portal_sections_api' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ title, description })
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                console.error('Failed to create section');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        return false;
+    }
+
+    // Delete a section (admin only)
+    async function deleteSection(sectionId) {
+        if (!confirm('Delete this section and all of its resources?')) return;
+        try {
+            const resp = await fetch(`{% url 'users:portal_section_delete' 0 %}`.replace('/0/', `/${sectionId}/`), {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                console.error('Failed to delete section');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Add a link resource to a section
+    async function addLink(event, sectionId) {
+        event.preventDefault();
+        const form = event.target;
+        const fd = new FormData(form);
+        fd.set('section', sectionId);
+        fd.set('resource_type', 'link');
+        // Light normalization for mailto: subjects with spaces
+        const rawUrl = fd.get('external_url');
+        if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('mailto:')) {
+            fd.set('external_url', rawUrl.replace(/\s/g, '%20'));
+        }
+        try {
+            const resp = await fetch("{% url 'users:portal_resource_upsert' %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: fd
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                let msg = 'Failed to add link.';
+                try {
+                    const data = await resp.json();
+                    if (data && (data.error || data.errors)) {
+                        msg = data.error || JSON.stringify(data.errors);
+                    }
+                } catch(_) {}
+                alert(msg);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Unexpected error adding link.');
+        }
+        return false;
+    }
+
+    // Delete a resource
+    async function deleteResource(resourceId) {
+        if (!confirm('Remove this resource?')) return;
+        try {
+            const resp = await fetch(`{% url 'users:portal_resource_delete' 0 %}`.replace('/0/', `/${resourceId}/`), {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                console.error('Failed to delete resource');
+            }
+        } catch (e) {
+            console.error(e);
         }
     }
 </script>
@@ -166,6 +293,14 @@
             <h3 class="text-lg leading-6 font-medium text-gray-900">Add New Announcement</h3>
             <form onsubmit="submitAnnouncement(event)" class="mt-4">
                 {% csrf_token %}
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="title">
+                        Title
+                    </label>
+                    <input name="title" 
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                           type="text" required />
+                </div>
                 <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-bold mb-2" for="content">
                         Announcement Content

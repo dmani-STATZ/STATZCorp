@@ -915,8 +915,9 @@ def portal_sections_api(request):
         sections = [serialize_section(section, request.user) for section in get_visible_sections(request.user)]
         return JsonResponse({'sections': sections})
 
-    if not _is_portal_admin(request.user):
-        return JsonResponse({'error': 'Only portal admins can modify sections.'}, status=403)
+    # Only superusers can create/update sections
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'Only superusers can modify sections.'}, status=403)
 
     data = _request_data(request)
     instance = None
@@ -951,8 +952,9 @@ def portal_sections_api(request):
 @require_http_methods(["POST"])
 def portal_section_delete(request, section_id):
     """Delete an existing portal section."""
-    if not _is_portal_admin(request.user):
-        return JsonResponse({'error': 'Only portal admins can delete sections.'}, status=403)
+    # Only superusers can delete sections
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'Only superusers can delete sections.'}, status=403)
     section = get_object_or_404(PortalSection, pk=section_id)
     section.delete()
     return JsonResponse({'success': True})
@@ -980,6 +982,14 @@ def portal_resource_upsert(request):
     if not _is_section_editor(request.user, section):
         return JsonResponse({'error': 'You do not have permission to manage this section.'}, status=403)
 
+    # Enforce that only superusers can add/update file-type resources
+    requested_type = (data.get('resource_type') or '').strip().lower()
+    is_file_upload = (requested_type == 'file') or (bool(files) and ('file' in files))
+    if instance and getattr(instance, 'resource_type', '') == 'file':
+        is_file_upload = True
+    if is_file_upload and not request.user.is_superuser:
+        return JsonResponse({'error': 'Only superusers can add or modify file resources.'}, status=403)
+
     payload = data.copy() if isinstance(data, QueryDict) else dict(data)
     if isinstance(payload, QueryDict):
         payload = payload.copy()
@@ -1002,8 +1012,13 @@ def portal_resource_upsert(request):
 def portal_resource_delete(request, resource_id):
     """Delete a portal resource."""
     resource = get_object_or_404(PortalResource, pk=resource_id)
-    if not _is_section_editor(request.user, resource.section):
-        return JsonResponse({'error': 'You do not have permission to delete this resource.'}, status=403)
+    # File resources can be deleted by superusers only; others follow section editor rules
+    if resource.resource_type == 'file':
+        if not request.user.is_superuser:
+            return JsonResponse({'error': 'Only superusers can delete file resources.'}, status=403)
+    else:
+        if not _is_section_editor(request.user, resource.section):
+            return JsonResponse({'error': 'You do not have permission to delete this resource.'}, status=403)
     resource.delete()
     return JsonResponse({'success': True})
 
