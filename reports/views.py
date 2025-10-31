@@ -274,7 +274,7 @@ def admin_ai_stream(request):
     sys_prompt = (
         "You are a helpful SQL assistant. You write safe, read-only SQL for our database. "
         "Return exactly one SELECT statement; no comments or explanations. Avoid multiple statements. "
-        "Never join by human-readable names; use foreign keys and id columns only."
+        "Never join by human-readable names; use foreign keys and id columns only.  Avoid using variables in the SQL query. The use of variables is not allowed."
     )
     usr_prompt = (
         f"SQL dialect: {dialect}. {date_rules} {limit_hint}\n\n"

@@ -4,7 +4,12 @@
 
 {% block body %}
 <div class="container mx-auto px-4 reports-scope">
-  <h1 class="text-2xl font-semibold text-gray-900 dark:text-white mt-4 mb-6">My Reports</h1>
+  <div class="flex items-center justify-between mt-4 mb-6">
+    <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">My Reports</h1>
+    {% if user.is_superuser %}
+      <a href="{% url 'reports:admin_dashboard' %}" class="px-3 py-2 rounded bg-blue-600 text-white">Open Admin Workspace</a>
+    {% endif %}
+  </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
     <div>
