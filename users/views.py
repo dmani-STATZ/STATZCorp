@@ -42,6 +42,7 @@ from django.urls import resolve, reverse
 import logging
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import user_passes_test
 import json
 from .user_settings import UserSettings
 from django.contrib.auth import get_user_model
@@ -1413,3 +1414,179 @@ def custom_password_reset(request):
         'form': form,
     }
     return render(request, 'users/custom_password_reset.html', context)
+def _import_sharepoint_xlsx_core(workbook, organizer):
+    from django.utils import timezone as dj_tz
+    ws = workbook.active
+    # Map headers
+    headers = {}
+    for idx, cell in enumerate(next(ws.iter_rows(min_row=1, max_row=1, values_only=True)), start=1):
+        key = (str(cell) if cell is not None else '').strip().lower()
+        headers[key] = idx
+    def col(name):
+        return headers.get(name.lower())
+    required = ['start date', 'end date', 'title']
+    if not all(h.lower() in headers for h in required):
+        raise ValueError('Missing required headers. Need: Start Date, End Date, Title')
+
+    created = 0
+    errors = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        try:
+            raw_title = row[col('title')-1] if col('title') else ''
+            title = (raw_title or '').strip()
+            if not title:
+                continue
+            s = row[col('start date')-1] if col('start date') else None
+            e = row[col('end date')-1] if col('end date') else None
+            # Optional fields
+            all_day_col = col('all day event') or col('all day')
+            all_day_val = (row[all_day_col-1] if all_day_col else None)
+            category_col = col('category') or col('categories')
+            category_val = (row[category_col-1] if category_col else None)
+
+            from datetime import datetime, timedelta, time, date
+            if s is None:
+                continue
+            if isinstance(s, date) and not isinstance(s, datetime):
+                s = datetime.combine(s, time(0,0,0))
+            # Detect all-day: either explicit or date-only values
+            is_all_day = False
+            if all_day_val is not None:
+                is_all_day = str(all_day_val).strip().lower() in ('1','true','yes','y')
+            if e is None:
+                if is_all_day:
+                    e = s.replace(hour=23, minute=59, second=0)
+                else:
+                    e = s + timedelta(hours=1)
+            elif isinstance(e, date) and not isinstance(e, datetime):
+                # SharePoint exports often give date-only for all day
+                e = datetime.combine(e, time(23,59,0))
+                is_all_day = True
+
+            if dj_tz.is_naive(s):
+                s = dj_tz.make_aware(s, dj_tz.get_current_timezone())
+            if dj_tz.is_naive(e):
+                e = dj_tz.make_aware(e, dj_tz.get_current_timezone())
+            if e <= s:
+                e = s + timedelta(minutes=30)
+
+            # Map category to kind
+            kind = 'meeting'
+            cat = (str(category_val).lower() if category_val else '')
+            if any(k in cat for k in ['holiday', 'wfh', 'work from home', 'vacation', 'sick', 'personal']):
+                kind = 'personal'
+            elif 'training' in cat:
+                kind = 'training'
+            elif 'travel' in cat:
+                kind = 'travel'
+            elif 'focus' in cat:
+                kind = 'focus'
+
+            ev = WorkCalendarEvent(
+                title=title,
+                description='',
+                kind=kind,
+                start_at=s,
+                end_at=e,
+                organizer=organizer,
+                priority='normal',
+                is_private=False,
+            )
+            ev.full_clean()
+            ev.save()
+            created += 1
+        except Exception:
+            errors += 1
+    return created, errors
+
+
+@login_required
+@require_http_methods(["POST"])
+def portal_import_sharepoint_xlsx(request):
+    """Import SharePoint calendar export (XLSX) via API. Returns JSON counts."""
+    from openpyxl import load_workbook
+    from io import BytesIO
+    import os
+
+    f = request.FILES.get('file') if hasattr(request, 'FILES') else None
+    try:
+        if f:
+            wb = load_workbook(filename=BytesIO(f.read()), data_only=True)
+        else:
+            path = os.path.join(os.path.dirname(__file__), 'AllItems.xlsx')
+            if not os.path.exists(path):
+                return JsonResponse({'error': 'No file uploaded and default AllItems.xlsx not found.'}, status=400)
+            wb = load_workbook(filename=path, data_only=True)
+        created, errors = _import_sharepoint_xlsx_core(wb, request.user)
+        return JsonResponse({'imported': created, 'skipped': errors})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+def _is_staff(user):
+    return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser))
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_http_methods(["GET", "POST"])
+def sharepoint_import_ui(request):
+    """Simple staff UI to upload a SharePoint XLSX and import events."""
+    context = {'result': None, 'error': None, 'title': 'Import Calendar (SharePoint XLSX)'}
+    if request.method == 'POST':
+        try:
+            from openpyxl import load_workbook
+            from io import BytesIO
+            f = request.FILES.get('file')
+            if not f:
+                context['error'] = 'Please choose an .xlsx file.'
+            else:
+                wb = load_workbook(filename=BytesIO(f.read()), data_only=True)
+                created, errors = _import_sharepoint_xlsx_core(wb, request.user)
+                context['result'] = {'imported': created, 'skipped': errors}
+        except Exception as e:
+            context['error'] = str(e)
+    return render(request, 'users/import_sharepoint.html', context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_events_export_csv(request):
+    """Export events as CSV for the visible range or all if not provided.
+    Exposes only non-private events plus the user's own private events.
+    """
+    import csv
+    from django.http import HttpResponse
+    start_param = request.GET.get('start')
+    end_param = request.GET.get('end')
+    from django.db.models import Q
+    qs = WorkCalendarEvent.objects.select_related('organizer').all()
+    visibility = Q(is_private=False) | Q(organizer=request.user)
+    qs = qs.filter(visibility)
+    if start_param and end_param:
+        try:
+            start_dt = _parse_datetime_string(start_param)
+            end_dt = _parse_datetime_string(end_param)
+            qs = qs.filter(end_at__gte=start_dt, start_at__lte=end_dt)
+        except Exception:
+            pass
+    qs = qs.order_by('start_at')
+
+    resp = HttpResponse(content_type='text/csv')
+    resp['Content-Disposition'] = 'attachment; filename="events_export.csv"'
+    writer = csv.writer(resp)
+    writer.writerow(['id','title','start','end','all_day','kind','location','is_private','organizer'])
+    for ev in qs:
+        all_day = (ev.start_at.hour == 0 and ev.end_at.hour == 23 and ev.end_at.minute >= 59)
+        writer.writerow([
+            ev.id,
+            ev.title,
+            ev.start_at.isoformat(),
+            ev.end_at.isoformat(),
+            'true' if all_day else 'false',
+            ev.kind,
+            ev.location,
+            'true' if ev.is_private else 'false',
+            ev.organizer.get_full_name() or ev.organizer.username,
+        ])
+    return resp

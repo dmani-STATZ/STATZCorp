@@ -6,15 +6,16 @@
     
     <div class="mb-4 flex justify-between items-center">
         <h2 class="text-xl font-medium text-gray-800">Resources</h2>
-        {% if user.is_superuser %}
-        <button onclick="toggleNewSection()" class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-            New Section
-        </button>
-        {% endif %}
+        <div class="flex items-center gap-2">
+            {% if user.is_superuser %}
+            <button id="adminToggleBtn" onclick="toggleAdminMode()" class="px-3 py-1 text-sm border rounded hover:bg-gray-100">Admin: OFF</button>
+            <button onclick="toggleNewSection()" class="admin-ui px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">New Section</button>
+            {% endif %}
+        </div>
     </div>
 
     {% if user.is_superuser %}
-    <div id="newSectionForm" class="hidden mb-6 p-4 border rounded-lg bg-gray-50">
+    <div id="newSectionForm" class="admin-ui hidden mb-6 p-4 border rounded-lg bg-gray-50">
         <form onsubmit="return addSection(event)">
             {% csrf_token %}
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -47,7 +48,7 @@
                 </div>
                 <div class="flex gap-2">
                     {% if user.is_superuser %}
-                    <button title="Delete Section" onclick="deleteSection({{ section.id }})" class="text-red-600 hover:text-red-800">
+                    <button title="Delete Section" onclick="deleteSection({{ section.id }})" class="admin-ui text-red-600 hover:text-red-800">
                         &#128465;
                     </button>
                     {% endif %}
@@ -62,7 +63,7 @@
                             {{ res.title }}
                         </a>
                         {% if section.can_edit and user.is_superuser %}
-                        <button title="Remove" onclick="deleteResource({{ res.id }})" class="ml-2 text-xs text-red-600 hover:text-red-800">Remove</button>
+                        <button title="Remove" onclick="deleteResource({{ res.id }})" class="admin-ui ml-2 text-xs text-red-600 hover:text-red-800">Remove</button>
                         {% endif %}
                     </li>
                     {% endfor %}
@@ -73,9 +74,9 @@
 
             {% if section.can_edit %}
             {% if user.is_superuser %}
-            <div class="mt-4 border-t pt-3">
+            <div class="admin-ui mt-4 border-t pt-3">
                 <details>
-                    <summary class="cursor-pointer text-sm text-gray-700 hover:text-gray-900">Add Link here</summary>
+                    <summary class="cursor-pointer text-sm text-gray-700 hover:text-gray-900">Add Link</summary>
                     <form class="mt-2" onsubmit="return addLink(event, {{ section.id }})">
                         {% csrf_token %}
                         <input type="hidden" name="section" value="{{ section.id }}" />
@@ -99,13 +100,21 @@
     <!-- Calendar Section -->
     <div class="mt-8 p-4 border rounded-lg">
         <div class="flex items-center justify-between mb-2">
-            <h2 class="text-xl font-medium text-gray-800">Calendar</h2>
+            <div class="flex items-center gap-3">
+                <h2 class="text-xl font-medium text-gray-800 cursor-pointer select-none" onclick="toggleCalendarMenu()">Calendar</h2>
+                <button type="button" onclick="openAddEventModal()" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Add Event</button>
+                <div id="calendarMenu" class="hidden ml-2 text-sm">
+                    {% if user.is_staff or user.is_superuser %}
+                    <a href="{% url 'users:sharepoint_import_ui' %}" class="px-2 py-1 border rounded hover:bg-gray-100 mr-2">Import from SharePoint</a>
+                    {% endif %}
+                    <a id="calendarExportLink" href="{% url 'users:portal_events_export_csv' %}" class="px-2 py-1 border rounded hover:bg-gray-100">Export CSV</a>
+                </div>
+            </div>
             <div class="flex items-center gap-2">
                 <button type="button" onclick="changeMonth(-1)" class="px-2 py-1 border rounded hover:bg-gray-100">Prev</button>
                 <div id="calendarMonthLabel" class="text-gray-600 min-w-[10rem] text-center"></div>
                 <button type="button" onclick="changeMonth(1)" class="px-2 py-1 border rounded hover:bg-gray-100">Next</button>
                 <button type="button" onclick="goToToday()" class="px-2 py-1 border rounded hover:bg-gray-100">Today</button>
-                <button type="button" onclick="openAddEventModal()" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Add Event</button>
             </div>
         </div>
         <div class="grid grid-cols-7 text-xs font-medium text-gray-500 mb-2">
@@ -295,6 +304,28 @@
 
 {% block extra_scripts %}
 <script>
+
+    // --- Admin Toggle (superuser only) ---
+    (function initAdminToggle(){
+        {% if user.is_superuser %}
+        const mode = localStorage.getItem('adminMode') || 'off';
+        setAdminMode(mode === 'on');
+        {% endif %}
+    })();
+
+    function setAdminMode(on){
+        const btn = document.getElementById('adminToggleBtn');
+        if (btn) btn.textContent = `Admin: ${on ? 'ON' : 'OFF'}`;
+        document.querySelectorAll('.admin-ui').forEach(el => {
+            el.style.display = on ? '' : 'none';
+        });
+        localStorage.setItem('adminMode', on ? 'on' : 'off');
+    }
+
+    function toggleAdminMode(){
+        const cur = localStorage.getItem('adminMode') || 'off';
+        setAdminMode(!(cur === 'on'));
+    }
 
     // Function to show modal
     function showAddAnnouncementModal() {
@@ -583,6 +614,7 @@
             renderCalendarFor(calendarPointer);
             fetchAndPaintEvents(calendarPointer);
             fetchAndPaintContractCounts(calendarPointer);
+            updateExportLink(calendarPointer);
         } catch (e) {
             console.error('Calendar render error', e);
         }
@@ -595,6 +627,7 @@
         renderCalendarFor(calendarPointer);
         fetchAndPaintEvents(calendarPointer);
         fetchAndPaintContractCounts(calendarPointer);
+        updateExportLink(calendarPointer);
     }
 
     async function fetchAndPaintEvents(date) {
@@ -641,28 +674,28 @@
                     }
                     const icon = styles.icon ? styles.icon + ' ' : '';
                     const lock = ev.is_private ? '🔒 ' : '';
-                    const prefix = ev.organizer_name ? (ev.organizer_name + ' - ') : '';
+                    const prefix = '';
                     let label;
                     let sortKey;
                     if (segStart) {
                         if (ev.all_day) {
-                            label = `${lock}${icon}${prefix}${ev.title}`;
+                            label = `${lock}${icon}${ev.title}`;
                             sortKey = '00:00';
                         } else {
                             const time = new Date(ev.start);
                             const hh = String(time.getHours()).padStart(2,'0');
                             const mm = String(time.getMinutes()).padStart(2,'0');
-                            label = `${lock}${icon}${hh}:${mm} ${prefix}${ev.title}`;
+                            label = `${lock}${icon}${hh}:${mm} ${ev.title}`;
                             sortKey = `${hh}:${mm}`;
                         }
                     } else if (segEnd && !ev.all_day) {
                         const time = new Date(ev.end);
                         const hh = String(time.getHours()).padStart(2,'0');
                         const mm = String(time.getMinutes()).padStart(2,'0');
-                        label = `${lock}${icon}${prefix}${ev.title} (${hh}:${mm})`;
+                        label = `${lock}${icon}${ev.title} (${hh}:${mm})`;
                         sortKey = `${hh}:${mm}`;
                     } else {
-                        label = `${lock}${icon}${prefix}${ev.title}`;
+                        label = `${lock}${icon}${ev.title}`;
                         sortKey = '00:00';
                     }
 
@@ -762,6 +795,26 @@
         renderCalendarFor(calendarPointer);
         fetchAndPaintEvents(calendarPointer);
         fetchAndPaintContractCounts(calendarPointer);
+        updateExportLink(calendarPointer);
+    }
+
+    function toggleCalendarMenu() {
+        const menu = document.getElementById('calendarMenu');
+        if (menu) menu.classList.toggle('hidden');
+    }
+
+    function updateExportLink(date) {
+        const link = document.getElementById('calendarExportLink');
+        if (!link) return;
+        const y = date.getFullYear();
+        const m = date.getMonth();
+        const start = new Date(y, m, 1, 0, 0, 0);
+        const end = new Date(y, m + 1, 0, 23, 59, 59);
+        function toISO(dt){
+            const tz = dt.getTimezoneOffset() * 60000; return new Date(dt.getTime() - tz).toISOString().slice(0,19);
+        }
+        const base = `{% url 'users:portal_events_export_csv' %}`;
+        link.href = `${base}?start=${encodeURIComponent(toISO(start))}&end=${encodeURIComponent(toISO(end))}`;
     }
 
     function styleForEvent(ev) {
@@ -887,13 +940,14 @@
         const sel = document.getElementById('eventCategory');
         const title = document.getElementById('eventTitle');
         if (!sel || !title) return;
+        // Always editable; prefill when choosing preset if empty
+        title.readOnly = false;
         if (sel.value === 'custom') {
-            title.readOnly = false;
-            title.value = '';
-            title.placeholder = 'Event title';
+            if (!title.value) title.placeholder = 'Event title';
         } else {
-            title.readOnly = true;
-            title.value = sel.value;
+            if (!title.value || title.value === 'Event title') {
+                title.value = sel.value;
+            }
         }
     }
 
