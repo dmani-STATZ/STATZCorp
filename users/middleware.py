@@ -20,47 +20,48 @@ class ActiveCompanyMiddleware(MiddlewareMixin):
         if not user or not user.is_authenticated:
             return
 
-        # Try session company first
-        company_id = request.session.get("active_company_id")
         company = None
 
-        if company_id:
-            try:
-                company = Company.objects.get(pk=company_id, is_active=True)
-            except Company.DoesNotExist:
-                company = None
+        # 1) Prefer persisted user setting as the canonical source
+        try:
+            setting_val = UserSettings.get_setting(user, "current_company_id", default=None)
+            if isinstance(setting_val, str) and setting_val.isdigit():
+                setting_company_id = int(setting_val)
+            else:
+                setting_company_id = setting_val
 
-            # Enforce membership unless superuser
-            if company and not user.is_superuser:
-                if not UserCompanyMembership.objects.filter(user=user, company=company).exists():
+            if setting_company_id:
+                try:
+                    candidate = Company.objects.get(pk=setting_company_id, is_active=True)
+                    if user.is_superuser or UserCompanyMembership.objects.filter(user=user, company=candidate).exists():
+                        company = candidate
+                        request.session["active_company_id"] = candidate.id
+                except Company.DoesNotExist:
+                    pass
+        except Exception:
+            # Ignore settings errors; fall back as usual
+            pass
+
+        # 2) If no valid setting, try session company
+        if not company:
+            company_id = request.session.get("active_company_id")
+            if company_id:
+                try:
+                    company = Company.objects.get(pk=company_id, is_active=True)
+                except Company.DoesNotExist:
                     company = None
 
-            if not company:
-                # Clean invalid session value
-                request.session.pop("active_company_id", None)
+                # Enforce membership unless superuser
+                if company and not user.is_superuser:
+                    if not UserCompanyMembership.objects.filter(user=user, company=company).exists():
+                        company = None
 
-        # If no valid company from session, try persisted user setting
-        if not company:
-            try:
-                setting_val = UserSettings.get_setting(user, "current_company_id", default=None)
-                # Normalize to int if possible
-                if isinstance(setting_val, str) and setting_val.isdigit():
-                    setting_company_id = int(setting_val)
+                if not company:
+                    # Clean invalid session value
+                    request.session.pop("active_company_id", None)
                 else:
-                    setting_company_id = setting_val
-
-                if setting_company_id:
-                    try:
-                        candidate = Company.objects.get(pk=setting_company_id, is_active=True)
-                        # Enforce membership unless superuser
-                        if user.is_superuser or UserCompanyMembership.objects.filter(user=user, company=candidate).exists():
-                            company = candidate
-                            request.session["active_company_id"] = candidate.id
-                    except Company.DoesNotExist:
-                        pass
-            except Exception:
-                # Ignore settings errors; fall back as usual
-                pass
+                    # Sync setting to match a valid session value
+                    UserSettings.save_setting(user, "current_company_id", company.id, setting_type="integer", description="User's currently selected company")
 
         # Fallbacks: default membership -> any membership -> default company
         if not company:
