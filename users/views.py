@@ -392,6 +392,17 @@ def switch_company(request):
             return redirect(next_url)
 
     request.session['active_company_id'] = company.id
+    # Persist selection in user settings for stability across sessions
+    try:
+        UserSettings.save_setting(
+            user=request.user,
+            name='current_company_id',
+            value=company.id,
+            setting_type='integer',
+            description="User's currently selected company"
+        )
+    except Exception:
+        pass
     messages.success(request, f'Active company set to {company.name}.')
     return redirect(next_url)
 
