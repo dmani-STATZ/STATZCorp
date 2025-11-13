@@ -49,6 +49,7 @@
                                 <span class="sr-only">Copy Link</span>
                             </button>
                             <a href="{% url 'training:arctic_wolf_email_preview' course.slug %}?audience=STATZ" target="_blank" class="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1 px-2 rounded">Create Email</a>
+                            <a href="{% url 'training:arctic_wolf_email_eml' course.slug %}?audience=STATZ" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-2 rounded">Download EML</a>
                             <button class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded" onclick="copySubjectFor('{{ course.slug }}')">Copy Subject</button>
                             <button class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded" onclick="copyBodyFor('{{ course.slug }}')">Copy Body</button>
                         </div>

@@ -11,6 +11,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Count, Q
 from django.utils.text import get_valid_filename
+from django.template.loader import render_to_string
+from django.conf import settings
 
 from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
 from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion
@@ -424,6 +426,46 @@ def arctic_wolf_email_preview(request, slug):
         'subject': f"Today's Security Awareness Session: {course.name}",
     }
     return render(request, 'training/arctic_wolf_email.html', context)
+
+
+@login_required
+def arctic_wolf_email_eml(request, slug):
+    """Generate a downloadable .eml file for the given course using the HTML body template.
+    The EML is a simple message with Subject and HTML body, leaving To/From blank
+    so Outlook can fill as appropriate when opened.
+    """
+    from email.message import EmailMessage
+    from email.utils import formatdate, make_msgid
+    from email.policy import SMTP
+
+    course = get_object_or_404(ArcticWolfCourse, slug=slug)
+    path = reverse('training:arctic_wolf_training_completion', kwargs={'slug': course.slug})
+    full_link = request.build_absolute_uri(path)
+    audience = request.GET.get('audience') or 'Team'
+
+    subject = f"Today's Security Awareness Session: {course.name}"
+    html = render_to_string('training/arctic_wolf_email_body.html', {
+        'course': course,
+        'full_link': full_link,
+        'audience': audience,
+    })
+
+    msg = EmailMessage(policy=SMTP)
+    msg['Subject'] = subject
+    # optionally set From if defined in settings
+    default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+    if default_from:
+        msg['From'] = default_from
+    msg['Date'] = formatdate(localtime=True)
+    msg['Message-ID'] = make_msgid(domain=None)
+    msg.set_content("This message contains HTML content. Please view in an HTML-capable client.")
+    msg.add_alternative(html, subtype='html')
+
+    eml_bytes = msg.as_bytes()
+    filename = f"aw-session-{course.slug}.eml"
+    response = HttpResponse(eml_bytes, content_type='message/rfc822')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 @login_required
 def admin_cmmc_upload(request):
