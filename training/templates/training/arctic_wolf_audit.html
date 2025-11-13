@@ -9,6 +9,9 @@
     }
     thead {
         background-color: transparent;
+        position: sticky;
+        top: 0;
+        z-index: 20;
     }
     tbody {
         background-color: transparent;
@@ -46,18 +49,47 @@
     tr {
         background-color: transparent;
     }
+
+    /* Sticky first column */
+    tbody td:first-child, thead th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        background: #fff;
+    }
+
+    /* Zebra rows for readability */
+    tbody tr:nth-child(odd) td { background-color: #fafafa; }
+    tbody tr:nth-child(even) td { background-color: #ffffff; }
+    tbody tr td.bg-green-200 { background-color: #bbf7d0 !important; }
+    tbody tr td.bg-red-200 { background-color: #fecaca !important; }
+
+    .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; }
+    .legend .done { background: #22c55e; }
+    .legend .todo { background: #ef4444; }
 </style>
 
 
     <div>
-        <h1 class="text-2xl font-bold mb-4">Arctic Wolf Training Audit</h1>
+        <h1 class="text-2xl font-bold mb-2">Arctic Wolf Training Audit</h1>
+        <div class="flex items-center justify-between mb-3 text-sm">
+            <div class="legend">
+                <span class="done"></span> Completed
+                <span class="ml-4 todo"></span> Not Completed
+            </div>
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-1"><input type="checkbox" id="toggle-incomplete-only"> Show only incomplete courses</label>
+                <label class="inline-flex items-center gap-1"><input type="checkbox" id="toggle-users-incomplete-only"> Show only users with incomplete</label>
+                <button id="copy-audit" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded">Copy Table</button>
+            </div>
+        </div>
         <div style="overflow: auto;"> 
             <table>
                 <thead>
                     <tr>
                         <th style="vertical-align: bottom; width: 150px;">Employee</th>
                         {% for course in courses %}
-                        <th>
+                        <th data-course-id="{{ course.id }}" class="{% if course.id in overdue_course_ids %} ring-2 ring-yellow-400 {% endif %}">
                             <div class="rotated-header">{{ course.name }}</div>
                         </th>
                         {% endfor %}
@@ -67,10 +99,10 @@
                 <tbody>
                     {% for user_data in audit_data %}
                     <tr>
-                        <td>{{ user_data.user.first_name }}&nbsp;{{ user_data.user.last_name }}</td>
+                        <td class="font-medium bg-white">{{ user_data.user.first_name }}&nbsp;{{ user_data.user.last_name }}</td>
                         {% for course in courses %}
                             {% with completed_date=user_data.courses|get_item:course.id %}
-                                <td class="{% if completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %}">
+                                <td data-course-id="{{ course.id }}" class="{% if completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %}">
                                     {% if completed_date %}
                                         <span class="text-xs block">{{ completed_date|date:"n/j/Y" }}</span>
                                     {% endif %}
@@ -85,4 +117,54 @@
             </table>
         </div>
     </div>
+    <script>
+        (function(){
+            const usersCount = {{ users_count|default:0 }};
+            const colCounts = JSON.parse('{{ column_completed_counts|safe|escapejs }}'.replaceAll("'", '"'));
+            const table = document.querySelector('table');
+            const toggleCourses = document.getElementById('toggle-incomplete-only');
+            const toggleUsers = document.getElementById('toggle-users-incomplete-only');
+            const copyBtn = document.getElementById('copy-audit');
+
+            function updateVisibility(){
+                const showIncompleteColsOnly = toggleCourses.checked;
+                const showUsersIncompleteOnly = toggleUsers.checked;
+
+                // Columns
+                const ths = table.querySelectorAll('thead th[data-course-id]');
+                ths.forEach(th => {
+                    const id = th.getAttribute('data-course-id');
+                    const full = (colCounts[id] || 0) >= usersCount;
+                    const show = !showIncompleteColsOnly || !full;
+                    th.style.display = show ? '' : 'none';
+                });
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    let userHasIncomplete = false;
+                    row.querySelectorAll('td[data-course-id]').forEach(td => {
+                        const id = td.getAttribute('data-course-id');
+                        const full = (colCounts[id] || 0) >= usersCount;
+                        const showCol = !showIncompleteColsOnly || !full;
+                        td.style.display = showCol ? '' : 'none';
+                        if (showCol && td.classList.contains('bg-red-200')) userHasIncomplete = true;
+                    });
+                    row.style.display = (!showUsersIncompleteOnly || userHasIncomplete) ? '' : 'none';
+                });
+            }
+            toggleCourses?.addEventListener('change', updateVisibility);
+            toggleUsers?.addEventListener('change', updateVisibility);
+            updateVisibility();
+
+            copyBtn?.addEventListener('click', () => {
+                const range = document.createRange();
+                range.selectNode(table);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                document.execCommand('copy');
+                sel.removeAllRanges();
+                alert('Audit table copied');
+            });
+        })();
+    </script>
 {% endblock %}

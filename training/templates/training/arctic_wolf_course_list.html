@@ -4,17 +4,39 @@
 
 {% block body %}
     <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">Arctic Wolf Training Courses</h1>
+        <h1 class="text-2xl font-bold mb-2">Arctic Wolf Training Courses</h1>
+        <div class="mb-4 p-4 bg-white shadow rounded border border-gray-100">
+            <div class="flex flex-wrap items-center justify-between">
+                <div>
+                    <div class="text-sm text-gray-600">Overall completion</div>
+                    <div class="text-xl font-semibold">{{ total_completed }} / {{ total_possible }} <span class="text-sm text-gray-500">({{ avg_completion_pct }}%)</span></div>
+                </div>
+                <div class="text-sm text-gray-600">Courses: {{ total_courses }} &middot; Staff: {{ staff_total }}</div>
+            </div>
+            <div class="mt-2 h-2 w-full bg-gray-200 rounded">
+                <div class="h-2 bg-blue-600 rounded" style="width: {{ avg_completion_pct }}%"></div>
+            </div>
+        </div>
         <ul>
             {% for course in courses %}
                 <li class="py-3 border-b border-gray-200">
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="font-semibold text-lg">{{ course.name }}</div>
+                            <div class="font-semibold text-lg">
+                                {{ course.name }}
+                                {% if course.id in new_course_ids %}
+                                    <span class="ml-2 inline-block text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full align-middle">New</span>
+                                {% endif %}
+                            </div>
                             <div class="text-sm text-gray-600">
                                 Created: {{ course.created_at|date:"Y-m-d" }}
                                 &middot;
                                 Completed: {{ completed_counts|get_item:course.id|default:0 }} / {{ staff_total }}
+                            </div>
+                            <div class="mt-1 h-1.5 w-64 bg-gray-200 rounded">
+                                {% with pct=completed_counts|get_item:course.id|percentage:staff_total %}
+                                <div class="h-1.5 bg-blue-600 rounded" style="width: {{ pct }}%"></div>
+                                {% endwith %}
                             </div>
                         </div>
                         <div class="flex items-center">

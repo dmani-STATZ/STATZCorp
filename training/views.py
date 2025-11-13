@@ -264,8 +264,8 @@ def add_arctic_wolf_course(request):
     return render(request, 'training/add_arctic_wolf_course.html', {'form': form})
 
 def arctic_wolf_course_list(request):
-    # Courses list
-    courses = ArcticWolfCourse.objects.all().order_by('name')
+    # Courses list (most recent first)
+    courses = ArcticWolfCourse.objects.all().order_by('-created_at', 'name')
 
     # Count staff completions per course safely
     staff_completed = (
@@ -287,11 +287,25 @@ def arctic_wolf_course_list(request):
         path = reverse('training:arctic_wolf_training_completion', kwargs={'slug': course.slug})
         full_links[course.slug] = request.build_absolute_uri(path)
 
+    # Summary metrics and "new" marker
+    now = timezone.now()
+    new_since = now - timezone.timedelta(days=14)
+    new_course_ids = {c.id for c in courses if c.created_at and c.created_at >= new_since}
+    total_courses = len(courses)
+    total_possible = staff_total * total_courses if staff_total and total_courses else 0
+    total_completed = sum(completed_counts.get(c.id, 0) for c in courses)
+    avg_completion_pct = round((total_completed / total_possible) * 100) if total_possible else 0
+
     context = {
         'courses': courses,
         'full_links': full_links,
         'staff_total': staff_total,
         'completed_counts': completed_counts,
+        'total_courses': total_courses,
+        'total_possible': total_possible,
+        'total_completed': total_completed,
+        'avg_completion_pct': avg_completion_pct,
+        'new_course_ids': new_course_ids,
     }
     return render(request, 'training/arctic_wolf_course_list.html', context)
 
@@ -316,7 +330,7 @@ def arctic_wolf_complete_training(request, slug):
 
 @login_required
 def user_arctic_wolf_courses(request):
-    courses = ArcticWolfCourse.objects.all().order_by('name')
+    courses = ArcticWolfCourse.objects.all().order_by('-created_at', 'name')
     completions = ArcticWolfCompletion.objects.filter(user=request.user).select_related('course')
     completed_courses = {completion.course_id: completion.completed_date for completion in completions}
     return render(request, 'training/user_arctic_wolf_courses.html', {
@@ -358,7 +372,8 @@ def arctic_wolf_audit(request):
     recent_ids = list(recent_courses.values_list('id', flat=True))
     older_ids = [cid for cid in older_ids_all if older_counts_map.get(cid, 0) < staff_count]
     all_ids = list({*recent_ids, *older_ids})
-    courses = ArcticWolfCourse.objects.filter(id__in=all_ids).order_by('name')
+    # Order audit courses most recent first
+    courses = ArcticWolfCourse.objects.filter(id__in=all_ids).order_by('-created_at', 'name')
     active_users = staff_users.order_by('username')
     audit_data = []
 
@@ -369,9 +384,22 @@ def arctic_wolf_audit(request):
             user_data['courses'][course.id] = completed.completed_date if completed else None
         audit_data.append(user_data)
 
+    # Per-course completion counts for UI (to hide fully complete columns if desired)
+    column_completed_counts = {
+        course.id: ArcticWolfCompletion.objects.filter(
+            user__in=active_users,
+            course=course,
+            completed_date__isnull=False,
+        ).count()
+        for course in courses
+    }
+
     context = {
         'courses': courses,
         'audit_data': audit_data,
+        'users_count': active_users.count(),
+        'overdue_course_ids': older_ids,
+        'column_completed_counts': column_completed_counts,
     }
     return render(request, 'training/arctic_wolf_audit.html', context)
 
