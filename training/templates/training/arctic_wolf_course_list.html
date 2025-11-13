@@ -7,17 +7,29 @@
         <h1 class="text-2xl font-bold mb-4">Arctic Wolf Training Courses</h1>
         <ul>
             {% for course in courses %}
-                <li class="flex items-center justify-between py-2 border-b border-gray-200">
-                    <span>{{ course.name }}</span>
-                    <div>
-                        <a href="{{ full_links|get_item:course.slug }}" target="_blank" class="text-blue-500 hover:underline mr-2">View Link</a>
-                        <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline"
-                                onclick="copyLink('{{ full_links|get_item:course.slug }}')">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block align-middle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M8 5a2 2 0 002-2h4a2 2 0 012 2M8 5a2 2 0 012-2h4a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 3H10m0 0h6m0 0v6" />
-                            </svg>
-                            <span class="sr-only">Copy Link</span>
-                        </button>
+                <li class="py-3 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-semibold text-lg">{{ course.name }}</div>
+                            <div class="text-sm text-gray-600">
+                                Created: {{ course.created_at|date:"Y-m-d" }}
+                                &middot;
+                                Completed: {{ completed_counts|get_item:course.id|default:0 }} / {{ staff_total }}
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <a href="{{ full_links|get_item:course.slug }}" target="_blank" class="text-blue-500 hover:underline mr-2">View Link</a>
+                            <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline"
+                                    onclick="copyLink('{{ full_links|get_item:course.slug }}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block align-middle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M8 5a2 2 0 002-2h4a2 2 0 012 2M8 5a2 2 0 012-2h4a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 3H10m0 0h6m0 0v6" />
+                                </svg>
+                                <span class="sr-only">Copy Link</span>
+                            </button>
+                            <a href="{% url 'training:arctic_wolf_email_preview' course.slug %}?audience=STATZ" target="_blank" class="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1 px-2 rounded">Create Email</a>
+                            <button class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded" onclick="copySubjectFor('{{ course.slug }}')">Copy Subject</button>
+                            <button class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded" onclick="copyBodyFor('{{ course.slug }}')">Copy Body</button>
+                        </div>
                     </div>
                 </li>
             {% empty %}
@@ -30,6 +42,51 @@
     </div>
 
     <script>
+        const audienceDefault = 'STATZ';
+        async function fetchPreviewDoc(slug) {
+            const url = `${window.location.origin}{% url 'training:arctic_wolf_email_preview' 'SLUG_PLACEHOLDER' %}`.replace('SLUG_PLACEHOLDER', slug) + `?audience=${encodeURIComponent(audienceDefault)}`;
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Failed to load preview');
+            const html = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            return doc;
+        }
+
+        async function copySubjectFor(slug) {
+            try {
+                const doc = await fetchPreviewDoc(slug);
+                const subject = (doc.querySelector('title')?.textContent || '').trim();
+                if (!subject) throw new Error('Subject not found');
+                await navigator.clipboard.writeText(subject);
+                alert('Subject copied');
+            } catch (e) {
+                console.error(e);
+                alert('Could not copy subject');
+            }
+        }
+
+        async function copyBodyFor(slug) {
+            try {
+                const doc = await fetchPreviewDoc(slug);
+                const root = doc.querySelector('#email-root');
+                if (!root) throw new Error('Email body not found');
+                const html = root.outerHTML;
+                if (navigator.clipboard && window.ClipboardItem) {
+                    const blob = new Blob([html], { type: 'text/html' });
+                    const item = new ClipboardItem({ 'text/html': blob });
+                    await navigator.clipboard.write([item]);
+                } else {
+                    // Fallback: copy as plain text
+                    await navigator.clipboard.writeText(html);
+                }
+                alert('Email body copied');
+            } catch (e) {
+                console.error(e);
+                alert('Could not copy body');
+            }
+        }
+
         function copyLink(text) {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text).then(function() {

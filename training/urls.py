@@ -18,5 +18,6 @@ urlpatterns = [
     path('arctic-wolf/complete/<slug:slug>/submit/', views.arctic_wolf_complete_training, name='arctic_wolf_complete_training'),
     path('my-courses/', views.user_arctic_wolf_courses, name='user_arctic_wolf_courses'), 
     path('arctic-wolf/audit/', views.arctic_wolf_audit, name='arctic_wolf_audit'),
+    path('arctic-wolf/email/<slug:slug>/', views.arctic_wolf_email_preview, name='arctic_wolf_email_preview'),
     path('admin/cmmc-upload/', views.admin_cmmc_upload, name='admin_cmmc_upload'),
 ]

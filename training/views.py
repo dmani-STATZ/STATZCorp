@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
+from django.db.models import Count, Q
 from django.utils.text import get_valid_filename
 
 from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
@@ -263,12 +264,36 @@ def add_arctic_wolf_course(request):
     return render(request, 'training/add_arctic_wolf_course.html', {'form': form})
 
 def arctic_wolf_course_list(request):
+    # Courses list
     courses = ArcticWolfCourse.objects.all().order_by('name')
+
+    # Count staff completions per course safely
+    staff_completed = (
+        ArcticWolfCompletion.objects
+        .filter(
+            user__is_active=True,
+            user__is_staff=True,
+            completed_date__isnull=False,
+        )
+        .values('course_id')
+        .annotate(c=Count('id'))
+    )
+    completed_counts = {row['course_id']: row['c'] for row in staff_completed}
+
+    staff_total = User.objects.filter(is_active=True, is_staff=True).count()
+
     full_links = {}
     for course in courses:
         path = reverse('training:arctic_wolf_training_completion', kwargs={'slug': course.slug})
         full_links[course.slug] = request.build_absolute_uri(path)
-    return render(request, 'training/arctic_wolf_course_list.html', {'courses': courses, 'full_links': full_links})
+
+    context = {
+        'courses': courses,
+        'full_links': full_links,
+        'staff_total': staff_total,
+        'completed_counts': completed_counts,
+    }
+    return render(request, 'training/arctic_wolf_course_list.html', context)
 
 
 def arctic_wolf_training_completion(request, slug):
@@ -304,22 +329,40 @@ def user_arctic_wolf_courses(request):
 def arctic_wolf_audit(request):
     six_months_ago = timezone.now().date() - timezone.timedelta(days=6 * 30)  # Approximate 6 months
 
-    # Get courses added in the last 6 months
+    # Reference set: active staff users only (AW applies to staff)
+    staff_users = User.objects.filter(is_active=True, is_staff=True)
+    staff_count = staff_users.count()
+
+    # Courses added in the last 6 months are always shown
     recent_courses = ArcticWolfCourse.objects.filter(created_at__date__gte=six_months_ago)
 
-    # Get older courses that are missing by at least one active user
-    all_active_users = User.objects.filter(is_active=True)
-    older_courses = ArcticWolfCourse.objects.filter(created_at__date__lt=six_months_ago).exclude(
-        arcticwolfcompletion__user__in=all_active_users,
-        arcticwolfcompletion__completed_date__isnull=False
-    ).distinct()
+    # Older courses: include only those where not all active staff completed
+    older_courses = list(ArcticWolfCourse.objects.filter(created_at__date__lt=six_months_ago))
+    older_ids_all = [c.id for c in older_courses]
+    if older_ids_all:
+        older_completion_counts = (
+            ArcticWolfCompletion.objects
+            .filter(
+                course_id__in=older_ids_all,
+                user__is_active=True,
+                user__is_staff=True,
+                completed_date__isnull=False,
+            )
+            .values('course_id')
+            .annotate(c=Count('id'))
+        )
+        older_counts_map = {row['course_id']: row['c'] for row in older_completion_counts}
+    else:
+        older_counts_map = {}
 
-    courses = recent_courses.union(older_courses).order_by('name')
-    active_users = User.objects.filter(is_active=True, is_staff=True).order_by('username')
+    recent_ids = list(recent_courses.values_list('id', flat=True))
+    older_ids = [cid for cid in older_ids_all if older_counts_map.get(cid, 0) < staff_count]
+    all_ids = list({*recent_ids, *older_ids})
+    courses = ArcticWolfCourse.objects.filter(id__in=all_ids).order_by('name')
+    active_users = staff_users.order_by('username')
     audit_data = []
 
     for user in active_users:
-        user_completions = ArcticWolfCompletion.objects.filter(user=user).values_list('course_id', flat=True)
         user_data = {'user': user, 'courses': {}}
         for course in courses:
             completed = ArcticWolfCompletion.objects.filter(user=user, course=course).first()
@@ -331,6 +374,28 @@ def arctic_wolf_audit(request):
         'audit_data': audit_data,
     }
     return render(request, 'training/arctic_wolf_audit.html', context)
+
+
+@login_required
+def arctic_wolf_email_preview(request, slug):
+    """Render a preview of the email to send to users for a given course.
+    This mimics the Arctic Wolf email, but uses our completion link and
+    replaces the Start CTA with a Sign CTA.
+    """
+    course = get_object_or_404(ArcticWolfCourse, slug=slug)
+    path = reverse('training:arctic_wolf_training_completion', kwargs={'slug': course.slug})
+    full_link = request.build_absolute_uri(path)
+
+    # Optional audience name in greeting (defaults to Team)
+    audience = request.GET.get('audience') or 'Team'
+
+    context = {
+        'course': course,
+        'full_link': full_link,
+        'audience': audience,
+        'subject': f"Today's Security Awareness Session: {course.name}",
+    }
+    return render(request, 'training/arctic_wolf_email.html', context)
 
 @login_required
 def admin_cmmc_upload(request):
