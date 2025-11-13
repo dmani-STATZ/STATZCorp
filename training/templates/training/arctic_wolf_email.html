@@ -35,6 +35,7 @@
             <!-- Utility actions for the preview page only (not part of email) -->
             <div class="inner actions" id="preview-actions">
                 <span class="muted">Preview tools:</span>
+                <a href="{% url 'training:arctic_wolf_email_eml' course.slug %}?audience={{ audience|urlencode }}" class="action-btn" style="text-decoration:none; display:inline-block;">Download EML</a>
                 <button class="action-btn" onclick="copySubject()">Copy Subject</button>
                 <button class="action-btn" onclick="copyHtml()">Copy HTML</button>
             </div>

@@ -451,6 +451,9 @@ def arctic_wolf_email_eml(request, slug):
     })
 
     msg = EmailMessage(policy=SMTP)
+    # Hint Outlook to open this .eml as a new, unsent draft instead of a received message
+    msg['X-Unsent'] = '1'
+    msg['Content-Class'] = 'urn:content-classes:message'
     msg['Subject'] = subject
     # optionally set From if defined in settings
     default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
@@ -458,7 +461,36 @@ def arctic_wolf_email_eml(request, slug):
         msg['From'] = default_from
     msg['Date'] = formatdate(localtime=True)
     msg['Message-ID'] = make_msgid(domain=None)
-    msg.set_content("This message contains HTML content. Please view in an HTML-capable client.")
+    # Plain-text alternative for compatibility
+    plain_text = (
+        f"Hello {audience},\n"
+        f"It's time for another security awareness session.\n"
+        f"Today's session is: {course.name}\n"
+        f"Duration: Less than 5 minutes\n"
+        f"We appreciate your participation in the program. Keeping everyone up to date with these topics is very important to our cybersecurity.\n"
+        f"When you're ready, click the \"Sign\" link:\n{full_link}\n\n"
+        f"Thank you,\n"
+        f"Arctic Wolf Managed Security Awareness Team\n\n"
+        f"---\n\n"
+        f"Hola {audience},\n"
+        f"Es hora de otra sesion de concienciacion sobre seguridad.\n"
+        f"La sesion de hoy es: {course.name}\n"
+        f"Duracion: Less than 5 minutes\n"
+        f"Agradecemos su participacion en el programa. Mantener a todos al dia sobre estos temas es muy importante para nuestra seguridad cibernetica.\n"
+        f"Cuando este listo, haga clic en el enlace \"Sign\":\n{full_link}\n\n"
+        f"Muchas gracias,"
+        f"Arctic Wolf Managed Security Awareness Team\n\n"
+        f"---\n\n"
+        f"Hallo {audience},\n"
+        f"Es ist Zeit fuer eine weitere Schulung zum Thema 'Security Awareness'.\n"
+        f"Das heutige Thema heisst: {course.name}\n"
+        f"Dauer: Less than 5 minutes\n"
+        f"Wir freuen uns ueber Ihre Teilnahme. Es ist fuer unsere IT-Sicherheit sehr wichtig, dass alle ueber diese Themen auf dem Laufenden sind.\n"
+        f"Klicken Sie jetzt auf den Link 'Sign', wenn Sie bereit sind:\n{full_link}\n\n"
+        f"Vielen Dank,"
+        f"Arctic Wolf Managed Security Awareness Team\n"
+    )
+    msg.set_content(plain_text)
     msg.add_alternative(html, subtype='html')
 
     eml_bytes = msg.as_bytes()
