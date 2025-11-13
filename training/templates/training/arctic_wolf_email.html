@@ -49,80 +49,104 @@
                                 <tr>
                                     <td style="padding:24px;">
                                         <div style="font-size:12px; text-align:right; margin-bottom:12px;">
-                                            <a href="#" style="color:#1f2937; text-decoration:none;">Espanol</a> | <a href="#" style="color:#1f2937; text-decoration:none;">Deutsch</a>
+                                            <a href="#Spanish" style="color:#1f2937; text-decoration:none;">Espanol</a> | <a href="#German" style="color:#1f2937; text-decoration:none;">Deutsch</a>
                                         </div>
 
                                         <!-- English -->
-                                        <p style="margin:0 0 12px 0;">Hello {{ audience }},</p>
-                                        <p style="margin:0 0 12px 0;">It's time for another security awareness session.</p>
-                                        <p style="margin:0 0 12px 0;">Today's session is: <span style="font-weight:bold;">{{ course.name }}</span></p>
-                                        <p style="margin:0 0 12px 0;">Duration: <span style="font-weight:bold;">Less than 5 minutes</span></p>
-                                        <p style="margin:0 0 12px 0; color:#444444;">We appreciate your participation in the program. Keeping everyone up to date with these topics is very important to our cybersecurity.</p>
-                                        <p style="margin:0 0 12px 0;">When you're ready, click the "Sign" button:</p>
+                                        <p style="margin:0;">Hello {{ audience }},</p>
+                                        <br>
+                                        <p style="margin:0;">It's time for another security awareness session.</p>
+                                        <br>
+                                        <p style="margin:0;">Today's session is: <span style="font-weight:bold;">{{ course.name }}</span></p>
+                                        <br>
+                                        <p style="margin:0;">Duration: <span style="font-weight:bold;">Less than 5 minutes</span></p>
+                                        <br>
+                                        <p style="margin:0; color:#444444;">We appreciate your participation in the program. Keeping everyone up to date with these topics is very important to our cybersecurity.</p>
+                                        <br>
+                                        <p style="margin:0;">When you're ready, click the "Sign" button:</p>
+                                        <br>
 
                                         <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:40px;v-text-anchor:middle;width:120px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:20px;v-text-anchor:middle;width:60px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
                                           <w:anchorlock/>
                                           <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;">Sign</center>
                                         </v:roundrect>
                                         <![endif]-->
                                         <!--[if !mso]><!-- -->
-                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:10px 18px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold;">
+                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:5px 9px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold;">
                                             <span style="color:#ffffff; text-decoration:none;">Sign</span>
                                         </a>
                                         <!--<![endif]-->
+                                        <br><br>
 
-                                        <p style="margin:16px 0 12px 0;">Thank you,</p>
-                                        <p style="margin:0 0 12px 0; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
+                                        <p style="margin:0;">Thank you,</p>
+                                        <br>
+                                        <p style="margin:0; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
 
                                         <hr style="border:0; height:1px; background:#e5e5e5; margin:24px 0;">
 
                                         <!-- Spanish -->
-                                        <p style="margin:0 0 12px 0;">Hola {{ audience }},</p>
-                                        <p style="margin:0 0 12px 0;">Es hora de otra sesion de concienciacion sobre seguridad.</p>
-                                        <p style="margin:0 0 12px 0;">La sesion de hoy es: <span style="font-weight:bold;">{{ course.name }}</span></p>
-                                        <p style="margin:0 0 12px 0;">Duracion: <span style="font-weight:bold;">Less than 5 minutes</span></p>
-                                        <p style="margin:0 0 12px 0; color:#444444;">Agradecemos su participacion en el programa. Mantener a todos al dia sobre estos temas es muy importante para nuestra seguridad cibernetica.</p>
-                                        <p style="margin:0 0 12px 0;">Cuando este listo, haga clic en el boton "Sign":</p>
+                                        <p style="margin:0;" id="Spanish">Hola {{ audience }},</p>
+                                        <br>
+                                        <p style="margin:0;">Es hora de otra sesion de concienciacion sobre seguridad.</p>
+                                        <br>
+                                        <p style="margin:0;">La sesion de hoy es: <span style="font-weight:bold;">{{ course.name }}</span></p>
+                                        <br>
+                                        <p style="margin:0;">Duracion: <span style="font-weight:bold;">Less than 5 minutes</span></p>
+                                        <br>
+                                        <p style="margin:0; color:#444444;">Agradecemos su participacion en el programa. Mantener a todos al dia sobre estos temas es muy importante para nuestra seguridad cibernetica.</p>
+                                        <br>
+                                        <p style="margin:0;">Cuando este listo, haga clic en el boton "Sign":</p>
+                                        <br>
 
                                         <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:40px;v-text-anchor:middle;width:120px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:20px;v-text-anchor:middle;width:60px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
                                           <w:anchorlock/>
                                           <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;">Sign</center>
                                         </v:roundrect>
                                         <![endif]-->
                                         <!--[if !mso]><!-- -->
-                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:10px 18px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold;">
+                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:5px 9px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold;">
                                             <span style="color:#ffffff; text-decoration:none;">Sign</span>
                                         </a>
                                         <!--<![endif]-->
+                                        <br><br>
 
-                                        <p style="margin:16px 0 12px 0;">Muchas gracias,</p>
-                                        <p style="margin:0 0 12px 0; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
+                                        <p style="margin:0;">Muchas gracias,</p>
+                                        <br>
+                                        <p style="margin:0; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
 
                                         <hr style="border:0; height:1px; background:#e5e5e5; margin:24px 0;">
 
                                         <!-- German -->
-                                        <p style="margin:0 0 12px 0;">Hallo {{ audience }},</p>
-                                        <p style="margin:0 0 12px 0;">Es ist Zeit fuer eine weitere Schulung zum Thema "Security Awareness".</p>
-                                        <p style="margin:0 0 12px 0;">Das heutige Thema heisst: <span style="font-weight:bold;">{{ course.name }}</span></p>
-                                        <p style="margin:0 0 12px 0;">Dauer: <span style="font-weight:bold;">Less than 5 minutes</span></p>
-                                        <p style="margin:0 0 12px 0; color:#444444;">Wir freuen uns ueber Ihre Teilnahme. Es ist fuer unsere IT-Sicherheit sehr wichtig, dass alle ueber diese Themen auf dem Laufenden sind.</p>
-                                        <p style="margin:0 0 12px 0;">Klicken Sie jetzt auf "Sign", wenn Sie bereit sind:</p>
+                                        <p style="margin:0;" id="German">Hallo {{ audience }},</p>
+                                        <br>
+                                        <p style="margin:0;">Es ist Zeit fuer eine weitere Schulung zum Thema "Security Awareness".</p>
+                                        <br>
+                                        <p style="margin:0;">Das heutige Thema heisst: <span style="font-weight:bold;">{{ course.name }}</span></p>
+                                        <br>
+                                        <p style="margin:0;">Dauer: <span style="font-weight:bold;">Less than 5 minutes</span></p>
+                                        <br>
+                                        <p style="margin:0; color:#444444;">Wir freuen uns ueber Ihre Teilnahme. Es ist fuer unsere IT-Sicherheit sehr wichtig, dass alle ueber diese Themen auf dem Laufenden sind.</p>
+                                        <br>
+                                        <p style="margin:0;">Klicken Sie jetzt auf "Sign", wenn Sie bereit sind:</p>
+                                        <br>
 
                                         <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:40px;v-text-anchor:middle;width:120px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:20px;v-text-anchor:middle;width:60px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
                                           <w:anchorlock/>
                                           <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;">Sign</center>
                                         </v:roundrect>
                                         <![endif]-->
                                         <!--[if !mso]><!-- -->
-                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:10px 18px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold;">
+                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:15px 9px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold;">
                                             <span style="color:#ffffff; text-decoration:none;">Sign</span>
                                         </a>
                                         <!--<![endif]-->
+                                        <br><br>
 
-                                        <p style="margin:16px 0 0 0;">Vielen Dank,</p>
+                                        <p style="margin:0;">Vielen Dank,</p>
+                                        <br>
                                         <p style="margin:0; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
                                     </td>
                                 </tr>
