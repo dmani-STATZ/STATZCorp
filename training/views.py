@@ -455,10 +455,7 @@ def arctic_wolf_email_eml(request, slug):
     msg['X-Unsent'] = '1'
     msg['Content-Class'] = 'urn:content-classes:message'
     msg['Subject'] = subject
-    # optionally set From if defined in settings
-    default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
-    if default_from:
-        msg['From'] = default_from
+    # Intentionally do NOT set From; Outlook will use the current user's account
     msg['Date'] = formatdate(localtime=True)
     msg['Message-ID'] = make_msgid(domain=None)
     # Plain-text alternative for compatibility
