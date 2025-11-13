@@ -1,0 +1,49 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'td_now/style.css' %}">
+{% endblock extra_head %}
+
+{% block body %}
+<div class="td-container">
+  <h2 class="td-title">TD Now</h2>
+  <div class="td-ui">
+    <button id="start-button" class="td-btn">Start Wave</button>
+    <span>Money: <span id="money">0</span></span>
+    <span>Lives: <span id="lives">0</span></span>
+    <span>Wave: <span id="wave">0</span></span>
+  </div>
+  <div class="td-layout">
+    <div class="td-left">
+      <canvas id="game-canvas" width="960" height="640"></canvas>
+      <div id="stage-overlay" style="position:relative;">
+        <div id="stage-msg" style="position:absolute; top:20px; left:20px; right:20px; background:#0b1220; color:#e5e7eb; border:1px solid #374151; border-radius:.25rem; padding:.75rem; display:none;">
+          <div id="stage-msg-text" style="margin-bottom:.5rem; white-space:pre-line;"></div>
+          <button id="stage-continue" class="td-btn">Continue</button>
+        </div>
+        <div id="debug-box" style="margin-top:.5rem; background:#0b1220; color:#e5e7eb; border:1px solid #374151; border-radius:.25rem; padding:.5rem; font-size:12px; display:none; white-space:pre-line;"></div>
+      </div>
+      <div class="td-help">Select a tower, then click a build spot to place it.</div>
+      <div id="td-message" class="td-message" hidden></div>
+    </div>
+    <aside class="td-right">
+      <div class="td-panel">
+        <div class="td-panel-title">Towers</div>
+        <div id="tower-list" class="td-tower-list"></div>
+        <div class="td-note">Locked/upgrade states coming soon.</div>
+      </div>
+      <div class="td-panel" style="margin-top:.75rem;">
+        <div class="td-panel-title">Selected Tower</div>
+        <div id="sel-info" class="td-sel-info">None</div>
+        <button id="upgrade-btn" class="td-btn td-upgrade-btn" disabled>Upgrade</button>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'td_now/main.js' %}?v={{ cache_version }}"></script>
+{% endblock extra_scripts %}

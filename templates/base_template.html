@@ -159,7 +159,7 @@
             <div class="text-xs text-gray-400 mr-4">
                 <span title="Full version info: {{ detailed_version }}">{{ display_version }}</span>
                 {% if version_info.build_number %}
-                <br><span class="text-xs text-gray-500">Build: {{ version_info.build_number }}</span>
+                <br><span class="text-xs text-gray-500 cursor-pointer" id="build-number">Build: {{ version_info.build_number }}</span>
                 {% endif %}
             </div>
             
@@ -293,6 +293,23 @@
         }
     </script>
     <script src="{% static 'js/theme_toggle.js' %}"></script>
+    <script>
+        // Secret entry: click the build number 5 times to open TD Now
+        (function(){
+            const el = document.getElementById('build-number');
+            if (!el) return;
+            let clicks = 0;
+            let timer = null;
+            el.addEventListener('click', function(){
+                clicks += 1;
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(() => { clicks = 0; }, 4000);
+                if (clicks >= 5) {
+                    window.location.href = '/td-now/';
+                }
+            });
+        })();
+    </script>
     {% if user.is_authenticated %}
     <script>
         window.CURRENT_USER_ID = "{{ user.id }}";

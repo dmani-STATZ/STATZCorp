@@ -1,0 +1,60 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'td_now/style.css' %}">
+<style>
+  .cb-wrap { max-width: 1100px; margin: 1rem auto; color: #111827; }
+  .cb-panel { background: #0b1220; border: 1px solid #1f2937; border-radius: .25rem; padding: .75rem; color: #e5e7eb; }
+  .cb-title { font-size: 1.25rem; margin-bottom: .5rem; }
+  .cb-flex { display: flex; gap: 1rem; }
+  .cb-field { margin-bottom: .5rem; display: flex; align-items: center; gap: .5rem; }
+  .cb-field label { width: 120px; font-size: .9rem; color: #cbd5e1; }
+  .cb-field input, .cb-field select, .cb-field textarea { flex: 1 1 auto; padding: .35rem .45rem; background: #0f172a; color: #e5e7eb; border: 1px solid #374151; border-radius: .25rem; }
+  .cb-stages { margin-top: .75rem; display: flex; flex-direction: column; gap: .75rem; }
+  .stage { border: 1px solid #374151; border-radius: .25rem; padding: .5rem; background: #0f172a; }
+  .stage h4 { margin: 0 0 .5rem 0; color: #e5e7eb; }
+  .stage-tools { display: flex; gap: .5rem; margin-bottom: .5rem; flex-wrap: wrap; }
+  .waves { display: flex; flex-direction: column; gap: .5rem; }
+  .wave { border: 1px dashed #374151; border-radius: .25rem; padding: .5rem; background: #0b1220; }
+  .groups { display: flex; flex-direction: column; gap: .25rem; }
+  .group { display: grid; grid-template-columns: 1fr 80px 100px 100px auto; gap: .35rem; align-items: center; }
+  .btn { background: #2563eb; color: white; padding: .35rem .6rem; border-radius: .25rem; cursor: pointer; }
+  .btn.gray { background: #6b7280; }
+  .btn.green { background: #10b981; }
+  .btn.red { background: #ef4444; }
+  .cb-actions { margin-top: .75rem; display: flex; gap: .5rem; }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="cb-wrap">
+  <div class="cb-title">TD Now - Campaign Builder</div>
+  <div class="cb-panel">
+    <div class="cb-field">
+      <label for="cb-name">Campaign Name</label>
+      <input id="cb-name" type="text" value="New Campaign">
+    </div>
+    <div class="cb-flex">
+      <div class="cb-field" style="flex:1;">
+        <label for="cb-money">Start Money</label>
+        <input id="cb-money" type="number" value="200">
+      </div>
+      <div class="cb-field" style="flex:1;">
+        <label for="cb-lives">Start Lives</label>
+        <input id="cb-lives" type="number" value="20">
+      </div>
+    </div>
+    <div class="cb-stages" id="cb-stages"></div>
+    <div class="cb-actions">
+      <button class="btn" id="add-stage">Add Stage</button>
+      <button class="btn green" id="save-campaign">Save Campaign</button>
+    </div>
+  </div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'td_now/campaign_builder.js' %}?v={{ cache_version }}"></script>
+{% endblock extra_scripts %}

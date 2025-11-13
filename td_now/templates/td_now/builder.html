@@ -1,0 +1,88 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'td_now/style.css' %}">
+<style>
+  .builder-wrap { max-width: 1280px; margin: 1rem auto; color: #111827; }
+  .builder-grid { display: flex; gap: 1rem; align-items: flex-start; }
+  .builder-left { flex: 1 1 auto; min-width: 0; }
+  .builder-right { flex: 0 0 260px; position: sticky; top: 16px; }
+  .builder-panel { background: #0b1220; border: 1px solid #1f2937; border-radius: .25rem; padding: .5rem; color: #e5e7eb; }
+  .builder-panel h3 { font-weight: 600; color: #cbd5e1; margin-bottom: .5rem; }
+  .builder-field { margin-bottom: .5rem; display: flex; align-items: center; gap: .5rem; }
+  .builder-field label { width: 90px; color: #cbd5e1; font-size: .85rem; }
+  .builder-field input[type=number], .builder-field input[type=text] { width: 100%; padding: .25rem .35rem; background: #0f172a; color: #e5e7eb; border: 1px solid #374151; border-radius: .25rem; }
+  .builder-tools { display: flex; gap: .5rem; margin-bottom: .5rem; flex-wrap: wrap; }
+  .builder-tools .tool { background: #0f172a; border: 1px solid #374151; color: #e5e7eb; padding: .25rem .5rem; border-radius: .25rem; cursor: pointer; }
+  .builder-tools .tool.active { outline: 2px solid #10b981; }
+  .builder-actions { display: flex; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+  .builder-actions .btn { background: #2563eb; color: white; padding: .35rem .6rem; border-radius: .25rem; }
+  .btn { background: #2563eb; color: white; padding: .35rem .6rem; border-radius: .25rem; cursor:pointer; }
+  .btn.gray { background: #6b7280; }
+  .builder-stats { color: #cbd5e1; font-size: .85rem; margin-top: .5rem; }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="builder-wrap">
+  <h2 class="td-title">TD Now - Map Builder</h2>
+  <div class="builder-grid">
+    <div class="builder-left">
+      <div style="display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem;">
+        <label style="color:#334155;">Load Map</label>
+        <select id="builder-load" style="padding:.25rem .35rem; background:#0f172a; color:#e5e7eb; border:1px solid #374151; border-radius:.25rem;"></select>
+        <button id="builder-load-btn" class="btn">Load</button>
+        <button id="builder-reset-btn" class="btn gray">New</button>
+      </div>
+      <canvas id="builder-canvas" width="960" height="640" style="background:#111827;border:1px solid #374151;display:block;"></canvas>
+      <div class="td-help">Tools: Path adds ordered path tiles (click order). Build adds tower spots. Erase removes. Drag to paint.</div>
+    </div>
+    <aside class="builder-right">
+      <div class="builder-panel">
+        <h3>Map Settings</h3>
+        <div class="builder-field">
+          <label for="map-name">Name</label>
+          <input id="map-name" type="text" value="New Map">
+        </div>
+        <div class="builder-field">
+          <label for="map-width">Width</label>
+          <input id="map-width" type="number" min="5" max="80" value="30">
+        </div>
+        <div class="builder-field">
+          <label for="map-height">Height</label>
+          <input id="map-height" type="number" min="5" max="60" value="20">
+        </div>
+
+        <div class="builder-tools">
+          <button class="tool active" data-tool="path">Path</button>
+          <button class="tool" data-tool="build">Build</button>
+          <button class="tool" data-tool="erase">Erase</button>
+        </div>
+
+        <div class="builder-actions">
+          <button id="apply-size" class="btn">Apply Size</button>
+          <button id="clear-path" class="btn">Clear Path</button>
+          <button id="clear-builds" class="btn">Clear Builds</button>
+          <button id="clear-all" class="btn">Clear All</button>
+        </div>
+
+        <div class="builder-actions">
+          <button id="save-map" class="btn" style="background:#10b981;">Save New</button>
+          <button id="update-map" class="btn" style="background:#f59e0b;">Update Loaded</button>
+      </div>
+
+        <div class="builder-stats">
+          Path tiles: <span id="stat-path">0</span><br>
+          Build spots: <span id="stat-build">0</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'td_now/builder.js' %}?v={{ cache_version }}"></script>
+{% endblock extra_scripts %}

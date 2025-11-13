@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'inventory.apps.InventoryConfig',
     'contracts.apps.ContractsConfig',
     'accesslog.apps.AccesslogConfig',
+    'td_now.apps.TDNowConfig',
     'crispy_forms',
     'django.contrib.admin',
     'django.contrib.auth',
