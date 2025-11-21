@@ -80,6 +80,10 @@
             <div class="flex items-center gap-3">
                 <label class="inline-flex items-center gap-1"><input type="checkbox" id="toggle-incomplete-only"> Show only incomplete courses</label>
                 <label class="inline-flex items-center gap-1"><input type="checkbox" id="toggle-users-incomplete-only"> Show only users with incomplete</label>
+                <a href="{% url 'training:arctic_wolf_audit_export' %}"
+                   class="bg-gray-900 hover:bg-black text-white font-semibold py-1 px-3 rounded">
+                    Export PDF
+                </a>
                 <button id="copy-audit" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded">Copy Table</button>
             </div>
         </div>

@@ -901,7 +901,14 @@
         const title = document.getElementById('dayEventsDate');
         const body = document.getElementById('dayEventsList');
         if (!modal || !title || !body) return;
-        title.textContent = new Date(dateKey).toDateString();
+        // dateKey is in YYYY-MM-DD; construct as local date to avoid TZ shifts
+        const parts = (dateKey || '').split('-').map(Number);
+        if (parts.length === 3 && !parts.some(isNaN)) {
+            const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+            title.textContent = dt.toDateString();
+        } else {
+            title.textContent = dateKey;
+        }
         body.innerHTML = '';
         for (const it of list) {
             const row = document.createElement('div');

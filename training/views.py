@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+import io
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,6 +14,9 @@ from django.db.models import Count, Q
 from django.utils.text import get_valid_filename
 from django.template.loader import render_to_string
 from django.conf import settings
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
 
 from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
 from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion
@@ -254,6 +258,142 @@ def training_audit(request):  # This audit is for non-staff users and is the CMM
     }
     return render(request, 'training/training_audit.html', context)
 
+
+@login_required
+def training_audit_export(request):
+    """
+    Export CMMC training audit as a PDF.
+    Layout per user:
+        Lastname, Firstname
+            Course          Date Complete       Supporting Docs (If needed)
+    Names are black, green indicates complete/good, red indicates not complete/bad.
+    """
+    users = User.objects.filter(is_active=True).order_by('username')
+    courses = Course.objects.all().order_by('name')
+
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    title = "Training Completion Audit"
+    generated = timezone.now().strftime("%m/%d/%Y")
+
+    def draw_page_header():
+        p.setFont("Helvetica-Bold", 18)
+        p.setFillColor(colors.black)
+        p.drawString(50, height - 50, title)
+        p.setFont("Helvetica", 10)
+        p.drawString(50, height - 65, f"Generated on {generated}")
+
+    draw_page_header()
+    y = height - 90
+
+    for user in users:
+        user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+        required_courses_for_user = set(
+            Matrix.objects.filter(account__in=user_accounts).values_list('course_id', flat=True).distinct()
+        )
+
+        if not required_courses_for_user:
+            continue
+
+        user_completion_status = Tracker.objects.filter(user=user).values(
+            'matrix__course_id', 'completed_date', 'document'
+        )
+        completion_dict = {item['matrix__course_id']: item for item in user_completion_status}
+
+        # Build list of required courses for this user
+        user_courses = []
+        for course in courses:
+            if course.id not in required_courses_for_user:
+                continue
+            completion_info = completion_dict.get(course.id)
+            completed_date = completion_info['completed_date'] if completion_info else None
+            has_document = bool(completion_info and completion_info['document'])
+            user_courses.append((course.name, completed_date, has_document))
+
+        if not user_courses:
+            continue
+
+        # New page if needed before user header
+        if y < 80:
+            p.showPage()
+            draw_page_header()
+            y = height - 90
+
+        # User header
+        p.setFont("Helvetica-Bold", 12)
+        p.setFillColor(colors.black)
+        p.drawString(50, y, f"{user.last_name}, {user.first_name}")
+        y -= 14
+
+        # Column headers
+        p.setFont("Helvetica-Bold", 10)
+        p.setFillColor(colors.black)
+        p.drawString(70, y, "Course")
+        p.drawString(320, y, "Date Complete")
+        p.drawString(430, y, "Supporting Docs")
+        y -= 12
+
+        p.setFont("Helvetica", 9)
+
+        for course_name, completed_date, has_document in user_courses:
+            # New page in middle of user's courses
+            if y < 50:
+                p.showPage()
+                draw_page_header()
+                y = height - 80
+
+                # Re-draw user and headers on new page
+                p.setFont("Helvetica-Bold", 12)
+                p.setFillColor(colors.black)
+                p.drawString(50, y, f"{user.last_name}, {user.first_name}")
+                y -= 14
+
+                p.setFont("Helvetica-Bold", 10)
+                p.setFillColor(colors.black)
+                p.drawString(70, y, "Course")
+                p.drawString(320, y, "Date Complete")
+                p.drawString(430, y, "Supporting Docs")
+                y -= 12
+
+                p.setFont("Helvetica", 9)
+
+            # Course name in black
+            p.setFillColor(colors.black)
+            p.drawString(70, y, course_name[:45])
+
+            # Date column: green if complete, red if not
+            if completed_date:
+                date_text = completed_date.strftime("%m/%d/%Y")
+                p.setFillColor(colors.green)
+            else:
+                date_text = "Not Complete"
+                p.setFillColor(colors.red)
+            p.drawString(320, y, date_text)
+
+            # Supporting docs: green check if document, red X otherwise
+            if has_document:
+                doc_text = "✓"
+                p.setFillColor(colors.green)
+            else:
+                doc_text = "X"
+                p.setFillColor(colors.red)
+            p.drawString(440, y, doc_text)
+
+            y -= 12
+
+        y -= 10  # extra spacing between users
+
+    p.showPage()
+    p.save()
+
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename=\"training_audit.pdf\"'
+    buffer.close()
+    return response
+
 @login_required
 def add_arctic_wolf_course(request):
     if request.method == 'POST':
@@ -404,6 +544,160 @@ def arctic_wolf_audit(request):
         'column_completed_counts': column_completed_counts,
     }
     return render(request, 'training/arctic_wolf_audit.html', context)
+
+
+@login_required
+def arctic_wolf_audit_export(request):
+    """
+    Export Arctic Wolf training audit as a PDF.
+    Layout per user:
+        Lastname, Firstname
+            Course          Date Complete       Supporting Docs (If needed)
+    Names are black, green indicates complete/good, red indicates not complete/bad.
+    Supporting Docs column is used as a completion check mark for AW.
+    """
+    six_months_ago = timezone.now().date() - timezone.timedelta(days=6 * 30)
+
+    staff_users = User.objects.filter(is_active=True, is_staff=True)
+
+    recent_courses = ArcticWolfCourse.objects.filter(created_at__date__gte=six_months_ago)
+
+    older_courses = list(ArcticWolfCourse.objects.filter(created_at__date__lt=six_months_ago))
+    older_ids_all = [c.id for c in older_courses]
+    if older_ids_all:
+        older_completion_counts = (
+            ArcticWolfCompletion.objects
+            .filter(
+                course_id__in=older_ids_all,
+                user__is_active=True,
+                user__is_staff=True,
+                completed_date__isnull=False,
+            )
+            .values('course_id')
+            .annotate(c=Count('id'))
+        )
+        staff_count = staff_users.count()
+        older_counts_map = {row['course_id']: row['c'] for row in older_completion_counts}
+        older_ids = [cid for cid in older_ids_all if older_counts_map.get(cid, 0) < staff_count]
+    else:
+        older_ids = []
+
+    recent_ids = list(recent_courses.values_list('id', flat=True))
+    all_ids = list({*recent_ids, *older_ids})
+    courses = ArcticWolfCourse.objects.filter(id__in=all_ids).order_by('-created_at', 'name')
+    active_users = staff_users.order_by('username')
+
+    # Pre-fetch completions to reduce queries
+    completions = ArcticWolfCompletion.objects.filter(
+        user__in=active_users,
+        course__in=courses,
+    ).values('user_id', 'course_id', 'completed_date')
+    completion_map = {}
+    for row in completions:
+        completion_map[(row['user_id'], row['course_id'])] = row['completed_date']
+
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    title = "Arctic Wolf Training Audit"
+    generated = timezone.now().strftime("%m/%d/%Y")
+
+    def draw_page_header():
+        p.setFont("Helvetica-Bold", 18)
+        p.setFillColor(colors.black)
+        p.drawString(50, height - 50, title)
+        p.setFont("Helvetica", 10)
+        p.drawString(50, height - 65, f"Generated on {generated}")
+
+    draw_page_header()
+    y = height - 90
+
+    for user in active_users:
+        # Build list of all AW audit courses for this user
+        user_courses = []
+        for course in courses:
+            completed_date = completion_map.get((user.id, course.id))
+            user_courses.append((course.name, completed_date))
+
+        if not user_courses:
+            continue
+
+        if y < 80:
+            p.showPage()
+            draw_page_header()
+            y = height - 90
+
+        # User header
+        p.setFont("Helvetica-Bold", 12)
+        p.setFillColor(colors.black)
+        p.drawString(50, y, f"{user.last_name}, {user.first_name}")
+        y -= 14
+
+        # Column headers
+        p.setFont("Helvetica-Bold", 10)
+        p.setFillColor(colors.black)
+        p.drawString(70, y, "Course")
+        p.drawString(320, y, "Date Complete")
+        p.drawString(430, y, "Supporting Docs")
+        y -= 12
+
+        p.setFont("Helvetica", 9)
+
+        for course_name, completed_date in user_courses:
+            if y < 50:
+                p.showPage()
+                draw_page_header()
+                y = height - 80
+
+                p.setFont("Helvetica-Bold", 12)
+                p.setFillColor(colors.black)
+                p.drawString(50, y, f"{user.last_name}, {user.first_name}")
+                y -= 14
+
+                p.setFont("Helvetica-Bold", 10)
+                p.setFillColor(colors.black)
+                p.drawString(70, y, "Course")
+                p.drawString(320, y, "Date Complete")
+                p.drawString(430, y, "Supporting Docs")
+                y -= 12
+
+                p.setFont("Helvetica", 9)
+
+            # Course name in black
+            p.setFillColor(colors.black)
+            p.drawString(70, y, course_name[:45])
+
+            # Date column: green if complete, red if not
+            if completed_date:
+                date_text = completed_date.strftime("%m/%d/%Y")
+                p.setFillColor(colors.green)
+            else:
+                date_text = "Not Complete"
+                p.setFillColor(colors.red)
+            p.drawString(320, y, date_text)
+
+            # Supporting docs column used as completion checkmark
+            if completed_date:
+                doc_text = "✓"
+                p.setFillColor(colors.green)
+            else:
+                doc_text = "X"
+                p.setFillColor(colors.red)
+            p.drawString(440, y, doc_text)
+
+            y -= 12
+
+        y -= 10
+
+    p.showPage()
+    p.save()
+
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename=\"arctic_wolf_audit.pdf\"'
+    buffer.close()
+    return response
 
 
 @login_required
