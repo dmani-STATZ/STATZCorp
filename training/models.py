@@ -115,3 +115,20 @@ class ArcticWolfCompletion(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.course}"
+
+
+class CourseReviewClick(models.Model):
+    """
+    Tracks when a user follows the course/policy review link from the requirements page.
+    Stores first click and latest click for accountability.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    matrix = models.ForeignKey(Matrix, on_delete=models.CASCADE)
+    first_clicked = models.DateTimeField()
+    last_clicked = models.DateTimeField()
+
+    class Meta:
+        unique_together = ('user', 'matrix')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.matrix.course.name} review clicks"

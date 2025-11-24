@@ -27,7 +27,7 @@ Pillow==11.1.0
 reportlab==4.3.0
 
 # PDF processing - Migrated to pypdf for better security and maintenance
-pypdf==6.0.0  # Latest version with enhanced security and performance
+pypdf==6.1.3  # Latest version with enhanced security and performance
 pdfplumber==0.11.5
 
 # Utilities

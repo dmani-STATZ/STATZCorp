@@ -16,7 +16,13 @@
                             <p class="text-gray-600 mt-1">{{ item.matrix_entry.course.description }}</p>
                         {% endif %}
                         {% if item.matrix_entry.course.link %}
-                            <p class="mt-2"><a href="{{ item.matrix_entry.course.link }}" class="text-blue-500 hover:underline" target="_blank">Review File</a></p>
+                            <p class="mt-2">
+                                <a href="{% url 'training:review_course_link' item.matrix_entry.id %}"
+                                   class="text-blue-500 hover:underline"
+                                   target="_blank">
+                                    Review File
+                                </a>
+                            </p>
                         {% endif %}
 
                         {% if item.completed and item.tracker_id %}

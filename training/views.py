@@ -19,7 +19,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 
 from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
-from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion
+from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion, CourseReviewClick
 
 @login_required
 def dashboard(request):
@@ -160,6 +160,38 @@ def user_training_requirements(request):
         'required_courses_data': required_courses_data,
     }
     return render(request, 'training/user_requirements.html', context)
+
+
+@login_required
+def review_course_link(request, matrix_id):
+    """
+    Log when a user clicks the course review link, then redirect to the actual URL.
+    Records first and latest click timestamps for accountability.
+    """
+    matrix = get_object_or_404(Matrix, pk=matrix_id)
+
+    # Ensure the user is associated with the matrix account (required course)
+    if not UserAccount.objects.filter(user=request.user, account=matrix.account).exists():
+        messages.error(request, "You do not have access to this course link.")
+        return redirect('training:user_requirements')
+
+    if not matrix.course.link:
+        messages.error(request, "No review link is available for this course.")
+        return redirect('training:user_requirements')
+
+    now = timezone.now()
+    review_click, created = CourseReviewClick.objects.get_or_create(
+        user=request.user,
+        matrix=matrix,
+        defaults={
+            'first_clicked': now,
+            'last_clicked': now,
+        },
+    )
+    if not created:
+        CourseReviewClick.objects.filter(pk=review_click.pk).update(last_clicked=now)
+
+    return redirect(matrix.course.link)
 
 @login_required
 def mark_complete(request, course_id):

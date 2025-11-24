@@ -10,6 +10,7 @@ urlpatterns = [
     path('matrix/manage/', views.manage_matrix, name='manage_matrix'),
     path('matrix/manage/<int:account_id>/', views.manage_matrix, name='manage_matrix_for_account'),
     path('requirements/', views.user_training_requirements, name='user_requirements'),
+    path('requirements/review/<int:matrix_id>/', views.review_course_link, name='review_course_link'),
     path('mark-complete/<int:course_id>/', views.mark_complete, name='mark_complete'),
     path('upload-document/<int:matrix_id>/', views.upload_document, name='upload_document'),
     path('view-document/<int:tracker_id>/', views.view_document, name='view_document'),
