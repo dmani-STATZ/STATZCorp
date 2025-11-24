@@ -625,6 +625,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // {% if dashboard_view == 'table' %}bg-white text-blue-800{% else %}text-white hover:bg-blue-600{% endif %}
+const dashboardSettingUrl = '{% url "users:settings-save" %}';
+const dashboardUserId = '{{ request.user.id }}';
+
 function toggleView(view) {
     const cardView = document.getElementById('card-view');
     const tableView = document.getElementById('table-view');
@@ -664,7 +667,7 @@ function toggleView(view) {
     }
 
     // Save user preference using the UserSettings API
-    fetch('/users/settings/save/', {
+    fetch(dashboardSettingUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -672,8 +675,10 @@ function toggleView(view) {
             'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({
-            setting_type: 'dashboard_view_preference',
-            value: view
+            user_id: dashboardUserId,
+            setting_name: 'dashboard_view_preference',
+            setting_value: view,
+            setting_type: 'string'
         })
     })
     .then(response => {

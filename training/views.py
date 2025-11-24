@@ -253,6 +253,10 @@ def view_document(request, tracker_id):
 
 @login_required
 def training_audit(request):  # This audit is for non-staff users and is the CMMC training
+    if not request.user.is_superuser:
+        messages.error(request, "You do not have permission to view this audit.")
+        return redirect('training:dashboard')
+
     users = User.objects.filter(is_active=True).order_by('username')
     courses = Course.objects.all().order_by('name')
     audit_data = []
@@ -300,6 +304,10 @@ def training_audit_export(request):
             Course          Date Complete       Supporting Docs (If needed)
     Names are black, green indicates complete/good, red indicates not complete/bad.
     """
+    if not request.user.is_superuser:
+        messages.error(request, "You do not have permission to export this audit.")
+        return redirect('training:dashboard')
+
     users = User.objects.filter(is_active=True).order_by('username')
     courses = Course.objects.all().order_by('name')
 
@@ -515,6 +523,10 @@ def user_arctic_wolf_courses(request):
 
 @login_required
 def arctic_wolf_audit(request):
+    if not request.user.is_superuser:
+        messages.error(request, "You do not have permission to view this audit.")
+        return redirect('training:dashboard')
+
     six_months_ago = timezone.now().date() - timezone.timedelta(days=6 * 30)  # Approximate 6 months
 
     # Reference set: active staff users only (AW applies to staff)
@@ -588,6 +600,10 @@ def arctic_wolf_audit_export(request):
     Names are black, green indicates complete/good, red indicates not complete/bad.
     Supporting Docs column is used as a completion check mark for AW.
     """
+    if not request.user.is_superuser:
+        messages.error(request, "You do not have permission to export this audit.")
+        return redirect('training:dashboard')
+
     six_months_ago = timezone.now().date() - timezone.timedelta(days=6 * 30)
 
     staff_users = User.objects.filter(is_active=True, is_staff=True)

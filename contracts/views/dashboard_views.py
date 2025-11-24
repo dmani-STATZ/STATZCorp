@@ -3,7 +3,7 @@ from django.views.generic import TemplateView
 from django.utils.decorators import method_decorator
 from django.utils import timezone
 from django.db.models import Q, Count, Sum, F, Value, CharField, IntegerField
-from django.db.models.functions import Cast
+from django.db.models.functions import Cast, Coalesce
 from django.utils.safestring import mark_safe
 from datetime import timedelta, datetime
 import calendar
@@ -241,17 +241,16 @@ class ContractLifecycleDashboardView(TemplateView):
         
         upcoming_due_dates = upcoming_contracts.count()
         
-        # Get buyer breakdown instead of contract types
-        buyer_breakdown = {
-            'DLA Land': open_contracts.filter(buyer_id__in=[4, 5, 8, 1048]).count(),
-            'DLA Aviation': open_contracts.filter(buyer_id__in=[3, 1098, 1095]).count(),
-            'DLA Maritime': open_contracts.filter(buyer_id__in=[6, 7, 1049, 1105, 1106]).count(),
-            'DLA Troop Support': open_contracts.filter(buyer_id=10).count(),
-        }
-        
-        # Calculate "Others" as the difference between total and the sum of the categorized buyers
-        categorized_count = sum(buyer_breakdown.values())
-        buyer_breakdown['Others'] = open_contracts_count - categorized_count
+        # Get buyer breakdown directly from the Buyer field for open contracts
+        buyer_breakdown_qs = (
+            open_contracts.annotate(
+                buyer_name=Coalesce('buyer__description', Value('Unassigned'), output_field=CharField())
+            )
+            .values('buyer_name')
+            .annotate(total=Count('id'))
+            .order_by('-total', 'buyer_name')
+        )
+        buyer_breakdown = {row['buyer_name']: row['total'] for row in buyer_breakdown_qs}
         
         # Get active suppliers (suppliers with open contracts and CLINs with item_number < 0990)
         # First convert item_number to a numeric value for comparison
