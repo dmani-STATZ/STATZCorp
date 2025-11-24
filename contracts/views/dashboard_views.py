@@ -7,10 +7,63 @@ from django.db.models.functions import Cast, Coalesce
 from django.utils.safestring import mark_safe
 from datetime import timedelta, datetime
 import calendar
+from django.http import Http404
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, Reminder, CanceledReason
 from users.user_settings import UserSettings
+
+
+def get_period_boundaries(now):
+    """Return start/end datetimes for all dashboard periods."""
+    this_week_start = now - timedelta(days=now.weekday())
+    this_week_end = this_week_start + timedelta(days=6)
+    last_week_start = this_week_start - timedelta(weeks=1)
+    last_week_end = last_week_start + timedelta(days=6)
+
+    this_month_start = now.replace(day=1)
+    this_month_end = now.replace(day=calendar.monthrange(now.year, now.month)[1])
+
+    if now.month == 1:
+        last_month_start = now.replace(year=now.year-1, month=12, day=1)
+        last_month_end = now.replace(year=now.year-1, month=12, day=31)
+    else:
+        last_month_start = now.replace(month=now.month-1, day=1)
+        last_month_end = now.replace(month=now.month-1, day=calendar.monthrange(now.year, now.month-1)[1])
+
+    current_quarter = (now.month - 1) // 3
+    this_quarter_start = now.replace(month=current_quarter * 3 + 1, day=1)
+    this_quarter_end = now.replace(
+        month=min(12, (current_quarter + 1) * 3),
+        day=calendar.monthrange(now.year, min(12, (current_quarter + 1) * 3))[1]
+    )
+
+    if current_quarter == 0:
+        last_quarter_start = now.replace(year=now.year - 1, month=10, day=1)
+        last_quarter_end = now.replace(year=now.year - 1, month=12, day=31)
+    else:
+        last_quarter_start = now.replace(month=((current_quarter - 1) * 3) + 1, day=1)
+        last_quarter_month = min(12, current_quarter * 3)
+        last_quarter_end = now.replace(
+            month=last_quarter_month,
+            day=calendar.monthrange(now.year, last_quarter_month)[1]
+        )
+
+    this_year_start = now.replace(month=1, day=1)
+    this_year_end = now.replace(month=12, day=31)
+    last_year_start = this_year_start.replace(year=this_year_start.year-1)
+    last_year_end = last_year_start.replace(month=12, day=31)
+
+    return {
+        'this_week': (this_week_start, this_week_end),
+        'last_week': (last_week_start, last_week_end),
+        'this_month': (this_month_start, this_month_end),
+        'last_month': (last_month_start, last_month_end),
+        'this_quarter': (this_quarter_start, this_quarter_end),
+        'last_quarter': (last_quarter_start, last_quarter_end),
+        'this_year': (this_year_start, this_year_end),
+        'last_year': (last_year_start, last_year_end),
+    }
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -72,47 +125,7 @@ class ContractLifecycleDashboardView(TemplateView):
         total_contracts = Contract.objects.filter(date_canceled__isnull=True, status__description='Open', company=self.request.active_company).count()
         context['total_contracts'] = total_contracts
         
-        # Time periods
-        this_week_start = now - timedelta(days=now.weekday())
-        this_week_end = this_week_start + timedelta(days=6)
-        last_week_start = this_week_start - timedelta(weeks=1)
-        last_week_end = last_week_start + timedelta(days=6)
-
-        # Calculate month boundaries
-        this_month_start = now.replace(day=1)
-        this_month_end = now.replace(day=calendar.monthrange(now.year, now.month)[1])
-        
-        # Calculate last month
-        if now.month == 1:
-            last_month_start = now.replace(year=now.year-1, month=12, day=1)
-            last_month_end = now.replace(year=now.year-1, month=12, day=31)
-        else:
-            last_month_start = now.replace(month=now.month-1, day=1)
-            last_month_end = now.replace(month=now.month-1, day=calendar.monthrange(now.year, now.month-1)[1])
-        
-        # Calculate quarter starts and ends
-        current_quarter = (now.month - 1) // 3
-        this_quarter_start = now.replace(month=current_quarter * 3 + 1, day=1)
-        this_quarter_end = now.replace(
-            month=min(12, (current_quarter + 1) * 3),
-            day=calendar.monthrange(now.year, min(12, (current_quarter + 1) * 3))[1]
-        )
-
-        if current_quarter == 0:  # If we're in Q1
-            last_quarter_start = now.replace(year=now.year - 1, month=10, day=1)
-            last_quarter_end = now.replace(year=now.year - 1, month=12, day=31)
-        else:
-            last_quarter_start = now.replace(month=((current_quarter - 1) * 3) + 1, day=1)
-            last_quarter_month = min(12, (current_quarter) * 3)
-            last_quarter_end = now.replace(
-                month=last_quarter_month,
-                day=calendar.monthrange(now.year, last_quarter_month)[1]
-            )
-
-        this_year_start = now.replace(month=1, day=1)
-        this_year_end = now.replace(month=12, day=31)
-        last_year_start = this_year_start.replace(year=this_year_start.year-1)
-        last_year_end = last_year_start.replace(month=12, day=31)
+        period_boundaries = get_period_boundaries(now)
 
         # Helper function to get stats for a time period
         def get_period_stats(start_date, end_date=None):
@@ -134,14 +147,17 @@ class ContractLifecycleDashboardView(TemplateView):
         
         # Get stats for each time period
         periods = {
-            'this_week': get_period_stats(this_week_start, this_week_end),
-            'last_week': get_period_stats(last_week_start, last_week_end),
-            'this_month': get_period_stats(this_month_start,this_month_end),
-            'last_month': get_period_stats(last_month_start, last_month_end),
-            'this_quarter': get_period_stats(this_quarter_start, this_quarter_end),
-            'last_quarter': get_period_stats(last_quarter_start, last_quarter_end),
-            'this_year': get_period_stats(this_year_start, this_year_end),
-            'last_year': get_period_stats(last_year_start, last_year_end),
+            key: get_period_stats(*period_boundaries[key])
+            for key in [
+                'this_week',
+                'last_week',
+                'this_month',
+                'last_month',
+                'this_quarter',
+                'last_quarter',
+                'this_year',
+                'last_year',
+            ]
         }
 
         context['periods'] = periods
@@ -290,4 +306,75 @@ class ContractLifecycleDashboardView(TemplateView):
             'top_suppliers': top_suppliers
         }
 
+        return context
+
+
+@method_decorator(conditional_login_required, name='dispatch')
+class DashboardMetricDetailView(TemplateView):
+    template_name = 'contracts/dashboard_metric_detail.html'
+
+    PERIOD_LABELS = {
+        'this_week': 'This Week',
+        'last_week': 'Last Week',
+        'this_month': 'This Month',
+        'last_month': 'Last Month',
+        'this_quarter': 'This Quarter',
+        'last_quarter': 'Last Quarter',
+        'this_year': 'This Year',
+        'last_year': 'Last Year',
+    }
+
+    METRIC_LABELS = {
+        'contracts_due': 'Contracts Due',
+        'contracts_due_late': 'Contracts Due Late',
+        'contracts_due_ontime': 'Contracts Due OnTime',
+        'new_contracts': 'New Contracts',
+        'new_contract_value': 'New Contract Value',
+    }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        metric = self.request.GET.get('metric')
+        period = self.request.GET.get('period')
+
+        if metric not in self.METRIC_LABELS:
+            raise Http404("Invalid metric")
+
+        period_boundaries = get_period_boundaries(timezone.now())
+        if period not in period_boundaries:
+            raise Http404("Invalid period")
+
+        start_date, end_date = period_boundaries[period]
+        contracts_qs = Contract.objects.filter(company=self.request.active_company).select_related(
+            'status',
+            'buyer',
+            'idiq_contract',
+        )
+
+        if metric == 'contracts_due':
+            contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+        elif metric == 'contracts_due_late':
+            contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=True).exclude(status__description='Cancelled')
+        elif metric == 'contracts_due_ontime':
+            contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=False).exclude(status__description='Cancelled')
+        elif metric in ('new_contracts', 'new_contract_value'):
+            contracts_qs = contracts_qs.filter(award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+
+        contracts_qs = contracts_qs.order_by('-award_date', '-due_date', '-id')
+
+        total_value = None
+        if metric == 'new_contract_value':
+            total_value = contracts_qs.aggregate(total=Sum('contract_value'))['total'] or 0
+
+        context.update({
+            'metric': metric,
+            'metric_label': self.METRIC_LABELS[metric],
+            'period': period,
+            'period_label': self.PERIOD_LABELS.get(period, period),
+            'start_date': start_date,
+            'end_date': end_date,
+            'contracts': contracts_qs,
+            'contract_count': contracts_qs.count(),
+            'total_value': total_value,
+        })
         return context

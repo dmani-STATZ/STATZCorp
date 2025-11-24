@@ -83,6 +83,7 @@ from .views import (
     
     # Dashboard views
     ContractLifecycleDashboardView,
+    DashboardMetricDetailView,
     
     # Contract log views
     ContractLogView,
@@ -163,6 +164,7 @@ urlpatterns = [
 
     # Dashboard views
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
+    path('dashboard/metric-detail/', DashboardMetricDetailView.as_view(), name='dashboard_metric_detail'),
     path('log/', ContractLogView.as_view(), name='contract_log_view'),
     path('log/export/', export_contract_log, name='export_contract_log'),
     path('log/export-xlsx/', export_contract_log_xlsx, name='export_contract_log_xlsx'),

@@ -82,6 +82,7 @@ from .acknowledgement_letter_views import (
 
 from .dashboard_views import (
     ContractLifecycleDashboardView,
+    DashboardMetricDetailView,
 )
 
 from .contract_log_views import (
