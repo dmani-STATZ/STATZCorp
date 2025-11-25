@@ -92,18 +92,53 @@
       <h2>AI Prompts</h2>
       <div class="panel-body">
         <div class="mt-2">
+          <label class="block mb-1">Model</label>
+          <input id="aiModel" type="text" class="w-full" value="{{ ai_model_default|default_if_none:'' }}">
+          <small class="muted">Change at runtime without restart; paste any OpenRouter model id.</small>
+        </div>
+        <div class="mt-2">
+          <label class="block mb-1">Fallback models (comma separated)</label>
+          <input id="aiFallbacks" type="text" class="w-full" value="{{ ai_model_fallbacks|default_if_none:'' }}">
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <form id="aiSettingsForm" method="post" action="{% url 'reports:admin_save_ai_settings' %}" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="model" id="aiSettingsModel" value="{{ ai_model_default|default_if_none:'' }}">
+            <input type="hidden" name="fallbacks" id="aiSettingsFallbacks" value="{{ ai_model_fallbacks|default_if_none:'' }}">
+            <button type="submit" class="btn">Save as my default</button>
+          </form>
+          <small class="muted">Saved per admin user.</small>
+        </div>
+        <div class="mt-2">
           <div class="mb-1">Query type</div>
-          <label class="mr-2"><input type="radio" name="aiCategory" value="contract" checked> Contract</label>
-          <label class="mr-2"><input type="radio" name="aiCategory" value="supplier"> Supplier</label>
-          <label class="mr-2"><input type="radio" name="aiCategory" value="nsn"> NSN</label>
-          <label class="mr-2"><input type="radio" name="aiCategory" value="other"> Other</label>
+          {% with ai_cat=selected.category|default:"contract" %}
+          <label class="mr-2"><input type="radio" name="aiCategory" value="contract" {% if ai_cat == "contract" %}checked{% endif %}> Contract</label>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="supplier" {% if ai_cat == "supplier" %}checked{% endif %}> Supplier</label>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="nsn" {% if ai_cat == "nsn" %}checked{% endif %}> NSN</label>
+          <label class="mr-2"><input type="radio" name="aiCategory" value="other" {% if ai_cat == "other" %}checked{% endif %}> Other</label>
+          {% endwith %}
           <div class="mt-2">
             <label><input id="aiFullSchema" type="checkbox"> Use full DB schema</label>
           </div>
         </div>
         <div class="mt-3">
-          <label class="block mb-1">User prompt</label>
-          <textarea id="aiPrompt" rows="6" placeholder="Describe the report to generate SQL..."></textarea>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block">User prompt</label>
+            <button
+              id="aiFillFromRequest"
+              class="btn"
+              type="button"
+              {% if not selected %}disabled{% endif %}
+              {% if selected %}
+                data-title="{{ selected.title|escape }}"
+                data-description="{{ selected.description|escape }}"
+                data-category="{{ selected.category }}"
+              {% endif %}
+            >
+              Use selected request
+            </button>
+          </div>
+          <textarea id="aiPrompt" rows="6" placeholder="Describe the report to generate SQL...">{% if selected %}{{ selected.title }}{% if selected.description %} - {{ selected.description }}{% endif %}{% endif %}</textarea>
         </div>
         <div class="mt-3">
           <button id="aiStart" class="btn primary" type="button">Start AI</button>
@@ -128,8 +163,14 @@
     let es = null;
     const startBtn = document.getElementById('aiStart');
     const stopBtn = document.getElementById('aiStop');
-    const copyBtn = document.getElementById('aiCopy');
+    const copySqlBtn = document.getElementById('aiCopy');
+    const copyRequestBtn = document.getElementById('aiFillFromRequest');
     const statusEl = document.getElementById('aiStatus');
+    const modelInput = document.getElementById('aiModel');
+    const fallbackInput = document.getElementById('aiFallbacks');
+    const settingsForm = document.getElementById('aiSettingsForm');
+    const settingsModel = document.getElementById('aiSettingsModel');
+    const settingsFallbacks = document.getElementById('aiSettingsFallbacks');
     function category(){
       const el = document.querySelector('input[name="aiCategory"]:checked');
       return el ? el.value : 'other';
@@ -162,6 +203,10 @@
       const url = new URL('{% url 'reports:admin_ai_stream' %}', window.location.origin);
       url.searchParams.set('prompt', prompt);
       url.searchParams.set('category', category());
+      const model = (modelInput.value || '').trim();
+      if(model){ url.searchParams.set('model', model); }
+      const fallbacks = (fallbackInput.value || '').trim();
+      if(fallbacks){ url.searchParams.set('fallbacks', fallbacks); }
       if(document.getElementById('aiFullSchema').checked){ url.searchParams.set('full','1'); }
       es = new EventSource(url);
       es.onmessage = (e) => {
@@ -170,10 +215,14 @@
           streamEl.value += data.text;
           streamEl.scrollTop = streamEl.scrollHeight;
           const maybe = extractSQL(streamEl.value);
-          if(maybe){ sqlEl.value = maybe; copyBtn.removeAttribute('disabled'); }
+          if(maybe){ sqlEl.value = maybe; copySqlBtn.removeAttribute('disabled'); }
         } else if(data.type === 'status'){ /* status */ }
         else if(data.type === 'done'){ es && es.close(); es=null; setRunning(false); }
-        else if(data.error){ streamEl.value += "\n[Error] " + data.error; }
+        else if(data.type === 'error' || data.error){
+          const msg = data.message || data.error || 'Unknown error';
+          streamEl.value += "\n[Error] " + msg;
+          stop();
+        }
       };
       es.onerror = () => { es && es.close(); es=null; setRunning(false); };
     }
@@ -202,6 +251,27 @@
       const editor = document.getElementById('id_sql_query');
       if(editor){ editor.value = sql || document.getElementById('aiStream').value; showToast('SQL copied to editor'); }
     }
+    function selectedRequestMeta(){
+      if(!copyRequestBtn){ return null; }
+      return {
+        title: copyRequestBtn.getAttribute('data-title') || '',
+        description: copyRequestBtn.getAttribute('data-description') || '',
+        category: copyRequestBtn.getAttribute('data-category') || '',
+      };
+    }
+    function applyRequestToAI(showToastMessage){
+      const meta = selectedRequestMeta();
+      if(!meta){ return; }
+      const parts = [];
+      if(meta.title){ parts.push(meta.title); }
+      if(meta.description){ parts.push(meta.description); }
+      const prompt = parts.join(' - ').trim();
+      const promptEl = document.getElementById('aiPrompt');
+      if(prompt && promptEl){ promptEl.value = prompt; }
+      const radio = meta.category ? document.querySelector(`input[name="aiCategory"][value="${meta.category}"]`) : null;
+      if(radio){ radio.checked = true; }
+      if(showToastMessage){ showToast('Request copied to AI prompt'); }
+    }
     // Copy context notes into hidden field when previewing to preserve text
     const previewForm = document.getElementById('previewForm');
     if(previewForm){
@@ -214,7 +284,18 @@
 
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
-    copyBtn.addEventListener('click', copy);
+    copySqlBtn.addEventListener('click', copy);
+    if(settingsForm){
+      settingsForm.addEventListener('submit', function(){
+        settingsModel.value = (modelInput.value || '').trim();
+        settingsFallbacks.value = (fallbackInput.value || '').trim();
+      });
+    }
+    if(copyRequestBtn){
+      copyRequestBtn.addEventListener('click', function(){ applyRequestToAI(true); });
+      // Prefill AI panel when a request is selected so the admin can start immediately.
+      if(selectedRequestMeta().title || selectedRequestMeta().description){ applyRequestToAI(false); }
+    }
 
     // Ensure SQL from the editor is included when saving
     const saveForm = document.getElementById('saveForm');

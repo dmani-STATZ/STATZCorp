@@ -18,4 +18,5 @@ urlpatterns = [
     path("admin/delete/<uuid:pk>/", views.admin_delete_request, name="admin_delete_request"),
     path("admin/preview/<uuid:pk>/", views.admin_preview_sql, name="admin_preview_sql"),
     path("admin/ai/stream/", views.admin_ai_stream, name="admin_ai_stream"),
+    path("admin/ai/settings/", views.admin_save_ai_settings, name="admin_save_ai_settings"),
 ]
