@@ -74,7 +74,10 @@
                 <tbody>
                     {% for user_data in audit_data %}
                         <tr>
-                            <td>{{ user_data.user.first_name }}&nbsp;{{ user_data.user.last_name }}</td>
+                            <td>
+                                {{ user_data.user.last_name }},&nbsp;{{ user_data.user.first_name }}
+                                {% if user_data.accounts_display %}<span class="text-gray-700">({{ user_data.accounts_display }})</span>{% endif %}
+                            </td>
                             {% for course in courses %}
                                 {% with status=user_data.courses|get_item:course.id %}
                                     <td class="{% if status.required %} {% if status.completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %} {% endif %}">

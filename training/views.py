@@ -262,12 +262,15 @@ def training_audit(request):  # This audit is for non-staff users and is the CMM
     audit_data = []
 
     for user in users:
-        user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+        user_accounts_qs = UserAccount.objects.filter(user=user).select_related('account')
+        user_account_ids = [ua.account_id for ua in user_accounts_qs]
+        account_labels = sorted({ua.account.get_type_display() for ua in user_accounts_qs})
+        accounts_display = ", ".join(account_labels)
         user_completion_status = Tracker.objects.filter(user=user).values('matrix__course_id', 'completed_date', 'document', 'document_name', 'id')
-        required_courses_for_user = Matrix.objects.filter(account__in=user_accounts).values_list('course_id', flat=True).distinct()
+        required_courses_for_user = Matrix.objects.filter(account__in=user_account_ids).values_list('course_id', flat=True).distinct()
 
         completion_dict = {item['matrix__course_id']: item for item in user_completion_status}
-        user_row = {'user': user, 'courses': {}}
+        user_row = {'user': user, 'accounts_display': accounts_display, 'courses': {}}
 
         for course in courses:
             is_required = course.id in required_courses_for_user
@@ -329,9 +332,12 @@ def training_audit_export(request):
     y = height - 90
 
     for user in users:
-        user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+        user_accounts_qs = UserAccount.objects.filter(user=user).select_related('account')
+        user_account_ids = [ua.account_id for ua in user_accounts_qs]
+        account_labels = sorted({ua.account.get_type_display() for ua in user_accounts_qs})
+        accounts_display = ", ".join(account_labels)
         required_courses_for_user = set(
-            Matrix.objects.filter(account__in=user_accounts).values_list('course_id', flat=True).distinct()
+            Matrix.objects.filter(account__in=user_account_ids).values_list('course_id', flat=True).distinct()
         )
 
         if not required_courses_for_user:
@@ -364,7 +370,10 @@ def training_audit_export(request):
         # User header
         p.setFont("Helvetica-Bold", 12)
         p.setFillColor(colors.black)
-        p.drawString(50, y, f"{user.last_name}, {user.first_name}")
+        name_label = f"{user.last_name}, {user.first_name}"
+        if accounts_display:
+            name_label = f"{name_label} ({accounts_display})"
+        p.drawString(50, y, name_label)
         y -= 14
 
         # Column headers

@@ -166,17 +166,19 @@
             {% get_require_login as require_login %}
             {% if require_login %}
                 {% if user.is_authenticated %}
-                    <div class="flex flex-col md:flex-row md:ml-auto">
+                    <div class="flex flex-col md:flex-row md:ml-auto items-center gap-2">
                         {% if user.is_superuser %}
                         <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">Welcome, {{ user.first_name }}</a>
-                    {% else %}
+                        {% else %}
                         <a href="{% url 'users:profile' %}" class="nav-item nav-link text-white px-3 py-2">Welcome, {{ user.first_name }}</a>
-                    {% endif %}
-                    
-                    <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2 rounded-md">Sign Out</button>
-                    </form>
+                        {% endif %}
+                        <button id="settings-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="user-settings-panel" class="flex items-center justify-center w-10 h-10 rounded-full border border-white/30 bg-white/10 text-white shadow-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/70 transition-all duration-200">
+                            <span class="sr-only">Open settings</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.594 3.094c.55-1.902 3.262-1.902 3.812 0a1.724 1.724 0 002.573 1.02c1.643-.947 3.434.844 2.487 2.487a1.724 1.724 0 001.02 2.573c1.902.55 1.902 3.262 0 3.812a1.724 1.724 0 00-1.02 2.573c.947 1.643-.844 3.434-2.487 2.487a1.724 1.724 0 00-2.573 1.02c-.55 1.902-3.262 1.902-3.812 0a1.724 1.724 0 00-2.573-1.02c-1.643.947-3.434-.844-2.487-2.487a1.724 1.724 0 00-1.02-2.573c-1.902-.55-1.902-3.262 0-3.812a1.724 1.724 0 001.02-2.573C3.553 4.958 5.344 3.167 6.987 4.114a1.724 1.724 0 002.573-1.02z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
                     </div>
                 {% else %}
                     <div class="flex flex-col md:flex-row md:ml-auto">
@@ -245,6 +247,79 @@
         {% block body %}{% endblock body %}
         {% block extra_scripts %}{% endblock extra_scripts %}
     </div>
+    {% if user.is_authenticated %}
+    <div id="user-settings-overlay" class="settings-overlay" aria-hidden="true">
+        <div id="user-settings-panel" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1">
+            <div class="settings-header">
+                <div>
+                    <p class="settings-kicker">Workspace</p>
+                    <h2 id="settings-title" class="settings-title">Settings</h2>
+                </div>
+                <div class="settings-actions">
+                    <form id="settings-logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="settings-chip settings-chip-ghost">Sign Out</button>
+                    </form>
+                    <button type="button" class="settings-icon-btn" data-close-settings aria-label="Close settings panel">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="settings-grid">
+                <div class="settings-row">
+                    <div>
+                        <p class="settings-label">Dashboard</p>
+                        <p class="settings-help">Pick the layout you want to see first.</p>
+                    </div>
+                    <div class="settings-toggle" data-setting="dashboard_view">
+                        <button type="button" class="settings-chip" data-value="table" aria-pressed="false">Table</button>
+                        <button type="button" class="settings-chip" data-value="card" aria-pressed="false">Card</button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div>
+                        <p class="settings-label">Dark Mode</p>
+                        <p class="settings-help">Switch the theme across STATZ.</p>
+                    </div>
+                    <div class="settings-toggle" data-setting="theme">
+                        <button type="button" class="settings-chip" data-value="light" aria-pressed="false">Off</button>
+                        <button type="button" class="settings-chip" data-value="dark" aria-pressed="false">On</button>
+                    </div>
+                </div>
+                {% if available_companies %}
+                <div class="settings-row">
+                    <div>
+                        <p class="settings-label">Default Company</p>
+                        <p class="settings-help">Set the context we load by default.</p>
+                    </div>
+                    <form id="settings-company-form" method="post" action="{% url 'users:switch_company' %}" class="settings-select-wrapper">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <label for="settings-company-select" class="sr-only">Choose company</label>
+                        <select name="company_id" id="settings-company-select" class="settings-select" {% if available_companies|length <= 1 %}disabled{% endif %}>
+                            {% for c in available_companies %}
+                                <option value="{{ c.id }}" {% if active_company and c.id == active_company.id %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+                {% endif %}
+                {% if user.is_superuser %}
+                <div class="settings-divider"></div>
+                <div class="settings-row">
+                    <div>
+                        <p class="settings-label">Admin</p>
+                        <p class="settings-help">Launch the console in a new view.</p>
+                    </div>
+                    <a href="{% url 'admin:index' %}" class="settings-chip settings-chip-outline">Admin Console</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <script>
         function toggleSidebar() {
@@ -313,6 +388,115 @@
     {% if user.is_authenticated %}
     <script>
         window.CURRENT_USER_ID = "{{ user.id }}";
+    </script>
+    <script>
+        (function(){
+            const trigger = document.getElementById('settings-trigger');
+            const overlay = document.getElementById('user-settings-overlay');
+            const panel = document.getElementById('user-settings-panel');
+            const dashboardGroup = document.querySelector('[data-setting="dashboard_view"]');
+            const themeGroup = document.querySelector('[data-setting="theme"]');
+            const themeToggleButton = document.getElementById('theme-toggle');
+            const companySelect = document.getElementById('settings-company-select');
+            const closeButtons = overlay ? overlay.querySelectorAll('[data-close-settings]') : [];
+            const csrfToken = (typeof getCookie === 'function') ? getCookie('csrftoken') : null;
+            const normalizeSetting = (value, fallback) => {
+                const clean = (value || '').toString().trim().toLowerCase();
+                if (!clean || clean === 'none') return fallback;
+                return clean;
+            };
+            const state = {
+                dashboard_view: normalizeSetting("{{ user_preferences.dashboard_view|default:'table' }}", 'table'),
+                theme: document.body.classList.contains('dark') ? 'dark' : 'light'
+            };
+
+            function setActive(group, value) {
+                if (!group) return;
+                group.querySelectorAll('[data-value]').forEach(btn => {
+                    const isActive = btn.dataset.value === value;
+                    btn.classList.toggle('is-active', isActive);
+                    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                });
+            }
+
+            setActive(dashboardGroup, state.dashboard_view);
+            setActive(themeGroup, state.theme === 'dark' ? 'dark' : 'light');
+
+            function openSettings() {
+                if (!overlay) return;
+                overlay.classList.add('active');
+                overlay.setAttribute('aria-hidden', 'false');
+                trigger?.setAttribute('aria-expanded', 'true');
+                setActive(dashboardGroup, state.dashboard_view);
+                setActive(themeGroup, state.theme === 'dark' ? 'dark' : 'light');
+                panel?.focus({ preventScroll: true });
+            }
+
+            function closeSettings() {
+                if (!overlay) return;
+                overlay.classList.remove('active');
+                overlay.setAttribute('aria-hidden', 'true');
+                trigger?.setAttribute('aria-expanded', 'false');
+                trigger?.focus({ preventScroll: true });
+            }
+
+            const saveSetting = (name, value, type = 'string') => {
+                if (!csrfToken) return Promise.resolve();
+                return fetch("{% url 'users:settings-save' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        user_id: "{{ user.id }}",
+                        setting_name: name,
+                        setting_value: value,
+                        setting_type: type
+                    })
+                }).catch(() => ({}));
+            };
+
+            trigger?.addEventListener('click', openSettings);
+            closeButtons.forEach(btn => btn.addEventListener('click', closeSettings));
+            overlay?.addEventListener('click', (event) => {
+                if (event.target === overlay) {
+                    closeSettings();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && overlay?.classList.contains('active')) {
+                    closeSettings();
+                }
+            });
+
+            dashboardGroup?.addEventListener('click', (event) => {
+                const btn = event.target.closest('[data-value]');
+                if (!btn) return;
+                const value = btn.dataset.value;
+                state.dashboard_view = value;
+                setActive(dashboardGroup, value);
+                saveSetting('dashboard_view', value);
+            });
+
+            themeGroup?.addEventListener('click', (event) => {
+                const btn = event.target.closest('[data-value]');
+                if (!btn) return;
+                const value = btn.dataset.value;
+                state.theme = value;
+                setActive(themeGroup, value);
+                const wantsDark = value === 'dark';
+                const isDark = document.body.classList.contains('dark');
+                if (wantsDark !== isDark) {
+                    themeToggleButton?.click();
+                }
+            });
+
+            companySelect?.addEventListener('change', () => {
+                companySelect.classList.add('pending');
+                companySelect.form?.submit();
+            });
+        })();
     </script>
     {% endif %}
     {% block extra_js %}

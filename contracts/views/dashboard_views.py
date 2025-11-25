@@ -264,7 +264,7 @@ class ContractLifecycleDashboardView(TemplateView):
             )
             .values('buyer_name')
             .annotate(total=Count('id'))
-            .order_by('-total', 'buyer_name')
+            .order_by('-total', 'buyer_name')[:6]
         )
         buyer_breakdown = {row['buyer_name']: row['total'] for row in buyer_breakdown_qs}
         
@@ -332,6 +332,108 @@ class DashboardMetricDetailView(TemplateView):
         'new_contract_value': 'New Contract Value',
     }
 
+    SERIES_CONFIG = {
+        'this_week': ('week', 26),
+        'last_week': ('week', 26),
+        'this_month': ('month', 24),
+        'last_month': ('month', 24),
+        'this_quarter': ('quarter', 16),
+        'last_quarter': ('quarter', 16),
+        'this_year': ('year', 10),
+        'last_year': ('year', 10),
+    }
+
+    @staticmethod
+    def _start_end_of_day(dt):
+        return (
+            dt.replace(hour=0, minute=0, second=0, microsecond=0),
+            dt.replace(hour=23, minute=59, second=59, microsecond=999999),
+        )
+
+    @staticmethod
+    def _month_start(dt):
+        return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    @staticmethod
+    def _month_end(dt):
+        last_day = calendar.monthrange(dt.year, dt.month)[1]
+        return dt.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+
+    @classmethod
+    def _shift_months(cls, dt, months_back):
+        # months_back is non-negative; shift backwards
+        month_index = (dt.year * 12 + (dt.month - 1)) - months_back
+        year = month_index // 12
+        month = (month_index % 12) + 1
+        anchor = dt.replace(year=year, month=month, day=1)
+        return cls._month_start(anchor), cls._month_end(anchor)
+
+    @classmethod
+    def _shift_quarters(cls, dt, quarters_back):
+        current_quarter = (dt.month - 1) // 3
+        quarter_index = (dt.year * 4 + current_quarter) - quarters_back
+        year = quarter_index // 4
+        quarter = quarter_index % 4  # 0-based
+        month = quarter * 3 + 1
+        start = dt.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_month = month + 2
+        end_day = calendar.monthrange(year, end_month)[1]
+        end = dt.replace(year=year, month=end_month, day=end_day, hour=23, minute=59, second=59, microsecond=999999)
+        return start, end
+
+    @classmethod
+    def _shift_years(cls, dt, years_back):
+        year = dt.year - years_back
+        start = dt.replace(year=year, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = dt.replace(year=year, month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+        return start, end
+
+    def _build_value_series(self, period, base_start):
+        """
+        Build a trailing series of periods for the new_contract_value metric.
+        """
+        if period not in self.SERIES_CONFIG:
+            return []
+
+        granularity, count = self.SERIES_CONFIG[period]
+        series = []
+
+        for idx in range(count):
+            if granularity == 'week':
+                start = base_start - timedelta(weeks=idx)
+                start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+                end = start + timedelta(days=6)
+                end = end.replace(hour=23, minute=59, second=59, microsecond=999999)
+                label = f"Week of {start.strftime('%b %d, %Y')}"
+            elif granularity == 'month':
+                start, end = self._shift_months(base_start, idx)
+                label = start.strftime('%b %Y')
+            elif granularity == 'quarter':
+                start, end = self._shift_quarters(base_start, idx)
+                quarter_num = ((start.month - 1) // 3) + 1
+                label = f"Q{quarter_num} {start.year}"
+            elif granularity == 'year':
+                start, end = self._shift_years(base_start, idx)
+                label = f"{start.year}"
+            else:
+                continue
+
+            qs = Contract.objects.filter(
+                company=self.request.active_company,
+                award_date__range=(start, end),
+            ).exclude(status__description='Cancelled')
+
+            series.append({
+                'label': label,
+                'start': start,
+                'end': end,
+                'contract_count': qs.count(),
+                'total_value': qs.aggregate(total=Sum('contract_value'))['total'] or 0,
+            })
+
+        # Keep most recent first
+        return sorted(series, key=lambda x: x['start'], reverse=True)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         metric = self.request.GET.get('metric')
@@ -345,6 +447,7 @@ class DashboardMetricDetailView(TemplateView):
             raise Http404("Invalid period")
 
         start_date, end_date = period_boundaries[period]
+        start_date, end_date = self._start_end_of_day(start_date)[0], self._start_end_of_day(end_date)[1]
         contracts_qs = Contract.objects.filter(company=self.request.active_company).select_related(
             'status',
             'buyer',
@@ -366,6 +469,12 @@ class DashboardMetricDetailView(TemplateView):
         if metric == 'new_contract_value':
             total_value = contracts_qs.aggregate(total=Sum('contract_value'))['total'] or 0
 
+        value_series = None
+        if metric == 'new_contract_value':
+            # Use the start of the requested period as the anchor for series generation
+            anchor_start = start_date
+            value_series = self._build_value_series(period, anchor_start)
+
         context.update({
             'metric': metric,
             'metric_label': self.METRIC_LABELS[metric],
@@ -376,5 +485,6 @@ class DashboardMetricDetailView(TemplateView):
             'contracts': contracts_qs,
             'contract_count': contracts_qs.count(),
             'total_value': total_value,
+            'value_series': value_series,
         })
         return context
