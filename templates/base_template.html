@@ -315,6 +315,25 @@
                     </div>
                     <a href="{% url 'admin:index' %}" class="settings-chip settings-chip-outline">Admin Console</a>
                 </div>
+                <div class="settings-row">
+                    <div>
+                        <p class="settings-label">OpenRouter Model</p>
+                        <p class="settings-help">Set the default model used by the Reports AI panel.</p>
+                    </div>
+                    <div class="flex flex-col gap-2 w-full">
+                        <input id="settings-ai-model" type="text" class="settings-select" value="{{ user_preferences.reports_ai_model|default:ai_model_default }}">
+                        <small class="settings-help">Any OpenRouter model id (e.g. gpt-4o-mini, qwen/qwen-2.5-32b-instruct).</small>
+                        <input id="settings-ai-fallbacks" type="text" class="settings-select" placeholder="Fallback models, comma separated" value="{{ user_preferences.reports_ai_fallbacks|default:ai_fallback_default }}">
+                        <form id="settings-ai-form" method="post" action="{% url 'reports:admin_save_ai_settings' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="model" id="settings-ai-model-field">
+                            <input type="hidden" name="fallbacks" id="settings-ai-fallbacks-field">
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" id="settings-ai-save" class="settings-chip settings-chip-outline">Save Model Defaults</button>
+                            <span id="settings-ai-status" class="settings-help ml-2"></span>
+                        </form>
+                    </div>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -496,6 +515,45 @@
                 companySelect.classList.add('pending');
                 companySelect.form?.submit();
             });
+
+            const aiModelInput = document.getElementById('settings-ai-model');
+            const aiFallbackInput = document.getElementById('settings-ai-fallbacks');
+            const aiForm = document.getElementById('settings-ai-form');
+            const aiStatus = document.getElementById('settings-ai-status');
+            const aiModelField = document.getElementById('settings-ai-model-field');
+            const aiFallbackField = document.getElementById('settings-ai-fallbacks-field');
+            if (aiForm && aiModelInput && aiFallbackInput && aiModelField && aiFallbackField) {
+                aiForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const modelVal = (aiModelInput.value || '').trim();
+                    const fallbackVal = (aiFallbackInput.value || '').trim();
+                    aiModelField.value = modelVal;
+                    aiFallbackField.value = fallbackVal;
+                    if (!csrfToken) { aiForm.submit(); return; }
+                    aiStatus.textContent = 'Saving...';
+                    try {
+                        const resp = await fetch(aiForm.action, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({ model: modelVal, fallbacks: fallbackVal })
+                        });
+                        if (resp.ok) {
+                            aiStatus.textContent = 'Saved';
+                            setTimeout(() => { aiStatus.textContent = ''; }, 2000);
+                        } else {
+                            aiStatus.textContent = 'Error saving';
+                            setTimeout(() => { aiStatus.textContent = ''; }, 3000);
+                        }
+                    } catch (e) {
+                        aiStatus.textContent = 'Error saving';
+                        setTimeout(() => { aiStatus.textContent = ''; }, 3000);
+                    }
+                });
+            }
         })();
     </script>
     {% endif %}

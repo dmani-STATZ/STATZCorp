@@ -1,6 +1,6 @@
 from typing import Optional
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.utils import timezone
@@ -400,8 +400,15 @@ def admin_save_ai_settings(request):
     if request.method != "POST":
         return HttpResponseBadRequest("Invalid method")
 
-    model = (request.POST.get("model") or "").strip()
-    fallbacks = (request.POST.get("fallbacks") or "").strip()
+    payload = request.POST
+    if request.content_type == "application/json":
+        try:
+            payload = json.loads(request.body or "{}")
+        except Exception:
+            payload = {}
+
+    model = (payload.get("model") or "").strip()
+    fallbacks = (payload.get("fallbacks") or "").strip()
     if model:
         UserSettings.save_setting(
             request.user,
@@ -416,5 +423,8 @@ def admin_save_ai_settings(request):
             fallbacks,
             description="Comma-separated OpenRouter fallback models for reports admin AI panel",
         )
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
+        return JsonResponse({"ok": True, "model": model, "fallbacks": fallbacks})
     messages.success(request, "AI model preferences saved.")
-    return redirect(reverse("reports:admin_dashboard"))
+    next_url = payload.get("next") or request.META.get("HTTP_REFERER") or reverse("reports:admin_dashboard")
+    return redirect(next_url)

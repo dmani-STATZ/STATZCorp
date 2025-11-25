@@ -92,24 +92,6 @@
       <h2>AI Prompts</h2>
       <div class="panel-body">
         <div class="mt-2">
-          <label class="block mb-1">Model</label>
-          <input id="aiModel" type="text" class="w-full" value="{{ ai_model_default|default_if_none:'' }}">
-          <small class="muted">Change at runtime without restart; paste any OpenRouter model id.</small>
-        </div>
-        <div class="mt-2">
-          <label class="block mb-1">Fallback models (comma separated)</label>
-          <input id="aiFallbacks" type="text" class="w-full" value="{{ ai_model_fallbacks|default_if_none:'' }}">
-        </div>
-        <div class="mt-2 flex items-center gap-2">
-          <form id="aiSettingsForm" method="post" action="{% url 'reports:admin_save_ai_settings' %}" class="inline">
-            {% csrf_token %}
-            <input type="hidden" name="model" id="aiSettingsModel" value="{{ ai_model_default|default_if_none:'' }}">
-            <input type="hidden" name="fallbacks" id="aiSettingsFallbacks" value="{{ ai_model_fallbacks|default_if_none:'' }}">
-            <button type="submit" class="btn">Save as my default</button>
-          </form>
-          <small class="muted">Saved per admin user.</small>
-        </div>
-        <div class="mt-2">
           <div class="mb-1">Query type</div>
           {% with ai_cat=selected.category|default:"contract" %}
           <label class="mr-2"><input type="radio" name="aiCategory" value="contract" {% if ai_cat == "contract" %}checked{% endif %}> Contract</label>
@@ -166,11 +148,6 @@
     const copySqlBtn = document.getElementById('aiCopy');
     const copyRequestBtn = document.getElementById('aiFillFromRequest');
     const statusEl = document.getElementById('aiStatus');
-    const modelInput = document.getElementById('aiModel');
-    const fallbackInput = document.getElementById('aiFallbacks');
-    const settingsForm = document.getElementById('aiSettingsForm');
-    const settingsModel = document.getElementById('aiSettingsModel');
-    const settingsFallbacks = document.getElementById('aiSettingsFallbacks');
     function category(){
       const el = document.querySelector('input[name="aiCategory"]:checked');
       return el ? el.value : 'other';
@@ -203,10 +180,6 @@
       const url = new URL('{% url 'reports:admin_ai_stream' %}', window.location.origin);
       url.searchParams.set('prompt', prompt);
       url.searchParams.set('category', category());
-      const model = (modelInput.value || '').trim();
-      if(model){ url.searchParams.set('model', model); }
-      const fallbacks = (fallbackInput.value || '').trim();
-      if(fallbacks){ url.searchParams.set('fallbacks', fallbacks); }
       if(document.getElementById('aiFullSchema').checked){ url.searchParams.set('full','1'); }
       es = new EventSource(url);
       es.onmessage = (e) => {
@@ -285,12 +258,6 @@
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
     copySqlBtn.addEventListener('click', copy);
-    if(settingsForm){
-      settingsForm.addEventListener('submit', function(){
-        settingsModel.value = (modelInput.value || '').trim();
-        settingsFallbacks.value = (fallbackInput.value || '').trim();
-      });
-    }
     if(copyRequestBtn){
       copyRequestBtn.addEventListener('click', function(){ applyRequestToAI(true); });
       // Prefill AI panel when a request is selected so the admin can start immediately.
