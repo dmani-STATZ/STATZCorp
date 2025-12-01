@@ -102,7 +102,7 @@ class SupplierForm(BaseModelForm):
             'name', 'cage_code', 'supplier_type', 'billing_address', 'shipping_address',
             'physical_address', 'business_phone', 'business_fax', 'business_email',
             'contact', 'probation', 'conditional', 'special_terms', 'prime', 'ppi',
-            'iso', 'notes', 'allows_gsi', 'is_packhouse', 'packhouse'
+            'iso', 'notes', 'allows_gsi', 'is_packhouse', 'packhouse', 'archived'
         ]
         widgets = {
             'business_phone': forms.TextInput(attrs={
@@ -204,6 +204,24 @@ class ContractCloseForm(BaseModelForm):
                 'type': 'datetime-local'
             })
         }
+
+
+class SupplierTypeForm(BaseModelForm):
+    class Meta:
+        model = SupplierType
+        fields = ['code', 'description']
+
+
+class CertificationTypeForm(BaseModelForm):
+    class Meta:
+        model = CertificationType
+        fields = ['code', 'name']
+
+
+class ClassificationTypeForm(BaseModelForm):
+    class Meta:
+        model = ClassificationType
+        fields = ['name']
 
 
 class CompanyForm(BaseModelForm):

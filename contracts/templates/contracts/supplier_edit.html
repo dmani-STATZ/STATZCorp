@@ -309,7 +309,7 @@ Form Data: {{ form.initial }}
                     <h2 class="section-header">Additional Information</h2>
                     <div class="grid grid-cols-3 gap-4 mb-4">
                         {% for field in form %}
-                            {% if field.name in 'probation,conditional,special_terms,prime,ppi,iso,allows_gsi' or field.name == 'is_packhouse' %}
+                            {% if field.name in 'probation,conditional,special_terms,prime,ppi,iso,allows_gsi,archived' or field.name == 'is_packhouse' %}
                                 <div>
                                     <div class="form-group">
                                         <label for="{{ field.id_for_label }}" class="form-label">

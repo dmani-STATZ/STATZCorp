@@ -1,12 +1,16 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from ..forms import (
     ContractTypeForm,
     ClinTypeForm,
     SalesClassForm,
     SpecialPaymentTermsForm,
+    SupplierTypeForm,
+    CertificationTypeForm,
+    ClassificationTypeForm,
 )
 from ..models import (
     Clin,
@@ -15,7 +19,12 @@ from ..models import (
     ContractType,
     SalesClass,
     SpecialPaymentTerms,
+    SupplierType,
     Supplier,
+    SupplierCertification,
+    SupplierClassification,
+    CertificationType,
+    ClassificationType,
 )
 
 
@@ -35,6 +44,65 @@ TABLE_CONFIG = [
                 "label": "contracts",
                 "check": lambda object_id: Contract.objects.filter(
                     contract_type_id=object_id
+                ).exists(),
+            },
+        ],
+    },
+    {
+        "key": "certification_types",
+        "title": "Certification Types",
+        "description": "Types used on supplier certifications.",
+        "model": CertificationType,
+        "form_class": CertificationTypeForm,
+        "order_by": "name",
+        "columns": [
+            {"header": "Code", "attr": "code"},
+            {"header": "Name", "attr": "name"},
+        ],
+        "usage_checks": [
+            {
+                "label": "supplier certifications",
+                "check": lambda object_id: SupplierCertification.objects.filter(
+                    certification_type_id=object_id
+                ).exists(),
+            },
+        ],
+    },
+    {
+        "key": "classification_types",
+        "title": "Classification Types",
+        "description": "Types used on supplier classifications.",
+        "model": ClassificationType,
+        "form_class": ClassificationTypeForm,
+        "order_by": "name",
+        "columns": [
+            {"header": "Name", "attr": "name"},
+        ],
+        "usage_checks": [
+            {
+                "label": "supplier classifications",
+                "check": lambda object_id: SupplierClassification.objects.filter(
+                    classification_type_id=object_id
+                ).exists(),
+            },
+        ],
+    },
+    {
+        "key": "supplier_types",
+        "title": "Supplier Types",
+        "description": "Controls the supplier type dropdown on supplier records.",
+        "model": SupplierType,
+        "form_class": SupplierTypeForm,
+        "order_by": "description",
+        "columns": [
+            {"header": "Code", "attr": "code"},
+            {"header": "Description", "attr": "description"},
+        ],
+        "usage_checks": [
+            {
+                "label": "suppliers",
+                "check": lambda object_id: Supplier.objects.filter(
+                    supplier_type_id=object_id
                 ).exists(),
             },
         ],
@@ -124,7 +192,7 @@ def code_table_admin(request):
 
         if not config:
             messages.error(request, "Unknown code table request.")
-            return redirect("contracts:code_table_admin")
+            return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key or ''}")
 
         if action == "create":
             form = config["form_class"](request.POST)
@@ -134,19 +202,18 @@ def code_table_admin(request):
                     request,
                     f"Added “{instance}” to {config['title'].lower()}.",
                 )
-                return redirect("contracts:code_table_admin")
-
+                return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key}")
             table_forms[table_key] = form
         elif action == "delete":
             object_id = request.POST.get("object_id")
             if not object_id:
                 messages.error(request, "Missing selection to delete.")
-                return redirect("contracts:code_table_admin")
+                return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key}")
 
             obj = config["model"].objects.filter(pk=object_id).first()
             if obj is None:
                 messages.error(request, "Record not found.")
-                return redirect("contracts:code_table_admin")
+                return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key}")
 
             in_use_labels = [
                 check_config["label"]
@@ -160,18 +227,17 @@ def code_table_admin(request):
                     request,
                     f"Unable to delete “{obj}” because it is referenced by {labels}.",
                 )
-                return redirect("contracts:code_table_admin")
+                return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key}")
 
             obj.delete()
             messages.success(
                 request,
                 f"Removed “{obj}” from {config['title'].lower()}.",
             )
-            return redirect("contracts:code_table_admin")
-
+            return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key}")
         else:
             messages.error(request, "Unsupported action.")
-            return redirect("contracts:code_table_admin")
+            return redirect(f"{reverse('contracts:code_table_admin')}?table={table_key or ''}")
 
     tables_context = []
     for config in TABLE_CONFIG:
@@ -214,6 +280,7 @@ def code_table_admin(request):
         "tables": tables_context,
         "ia_choices": Clin.ORIGIN_DESTINATION_CHOICES,
         "fob_choices": Clin.ORIGIN_DESTINATION_CHOICES,
+        "selected_table": request.GET.get("table"),
     }
 
     return render(request, "contracts/code_table_admin.html", context)

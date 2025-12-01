@@ -13,7 +13,7 @@
 
     <div class="space-y-12">
         {% for table in tables %}
-            <section class="bg-white shadow rounded-lg p-6">
+            <section class="bg-white shadow rounded-lg p-6" id="table-{{ table.key }}">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                         <h2 class="text-xl font-semibold text-gray-900">{{ table.title }}</h2>
@@ -135,4 +135,17 @@
         </section>
     </div>
 </div>
+<script>
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const sel = params.get('table');
+        if (!sel) return;
+        const el = document.getElementById(`table-${sel}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'instant', block: 'start' });
+            el.classList.add('ring', 'ring-indigo-200');
+            setTimeout(() => el.classList.remove('ring', 'ring-indigo-200'), 1500);
+        }
+    })();
+</script>
 {% endblock %}

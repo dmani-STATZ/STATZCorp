@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.views.generic import TemplateView
 from django.utils.decorators import method_decorator
 from django.utils import timezone
-from django.db.models import Q, Count, Sum, F, Value, CharField, IntegerField
+from django.db.models import Q, Count, Sum, F, Value, CharField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Cast, Coalesce
 from django.utils.safestring import mark_safe
 from datetime import timedelta, datetime
@@ -12,6 +12,8 @@ from django.http import Http404
 from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, Reminder, CanceledReason
 from users.user_settings import UserSettings
+import csv
+from django.http import HttpResponse
 
 
 def get_period_boundaries(now):
@@ -66,6 +68,63 @@ def get_period_boundaries(now):
     }
 
 
+def get_dashboard_metric_queryset(request, metric, period):
+    """
+    Shared utility to build the filtered contract queryset and ranges for a metric/period.
+    """
+    if metric not in DashboardMetricDetailView.METRIC_LABELS:
+        raise Http404("Invalid metric")
+
+    period_boundaries = get_period_boundaries(timezone.now())
+    if period not in period_boundaries:
+        raise Http404("Invalid period")
+
+    start_date, end_date = period_boundaries[period]
+    start_date = DashboardMetricDetailView._start_end_of_day(start_date)[0]
+    end_date = DashboardMetricDetailView._start_end_of_day(end_date)[1]
+
+    base_qs = Contract.objects.filter(company=request.active_company).select_related(
+        'status',
+        'buyer',
+        'idiq_contract',
+    ).annotate(
+        supplier_name=Subquery(
+            Clin.objects.filter(contract_id=OuterRef('id'))
+            .values('supplier__name')
+            .order_by('id')[:1]
+        ),
+        supplier_cage=Subquery(
+            Clin.objects.filter(contract_id=OuterRef('id'))
+            .values('supplier__cage_code')
+            .order_by('id')[:1]
+        ),
+    )
+
+    contracts_qs = base_qs
+
+    if metric == 'contracts_due':
+        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+    elif metric == 'contracts_due_late':
+        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=True).exclude(status__description='Cancelled')
+    elif metric == 'contracts_due_ontime':
+        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=False).exclude(status__description='Cancelled')
+    elif metric in ('new_contracts', 'new_contract_value'):
+        contracts_qs = contracts_qs.filter(award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+
+    contracts_qs = contracts_qs.order_by('-award_date', '-due_date', '-id')
+
+    total_value = None
+    if metric == 'new_contract_value':
+        total_value = contracts_qs.aggregate(total=Sum('contract_value'))['total'] or 0
+
+    return {
+        'start_date': start_date,
+        'end_date': end_date,
+        'contracts_qs': contracts_qs,
+        'total_value': total_value,
+    }
+
+
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractLifecycleDashboardView(TemplateView):
     template_name = 'contracts/contract_lifecycle_dashboard.html'
@@ -101,8 +160,10 @@ class ContractLifecycleDashboardView(TemplateView):
             
             if first_clin and first_clin.supplier:
                 contract_data['supplier_name'] = first_clin.supplier.name
+                contract_data['supplier_id'] = first_clin.supplier.id
             else:
                 contract_data['supplier_name'] = 'N/A'
+                contract_data['supplier_id'] = None
             
             contracts_data.append(contract_data)
 
@@ -439,35 +500,11 @@ class DashboardMetricDetailView(TemplateView):
         metric = self.request.GET.get('metric')
         period = self.request.GET.get('period')
 
-        if metric not in self.METRIC_LABELS:
-            raise Http404("Invalid metric")
-
-        period_boundaries = get_period_boundaries(timezone.now())
-        if period not in period_boundaries:
-            raise Http404("Invalid period")
-
-        start_date, end_date = period_boundaries[period]
-        start_date, end_date = self._start_end_of_day(start_date)[0], self._start_end_of_day(end_date)[1]
-        contracts_qs = Contract.objects.filter(company=self.request.active_company).select_related(
-            'status',
-            'buyer',
-            'idiq_contract',
-        )
-
-        if metric == 'contracts_due':
-            contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
-        elif metric == 'contracts_due_late':
-            contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=True).exclude(status__description='Cancelled')
-        elif metric == 'contracts_due_ontime':
-            contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=False).exclude(status__description='Cancelled')
-        elif metric in ('new_contracts', 'new_contract_value'):
-            contracts_qs = contracts_qs.filter(award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
-
-        contracts_qs = contracts_qs.order_by('-award_date', '-due_date', '-id')
-
-        total_value = None
-        if metric == 'new_contract_value':
-            total_value = contracts_qs.aggregate(total=Sum('contract_value'))['total'] or 0
+        metric_data = get_dashboard_metric_queryset(self.request, metric, period)
+        start_date = metric_data['start_date']
+        end_date = metric_data['end_date']
+        contracts_qs = metric_data['contracts_qs']
+        total_value = metric_data['total_value']
 
         value_series = None
         if metric == 'new_contract_value':
@@ -488,3 +525,52 @@ class DashboardMetricDetailView(TemplateView):
             'value_series': value_series,
         })
         return context
+
+
+@conditional_login_required
+def dashboard_metric_detail_export(request):
+    metric = request.GET.get('metric')
+    period = request.GET.get('period')
+
+    metric_data = get_dashboard_metric_queryset(request, metric, period)
+    contracts_qs = metric_data['contracts_qs']
+    start_date = metric_data['start_date']
+    end_date = metric_data['end_date']
+
+    response = HttpResponse(content_type='text/csv')
+    filename = f"{metric}_{period}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Contract',
+        'PO Number',
+        'Status',
+        'Buyer',
+        'Supplier',
+        'Supplier Cage',
+        'Award Date',
+        'Due Date',
+        'Value',
+        'Plan Gross',
+        'Range Start',
+        'Range End',
+    ])
+
+    for contract in contracts_qs:
+        writer.writerow([
+            contract.contract_number or '',
+            contract.po_number or '',
+            getattr(contract.status, 'description', '') or '',
+            getattr(contract.buyer, 'description', '') or '',
+            getattr(contract, 'supplier_name', '') or '',
+            getattr(contract, 'supplier_cage', '') or '',
+            contract.award_date.strftime('%Y-%m-%d') if contract.award_date else '',
+            contract.due_date.strftime('%Y-%m-%d') if contract.due_date else '',
+            contract.contract_value or 0,
+            contract.plan_gross or 0,
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d'),
+        ])
+
+    return response

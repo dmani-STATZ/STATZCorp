@@ -270,7 +270,13 @@
                                 </a>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap">
+                                {% if contract.supplier_id %}
+                                    <a class="text-blue-600 hover:text-blue-800" href="{% url 'contracts:supplier_list' %}?supplier_id={{ contract.supplier_id }}&tab=info">
+                                        {{ contract.supplier_name|upper }}
+                                    </a>
+                                {% else %}
                                     {{ contract.supplier_name|upper }}
+                                {% endif %}
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                                 {{ contract.award_date|date:"M d, Y" }}
                             </td>
@@ -444,7 +450,9 @@
                 <div class="mt-4 space-y-2">
                     {% for supplier in metrics.top_suppliers %}
                     <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600 truncate max-w-[180px]">{{ supplier.supplier__name }}</span>
+                        <a class="text-blue-600 hover:text-blue-800 truncate max-w-[180px]" href="{% url 'contracts:supplier_list' %}?supplier_id={{ supplier.supplier_id }}&tab=info">
+                            {{ supplier.supplier__name }}
+                        </a>
                         <span class="font-medium text-blue-600">{{ supplier.contract_count }} contracts</span>
                     </div>
                     {% empty %}

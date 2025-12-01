@@ -38,12 +38,24 @@ from .views import (
     SupplierSearchView,
     SupplierDetailView,
     SupplierCreateView,
+    toggle_supplier_flag,
+    update_supplier_header,
+    update_supplier_address,
+    update_supplier_notes,
+    update_supplier_selects,
+    update_supplier_compliance,
+    update_supplier_files,
+    save_supplier_contact,
+    delete_supplier_contact,
+    addresses_lookup,
     add_supplier_certification,
     delete_supplier_certification,
     get_supplier_certification,
     add_supplier_classification,
     delete_supplier_classification,
     get_supplier_classification,
+    supplier_autocomplete,
+    supplier_admin_tools,
     
     # Contact and Address views
     ContactListView,
@@ -84,6 +96,7 @@ from .views import (
     # Dashboard views
     ContractLifecycleDashboardView,
     DashboardMetricDetailView,
+    dashboard_metric_detail_export,
     
     # Contract log views
     ContractLogView,
@@ -165,6 +178,7 @@ urlpatterns = [
     # Dashboard views
     path('', ContractLifecycleDashboardView.as_view(), name='contracts_dashboard'),
     path('dashboard/metric-detail/', DashboardMetricDetailView.as_view(), name='dashboard_metric_detail'),
+    path('dashboard/metric-detail/export/', dashboard_metric_detail_export, name='dashboard_metric_detail_export'),
     path('log/', ContractLogView.as_view(), name='contract_log_view'),
     path('log/export/', export_contract_log, name='export_contract_log'),
     path('log/export-xlsx/', export_contract_log_xlsx, name='export_contract_log_xlsx'),
@@ -198,10 +212,21 @@ urlpatterns = [
     # NSN and Supplier management
     path('nsn/<int:pk>/edit/', NsnUpdateView.as_view(), name='nsn_edit'),
     path('suppliers/', SupplierListView.as_view(), name='supplier_list'),
+    path('suppliers/autocomplete/', supplier_autocomplete, name='supplier_autocomplete'),
     path('suppliers/search/', SupplierSearchView.as_view(), name='supplier_search'),
     path('supplier/<int:pk>/', SupplierDetailView.as_view(), name='supplier_detail'),
     path('supplier/<int:pk>/edit/', SupplierUpdateView.as_view(), name='supplier_edit'),
     path('supplier/create/', SupplierCreateView.as_view(), name='supplier_create'),
+    path('supplier/<int:pk>/toggle-flag/', toggle_supplier_flag, name='supplier_toggle_flag'),
+    path('supplier/<int:pk>/quick-update/', update_supplier_header, name='supplier_quick_update'),
+    path('supplier/<int:pk>/update-notes/', update_supplier_notes, name='supplier_update_notes'),
+    path('supplier/<int:pk>/update-selects/', update_supplier_selects, name='supplier_update_selects'),
+    path('supplier/<int:pk>/update-compliance/', update_supplier_compliance, name='supplier_update_compliance'),
+    path('supplier/<int:pk>/update-files/', update_supplier_files, name='supplier_update_files'),
+    path('supplier/<int:pk>/address/', update_supplier_address, name='supplier_update_address'),
+    path('supplier/<int:pk>/contact/save/', save_supplier_contact, name='supplier_save_contact'),
+    path('supplier/<int:pk>/contact/<int:contact_id>/delete/', delete_supplier_contact, name='supplier_delete_contact'),
+    path('addresses/lookup/', addresses_lookup, name='addresses_lookup'),
     
     # Supplier Certifications and Classifications
     path('supplier/<int:supplier_id>/certification/add/', add_supplier_certification, name='supplier_add_certification'),
@@ -327,4 +352,6 @@ urlpatterns = [
 
     # Code table management (superuser-only)
     path('code-tables/', code_table_admin, name='code_table_admin'),
+    # Admin tools
+    path('admin-tools/', supplier_admin_tools, name='admin_tools'),
 ] 

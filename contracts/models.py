@@ -429,6 +429,7 @@ class Nsn(AuditModel):
 class Supplier(AuditModel):
     name = models.CharField(max_length=100, null=True, blank=True)
     cage_code = models.CharField(max_length=10, null=True, blank=True)
+    dodaac = models.CharField(max_length=10, null=True, blank=True)
     supplier_type = models.ForeignKey('SupplierType', on_delete=models.CASCADE, null=True, blank=True)
     billing_address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True, related_name='supplier_billing')
     shipping_address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True, related_name='supplier_shipping')
@@ -436,7 +437,7 @@ class Supplier(AuditModel):
     business_phone = models.CharField(max_length=25, null=True, blank=True)
     business_fax = models.CharField(max_length=25, null=True, blank=True)
     business_email = models.EmailField(null=True, blank=True)
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE, null=True, blank=True)
+    contact = models.ForeignKey('Contact', on_delete=models.CASCADE, null=True, blank=True, related_name='primary_for_supplier')
     probation = models.BooleanField(null=True, blank=True)
     probation_on = models.DateTimeField(null=True, blank=True)
     probation_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='supplier_probation')
@@ -452,7 +453,20 @@ class Supplier(AuditModel):
     is_packhouse = models.BooleanField(null=True, blank=True)
     packhouse = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True)
     files_url = models.CharField(max_length=200, null=True, blank=True)
-    allows_gsi = models.BooleanField(null=True, blank=True)
+    ALLOWS_GSI_CHOICES = [
+        ('UNK', 'Unknown'),
+        ('YES', 'Yes'),
+        ('NO', 'No'),
+    ]
+    allows_gsi = models.CharField(
+        max_length=3,
+        choices=ALLOWS_GSI_CHOICES,
+        default='UNK',
+        help_text="Whether the supplier allows GSI at facility (Unknown until confirmed).",
+    )
+    archived = models.BooleanField(default=False)
+    archived_on = models.DateTimeField(null=True, blank=True)
+    archived_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='supplier_archived')
 
     def __str__(self):
         name_display = self.name.upper() if self.name else "NO NAME"
@@ -616,6 +630,7 @@ class Contact(models.Model):
     title = models.TextField(null=True, blank=True)
     phone = models.CharField(max_length=25, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True, related_name='contacts')
     address = models.ForeignKey('Address', on_delete=models.CASCADE, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
 

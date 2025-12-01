@@ -110,6 +110,9 @@
                     {% if supplier.supplier_type %}
                     <span class="text-sm text-gray-500 dark:text-gray-300">{{ supplier.supplier_type.description }}</span>
                     {% endif %}
+                    {% if supplier.archived %}
+                    <span class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Archived</span>
+                    {% endif %}
                 </div>
                 <div class="mt-2 flex flex-wrap gap-2">
                     {% if supplier.probation %}
@@ -121,6 +124,7 @@
                     {% if supplier.iso %}
                     <span class="status-badge success">ISO Certified</span>
                     {% endif %}
+                    <span class="status-badge" style="background-color:#f3f4f6;color:#374151;">GSI: {{ supplier.get_allows_gsi_display }}</span>
                 </div>
             </div>
             <div class="flex space-x-3">
@@ -163,7 +167,13 @@
                     <dl class="space-y-3">
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Business Phone</dt>
-                            <dd class="mt-1">{{ supplier.business_phone|default:"Not provided" }}</dd>
+                            <dd class="mt-1">
+                                {% if supplier.business_phone %}
+                                <a href="tel:{{ supplier.business_phone }}" class="text-indigo-600 hover:text-indigo-800">{{ supplier.business_phone }}</a>
+                                {% else %}
+                                Not provided
+                                {% endif %}
+                            </dd>
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Business Fax</dt>
@@ -171,7 +181,13 @@
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Business Email</dt>
-                            <dd class="mt-1">{{ supplier.business_email|default:"Not provided" }}</dd>
+                            <dd class="mt-1">
+                                {% if supplier.business_email %}
+                                <a href="mailto:{{ supplier.business_email }}" class="text-indigo-600 hover:text-indigo-800">{{ supplier.business_email }}</a>
+                                {% else %}
+                                Not provided
+                                {% endif %}
+                            </dd>
                         </div>
                     </dl>
                 </div>
@@ -208,7 +224,17 @@
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Allows GSI</dt>
-                            <dd class="mt-1">{{ supplier.allows_gsi|yesno:"Yes,No,Unknown" }}</dd>
+                            <dd class="mt-1">{{ supplier.get_allows_gsi_display }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Archived</dt>
+                            <dd class="mt-1">
+                                {% if supplier.archived %}
+                                    Archived on {{ supplier.archived_on|date:"M d, Y H:i"|default:"Date not recorded" }}
+                                {% else %}
+                                    Active
+                                {% endif %}
+                            </dd>
                         </div>
                     </dl>
                 </div>
@@ -242,13 +268,17 @@
         <!-- Contracts Tab -->
         <div id="contracts" class="tab-content {% if active_tab == 'contracts' %}active{% endif %}">
             <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-200 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <h3 class="text-lg font-medium text-gray-900">Contracts</h3>
+                    <div class="w-full md:w-64">
+                        <label for="contract_filter" class="sr-only">Filter contracts</label>
+                        <input type="text" id="contract_filter" placeholder="Filter by contract #" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
                 </div>
                 {% if contracts %}
                 <div class="divide-y divide-gray-200">
                     {% for contract in contracts %}
-                    <div class="p-6">
+                    <div class="p-6 contract-row" data-contract-text="{{ contract.contract_number }} {{ contract.prime|default_if_none:'' }}">
                         <div class="flex items-center justify-between">
                             <div>
                                 <h4 class="text-lg font-medium text-gray-900">
@@ -675,11 +705,11 @@
 
         // Set up notes form submission
         const notesForm = document.getElementById('notesForm');
-        if (notesForm) {
-            notesForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const formData = new FormData(this);
-                
+          if (notesForm) {
+              notesForm.addEventListener('submit', function(e) {
+                  e.preventDefault();
+                  const formData = new FormData(this);
+                  
                 fetch(this.action, {
                     method: 'POST',
                     body: formData,
@@ -709,9 +739,22 @@
                     console.error('Error:', error);
                     alert('Failed to save notes. Please try again.');
                 });
-            });
-        }
-    });
+              });
+          }
+
+          // Client-side contract filter
+          const contractFilter = document.getElementById('contract_filter');
+          if (contractFilter) {
+              const contractRows = document.querySelectorAll('.contract-row');
+              contractFilter.addEventListener('input', function() {
+                  const term = this.value.toLowerCase();
+                  contractRows.forEach(row => {
+                      const text = row.dataset.contractText.toLowerCase();
+                      row.style.display = text.includes(term) ? '' : 'none';
+                  });
+              });
+          }
+      });
 
     // Modal functions
     function showModal(modalId) {

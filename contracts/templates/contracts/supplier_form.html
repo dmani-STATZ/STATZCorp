@@ -57,8 +57,9 @@
                 {% include "contracts/includes/checkbox_field.html" with field=form.conditional %}
                 {% include "contracts/includes/checkbox_field.html" with field=form.ppi %}
                 {% include "contracts/includes/checkbox_field.html" with field=form.iso %}
-                {% include "contracts/includes/checkbox_field.html" with field=form.allows_gsi %}
+                {% include "contracts/includes/simple_field.html" with field=form.allows_gsi %}
                 {% include "contracts/includes/checkbox_field.html" with field=form.is_packhouse %}
+                {% include "contracts/includes/checkbox_field.html" with field=form.archived %}
             </div>
         </section>
 

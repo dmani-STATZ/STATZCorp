@@ -11,7 +11,7 @@ from datetime import timedelta
 from STATZWeb.decorators import conditional_login_required
 from ..models import (
     Supplier, Address, Contract, Clin, Contact, 
-    SupplierCertification, SupplierClassification, CertificationType, ClassificationType
+    SupplierCertification, SupplierClassification, CertificationType, ClassificationType, SupplierType, SpecialPaymentTerms
 )
 from ..forms import SupplierForm
 
@@ -22,13 +22,17 @@ class SupplierListView(ListView):
     template_name = 'contracts/supplier_list.html'
     context_object_name = 'suppliers'
     paginate_by = 7
-    
+    ajax_required_fields = ['id', 'name', 'cage_code']
+
     def get_queryset(self):
         queryset = Supplier.objects.all()
         
         # Get search parameters
         name = self.request.GET.get('name', '').strip()
         cage_code = self.request.GET.get('cage_code', '').strip()
+        q = self.request.GET.get('q', '').strip()
+        certification_type = self.request.GET.get('certification')
+        archived_filter = self.request.GET.get('archived', 'active')
         probation = self.request.GET.get('probation') == 'true'
         conditional = self.request.GET.get('conditional') == 'true'
         iso = self.request.GET.get('iso') == 'true'
@@ -39,6 +43,8 @@ class SupplierListView(ListView):
             queryset = queryset.filter(name__icontains=name)
         if cage_code:
             queryset = queryset.filter(cage_code__icontains=cage_code)
+        if q:
+            queryset = queryset.filter(Q(name__icontains=q) | Q(cage_code__icontains=q))
         if probation:
             queryset = queryset.filter(probation=True)
         if conditional:
@@ -47,8 +53,505 @@ class SupplierListView(ListView):
             queryset = queryset.filter(iso=True)
         if ppi:
             queryset = queryset.filter(ppi=True)
+        if certification_type:
+            queryset = queryset.filter(
+                suppliercertification__certification_type_id=certification_type
+            )
+        if archived_filter == 'archived':
+            queryset = queryset.filter(archived=True)
+        elif archived_filter == 'all':
+            # No filter, include everything
+            pass
+        else:
+            queryset = queryset.filter(archived=False)
         
-        return queryset.order_by('name')
+        return queryset.order_by('name').distinct()
+
+    @staticmethod
+    def build_detail_payload(supplier):
+        if not supplier:
+            return {}
+
+        def format_address(addr):
+            if not addr:
+                return None
+            parts = [
+                addr.address_line_1,
+                addr.address_line_2,
+                f"{addr.city}, {addr.state} {addr.zip}"
+            ]
+            return "\n".join([p for p in parts if p])
+
+        def format_address_single_line(addr):
+            if not addr:
+                return None
+            parts = [
+                addr.address_line_1,
+                addr.address_line_2,
+                f"{addr.city}, {addr.state} {addr.zip}".strip()
+            ]
+            return ", ".join([p for p in parts if p])
+
+        def as_dict(addr):
+            if not addr:
+                return None
+            return {
+                'id': addr.id,
+                'line1': addr.address_line_1,
+                'line2': addr.address_line_2,
+                'city': addr.city,
+                'state': addr.state,
+                'zip': addr.zip,
+                'display': format_address_single_line(addr)
+            }
+
+        contracts_qs = Contract.objects.filter(clin__supplier=supplier).distinct().order_by('-created_on')
+        contracts = contracts_qs[:10]
+        contacts = list(Contact.objects.filter(supplier=supplier))
+        if supplier.contact and supplier.contact not in contacts:
+            contacts.append(supplier.contact)
+        certifications = SupplierCertification.objects.filter(supplier=supplier)
+        classifications = SupplierClassification.objects.filter(supplier=supplier)
+        now = timezone.now()
+        year_ago = now - timedelta(days=365)
+        contract_stats = {
+            'total_contracts': contracts_qs.count(),
+            'active_contracts': contracts_qs.filter(status__description='Open').count(),
+            'total_value': Clin.objects.filter(supplier=supplier).aggregate(
+                total=Sum('quote_value', output_field=DecimalField())
+            )['total'] or 0,
+            'yearly_value': Clin.objects.filter(
+                supplier=supplier,
+                contract__created_on__gte=year_ago
+            ).aggregate(
+                total=Sum('quote_value', output_field=DecimalField())
+            )['total'] or 0,
+        }
+
+        address = None
+        if supplier.physical_address:
+            addr = supplier.physical_address
+            address = ", ".join(filter(None, [
+                addr.address_line_1,
+                addr.address_line_2,
+                f"{addr.city}, {addr.state} {addr.zip}"
+            ]))
+
+        def fmt_dt(dt):
+            return dt.strftime('%Y-%m-%d %H:%M') if dt else None
+
+        return {
+            'id': supplier.id,
+            'name': supplier.name,
+            'cage_code': supplier.cage_code,
+            'dodaac': supplier.dodaac,
+            'supplier_type': supplier.supplier_type.description if supplier.supplier_type else '',
+            'supplier_type_id': supplier.supplier_type.id if supplier.supplier_type else None,
+            'is_packhouse': supplier.is_packhouse,
+            'packhouse': supplier.packhouse.cage_code if supplier.packhouse else '',
+            'packhouse_id': supplier.packhouse.id if supplier.packhouse else None,
+            'probation': supplier.probation,
+            'probation_on': fmt_dt(supplier.probation_on),
+            'probation_by': supplier.probation_by.username if supplier.probation_by else None,
+            'conditional': supplier.conditional,
+            'conditional_on': fmt_dt(supplier.conditional_on),
+            'conditional_by': supplier.conditional_by.username if supplier.conditional_by else None,
+            'archived': supplier.archived,
+            'archived_on': fmt_dt(supplier.archived_on),
+            'archived_by': supplier.archived_by.username if supplier.archived_by else None,
+            'business_phone': supplier.business_phone,
+            'business_fax': supplier.business_fax,
+            'business_email': supplier.business_email,
+            'address': address,
+            'billing_address': format_address(supplier.billing_address),
+            'shipping_address': format_address(supplier.shipping_address),
+            'physical_address': format_address(supplier.physical_address),
+            'billing_address_id': supplier.billing_address.id if supplier.billing_address else None,
+            'shipping_address_id': supplier.shipping_address.id if supplier.shipping_address else None,
+            'physical_address_id': supplier.physical_address.id if supplier.physical_address else None,
+            'billing_address_display': format_address_single_line(supplier.billing_address),
+            'shipping_address_display': format_address_single_line(supplier.shipping_address),
+            'physical_address_display': format_address_single_line(supplier.physical_address),
+            'billing_address_obj': as_dict(supplier.billing_address),
+            'shipping_address_obj': as_dict(supplier.shipping_address),
+            'physical_address_obj': as_dict(supplier.physical_address),
+            'contact_name': supplier.contact.name if supplier.contact else None,
+            'contact_email': supplier.contact.email if supplier.contact else None,
+            'contact_phone': supplier.contact.phone if supplier.contact else None,
+            'special_terms': supplier.special_terms.terms if supplier.special_terms else None,
+            'special_terms_id': supplier.special_terms.id if supplier.special_terms else None,
+            'special_terms_on': fmt_dt(supplier.special_terms_on),
+            'prime': supplier.prime,
+            'ppi': supplier.ppi,
+            'iso': supplier.iso,
+            'allows_gsi': supplier.get_allows_gsi_display() if hasattr(supplier, 'get_allows_gsi_display') else None,
+            'allows_gsi_value': supplier.allows_gsi,
+            'files_url': supplier.files_url,
+            'notes': supplier.notes or '',
+            'certifications': [
+                {
+                    'type': cert.certification_type.name,
+                    'id': cert.id,
+                    'date': cert.certification_date.strftime('%Y-%m-%d') if cert.certification_date else None,
+                    'expires': cert.certification_expiration.strftime('%Y-%m-%d') if cert.certification_expiration else None
+                } for cert in certifications
+            ],
+            'classifications': [
+                {
+                    'type': c.classification_type.name,
+                    'id': c.id,
+                    'date': c.classification_date.strftime('%Y-%m-%d') if c.classification_date else None,
+                    'expires': c.expiration_date.strftime('%Y-%m-%d') if c.expiration_date else None
+                } for c in classifications
+            ],
+            'contracts': [
+                {
+                    'number': c.contract_number,
+                    'status': c.status.description if c.status else '',
+                    'award_date': c.award_date.strftime('%Y-%m-%d') if c.award_date else None
+                } for c in contracts
+            ],
+            'contacts': [
+                {
+                    'id': ct.id,
+                    'name': ct.name,
+                    'title': ct.title,
+                    'email': ct.email,
+                    'phone': ct.phone
+                } for ct in contacts
+            ],
+            'stats': contract_stats,
+        }
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            supplier_id = self.request.GET.get('supplier_id')
+            supplier = None
+            if supplier_id:
+                supplier = Supplier.objects.filter(pk=supplier_id).first()
+            payload = self.build_detail_payload(supplier)
+            return JsonResponse(payload, safe=False)
+        return super().render_to_response(context, **response_kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['certification_types'] = CertificationType.objects.all().order_by('name')
+        context['archived_filter'] = self.request.GET.get('archived', 'active')
+        
+        suppliers = context.get('suppliers') or []
+        selected_supplier = None
+        supplier_id = self.request.GET.get('supplier_id')
+        if supplier_id:
+            try:
+                # Prefer the supplier from current page of results; fallback to direct lookup for deep links
+                selected_supplier = suppliers.filter(pk=supplier_id).first()
+                if not selected_supplier:
+                    selected_supplier = Supplier.objects.filter(pk=supplier_id).first()
+            except Exception:
+                selected_supplier = None
+
+        contracts = Contract.objects.none()
+        contacts = Contact.objects.none()
+        certifications = SupplierCertification.objects.none()
+        classifications = SupplierClassification.objects.none()
+        contract_stats = {}
+
+        if selected_supplier:
+            payload = self.build_detail_payload(selected_supplier)
+        else:
+            payload = {}
+
+        context.update({
+            'selected_supplier': selected_supplier,
+            'has_selected_supplier': selected_supplier is not None,
+            'detail_payload': payload,
+            'detail_contracts': payload.get('contracts', []),
+            'detail_contacts': payload.get('contacts', []),
+            'detail_certifications': payload.get('certifications', []),
+            'detail_classifications': payload.get('classifications', []),
+            'detail_stats': payload.get('stats', {}),
+            'active_tab': self.request.GET.get('tab', 'info'),
+            'supplier_types': SupplierType.objects.all().order_by('description'),
+            'packhouse_options': Supplier.objects.filter(
+                Q(is_packhouse=True) | Q(supplier_type__description__iexact='packhouse')
+            ).order_by('name'),
+            'special_terms_options': SpecialPaymentTerms.objects.all().order_by('terms'),
+            'certification_types': CertificationType.objects.all().order_by('name'),
+            'classification_types': ClassificationType.objects.all().order_by('name'),
+        })
+        return context
+
+
+@conditional_login_required
+def toggle_supplier_flag(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    field = request.POST.get('field')
+    if field not in ['probation', 'conditional', 'archived']:
+        return JsonResponse({'error': 'Invalid field'}, status=400)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    now = timezone.now()
+    user = request.user
+
+    def clear(field_name, on_attr, by_attr):
+        setattr(supplier, field_name, False)
+        setattr(supplier, on_attr, None)
+        setattr(supplier, by_attr, None)
+
+    def set_flag(field_name, on_attr, by_attr):
+        setattr(supplier, field_name, True)
+        setattr(supplier, on_attr, now)
+        setattr(supplier, by_attr, user)
+
+    if field == 'probation':
+        if supplier.probation:
+            clear('probation', 'probation_on', 'probation_by')
+        else:
+            set_flag('probation', 'probation_on', 'probation_by')
+    elif field == 'conditional':
+        if supplier.conditional:
+            clear('conditional', 'conditional_on', 'conditional_by')
+        else:
+            set_flag('conditional', 'conditional_on', 'conditional_by')
+    elif field == 'archived':
+        if supplier.archived:
+            clear('archived', 'archived_on', 'archived_by')
+        else:
+            set_flag('archived', 'archived_on', 'archived_by')
+
+    supplier.save()
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def update_supplier_header(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+
+    supplier = get_object_or_404(Supplier, pk=pk)
+    name = (request.POST.get('name') or '').strip()
+    cage_code = (request.POST.get('cage_code') or '').strip()
+    dodaac = (request.POST.get('dodaac') or '').strip()
+
+    supplier.name = name or None
+    supplier.cage_code = cage_code or None
+    supplier.dodaac = dodaac or None
+    supplier.modified_by = request.user
+    supplier.save(update_fields=['name', 'cage_code', 'dodaac', 'modified_by', 'modified_on'])
+
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def update_supplier_notes(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    notes = request.POST.get('notes', '')
+    supplier.notes = notes
+    supplier.modified_by = request.user
+    supplier.save(update_fields=['notes', 'modified_by', 'modified_on'])
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def update_supplier_files(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    files_url = request.POST.get('files_url', '').strip()
+    supplier.files_url = files_url or None
+    supplier.modified_by = request.user
+    supplier.save(update_fields=['files_url', 'modified_by', 'modified_on'])
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def update_supplier_selects(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    supplier_type_id = request.POST.get('supplier_type_id')
+    packhouse_id = request.POST.get('packhouse_id')
+
+    if supplier_type_id:
+        supplier.supplier_type = SupplierType.objects.filter(pk=supplier_type_id).first()
+    else:
+        supplier.supplier_type = None
+    if packhouse_id is not None:
+        supplier.packhouse = Supplier.objects.filter(pk=packhouse_id).first() if packhouse_id else None
+
+    supplier.modified_by = request.user
+    supplier.save(update_fields=['supplier_type', 'packhouse', 'modified_by', 'modified_on'])
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def update_supplier_compliance(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    prime_val = request.POST.get('prime')
+    ppi_val = request.POST.get('ppi')
+    iso_val = request.POST.get('iso')
+    gsi_val = request.POST.get('allows_gsi')
+    special_terms_id = request.POST.get('special_terms_id')
+
+    supplier.prime = int(prime_val) if prime_val else None
+    if ppi_val in ['true', 'false']:
+        supplier.ppi = True if ppi_val == 'true' else False
+    if iso_val in ['true', 'false']:
+        supplier.iso = True if iso_val == 'true' else False
+    if gsi_val in ['YES', 'NO', 'UNK']:
+        supplier.allows_gsi = gsi_val
+    if special_terms_id:
+        supplier.special_terms = SpecialPaymentTerms.objects.filter(pk=special_terms_id).first()
+        supplier.special_terms_on = timezone.now()
+    else:
+        supplier.special_terms = None
+        supplier.special_terms_on = None
+
+    supplier.modified_by = request.user
+    supplier.save(update_fields=['prime', 'ppi', 'iso', 'allows_gsi', 'special_terms', 'special_terms_on', 'modified_by', 'modified_on'])
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def addresses_lookup(request):
+    q = (request.GET.get('q') or '').strip()
+    addresses = Address.objects.all()
+    if q:
+        addresses = addresses.filter(
+            Q(address_line_1__icontains=q) |
+            Q(address_line_2__icontains=q) |
+            Q(city__icontains=q) |
+            Q(state__icontains=q) |
+            Q(zip__icontains=q)
+        )
+    addresses = addresses.order_by('-id')[:50]
+    results = []
+    for addr in addresses:
+        parts = [addr.address_line_1, addr.address_line_2, f"{addr.city}, {addr.state} {addr.zip}"]
+        display = ", ".join([p for p in parts if p])
+        results.append({
+            'id': addr.id,
+            'line1': addr.address_line_1,
+            'line2': addr.address_line_2,
+            'city': addr.city,
+            'state': addr.state,
+            'zip': addr.zip,
+            'display': display,
+        })
+    return JsonResponse({'results': results})
+
+
+@conditional_login_required
+def update_supplier_address(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    field = request.POST.get('field')
+    if field not in ['physical', 'shipping', 'billing']:
+        return JsonResponse({'error': 'Invalid field'}, status=400)
+
+    address_id = request.POST.get('address_id')
+    line1 = (request.POST.get('line1') or '').strip()
+    line2 = (request.POST.get('line2') or '').strip()
+    city = (request.POST.get('city') or '').strip()
+    state = (request.POST.get('state') or '').strip()
+    zip_code = (request.POST.get('zip') or '').strip()
+
+    address_obj = None
+    if address_id:
+        address_obj = Address.objects.filter(pk=address_id).first()
+        if address_obj and (line1 or line2 or city or state or zip_code):
+            address_obj.address_line_1 = line1 or address_obj.address_line_1
+            address_obj.address_line_2 = line2 or address_obj.address_line_2
+            address_obj.city = city or address_obj.city
+            address_obj.state = state or address_obj.state
+            address_obj.zip = zip_code or address_obj.zip
+            address_obj.save()
+    elif line1 or city or state or zip_code:
+        address_obj = Address.objects.create(
+            address_line_1=line1,
+            address_line_2=line2 or None,
+            city=city,
+            state=state,
+            zip=zip_code
+        )
+
+    if not address_obj:
+        return JsonResponse({'error': 'No address data provided'}, status=400)
+
+    if field == 'physical':
+        supplier.physical_address = address_obj
+    elif field == 'shipping':
+        supplier.shipping_address = address_obj
+    elif field == 'billing':
+        supplier.billing_address = address_obj
+
+    supplier.modified_by = request.user
+    supplier.save(update_fields=['physical_address', 'shipping_address', 'billing_address', 'modified_by', 'modified_on'])
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def save_supplier_contact(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    contact_id = request.POST.get('contact_id')
+    name = (request.POST.get('name') or '').strip()
+    email = (request.POST.get('email') or '').strip()
+    phone = (request.POST.get('phone') or '').strip()
+    title = (request.POST.get('title') or '').strip()
+
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+
+    if contact_id:
+        contact = get_object_or_404(Contact, pk=contact_id)
+        if contact.supplier and contact.supplier != supplier:
+            return JsonResponse({'error': 'Contact belongs to another supplier'}, status=403)
+    else:
+        contact = Contact()
+
+    contact.supplier = supplier
+    contact.name = name
+    contact.email = email or None
+    contact.phone = phone or None
+    contact.title = title or None
+    contact.save()
+
+    if not supplier.contact:
+        supplier.contact = contact
+        supplier.save(update_fields=['contact'])
+
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def delete_supplier_contact(request, pk, contact_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
+
+    if supplier.contact_id == contact.id:
+        supplier.contact = None
+        supplier.save(update_fields=['contact'])
+
+    contact.delete()
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -64,6 +567,8 @@ class SupplierSearchView(ListView):
         # Get search parameters
         name = self.request.GET.get('name', '').strip()
         cage_code = self.request.GET.get('cage_code', '').strip()
+        q = self.request.GET.get('q', '').strip()
+        archived_filter = self.request.GET.get('archived', 'active')
         probation = self.request.GET.get('probation') == 'true'
         conditional = self.request.GET.get('conditional') == 'true'
         iso = self.request.GET.get('iso') == 'true'
@@ -74,6 +579,8 @@ class SupplierSearchView(ListView):
             queryset = queryset.filter(name__icontains=name)
         if cage_code:
             queryset = queryset.filter(cage_code__icontains=cage_code)
+        if q:
+            queryset = queryset.filter(Q(name__icontains=q) | Q(cage_code__icontains=q))
         if probation:
             queryset = queryset.filter(probation=True)
         if conditional:
@@ -82,6 +589,12 @@ class SupplierSearchView(ListView):
             queryset = queryset.filter(iso=True)
         if ppi:
             queryset = queryset.filter(ppi=True)
+        if archived_filter == 'archived':
+            queryset = queryset.filter(archived=True)
+        elif archived_filter == 'all':
+            pass
+        else:
+            queryset = queryset.filter(archived=False)
         
         return queryset.order_by('name')
 
@@ -189,6 +702,7 @@ class SupplierUpdateView(UpdateView):
             'allows_gsi': obj.allows_gsi,
             'is_packhouse': obj.is_packhouse,
             'packhouse': obj.packhouse,
+            'archived': obj.archived,
         }
         return obj
     
@@ -218,6 +732,7 @@ class SupplierUpdateView(UpdateView):
             'allows_gsi': supplier.allows_gsi,
             'is_packhouse': supplier.is_packhouse,
             'packhouse': supplier.packhouse.id if supplier.packhouse else None,
+            'archived': supplier.archived,
         }
         
         form.initial.update(initial_data)
@@ -272,6 +787,14 @@ class SupplierUpdateView(UpdateView):
             else:
                 # Keep the original value for unchanged fields
                 setattr(supplier, field, original[field])
+
+        if 'archived' in form.changed_data:
+            if form.cleaned_data.get('archived'):
+                supplier.archived_on = timezone.now()
+                supplier.archived_by = self.request.user
+            else:
+                supplier.archived_on = None
+                supplier.archived_by = None
         
         supplier.save()
         messages.success(self.request, f"Supplier {supplier.name} updated successfully!")
@@ -396,3 +919,24 @@ def get_supplier_classification(request, pk):
         'classification_date': classification.classification_date.strftime('%Y-%m-%d') if classification.classification_date else None,
         'expiration_date': classification.expiration_date.strftime('%Y-%m-%d') if classification.expiration_date else None
     }) 
+
+
+@conditional_login_required
+def supplier_autocomplete(request):
+    term = request.GET.get('q', '').strip()
+    archived_filter = request.GET.get('archived', 'active')
+
+    queryset = Supplier.objects.all()
+    if archived_filter == 'active':
+        queryset = queryset.filter(archived=False)
+    elif archived_filter == 'archived':
+        queryset = queryset.filter(archived=True)
+    # 'all' returns everything
+
+    if term:
+        queryset = queryset.filter(Q(name__icontains=term) | Q(cage_code__icontains=term))
+
+    results = list(
+        queryset.order_by('name')[:10].values('id', 'name', 'cage_code')
+    )
+    return JsonResponse({'results': results})

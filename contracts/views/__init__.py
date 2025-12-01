@@ -34,6 +34,17 @@ from .supplier_views import (
     add_supplier_classification,
     delete_supplier_classification,
     get_supplier_classification,
+    toggle_supplier_flag,
+    update_supplier_address,
+    update_supplier_notes,
+    update_supplier_selects,
+    update_supplier_compliance,
+    update_supplier_files,
+    save_supplier_contact,
+    delete_supplier_contact,
+    addresses_lookup,
+    supplier_autocomplete,
+    update_supplier_header,
 )
 
 from .nsn_views import (
@@ -83,6 +94,7 @@ from .acknowledgement_letter_views import (
 from .dashboard_views import (
     ContractLifecycleDashboardView,
     DashboardMetricDetailView,
+    dashboard_metric_detail_export,
 )
 
 from .contract_log_views import (
@@ -151,6 +163,7 @@ from .shipment_views import (
 from .code_table_views import (
     code_table_admin,
 )
+from .admin_tools import supplier_admin_tools
 
 __all__ = [
     'folder_tracking',
@@ -165,5 +178,6 @@ __all__ = [
     'get_acknowledgment_letter',
     'update_acknowledgment_letter',
     'code_table_admin',
+    'supplier_admin_tools',
 ]
 
