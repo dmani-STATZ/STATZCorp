@@ -200,24 +200,10 @@
       es.onerror = () => { es && es.close(); es=null; setRunning(false); };
     }
     function stop(){ if(es){ es.close(); es=null; } setRunning(false); }
-    function ensureToastRoot(){
-      let root = document.getElementById('toast-root');
-      if(!root){
-        root = document.createElement('div');
-        root.id = 'toast-root';
-        root.className = 'toast';
-        document.body.appendChild(root);
-      }
-      return root;
-    }
     function showToast(msg){
-      const root = ensureToastRoot();
-      const el = document.createElement('div');
-      el.className = 'toast-item';
-      el.textContent = msg;
-      root.appendChild(el);
-      setTimeout(()=>{ el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, 1200);
-      setTimeout(()=>{ root.removeChild(el); }, 1700);
+      if (window.notify) {
+        window.notify('info', msg);
+      }
     }
     function copy(){
       const sql = document.getElementById('aiSql').value.trim();

@@ -40,18 +40,9 @@ const ClinShipments = {
     },
 
     showMessage(message, type) {
-        // You can customize this to show messages however you want
         console.log(`${type}: ${message}`);
-        
-        // Example toast notification (you can implement your own)
-        if (typeof Toastify !== 'undefined') {
-            Toastify({
-                text: message,
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                backgroundColor: type === 'error' ? "#EF4444" : "#10B981"
-            }).showToast();
+        if (window.notify) {
+            window.notify(type === 'error' ? 'error' : 'success', message);
         }
     },
 

@@ -19,6 +19,7 @@
         border-radius: 12px;
         box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
         padding: 18px;
+        position: relative;
     }
     .heading-row {
         display: flex;
@@ -79,6 +80,141 @@
         color: #475569;
         line-height: 1.2;
     }
+
+    /* Loading States - Spinner */
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: currentColor;
+        animation: spin 0.8s ease-in-out infinite;
+    }
+    .spinner-dark {
+        border: 2px solid rgba(100, 116, 139, 0.2);
+        border-top-color: #475569;
+    }
+    .spinner-lg {
+        width: 24px;
+        height: 24px;
+        border-width: 3px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Search Loading */
+    .search-wrapper {
+        position: relative;
+    }
+    .search-spinner {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    .search-wrapper.loading .search-spinner {
+        opacity: 1;
+    }
+
+    /* Detail Panel Loading Overlay */
+    .detail-loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        border-radius: 12px;
+    }
+    .detail-loading-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Skeleton Loading Animation */
+    .skeleton {
+        background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 4px;
+    }
+    @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    .skeleton-text {
+        height: 14px;
+        margin-bottom: 8px;
+    }
+    .skeleton-text-sm {
+        height: 10px;
+        margin-bottom: 6px;
+    }
+    .skeleton-box {
+        height: 80px;
+    }
+
+    /* Button Loading States */
+    .btn-loading {
+        position: relative;
+        color: transparent !important;
+        pointer-events: none;
+    }
+    .btn-loading::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 16px;
+        height: 16px;
+        margin-left: -8px;
+        margin-top: -8px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 0.8s ease-in-out infinite;
+    }
+    .btn-loading-dark::after {
+        border: 2px solid rgba(100, 116, 139, 0.2);
+        border-top-color: #475569;
+    }
+
+    /* Select loading state */
+    select.loading {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' stroke='%23e2e8f0' stroke-width='3'%3E%3C/circle%3E%3Cpath fill='%236366f1' d='M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7V2z'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='1s' repeatCount='indefinite'/%3E%3C/path%3E%3C/svg%3E");
+        background-position: right 8px center;
+        background-repeat: no-repeat;
+        background-size: 16px;
+        padding-right: 32px;
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    /* Inline saving indicator */
+    .save-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #10b981;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    .save-indicator.visible {
+        opacity: 1;
+    }
+    .save-indicator.saving {
+        color: #6366f1;
+    }
 </style>
 {% endblock %}
 
@@ -103,9 +239,14 @@
         <div class="mock-pane">
             <p class="text-sm font-semibold text-slate-700 mb-3">Supplier Search</p>
             <div class="space-y-3">
-                <input type="text" id="supplier-search" name="q" value="{{ request.GET.q }}"
-                       class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                       placeholder="Search by name or CAGE...">
+                <div class="search-wrapper" id="search-wrapper">
+                    <input type="text" id="supplier-search" name="q" value="{{ request.GET.q }}"
+                           class="w-full rounded-md border border-slate-300 px-3 py-2 pr-8 text-sm"
+                           placeholder="Search by name or CAGE...">
+                    <div class="search-spinner">
+                        <div class="spinner spinner-dark" style="width: 14px; height: 14px;"></div>
+                    </div>
+                </div>
             </div>
             <div id="supplier-list" class="mt-4 space-y-2 text-sm text-slate-700 max-h-[70vh] overflow-auto">
                 {% for supplier in suppliers %}
@@ -123,7 +264,14 @@
         </div>
 
         <!-- Right 75% -->
-        <div class="mock-pane space-y-3">
+        <div class="mock-pane space-y-3" id="detail-pane">
+            <!-- Loading Overlay -->
+            <div id="detail-loading-overlay" class="detail-loading-overlay">
+                <div class="flex flex-col items-center gap-3">
+                    <div class="spinner spinner-dark spinner-lg"></div>
+                    <span class="text-sm text-slate-600 font-medium">Loading supplier...</span>
+                </div>
+            </div>
             <p class="text-sm font-semibold text-slate-700">Supplier Info</p>
             <div class="tabs">
                 <button class="tab-btn active" data-tab="info">Info</button>
@@ -327,11 +475,12 @@
                                 <button type="button" id="edit-files-btn" class="text-indigo-600 text-sm font-semibold hover:underline">Edit</button>
                             </div>
                             <div class="text-sm">
-                                {% if detail_payload.files_url %}
-                                    <a id="detail-files-url" href="{{ detail_payload.files_url }}" target="_blank" rel="noopener" class="text-indigo-600 hover:text-indigo-800 break-all">{{ detail_payload.files_url }}</a>
-                                {% else %}
-                                    <span id="detail-files-url" class="text-slate-500">None provided</span>
-                                {% endif %}
+                                <a id="detail-files-url"
+                                   href="{{ detail_payload.files_url|default:'' }}"
+                                   target="_blank" rel="noopener"
+                                   class="{% if detail_payload.files_url %}text-indigo-600 hover:text-indigo-800{% else %}text-slate-500 pointer-events-none cursor-not-allowed{% endif %}">
+                                    {% if detail_payload.files_url %}SharePoint Link{% else %}None provided{% endif %}
+                                </a>
                             </div>
                         </div>
                         <div class="supplier-card">
@@ -480,6 +629,7 @@
     </div>
 </div>
 {% if detail_payload %}{{ detail_payload|json_script:"detail-data" }}{% endif %}
+{% if initial_suppliers %}{{ initial_suppliers|json_script:"initial-suppliers" }}{% endif %}
 
 <!-- Quick edit modal for name, CAGE, and DODAAC -->
 <div id="name-edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
@@ -513,7 +663,10 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="name-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="name-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="name-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
@@ -566,7 +719,10 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="address-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="address-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="address-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
@@ -608,7 +764,10 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="contact-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="contact-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="contact-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
@@ -650,7 +809,10 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="cert-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="cert-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="cert-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
@@ -692,7 +854,10 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="class-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="class-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="class-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
@@ -716,7 +881,10 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="notes-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="notes-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="notes-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
@@ -741,13 +909,69 @@
         </div>
         <div class="mt-6 flex justify-end gap-2">
             <button type="button" id="files-modal-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</button>
-            <button type="button" id="files-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save</button>
+            <button type="button" id="files-modal-save" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 inline-flex items-center gap-2 min-w-[80px] justify-center">
+                <span class="btn-text">Save</span>
+                <span class="btn-spinner hidden"><div class="spinner" style="width: 14px; height: 14px;"></div></span>
+            </button>
         </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ============================================
+    // LOADING STATES & TOAST NOTIFICATION SYSTEM
+    // ============================================
+    
+    function showToast(message, type = 'success', duration = 3000) {
+        if (window.notify) {
+            window.notify(type, message, duration);
+        }
+    }
+    
+    // Button loading state helpers
+    function setButtonLoading(btn, loading) {
+        if (!btn) return;
+        const textEl = btn.querySelector('.btn-text');
+        const spinnerEl = btn.querySelector('.btn-spinner');
+        if (textEl && spinnerEl) {
+            if (loading) {
+                textEl.classList.add('hidden');
+                spinnerEl.classList.remove('hidden');
+                btn.disabled = true;
+            } else {
+                textEl.classList.remove('hidden');
+                spinnerEl.classList.add('hidden');
+                btn.disabled = false;
+            }
+        } else {
+            btn.disabled = loading;
+        }
+    }
+    
+    // Search loading state
+    const searchWrapper = document.getElementById('search-wrapper');
+    function setSearchLoading(loading) {
+        if (searchWrapper) {
+            searchWrapper.classList.toggle('loading', loading);
+        }
+    }
+    
+    // Detail panel loading overlay
+    const detailOverlay = document.getElementById('detail-loading-overlay');
+    function setDetailLoading(loading) {
+        if (detailOverlay) {
+            detailOverlay.classList.toggle('active', loading);
+        }
+    }
+    
+    // Select loading state
+    function setSelectLoading(select, loading) {
+        if (!select) return;
+        select.classList.toggle('loading', loading);
+        select.disabled = loading;
+    }
+    
     // Tab switching (persist tab in URL so deep links keep state)
     const tabButtons = document.querySelectorAll('[data-tab]');
     const tabPanels = document.querySelectorAll('[data-panel]');
@@ -775,6 +999,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentDetail = detailDataScript ? JSON.parse(detailDataScript.textContent || '{}') : null;
     let currentSupplierId = currentDetail ? currentDetail.id : null;
     const urlSupplierId = new URL(window.location).searchParams.get('supplier_id');
+    const initialSuppliersScript = document.getElementById('initial-suppliers');
+    let initialSuppliers = [];
+    if (initialSuppliersScript) {
+        try {
+            initialSuppliers = JSON.parse(initialSuppliersScript.textContent || '[]');
+        } catch (e) {
+            initialSuppliers = [];
+        }
+    }
 
     // Build left-hand list and navigate with a full page load (so URL updates)
     function renderList(items) {
@@ -802,21 +1035,31 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             a.addEventListener('click', function(ev) {
                 ev.preventDefault();
-                const targetUrl = new URL(window.location.pathname, window.location.origin);
-                targetUrl.searchParams.set('supplier_id', item.id);
-                targetUrl.searchParams.set('tab', currentTab || 'info');
-                window.location = targetUrl.toString();
+                fetchDetail(item.id, true);
             });
             listEl.appendChild(a);
         });
     }
 
     function doSearch(term) {
+        setSearchLoading(true);
         const params = new URLSearchParams({ q: term || '', archived });
         fetch(`{% url 'contracts:supplier_autocomplete' %}?${params.toString()}`)
             .then(resp => resp.json())
-            .then(data => renderList(data.results || []))
-            .catch(() => {});
+            .then(data => {
+                renderList(data.results || []);
+                const url = new URL(window.location);
+                if (term) url.searchParams.set('q', term); else url.searchParams.delete('q');
+                url.searchParams.delete('supplier_id');
+                url.searchParams.set('tab', currentTab || 'info');
+                window.history.replaceState({}, '', url);
+            })
+            .catch(() => {
+                showToast('Search failed. Please try again.', 'error');
+            })
+            .finally(() => {
+                setSearchLoading(false);
+            });
     }
 
     let debounceTimer;
@@ -825,6 +1068,23 @@ document.addEventListener('DOMContentLoaded', function() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => doSearch(term), 200);
     });
+
+    // Allow manual reset of search/list
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.textContent = 'Reset';
+    resetBtn.className = 'mt-2 text-xs text-indigo-600 hover:underline';
+    resetBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        renderList(initialSuppliers);
+        const url = new URL(window.location);
+        url.searchParams.delete('q');
+        url.searchParams.delete('supplier_id');
+        window.history.replaceState({}, '', url);
+    });
+    if (searchInput && searchInput.parentElement) {
+        searchInput.parentElement.appendChild(resetBtn);
+    }
 
     // Render the main detail pane from a supplier payload
     function setDetail(data) {
@@ -877,14 +1137,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const filesEl = document.getElementById('detail-files-url');
         if (filesEl) {
             if (data.files_url) {
-                filesEl.textContent = data.files_url;
+                filesEl.textContent = 'SharePoint Link';
                 filesEl.setAttribute('href', data.files_url);
-                filesEl.classList.remove('text-slate-500');
+                filesEl.classList.remove('text-slate-500', 'pointer-events-none', 'cursor-not-allowed');
                 filesEl.classList.add('text-indigo-600');
             } else {
                 filesEl.textContent = 'None provided';
-                filesEl.removeAttribute('href');
-                filesEl.classList.add('text-slate-500');
+                filesEl.setAttribute('href', '#');
+                filesEl.classList.add('text-slate-500', 'pointer-events-none', 'cursor-not-allowed');
                 filesEl.classList.remove('text-indigo-600');
             }
         }
@@ -978,7 +1238,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Fetch detail payload via AJAX (used on initial load when only supplier_id is in URL)
-    function fetchDetail(id) {
+    function fetchDetail(id, updateUrl = false) {
+        setDetailLoading(true);
         const params = new URLSearchParams({ supplier_id: id, ajax: '1' });
         fetch(`${window.location.pathname}?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(resp => resp.json())
@@ -990,18 +1251,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     el.classList.toggle('border-indigo-300', el.dataset.id == id);
                     el.classList.toggle('bg-indigo-50', el.dataset.id == id);
                 });
+                if (updateUrl) {
+                    const url = new URL(window.location);
+                    url.searchParams.set('supplier_id', id);
+                    url.searchParams.set('tab', currentTab || 'info');
+                    window.history.replaceState({}, '', url);
+                }
             })
-            .catch(() => {});
+            .catch((err) => {
+                showToast('Failed to load supplier details.', 'error');
+                console.error('Supplier detail error', err);
+            })
+            .finally(() => {
+                setDetailLoading(false);
+            });
     }
 
     // Attach click handlers to existing list
     document.querySelectorAll('.supplier-item').forEach(el => {
         el.addEventListener('click', function(ev) {
             ev.preventDefault();
-            const targetUrl = new URL(window.location.pathname, window.location.origin);
-            targetUrl.searchParams.set('supplier_id', this.dataset.id);
-            targetUrl.searchParams.set('tab', currentTab || 'info');
-            window.location = targetUrl.toString();
+            fetchDetail(this.dataset.id, true);
         });
     });
 
@@ -1010,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setDetail(currentDetail);
         currentSupplierId = currentDetail.id || currentSupplierId;
     } else if (urlSupplierId) {
-        fetchDetail(urlSupplierId);
+        fetchDetail(urlSupplierId, true);
     }
 
     // Render contact cards and wire edit/delete actions
@@ -1062,6 +1332,12 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 const contactId = btn.dataset.contactId;
                 if (!contactId || !currentSupplierId) return;
+                
+                // Add loading state to the row
+                const row = btn.closest('.contact-row');
+                if (row) row.style.opacity = '0.5';
+                btn.disabled = true;
+                
                 const deleteUrl = `{% url 'contracts:supplier_delete_contact' pk=0 contact_id=0 %}`.replace('/0/contact/0/', `/${currentSupplierId}/contact/${contactId}/`);
                 fetch(deleteUrl, {
                     method: 'POST',
@@ -1074,8 +1350,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     currentSupplierId = data.id;
                     setDetail(data);
+                    showToast('Contact deleted.', 'success');
                 })
-                .catch(() => {});
+                .catch(() => {
+                    showToast('Failed to delete contact.', 'error');
+                    if (row) row.style.opacity = '1';
+                    btn.disabled = false;
+                });
             });
         });
     }
@@ -1102,6 +1383,12 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 const cid = btn.dataset.id;
                 if (!cid || !currentSupplierId) return;
+                
+                // Add loading state to the row
+                const row = btn.closest('[data-cert-id]');
+                if (row) row.style.opacity = '0.5';
+                btn.disabled = true;
+                
                 fetch(`{% url 'contracts:supplier_delete_certification' supplier_id=0 pk=0 %}`.replace('/0/', `/${currentSupplierId}/`).replace('/0/', `/${cid}/`), {
                     method: 'POST',
                     headers: {
@@ -1110,8 +1397,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .then(resp => resp.json())
-                .then(() => refreshDetail())
-                .catch(() => {});
+                .then(() => {
+                    refreshDetail();
+                    showToast('Certification deleted.', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to delete certification.', 'error');
+                    if (row) row.style.opacity = '1';
+                    btn.disabled = false;
+                });
             });
         });
     }
@@ -1138,6 +1432,12 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 const cid = btn.dataset.id;
                 if (!cid || !currentSupplierId) return;
+                
+                // Add loading state to the row
+                const row = btn.closest('[data-class-id]');
+                if (row) row.style.opacity = '0.5';
+                btn.disabled = true;
+                
                 fetch(`{% url 'contracts:supplier_delete_classification' supplier_id=0 pk=0 %}`.replace('/0/', `/${currentSupplierId}/`).replace('/0/', `/${cid}/`), {
                     method: 'POST',
                     headers: {
@@ -1146,21 +1446,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .then(resp => resp.json())
-                .then(() => refreshDetail())
-                .catch(() => {});
+                .then(() => {
+                    refreshDetail();
+                    showToast('Classification deleted.', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to delete classification.', 'error');
+                    if (row) row.style.opacity = '1';
+                    btn.disabled = false;
+                });
             });
         });
     }
 
-    function refreshDetail() {
+    function refreshDetail(showOverlay = false) {
         if (!currentSupplierId) return;
+        if (showOverlay) setDetailLoading(true);
         const params = new URLSearchParams({ supplier_id: currentSupplierId, ajax: '1' });
         fetch(`${window.location.pathname}?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(resp => resp.json())
             .then(data => {
                 setDetail(data);
             })
-            .catch(() => {});
+            .catch(() => {
+                showToast('Failed to refresh data.', 'error');
+            })
+            .finally(() => {
+                if (showOverlay) setDetailLoading(false);
+            });
     }
 
     // Toggle buttons
@@ -1275,7 +1588,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (nameSaveBtn) {
         nameSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId) return;
-            nameSaveBtn.disabled = true;
+            setButtonLoading(nameSaveBtn, true);
             fetch(`{% url 'contracts:supplier_quick_update' pk=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1300,12 +1613,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     listTitle.textContent = data.cage_code ? `${data.name || 'N/A'} (${data.cage_code})` : (data.name || 'N/A');
                 }
                 closeNameModal();
+                showToast('Supplier updated successfully!', 'success');
             })
             .catch(() => {
-                if (nameSaveBtn) nameSaveBtn.disabled = false;
+                showToast('Failed to save changes. Please try again.', 'error');
             })
             .finally(() => {
-                if (nameSaveBtn) nameSaveBtn.disabled = false;
+                setButtonLoading(nameSaveBtn, false);
             });
         });
     }
@@ -1372,7 +1686,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (addressSaveBtn) {
         addressSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId || !activeAddressField) return;
-            addressSaveBtn.disabled = true;
+            setButtonLoading(addressSaveBtn, true);
             fetch(`{% url 'contracts:supplier_update_address' pk=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1394,12 +1708,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentSupplierId = data.id;
                 setDetail(data);
                 closeAddressModal();
+                showToast('Address updated successfully!', 'success');
             })
             .catch(() => {
-                if (addressSaveBtn) addressSaveBtn.disabled = false;
+                showToast('Failed to save address. Please try again.', 'error');
             })
             .finally(() => {
-                if (addressSaveBtn) addressSaveBtn.disabled = false;
+                setButtonLoading(addressSaveBtn, false);
             });
         });
     }
@@ -1431,7 +1746,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (contactSaveBtn) {
         contactSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId) return;
-            contactSaveBtn.disabled = true;
+            setButtonLoading(contactSaveBtn, true);
             fetch(`{% url 'contracts:supplier_save_contact' pk=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1452,18 +1767,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 setDetail(data);
                 closeContactModal();
                 if (contactPhoneInput) contactPhoneInput.value = formatPhone(contactPhoneInput.value);
+                showToast('Contact saved successfully!', 'success');
             })
             .catch(() => {
-                if (contactSaveBtn) contactSaveBtn.disabled = false;
+                showToast('Failed to save contact. Please try again.', 'error');
             })
             .finally(() => {
-                if (contactSaveBtn) contactSaveBtn.disabled = false;
+                setButtonLoading(contactSaveBtn, false);
             });
         });
     }
 
-    function updateSelects(payload) {
+    function updateSelects(payload, triggerSelect = null) {
         if (!currentSupplierId) return;
+        if (triggerSelect) setSelectLoading(triggerSelect, true);
         fetch(`{% url 'contracts:supplier_update_selects' pk=0 %}`.replace('0', currentSupplierId), {
             method: 'POST',
             headers: {
@@ -1476,24 +1793,31 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             currentSupplierId = data.id;
             setDetail(data);
+            showToast('Updated successfully!', 'success');
         })
-        .catch(() => {});
+        .catch(() => {
+            showToast('Failed to update. Please try again.', 'error');
+        })
+        .finally(() => {
+            if (triggerSelect) setSelectLoading(triggerSelect, false);
+        });
     }
 
     if (supplierTypeSelect) {
         supplierTypeSelect.addEventListener('change', () => {
-            updateSelects({ supplier_type_id: supplierTypeSelect.value || '' });
+            updateSelects({ supplier_type_id: supplierTypeSelect.value || '' }, supplierTypeSelect);
         });
     }
 
     if (packhouseSelectEl) {
         packhouseSelectEl.addEventListener('change', () => {
-            updateSelects({ packhouse_id: packhouseSelectEl.value || '' });
+            updateSelects({ packhouse_id: packhouseSelectEl.value || '' }, packhouseSelectEl);
         });
     }
 
-    function updateCompliance(payload) {
+    function updateCompliance(payload, triggerSelect = null) {
         if (!currentSupplierId) return;
+        if (triggerSelect) setSelectLoading(triggerSelect, true);
         fetch(`{% url 'contracts:supplier_update_compliance' pk=0 %}`.replace('0', currentSupplierId), {
             method: 'POST',
             headers: {
@@ -1506,33 +1830,39 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             currentSupplierId = data.id;
             setDetail(data);
+            showToast('Compliance updated!', 'success');
         })
-        .catch(() => {});
+        .catch(() => {
+            showToast('Failed to update compliance.', 'error');
+        })
+        .finally(() => {
+            if (triggerSelect) setSelectLoading(triggerSelect, false);
+        });
     }
 
     if (primeSelect) {
         primeSelect.addEventListener('change', () => {
-            updateCompliance({ prime: primeSelect.value || '' });
+            updateCompliance({ prime: primeSelect.value || '' }, primeSelect);
         });
     }
     if (ppiSelect) {
         ppiSelect.addEventListener('change', () => {
-            updateCompliance({ ppi: ppiSelect.value || '' });
+            updateCompliance({ ppi: ppiSelect.value || '' }, ppiSelect);
         });
     }
     if (isoSelect) {
         isoSelect.addEventListener('change', () => {
-            updateCompliance({ iso: isoSelect.value || '' });
+            updateCompliance({ iso: isoSelect.value || '' }, isoSelect);
         });
     }
     if (gsiSelect) {
         gsiSelect.addEventListener('change', () => {
-            updateCompliance({ allows_gsi: gsiSelect.value || 'UNK' });
+            updateCompliance({ allows_gsi: gsiSelect.value || 'UNK' }, gsiSelect);
         });
     }
     if (specialTermsSelect) {
         specialTermsSelect.addEventListener('change', () => {
-            updateCompliance({ special_terms_id: specialTermsSelect.value || '' });
+            updateCompliance({ special_terms_id: specialTermsSelect.value || '' }, specialTermsSelect);
         });
     }
 
@@ -1558,7 +1888,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (certSaveBtn) {
         certSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId || !certTypeInput || !certTypeInput.value) return;
-            certSaveBtn.disabled = true;
+            setButtonLoading(certSaveBtn, true);
             fetch(`{% url 'contracts:supplier_add_certification' supplier_id=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1575,12 +1905,13 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(() => {
                 closeCertModal();
                 refreshDetail();
+                showToast('Certification added successfully!', 'success');
             })
             .catch(() => {
-                if (certSaveBtn) certSaveBtn.disabled = false;
+                showToast('Failed to add certification.', 'error');
             })
             .finally(() => {
-                if (certSaveBtn) certSaveBtn.disabled = false;
+                setButtonLoading(certSaveBtn, false);
             });
         });
     }
@@ -1606,7 +1937,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (classSaveBtn) {
         classSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId || !classTypeInput || !classTypeInput.value) return;
-            classSaveBtn.disabled = true;
+            setButtonLoading(classSaveBtn, true);
             fetch(`{% url 'contracts:supplier_add_classification' supplier_id=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1623,12 +1954,13 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(() => {
                 closeClassModal();
                 refreshDetail();
+                showToast('Classification added successfully!', 'success');
             })
             .catch(() => {
-                if (classSaveBtn) classSaveBtn.disabled = false;
+                showToast('Failed to add classification.', 'error');
             })
             .finally(() => {
-                if (classSaveBtn) classSaveBtn.disabled = false;
+                setButtonLoading(classSaveBtn, false);
             });
         });
     }
@@ -1657,7 +1989,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (notesSaveBtn) {
         notesSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId) return;
-            notesSaveBtn.disabled = true;
+            setButtonLoading(notesSaveBtn, true);
             fetch(`{% url 'contracts:supplier_update_notes' pk=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1673,12 +2005,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentSupplierId = data.id;
                 setDetail(data);
                 closeNotesModal();
+                showToast('Notes saved successfully!', 'success');
             })
             .catch(() => {
-                if (notesSaveBtn) notesSaveBtn.disabled = false;
+                showToast('Failed to save notes.', 'error');
             })
             .finally(() => {
-                if (notesSaveBtn) notesSaveBtn.disabled = false;
+                setButtonLoading(notesSaveBtn, false);
             });
         });
     }
@@ -1705,7 +2038,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (filesSaveBtn) {
         filesSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId) return;
-            filesSaveBtn.disabled = true;
+            setButtonLoading(filesSaveBtn, true);
             fetch(`{% url 'contracts:supplier_update_files' pk=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1721,12 +2054,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentSupplierId = data.id;
                 setDetail(data);
                 closeFilesModal();
+                showToast('Files URL saved successfully!', 'success');
             })
             .catch(() => {
-                if (filesSaveBtn) filesSaveBtn.disabled = false;
+                showToast('Failed to save files URL.', 'error');
             })
             .finally(() => {
-                if (filesSaveBtn) filesSaveBtn.disabled = false;
+                setButtonLoading(filesSaveBtn, false);
             });
         });
     }
@@ -1755,6 +2089,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.disabled || this.dataset.disabled === 'true') return;
             const field = this.dataset.flag;
             if (!currentSupplierId || !field) return;
+            
+            // Disable button during request
+            this.disabled = true;
+            const originalText = this.textContent;
+            this.innerHTML = '<div class="spinner spinner-dark" style="width: 12px; height: 12px;"></div>';
+            
             fetch(`{% url 'contracts:supplier_toggle_flag' pk=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1771,8 +2111,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     const f = b.dataset.flag;
                     b.classList.toggle('active', data[f] === true);
                 });
+                const statusText = data[field] ? 'enabled' : 'disabled';
+                showToast(`${field.charAt(0).toUpperCase() + field.slice(1)} ${statusText}!`, 'success');
             })
-            .catch(() => {});
+            .catch(() => {
+                showToast('Failed to update status.', 'error');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = originalText;
+            });
         });
     });
 });

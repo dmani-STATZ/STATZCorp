@@ -8,8 +8,6 @@ Contract Details: {{ contract.contract_number }}
 
 {% block extra_head %}
 {{ block.super }}
-<!-- Add Toastify CSS for notifications -->
-<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 <style>
     /* Form label styling */
     .section-header {
@@ -274,8 +272,6 @@ Contract Details: {{ contract.contract_number }}
 
 {% block extra_scripts %}
 {{ block.super }}
-<!-- Add Toastify JS for notifications -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <!-- Add Contract Splits Component JS -->
 <script src="{% static 'contracts/js/contract_splits.js' %}"></script>
 {% endblock %} 

@@ -6,7 +6,6 @@
 
 {% block extra_head %}
 {{ block.super }}
-    <link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -25,16 +24,6 @@
             </div>
         </div>
         
-        {% if messages %}
-        <div class="mb-4 w-[960px] max-w-full">
-            {% for message in messages %}
-            <div class="p-4 rounded-md {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
-                {{ message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
         {% if contract %}
         <!-- Contract Details Section - 50% width (960px) -->
         <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
@@ -302,13 +291,16 @@
 </div>
 
 {% block extra_js %}
-<!-- Add Toastify JS for notifications -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <!-- Add Contract Splits Component JS -->
 <script src="{% static 'contracts/js/contract_splits.js' %}"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const notifyToast = (msg, type = 'info', duration = 3000) => {
+        if (window.notify) {
+            window.notify(type, msg, duration);
+        }
+    };
     const searchInput = document.getElementById('contract-search');
     const searchResults = document.getElementById('search-results');
     let debounceTimer;
@@ -383,27 +375,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 1000);
             
             // Show a success notification
-            if (typeof Toastify === 'function') {
-                Toastify({
-                    text: `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} ${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to $${formattedValue}`,
-                    duration: 3000,
-                    gravity: "top",
-                    position: 'right',
-                    backgroundColor: "#4CAF50",
-                }).showToast();
-            }
+            notifyToast(`${entityType.charAt(0).toUpperCase() + entityType.slice(1)} ${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to $${formattedValue}`, 'success');
             return true;
         } else {
             // Show error notification only if an update was attempted but failed
-            if (typeof Toastify === 'function') {
-                Toastify({
-                    text: "Error: Could not update display value",
-                    duration: 3000,
-                    gravity: "top",
-                    position: 'right',
-                    backgroundColor: "#f44336",
-                }).showToast();
-            }
+            notifyToast("Error: Could not update display value", 'error');
             return false;
         }
     };

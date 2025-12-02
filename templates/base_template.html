@@ -557,6 +557,66 @@
         })();
     </script>
     {% endif %}
+    <div id="toast-root" class="toast" aria-live="polite" aria-atomic="true"></div>
+    <script>
+    (function() {
+        const DEFAULT_DURATION = 3500;
+
+        function ensureToastRoot() {
+            let root = document.getElementById('toast-root');
+            if (!root) {
+                root = document.createElement('div');
+                root.id = 'toast-root';
+                root.className = 'toast';
+                document.body.appendChild(root);
+            }
+            return root;
+        }
+
+        function normalizeType(type) {
+            const t = (type || '').toLowerCase();
+            if (['success', 'error', 'warning', 'info'].includes(t)) {
+                return t;
+            }
+            return 'info';
+        }
+
+        function notify(type, message, duration) {
+            const root = ensureToastRoot();
+            const item = document.createElement('div');
+            const resolvedType = normalizeType(type);
+            item.className = 'toast-item';
+            item.classList.add(resolvedType);
+            item.textContent = message;
+            root.appendChild(item);
+            requestAnimationFrame(() => item.classList.add('show'));
+
+            const timeout = Number.isFinite(duration) ? duration : DEFAULT_DURATION;
+            setTimeout(() => {
+                item.classList.remove('show');
+                setTimeout(() => item.remove(), 300);
+            }, timeout);
+        }
+
+        window.notify = notify;
+        window.showToast = notify;
+        window.Toastify = function(opts) {
+            return {
+                showToast: function() {
+                    const text = (opts && (opts.text || opts.message)) || '';
+                    const cls = (opts && opts.className) || '';
+                    const bg = (opts && opts.backgroundColor) || '';
+                    const duration = (opts && (opts.duration || opts.timeOut)) || DEFAULT_DURATION;
+                    const type = cls.includes('error') || bg.includes('f44336') ? 'error'
+                        : cls.includes('success') || bg.includes('4CAF50') ? 'success'
+                        : cls.includes('warning') ? 'warning'
+                        : 'info';
+                    notify(type, text, duration);
+                }
+            };
+        };
+    })();
+    </script>
     {% block extra_js %}
     <script>
     function updateUnreadMessageCount() {

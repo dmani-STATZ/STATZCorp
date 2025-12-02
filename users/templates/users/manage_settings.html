@@ -56,11 +56,6 @@
     </div>
 </div>
 
-<!-- Toast Notification -->
-<div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-full transition-transform duration-300 hidden">
-    <span id="toastMessage"></span>
-</div>
-
 {% endblock body %}
 {% block extra_scripts %}
 
@@ -78,26 +73,9 @@ function log(message) {
 
 // Toast notification
 function showToast(message, isError = false) {
-    let toast = document.getElementById('toast');
-    let toastMessage = document.getElementById('toastMessage');
-    
-    toastMessage.textContent = message;
-    toast.classList.remove('hidden', 'translate-y-full');
-    toast.classList.add('translate-y-0');
-    
-    if (isError) {
-        toast.classList.add('bg-red-600');
-    } else {
-        toast.classList.add('bg-gray-800');
+    if (window.notify) {
+        window.notify(isError ? 'error' : 'success', message);
     }
-    
-    setTimeout(() => {
-        toast.classList.add('translate-y-full');
-        setTimeout(() => {
-            toast.classList.add('hidden');
-            toast.classList.remove('bg-red-600', 'bg-gray-800');
-        }, 300);
-    }, 3000);
 }
 
 // Load user settings

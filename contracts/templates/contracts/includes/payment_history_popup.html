@@ -1,10 +1,5 @@
 {% load static %}
 
-<!-- Add Toastify CSS at the top -->
-<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
-<!-- Add Toastify JS -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-
 <div class="payment-history-modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
      id="paymentHistoryPopup" 
      data-source-page="" 
@@ -68,6 +63,12 @@
 </div>
 
 <script>
+const notifyToast = (msg, type = 'info', duration = 3000) => {
+    if (window.notify) {
+        window.notify(type, msg, duration);
+    }
+};
+
 function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, currentValue) {
     const popup = document.getElementById('paymentHistoryPopup');
     popup.dataset.entityType = entityType;
@@ -158,26 +159,14 @@ if (form) {
                 }
                 
                 // Show success notification
-                Toastify({
-                    text: "Payment history entry added successfully",
-                    duration: 3000,
-                    gravity: "top",
-                    position: 'right',
-                    backgroundColor: "#4CAF50",
-                }).showToast();
+                notifyToast("Payment history entry added successfully", 'success');
             } else {
                 throw new Error(data.error || 'Failed to add payment history entry');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            Toastify({
-                text: error.message || "Failed to add payment history entry",
-                duration: 3000,
-                gravity: "top",
-                position: 'right',
-                backgroundColor: "#f44336",
-            }).showToast();
+            notifyToast(error.message || "Failed to add payment history entry", 'error');
         });
     });
 }

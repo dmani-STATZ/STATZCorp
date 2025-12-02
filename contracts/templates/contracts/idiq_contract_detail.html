@@ -6,8 +6,6 @@
 
 {% block extra_head %}
 {{ block.super }}
-<!-- Add Toastify CSS for notifications -->
-<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
 <style>
     .light-green-bg {
         background-color: #e8f5e9;
@@ -303,8 +301,6 @@
 
 {% block extra_scripts %}
 {{ block.super }}
-<!-- Add Toastify JS for notifications -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <!-- Add note modal functionality -->
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
 
@@ -314,24 +310,16 @@ const csrftoken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]'
 
 // Helper function to show error notifications
 function showErrorNotification(message) {
-    Toastify({
-        text: message || "An error occurred",
-        duration: 3000,
-        gravity: "top",
-        position: 'right',
-        backgroundColor: "#f44336",
-    }).showToast();
+    if (window.notify) {
+        window.notify('error', message || "An error occurred");
+    }
 }
 
 // Helper function to show success notifications
 function showSuccessNotification(message) {
-    Toastify({
-        text: message,
-        duration: 3000,
-        gravity: "top",
-        position: 'right',
-        backgroundColor: "#4CAF50",
-    }).showToast();
+    if (window.notify) {
+        window.notify('success', message);
+    }
 }
 
 // Helper function to add CSRF token to fetch headers

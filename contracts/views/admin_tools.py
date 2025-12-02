@@ -4,8 +4,10 @@ from django.shortcuts import render
 from django.utils import timezone
 import csv
 import re
+from difflib import SequenceMatcher
 from io import TextIOWrapper
 from pathlib import Path
+from urllib.parse import quote
 
 from openpyxl import load_workbook
 
@@ -68,7 +70,33 @@ def supplier_admin_tools(request):
         else:
             try:
                 updated, missing, errors, skipped = 0, 0, 0, 0
+
+                def normalize(val: str) -> str:
+                    return re.sub(r'[^A-Z0-9]', '', (val or '').upper())
+
+                # Precompute supplier list for matching
+                supplier_cache = list(Supplier.objects.filter(name__isnull=False))
+                normalized_cache = [(s, normalize(s.name)) for s in supplier_cache]
+
+                def best_fuzzy_match(norm_name: str, threshold: float = 0.8):
+                    best_sup = None
+                    best_score = 0.0
+                    for sup, sup_norm in normalized_cache:
+                        score = SequenceMatcher(None, norm_name, sup_norm).ratio()
+                        if score > best_score:
+                            best_score = score
+                            best_sup = sup
+                    if best_score >= threshold:
+                        return best_sup, best_score
+                    return None, best_score
                 ext = Path(upload.name or "").suffix.lower()
+
+                base_sharepoint_prefix = "https://statzcorpgcch.sharepoint.us/sites/Statz/Shared%20Documents/Forms/AllItems.aspx?RootFolder=/sites%2FStatz%2FShared%20Documents%2FStatz%2DPublic%2Fdata%2FV87%2FASUPPLIER%20MGMT%2F"
+
+                def build_url_from_name(folder_name: str) -> str:
+                    if not folder_name:
+                        return ""
+                    return base_sharepoint_prefix + quote(folder_name, safe='')
 
                 def process_row(idx, supplier_id, name, files_url, item_type):
                     nonlocal updated, missing, errors, skipped
@@ -95,6 +123,20 @@ def supplier_admin_tools(request):
                             supplier = None
                     if not supplier and name:
                         supplier = Supplier.objects.filter(name__iexact=name).first()
+                    if not supplier and name:
+                        norm = normalize(name)
+                        for sup, sup_norm in normalized_cache:
+                            if sup_norm == norm:
+                                supplier = sup
+                                break
+                    if not supplier and name:
+                        # fuzzy match
+                        candidate, score = best_fuzzy_match(normalize(name))
+                        if candidate:
+                            supplier = candidate
+
+                    if not files_url and name:
+                        files_url = build_url_from_name(name)
 
                     if not supplier:
                         missing += 1

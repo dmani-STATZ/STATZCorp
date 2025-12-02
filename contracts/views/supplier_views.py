@@ -261,6 +261,12 @@ class SupplierListView(ListView):
         else:
             payload = {}
 
+        suppliers_qs = context.get('suppliers') or Supplier.objects.none()
+        if hasattr(suppliers_qs, 'values'):
+            initial_suppliers = list(suppliers_qs.values('id', 'name', 'cage_code')[:50])
+        else:
+            initial_suppliers = [{'id': s.id, 'name': s.name, 'cage_code': s.cage_code} for s in suppliers_qs[:50]]
+
         context.update({
             'selected_supplier': selected_supplier,
             'has_selected_supplier': selected_supplier is not None,
@@ -278,6 +284,7 @@ class SupplierListView(ListView):
             'special_terms_options': SpecialPaymentTerms.objects.all().order_by('terms'),
             'certification_types': CertificationType.objects.all().order_by('name'),
             'classification_types': ClassificationType.objects.all().order_by('name'),
+            'initial_suppliers': initial_suppliers,
         })
         return context
 

@@ -973,4 +973,9 @@ input[type="datetime-local"] {
 
 /* ===== Toasts ===== */
 .toast { position: fixed; right: 16px; bottom: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
-.toast-item { background: rgba(17,24,39,.95); color: #fff; padding: 8px 12px; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: 14px; }
+.toast-item { background: rgba(17,24,39,.95); color: #fff; padding: 10px 14px; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: 14px; opacity: 0; transform: translateY(10px); transition: opacity .2s ease, transform .2s ease; }
+.toast-item.show { opacity: 1; transform: translateY(0); }
+.toast-item.success { background: #15803d; }
+.toast-item.error { background: #b91c1c; }
+.toast-item.warning { background: #d97706; }
+.toast-item.info { background: #1d4ed8; }

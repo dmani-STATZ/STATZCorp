@@ -11,8 +11,6 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 {% endblock extra_head %}
 
 {% block content %}
@@ -684,13 +682,15 @@
 
 {% block extra_scripts %}
 {{ block.super }}
-<!-- Add Toastify JS for notifications -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-
 <script>
     // Execute code when the DOM is fully loaded
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
+        const notifyToast = (msg, type = 'info', duration = 3000) => {
+            if (window.notify) {
+                window.notify(type, msg, duration);
+            }
+        };
         
         // Add delete CLIN functionality
         const deleteBtn = document.getElementById('delete-clin-btn');
@@ -858,25 +858,13 @@
                 }, 1000);
                 
                 // Show success notification
-                Toastify({
-                    text: `${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to ${formattedValue}`,
-                    duration: 3000,
-                    gravity: "top",
-                    position: 'right',
-                    backgroundColor: "#4CAF50",
-                }).showToast();
+                notifyToast(`${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to ${formattedValue}`, 'success');
                 
                 return true;
             }
             
             console.error(`Could not find fields for ${fieldType}`);
-            Toastify({
-                text: "Error: Could not update display value",
-                duration: 3000,
-                gravity: "top",
-                position: 'right',
-                backgroundColor: "#f44336",
-            }).showToast();
+            notifyToast("Error: Could not update display value", 'error');
             
             return false;
         };
@@ -939,32 +927,14 @@
                             // Clear the form
                             paymentHistoryForm.reset();
                             
-                            Toastify({
-                                text: "Payment entry added successfully",
-                                duration: 3000,
-                                gravity: "top",
-                                position: 'right',
-                                backgroundColor: "#4CAF50",
-                            }).showToast();
+                            notifyToast("Payment entry added successfully", 'success');
                         } else {
-                            Toastify({
-                                text: data.error || "Error adding payment entry",
-                                duration: 3000,
-                                gravity: "top",
-                                position: 'right',
-                                backgroundColor: "#f44336",
-                            }).showToast();
+                            notifyToast(data.error || "Error adding payment entry", 'error');
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        Toastify({
-                            text: "Error adding payment entry",
-                            duration: 3000,
-                            gravity: "top",
-                            position: 'right',
-                            backgroundColor: "#f44336",
-                        }).showToast();
+                        notifyToast("Error adding payment entry", 'error');
                     });
                 });
             }
