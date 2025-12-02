@@ -113,7 +113,7 @@ def supplier_admin_tools(request):
                         rows.append({"row": idx, "status": "error", "supplier": supplier.name, "url": files_url or "(cleared)"})
 
                 if ext == ".xlsx":
-                    wb = load_workbook(upload, read_only=True, data_only=True)
+                    wb = load_workbook(upload, read_only=False, data_only=True)
                     ws = wb.active
                     headers = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
                     header_map = {h.lower(): idx for idx, h in enumerate(headers)}
@@ -126,7 +126,8 @@ def supplier_admin_tools(request):
                     for idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
                         name_cell = get_cell(row, "name")
                         name_val = name_cell.value or ""
-                        url = name_cell.hyperlink.target if name_cell and name_cell.hyperlink else ""
+                        hyperlink_obj = getattr(name_cell, "hyperlink", None) if name_cell else None
+                        url = hyperlink_obj.target if hyperlink_obj else ""
                         item_type_cell = get_cell(row, "Item Type")
                         item_type_val = item_type_cell.value if hasattr(item_type_cell, "value") else ""
                         supplier_id_val = ""
