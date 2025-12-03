@@ -452,7 +452,7 @@ class Supplier(AuditModel):
     notes = models.TextField(null=True, blank=True)
     is_packhouse = models.BooleanField(null=True, blank=True)
     packhouse = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True)
-    files_url = models.CharField(max_length=200, null=True, blank=True)
+    files_url = models.CharField(max_length=400, null=True, blank=True)
     ALLOWS_GSI_CHOICES = [
         ('UNK', 'Unknown'),
         ('YES', 'Yes'),
@@ -671,6 +671,25 @@ class ClassificationType(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class SupplierDocument(AuditModel):
+    DOC_TYPE_CHOICES = [
+        ('CERT', 'Certification'),
+        ('CLASS', 'Classification'),
+        ('GENERAL', 'General'),
+    ]
+
+    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, related_name='documents')
+    certification = models.ForeignKey('SupplierCertification', on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
+    classification = models.ForeignKey('SupplierClassification', on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
+    doc_type = models.CharField(max_length=12, choices=DOC_TYPE_CHOICES, default='GENERAL')
+    description = models.CharField(max_length=255, null=True, blank=True)
+    file = models.FileField(upload_to='supplier-docs/')
+
+    def __str__(self):
+        label = self.get_doc_type_display() or 'Document'
+        return f"{label} for {self.supplier.name if self.supplier else 'Unknown'}"
     
 class Reminder(models.Model):
     reminder_title = models.CharField(max_length=50, null=True, blank=True)

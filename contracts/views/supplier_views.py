@@ -5,15 +5,47 @@ from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.http import HttpResponseRedirect, JsonResponse
 from django.db.models import Q, Count, Sum, Case, When, DecimalField
+from django.db import DatabaseError
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import (
     Supplier, Address, Contract, Clin, Contact, 
-    SupplierCertification, SupplierClassification, CertificationType, ClassificationType, SupplierType, SpecialPaymentTerms
+    SupplierCertification, SupplierClassification, CertificationType, ClassificationType, SupplierType, SpecialPaymentTerms,
+    SupplierDocument,
 )
 from ..forms import SupplierForm
+
+
+def parse_date_input(value):
+    """
+    Parse common date strings (HTML date inputs, ISO strings) into aware datetimes.
+    Returns None when empty or invalid.
+    """
+    if not value:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+
+    parsed = None
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%m/%d/%Y"):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+            break
+        except ValueError:
+            continue
+
+    if parsed is None:
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    if parsed.tzinfo is None:
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -21,7 +53,7 @@ class SupplierListView(ListView):
     model = Supplier
     template_name = 'contracts/supplier_list.html'
     context_object_name = 'suppliers'
-    paginate_by = 7
+    paginate_by = None
     ajax_required_fields = ['id', 'name', 'cage_code']
 
     def get_queryset(self):
@@ -112,6 +144,10 @@ class SupplierListView(ListView):
             contacts.append(supplier.contact)
         certifications = SupplierCertification.objects.filter(supplier=supplier)
         classifications = SupplierClassification.objects.filter(supplier=supplier)
+        try:
+            documents = SupplierDocument.objects.filter(supplier=supplier).select_related('certification', 'classification')
+        except DatabaseError:
+            documents = SupplierDocument.objects.none()
         now = timezone.now()
         year_ago = now - timedelta(days=365)
         contract_stats = {
@@ -139,6 +175,23 @@ class SupplierListView(ListView):
 
         def fmt_dt(dt):
             return dt.strftime('%Y-%m-%d %H:%M') if dt else None
+
+        doc_map_cert = {}
+        doc_map_class = {}
+        def get_file_bits(doc):
+            try:
+                url = doc.file.url
+            except Exception:
+                url = ''
+            name = doc.file.name if doc.file else ''
+            return url, name
+
+        for doc in documents:
+            url, name = get_file_bits(doc)
+            if doc.certification_id and doc.certification_id not in doc_map_cert:
+                doc_map_cert[doc.certification_id] = (doc, url, name)
+            if doc.classification_id and doc.classification_id not in doc_map_class:
+                doc_map_class[doc.classification_id] = (doc, url, name)
 
         return {
             'id': supplier.id,
@@ -193,7 +246,11 @@ class SupplierListView(ListView):
                     'type': cert.certification_type.name,
                     'id': cert.id,
                     'date': cert.certification_date.strftime('%Y-%m-%d') if cert.certification_date else None,
-                    'expires': cert.certification_expiration.strftime('%Y-%m-%d') if cert.certification_expiration else None
+                    'expires': cert.certification_expiration.strftime('%Y-%m-%d') if cert.certification_expiration else None,
+                    'compliance_status': cert.compliance_status,
+                    'document_id': doc_map_cert.get(cert.id)[0].id if doc_map_cert.get(cert.id) else None,
+                    'document_url': doc_map_cert.get(cert.id)[1] if doc_map_cert.get(cert.id) else None,
+                    'document_name': doc_map_cert.get(cert.id)[2] if doc_map_cert.get(cert.id) else None,
                 } for cert in certifications
             ],
             'classifications': [
@@ -201,7 +258,10 @@ class SupplierListView(ListView):
                     'type': c.classification_type.name,
                     'id': c.id,
                     'date': c.classification_date.strftime('%Y-%m-%d') if c.classification_date else None,
-                    'expires': c.expiration_date.strftime('%Y-%m-%d') if c.expiration_date else None
+                    'expires': c.classification_expiration.strftime('%Y-%m-%d') if c.classification_expiration else None,
+                    'document_id': doc_map_class.get(c.id)[0].id if doc_map_class.get(c.id) else None,
+                    'document_url': doc_map_class.get(c.id)[1] if doc_map_class.get(c.id) else None,
+                    'document_name': doc_map_class.get(c.id)[2] if doc_map_class.get(c.id) else None,
                 } for c in classifications
             ],
             'contracts': [
@@ -221,6 +281,17 @@ class SupplierListView(ListView):
                 } for ct in contacts
             ],
             'stats': contract_stats,
+            'documents': [
+                {
+                    'id': doc.id,
+                    'doc_type': doc.doc_type,
+                    'description': doc.description,
+                    'certification_id': doc.certification_id,
+                    'classification_id': doc.classification_id,
+                    'file_name': get_file_bits(doc)[1],
+                    'file_url': get_file_bits(doc)[0],
+                } for doc in documents
+            ],
         }
 
     def render_to_response(self, context, **response_kwargs):
@@ -263,9 +334,9 @@ class SupplierListView(ListView):
 
         suppliers_qs = context.get('suppliers') or Supplier.objects.none()
         if hasattr(suppliers_qs, 'values'):
-            initial_suppliers = list(suppliers_qs.values('id', 'name', 'cage_code')[:50])
+            initial_suppliers = list(suppliers_qs.values('id', 'name', 'cage_code')[:200])
         else:
-            initial_suppliers = [{'id': s.id, 'name': s.name, 'cage_code': s.cage_code} for s in suppliers_qs[:50]]
+            initial_suppliers = [{'id': s.id, 'name': s.name, 'cage_code': s.cage_code} for s in suppliers_qs[:200]]
 
         context.update({
             'selected_supplier': selected_supplier,
@@ -285,6 +356,12 @@ class SupplierListView(ListView):
             'certification_types': CertificationType.objects.all().order_by('name'),
             'classification_types': ClassificationType.objects.all().order_by('name'),
             'initial_suppliers': initial_suppliers,
+            'compliance_statuses': SupplierCertification.objects.exclude(
+                compliance_status__isnull=True
+            ).exclude(
+                compliance_status__exact=''
+            ).values_list('compliance_status', flat=True).distinct().order_by('compliance_status'),
+            'today': timezone.localdate(),
         })
         return context
 
@@ -831,20 +908,52 @@ def add_supplier_certification(request, supplier_id):
         
         supplier = get_object_or_404(Supplier, id=supplier_id)
         certification_type = get_object_or_404(CertificationType, id=request.POST.get('certification_type'))
+        cert_date_raw = request.POST.get('certification_date')
+        cert_exp_raw = request.POST.get('certification_expiration')
+        cert_date = parse_date_input(cert_date_raw)
+        cert_exp = parse_date_input(cert_exp_raw)
+        compliance_status = (request.POST.get('compliance_status') or '').strip() or None
+        file_obj = request.FILES.get('file')
+
+        if cert_date_raw and cert_date is None:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid certification date. Use YYYY-MM-DD.'
+            }, status=400)
+        if cert_exp_raw and cert_exp is None:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid certification expiration. Use YYYY-MM-DD.'
+            }, status=400)
+        if cert_date and cert_date.date() > timezone.localdate():
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Certification date cannot be in the future.'
+            }, status=400)
         
         print(f"DEBUG - Creating certification with:")
         print(f"DEBUG - Supplier: {supplier}")
         print(f"DEBUG - Type: {certification_type}")
-        print(f"DEBUG - Date: {request.POST.get('certification_date')}")
-        print(f"DEBUG - Expiration: {request.POST.get('certification_expiration')}")
+        print(f"DEBUG - Date: {cert_date_raw}")
+        print(f"DEBUG - Expiration: {cert_exp_raw}")
         
         try:
             certification = SupplierCertification.objects.create(
                 supplier=supplier,
                 certification_type=certification_type,
-                certification_date=request.POST.get('certification_date'),
-                certification_expiration=request.POST.get('certification_expiration')
+                certification_date=cert_date,
+                certification_expiration=cert_exp,
+                compliance_status=compliance_status
             )
+            if file_obj:
+                SupplierDocument.objects.create(
+                    supplier=supplier,
+                    certification=certification,
+                    doc_type='CERT',
+                    file=file_obj,
+                    description=f"{certification_type.name} certification document",
+                    created_by=request.user if hasattr(request, 'user') else None,
+                )
             print(f"DEBUG - Successfully created certification: {certification}")
             return JsonResponse({
                 'status': 'success',
@@ -878,7 +987,7 @@ def get_supplier_certification(request, pk):
     return JsonResponse({
         'id': certification.id,
         'certification_type': certification.certification_type.id,
-        'compliance_status': certification.compliance_status.id,
+        'compliance_status': certification.compliance_status,
         'certification_date': certification.certification_date.strftime('%Y-%m-%d') if certification.certification_date else None,
         'certification_expiration': certification.certification_expiration.strftime('%Y-%m-%d') if certification.certification_expiration else None
     })
@@ -889,13 +998,49 @@ def add_supplier_classification(request, supplier_id):
     if request.method == 'POST':
         supplier = get_object_or_404(Supplier, id=supplier_id)
         classification_type = get_object_or_404(ClassificationType, id=request.POST.get('classification_type'))
+        class_date_raw = request.POST.get('classification_date')
+        class_exp_raw = request.POST.get('expiration_date')
+        class_date = parse_date_input(class_date_raw)
+        class_exp = parse_date_input(class_exp_raw)
+        file_obj = request.FILES.get('file')
+
+        if class_date_raw and class_date is None:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid classification date. Use YYYY-MM-DD.'
+            }, status=400)
+        if class_exp_raw and class_exp is None:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid classification expiration. Use YYYY-MM-DD.'
+            }, status=400)
+        if class_date and class_date.date() > timezone.localdate():
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Classification date cannot be in the future.'
+            }, status=400)
         
-        classification = SupplierClassification.objects.create(
-            supplier=supplier,
-            classification_type=classification_type,
-            classification_date=request.POST.get('classification_date'),
-            expiration_date=request.POST.get('expiration_date')
-        )
+        try:
+            classification = SupplierClassification.objects.create(
+                supplier=supplier,
+                classification_type=classification_type,
+                classification_date=class_date,
+                classification_expiration=class_exp
+            )
+            if file_obj:
+                SupplierDocument.objects.create(
+                    supplier=supplier,
+                    classification=classification,
+                    doc_type='CLASS',
+                    file=file_obj,
+                    description=f"{classification_type.name} classification document",
+                    created_by=request.user if hasattr(request, 'user') else None,
+                )
+        except Exception as exc:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Error creating classification: {exc}'
+            }, status=400)
         
         return JsonResponse({
             'status': 'success',
@@ -924,7 +1069,7 @@ def get_supplier_classification(request, pk):
         'id': classification.id,
         'classification_type': classification.classification_type.id,
         'classification_date': classification.classification_date.strftime('%Y-%m-%d') if classification.classification_date else None,
-        'expiration_date': classification.expiration_date.strftime('%Y-%m-%d') if classification.expiration_date else None
+        'expiration_date': classification.classification_expiration.strftime('%Y-%m-%d') if classification.classification_expiration else None
     }) 
 
 

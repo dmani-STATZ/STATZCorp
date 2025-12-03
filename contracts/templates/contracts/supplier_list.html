@@ -47,26 +47,38 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
     .toggle-btn {
-        border: 2px solid #38bdf8;
-        background: #f8fbff;
+        border: 2px solid #d1fae5;
+        background: #ecfdf3;
         padding: 6px 14px;
         border-radius: 8px;
         font-size: 0.875rem;
         font-weight: 700;
-        color: #0369a1;
-        box-shadow: 0 1px 2px rgba(59, 130, 246, 0.18);
+        color: #065f46;
+        box-shadow: 0 1px 2px rgba(16, 185, 129, 0.18);
         transition: all 0.15s ease;
     }
     .toggle-btn:hover:not(:disabled) {
-        background: #e0f2fe;
-        color: #075985;
-        box-shadow: 0 3px 8px rgba(14, 165, 233, 0.25);
+        background: #d1fae5;
+        color: #047857;
+        box-shadow: 0 3px 8px rgba(16, 185, 129, 0.2);
     }
     .toggle-btn.active {
-        background: #dbeafe;
-        border-color: #2563eb;
+        background: #fef2f2;
+        border-color: #fca5a5;
+        color: #b91c1c;
+        box-shadow: 0 4px 10px rgba(248, 113, 113, 0.3);
+    }
+    .toggle-btn[data-flag="archived"] {
+        background: #eff6ff;
+        border-color: #bfdbfe;
         color: #1d4ed8;
-        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22);
+        box-shadow: 0 1px 2px rgba(96, 165, 250, 0.18);
+    }
+    .toggle-btn[data-flag="archived"].active {
+        background: #0f172a;
+        color: #f8fafc;
+        border-color: #94a3b8;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35);
     }
     .toggle-btn:disabled {
         border-color: #cbd5e1;
@@ -548,7 +560,10 @@
                     <div class="supplier-card space-y-3">
                         <div class="flex items-center justify-between">
                             <div class="text-xs uppercase text-slate-500">Certifications</div>
-                            <button type="button" id="open-cert-modal" class="text-indigo-600 text-sm font-semibold hover:underline">Add</button>
+                            <button type="button" id="open-cert-modal" class="text-indigo-600 text-sm font-semibold hover:underline"
+                                onclick="const m=document.getElementById('cert-modal'); if(m){m.classList.remove('hidden'); m.classList.add('flex');}">
+                                Add
+                            </button>
                         </div>
                         <div id="detail-certs" class="space-y-2 text-sm">
                             {% if detail_certifications %}
@@ -559,9 +574,13 @@
                                         <div class="text-xs text-slate-600">
                                             {% if cert.date %}Date: {{ cert.date }}{% endif %}
                                             {% if cert.expires %} {% if cert.date %}|{% endif %} Exp: {{ cert.expires }}{% endif %}
+                                            {% if cert.compliance_status %} {% if cert.date or cert.expires %}|{% endif %} Compliance: {{ cert.compliance_status }}{% endif %}
+                                            {% if cert.document_url %} {% if cert.date or cert.expires or cert.compliance_status %}|{% endif %} <a href="{{ cert.document_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">View file</a>{% endif %}
                                         </div>
                                     </div>
-                                    <button type="button" class="delete-cert-btn text-red-500 hover:text-red-700" title="Delete" data-id="{{ cert.id|default:'' }}">✕</button>
+                                    <button type="button" class="delete-cert-btn text-red-500 hover:text-red-700" title="Delete" data-id="{{ cert.id|default:'' }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
                                 </div>
                                 {% endfor %}
                             {% else %}
@@ -573,7 +592,10 @@
                     <div class="supplier-card space-y-3">
                         <div class="flex items-center justify-between">
                             <div class="text-xs uppercase text-slate-500">Classifications</div>
-                            <button type="button" id="open-class-modal" class="text-indigo-600 text-sm font-semibold hover:underline">Add</button>
+                            <button type="button" id="open-class-modal" class="text-indigo-600 text-sm font-semibold hover:underline"
+                                onclick="const m=document.getElementById('class-modal'); if(m){m.classList.remove('hidden'); m.classList.add('flex');}">
+                                Add
+                            </button>
                         </div>
                         <div id="detail-classifications" class="space-y-2 text-sm">
                             {% if detail_classifications %}
@@ -584,9 +606,12 @@
                                         <div class="text-xs text-slate-600">
                                             {% if c.date %}Date: {{ c.date }}{% endif %}
                                             {% if c.expires %} {% if c.date %}|{% endif %} Exp: {{ c.expires }}{% endif %}
+                                            {% if c.document_url %} {% if c.date or c.expires %}|{% endif %}<a href="{{ c.document_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">View file</a>{% endif %}
                                         </div>
                                     </div>
-                                    <button type="button" class="delete-class-btn text-red-500 hover:text-red-700" title="Delete" data-id="{{ c.id|default:'' }}">✕</button>
+                                    <button type="button" class="delete-class-btn text-red-500 hover:text-red-700" title="Delete" data-id="{{ c.id|default:'' }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
                                 </div>
                                 {% endfor %}
                             {% else %}
@@ -799,12 +824,25 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs uppercase text-slate-500 mb-1" for="cert-date-input">Date</label>
-                    <input id="cert-date-input" type="date" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm">
+                    <input id="cert-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm">
                 </div>
                 <div>
                     <label class="block text-xs uppercase text-slate-500 mb-1" for="cert-exp-input">Expiration</label>
                     <input id="cert-exp-input" type="date" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm">
                 </div>
+            </div>
+            <div>
+                <label class="block text-xs uppercase text-slate-500 mb-1" for="cert-compliance-input">Compliance Status</label>
+                <input id="cert-compliance-input" list="compliance-status-options" type="text" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm" placeholder="Enter or select status">
+                <datalist id="compliance-status-options">
+                    {% for status in compliance_statuses %}
+                    <option value="{{ status }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div>
+                <label class="block text-xs uppercase text-slate-500 mb-1" for="cert-file-input">Attach File (optional)</label>
+                <input id="cert-file-input" type="file" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white">
             </div>
         </div>
         <div class="mt-6 flex justify-end gap-2">
@@ -844,12 +882,16 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs uppercase text-slate-500 mb-1" for="class-date-input">Date</label>
-                    <input id="class-date-input" type="date" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm">
+                    <input id="class-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm">
                 </div>
                 <div>
                     <label class="block text-xs uppercase text-slate-500 mb-1" for="class-exp-input">Expiration</label>
                     <input id="class-exp-input" type="date" class="w-full rounded-md border border-slate-300 px-2 py-2 bg-white text-sm">
                 </div>
+            </div>
+            <div>
+                <label class="block text-xs uppercase text-slate-500 mb-1" for="class-file-input">Attach File (optional)</label>
+                <input id="class-file-input" type="file" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white">
             </div>
         </div>
         <div class="mt-6 flex justify-end gap-2">
@@ -919,6 +961,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    try {
     // ============================================
     // LOADING STATES & TOAST NOTIFICATION SYSTEM
     // ============================================
@@ -1237,12 +1280,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function resetDetailUI() {
+        const textTargets = [
+            'detail-name', 'detail-cage', 'detail-dodaac', 'detail-phone', 'detail-email', 'detail-fax',
+            'detail-address', 'detail-notes', 'detail-notes-2', 'detail-addr-physical', 'detail-addr-shipping', 'detail-addr-billing',
+            'detail-gsi', 'detail-ppi', 'detail-iso', 'detail-prime', 'detail-special', 'detail-special-on',
+            'detail-prob-on', 'detail-prob-by', 'detail-cond-on', 'detail-cond-by', 'detail-arch-on', 'detail-arch-by',
+            'detail-contact-name', 'detail-contact-email', 'detail-contact-phone'
+        ];
+        textTargets.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '';
+        });
+        const listTargets = [
+            'detail-contracts', 'detail-contacts', 'detail-certs', 'detail-classifications', 'detail-stats', 'contacts-list'
+        ];
+        listTargets.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        });
+    }
+
     // Fetch detail payload via AJAX (used on initial load when only supplier_id is in URL)
     function fetchDetail(id, updateUrl = false) {
         setDetailLoading(true);
+        resetDetailUI();
         const params = new URLSearchParams({ supplier_id: id, ajax: '1' });
         fetch(`${window.location.pathname}?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(resp => resp.json())
+            .then(async resp => {
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    throw new Error(`HTTP ${resp.status}: ${text.slice(0, 300)}`);
+                }
+                return resp.json();
+            })
             .then(data => {
                 setDetail(data);
                 currentSupplierId = data.id;
@@ -1259,7 +1330,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch((err) => {
-                showToast('Failed to load supplier details.', 'error');
+                const message = err && err.message ? err.message : 'Failed to load supplier details.';
+                showToast(message, 'error');
                 console.error('Supplier detail error', err);
             })
             .finally(() => {
@@ -1373,10 +1445,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>
                     <div class="font-semibold text-slate-900">${cert.type || ''}</div>
                     <div class="text-xs text-slate-600">
-                        ${cert.date ? `Date: ${cert.date}` : ''}${cert.expires ? `${cert.date ? ' | ' : ''}Exp: ${cert.expires}` : ''}
+                        ${cert.date ? `Date: ${cert.date}` : ''}${cert.expires ? `${cert.date ? ' | ' : ''}Exp: ${cert.expires}` : ''}${cert.compliance_status ? `${(cert.date || cert.expires) ? ' | ' : ''}Compliance: ${cert.compliance_status}` : ''}${cert.document_url ? `${(cert.date || cert.expires || cert.compliance_status) ? ' | ' : ''}<a href=\"${cert.document_url}\" target=\"_blank\" class=\"text-indigo-600 hover:text-indigo-800\">View file</a>` : ''}
                     </div>
                 </div>
-                <button type="button" class="delete-cert-btn text-red-500 hover:text-red-700" title="Delete" data-id="${cert.id || ''}">✕</button>
+                <button type="button" class="delete-cert-btn text-red-500 hover:text-red-700" title="Delete" data-id="${cert.id || ''}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
             </div>
         `).join('');
         wrap.querySelectorAll('.delete-cert-btn').forEach(btn => {
@@ -1422,10 +1496,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>
                     <div class="font-semibold text-slate-900">${c.type || ''}</div>
                     <div class="text-xs text-slate-600">
-                        ${c.date ? `Date: ${c.date}` : ''}${c.expires ? `${c.date ? ' | ' : ''}Exp: ${c.expires}` : ''}
+                        ${c.date ? `Date: ${c.date}` : ''}${c.expires ? `${c.date ? ' | ' : ''}Exp: ${c.expires}` : ''}${c.document_url ? `${(c.date || c.expires) ? ' | ' : ''}<a href=\"${c.document_url}\" target=\"_blank\" class=\"text-indigo-600 hover:text-indigo-800\">View file</a>` : ''}
                     </div>
                 </div>
-                <button type="button" class="delete-class-btn text-red-500 hover:text-red-700" title="Delete" data-id="${c.id || ''}">✕</button>
+                <button type="button" class="delete-class-btn text-red-500 hover:text-red-700" title="Delete" data-id="${c.id || ''}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
             </div>
         `).join('');
         wrap.querySelectorAll('.delete-class-btn').forEach(btn => {
@@ -1537,6 +1613,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const certTypeInput = document.getElementById('cert-type-input');
     const certDateInput = document.getElementById('cert-date-input');
     const certExpInput = document.getElementById('cert-exp-input');
+    const certFileInput = document.getElementById('cert-file-input');
+    const certComplianceInput = document.getElementById('cert-compliance-input');
     const certSaveBtn = document.getElementById('cert-modal-save');
     const certCancelBtn = document.getElementById('cert-modal-cancel');
     const certCloseBtn = document.getElementById('cert-modal-close');
@@ -1545,6 +1623,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const classTypeInput = document.getElementById('class-type-input');
     const classDateInput = document.getElementById('class-date-input');
     const classExpInput = document.getElementById('class-exp-input');
+    const classFileInput = document.getElementById('class-file-input');
     const classSaveBtn = document.getElementById('class-modal-save');
     const classCancelBtn = document.getElementById('class-modal-cancel');
     const classCloseBtn = document.getElementById('class-modal-close');
@@ -1872,6 +1951,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (certTypeInput) certTypeInput.value = '';
         if (certDateInput) certDateInput.value = '';
         if (certExpInput) certExpInput.value = '';
+        if (certComplianceInput) certComplianceInput.value = '';
+        if (certFileInput) certFileInput.value = '';
         certModal.classList.remove('hidden');
         certModal.classList.add('flex');
     }
@@ -1889,17 +1970,21 @@ document.addEventListener('DOMContentLoaded', function() {
         certSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId || !certTypeInput || !certTypeInput.value) return;
             setButtonLoading(certSaveBtn, true);
+            const formData = new FormData();
+            formData.append('certification_type', certTypeInput.value);
+            formData.append('certification_date', certDateInput ? certDateInput.value : '');
+            formData.append('certification_expiration', certExpInput ? certExpInput.value : '');
+            formData.append('compliance_status', certComplianceInput ? certComplianceInput.value : '');
+            if (certFileInput && certFileInput.files && certFileInput.files[0]) {
+                formData.append('file', certFileInput.files[0]);
+            }
             fetch(`{% url 'contracts:supplier_add_certification' supplier_id=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: new URLSearchParams({
-                    certification_type: certTypeInput.value,
-                    certification_date: certDateInput ? certDateInput.value : '',
-                    certification_expiration: certExpInput ? certExpInput.value : ''
-                })
+                body: formData
             })
             .then(resp => resp.json())
             .then(() => {
@@ -1921,6 +2006,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (classTypeInput) classTypeInput.value = '';
         if (classDateInput) classDateInput.value = '';
         if (classExpInput) classExpInput.value = '';
+        if (classFileInput) classFileInput.value = '';
         classModal.classList.remove('hidden');
         classModal.classList.add('flex');
     }
@@ -1938,17 +2024,20 @@ document.addEventListener('DOMContentLoaded', function() {
         classSaveBtn.addEventListener('click', function() {
             if (!currentSupplierId || !classTypeInput || !classTypeInput.value) return;
             setButtonLoading(classSaveBtn, true);
+            const formData = new FormData();
+            formData.append('classification_type', classTypeInput.value);
+            formData.append('classification_date', classDateInput ? classDateInput.value : '');
+            formData.append('expiration_date', classExpInput ? classExpInput.value : '');
+            if (classFileInput && classFileInput.files && classFileInput.files[0]) {
+                formData.append('file', classFileInput.files[0]);
+            }
             fetch(`{% url 'contracts:supplier_add_classification' supplier_id=0 %}`.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: new URLSearchParams({
-                    classification_type: classTypeInput.value,
-                    classification_date: classDateInput ? classDateInput.value : '',
-                    expiration_date: classExpInput ? classExpInput.value : ''
-                })
+                body: formData
             })
             .then(resp => resp.json())
             .then(() => {
@@ -2123,6 +2212,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+    } catch (err) {
+        console.error('Supplier page init error', err);
+        if (window.notify) {
+            window.notify('error', `Page error: ${err.message}`, 6000);
+        } else {
+            alert(`Page error: ${err.message}`);
+        }
+    }
 });
 </script>
 {% endblock %}
