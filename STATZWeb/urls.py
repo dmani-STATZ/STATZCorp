@@ -93,6 +93,8 @@ urlpatterns = [
     
     path('inventory/', include('inventory.urls')),
     path('contracts/', include('contracts.urls')),
+    path('suppliers/', include('suppliers.urls')),
+    path('products/', include('products.urls')),
     path('accesslog/', include('accesslog.urls')),
     path('processing/', include('processing.urls')),
     path('training/', include('training.urls')),

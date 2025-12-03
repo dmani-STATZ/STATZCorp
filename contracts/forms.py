@@ -3,13 +3,34 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from users.models import UserCompanyMembership
+from products.models import Nsn
+from suppliers.models import (
+    Supplier,
+    Contact,
+    SupplierType,
+    SupplierCertification,
+    SupplierClassification,
+    CertificationType,
+    ClassificationType,
+)
 from .models import (
-    Nsn, Supplier, Contract, Clin, Note, Reminder,
-    ClinAcknowledgment, AcknowledgementLetter, Contact, Address,
-    Buyer, ContractType, ClinType, CanceledReason, SalesClass,
-    SpecialPaymentTerms, IdiqContract, IdiqContractDetails, SupplierType, SupplierCertification,
-    CertificationType, SupplierClassification,
-    ClassificationType, FolderTracking, Company
+    Contract,
+    Clin,
+    Note,
+    Reminder,
+    ClinAcknowledgment,
+    AcknowledgementLetter,
+    Address,
+    Buyer,
+    ContractType,
+    ClinType,
+    CanceledReason,
+    SalesClass,
+    SpecialPaymentTerms,
+    IdiqContract,
+    IdiqContractDetails,
+    FolderTracking,
+    Company,
 )
 
 User = get_user_model()

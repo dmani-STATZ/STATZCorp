@@ -1,7 +1,9 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from processing.models import ProcessContract, ProcessClin
-from contracts.models import Buyer, Nsn, Supplier
+from contracts.models import Buyer
+from products.models import Nsn
+from suppliers.models import Supplier
 
 def match_buyer(request, pk):
     process_contract = get_object_or_404(ProcessContract, id=pk)

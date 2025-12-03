@@ -17,7 +17,8 @@ from django.core.files.base import ContentFile
 from django.db.models import Q
 
 
-from contracts.models import ClinType, Contract, Clin, ContractType, Buyer, Nsn
+from contracts.models import ClinType, Contract, Clin, ContractType, Buyer
+from products.models import Nsn
 from STATZWeb.decorators import conditional_login_required
 
 # Define the fields we want to extract from DD Form 1155

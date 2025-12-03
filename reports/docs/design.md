@@ -33,7 +33,7 @@ LLM Contract (Structured Output)
   - base_model: "contracts.Contract"
   - selects: [{ model: "contracts.Contract", field: "contract_number", alias: "Contract" }, ...]
   - filters: [{ model: "contracts.Contract", field: "award_date", op: "this_month" }]
-  - joins: [{ from_model: "contracts.Contract", to_model: "contracts.Clin" }, { from_model: "contracts.Clin", to_model: "contracts.Supplier" }, { from_model: "contracts.Clin", to_model: "contracts.Nsn" }]
+  - joins: [{ from_model: "contracts.Contract", to_model: "contracts.Clin" }, { from_model: "contracts.Clin", to_model: "suppliers.Supplier" }, { from_model: "contracts.Clin", to_model: "products.Nsn" }]
   - group_by, order_by, limit, result_mode: "flat" | "nested"
 - Only after server validation do we compile to ORM or generate SQL. Optional: also ask the LLM to return an explanation string for UI transparency.
 

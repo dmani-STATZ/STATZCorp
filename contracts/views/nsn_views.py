@@ -5,14 +5,14 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Nsn
+from products.models import Nsn
 from ..forms import NsnForm
 
 
 @method_decorator(conditional_login_required, name='dispatch')
 class NsnUpdateView(UpdateView):
     model = Nsn
-    template_name = 'contracts/nsn_edit.html'
+    template_name = 'products/nsn_edit.html'
     context_object_name = 'nsn'
     form_class = NsnForm
     
@@ -25,4 +25,4 @@ class NsnUpdateView(UpdateView):
         if 'clin_id' in self.kwargs:
             return reverse('contracts:clin_detail', kwargs={'pk': self.kwargs['clin_id']})
         # Otherwise, redirect to a list of NSNs or another appropriate page
-        return reverse('contracts:nsn_list') 
+        return reverse('contracts:contracts_dashboard') 

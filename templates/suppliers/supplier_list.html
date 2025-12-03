@@ -1052,6 +1052,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Compliance select elements (declared early so setDetail can use them)
+    const primeSelect = document.getElementById('prime-select');
+    const ppiSelect = document.getElementById('ppi-select');
+    const isoSelect = document.getElementById('iso-select');
+    const gsiSelect = document.getElementById('gsi-select');
+    const specialTermsSelect = document.getElementById('special-terms-select');
+
     // Build left-hand list and navigate with a full page load (so URL updates)
     function renderList(items) {
         listEl.innerHTML = '';
@@ -1630,11 +1637,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const openClassBtn = document.getElementById('open-class-modal');
     const supplierTypeSelect = document.getElementById('detail-type-select');
     const packhouseSelectEl = document.getElementById('detail-packhouse-select');
-    const primeSelect = document.getElementById('prime-select');
-    const ppiSelect = document.getElementById('ppi-select');
-    const isoSelect = document.getElementById('iso-select');
-    const gsiSelect = document.getElementById('gsi-select');
-    const specialTermsSelect = document.getElementById('special-terms-select');
     let activeAddressField = null;
     let addressesCache = [];
 

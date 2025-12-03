@@ -8,7 +8,8 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contact, Address, Supplier
+from suppliers.models import Contact, Supplier
+from ..models import Address
 from ..forms import ContactForm, AddressForm
 
 # Contact Views

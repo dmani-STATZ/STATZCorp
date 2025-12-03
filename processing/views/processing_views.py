@@ -6,7 +6,9 @@ from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
 from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ProcessContractSplit
 from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
-from contracts.models import Contract, Clin, Buyer, Nsn, Supplier, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
+from contracts.models import Contract, Clin, Buyer, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
+from products.models import Nsn
+from suppliers.models import Supplier
 import csv
 import os
 from io import StringIO

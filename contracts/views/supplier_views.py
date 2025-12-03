@@ -10,10 +10,21 @@ from django.utils import timezone
 from datetime import timedelta, datetime
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import (
-    Supplier, Address, Contract, Clin, Contact, 
-    SupplierCertification, SupplierClassification, CertificationType, ClassificationType, SupplierType, SpecialPaymentTerms,
+from suppliers.models import (
+    Supplier,
+    Contact,
+    SupplierCertification,
+    SupplierClassification,
+    CertificationType,
+    ClassificationType,
+    SupplierType,
     SupplierDocument,
+)
+from ..models import (
+    Address,
+    Contract,
+    Clin,
+    SpecialPaymentTerms,
 )
 from ..forms import SupplierForm
 
@@ -51,7 +62,7 @@ def parse_date_input(value):
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierListView(ListView):
     model = Supplier
-    template_name = 'contracts/supplier_list.html'
+    template_name = 'suppliers/supplier_list.html'
     context_object_name = 'suppliers'
     paginate_by = None
     ajax_required_fields = ['id', 'name', 'cage_code']
@@ -641,7 +652,7 @@ def delete_supplier_contact(request, pk, contact_id):
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierSearchView(ListView):
     model = Supplier
-    template_name = 'contracts/supplier_search.html'
+    template_name = 'suppliers/supplier_search.html'
     context_object_name = 'suppliers'
     paginate_by = 20
     
@@ -686,7 +697,7 @@ class SupplierSearchView(ListView):
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierDetailView(DetailView):
     model = Supplier
-    template_name = 'contracts/supplier_detail.html'
+    template_name = 'suppliers/supplier_detail.html'
     context_object_name = 'supplier'
     
     def get_context_data(self, **kwargs):
@@ -745,7 +756,7 @@ class SupplierDetailView(DetailView):
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierCreateView(CreateView):
     model = Supplier
-    template_name = 'contracts/supplier_form.html'
+    template_name = 'suppliers/supplier_form.html'
     form_class = SupplierForm
     success_url = reverse_lazy('contracts:supplier_list')
     
@@ -758,7 +769,7 @@ class SupplierCreateView(CreateView):
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierUpdateView(UpdateView):
     model = Supplier
-    template_name = 'contracts/supplier_edit.html'
+    template_name = 'suppliers/supplier_edit.html'
     context_object_name = 'supplier'
     form_class = SupplierForm
     

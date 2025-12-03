@@ -73,6 +73,8 @@ INSTALLED_APPS = [
     'processing.apps.ProcessingConfig',
     'training.apps.TrainingConfig',
     'reports.apps.ReportsConfig',
+    'suppliers',
+    'products',
 ]
 
 # Middleware - Environment aware

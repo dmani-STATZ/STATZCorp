@@ -12,6 +12,14 @@ from ..forms import (
     CertificationTypeForm,
     ClassificationTypeForm,
 )
+from suppliers.models import (
+    SupplierType,
+    Supplier,
+    SupplierCertification,
+    SupplierClassification,
+    CertificationType,
+    ClassificationType,
+)
 from ..models import (
     Clin,
     ClinType,
@@ -19,12 +27,6 @@ from ..models import (
     ContractType,
     SalesClass,
     SpecialPaymentTerms,
-    SupplierType,
-    Supplier,
-    SupplierCertification,
-    SupplierClassification,
-    CertificationType,
-    ClassificationType,
 )
 
 

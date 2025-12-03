@@ -11,7 +11,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import IdiqContract, IdiqContractDetails, Contract, Nsn, Supplier, Note
+from contracts.models import IdiqContract, IdiqContractDetails, Contract, Note
+from products.models import Nsn
+from suppliers.models import Supplier
 
 class IdiqContractDetailView(LoginRequiredMixin, DetailView):
     model = IdiqContract
