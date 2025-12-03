@@ -1,10 +1,10 @@
 from django.db import models
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, Case, When, Value
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.views.generic import TemplateView, DetailView
 
-from contracts.models import Contract
+from contracts.models import Contract, Clin
 from suppliers.models import Supplier, SupplierDocument
 
 
@@ -114,6 +114,18 @@ class SupplierDetailView(DetailView):
             'conditional': supplier.conditional,
             'archived': supplier.archived,
         }
+        context['contracts'] = Contract.objects.filter(supplier=supplier).select_related('status').annotate(
+            performance_flag=Case(
+                When(due_date_late=True, then=Value('Late')),
+                default=Value(''),
+                output_field=models.CharField(),
+            )
+        ).order_by('-award_date', '-created_on')
+
+        context['clin_summary'] = Clin.objects.filter(supplier=supplier).aggregate(
+            total_clins=Count('id'),
+            total_value=Coalesce(Sum('quote_value'), 0.0, output_field=models.FloatField()),
+        )
         return context
 
 

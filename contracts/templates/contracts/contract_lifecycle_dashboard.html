@@ -271,7 +271,7 @@
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap">
                                 {% if contract.supplier_id %}
-                                    <a class="text-blue-600 hover:text-blue-800" href="{% url 'contracts:supplier_list' %}?supplier_id={{ contract.supplier_id }}&tab=info">
+                                    <a class="text-blue-600 hover:text-blue-800" href="{% url 'suppliers:supplier_detail_page' contract.supplier_id %}">
                                         {{ contract.supplier_name|upper }}
                                     </a>
                                 {% else %}

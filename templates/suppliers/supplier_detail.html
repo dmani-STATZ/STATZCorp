@@ -1,8 +1,8 @@
-{% extends "base_template.html" %}
+{% extends "contracts/contract_base.html" %}
 {% block title %}Supplier Detail{% endblock %}
 
-{% block body %}
-<div class="container mx-auto px-4 pt-20 pb-6 space-y-6">
+{% block contract_content %}
+<div class="container mx-auto px-4 pt-6 pb-6 space-y-6">
   <div class="bg-white shadow-sm rounded-lg p-4 md:p-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
     <div>
       <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
@@ -96,5 +96,50 @@
       </div>
     </div>
   </div>
+
+  <div class="bg-white shadow-sm rounded-lg p-6">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-gray-900">Contracts</h2>
+      {% if clin_summary.total_clins %}
+        <p class="text-sm text-gray-500">CLINs: {{ clin_summary.total_clins }} | Value: ${{ clin_summary.total_value|floatformat:0 }}</p>
+      {% endif %}
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Value</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          {% for contract in contracts %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-2">
+                <a href="{% url 'contracts:contract_detail' contract.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                  {{ contract.contract_number|default:"Contract" }}
+                </a>
+              </td>
+              <td class="px-4 py-2 text-sm text-gray-900">${{ contract.contract_value|floatformat:0 }}</td>
+              <td class="px-4 py-2 text-sm text-gray-900">{{ contract.status.description|default:"—" }}</td>
+              <td class="px-4 py-2 text-sm">
+                {% if contract.performance_flag %}
+                  <span class="px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold">{{ contract.performance_flag }}</span>
+                {% else %}
+                  <span class="text-gray-500 text-xs">On track</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="px-4 py-3 text-sm text-gray-500">No contracts associated with this supplier.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
-{% endblock body %}
+{% endblock contract_content %}
