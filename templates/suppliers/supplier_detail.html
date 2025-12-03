@@ -1,890 +1,100 @@
-{% extends "contracts/contract_base.html" %}
-{% load static %}
+{% extends "base_template.html" %}
+{% block title %}Supplier Detail{% endblock %}
 
-{% block title %}{{ supplier.name }} - Supplier Details{% endblock %}
+{% block body %}
+<div class="container mx-auto px-4 pt-20 pb-6 space-y-6">
+  <div class="bg-white shadow-sm rounded-lg p-4 md:p-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
+      <h1 class="text-2xl font-semibold text-gray-900">{{ supplier.name|default:"Supplier" }}</h1>
+      <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
+        <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">CAGE: {{ supplier.cage_code|default:"—" }}</span>
+        <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">DoDAAC: {{ supplier.dodaac|default:"—" }}</span>
+        {% if supplier.allows_gsi %}<span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">GSI: {{ supplier.get_allows_gsi_display }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% if compliance_flags.probation %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">Probation</span>{% endif %}
+      {% if compliance_flags.conditional %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Conditional</span>{% endif %}
+      {% if compliance_flags.archived %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">Archived</span>{% endif %}
+    </div>
+  </div>
 
-{% block extra_head %}
-{{ block.super }}
-<style>
-    .tab-container {
-        border-bottom: 1px solid #e5e7eb;
-    }
-    
-    .tab {
-        position: relative;
-        padding: 1rem 1.5rem;
-        font-weight: 500;
-        color: #6b7280;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    
-    .tab:hover {
-        color: #4b5563;
-    }
-    
-    .tab.active {
-        color: #3b82f6;
-        font-weight: 600;
-    }
-    
-    .tab.active:after {
-        content: '';
-        position: absolute;
-        bottom: -1px;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background-color: #3b82f6;
-    }
-    
-    .tab-content {
-        display: none;
-    }
-    
-    .tab-content.active {
-        display: block;
-    }
-    
-    .status-badge {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-weight: 500;
-    }
-    
-    .status-badge.warning {
-        background-color: #fef3c7;
-        color: #92400e;
-    }
-    
-    .status-badge.danger {
-        background-color: #fee2e2;
-        color: #991b1b;
-    }
-    
-    .status-badge.success {
-        background-color: #dcfce7;
-        color: #166534;
-    }
-    
-    .info-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
-    }
-    
-    .info-card {
-        background-color: white;
-        border-radius: 0.5rem;
-        padding: 1.5rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-    }
-    
-    .stat-card {
-        background-color: white;
-        border-radius: 0.5rem;
-        padding: 1.5rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        transition: all 0.2s ease;
-    }
-    
-    .stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="container mx-auto px-4 py-8 dark:bg-gray-900 dark:text-gray-100">
-    <!-- Header -->
-    <div class="mb-8">
-        <div class="flex justify-between items-start">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ supplier.name }}</h1>
-                <div class="mt-2 flex items-center space-x-4">
-                    {% if supplier.cage_code %}
-                    <span class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">CAGE: {{ supplier.cage_code }}</span>
-                    {% endif %}
-                    {% if supplier.supplier_type %}
-                    <span class="text-sm text-gray-500 dark:text-gray-300">{{ supplier.supplier_type.description }}</span>
-                    {% endif %}
-                    {% if supplier.archived %}
-                    <span class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Archived</span>
-                    {% endif %}
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                    {% if supplier.probation %}
-                    <span class="status-badge danger">On Probation</span>
-                    {% endif %}
-                    {% if supplier.conditional %}
-                    <span class="status-badge warning">Conditional</span>
-                    {% endif %}
-                    {% if supplier.iso %}
-                    <span class="status-badge success">ISO Certified</span>
-                    {% endif %}
-                    <span class="status-badge" style="background-color:#f3f4f6;color:#374151;">GSI: {{ supplier.get_allows_gsi_display }}</span>
-                </div>
-            </div>
-            <div class="flex space-x-3">
-                <a href="{% url 'contracts:supplier_edit' pk=supplier.id %}" 
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit
-                </a>
-                <a href="{% url 'contracts:supplier_list' %}" 
-                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Back to List
-                </a>
-            </div>
-        </div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="bg-white shadow-sm rounded-lg p-4 lg:col-span-2">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Addresses</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {% for key, addr in addresses.items %}
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-xs uppercase text-gray-500">{{ key|title }} Address</p>
+            {% if addr %}
+              <p class="text-sm text-gray-900">{{ addr.address_line_1 }}</p>
+              {% if addr.address_line_2 %}<p class="text-sm text-gray-900">{{ addr.address_line_2 }}</p>{% endif %}
+              <p class="text-sm text-gray-900">{{ addr.city }}, {{ addr.state }} {{ addr.zip }}</p>
+            {% else %}
+              <p class="text-sm text-gray-500">Not provided.</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="tab-container flex space-x-1 overflow-x-auto">
-        <button class="tab {% if active_tab == 'info' %}active{% endif %}" data-tab="info">Info</button>
-        <button class="tab {% if active_tab == 'notes' %}active{% endif %}" data-tab="notes">Notes</button>
-        <button class="tab {% if active_tab == 'contracts' %}active{% endif %}" data-tab="contracts">Contracts</button>
-        <button class="tab {% if active_tab == 'personnel' %}active{% endif %}" data-tab="personnel">Personnel</button>
-        <button class="tab {% if active_tab == 'keywords' %}active{% endif %}" data-tab="keywords">Keywords</button>
-        <button class="tab {% if active_tab == 'qms' %}active{% endif %}" data-tab="qms">QMS</button>
-        <button class="tab {% if active_tab == 'files' %}active{% endif %}" data-tab="files">Files</button>
-        <button class="tab {% if active_tab == 'statistics' %}active{% endif %}" data-tab="statistics">Statistics</button>
-        <button class="tab {% if active_tab == 'quotations' %}active{% endif %}" data-tab="quotations">Quotations</button>
-        <button class="tab {% if active_tab == 'vsm' %}active{% endif %}" data-tab="vsm">VSM</button>
+    <div class="bg-white shadow-sm rounded-lg p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
+        <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</a>
+      </div>
+      <div class="space-y-3">
+        {% for contact in contacts %}
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm font-semibold text-gray-900">{{ contact.name }}</p>
+            <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
+            <p class="text-xs text-gray-600">{{ contact.email|default:"" }}</p>
+            <p class="text-xs text-gray-600">{{ contact.phone|default:"" }}</p>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No contacts yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="bg-white shadow-sm rounded-lg p-4 lg:col-span-2">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Notes</h2>
+        <span class="text-xs text-gray-500">Inline notes field</span>
+      </div>
+      {% if supplier.notes %}
+        <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
+      {% else %}
+        <p class="text-sm text-gray-500">No notes provided.</p>
+      {% endif %}
     </div>
 
-    <!-- Tab Content -->
-    <div class="mt-6">
-        <!-- Info Tab -->
-        <div id="info" class="tab-content {% if active_tab == 'info' %}active{% endif %}">
-            <div class="info-grid">
-                <div class="info-card">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Contact Information</h3>
-                    <dl class="space-y-3">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Business Phone</dt>
-                            <dd class="mt-1">
-                                {% if supplier.business_phone %}
-                                <a href="tel:{{ supplier.business_phone }}" class="text-indigo-600 hover:text-indigo-800">{{ supplier.business_phone }}</a>
-                                {% else %}
-                                Not provided
-                                {% endif %}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Business Fax</dt>
-                            <dd class="mt-1">{{ supplier.business_fax|default:"Not provided" }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Business Email</dt>
-                            <dd class="mt-1">
-                                {% if supplier.business_email %}
-                                <a href="mailto:{{ supplier.business_email }}" class="text-indigo-600 hover:text-indigo-800">{{ supplier.business_email }}</a>
-                                {% else %}
-                                Not provided
-                                {% endif %}
-                            </dd>
-                        </div>
-                    </dl>
-                </div>
-
-                <div class="info-card">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Physical Address</h3>
-                    {% if supplier.physical_address %}
-                    <address class="not-italic">
-                        {{ supplier.physical_address.address_line_1 }}<br>
-                        {% if supplier.physical_address.address_line_2 %}
-                        {{ supplier.physical_address.address_line_2 }}<br>
-                        {% endif %}
-                        {{ supplier.physical_address.city }}, {{ supplier.physical_address.state }} {{ supplier.physical_address.zip }}
-                    </address>
-                    {% else %}
-                    <p class="text-gray-500">No physical address provided</p>
-                    {% endif %}
-                </div>
-
-                <div class="info-card">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
-                    <dl class="space-y-3">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Prime</dt>
-                            <dd class="mt-1">{{ supplier.prime|yesno:"Yes,No,Unknown" }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">PPI</dt>
-                            <dd class="mt-1">{{ supplier.ppi|yesno:"Yes,No,Unknown" }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">ISO</dt>
-                            <dd class="mt-1">{{ supplier.iso|yesno:"Yes,No,Unknown" }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Allows GSI</dt>
-                            <dd class="mt-1">{{ supplier.get_allows_gsi_display }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Archived</dt>
-                            <dd class="mt-1">
-                                {% if supplier.archived %}
-                                    Archived on {{ supplier.archived_on|date:"M d, Y H:i"|default:"Date not recorded" }}
-                                {% else %}
-                                    Active
-                                {% endif %}
-                            </dd>
-                        </div>
-                    </dl>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notes Tab -->
-        <div id="notes" class="tab-content {% if active_tab == 'notes' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">Notes</h3>
-                    <button type="button" 
-                            data-action="show-notes-modal"
-                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit Notes
-                    </button>
-                </div>
-                {% if supplier.notes %}
-                <div class="prose max-w-none">
-                    {{ supplier.notes|linebreaks }}
-                </div>
-                {% else %}
-                <p class="text-gray-500">No notes available</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Contracts Tab -->
-        <div id="contracts" class="tab-content {% if active_tab == 'contracts' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <h3 class="text-lg font-medium text-gray-900">Contracts</h3>
-                    <div class="w-full md:w-64">
-                        <label for="contract_filter" class="sr-only">Filter contracts</label>
-                        <input type="text" id="contract_filter" placeholder="Filter by contract #" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-                {% if contracts %}
-                <div class="divide-y divide-gray-200">
-                    {% for contract in contracts %}
-                    <div class="p-6 contract-row" data-contract-text="{{ contract.contract_number }} {{ contract.prime|default_if_none:'' }}">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h4 class="text-lg font-medium text-gray-900">
-                                    <a href="{% url 'contracts:contract_management' pk=contract.id %}" class="hover:text-indigo-600">
-                                        {{ contract.contract_number }}
-                                    </a>
-                                </h4>
-                                <p class="mt-1 text-sm text-gray-500">
-                                    Award Date: {{ contract.award_date|date:"M d, Y"|default:"Not set" }}
-                                </p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                {% if contract.status.description == 'Open' %}
-                                <span class="status-badge success">Open</span>
-                                {% elif contract.status.description == 'Closed' %}
-                                <span class="status-badge danger">Closed</span>
-                                {% elif contract.status.description == 'Cancelled' %}
-                                <span class="status-badge warning">Cancelled</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="p-6 text-center">
-                    <p class="text-gray-500">No contracts found for this supplier</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Personnel Tab -->
-        <div id="personnel" class="tab-content {% if active_tab == 'personnel' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h3 class="text-lg font-medium text-gray-900">Personnel</h3>
-                    <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}" 
-                       class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Add Contact
-                    </a>
-                </div>
-                {% if contacts %}
-                <div class="divide-y divide-gray-200">
-                    {% for contact in contacts %}
-                    <div class="p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h4 class="text-lg font-medium text-gray-900">
-                                    {{ contact.salutation }} {{ contact.name }}
-                                </h4>
-                                {% if contact.title %}
-                                <p class="mt-1 text-sm text-gray-500">{{ contact.title }}</p>
-                                {% endif %}
-                                <div class="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-                                    {% if contact.phone %}
-                                    <span class="flex items-center">
-                                        <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                                        </svg>
-                                        {{ contact.phone }}
-                                    </span>
-                                    {% endif %}
-                                    {% if contact.email %}
-                                    <span class="flex items-center">
-                                        <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                        </svg>
-                                        {{ contact.email }}
-                                    </span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="flex space-x-2">
-                                <a href="{% url 'contracts:contact_update' pk=contact.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-                                <a href="{% url 'contracts:contact_delete' pk=contact.id %}" class="text-red-600 hover:text-red-900">Delete</a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="p-6 text-center">
-                    <p class="text-gray-500">No contacts found for this supplier</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Keywords Tab -->
-        <div id="keywords" class="tab-content {% if active_tab == 'keywords' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Keywords</h3>
-                <p class="text-gray-500">Feature coming soon - This will allow tagging and categorization of suppliers</p>
-            </div>
-        </div>
-
-        <!-- QMS Tab -->
-        <div id="qms" class="tab-content {% if active_tab == 'qms' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
-                <!-- Certifications Section -->
-                <div class="mb-8">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-medium text-gray-900">Certifications</h3>
-                        <button id="addCertificationBtn" type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Add Certification
-                        </button>
-                    </div>
-                    {% if certifications %}
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead>
-                                <tr>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiration</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% for cert in certifications %}
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_type.name }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.compliance_status }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_date|date:"Y-m-d" }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ cert.certification_expiration|date:"Y-m-d" }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button data-action="delete-certification" data-id="{{ cert.id }}" class="text-red-600 hover:text-red-900">Delete</button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="text-gray-500">No certifications available</p>
-                    {% endif %}
-                </div>
-
-                <!-- Classifications Section -->
-                <div>
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-medium text-gray-900">Classifications</h3>
-                        <button id="addClassificationBtn" type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Add Classification
-                        </button>
-                    </div>
-                    {% if classifications %}
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead>
-                                <tr>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiration</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% for class in classifications %}
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ class.classification_type.name }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ class.classification_date|date:"Y-m-d" }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ class.classification_expiration|date:"Y-m-d" }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button data-action="delete-classification" data-id="{{ class.id }}" class="text-red-600 hover:text-red-900">Delete</button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="text-gray-500">No classifications available</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Files Tab -->
-        <div id="files" class="tab-content {% if active_tab == 'files' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">Files</h3>
-                    {% if supplier.files_url %}
-                    <a href="{{ supplier.files_url }}" target="_blank" 
-                       class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        Open File Location
-                    </a>
-                    {% endif %}
-                </div>
-                {% if supplier.files_url %}
-                <p class="text-sm text-gray-500">Files are stored at: {{ supplier.files_url }}</p>
-                {% else %}
-                <p class="text-gray-500">No file location specified for this supplier</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Statistics Tab -->
-        <div id="statistics" class="tab-content {% if active_tab == 'statistics' %}active{% endif %}">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Total Contracts</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ contract_stats.total_contracts }}</dd>
-                </div>
-                <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Active Contracts</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ contract_stats.active_contracts }}</dd>
-                </div>
-                <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Total Contract Value</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-gray-900">${{ contract_stats.total_value|floatformat:2 }}</dd>
-                </div>
-                <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Value (Last 12 Months)</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-gray-900">${{ contract_stats.yearly_value|floatformat:2 }}</dd>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quotations Tab -->
-        <div id="quotations" class="tab-content {% if active_tab == 'quotations' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Quotations</h3>
-                <p class="text-gray-500">Feature coming soon - This will track and manage supplier quotations</p>
-            </div>
-        </div>
-
-        <!-- VSM Tab -->
-        <div id="vsm" class="tab-content {% if active_tab == 'vsm' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Value Stream Mapping</h3>
-                <p class="text-gray-500">Feature coming soon - This will provide value stream mapping capabilities</p>
-            </div>
-        </div>
+    <div class="bg-white shadow-sm rounded-lg p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Files & Documents</h2>
+      </div>
+      <div class="space-y-3">
+        {% if supplier.files_url %}
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm font-medium text-gray-900">Files URL</p>
+            <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
+          </div>
+        {% endif %}
+        {% for doc in documents %}
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
+            <p class="text-xs text-gray-600">{{ doc.description|default:"Document" }}</p>
+          </div>
+        {% empty %}
+          {% if not supplier.files_url %}
+            <p class="text-sm text-gray-500">No documents uploaded.</p>
+          {% endif %}
+        {% endfor %}
+      </div>
     </div>
+  </div>
 </div>
-
-<!-- Certification Modal -->
-<div id="certificationModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg p-8 max-w-md w-full">
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="certificationModalTitle" class="text-lg font-medium text-gray-900">Add Certification</h3>
-            <button data-action="hide-modal" data-modal="certificationModal" class="text-gray-400 hover:text-gray-500">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <form id="certificationForm" method="POST" action="{% url 'contracts:supplier_add_certification' supplier.id %}">
-            {% csrf_token %}
-            <div class="space-y-4">
-                <div>
-                    <label for="certification_type" class="block text-sm font-medium text-gray-700">Certification Type</label>
-                    <select id="certification_type" name="certification_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
-                        {% for type in certification_types %}
-                        <option value="{{ type.id }}">{{ type.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="compliance_status" class="block text-sm font-medium text-gray-700">Compliance Status</label>
-                    <input type="text" id="compliance_status" name="compliance_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
-                </div>
-                <div>
-                    <label for="certification_date" class="block text-sm font-medium text-gray-700">Certification Date</label>
-                    <input type="date" id="certification_date" name="certification_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label for="certification_expiration" class="block text-sm font-medium text-gray-700">Expiration Date</label>
-                    <input type="date" id="certification_expiration" name="certification_expiration" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
-            </div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" data-action="hide-modal" data-modal="certificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Save
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Classification Modal -->
-<div id="classificationModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg p-8 max-w-md w-full">
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="classificationModalTitle" class="text-lg font-medium text-gray-900">Add Classification</h3>
-            <button data-action="hide-modal" data-modal="classificationModal" class="text-gray-400 hover:text-gray-500">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <form id="classificationForm" method="POST" action="{% url 'contracts:supplier_add_classification' supplier.id %}">
-            {% csrf_token %}
-            <div class="space-y-4">
-                <div>
-                    <label for="classification_type" class="block text-sm font-medium text-gray-700">Classification Type</label>
-                    <select id="classification_type" name="classification_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
-                        {% for type in classification_types %}
-                        <option value="{{ type.id }}">{{ type.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="classification_date" class="block text-sm font-medium text-gray-700">Classification Date</label>
-                    <input type="date" id="classification_date" name="classification_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label for="classification_expiration" class="block text-sm font-medium text-gray-700">Expiration Date</label>
-                    <input type="date" id="classification_expiration" name="expiration_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
-            </div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" data-action="hide-modal" data-modal="classificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Save
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Notes Modal -->
-<div id="notesModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg p-8 max-w-2xl w-full">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-medium text-gray-900">Edit Notes</h3>
-            <button data-action="hide-modal" data-modal="notesModal" class="text-gray-400 hover:text-gray-500">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <form id="notesForm" method="POST" action="{% url 'contracts:supplier_edit' pk=supplier.id %}">
-            {% csrf_token %}
-            <div class="space-y-4">
-                <div>
-                    <label for="notes" class="block text-sm font-medium text-gray-700">Notes</label>
-                    <textarea id="notes" name="notes" rows="8" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ supplier.notes }}</textarea>
-                </div>
-            </div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" data-action="hide-modal" data-modal="notesModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Save Changes
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
-{{ block.super }}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const tabs = document.querySelectorAll('.tab');
-        const tabContents = document.querySelectorAll('.tab-content');
-        
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remove active class from all tabs and contents
-                tabs.forEach(t => t.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
-                
-                // Add active class to clicked tab and corresponding content
-                tab.classList.add('active');
-                const tabId = tab.getAttribute('data-tab');
-                document.getElementById(tabId).classList.add('active');
-                
-                // Update URL with active tab
-                const url = new URL(window.location);
-                url.searchParams.set('tab', tabId);
-                window.history.pushState({}, '', url);
-            });
-        });
-
-        // Event delegation for all button actions
-        document.addEventListener('click', function(event) {
-            const button = event.target.closest('[data-action]');
-            if (!button) return;
-
-            const action = button.dataset.action;
-            const id = button.dataset.id;
-            const modalId = button.dataset.modal;
-
-            switch(action) {
-                case 'delete-certification':
-                    deleteCertification(id);
-                    break;
-                case 'delete-classification':
-                    deleteClassification(id);
-                    break;
-                case 'show-notes-modal':
-                    showModal('notesModal');
-                    break;
-                case 'hide-modal':
-                    hideModal(modalId);
-                    break;
-            }
-        });
-
-        // Add event listeners for certification and classification buttons
-        document.getElementById('addCertificationBtn').addEventListener('click', function() {
-            showModal('certificationModal');
-        });
-
-        document.getElementById('addClassificationBtn').addEventListener('click', function() {
-            showModal('classificationModal');
-        });
-
-        // Set up notes form submission
-        const notesForm = document.getElementById('notesForm');
-          if (notesForm) {
-              notesForm.addEventListener('submit', function(e) {
-                  e.preventDefault();
-                  const formData = new FormData(this);
-                  
-                fetch(this.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        // Update the notes content in the page
-                        const notesContent = document.querySelector('#notes .prose');
-                        if (notesContent) {
-                            if (data.notes) {
-                                notesContent.innerHTML = data.notes.replace(/\n/g, '<br>');
-                            } else {
-                                notesContent.innerHTML = '<p class="text-gray-500">No notes available</p>';
-                            }
-                        }
-                        hideModal('notesModal');
-                    } else {
-                        alert(data.message || 'An error occurred while saving notes');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Failed to save notes. Please try again.');
-                });
-              });
-          }
-
-          // Client-side contract filter
-          const contractFilter = document.getElementById('contract_filter');
-          if (contractFilter) {
-              const contractRows = document.querySelectorAll('.contract-row');
-              contractFilter.addEventListener('input', function() {
-                  const term = this.value.toLowerCase();
-                  contractRows.forEach(row => {
-                      const text = row.dataset.contractText.toLowerCase();
-                      row.style.display = text.includes(term) ? '' : 'none';
-                  });
-              });
-          }
-      });
-
-    // Modal functions
-    function showModal(modalId) {
-        document.getElementById(modalId).classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function hideModal(modalId) {
-        document.getElementById(modalId).classList.add('hidden');
-        document.body.style.overflow = '';
-    }
-
-    // Certification functions
-    function editCertification(id) {
-        fetch(`/contracts/supplier/certification/${id}/`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Update modal title
-                document.getElementById('certificationModalTitle').textContent = 'Edit Certification';
-                
-                // Populate form fields
-                document.getElementById('certification_type').value = data.certification_type;
-                document.getElementById('compliance_status').value = data.compliance_status;
-                document.getElementById('certification_date').value = data.certification_date;
-                document.getElementById('certification_expiration').value = data.certification_expiration;
-                
-                // Update form action URL
-                const form = document.getElementById('certificationForm');
-                form.action = `/contracts/supplier/{{ supplier.id }}/certification/${id}/edit/`;
-                
-                // Show modal
-                showModal('certificationModal');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to load certification details. Please try again.');
-            });
-    }
-
-    function deleteCertification(id) {
-        if (confirm('Are you sure you want to delete this certification?')) {
-            fetch(`/contracts/supplier/{{ supplier.id }}/certification/${id}/delete/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    window.location.reload();
-                } else {
-                    alert(data.message || 'An error occurred');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to delete certification');
-            });
-        }
-    }
-
-    // Classification functions
-    function editClassification(id) {
-        fetch(`/contracts/supplier/classification/${id}/`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Update modal title
-                document.getElementById('classificationModalTitle').textContent = 'Edit Classification';
-                
-                // Populate form fields
-                document.getElementById('classification_type').value = data.classification_type;
-                document.getElementById('classification_date').value = data.classification_date;
-                document.getElementById('classification_expiration').value = data.expiration_date;
-                
-                // Update form action URL
-                const form = document.getElementById('classificationForm');
-                form.action = `/contracts/supplier/{{ supplier.id }}/classification/${id}/edit/`;
-                
-                // Show modal
-                showModal('classificationModal');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to load classification details. Please try again.');
-            });
-    }
-
-    function deleteClassification(id) {
-        if (confirm('Are you sure you want to delete this classification?')) {
-            fetch(`/contracts/supplier/classification/${id}/delete/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    window.location.reload();
-                } else {
-                    alert(data.message || 'An error occurred');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to delete classification');
-            });
-        }
-    }
-
-    // Close modals when clicking outside
-    window.onclick = function(event) {
-        if (event.target.classList.contains('bg-gray-500')) {
-            document.querySelectorAll('.modal').forEach(modal => {
-                if (!modal.classList.contains('hidden')) {
-                    hideModal(modal.id);
-                }
-            });
-        }
-    }
-</script>
-{% endblock %} 
+{% endblock body %}

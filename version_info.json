@@ -1,9 +1,9 @@
 {
-  "commit_hash": "23a4c500afe340bb01e55d2c2a86eade0c224ef8",
-  "short_hash": "23a4c50",
-  "branch": "main",
+  "commit_hash": "87e8a953eed6d9c0ca9243bda9788393496767a9",
+  "short_hash": "87e8a95",
+  "branch": "feature/split-apps-suppliers-products",
   "tag": "none",
   "date": "",
-  "build_number": "build-23a4c50",
+  "build_number": "build-87e8a95",
   "deployment_id": ""
 }

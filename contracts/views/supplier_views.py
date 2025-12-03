@@ -697,7 +697,7 @@ class SupplierSearchView(ListView):
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierDetailView(DetailView):
     model = Supplier
-    template_name = 'suppliers/supplier_detail.html'
+    template_name = 'suppliers/legacy_supplier_detail.html'
     context_object_name = 'supplier'
     
     def get_context_data(self, **kwargs):

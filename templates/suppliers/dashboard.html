@@ -1,0 +1,194 @@
+{% extends "base_template.html" %}
+{% block title %}Suppliers Dashboard{% endblock %}
+
+{% block body %}
+<div class="container mx-auto py-6 space-y-6">
+  <div class="bg-white shadow-sm rounded-lg p-4 md:p-6">
+    <form class="flex flex-col gap-3">
+      <label class="text-sm font-medium text-gray-700 text-center">Search by Supplier Name, CAGE, or Contract #</label>
+      <div class="relative max-w-4xl mx-auto w-full">
+        <input
+          id="supplier-search"
+          type="text"
+          class="w-full rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3"
+          placeholder="Start typing a supplier name, CAGE, or contract number"
+          autocomplete="off"
+        />
+        <div
+          id="supplier-results"
+          class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg divide-y divide-gray-100 hidden"
+        ></div>
+      </div>
+    </form>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white shadow-sm rounded-lg p-4">
+      <p class="text-xs uppercase text-gray-500">Suppliers</p>
+      <p class="text-3xl font-semibold text-gray-900">{{ total_suppliers|default:0 }}</p>
+    </div>
+    <div class="bg-white shadow-sm rounded-lg p-4">
+      <p class="text-xs uppercase text-gray-500">Contracts</p>
+      <p class="text-3xl font-semibold text-gray-900">{{ total_contracts|default:0 }}</p>
+    </div>
+    <div class="bg-white shadow-sm rounded-lg p-4">
+      <p class="text-xs uppercase text-gray-500">Total Award Value</p>
+      <p class="text-3xl font-semibold text-gray-900">${{ total_contract_value|floatformat:0 }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white shadow-sm rounded-lg p-4">
+    <h2 class="text-sm font-semibold text-gray-900 mb-3">Suppliers by Type</h2>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="border border-gray-200 rounded-lg p-3">
+        <p class="text-xs uppercase text-gray-500">Manufacturer</p>
+        <p class="text-2xl font-semibold text-gray-900">{{ type_counts.manufacturer|default:0 }}</p>
+      </div>
+      <div class="border border-gray-200 rounded-lg p-3">
+        <p class="text-xs uppercase text-gray-500">Distributor</p>
+        <p class="text-2xl font-semibold text-gray-900">{{ type_counts.distributor|default:0 }}</p>
+      </div>
+      <div class="border border-gray-200 rounded-lg p-3">
+        <p class="text-xs uppercase text-gray-500">Packhouse</p>
+        <p class="text-2xl font-semibold text-gray-900">{{ type_counts.packhouse|default:0 }}</p>
+      </div>
+      <div class="border border-gray-200 rounded-lg p-3">
+        <p class="text-xs uppercase text-gray-500">Other</p>
+        <p class="text-2xl font-semibold text-gray-900">{{ type_counts.other|default:0 }}</p>
+      </div>
+      <div class="border border-gray-200 rounded-lg p-3">
+        <p class="text-xs uppercase text-gray-500">Unspecified</p>
+        <p class="text-2xl font-semibold text-gray-900">{{ type_counts.unspecified|default:0 }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Top Manufacturers</h2>
+        <p class="text-sm text-gray-500">By award value</p>
+      </div>
+      <div class="space-y-3">
+        {% for supplier in top_manufacturers %}
+          <div class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
+            <div class="flex items-center justify-between">
+              <div>
+                <a href="{% url 'suppliers:supplier_detail_page' supplier.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                  {{ supplier.name|default:"Unnamed Supplier" }}
+                </a>
+                <div class="text-xs text-gray-500">Contracts: {{ supplier.contract_count|default:0 }}</div>
+              </div>
+              <div class="text-sm font-semibold text-gray-900">${{ supplier.contract_value|floatformat:0 }}</div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No manufacturer data available.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Top Distributors</h2>
+        <p class="text-sm text-gray-500">By award value</p>
+      </div>
+      <div class="space-y-3">
+        {% for supplier in top_distributors %}
+          <div class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
+            <div class="flex items-center justify-between">
+              <div>
+                <a href="{% url 'suppliers:supplier_detail_page' supplier.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                  {{ supplier.name|default:"Unnamed Supplier" }}
+                </a>
+                <div class="text-xs text-gray-500">Contracts: {{ supplier.contract_count|default:0 }}</div>
+              </div>
+              <div class="text-sm font-semibold text-gray-900">${{ supplier.contract_value|floatformat:0 }}</div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No distributor data available.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white shadow-sm rounded-lg p-6">
+    <p class="text-gray-600 mb-4">Recently active suppliers</p>
+    <ul class="divide-y divide-gray-200">
+      {% for item in recently_active_suppliers %}
+        <li class="py-3 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-900">{{ item.supplier.name|default:"Supplier" }}</p>
+            <p class="text-xs text-gray-500">Last activity: {{ item.last_activity|date:"Y-m-d H:i" }}</p>
+          </div>
+          <a href="{% url 'suppliers:supplier_detail_page' item.supplier.pk %}" class="text-blue-600 hover:text-blue-800 text-sm">Detail</a>
+        </li>
+      {% empty %}
+        <li class="py-3 text-gray-500 text-sm">No recent supplier activity.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock body %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const input = document.getElementById('supplier-search');
+  const resultsBox = document.getElementById('supplier-results');
+  if (!input || !resultsBox) return;
+
+  let timer;
+
+  function hideResults() {
+    resultsBox.classList.add('hidden');
+    resultsBox.innerHTML = '';
+  }
+
+  function renderResults(items) {
+    if (!items.length) {
+      hideResults();
+      return;
+    }
+    resultsBox.innerHTML = '';
+    items.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between';
+      const cage = item.cage_code ? `<span class="text-xs text-gray-500 font-mono">CAGE: ${item.cage_code}</span>` : '';
+      btn.innerHTML = `<span class="text-sm text-gray-900">${item.supplier_name || 'Supplier'}</span>${cage}`;
+      btn.addEventListener('click', () => {
+        window.location.href = `/suppliers/${item.supplier_id}/detail/`;
+      });
+      resultsBox.appendChild(btn);
+    });
+    resultsBox.classList.remove('hidden');
+  }
+
+  function search(term) {
+    if (!term) {
+      hideResults();
+      return;
+    }
+    const params = new URLSearchParams({ q: term });
+    fetch(`/suppliers/search/?${params.toString()}`, { headers: { 'Accept': 'application/json' } })
+      .then(resp => resp.json())
+      .then(data => renderResults(data.results || []))
+      .catch(() => hideResults());
+  }
+
+  input.addEventListener('input', () => {
+    const val = input.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(() => search(val), 200);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!resultsBox.contains(e.target) && e.target !== input) {
+      hideResults();
+    }
+  });
+})();
+</script>
+{% endblock %}
