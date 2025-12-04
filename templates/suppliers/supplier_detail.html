@@ -2,35 +2,106 @@
 {% block title %}Supplier Detail{% endblock %}
 
 {% block contract_content %}
-<div class="container mx-auto px-4 pt-6 pb-6 space-y-6">
-  <div class="bg-white shadow-sm rounded-lg p-4 md:p-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-    <div>
-      <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
-      <h1 class="text-2xl font-semibold text-gray-900">{{ supplier.name|default:"Supplier" }}</h1>
-      <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
-        <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">CAGE: {{ supplier.cage_code|default:"—" }}</span>
-        <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">DoDAAC: {{ supplier.dodaac|default:"—" }}</span>
-        {% if supplier.allows_gsi %}<span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">GSI: {{ supplier.get_allows_gsi_display }}</span>{% endif %}
+<div class="max-w-6xl mx-auto px-4 pt-6 pb-10 space-y-6">
+  <!-- Header -->
+  <div class="bg-white shadow-sm rounded-xl p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div class="flex items-center gap-4">
+      {% if supplier.logo_url %}
+        <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-16 w-16 object-contain rounded-md border border-gray-200 bg-white">
+      {% else %}
+        <div class="h-16 w-16 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400 text-xl font-semibold">
+          {{ supplier.name|default:"S"|slice:":1" }}
+        </div>
+      {% endif %}
+      <div>
+        <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
+        <h1 class="text-3xl font-semibold text-gray-900">{{ supplier.name|default:"Supplier" }}</h1>
+        <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">CAGE: {{ supplier.cage_code|default:"—" }}</span>
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">DoDAAC: {{ supplier.dodaac|default:"—" }}</span>
+          {% if supplier.allows_gsi %}<span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">GSI: {{ supplier.get_allows_gsi_display }}</span>{% endif %}
+          {% if supplier.website_url %}
+            <a href="{{ supplier.website_url }}" target="_blank" rel="noopener" class="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 hover:text-blue-900">
+              {{ supplier.website_url }}
+            </a>
+          {% endif %}
+        </div>
+        <div class="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
+          {% if supplier.primary_phone or supplier.business_phone %}
+            <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+              {{ supplier.primary_phone|default:supplier.business_phone }}
+            </a>
+          {% endif %}
+          {% if supplier.primary_email or supplier.business_email %}
+            <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+              {{ supplier.primary_email|default:supplier.business_email }}
+            </a>
+          {% endif %}
+        </div>
       </div>
     </div>
     <div class="flex flex-wrap gap-2">
       {% if compliance_flags.probation %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">Probation</span>{% endif %}
       {% if compliance_flags.conditional %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Conditional</span>{% endif %}
       {% if compliance_flags.archived %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">Archived</span>{% endif %}
+      <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 hover:text-gray-900">
+        Edit Supplier
+      </a>
+      {% if supplier.website_url %}
+        <a
+          id="enrich-from-website-btn"
+          data-supplier-id="{{ supplier.id }}"
+          href="{% url 'suppliers:supplier_enrich_page' supplier.id %}"
+          class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:text-green-900">
+          Enrich from website
+        </a>
+      {% endif %}
     </div>
   </div>
 
+  <!-- Status / Notes -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white shadow-sm rounded-xl p-4">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Status Flags</h2>
+      <ul class="space-y-2 text-sm text-gray-800">
+        <li>Probation: {% if supplier.probation %}<span class="text-red-600 font-semibold">Yes</span> ({{ supplier.probation_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
+        <li>Conditional: {% if supplier.conditional %}<span class="text-orange-600 font-semibold">Yes</span> ({{ supplier.conditional_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
+        <li>Archived: {% if supplier.archived %}<span class="text-gray-700 font-semibold">Yes</span> ({{ supplier.archived_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
+      </ul>
+    </div>
+    <div class="bg-white shadow-sm rounded-xl p-4">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Compliance</h2>
+      <ul class="space-y-2 text-sm text-gray-800">
+        <li>ISO: {% if supplier.iso %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</li>
+        <li>PPI: {% if supplier.ppi %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</li>
+        <li>Special Terms: {{ supplier.special_terms|default:"—" }}</li>
+        <li>Supplier Type: {{ supplier.supplier_type|default:"—" }}</li>
+      </ul>
+    </div>
+    <div class="bg-white shadow-sm rounded-xl p-4">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Notes</h2>
+      {% if supplier.notes %}
+        <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
+      {% else %}
+        <p class="text-sm text-gray-500">No notes provided.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Addresses / Contacts -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <div class="bg-white shadow-sm rounded-lg p-4 lg:col-span-2">
+    <div class="bg-white shadow-sm rounded-xl p-4 lg:col-span-2">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Addresses</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         {% for key, addr in addresses.items %}
           <div class="border border-gray-200 rounded-lg p-3">
             <p class="text-xs uppercase text-gray-500">{{ key|title }} Address</p>
             {% if addr %}
-              <p class="text-sm text-gray-900">{{ addr.address_line_1 }}</p>
-              {% if addr.address_line_2 %}<p class="text-sm text-gray-900">{{ addr.address_line_2 }}</p>{% endif %}
-              <p class="text-sm text-gray-900">{{ addr.city }}, {{ addr.state }} {{ addr.zip }}</p>
+              {% with full_addr=addr.address_line_1|add:', '|add:addr.city|add:', '|add:addr.state|add:' '|add:addr.zip %}
+                <a href="https://www.google.com/maps/search/{{ full_addr|urlencode }}" target="_blank" rel="noopener" class="text-sm text-blue-600 hover:text-blue-800">
+                  {{ addr.address_line_1 }}{% if addr.address_line_2 %}, {{ addr.address_line_2 }}{% endif %}, {{ addr.city }}, {{ addr.state }} {{ addr.zip }}
+                </a>
+              {% endwith %}
             {% else %}
               <p class="text-sm text-gray-500">Not provided.</p>
             {% endif %}
@@ -39,7 +110,7 @@
       </div>
     </div>
 
-    <div class="bg-white shadow-sm rounded-lg p-4">
+    <div class="bg-white shadow-sm rounded-xl p-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
         <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</a>
@@ -49,8 +120,12 @@
           <div class="border border-gray-200 rounded-lg p-3">
             <p class="text-sm font-semibold text-gray-900">{{ contact.name }}</p>
             <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
-            <p class="text-xs text-gray-600">{{ contact.email|default:"" }}</p>
-            <p class="text-xs text-gray-600">{{ contact.phone|default:"" }}</p>
+            {% if contact.email %}
+              <p class="text-xs text-gray-600"><a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">{{ contact.email }}</a></p>
+            {% endif %}
+            {% if contact.phone %}
+              <p class="text-xs text-gray-600"><a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">{{ contact.phone }}</a></p>
+            {% endif %}
           </div>
         {% empty %}
           <p class="text-sm text-gray-500">No contacts yet.</p>
@@ -59,45 +134,41 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <div class="bg-white shadow-sm rounded-lg p-4 lg:col-span-2">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900">Notes</h2>
-        <span class="text-xs text-gray-500">Inline notes field</span>
-      </div>
-      {% if supplier.notes %}
-        <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
-      {% else %}
-        <p class="text-sm text-gray-500">No notes provided.</p>
-      {% endif %}
+  <!-- Files -->
+  <div class="bg-white shadow-sm rounded-xl p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-gray-900">Files & Documents</h2>
     </div>
-
-    <div class="bg-white shadow-sm rounded-lg p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900">Files & Documents</h2>
-      </div>
-      <div class="space-y-3">
-        {% if supplier.files_url %}
-          <div class="border border-gray-200 rounded-lg p-3">
-            <p class="text-sm font-medium text-gray-900">Files URL</p>
-            <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
-          </div>
+    <div class="space-y-3">
+      {% if supplier.files_url %}
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="text-sm font-medium text-gray-900">Files URL</p>
+          <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
+        </div>
+      {% endif %}
+      {% for doc in documents %}
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
+          <p class="text-xs text-gray-600">{{ doc.description|default:"Document" }}</p>
+        </div>
+      {% empty %}
+        {% if not supplier.files_url %}
+          <p class="text-sm text-gray-500">No documents uploaded.</p>
         {% endif %}
-        {% for doc in documents %}
-          <div class="border border-gray-200 rounded-lg p-3">
-            <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
-            <p class="text-xs text-gray-600">{{ doc.description|default:"Document" }}</p>
-          </div>
-        {% empty %}
-          {% if not supplier.files_url %}
-            <p class="text-sm text-gray-500">No documents uploaded.</p>
-          {% endif %}
-        {% endfor %}
-      </div>
+      {% endfor %}
     </div>
   </div>
 
-  <div class="bg-white shadow-sm rounded-lg p-6">
+  <div id="enrichment-panel" class="bg-white shadow-sm rounded-xl p-4" style="display:none; margin-top:1rem;">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-gray-900">Suggested updates from {{ supplier.website_url }}</h2>
+    </div>
+    <p id="enrichment-empty-msg" class="text-sm text-gray-500" style="display:none;">No suggestions found.</p>
+    <div id="enrichment-rows"></div>
+  </div>
+
+  <!-- Contracts -->
+  <div class="bg-white shadow-sm rounded-xl p-6">
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-lg font-semibold text-gray-900">Contracts</h2>
       {% if clin_summary.total_clins %}

@@ -1,0 +1,151 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block contract_content %}
+<div class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+  <div class="bg-white shadow-sm rounded-lg p-4">
+    <h1 class="text-2xl font-semibold text-gray-900">Enrich Supplier</h1>
+    <p class="text-sm text-gray-600">Fetch public info from the supplier website and optionally apply it.</p>
+    <div class="mt-3">
+      <a href="{% url 'suppliers:supplier_detail' supplier.id %}" class="text-sm text-blue-600 hover:text-blue-800">&larr; Back to supplier</a>
+    </div>
+  </div>
+
+  <div class="bg-white shadow-sm rounded-lg p-4 space-y-4">
+    <div class="flex items-center gap-3">
+      <label for="enrich-website-url" class="text-sm font-medium text-gray-700">Website URL</label>
+      <input id="enrich-website-url" type="url" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ supplier.website_url|default:'' }}" placeholder="https://example.com">
+      <button id="save-website-btn" class="px-3 py-2 text-sm font-semibold rounded-md bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">Save URL</button>
+      <button id="run-enrichment-btn" data-supplier-id="{{ supplier.id }}" class="px-3 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700">Run Enrichment</button>
+    </div>
+    <p class="text-xs text-gray-500">Saving the URL will update the supplier record before running enrichment.</p>
+  </div>
+
+  <div id="enrichment-status" class="hidden text-sm text-gray-600">Running enrichment...</div>
+
+  <div id="enrichment-panel" class="bg-white shadow-sm rounded-lg p-4 hidden">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Suggested updates</h2>
+    <p id="enrichment-empty-msg" class="text-sm text-gray-500 hidden">No suggestions found.</p>
+    <div id="enrichment-rows" class="space-y-3"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const supplierId = document.getElementById('run-enrichment-btn')?.dataset.supplierId || "{{ supplier.id }}";
+  const urlInput = document.getElementById('enrich-website-url');
+  const saveUrlBtn = document.getElementById('save-website-btn');
+  const runBtn = document.getElementById('run-enrichment-btn');
+  const statusEl = document.getElementById('enrichment-status');
+  const panel = document.getElementById('enrichment-panel');
+  const rowsContainer = document.getElementById('enrichment-rows');
+  const emptyMsg = document.getElementById('enrichment-empty-msg');
+
+  function getCSRF() {
+    const name = 'csrftoken';
+    const cookies = document.cookie ? document.cookie.split(';') : [];
+    for (let c of cookies) {
+      const cookie = c.trim();
+      if (cookie.startsWith(name + '=')) {
+        return decodeURIComponent(cookie.substring(name.length + 1));
+      }
+    }
+    return '';
+  }
+
+  saveUrlBtn.addEventListener('click', () => {
+    const newUrl = urlInput.value.trim();
+    if (!newUrl) {
+      alert('Please enter a website URL.');
+      return;
+    }
+    fetch(`/suppliers/${supplierId}/apply-enrichment/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRF(),
+      },
+      body: JSON.stringify({ field: 'website_url', value: newUrl }),
+    })
+      .then((resp) => resp.json())
+      .then(() => alert('Website URL saved.'))
+      .catch(() => alert('Failed to save URL.'));
+  });
+
+  runBtn.addEventListener('click', () => {
+    statusEl.classList.remove('hidden');
+    panel.classList.add('hidden');
+    rowsContainer.innerHTML = '';
+    emptyMsg.classList.add('hidden');
+
+    fetch(`/suppliers/${supplierId}/enrich/`)
+      .then((resp) => resp.json())
+      .then((data) => {
+        statusEl.classList.add('hidden');
+        renderRows(data.suggestions || {});
+      })
+      .catch(() => {
+        statusEl.classList.add('hidden');
+        emptyMsg.textContent = 'Failed to fetch suggestions.';
+        emptyMsg.classList.remove('hidden');
+        panel.classList.remove('hidden');
+      });
+  });
+
+  function renderRows(suggestions) {
+    rowsContainer.innerHTML = '';
+    let hasRows = false;
+    const fields = {
+      logo_url: 'Logo URL',
+      primary_phone: 'Phone',
+      primary_email: 'Email',
+      address: 'Address',
+    };
+    Object.keys(fields).forEach((field) => {
+      const data = suggestions[field];
+      if (!data || !data.suggested || data.suggested === data.current) return;
+      hasRows = true;
+      const row = document.createElement('div');
+      row.className = 'border border-gray-200 rounded-md p-3 flex flex-col gap-1';
+      row.dataset.field = field;
+      row.innerHTML = `
+        <div class="text-sm font-medium text-gray-900">${fields[field]}</div>
+        <div class="text-xs text-gray-600">Current: <span class="current-value">${data.current || '—'}</span></div>
+        <div class="text-xs text-gray-800">Suggested: <span class="suggested-value">${data.suggested}</span></div>
+        <div class="mt-2">
+          <button class="apply-suggestion-btn inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs rounded">Apply</button>
+        </div>
+      `;
+      rowsContainer.appendChild(row);
+    });
+    emptyMsg.classList.toggle('hidden', hasRows);
+    panel.classList.remove('hidden');
+    bindApply();
+  }
+
+  function bindApply() {
+    rowsContainer.querySelectorAll('.apply-suggestion-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.border');
+        const field = row.dataset.field;
+        const suggested = row.querySelector('.suggested-value').textContent;
+        fetch(`/suppliers/${supplierId}/apply-enrichment/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRF(),
+          },
+          body: JSON.stringify({ field, value: suggested }),
+        })
+          .then((resp) => resp.json())
+          .then(() => {
+            row.querySelector('.current-value').textContent = suggested;
+            row.classList.add('opacity-60');
+          })
+          .catch(() => alert('Failed to apply suggestion'));
+      });
+    });
+  }
+})();
+</script>
+{% endblock contract_content %}

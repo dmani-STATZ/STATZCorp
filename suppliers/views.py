@@ -1,8 +1,13 @@
+import json
+
 from django.db import models
 from django.db.models import Q, Count, Sum, Case, When, Value
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
-from django.views.generic import TemplateView, DetailView
+from django.utils import timezone
+from django.views.generic import TemplateView, DetailView, View
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404
 
 from contracts.models import Contract, Clin
 from suppliers.models import Supplier, SupplierDocument
@@ -126,6 +131,92 @@ class SupplierDetailView(DetailView):
             total_clins=Count('id'),
             total_value=Coalesce(Sum('quote_value'), 0.0, output_field=models.FloatField()),
         )
+        return context
+
+
+class SupplierEnrichView(LoginRequiredMixin, View):
+    """
+    GET: return enrichment suggestions as JSON for the given supplier.
+    Does NOT modify the database.
+    """
+
+    def get(self, request, pk):
+        supplier = get_object_or_404(Supplier, pk=pk)
+
+        if not supplier.website_url:
+            return JsonResponse({"error": "No website URL set for this supplier."}, status=400)
+
+        from .utils import scrape_supplier_site
+
+        suggestions = scrape_supplier_site(supplier.website_url) or {}
+
+        payload = {
+            "suggestions": {
+                "logo_url": {
+                    "current": supplier.logo_url,
+                    "suggested": suggestions.get("logo_url"),
+                },
+                "primary_phone": {
+                    "current": supplier.primary_phone or supplier.business_phone,
+                    "suggested": suggestions.get("primary_phone"),
+                },
+                "primary_email": {
+                    "current": supplier.primary_email or supplier.business_email,
+                    "suggested": suggestions.get("primary_email"),
+                },
+                "address": {
+                    "current": supplier.shipping_address or supplier.billing_address,
+                    "suggested": suggestions.get("address"),
+                },
+            }
+        }
+
+        return JsonResponse(payload)
+
+
+class SupplierApplyEnrichmentView(LoginRequiredMixin, View):
+    """
+    POST: apply a single suggested field (e.g. primary_phone) for a supplier.
+    Expects JSON: {"field": "<field_name>", "value": "<new_value>"}
+    """
+
+    def post(self, request, pk):
+        supplier = get_object_or_404(Supplier, pk=pk)
+
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+        except ValueError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        field = data.get("field")
+        value = data.get("value")
+
+        allowed_fields = ["logo_url", "primary_phone", "primary_email", "website_url"]
+
+        if field not in allowed_fields and field != "address":
+            return JsonResponse({"error": "Field not allowed"}, status=400)
+
+        if field == "address":
+            # Map suggested address to shipping_address for now
+            supplier.shipping_address = value
+            update_fields = ["shipping_address", "last_enriched_at"]
+        else:
+            setattr(supplier, field, value)
+            update_fields = [field, "last_enriched_at"]
+
+        supplier.last_enriched_at = timezone.now()
+        supplier.save(update_fields=update_fields)
+
+        return JsonResponse({"ok": True})
+
+
+class SupplierEnrichPageView(LoginRequiredMixin, TemplateView):
+    template_name = 'suppliers/supplier_enrich.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        supplier = get_object_or_404(Supplier, pk=kwargs.get("pk"))
+        context['supplier'] = supplier
         return context
 
 

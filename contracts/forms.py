@@ -122,6 +122,7 @@ class SupplierForm(BaseModelForm):
         fields = [
             'name', 'cage_code', 'supplier_type', 'billing_address', 'shipping_address',
             'physical_address', 'business_phone', 'business_fax', 'business_email',
+            'primary_phone', 'primary_email', 'website_url', 'logo_url',
             'contact', 'probation', 'conditional', 'special_terms', 'prime', 'ppi',
             'iso', 'notes', 'allows_gsi', 'is_packhouse', 'packhouse', 'archived'
         ]
@@ -132,6 +133,12 @@ class SupplierForm(BaseModelForm):
             'business_fax': forms.TextInput(attrs={
                 'type': 'tel'
             }),
+            'primary_phone': forms.TextInput(attrs={
+                'type': 'tel'
+            }),
+            'primary_email': forms.EmailInput(),
+            'website_url': forms.URLInput(),
+            'logo_url': forms.URLInput(),
             'notes': forms.Textarea(attrs={
                 'rows': 4
             }),
