@@ -178,7 +178,7 @@
                         <td class="px-1.5 py-1">{{ clin.contract.contract_type.description }}</td>
                         <td class="px-1.5 py-1">{{ clin.item_number }}</td>
                         <td class="px-1.5 py-1">
-                            <a href="{% url 'contracts:supplier_detail' clin.supplier.id %}" 
+                            <a href="{% url 'suppliers:supplier_detail' clin.supplier.id %}" 
                                class="text-blue-600 hover:text-blue-800">
                                 {{ clin.supplier.name }}
                             </a>

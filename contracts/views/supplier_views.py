@@ -758,7 +758,7 @@ class SupplierCreateView(CreateView):
     model = Supplier
     template_name = 'suppliers/supplier_form.html'
     form_class = SupplierForm
-    success_url = reverse_lazy('contracts:supplier_list')
+    success_url = reverse_lazy('suppliers:supplier_list')
     
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -786,6 +786,10 @@ class SupplierUpdateView(UpdateView):
             'business_phone': obj.business_phone,
             'business_fax': obj.business_fax,
             'business_email': obj.business_email,
+            'primary_phone': getattr(obj, 'primary_phone', None),
+            'primary_email': getattr(obj, 'primary_email', None),
+            'website_url': getattr(obj, 'website_url', None),
+            'logo_url': getattr(obj, 'logo_url', None),
             'contact': obj.contact,
             'probation': obj.probation,
             'conditional': obj.conditional,
@@ -881,7 +885,7 @@ class SupplierUpdateView(UpdateView):
                 setattr(supplier, field, value)
             else:
                 # Keep the original value for unchanged fields
-                setattr(supplier, field, original[field])
+                setattr(supplier, field, original.get(field))
 
         if 'archived' in form.changed_data:
             if form.cleaned_data.get('archived'):
@@ -907,7 +911,7 @@ class SupplierUpdateView(UpdateView):
     def get_success_url(self):
         if 'contract_id' in self.kwargs:
             return reverse('contracts:contract_management', kwargs={'pk': self.kwargs['contract_id']})
-        return reverse('contracts:supplier_list')
+        return reverse('suppliers:supplier_list')
 
 
 # Certification Views

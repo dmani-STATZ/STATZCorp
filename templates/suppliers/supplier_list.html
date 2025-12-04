@@ -237,7 +237,7 @@
             <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-1">Supplier Management</p>
             <h1 class="text-3xl font-bold text-slate-900">Suppliers</h1>
         </div>
-        <a href="{% url 'contracts:supplier_create' %}"
+        <a href="{% url 'suppliers:supplier_create' %}"
            class="inline-flex items-center px-4 py-2 rounded-lg text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 shadow">
             <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function doSearch(term) {
         setSearchLoading(true);
         const params = new URLSearchParams({ q: term || '', archived });
-        fetch(`{% url 'contracts:supplier_autocomplete' %}?${params.toString()}`)
+        fetch(`{% url 'suppliers:supplier_autocomplete' %}?${params.toString()}`)
             .then(resp => resp.json())
             .then(data => {
                 renderList(data.results || []);

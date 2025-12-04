@@ -211,7 +211,7 @@
                         <label class="form-label requiredField">Supplier</label>
                         <p class="font-medium relative group">
                             {% if clin.supplier %}
-                                <a href="{% url 'contracts:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
+                                <a href="{% url 'suppliers:supplier_edit' clin.supplier.id %}?next={{ request.path|urlencode }}" 
                                    class="text-blue-600 hover:text-blue-800">
                                     {{ clin.supplier.name }}
                                 </a>

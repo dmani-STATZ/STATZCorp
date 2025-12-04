@@ -85,7 +85,7 @@ class ContactCreateView(CreateView):
     def get_success_url(self):
         messages.success(self.request, 'Contact created successfully.')
         if 'supplier_id' in self.request.GET:
-            return reverse('contracts:supplier_detail', kwargs={'pk': self.request.GET.get('supplier_id')})
+            return reverse('suppliers:supplier_detail', kwargs={'pk': self.request.GET.get('supplier_id')})
         return reverse('contracts:contact_detail', kwargs={'pk': self.object.pk})
     
     def get_context_data(self, **kwargs):

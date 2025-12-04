@@ -1,460 +1,202 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
 
-{% block extra_head %}
-{{ block.super }}
-<style>
-    /* Form label styling */
-    .form-label {
-        text-transform: capitalize;
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #4b5563;
-        margin-bottom: 0.5rem;
-        display: block;
-        font-family: inherit;
-    }
-    
-    /* For acronyms that should always be uppercase */
-    .text-uppercase {
-        text-transform: uppercase !important;
-    }
-    
-    /* Section headers */
-    .section-header {
-        font-size: 1.125rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #e5e7eb;
-        font-family: inherit;
-    }
-    
-    /* Address card styling */
-    .address-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.375rem;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        background-color: #f9fafb;
-    }
-    
-    .address-card.current {
-        background-color: #eff6ff;
-        border-color: #3b82f6;
-    }
-</style>
-{% endblock %}
-
-{% block extra_scripts %}
-{{ block.super }}
-<script>
-    // Function to open address selector popup
-    function openAddressSelector(fieldId) {
-        // Get the current address ID if any
-        const currentAddressId = document.getElementById(fieldId).value;
-        
-        // Define popup dimensions
-        const popupWidth = 850;
-        const popupHeight = 865;
-        
-        // Calculate position to center the popup on the parent window
-        const left = window.screenX + (window.outerWidth - popupWidth) / 2;
-        const top = window.screenY + (window.outerHeight - popupHeight) / 2;
-        
-        // Open the address selector in a new window with calculated position
-        const url = "{% url 'contracts:address_selector' %}?target_field=" + fieldId + "&current_id=" + currentAddressId;
-        const selectorWindow = window.open(
-            url,
-            "AddressSelector",
-            `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
-        );
-    }
-    
-    // Function to open create address window
-    function openCreateAddressWindow(event) {
-        event.preventDefault();
-        const url = event.target.href || event.currentTarget.href;
-        
-        // Define popup dimensions
-        const popupWidth = 600;
-        const popupHeight = 800;
-        
-        // Calculate position to center the popup on the parent window
-        const left = window.screenX + (window.outerWidth - popupWidth) / 2;
-        const top = window.screenY + (window.outerHeight - popupHeight) / 2;
-        
-        const newWindow = window.open(
-            url, 
-            "CreateAddress", 
-            `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
-        );
-        
-        // Check periodically if the window was closed
-        const checkClosed = setInterval(function() {
-            if (newWindow.closed) {
-                clearInterval(checkClosed);
-                // Only reload if an address was actually created
-                // We'll handle this through a callback from the address creation window
-                // The address creation window should set window.opener.addressCreated = true
-                if (window.addressCreated) {
-                    window.addressCreated = false;
-                    window.location.reload();
-                }
-            }
-        }, 500);
-    }
-    
-    // Function to refresh address display after selection
-    window.refreshAfterAddressSelection = function() {
-        // Instead of submitting the form or reloading the page, just refresh the current page
-        window.location.reload();
-    };
-</script>
-{% endblock %}
-
-{% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-4xl mx-auto">
-        <!-- Header -->
-        <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Edit Supplier</h1>
-                <button onclick="history.back()" 
-                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                    </svg>
-                    Back
-                </button>
-            </div>
+{% block contract_content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-semibold text-gray-900">Edit Supplier</h1>
+            <p class="mt-2 text-gray-600">
+                Update supplier details, website, contact info, and compliance flags.
+            </p>
         </div>
-
-        <!-- Form -->
-        <div class="bg-white shadow-lg rounded-lg p-6">
-            <form method="post" class="space-y-6">
-                {% csrf_token %}
-
-                <!-- Debug Information -->
-                <!-- <div class="bg-red-50 p-4 rounded-lg mb-6">
-                    <h2 class="text-lg font-semibold text-red-700">Debug Information</h2>
-                    <pre class="text-xs overflow-auto p-2 bg-white rounded border border-red-200 mt-2">
-Supplier ID: {{ supplier.id }}
-Supplier Name: {{ supplier.name }}
-Supplier Cage Code: {{ supplier.cage_code }}
-Form Data: {{ form.initial }}
-                    </pre>
-                </div> -->
-                
-                <!-- Basic Information -->
-                <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="section-header">Basic Information</h2>
-                    <div class="grid grid-cols-1 gap-4">
-                        <div class="col-span-1">
-                            <div class="form-group">
-                                <label for="{{ form.name.id_for_label }}" class="form-label">
-                                    {{ form.name.label }}
-                                </label>
-                                {{ form.name }}
-                                {% if form.name.errors %}
-                                    <div class="text-red-500 text-sm mt-1">{{ form.name.errors }}</div>
-                                {% endif %}
-                                {% if form.name.help_text %}
-                                    <div class="text-gray-500 text-sm mt-1">{{ form.name.help_text }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <div class="form-group">
-                                    <label for="{{ form.cage_code.id_for_label }}" class="form-label">
-                                        {{ form.cage_code.label }}
-                                    </label>
-                                    {{ form.cage_code }}
-                                    {% if form.cage_code.errors %}
-                                        <div class="text-red-500 text-sm mt-1">{{ form.cage_code.errors }}</div>
-                                    {% endif %}
-                                    {% if form.cage_code.help_text %}
-                                        <div class="text-gray-500 text-sm mt-1">{{ form.cage_code.help_text }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div>
-                                <div class="form-group">
-                                    <label for="{{ form.supplier_type.id_for_label }}" class="form-label">
-                                        {{ form.supplier_type.label }}
-                                    </label>
-                                    {{ form.supplier_type }}
-                                    {% if form.supplier_type.errors %}
-                                        <div class="text-red-500 text-sm mt-1">{{ form.supplier_type.errors }}</div>
-                                    {% endif %}
-                                    {% if form.supplier_type.help_text %}
-                                        <div class="text-gray-500 text-sm mt-1">{{ form.supplier_type.help_text }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Address Information -->
-                <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="section-header">Address Information</h2>
-                    <div class="space-y-6">
-                        {% for field in form %}
-                            {% if field.name == 'physical_address' or field.name == 'shipping_address' or field.name == 'billing_address' %}
-                                <div>
-                                    <div class="form-group">
-                                        <label for="{{ field.id_for_label }}" class="form-label">
-                                            {{ field.label }}
-                                        </label>
-                                        
-                                        <!-- We'll use a hidden input but make sure it gets the field's value correctly -->
-                                        {{ field.as_hidden }}
-                                        
-                                        <!-- Address display -->
-                                        <div class="mb-3">
-                                            {% if field.value and addresses %}
-                                                {% with address_id=field.value|stringformat:"s" %}
-                                                    {% for address in addresses %}
-                                                        {% if address.id|stringformat:"s" == address_id %}
-                                                            <div class="address-card current">
-                                                                <div class="flex justify-between items-start">
-                                                                    <div>
-                                                                        <div class="text-blue-700">
-                                                                            {{ address.address_line_1 }}{% if address.address_line_2 %}, {{ address.address_line_2 }}{% endif %}<br>
-                                                                            {{ address.city }}, {{ address.state }} {{ address.zip }}<br>
-                                                                            {% if address.country %}{{ address.country }}{% endif %}
-                                                                        </div>
-                                                                    </div>
-                                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800">
-                                                                        <svg class="mr-1.5 h-2 w-2 text-blue-400" fill="currentColor" viewBox="0 0 8 8">
-                                                                            <circle cx="4" cy="4" r="3" />
-                                                                        </svg>
-                                                                        Current
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        {% endif %}
-                                                    {% endfor %}
-                                                {% endwith %}
-                                            {% else %}
-                                                <div class="p-4 border rounded-md bg-gray-50 border-gray-200 mb-4">
-                                                    <div class="text-gray-500 italic">No address assigned</div>
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        
-                                        <div class="flex space-x-4">
-                                            <button type="button" 
-                                                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                    onclick="openAddressSelector('{{ field.id_for_label }}')">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                                </svg>
-                                                Change Address
-                                            </button>
-                                            
-                                            <a href="{% url 'contracts:address_create' %}?popup=true" 
-                                               onclick="openCreateAddressWindow(event)"
-                                               class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                                </svg>
-                                                Create New Address
-                                            </a>
-                                        </div>
-                                        
-                                        {% if field.errors %}
-                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                        {% endif %}
-                                        {% if field.help_text %}
-                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- Contact Information -->
-                <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="section-header">Contact Information</h2>
-                    <div class="grid grid-cols-2 gap-4">
-                        {% for field in form %}
-                            {% if field.name in 'business_phone,business_fax,business_email,contact' %}
-                                <div>
-                                    <div class="form-group">
-                                        <label for="{{ field.id_for_label }}" class="form-label">
-                                            {{ field.label }}
-                                        </label>
-                                        {{ field }}
-                                        {% if field.errors %}
-                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                        {% endif %}
-                                        {% if field.help_text %}
-                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- Additional Information -->
-                <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h2 class="section-header">Additional Information</h2>
-                    <div class="grid grid-cols-3 gap-4 mb-4">
-                        {% for field in form %}
-                            {% if field.name in 'probation,conditional,special_terms,prime,ppi,iso,allows_gsi,archived' or field.name == 'is_packhouse' %}
-                                <div>
-                                    <div class="form-group">
-                                        <label for="{{ field.id_for_label }}" class="form-label">
-                                            {{ field.label }}
-                                        </label>
-                                        {{ field }}
-                                        {% if field.errors %}
-                                            <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                        {% endif %}
-                                        {% if field.help_text %}
-                                            <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                    {% for field in form %}
-                        {% if field.name == 'packhouse' %}
-                            <div>
-                                <div class="form-group">
-                                    <label for="{{ field.id_for_label }}" class="form-label">
-                                        {{ field.label }}
-                                    </label>
-                                    {{ field }}
-                                    {% if field.errors %}
-                                        <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                    {% endif %}
-                                    {% if field.help_text %}
-                                        <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                    {% for field in form %}
-                        {% if field.name == 'notes' %}
-                            <div>
-                                <div class="form-group">
-                                    <label for="{{ field.id_for_label }}" class="form-label">
-                                        {{ field.label }}
-                                    </label>
-                                    <textarea name="{{ field.name }}" id="{{ field.id_for_label }}" rows="4"
-                                              class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ field.value|default:'' }}</textarea>
-                                    {% if field.errors %}
-                                        <div class="text-red-500 text-sm mt-1">{{ field.errors }}</div>
-                                    {% endif %}
-                                    {% if field.help_text %}
-                                        <div class="text-gray-500 text-sm mt-1">{{ field.help_text }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-
-                <div class="flex justify-end space-x-4">
-                    <button type="button" 
-                            onclick="history.back()" 
-                            class="btn-secondary">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="btn-primary">
-                        Save Changes
-                    </button>
-                </div>
-            </form>
-        </div>
+        <a href="{% url 'suppliers:supplier_detail' pk=object.pk %}"
+           class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            Cancel
+        </a>
     </div>
+
+    <form method="post" class="bg-white shadow rounded-lg p-6 space-y-6 border border-gray-200">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+                {{ form.non_field_errors|join:", " }}
+            </div>
+        {% endif %}
+
+        <section>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Supplier Details</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                {% include "contracts/includes/simple_field.html" with field=form.name %}
+                {% include "contracts/includes/simple_field.html" with field=form.cage_code %}
+                {% include "contracts/includes/simple_field.html" with field=form.supplier_type %}
+                {% include "contracts/includes/simple_field.html" with field=form.contact %}
+                {% include "contracts/includes/simple_field.html" with field=form.special_terms %}
+                {% include "contracts/includes/simple_field.html" with field=form.packhouse %}
+                {% include "contracts/includes/simple_field.html" with field=form.prime %}
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Contact & Web</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                {% include "contracts/includes/simple_field.html" with field=form.business_phone %}
+                {% include "contracts/includes/simple_field.html" with field=form.business_fax %}
+                {% include "contracts/includes/simple_field.html" with field=form.business_email %}
+                {% include "contracts/includes/simple_field.html" with field=form.primary_phone %}
+                {% include "contracts/includes/simple_field.html" with field=form.primary_email %}
+                <div id="website">
+                    {% include "contracts/includes/simple_field.html" with field=form.website_url %}
+                </div>
+                {% include "contracts/includes/simple_field.html" with field=form.logo_url %}
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </span>
+                Addresses
+            </h2>
+            <div class="space-y-4">
+                {% include "suppliers/includes/address_picker.html" with field=form.physical_address label="Physical Address" %}
+                {% include "suppliers/includes/address_picker.html" with field=form.shipping_address label="Shipping Address" %}
+                {% include "suppliers/includes/address_picker.html" with field=form.billing_address label="Billing Address" %}
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-purple-100 text-purple-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+                Status & Flags
+            </h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Probation -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-red-100 text-red-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </span>
+                        Probation
+                    </div>
+                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.probation.id_for_label }}">
+                        <span class="sr-only">{{ form.probation }}</span>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                    </div>
+                </div>
+                <!-- Conditional -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-yellow-100 text-yellow-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </span>
+                        Conditional
+                    </div>
+                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.conditional.id_for_label }}">
+                        <span class="sr-only">{{ form.conditional }}</span>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                    </div>
+                </div>
+                <!-- PPI -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </span>
+                        PPI
+                    </div>
+                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.ppi.id_for_label }}">
+                        <span class="sr-only">{{ form.ppi }}</span>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                    </div>
+                </div>
+                <!-- ISO -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-green-100 text-green-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        </span>
+                        ISO
+                    </div>
+                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.iso.id_for_label }}">
+                        <span class="sr-only">{{ form.iso }}</span>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                    </div>
+                </div>
+                <!-- Packhouse -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        </span>
+                        Is Packhouse
+                    </div>
+                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.is_packhouse.id_for_label }}">
+                        <span class="sr-only">{{ form.is_packhouse }}</span>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                    </div>
+                </div>
+                <!-- Archived -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                        </span>
+                        Archived
+                    </div>
+                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.archived.id_for_label }}">
+                        <span class="sr-only">{{ form.archived }}</span>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
+                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                    </div>
+                </div>
+                <!-- Special Terms -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Special Terms</p>
+                    {% include "contracts/includes/simple_field.html" with field=form.special_terms %}
+                </div>
+                <!-- Packhouse Select -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Packhouse</p>
+                    {% include "contracts/includes/simple_field.html" with field=form.packhouse %}
+                </div>
+                <!-- Payment Terms -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Allows GSI</p>
+                    {% include "contracts/includes/simple_field.html" with field=form.allows_gsi %}
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Additional Notes</h2>
+            {% include "contracts/includes/simple_field.html" with field=form.notes %}
+        </section>
+
+        <div class="pt-4 flex justify-end space-x-3">
+            <a href="{% url 'suppliers:supplier_detail' pk=object.pk %}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Save Changes
+            </button>
+        </div>
+    </form>
 </div>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-    /* Form control base styles */
-    .form-control {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.375rem;
-        border: 1px solid #d1d5db;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    }
-    
-    .form-control:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-    }
-    
-    /* Style select boxes specifically */
-    select.form-control {
-        appearance: none;
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-        background-position: right 0.5rem center;
-        background-repeat: no-repeat;
-        background-size: 1.5em 1.5em;
-        padding-right: 2.5rem;
-    }
-    
-    /* Adjust textarea heights */
-    textarea.form-control {
-        min-height: 4rem;
-    }
-
-    /* Style form errors */
-    .errorlist {
-        color: #dc2626;
-        font-size: 0.875rem;
-        margin-top: 0.25rem;
-        list-style-type: none;
-        padding: 0;
-    }
-
-    /* Button styling */
-    .btn-primary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        border-radius: 0.375rem;
-        color: white;
-        background-color: #3b82f6;
-        transition: background-color 0.2s;
-    }
-    
-    .btn-primary:hover {
-        background-color: #2563eb;
-    }
-    
-    .btn-secondary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        border-radius: 0.375rem;
-        color: #374151;
-        background-color: #f3f4f6;
-        transition: background-color 0.2s;
-    }
-    
-    .btn-secondary:hover {
-        background-color: #e5e7eb;
-    }
-</style>
-{% endblock %} 
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'suppliers/js/supplier_edit.js' %}"></script>
+{% endblock %}
