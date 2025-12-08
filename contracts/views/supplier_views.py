@@ -834,6 +834,14 @@ class SupplierUpdateView(UpdateView):
             'archived': supplier.archived,
         }
         
+        # Handle auto-selection of newly created address
+        new_address_id = self.request.GET.get('new_address_id')
+        address_type = self.request.GET.get('address_type')
+        if new_address_id and address_type:
+            address_field = f'{address_type}_address'
+            if address_field in initial_data:
+                initial_data[address_field] = int(new_address_id)
+        
         form.initial.update(initial_data)
         return form
     
@@ -848,6 +856,20 @@ class SupplierUpdateView(UpdateView):
         # Use a set to track unique IDs
         seen_address_ids = set()
         
+        # If a new address was just created, add it first
+        new_address_id = self.request.GET.get('new_address_id')
+        address_type = self.request.GET.get('address_type')
+        if new_address_id:
+            try:
+                new_address = Address.objects.get(id=new_address_id)
+                all_needed_addresses.append(new_address)
+                seen_address_ids.add(new_address.id)
+                # Set a flag to show success message
+                type_labels = {'physical': 'Physical', 'shipping': 'Shipping', 'billing': 'Billing'}
+                context['new_address_message'] = f"New address created and selected as {type_labels.get(address_type, '')} Address"
+            except Address.DoesNotExist:
+                pass
+        
         # Add addresses, ensuring no duplicates
         for address in [supplier.physical_address, supplier.shipping_address, supplier.billing_address]:
             if address and address.id not in seen_address_ids:
@@ -860,6 +882,8 @@ class SupplierUpdateView(UpdateView):
         
         # Add all addresses to context for display
         context['addresses'] = all_needed_addresses
+        context['new_address_id'] = new_address_id
+        context['address_type'] = address_type
         return context
     
     def form_valid(self, form):
@@ -887,6 +911,21 @@ class SupplierUpdateView(UpdateView):
                 # Keep the original value for unchanged fields
                 setattr(supplier, field, original.get(field))
 
+        def handle_flag(flag_name, date_attr, user_attr):
+            if flag_name not in form.changed_data:
+                return
+            if form.cleaned_data.get(flag_name):
+                setattr(supplier, flag_name, True)
+                setattr(supplier, date_attr, timezone.now())
+                setattr(supplier, user_attr, self.request.user)
+            else:
+                setattr(supplier, flag_name, False)
+                setattr(supplier, date_attr, None)
+                setattr(supplier, user_attr, None)
+
+        handle_flag('probation', 'probation_on', 'probation_by')
+        handle_flag('conditional', 'conditional_on', 'conditional_by')
+
         if 'archived' in form.changed_data:
             if form.cleaned_data.get('archived'):
                 supplier.archived_on = timezone.now()
@@ -894,7 +933,7 @@ class SupplierUpdateView(UpdateView):
             else:
                 supplier.archived_on = None
                 supplier.archived_by = None
-        
+
         supplier.save()
         messages.success(self.request, f"Supplier {supplier.name} updated successfully!")
         return HttpResponseRedirect(self.get_success_url())
@@ -911,7 +950,7 @@ class SupplierUpdateView(UpdateView):
     def get_success_url(self):
         if 'contract_id' in self.kwargs:
             return reverse('contracts:contract_management', kwargs={'pk': self.kwargs['contract_id']})
-        return reverse('suppliers:supplier_list')
+        return reverse('suppliers:supplier_detail', kwargs={'pk': self.object.pk})
 
 
 # Certification Views

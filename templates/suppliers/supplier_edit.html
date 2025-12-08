@@ -19,6 +19,15 @@
     <form method="post" class="bg-white shadow rounded-lg p-6 space-y-6 border border-gray-200">
         {% csrf_token %}
 
+        {% if new_address_message %}
+            <div class="rounded-md bg-green-50 border border-green-200 p-4 text-sm text-green-700 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                {{ new_address_message }}
+            </div>
+        {% endif %}
+
         {% if form.non_field_errors %}
             <div class="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
                 {{ form.non_field_errors|join:", " }}
@@ -32,8 +41,6 @@
                 {% include "contracts/includes/simple_field.html" with field=form.cage_code %}
                 {% include "contracts/includes/simple_field.html" with field=form.supplier_type %}
                 {% include "contracts/includes/simple_field.html" with field=form.contact %}
-                {% include "contracts/includes/simple_field.html" with field=form.special_terms %}
-                {% include "contracts/includes/simple_field.html" with field=form.packhouse %}
                 {% include "contracts/includes/simple_field.html" with field=form.prime %}
             </div>
         </section>
@@ -54,13 +61,8 @@
         </section>
 
         <section>
-            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </span>
-                Addresses
-            </h2>
-            <div class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Addresses</h2>
+            <div class="grid md:grid-cols-3 gap-4">
                 {% include "suppliers/includes/address_picker.html" with field=form.physical_address label="Physical Address" %}
                 {% include "suppliers/includes/address_picker.html" with field=form.shipping_address label="Shipping Address" %}
                 {% include "suppliers/includes/address_picker.html" with field=form.billing_address label="Billing Address" %}
@@ -68,112 +70,33 @@
         </section>
 
         <section>
-            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-purple-100 text-purple-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </span>
-                Status & Flags
-            </h2>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Probation -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
-                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-red-100 text-red-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        </span>
-                        Probation
-                    </div>
-                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.probation.id_for_label }}">
-                        <span class="sr-only">{{ form.probation }}</span>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Status & Flags</h2>
+            <div class="space-y-8">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Risk Flags</h3>
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {% include "suppliers/includes/status_toggle.html" with field=form.probation label="Probation" description="Tracks whether the supplier is currently on probation." %}
+                        {% include "suppliers/includes/status_toggle.html" with field=form.conditional label="Conditional" description="Marks suppliers operating under conditional approval." %}
+                        {% include "suppliers/includes/status_toggle.html" with field=form.archived label="Archived" description="Archives suppliers to hide them from active workflows." %}
                     </div>
                 </div>
-                <!-- Conditional -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
-                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-yellow-100 text-yellow-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </span>
-                        Conditional
-                    </div>
-                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.conditional.id_for_label }}">
-                        <span class="sr-only">{{ form.conditional }}</span>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Certifications & Type</h3>
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {% include "suppliers/includes/status_toggle.html" with field=form.ppi label="PPI Certified" description="Indicates whether PPI certification is current." %}
+                        {% include "suppliers/includes/status_toggle.html" with field=form.iso label="ISO Certified" description="Indicates whether ISO certification is current." %}
+                        {% include "suppliers/includes/status_toggle.html" with field=form.is_packhouse label="Packhouse" description="Supplier operates as an approved packhouse." %}
                     </div>
                 </div>
-                <!-- PPI -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
-                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </span>
-                        PPI
-                    </div>
-                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.ppi.id_for_label }}">
-                        <span class="sr-only">{{ form.ppi }}</span>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
-                    </div>
-                </div>
-                <!-- ISO -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
-                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-green-100 text-green-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        </span>
-                        ISO
-                    </div>
-                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.iso.id_for_label }}">
-                        <span class="sr-only">{{ form.iso }}</span>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
-                    </div>
-                </div>
-                <!-- Packhouse -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
-                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                        </span>
-                        Is Packhouse
-                    </div>
-                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.is_packhouse.id_for_label }}">
-                        <span class="sr-only">{{ form.is_packhouse }}</span>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
-                    </div>
-                </div>
-                <!-- Archived -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
-                        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 text-gray-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-                        </span>
-                        Archived
-                    </div>
-                    <div class="toggle-control inline-flex rounded-full border border-gray-200 overflow-hidden text-xs font-semibold" data-checkbox-id="{{ form.archived.id_for_label }}">
-                        <span class="sr-only">{{ form.archived }}</span>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="true">On</button>
-                        <button type="button" class="toggle-option px-3 py-1 focus:outline-none" data-value="false">Off</button>
-                    </div>
-                </div>
-                <!-- Special Terms -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <p class="text-sm font-semibold text-gray-700 mb-2">Special Terms</p>
-                    {% include "contracts/includes/simple_field.html" with field=form.special_terms %}
-                </div>
-                <!-- Packhouse Select -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <p class="text-sm font-semibold text-gray-700 mb-2">Packhouse</p>
-                    {% include "contracts/includes/simple_field.html" with field=form.packhouse %}
-                </div>
-                <!-- Payment Terms -->
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <p class="text-sm font-semibold text-gray-700 mb-2">Allows GSI</p>
-                    {% include "contracts/includes/simple_field.html" with field=form.allows_gsi %}
-                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Additional Options</h2>
+            <div class="grid md:grid-cols-3 gap-4">
+                {% include "contracts/includes/simple_field.html" with field=form.special_terms %}
+                {% include "contracts/includes/simple_field.html" with field=form.packhouse %}
+                {% include "contracts/includes/simple_field.html" with field=form.allows_gsi %}
             </div>
         </section>
 
@@ -198,5 +121,78 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'suppliers/js/supplier_edit.js' %}"></script>
+<script src="{% static 'suppliers/js/supplier_edit.js' %}?v=20251204-001"></script>
+
+<!--
+CHANGE TRACKING & VISUAL INDICATORS - TESTING GUIDE
+====================================================
+
+This form now includes comprehensive change tracking with visual indicators.
+
+FEATURES IMPLEMENTED:
+1. Visual Change Indicators
+   - Amber/yellow pulse bar on the left side of changed fields
+   - Amber border on changed input fields
+   - Ring highlight on changed toggle controls
+   - Badge counter on the "Save Changes" button showing number of pending changes
+
+2. Field Wiring Verification
+   - All text inputs, selects, and textareas are tracked
+   - Toggle controls (checkboxes) are properly wired and tracked
+   - Address select dropdowns are tracked
+   - All changes trigger proper events
+
+3. Console Debugging
+   - Open browser console (F12) to see detailed logs
+   - Shows initial field values on page load
+   - Logs every field change with before/after values
+   - Shows which fields are being submitted
+
+TESTING CHECKLIST:
+□ Text Fields (name, cage_code, phones, emails, URLs)
+  - Change a value -> should see amber bar & border
+  - Revert to original -> indicator should disappear
+
+□ Select Fields (supplier_type, contact, special_terms, prime, packhouse)
+  - Change selection -> should see amber bar
+  - Revert to original -> indicator should disappear
+
+□ Address Selects (physical, shipping, billing)
+  - Change address -> should see amber bar
+  - Should properly save the new address
+
+□ Toggle Controls in Warning Flags section
+  - Probation: Click On/Off -> should see ring highlight
+  - Conditional: Click On/Off -> should see ring highlight  
+  - Archived: Click On/Off -> should see ring highlight
+  - Values should save properly
+
+□ Toggle Controls in Certifications section
+  - PPI: Click Yes/No -> should see ring highlight
+  - ISO: Click Yes/No -> should see ring highlight
+  - Is Packhouse: Click Yes/No -> should see ring highlight
+  - Values should save properly
+
+□ Additional Options
+  - allows_gsi: Should track and save
+  - packhouse: Should track and save
+
+□ Textarea (notes)
+  - Type changes -> should see amber bar & border
+  - Should save properly
+
+□ Save Button Badge
+  - Should show number of changed fields
+  - Should hide when no changes
+
+TROUBLESHOOTING:
+If a field doesn't save:
+1. Check browser console for errors
+2. Verify the field name matches the form definition
+3. Check that the field is in the SupplierForm fields list
+4. Ensure the toggle control has the correct data-checkbox-id
+
+To disable debug logging:
+Change DEBUG = true to DEBUG = false in supplier_edit.js
+-->
 {% endblock %}

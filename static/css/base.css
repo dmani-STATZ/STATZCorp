@@ -979,3 +979,42 @@ input[type="datetime-local"] {
 .toast-item.error { background: #b91c1c; }
 .toast-item.warning { background: #d97706; }
 .toast-item.info { background: #1d4ed8; }
+
+/* ===== Form Change Indicators ===== */
+.change-indicator {
+    position: absolute;
+    left: -8px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: #f59e0b;
+    border-radius: 2px;
+    animation: pulse-glow 2s ease-in-out infinite;
+    z-index: 10;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+    }
+    50% {
+        opacity: 0.7;
+        box-shadow: 0 0 16px rgba(245, 158, 11, 0.8);
+    }
+}
+
+/* Ensure border transitions are smooth */
+.form-input,
+.form-select,
+select,
+input,
+textarea {
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+/* Highlight changed fields */
+.border-amber-400 {
+    border-color: #fbbf24 !important;
+    box-shadow: 0 0 0 1px #fbbf24;
+}

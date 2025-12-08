@@ -3,7 +3,9 @@ const CACHE_NAME = 'statz-cache-v1';
 
 // Assets to cache for performance improvements only (not offline)
 const STATIC_ASSETS = [
-    '/static/css/dist/styles.css',
+    '/static/css/base.css',
+    '/static/css/light-mode.css',
+    '/static/css/dark-mode.css',
     '/static/images/StatzCorpColorFINAL.png',
     '/static/favicon/favicon.ico',
     // Icon files

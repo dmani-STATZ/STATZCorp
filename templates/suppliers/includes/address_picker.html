@@ -1,30 +1,63 @@
-<div class="border border-gray-200 rounded-lg p-4">
-    <div class="flex items-center justify-between mb-3">
+<div class="border border-gray-200 rounded-lg p-3 h-full">
+    <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 10-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-            </svg>
+            {% if 'physical' in field.name %}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                </svg>
+            {% elif 'shipping' in field.name %}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+                    <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z"/>
+                </svg>
+            {% elif 'billing' in field.name %}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-purple-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4z"/>
+                    <path fill-rule="evenodd" d="M6 10a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                </svg>
+            {% else %}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 10-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+            {% endif %}
             {{ label }}
         </div>
-        <a href="{% url 'contracts:address_create' %}?next={% url 'suppliers:supplier_edit' supplier.pk %}"
-           class="text-xs text-blue-600 hover:text-blue-800">
-            + Add Address
+        {% with address_type=field.name|cut:"_address" %}
+        <a href="{% url 'contracts:address_create' %}?next={% url 'suppliers:supplier_edit' object.pk %}&address_type={{ address_type }}"
+           class="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+            </svg>
+            New
         </a>
+        {% endwith %}
     </div>
-    <div class="flex flex-wrap gap-2 address-picker" data-select-id="{{ field.id_for_label }}">
+    
+    <!-- Current Selection Display -->
+    {% if field.value %}
+        <div class="mb-2 p-2 bg-gray-50 rounded text-xs text-gray-600 border border-gray-100">
+            {% for option in field.field.choices %}
+                {% if option.0|stringformat:"s" == field.value|stringformat:"s" %}
+                    <span class="font-medium text-gray-800">{{ option.1 }}</span>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="mb-2 p-2 bg-gray-50 rounded text-xs text-gray-400 border border-gray-100 italic">
+            No address selected
+        </div>
+    {% endif %}
+    
+    <!-- Dropdown Select -->
+    <select name="{{ field.html_name }}" id="{{ field.id_for_label }}"
+            class="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <option value="">-- Select Address --</option>
         {% for option in field.field.choices %}
             {% if option.0 %}
-                <button type="button"
-                        class="address-option px-3 py-2 rounded border {% if option.0 == field.value %}border-blue-500 bg-blue-50 text-blue-700{% else %}border-gray-200 text-gray-600{% endif %}"
-                        data-value="{{ option.0 }}">
+                <option value="{{ option.0 }}" {% if option.0|stringformat:"s" == field.value|stringformat:"s" %}selected{% endif %}>
                     {{ option.1 }}
-                </button>
+                </option>
             {% endif %}
-        {% empty %}
-            <p class="text-sm text-gray-500">No addresses available.</p>
         {% endfor %}
-    </div>
-    <div class="address-select hidden">
-        {{ field }}
-    </div>
+    </select>
 </div>

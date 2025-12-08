@@ -117,6 +117,8 @@ class NsnForm(BaseModelForm):
         }
 
 class SupplierForm(BaseModelForm):
+    toggle_fields = ['probation', 'conditional', 'ppi', 'iso', 'is_packhouse']
+
     class Meta:
         model = Supplier
         fields = [
@@ -154,6 +156,12 @@ class SupplierForm(BaseModelForm):
             self.fields['packhouse'].queryset = self.fields['packhouse'].queryset.order_by('name')
         if 'contact' in self.fields:
             self.fields['contact'].queryset = self.fields['contact'].queryset.order_by('name')
+
+        for name in self.toggle_fields:
+            field = self.fields.get(name)
+            if field:
+                existing = field.widget.attrs.get('class', '')
+                field.widget.attrs['class'] = f"{existing} sr-only peer".strip()
 
 class ContractForm(BaseModelForm):
     assigned_user = ActiveUserModelChoiceField(

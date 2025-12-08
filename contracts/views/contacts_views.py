@@ -249,13 +249,37 @@ class AddressCreateView(CreateView):
         if self.request.GET.get('popup') == 'true':
             # For popup mode, return success page with JavaScript to close window
             return reverse_lazy('contracts:address_create_success')
+        
+        # Handle 'next' parameter for redirect
+        next_url = self.request.GET.get('next') or self.request.POST.get('next')
+        if next_url:
+            # Append address_id and address_type to help with auto-selection
+            from urllib.parse import urlencode, urlparse, parse_qs
+            parsed = urlparse(next_url)
+            params = parse_qs(parsed.query)
+            params['new_address_id'] = [str(self.object.id)]
+            address_type = self.request.GET.get('address_type') or self.request.POST.get('address_type')
+            if address_type:
+                params['address_type'] = [address_type]
+            new_query = urlencode(params, doseq=True)
+            return f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{new_query}" if parsed.scheme else f"{parsed.path}?{new_query}"
+        
         return reverse_lazy('contracts:address_list')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create New Address'
+        address_type = self.request.GET.get('address_type', '')
+        type_labels = {
+            'physical': 'Physical',
+            'shipping': 'Shipping', 
+            'billing': 'Billing'
+        }
+        type_label = type_labels.get(address_type, '')
+        context['title'] = f'Create {type_label} Address' if type_label else 'Create New Address'
         context['submit_text'] = 'Create Address'
         context['is_popup'] = self.request.GET.get('popup') == 'true'
+        context['next_url'] = self.request.GET.get('next', '')
+        context['address_type'] = address_type
         return context
     
     def form_valid(self, form):

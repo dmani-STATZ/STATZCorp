@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Change Indicator Visual Test</title>
+    <style>
+        /* From base.css */
+        .change-indicator {
+            position: absolute;
+            left: -8px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #f59e0b;
+            border-radius: 2px;
+            animation: pulse-glow 2s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+            }
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 16px rgba(245, 158, 11, 0.8);
+            }
+        }
+
+        .border-amber-400 {
+            border-color: #fbbf24 !important;
+            box-shadow: 0 0 0 1px #fbbf24;
+        }
+
+        /* Test styling */
+        .test-container {
+            position: relative;
+            margin: 40px;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .toggle-control {
+            display: inline-flex;
+            border-radius: 9999px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            font-size: 12px;
+            font-weight: 600;
+            background: white;
+        }
+
+        .toggle-option {
+            padding: 6px 16px;
+            cursor: pointer;
+            border: none;
+            background: white;
+            color: #6b7280;
+        }
+
+        .toggle-option.active-on {
+            background: #10b981;
+            color: white;
+        }
+
+        .toggle-option.active-off {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
+</head>
+<body style="font-family: system-ui, -apple-system, sans-serif; padding: 20px; background: #f9fafb;">
+    <h1>Visual Change Indicator Test</h1>
+    <p>This page tests if the CSS animations work in your browser.</p>
+
+    <div class="test-container">
+        <h3>Test 1: Input with Change Indicator</h3>
+        <div style="position: relative;">
+            <input type="text" 
+                   id="test-input" 
+                   class="border-amber-400" 
+                   value="This field has a changed indicator"
+                   style="border-width: 2px;">
+            <div class="change-indicator"></div>
+        </div>
+        <p style="margin-top: 10px; color: #6b7280; font-size: 14px;">
+            You should see: <br>
+            ✅ An amber/orange pulsing bar on the LEFT edge<br>
+            ✅ An amber border around the input<br>
+            ✅ The bar should glow/pulse smoothly
+        </p>
+    </div>
+
+    <div class="test-container">
+        <h3>Test 2: Toggle Control with Ring</h3>
+        <div class="toggle-control" style="box-shadow: 0 0 0 2px #fbbf24, 0 0 0 3px rgba(251, 191, 36, 0.3);">
+            <button class="toggle-option active-on">On</button>
+            <button class="toggle-option">Off</button>
+        </div>
+        <p style="margin-top: 10px; color: #6b7280; font-size: 14px;">
+            You should see: <br>
+            ✅ A glowing amber ring around the toggle<br>
+            ✅ The "On" button is green
+        </p>
+    </div>
+
+    <div class="test-container">
+        <h3>Test 3: Normal Field (No Indicator)</h3>
+        <input type="text" value="This field has NO change indicator">
+        <p style="margin-top: 10px; color: #6b7280; font-size: 14px;">
+            This should look normal with no amber styling.
+        </p>
+    </div>
+
+    <div style="margin: 40px; padding: 20px; background: #fef3c7; border: 2px solid #fbbf24; border-radius: 8px;">
+        <h3 style="margin-top: 0;">📋 What to Check:</h3>
+        <ol>
+            <li><strong>Can you see the pulsing amber bar?</strong> If NO, CSS animations might be disabled in your browser.</li>
+            <li><strong>Is the bar animating smoothly?</strong> If it's flickering, there might be a performance issue.</li>
+            <li><strong>Can you see the amber border on the input?</strong> If NO, the border styling isn't working.</li>
+            <li><strong>Can you see the ring around the toggle?</strong> If NO, box-shadow isn't working.</li>
+        </ol>
+        <p style="margin-bottom: 0;"><strong>If ANY of these don't work</strong>, let me know which ones, and I'll provide an alternative solution!</p>
+    </div>
+
+    <script>
+        console.log('✅ Visual test page loaded');
+        console.log('If you can read this in the console, JavaScript is working');
+    </script>
+</body>
+</html>
+
