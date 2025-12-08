@@ -6,14 +6,10 @@
                 <p class="text-xs text-gray-500 mt-1">{{ description }}</p>
             {% endif %}
         </div>
-        <label class="toggle-control inline-flex items-center cursor-pointer gap-3" data-checkbox-id="{{ field.id_for_label }}">
+        <label class="flex items-center gap-3 cursor-pointer">
             {{ field }}
-            <div class="relative w-14 h-7 rounded-full bg-gray-200 transition peer-checked:bg-green-500">
-                <span class="absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition peer-checked:translate-x-7"></span>
-            </div>
-            <span class="text-xs font-semibold tracking-wide">
-                <span class="text-gray-500 peer-checked:hidden">Off</span>
-                <span class="hidden text-green-700 peer-checked:inline">On</span>
+            <span class="text-sm font-medium text-gray-700">
+                {{ on_label|default:"Enabled" }}
             </span>
         </label>
     </div>

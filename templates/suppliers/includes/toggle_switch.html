@@ -1,0 +1,103 @@
+{% comment %}
+Toggle Switch Component for Boolean Fields
+Usage: {% include "suppliers/includes/toggle_switch.html" with field=form.probation label="Probation" description="..." %}
+{% endcomment %}
+
+<div class="border border-gray-200 rounded-lg p-4 bg-white">
+    <div class="flex items-center justify-between gap-4">
+        <div class="flex-1">
+            <p class="text-sm font-semibold text-gray-800">{{ label }}</p>
+            {% if description %}
+                <p class="text-xs text-gray-500 mt-1">{{ description }}</p>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3">
+            {# Hidden checkbox for form submission - treat None as False #}
+            {% with field_checked=field.value|default:False %}
+            <input type="checkbox" 
+                   id="{{ field.id_for_label }}" 
+                   name="{{ field.html_name }}" 
+                   class="hidden"
+                   {% if field_checked %}checked{% endif %}>
+            
+            {# Visual toggle switch #}
+            <button type="button" 
+                    class="toggle-control relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {% if field_checked %}bg-blue-600{% else %}bg-gray-200{% endif %}"
+                    data-checkbox-id="{{ field.id_for_label }}"
+                    role="switch"
+                    aria-checked="{% if field_checked %}true{% else %}false{% endif %}"
+                    aria-labelledby="label-{{ field.id_for_label }}">
+                <span class="toggle-slider inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if field_checked %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+            </button>
+            
+            {# Yes/No label #}
+            <span id="label-{{ field.id_for_label }}" class="text-sm font-medium text-gray-700 min-w-[2rem]">
+                <span class="toggle-label">{% if field_checked %}Yes{% else %}No{% endif %}</span>
+            </span>
+            {% endwith %}
+        </div>
+    </div>
+    
+    {% if field.errors %}
+        <div class="mt-2 text-sm text-red-600">
+            {{ field.errors|join:", " }}
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Initialize toggle switches (runs immediately when template is loaded)
+(function() {
+    // Find all toggle controls on the page
+    document.querySelectorAll('.toggle-control').forEach(toggleBtn => {
+        // Skip if already initialized
+        if (toggleBtn.dataset.initialized === 'true') return;
+        toggleBtn.dataset.initialized = 'true';
+        
+        const checkboxId = toggleBtn.dataset.checkboxId;
+        const checkbox = document.getElementById(checkboxId);
+        
+        if (!checkbox) {
+            console.error('Checkbox not found for toggle:', checkboxId);
+            return;
+        }
+        
+        // Handle toggle click
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Toggle the checkbox state
+            checkbox.checked = !checkbox.checked;
+            
+            // Update visual state
+            updateToggleVisuals(toggleBtn, checkbox.checked);
+            
+            // Dispatch change event for form tracking
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            checkbox.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    });
+    
+    function updateToggleVisuals(toggleBtn, isChecked) {
+        const slider = toggleBtn.querySelector('.toggle-slider');
+        const label = toggleBtn.parentElement.querySelector('.toggle-label');
+        
+        if (isChecked) {
+            toggleBtn.classList.remove('bg-gray-200');
+            toggleBtn.classList.add('bg-blue-600');
+            slider.classList.remove('translate-x-1');
+            slider.classList.add('translate-x-6');
+            toggleBtn.setAttribute('aria-checked', 'true');
+            if (label) label.textContent = 'Yes';
+        } else {
+            toggleBtn.classList.remove('bg-blue-600');
+            toggleBtn.classList.add('bg-gray-200');
+            slider.classList.remove('translate-x-6');
+            slider.classList.add('translate-x-1');
+            toggleBtn.setAttribute('aria-checked', 'false');
+            if (label) label.textContent = 'No';
+        }
+    }
+})();
+</script>
+

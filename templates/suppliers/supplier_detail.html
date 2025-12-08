@@ -4,7 +4,10 @@
 {% block contract_content %}
 <div class="max-w-6xl mx-auto px-4 pt-6 pb-10 space-y-6">
   <!-- Header -->
-  <div class="bg-white shadow-sm rounded-xl p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+  <div class="relative shadow-sm rounded-xl p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if supplier.probation %}bg-red-50 border border-red-200{% elif supplier.conditional %}bg-yellow-50 border border-yellow-200{% else %}bg-white{% endif %}">
+    <div class="absolute top-4 right-4">
+      <div class="h-5 w-5 rounded-full border-2 {% if supplier.archived %}bg-red-500 border-red-600{% else %}bg-green-500 border-green-600{% endif %}" title="{% if supplier.archived %}Archived{% else %}Active{% endif %}"></div>
+    </div>
     <div class="flex items-center gap-4">
       {% if supplier.logo_url %}
         <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-16 w-16 object-contain rounded-md border border-gray-200 bg-white">
@@ -40,10 +43,7 @@
         </div>
       </div>
     </div>
-    <div class="flex flex-wrap gap-2">
-      {% if compliance_flags.probation %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">Probation</span>{% endif %}
-      {% if compliance_flags.conditional %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Conditional</span>{% endif %}
-      {% if compliance_flags.archived %}<span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">Archived</span>{% endif %}
+    <div class="flex flex-wrap gap-2 md:pl-6">
       <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 hover:text-gray-900">
         Edit Supplier
       </a>

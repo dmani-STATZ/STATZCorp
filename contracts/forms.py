@@ -117,8 +117,6 @@ class NsnForm(BaseModelForm):
         }
 
 class SupplierForm(BaseModelForm):
-    toggle_fields = ['probation', 'conditional', 'ppi', 'iso', 'is_packhouse']
-
     class Meta:
         model = Supplier
         fields = [
@@ -146,7 +144,14 @@ class SupplierForm(BaseModelForm):
             }),
             'prime': forms.TextInput(attrs={
                 'class': 'w-10'  # Keep this specific width class
-            })
+            }),
+            # Boolean fields as checkboxes for toggle switches
+            'probation': forms.CheckboxInput(),
+            'conditional': forms.CheckboxInput(),
+            'ppi': forms.CheckboxInput(),
+            'iso': forms.CheckboxInput(),
+            'is_packhouse': forms.CheckboxInput(),
+            'archived': forms.CheckboxInput(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -156,12 +161,14 @@ class SupplierForm(BaseModelForm):
             self.fields['packhouse'].queryset = self.fields['packhouse'].queryset.order_by('name')
         if 'contact' in self.fields:
             self.fields['contact'].queryset = self.fields['contact'].queryset.order_by('name')
-
-        for name in self.toggle_fields:
-            field = self.fields.get(name)
-            if field:
-                existing = field.widget.attrs.get('class', '')
-                field.widget.attrs['class'] = f"{existing} sr-only peer".strip()
+        
+        # Handle null boolean fields - treat None as False for display
+        if self.instance and self.instance.pk:
+            for field_name in ['probation', 'conditional', 'ppi', 'iso', 'is_packhouse', 'archived']:
+                if field_name in self.fields:
+                    value = getattr(self.instance, field_name, None)
+                    if value is None:
+                        self.initial[field_name] = False
 
 class ContractForm(BaseModelForm):
     assigned_user = ActiveUserModelChoiceField(

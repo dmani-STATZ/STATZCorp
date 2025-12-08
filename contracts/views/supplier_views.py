@@ -211,16 +211,16 @@ class SupplierListView(ListView):
             'dodaac': supplier.dodaac,
             'supplier_type': supplier.supplier_type.description if supplier.supplier_type else '',
             'supplier_type_id': supplier.supplier_type.id if supplier.supplier_type else None,
-            'is_packhouse': supplier.is_packhouse,
+            'is_packhouse': bool(supplier.is_packhouse),
             'packhouse': supplier.packhouse.cage_code if supplier.packhouse else '',
             'packhouse_id': supplier.packhouse.id if supplier.packhouse else None,
-            'probation': supplier.probation,
+            'probation': bool(supplier.probation),
             'probation_on': fmt_dt(supplier.probation_on),
             'probation_by': supplier.probation_by.username if supplier.probation_by else None,
-            'conditional': supplier.conditional,
+            'conditional': bool(supplier.conditional),
             'conditional_on': fmt_dt(supplier.conditional_on),
             'conditional_by': supplier.conditional_by.username if supplier.conditional_by else None,
-            'archived': supplier.archived,
+            'archived': bool(supplier.archived),
             'archived_on': fmt_dt(supplier.archived_on),
             'archived_by': supplier.archived_by.username if supplier.archived_by else None,
             'business_phone': supplier.business_phone,
@@ -246,8 +246,8 @@ class SupplierListView(ListView):
             'special_terms_id': supplier.special_terms.id if supplier.special_terms else None,
             'special_terms_on': fmt_dt(supplier.special_terms_on),
             'prime': supplier.prime,
-            'ppi': supplier.ppi,
-            'iso': supplier.iso,
+            'ppi': bool(supplier.ppi),
+            'iso': bool(supplier.iso),
             'allows_gsi': supplier.get_allows_gsi_display() if hasattr(supplier, 'get_allows_gsi_display') else None,
             'allows_gsi_value': supplier.allows_gsi,
             'files_url': supplier.files_url,
@@ -933,6 +933,13 @@ class SupplierUpdateView(UpdateView):
             else:
                 supplier.archived_on = None
                 supplier.archived_by = None
+        
+        # Ensure boolean fields without tracking are set to False instead of None
+        for bool_field in ['ppi', 'iso', 'is_packhouse']:
+            if bool_field in form.changed_data:
+                value = form.cleaned_data.get(bool_field)
+                # Convert None to False
+                setattr(supplier, bool_field, bool(value))
 
         supplier.save()
         messages.success(self.request, f"Supplier {supplier.name} updated successfully!")

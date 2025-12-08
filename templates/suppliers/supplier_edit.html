@@ -75,17 +75,17 @@
                 <div>
                     <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Risk Flags</h3>
                     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {% include "suppliers/includes/status_toggle.html" with field=form.probation label="Probation" description="Tracks whether the supplier is currently on probation." %}
-                        {% include "suppliers/includes/status_toggle.html" with field=form.conditional label="Conditional" description="Marks suppliers operating under conditional approval." %}
-                        {% include "suppliers/includes/status_toggle.html" with field=form.archived label="Archived" description="Archives suppliers to hide them from active workflows." %}
+                        {% include "suppliers/includes/toggle_switch.html" with field=form.probation label="Probation" description="Tracks whether the supplier is currently on probation." %}
+                        {% include "suppliers/includes/toggle_switch.html" with field=form.conditional label="Conditional" description="Marks suppliers operating under conditional approval." %}
+                        {% include "suppliers/includes/toggle_switch.html" with field=form.archived label="Archived" description="Archives suppliers to hide them from active workflows." %}
                     </div>
                 </div>
                 <div>
                     <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Certifications & Type</h3>
                     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {% include "suppliers/includes/status_toggle.html" with field=form.ppi label="PPI Certified" description="Indicates whether PPI certification is current." %}
-                        {% include "suppliers/includes/status_toggle.html" with field=form.iso label="ISO Certified" description="Indicates whether ISO certification is current." %}
-                        {% include "suppliers/includes/status_toggle.html" with field=form.is_packhouse label="Packhouse" description="Supplier operates as an approved packhouse." %}
+                        {% include "suppliers/includes/toggle_switch.html" with field=form.ppi label="PPI Certified" description="Indicates whether PPI certification is current." %}
+                        {% include "suppliers/includes/toggle_switch.html" with field=form.iso label="ISO Certified" description="Indicates whether ISO certification is current." %}
+                        {% include "suppliers/includes/toggle_switch.html" with field=form.is_packhouse label="Packhouse" description="Supplier operates as an approved packhouse." %}
                     </div>
                 </div>
             </div>
