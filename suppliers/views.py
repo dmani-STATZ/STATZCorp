@@ -5,12 +5,12 @@ from django.db.models import Q, Count, Sum, Case, When, Value
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.utils import timezone
-from django.views.generic import TemplateView, DetailView, View
+from django.views.generic import TemplateView, DetailView, View, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404
 
 from contracts.models import Contract, Clin
-from suppliers.models import Supplier, SupplierDocument
+from suppliers.models import Supplier, SupplierDocument, SupplierType
 
 
 class DashboardView(TemplateView):
@@ -19,9 +19,9 @@ class DashboardView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         suppliers_with_metrics = Supplier.objects.annotate(
-            contract_count=Count('contract', distinct=True),
+            contract_count=Count('clin__contract', distinct=True),
             contract_value=Coalesce(
-                Sum('contract__contract_value'),
+                Sum('clin__quote_value'),
                 0.0,
                 output_field=models.FloatField(),
             ),
@@ -41,14 +41,14 @@ class DashboardView(TemplateView):
 
         def is_packhouse(qs):
             return qs.filter(
-                Q(is_packhouse=True)
+                Q(supplier_type__code__iexact='P')
                 | Q(supplier_type__description__icontains='packhouse')
             )
 
         manufacturer_qs = is_manufacturer(suppliers_with_metrics)
         distributor_qs = is_distributor(suppliers_with_metrics)
         packhouse_qs = is_packhouse(suppliers_with_metrics)
-        unspecified_qs = suppliers_with_metrics.filter(supplier_type__isnull=True, is_packhouse=False)
+        unspecified_qs = suppliers_with_metrics.filter(supplier_type__isnull=True)
         other_qs = suppliers_with_metrics.exclude(pk__in=manufacturer_qs.values_list('pk', flat=True)) \
             .exclude(pk__in=distributor_qs.values_list('pk', flat=True)) \
             .exclude(pk__in=packhouse_qs.values_list('pk', flat=True)) \
@@ -72,7 +72,9 @@ class DashboardView(TemplateView):
             'unspecified': unspecified_qs.count(),
         }
 
-        contracts_qs = Contract.objects.filter(supplier__isnull=False)
+        contracts_qs = Contract.objects.filter(
+            clin__supplier__isnull=False
+        ).distinct()
         context['total_suppliers'] = Supplier.objects.count()
         context['total_contracts'] = contracts_qs.count()
         context['total_contract_value'] = contracts_qs.aggregate(
@@ -239,3 +241,36 @@ def supplier_search_api(request):
         for s in qs
     ]
     return JsonResponse({'results': results})
+
+
+class SuppliersInfoByType(LoginRequiredMixin, ListView):
+    template_name = 'suppliers/suppliers_by_type.html'
+    model = Supplier
+    context_object_name = 'suppliers'
+    paginate_by = 2
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # store slug on self so we can reuse it in get_context_data
+        self.type_slug = self.kwargs.get('type_slug', '').lower()
+
+        if self.type_slug == 'unspecified':
+            return qs.filter(supplier_type__isnull=True)
+
+        return qs.filter(supplier_type__description__iexact=self.type_slug)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        slug = getattr(self, 'type_slug', '').lower()
+
+        label_map = {
+            'manufacturer': 'Manufacturer',
+            'distributor': 'Distributor',
+            'packhouse': 'PackHouse',
+            'other': 'Other',
+            'unspecified': 'Unspecified',
+        }
+
+        context['type_label'] = label_map.get(slug, 'Suppliers')
+        return context

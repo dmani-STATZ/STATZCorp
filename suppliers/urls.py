@@ -13,6 +13,7 @@ from suppliers.views import (
     SupplierEnrichView,
     SupplierApplyEnrichmentView,
     SupplierEnrichPageView,
+    SuppliersInfoByType
 )
 
 app_name = 'suppliers'
@@ -22,6 +23,7 @@ urlpatterns = [
     path('dashboard/', DashboardView.as_view(), name='supplier_dashboard_alias'),
     path('details/', SupplierListView.as_view(), name='supplier_list'),
     path('search/', supplier_search_api, name='supplier_search_api'),
+    path('info/<str:type_slug>/', SuppliersInfoByType.as_view(), name='supplier_info_by_type'),
     path('search/page/', SupplierSearchView.as_view(), name='supplier_search'),
     path('autocomplete/', supplier_autocomplete, name='supplier_autocomplete'),
     path('create/', SupplierCreateView.as_view(), name='supplier_create'),
