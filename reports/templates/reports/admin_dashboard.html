@@ -91,6 +91,27 @@
     <div class="panel">
       <h2>AI Prompts</h2>
       <div class="panel-body">
+        <div class="mb-3 p-3 bg-gray-900 rounded">
+          <div id="globalModelStatus" class="text-sm {% if not global_ai_model_info.has_stored_model %}text-yellow-400{% elif global_ai_model_info.needs_update %}text-orange-400{% else %}text-gray-300{% endif %}">
+            {% if not global_ai_model_info.has_stored_model %}
+              No shared AI model configured. Fallback: {{ global_ai_model_info.fallback_model }}.
+            {% elif global_ai_model_info.needs_update %}
+              Shared model {{ global_ai_model_info.stored_model }} is flagged for replacement.
+            {% else %}
+              Shared model: {{ global_ai_model_info.stored_model }}{% if global_ai_model_info.updated_by %} (updated by {{ global_ai_model_info.updated_by }}{% if global_ai_model_info.updated_at_display %} on {{ global_ai_model_info.updated_at_display }}{% endif %}){% endif %}.
+            {% endif %}
+          </div>
+          {% if request.user.is_superuser %}
+          <div class="mt-2 flex flex-wrap gap-2 items-center">
+            <input id="admin-global-model-input" type="text" class="flex-1 md:flex-none rounded border border-gray-600 bg-gray-800 text-gray-100 px-2 py-1" value="{{ global_ai_model_info.stored_model|default:'' }}" placeholder="mistralai/mistral-small:free">
+            <label class="flex items-center gap-1 text-sm text-gray-200">
+              <input type="checkbox" id="admin-global-model-flag" {% if global_ai_model_info.needs_update %}checked{% endif %}>
+              Needs update
+            </label>
+            <button id="admin-global-model-save" class="btn small" type="button">Save Shared Model</button>
+          </div>
+          {% endif %}
+        </div>
         <div class="mt-2">
           <div class="mb-1">Query type</div>
           {% with ai_cat=selected.category|default:"contract" %}
@@ -148,6 +169,80 @@
     const copySqlBtn = document.getElementById('aiCopy');
     const copyRequestBtn = document.getElementById('aiFillFromRequest');
     const statusEl = document.getElementById('aiStatus');
+    const globalModelStatusEl = document.getElementById('globalModelStatus');
+    const globalModelInput = document.getElementById('admin-global-model-input');
+    const globalModelFlag = document.getElementById('admin-global-model-flag');
+    const globalModelSaveBtn = document.getElementById('admin-global-model-save');
+    let globalModelInfo = JSON.parse('{{ global_ai_model_info_json|escapejs }}');
+
+    function getCSRF(){
+      const name = 'csrftoken';
+      const cookies = document.cookie ? document.cookie.split(';') : [];
+      for(const c of cookies){
+        const cookie = c.trim();
+        if(cookie.startsWith(name + '=')){
+          return decodeURIComponent(cookie.substring(name.length + 1));
+        }
+      }
+      return '';
+    }
+
+    function renderGlobalModelStatus(info){
+      if(!globalModelStatusEl){ return; }
+      let text = '';
+      let className = 'text-sm text-gray-300';
+      if(!info || !info.has_stored_model){
+        text = `No shared AI model configured. Fallback: ${info?.fallback_model || 'mistralai/mistral-small:free'}.`;
+        className = 'text-sm text-yellow-400';
+      } else if(info.needs_update){
+        text = `Shared model ${info.stored_model} is flagged for replacement.`;
+        className = 'text-sm text-orange-400';
+      } else {
+        text = `Shared model: ${info.stored_model || info.effective_model}`;
+        if(info.updated_by){
+          text += ` (updated by ${info.updated_by}`;
+          if(info.updated_at_display){ text += ` on ${info.updated_at_display}`; }
+          text += ')';
+        }
+      }
+      globalModelStatusEl.textContent = text;
+      globalModelStatusEl.className = className;
+      if(globalModelFlag){ globalModelFlag.checked = !!info?.needs_update; }
+      if(globalModelInput && info?.has_stored_model){
+        globalModelInput.value = info.stored_model;
+      }
+    }
+
+    renderGlobalModelStatus(globalModelInfo);
+
+    globalModelSaveBtn?.addEventListener('click', function(){
+      const payload = {
+        model: (globalModelInput?.value || '').trim(),
+        needs_update: globalModelFlag?.checked ?? false,
+      };
+      fetch('{% url "suppliers:global_ai_model_config" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRF(),
+        },
+        body: JSON.stringify(payload),
+      })
+        .then(async (resp) => {
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.ok) {
+            const msg = data.error || data.message || 'Failed to save shared model.';
+            throw new Error(msg);
+          }
+          return data;
+        })
+        .then((data) => {
+          globalModelInfo = data.info;
+          renderGlobalModelStatus(globalModelInfo);
+          alert(data.message || 'Shared model saved.');
+        })
+        .catch((err) => alert(err.message || 'Unable to save shared model.'));
+    });
     function category(){
       const el = document.querySelector('input[name="aiCategory"]:checked');
       return el ? el.value : 'other';

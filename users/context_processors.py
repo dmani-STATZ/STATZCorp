@@ -1,20 +1,22 @@
 from users.user_settings import UserSettings
 import time
-import os
-from django.conf import settings
 from .models import SystemMessage, UserCompanyMembership
 from contracts.models import Company
+from suppliers.openrouter_config import get_openrouter_model_info
 
 def user_preferences(request):
     """
     Add user preferences to the context
     """
+    model_info = get_openrouter_model_info()
+    model_default = model_info["effective_model"]
+    fallback_default = model_info["fallback_model"]
     if not request.user.is_authenticated:
         return {
             'user_preferences': {},
             'cache_version': str(int(time.time())),
-            'ai_model_default': getattr(settings, "OPENROUTER_MODEL", os.environ.get("OPENROUTER_MODEL", "")),
-            'ai_fallback_default': getattr(settings, "OPENROUTER_MODEL_FALLBACKS", os.environ.get("OPENROUTER_MODEL_FALLBACKS", "")),
+            'ai_model_default': model_default,
+            'ai_fallback_default': fallback_default,
         }
 
     preferences = UserSettings.get_all_settings(request.user)
@@ -28,8 +30,8 @@ def user_preferences(request):
     return {
         'user_preferences': preferences,
         'cache_version': cache_version,
-        'ai_model_default': getattr(settings, "OPENROUTER_MODEL", os.environ.get("OPENROUTER_MODEL", "")),
-        'ai_fallback_default': getattr(settings, "OPENROUTER_MODEL_FALLBACKS", os.environ.get("OPENROUTER_MODEL_FALLBACKS", "")),
+        'ai_model_default': model_default,
+        'ai_fallback_default': fallback_default,
     }
 
 def unread_messages(request):

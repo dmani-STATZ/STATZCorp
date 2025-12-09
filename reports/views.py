@@ -10,6 +10,7 @@ from .models import ReportRequest
 from .forms import ReportRequestForm, SQLUpdateForm
 from .utils import run_select, rows_to_csv, generate_db_schema_snapshot
 from users.user_settings import UserSettings
+from suppliers.openrouter_config import get_model_for_request, get_openrouter_model_info
 from django.http import StreamingHttpResponse
 from django.conf import settings
 from django.db import connection
@@ -151,7 +152,8 @@ def admin_dashboard(request):
         selected = get_object_or_404(ReportRequest, pk=selected_id)
         sql_form = SQLUpdateForm(instance=selected)
 
-    ai_model_default = getattr(settings, "OPENROUTER_MODEL", os.environ.get("OPENROUTER_MODEL", "mistralai/mistral-small:free"))
+    global_model_info = get_openrouter_model_info()
+    ai_model_default = global_model_info["stored_model"] or global_model_info["effective_model"]
     _fallback_raw = getattr(settings, "OPENROUTER_MODEL_FALLBACKS", os.environ.get("OPENROUTER_MODEL_FALLBACKS", ""))
     if isinstance(_fallback_raw, (list, tuple)):
         ai_model_fallbacks = ",".join(_fallback_raw)
@@ -170,6 +172,8 @@ def admin_dashboard(request):
             "sql_form": sql_form,
             "ai_model_default": saved_model,
             "ai_model_fallbacks": saved_fallbacks,
+            "global_ai_model_info": global_model_info,
+            "global_ai_model_info_json": json.dumps(global_model_info),
         },
     )
 
@@ -298,9 +302,10 @@ def admin_ai_stream(request):
 
     api_key = getattr(settings, "OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY", ""))
     base_url = getattr(settings, "OPENROUTER_BASE_URL", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")).rstrip("/")
-    model = (request.GET.get("model") or UserSettings.get_setting(request.user, "reports_ai_model", getattr(settings, "OPENROUTER_MODEL", os.environ.get("OPENROUTER_MODEL", "mistralai/mistral-small:free")))).strip()
-    if not model:
-        model = "mistralai/mistral-small:free"
+    override_model = (request.GET.get("model") or "").strip()
+    user_saved_model = UserSettings.get_setting(request.user, "reports_ai_model", "")
+    preferred_model = (override_model or user_saved_model or None)
+    model, _ = get_model_for_request(preferred_model)
     raw_fallbacks = request.GET.get("fallbacks")
     if raw_fallbacks is None:
         raw_fallbacks = UserSettings.get_setting(

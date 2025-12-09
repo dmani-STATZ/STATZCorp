@@ -16,36 +16,416 @@
       <label for="enrich-website-url" class="text-sm font-medium text-gray-700">Website URL</label>
       <input id="enrich-website-url" type="url" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ supplier.website_url|default:'' }}" placeholder="https://example.com">
       <button id="save-website-btn" class="px-3 py-2 text-sm font-semibold rounded-md bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">Save URL</button>
-      <button id="run-enrichment-btn" data-supplier-id="{{ supplier.id }}" class="px-3 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700">Run Enrichment</button>
-    </div>
+   </div>
     <p class="text-xs text-gray-500">Saving the URL will update the supplier record before running enrichment.</p>
+    <div  class="flex items-center gap-4">
+    <button id="run-enrichment-btn" data-supplier-id="{{ supplier.id }}" class="px-3 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700">Run Enrichment</button>
+    <label for="manual-mode-toggle" class="flex items-center gap-2 text-sm text-gray-700">
+      <input type="checkbox" id="manual-mode-toggle" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+      Run manually with my own LLM (skip OpenRouter call)
+    </label>  </div>
+    <div id="manual-mode-section" class="hidden">
+    <p class="text-xs text-gray-500">We'll still fetch the HTML and provide the full context for copying.</p></div>
+    <div  id="ai-model-section" >
+    <div class="flex items-center gap-3">
+      <label for="ai-model-input" class="text-sm font-medium text-gray-700">AI Model</label>
+      <input id="ai-model-input" type="text" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ default_ai_model|default:'' }}" placeholder="mistralai/mistral-small:free">
+      <span class="text-xs text-gray-500">Enter an OpenRouter model slug to override the default.</span>
+    </div>
+    <div class="mt-1">
+      <p id="ai-model-status" class="text-xs {% if not global_ai_model_info.has_stored_model %}text-yellow-600{% elif global_ai_model_info.needs_update %}text-orange-600{% else %}text-gray-500{% endif %}">
+        {% if not global_ai_model_info.has_stored_model %}
+          No shared AI model configured yet. We'll fall back to {{ global_ai_model_info.fallback_model }} until one is saved.
+        {% elif global_ai_model_info.needs_update %}
+          Shared model {{ global_ai_model_info.stored_model }} is flagged for replacement. Please update it soon.
+        {% else %}
+          Shared model: {{ global_ai_model_info.stored_model|default:global_ai_model_info.effective_model }}{% if global_ai_model_info.updated_by %} (updated by {{ global_ai_model_info.updated_by }}{% if global_ai_model_info.updated_at_display %} on {{ global_ai_model_info.updated_at_display }}{% endif %}){% endif %}.
+        {% endif %}
+      </p>
+      {% if request.user.is_superuser %}
+      <div class="flex flex-wrap items-center gap-3 mt-2">
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" id="ai-model-needs-update" {% if global_ai_model_info.needs_update %}checked{% endif %}>
+          Model needs update
+        </label>
+        <button id="save-default-model-btn" class="px-3 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700">Save Shared Model</button>
+      </div>
+      {% else %}
+      <p class="text-xs text-gray-500 mt-1">Only admins can change the shared model.</p>
+      {% endif %}
+    </div>
+  </div>
   </div>
 
-  <div id="enrichment-status" class="hidden text-sm text-gray-600">Running enrichment...</div>
+  <div id="enrichment-status" class="hidden text-sm text-gray-600">Fetching website...</div>
+  <div id="enrichment-error" class="hidden text-sm text-red-600"></div>
 
   <div id="enrichment-panel" class="bg-white shadow-sm rounded-lg p-4 hidden">
-    <h2 class="text-lg font-semibold text-gray-900 mb-3">Suggested updates</h2>
-    <p id="enrichment-empty-msg" class="text-sm text-gray-500 hidden">No suggestions found.</p>
-    <div id="enrichment-rows" class="space-y-3"></div>
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Fetched Website HTML</h2>
+        <p class="text-xs text-gray-500">Raw HTML fetched from <span id="enriched-url" class="font-mono text-gray-700"></span></p>
+      </div>
+      <button id="toggle-html-panel" class="text-sm font-semibold text-blue-600 hover:text-blue-800">Show</button>
+    </div>
+    <div id="enrichment-panel-content" class="mt-3 hidden">
+      <div class="border border-gray-200 rounded-md bg-gray-900 text-green-200 text-xs p-3 overflow-auto" style="height: 300px; overflow-y: auto;">
+        <pre id="enrichment-html" class="whitespace-pre-wrap break-all"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div id="ai-panel" class="bg-white shadow-sm rounded-lg p-4 hidden">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold text-gray-900">AI Extracted Details</h2>
+      <span class="text-xs text-gray-500">Powered by OpenRouter</span>
+    </div>
+    <p class="text-xs text-gray-500 mb-2">We asked the model to extract logos, addresses, phone numbers, emails, CAGE code, and any public contact info.</p>
+    <p id="ai-model-used" class="text-xs text-gray-500 hidden mb-2"></p>
+    <div id="ai-error" class="hidden text-sm text-red-600 mb-2"></div>
+    <div class="border border-dashed border-gray-300 rounded-md p-3 mb-4 space-y-2 bg-gray-50">
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="copy-context-btn" class="px-3 py-1 text-xs font-semibold rounded bg-gray-900 text-white disabled:opacity-50" disabled>Copy Context Prompt</button>
+        <span class="text-xs text-gray-600">Copy the prompt + HTML and run it in your preferred LLM if you need a different model.</span>
+      </div>
+      <textarea id="ai-manual-input" rows="6" class="w-full rounded border border-gray-300 text-xs p-2 font-mono" placeholder="Paste the JSON response from your external LLM here..."></textarea>
+      <div class="flex items-center gap-3">
+        <button id="ai-manual-apply" class="px-3 py-1 text-xs font-semibold rounded bg-indigo-600 text-white">Use JSON Response</button>
+        <span id="ai-manual-feedback" class="text-xs text-gray-500 hidden"></span>
+      </div>
+    </div>
+    <div id="ai-suggestion-sections" class="space-y-5">
+      <div id="ai-address-section" class="hidden">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-sm font-semibold text-gray-900">Addresses</h3>
+          <span class="text-xs text-gray-500">Select one or more address types to update.</span>
+        </div>
+        <p id="ai-address-current" class="text-xs text-gray-500 mb-2"></p>
+        <div class="space-y-2">
+          <label class="text-xs text-gray-700 font-medium" for="ai-address-select">Choose a suggested address</label>
+          <select id="ai-address-select" class="w-full text-xs rounded border border-gray-300 px-2 py-1"></select>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div class="space-y-1">
+              <label class="text-xs text-gray-700 font-medium" for="ai-address-line1">Address Line 1</label>
+              <input id="ai-address-line1" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="123 Main St">
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-gray-700 font-medium" for="ai-address-line2">Address Line 2</label>
+              <input id="ai-address-line2" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="Suite 500">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div class="space-y-1">
+              <label class="text-xs text-gray-700 font-medium" for="ai-address-city">City</label>
+              <input id="ai-address-city" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="Gaithersburg">
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-gray-700 font-medium" for="ai-address-state">State</label>
+              <input id="ai-address-state" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="MD">
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-gray-700 font-medium" for="ai-address-zip">ZIP</label>
+              <input id="ai-address-zip" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="20877">
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 text-xs text-gray-700">
+            <label class="flex items-center gap-1"><input type="checkbox" value="physical" class="address-type-checkbox"> Physical</label>
+            <label class="flex items-center gap-1"><input type="checkbox" value="shipping" class="address-type-checkbox"> Shipping</label>
+            <label class="flex items-center gap-1"><input type="checkbox" value="billing" class="address-type-checkbox"> Billing</label>
+          </div>
+          <button id="ai-address-apply" class="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white w-fit">Apply Address</button>
+        </div>
+      </div>
+      <div id="ai-phone-section" class="hidden">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-sm font-semibold text-gray-900">Phone Numbers</h3>
+          <span class="text-xs text-gray-500">Choose the target phone field.</span>
+        </div>
+        <p id="ai-phone-current" class="text-xs text-gray-500 mb-2"></p>
+        <div id="ai-phone-list" class="space-y-3"></div>
+      </div>
+      <div id="ai-email-section" class="hidden">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-sm font-semibold text-gray-900">Email Addresses</h3>
+          <span class="text-xs text-gray-500">Choose the target email field.</span>
+        </div>
+        <p id="ai-email-current" class="text-xs text-gray-500 mb-2"></p>
+        <div id="ai-email-list" class="space-y-3"></div>
+      </div>
+      <div id="ai-cage-section" class="hidden">
+        <h3 class="text-sm font-semibold text-gray-900 mb-1">CAGE Code</h3>
+        <p class="text-xs text-gray-500 mb-2">Compare the suggested value with the current supplier record.</p>
+        <div class="text-xs text-gray-400 mb-2">
+          <div>Current: <span id="ai-cage-current" class="font-mono text-gray-700">--</span></div>
+          <div>Suggested: <span id="ai-cage-suggested" class="font-mono text-green-700">--</span></div>
+        </div>
+        <button id="ai-cage-apply" class="px-3 py-1 text-xs font-semibold bg-blue-600 text-white rounded">Apply CAGE Code</button>
+      </div>
+    </div>
+    <div class="mt-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-gray-900">Raw JSON Output</h3>
+        <button id="toggle-json-panel" class="text-sm font-semibold text-blue-600 hover:text-blue-800">Show</button>
+      </div>
+      <div id="ai-json-content" class="mt-2 hidden">
+        <div class="border border-gray-200 rounded-md bg-gray-900 text-green-200 text-xs p-3 overflow-auto max-h-[32rem]">
+          <pre id="ai-output" class="whitespace-pre-wrap break-all"></pre>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 (() => {
-  const supplierId = document.getElementById('run-enrichment-btn')?.dataset.supplierId || "{{ supplier.id }}";
   const urlInput = document.getElementById('enrich-website-url');
   const saveUrlBtn = document.getElementById('save-website-btn');
   const runBtn = document.getElementById('run-enrichment-btn');
+  const supplierId = (runBtn && runBtn.dataset && runBtn.dataset.supplierId) || '{{ supplier.id }}';
   const statusEl = document.getElementById('enrichment-status');
   const panel = document.getElementById('enrichment-panel');
-  const rowsContainer = document.getElementById('enrichment-rows');
-  const emptyMsg = document.getElementById('enrichment-empty-msg');
+  const htmlOutput = document.getElementById('enrichment-html');
+  const errorEl = document.getElementById('enrichment-error');
+  const enrichedUrlEl = document.getElementById('enriched-url');
+  const aiPanel = document.getElementById('ai-panel');
+  const aiOutput = document.getElementById('ai-output');
+  const aiError = document.getElementById('ai-error');
+  const jsonAccordionBtn = document.getElementById('toggle-json-panel');
+  const jsonAccordionContent = document.getElementById('ai-json-content');
+  const htmlAccordionBtn = document.getElementById('toggle-html-panel');
+  const htmlAccordionContent = document.getElementById('enrichment-panel-content');
+  const modelInput = document.getElementById('ai-model-input');
+  const aiModelUsedEl = document.getElementById('ai-model-used');
+  const modelStatusEl = document.getElementById('ai-model-status');
+  const needsUpdateCheckbox = document.getElementById('ai-model-needs-update');
+  const saveDefaultModelBtn = document.getElementById('save-default-model-btn');
+  const addressSection = document.getElementById('ai-address-section');
+  const addressSelect = document.getElementById('ai-address-select');
+  const addressLine1Input = document.getElementById('ai-address-line1');
+  const addressLine2Input = document.getElementById('ai-address-line2');
+  const addressCityInput = document.getElementById('ai-address-city');
+  const addressStateInput = document.getElementById('ai-address-state');
+  const addressZipInput = document.getElementById('ai-address-zip');
+  const addressApplyBtn = document.getElementById('ai-address-apply');
+  const addressCurrentEl = document.getElementById('ai-address-current');
+  const phoneSection = document.getElementById('ai-phone-section');
+  const phoneList = document.getElementById('ai-phone-list');
+  const phoneCurrentEl = document.getElementById('ai-phone-current');
+  const emailSection = document.getElementById('ai-email-section');
+  const emailList = document.getElementById('ai-email-list');
+  const emailCurrentEl = document.getElementById('ai-email-current');
+  const cageSection = document.getElementById('ai-cage-section');
+  const cageCurrentEl = document.getElementById('ai-cage-current');
+  const cageSuggestedEl = document.getElementById('ai-cage-suggested');
+  const cageApplyBtn = document.getElementById('ai-cage-apply');
+  const manualModeToggle = document.getElementById('manual-mode-toggle');
+  const copyContextBtn = document.getElementById('copy-context-btn');
+  const manualInput = document.getElementById('ai-manual-input');
+  const manualApplyBtn = document.getElementById('ai-manual-apply');
+  const manualFeedback = document.getElementById('ai-manual-feedback');
+
+  const safeParse = (text, fallback) => {
+    if (!text) {
+      return fallback;
+    }
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed === undefined || parsed === null) {
+        return fallback;
+      }
+      return parsed;
+    } catch (err) {
+      console.warn('Failed to parse JSON payload', err);
+      return fallback;
+    }
+  };
+
+  const supplierSnapshot = safeParse('{{ supplier_snapshot_json|escapejs }}', {});
+  supplierSnapshot.addresses = supplierSnapshot.addresses || {};
+  let globalModelInfo = safeParse('{{ global_ai_model_info_json|escapejs }}', {});
+  let lastAiResult = null;
+  let contextPrompt = null;
+  let addressSuggestions = [];
+
+  const addressTypes = [
+    { key: 'physical', label: 'Physical' },
+    { key: 'shipping', label: 'Shipping' },
+    { key: 'billing', label: 'Billing' },
+  ];
+
+  function parseAddressParts(text) {
+    if (!text) {
+      return { line1: '', line2: '', city: '', state: '', postal_code: '', country: '' };
+    }
+    const cleaned = text.trim();
+    const flat = cleaned.replace(/[\r\n]+/g, ', ').replace(/\s+/g, ' ').replace(/,\s*,/g, ',').replace(/^\s*,|,\s*$/g, '');
+    const primary = cleaned.match(/^(?<line1>.+?),\s*(?:(?<line2>[^,]+?),\s*)?(?<city>[^,]+?),\s*(?<state>[A-Za-z]{2})\s+(?<postal>\d{5}(?:-\d{4})?)(?:\s*(?<country>.+))?$/);
+    if (primary && primary.groups) {
+      return {
+        line1: (primary.groups.line1 || '').trim(),
+        line2: (primary.groups.line2 || '').trim(),
+        city: (primary.groups.city || '').trim(),
+        state: (primary.groups.state || '').trim(),
+        postal_code: (primary.groups.postal || '').trim(),
+        country: (primary.groups.country || '').trim(),
+      };
+    }
+    const parts = flat.split(',').map((p) => p.trim()).filter(Boolean);
+    let line1 = parts[0] || flat;
+    let line2 = '';
+    let city = '';
+    let state = '';
+    let postal_code = '';
+    let country = '';
+    const zipMatch = flat.match(/(\d{5}(?:-\d{4})?)\s*$/);
+    if (zipMatch) {
+      postal_code = zipMatch[1];
+      const beforeZip = flat.slice(0, zipMatch.index).replace(/,\s*$/, '').trim();
+      const stateMatch = beforeZip.match(/([A-Za-z]{2})\s*$/);
+      if (stateMatch) {
+        state = stateMatch[1];
+        const cityPart = beforeZip.slice(0, stateMatch.index).replace(/,\s*$/, '').trim();
+        const cityTokens = cityPart.split(',').map((p) => p.trim()).filter(Boolean);
+        if (cityTokens.length) {
+          city = cityTokens[cityTokens.length - 1];
+          if (cityTokens.length > 1) {
+            line1 = cityTokens[0];
+            if (cityTokens.length > 2) {
+              line2 = cityTokens[1];
+            }
+          }
+        } else {
+          city = cityPart;
+        }
+      }
+    }
+    if (!city && parts.length) {
+      city = parts.pop();
+    }
+    if (parts.length >= 2) {
+      line2 = parts[1];
+    }
+    if (parts.length >= 1) {
+      line1 = parts[0];
+    }
+    return { line1, line2, city, state, postal_code, country };
+  }
+
+  const phoneFieldOptions = [
+    { value: 'primary_phone', label: 'Primary Phone' },
+    { value: 'business_phone', label: 'Business Phone' },
+    { value: 'business_fax', label: 'Business Fax' },
+  ];
+  const emailFieldOptions = [
+    { value: 'primary_email', label: 'Primary Email' },
+    { value: 'business_email', label: 'Business Email' },
+  ];
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  const checkbox = document.getElementById("manual-mode-toggle");
+  const manualSection = document.getElementById("manual-mode-section");
+  const aiModelSection = document.getElementById("ai-model-section");
+
+  const updateVisibility = () => {
+    if (checkbox.checked) {
+      manualSection.classList.remove("hidden");
+      aiModelSection.classList.add("hidden");
+    } else {
+      manualSection.classList.add("hidden");
+      aiModelSection.classList.remove("hidden");
+    }
+  };
+
+  checkbox.addEventListener("change", updateVisibility);
+  updateVisibility(); // apply initial state
+});
+
+  function resetManualFeedback() {
+    if (!manualFeedback) {
+      return;
+    }
+    manualFeedback.textContent = '';
+    manualFeedback.classList.add('hidden');
+    manualFeedback.classList.remove('text-red-600', 'text-green-600');
+    manualFeedback.classList.add('text-gray-500');
+  }
+
+  function setManualFeedback(message, { error = false, success = false } = {}) {
+    if (!manualFeedback) {
+      return;
+    }
+    manualFeedback.textContent = message || '';
+    if (!message) {
+      resetManualFeedback();
+      return;
+    }
+    manualFeedback.classList.remove('hidden', 'text-red-600', 'text-green-600', 'text-gray-500');
+    if (error) {
+      manualFeedback.classList.add('text-red-600');
+    } else if (success) {
+      manualFeedback.classList.add('text-green-600');
+    } else {
+      manualFeedback.classList.add('text-gray-500');
+    }
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (ok) {
+          resolve();
+        } else {
+          reject(new Error('Copy command failed.'));
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function parseManualJson(raw) {
+    if (!raw) {
+      throw new Error('No JSON provided.');
+    }
+    let cleaned = raw.trim();
+    if (!cleaned) {
+      throw new Error('No JSON provided.');
+    }
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?/i, '').trim();
+      if (cleaned.includes('```')) {
+        cleaned = cleaned.split('```', 1)[0].trim();
+      }
+    }
+    try {
+      return JSON.parse(cleaned);
+    } catch (err) {
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+      throw err;
+    }
+  }
 
   function getCSRF() {
     const name = 'csrftoken';
     const cookies = document.cookie ? document.cookie.split(';') : [];
-    for (let c of cookies) {
-      const cookie = c.trim();
+    for (let i = 0; i < cookies.length; i += 1) {
+      const cookie = cookies[i].trim();
       if (cookie.startsWith(name + '=')) {
         return decodeURIComponent(cookie.substring(name.length + 1));
       }
@@ -53,11 +433,347 @@
     return '';
   }
 
-  saveUrlBtn.addEventListener('click', () => {
-    const newUrl = urlInput.value.trim();
-    if (!newUrl) {
-      alert('Please enter a website URL.');
+  function buildAddressCurrentText() {
+    return addressTypes
+      .map((type) => `${type.label}: ${supplierSnapshot.addresses[type.key] || 'n/a'}`)
+      .join(' | ');
+  }
+
+  function buildPhoneCurrentText() {
+    const segments = [];
+    segments.push(`Primary: ${supplierSnapshot.primary_phone || 'n/a'}`);
+    segments.push(`Business: ${supplierSnapshot.business_phone || 'n/a'}`);
+    segments.push(`Fax: ${supplierSnapshot.business_fax || 'n/a'}`);
+    return segments.join(' | ');
+  }
+
+  function buildEmailCurrentText() {
+    const segments = [];
+    segments.push(`Primary: ${supplierSnapshot.primary_email || 'n/a'}`);
+    segments.push(`Business: ${supplierSnapshot.business_email || 'n/a'}`);
+    return segments.join(' | ');
+  }
+
+  function renderModelStatus(info) {
+    if (!modelStatusEl) {
       return;
+    }
+    let text = '';
+    let className = 'text-xs text-gray-500';
+    if (!info || !info.has_stored_model) {
+      const fallback = (info && info.fallback_model) || 'mistralai/mistral-small:free';
+      text = `No shared AI model configured yet. Falling back to ${fallback}.`;
+      className = 'text-xs text-yellow-600';
+    } else if (info.needs_update) {
+      text = `Shared model ${info.stored_model} is flagged for replacement.`;
+      className = 'text-xs text-orange-600';
+    } else {
+      text = `Shared model: ${info.stored_model || info.effective_model}`;
+      if (info.updated_by) {
+        text += ` (updated by ${info.updated_by}`;
+        if (info.updated_at_display) {
+          text += ` on ${info.updated_at_display}`;
+        }
+        text += ')';
+      }
+    }
+    modelStatusEl.textContent = text;
+    modelStatusEl.className = className;
+    if (needsUpdateCheckbox) {
+      needsUpdateCheckbox.checked = !!(info && info.needs_update);
+    }
+    if (modelInput && info && info.stored_model && !modelInput.value.trim()) {
+      modelInput.value = info.stored_model;
+    }
+  }
+
+  function renderAddresses(addresses) {
+    if (!addressSection) {
+      return;
+    }
+    const normalized = Array.isArray(addresses) ? addresses.filter((addr) => addr && addr.value) : [];
+    addressSuggestions = normalized;
+    if (!normalized.length) {
+      addressSection.classList.add('hidden');
+      return;
+    }
+    addressSection.classList.remove('hidden');
+    if (addressCurrentEl) {
+      addressCurrentEl.textContent = buildAddressCurrentText();
+    }
+    if (addressSelect) {
+      addressSelect.innerHTML = '';
+      normalized.forEach((addr, idx) => {
+        const option = document.createElement('option');
+        option.value = String(idx);
+        option.textContent = addr.label ? `${addr.label}: ${addr.value}` : addr.value;
+        addressSelect.appendChild(option);
+      });
+      addressSelect.value = '0';
+      populateAddressFieldsFromSelection();
+    }
+  }
+
+  function renderPhones(phones) {
+    if (!phoneSection) {
+      return;
+    }
+    phoneList.innerHTML = '';
+    if (phoneCurrentEl) {
+      phoneCurrentEl.textContent = buildPhoneCurrentText();
+    }
+    const normalized = Array.isArray(phones) ? phones.filter((phone) => phone && phone.value) : [];
+    if (!normalized.length) {
+      phoneSection.classList.add('hidden');
+      return;
+    }
+    phoneSection.classList.remove('hidden');
+    normalized.forEach((phone, idx) => {
+      const card = document.createElement('div');
+      card.className = 'border border-gray-200 rounded p-3 space-y-2 bg-gray-50';
+      const title = document.createElement('div');
+      title.className = 'text-sm font-semibold text-gray-900';
+      title.textContent = phone.label || `Phone ${idx + 1}`;
+      const valueEl = document.createElement('div');
+      valueEl.className = 'text-xs text-gray-600';
+      valueEl.textContent = phone.value;
+      const select = document.createElement('select');
+      select.className = 'w-full text-xs rounded border border-gray-300 px-2 py-1';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Select phone field';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      select.appendChild(placeholder);
+      phoneFieldOptions.forEach((opt) => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        select.appendChild(option);
+      });
+      const note = document.createElement('div');
+      note.className = 'text-xs text-gray-500';
+      select.addEventListener('change', () => {
+        const selectedOption = phoneFieldOptions.find((opt) => opt.value === select.value);
+        note.textContent = selectedOption ? `Will update: ${selectedOption.label}` : '';
+      });
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white';
+      applyBtn.textContent = 'Apply Phone';
+      applyBtn.addEventListener('click', () => {
+        const field = select.value;
+        if (!field) {
+          alert('Select which phone field to update.');
+          return;
+        }
+        applyFieldValue(field, phone.value, applyBtn, 'Phone number saved.');
+      });
+      card.appendChild(title);
+      card.appendChild(valueEl);
+      card.appendChild(select);
+      card.appendChild(note);
+      card.appendChild(applyBtn);
+      phoneList.appendChild(card);
+    });
+  }
+
+  function renderEmails(emails) {
+    if (!emailSection) {
+      return;
+    }
+    emailList.innerHTML = '';
+    if (emailCurrentEl) {
+      emailCurrentEl.textContent = buildEmailCurrentText();
+    }
+    const normalized = Array.isArray(emails) ? emails.filter((email) => email && email.value) : [];
+    if (!normalized.length) {
+      emailSection.classList.add('hidden');
+      return;
+    }
+    emailSection.classList.remove('hidden');
+    normalized.forEach((email, idx) => {
+      const card = document.createElement('div');
+      card.className = 'border border-gray-200 rounded p-3 space-y-2 bg-gray-50';
+      const title = document.createElement('div');
+      title.className = 'text-sm font-semibold text-gray-900';
+      title.textContent = email.label || `Email ${idx + 1}`;
+      const valueEl = document.createElement('div');
+      valueEl.className = 'text-xs text-gray-600';
+      valueEl.textContent = email.value;
+      const select = document.createElement('select');
+      select.className = 'w-full text-xs rounded border border-gray-300 px-2 py-1';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Select email field';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      select.appendChild(placeholder);
+      emailFieldOptions.forEach((opt) => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        select.appendChild(option);
+      });
+      const note = document.createElement('div');
+      note.className = 'text-xs text-gray-500';
+      select.addEventListener('change', () => {
+        const selectedOption = emailFieldOptions.find((opt) => opt.value === select.value);
+        note.textContent = selectedOption ? `Will update: ${selectedOption.label}` : '';
+      });
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white';
+      applyBtn.textContent = 'Apply Email';
+      applyBtn.addEventListener('click', () => {
+        const field = select.value;
+        if (!field) {
+          alert('Select which email field to update.');
+          return;
+        }
+        applyFieldValue(field, email.value, applyBtn, 'Email saved.');
+      });
+      card.appendChild(title);
+      card.appendChild(valueEl);
+      card.appendChild(select);
+      card.appendChild(note);
+      card.appendChild(applyBtn);
+      emailList.appendChild(card);
+    });
+  }
+
+  function renderCage(cageValue) {
+    if (!cageSection) {
+      return;
+    }
+    if (!cageValue) {
+      cageSection.classList.add('hidden');
+      return;
+    }
+    cageSection.classList.remove('hidden');
+    if (cageSuggestedEl) {
+      cageSuggestedEl.textContent = cageValue;
+    }
+    if (cageCurrentEl) {
+      cageCurrentEl.textContent = supplierSnapshot.cage_code || 'n/a';
+    }
+    if (cageApplyBtn) {
+      cageApplyBtn.onclick = () => applyFieldValue('cage_code', cageValue, cageApplyBtn, 'CAGE code saved.');
+    }
+  }
+
+  function normalizeResult(result) {
+    if (!result) {
+      return null;
+    }
+    if (typeof result === 'string') {
+      try {
+        return JSON.parse(result);
+      } catch (err) {
+        console.warn('AI result was not valid JSON', err);
+        return { raw_text: result };
+      }
+    }
+    if (result && Array.isArray(result.addresses)) {
+      result.addresses = result.addresses.map((addr) => {
+        if (!addr || typeof addr !== 'object') return addr;
+        if (addr.line1 || addr.city || addr.state || addr.postal_code) {
+          return addr;
+        }
+        const parts = parseAddressParts(addr.value || addr.text || addr.address || '');
+        return { ...addr, ...parts };
+      });
+    }
+    return result;
+  }
+
+  function renderSuggestions(result) {
+    const normalized = normalizeResult(result);
+    lastAiResult = normalized;
+    if (!normalized) {
+      if (addressSection) {
+        addressSection.classList.add('hidden');
+      }
+      if (phoneSection) {
+        phoneSection.classList.add('hidden');
+      }
+      if (cageSection) {
+        cageSection.classList.add('hidden');
+      }
+      aiOutput.textContent = '';
+      return;
+    }
+    renderAddresses(normalized.addresses || []);
+    renderPhones(normalized.phone_numbers || []);
+    renderEmails(normalized.emails || []);
+    renderCage(normalized.cage_code);
+    try {
+      aiOutput.textContent = JSON.stringify(normalized, null, 2);
+    } catch (err) {
+      aiOutput.textContent = typeof result === 'string' ? result : String(result);
+    }
+    if (jsonAccordionBtn && jsonAccordionContent) {
+      setAccordion(jsonAccordionBtn, jsonAccordionContent, false);
+    }
+  }
+
+  function applyAddressSuggestion(addressPayload, types, buttonEl) {
+    if (!addressPayload || !(types && types.length)) {
+      return;
+    }
+    if (buttonEl) {
+      buttonEl.disabled = true;
+    }
+    const payload = {
+      field: 'address',
+      value: {
+        text: addressPayload.text || '',
+        line1: addressPayload.line1 || '',
+        line2: addressPayload.line2 || '',
+        city: addressPayload.city || '',
+        state: addressPayload.state || '',
+        postal_code: addressPayload.postal_code || '',
+        country: addressPayload.country || '',
+        types,
+      },
+    };
+    fetch(`/suppliers/${supplierId}/apply-enrichment/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRF(),
+      },
+      body: JSON.stringify(payload),
+    })
+      .then(async (resp) => {
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          const msg = data.error || 'Failed to save address.';
+          throw new Error(msg);
+        }
+        return data;
+      })
+      .then(() => {
+        supplierSnapshot.addresses = supplierSnapshot.addresses || {};
+        const displayText = payload.value.text || payload.value.line1;
+        types.forEach((type) => {
+          supplierSnapshot.addresses[type] = displayText;
+        });
+        renderSuggestions(lastAiResult);
+        alert('Address saved.');
+      })
+      .catch((err) => alert(err.message || 'Unable to save address.'))
+      .finally(() => {
+        if (buttonEl) {
+          buttonEl.disabled = false;
+        }
+      });
+  }
+
+  function applyFieldValue(field, value, buttonEl, successMessage) {
+    if (!field || value === undefined || value === null) {
+      return;
+    }
+    if (buttonEl) {
+      buttonEl.disabled = true;
     }
     fetch(`/suppliers/${supplierId}/apply-enrichment/`, {
       method: 'POST',
@@ -65,87 +781,296 @@
         'Content-Type': 'application/json',
         'X-CSRFToken': getCSRF(),
       },
-      body: JSON.stringify({ field: 'website_url', value: newUrl }),
+      body: JSON.stringify({ field, value }),
     })
-      .then((resp) => resp.json())
-      .then(() => alert('Website URL saved.'))
-      .catch(() => alert('Failed to save URL.'));
-  });
-
-  runBtn.addEventListener('click', () => {
-    statusEl.classList.remove('hidden');
-    panel.classList.add('hidden');
-    rowsContainer.innerHTML = '';
-    emptyMsg.classList.add('hidden');
-
-    fetch(`/suppliers/${supplierId}/enrich/`)
-      .then((resp) => resp.json())
-      .then((data) => {
-        statusEl.classList.add('hidden');
-        renderRows(data.suggestions || {});
+      .then(async (resp) => {
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          const msg = data.error || 'Failed to save value.';
+          throw new Error(msg);
+        }
+        return data;
       })
-      .catch(() => {
-        statusEl.classList.add('hidden');
-        emptyMsg.textContent = 'Failed to fetch suggestions.';
-        emptyMsg.classList.remove('hidden');
-        panel.classList.remove('hidden');
+      .then(() => {
+        if (field === 'cage_code') {
+          supplierSnapshot.cage_code = value;
+        } else if (Object.prototype.hasOwnProperty.call(supplierSnapshot, field)) {
+          supplierSnapshot[field] = value;
+        }
+        renderSuggestions(lastAiResult);
+        alert(successMessage || 'Field updated.');
+      })
+      .catch((err) => alert(err.message || 'Unable to save value.'))
+      .finally(() => {
+        if (buttonEl) {
+          buttonEl.disabled = false;
+        }
+      });
+  }
+
+  if (saveUrlBtn) {
+    saveUrlBtn.addEventListener('click', () => {
+      if (!urlInput) {
+        return;
+      }
+      const newUrl = urlInput.value.trim();
+      if (!newUrl) {
+        alert('Please enter a website URL.');
+        return;
+      }
+      applyFieldValue('website_url', newUrl, saveUrlBtn, 'Website URL saved.');
+    });
+  }
+
+  renderModelStatus(globalModelInfo);
+
+  if (saveDefaultModelBtn) {
+    saveDefaultModelBtn.addEventListener('click', () => {
+      const payload = {
+        model: (modelInput && modelInput.value ? modelInput.value.trim() : ''),
+        needs_update: !!(needsUpdateCheckbox && needsUpdateCheckbox.checked),
+      };
+      saveDefaultModelBtn.disabled = true;
+      fetch('{% url "suppliers:global_ai_model_config" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRF(),
+        },
+        body: JSON.stringify(payload),
+      })
+        .then(async (resp) => {
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.ok) {
+            const msg = data.error || data.message || 'Failed to save shared model.';
+            throw new Error(msg);
+          }
+          return data;
+        })
+        .then((data) => {
+          globalModelInfo = data.info;
+          renderModelStatus(globalModelInfo);
+          if (modelInput && globalModelInfo && globalModelInfo.stored_model) {
+            modelInput.value = globalModelInfo.stored_model;
+          }
+          alert(data.message || 'Shared model saved.');
+        })
+        .catch((err) => {
+          alert(err.message || 'Unable to save shared model.');
+        })
+        .finally(() => {
+          saveDefaultModelBtn.disabled = false;
+        });
+    });
+  }
+
+  if (runBtn) {
+    runBtn.addEventListener('click', () => {
+      statusEl.classList.remove('hidden');
+      statusEl.textContent = 'Fetching website and running AI enrichment...';
+      runBtn.disabled = true;
+      panel.classList.add('hidden');
+      aiPanel.classList.add('hidden');
+      aiOutput.textContent = '';
+      aiError.classList.add('hidden');
+      aiError.textContent = '';
+      aiModelUsedEl.classList.add('hidden');
+      aiModelUsedEl.textContent = '';
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+      contextPrompt = null;
+      if (copyContextBtn) {
+        copyContextBtn.disabled = true;
+      }
+      if (manualInput) {
+        manualInput.value = '';
+      }
+      resetManualFeedback();
+
+      const modelValue = modelInput && modelInput.value ? modelInput.value.trim() : '';
+      const params = new URLSearchParams();
+      if (modelValue) {
+        params.set('model', modelValue);
+      }
+      if (manualModeToggle && manualModeToggle.checked) {
+        params.set('manual_only', '1');
+      }
+      let endpoint = `/suppliers/${supplierId}/enrich/`;
+      const qs = params.toString();
+      if (qs) {
+        endpoint += `?${qs}`;
+      }
+
+      fetch(endpoint)
+        .then(async (resp) => {
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            const message = data.error || 'Failed to retrieve website HTML.';
+            throw new Error(message);
+          }
+          return data;
+        })
+        .then((data) => {
+          contextPrompt = data.context_prompt || null;
+          if (copyContextBtn) {
+            copyContextBtn.disabled = !(contextPrompt && contextPrompt.combined);
+          }
+          if (data.global_model_info) {
+            globalModelInfo = data.global_model_info;
+            renderModelStatus(globalModelInfo);
+          }
+          htmlOutput.textContent = data.html || '';
+          const currentUrlValue = urlInput ? urlInput.value : '';
+          enrichedUrlEl.textContent = data.url || currentUrlValue || '';
+          panel.classList.remove('hidden');
+          if (htmlAccordionBtn && htmlAccordionContent) {
+            setAccordion(htmlAccordionBtn, htmlAccordionContent, false);
+          }
+          if (data.ai_result) {
+            aiPanel.classList.remove('hidden');
+            aiError.classList.add('hidden');
+            renderSuggestions(data.ai_result);
+            resetManualFeedback();
+          } else if (data.ai_error) {
+            renderSuggestions(null);
+            aiError.textContent = data.ai_error;
+            aiError.classList.remove('hidden');
+            aiPanel.classList.remove('hidden');
+            resetManualFeedback();
+          } else if (data.manual_only) {
+            renderSuggestions(null);
+            aiPanel.classList.remove('hidden');
+            setManualFeedback(
+              'Manual mode enabled. Paste the JSON from your preferred LLM below when it is ready.',
+              { error: false }
+            );
+          } else {
+            renderSuggestions(null);
+            aiPanel.classList.add('hidden');
+            resetManualFeedback();
+          }
+          if (data.model_used) {
+            aiModelUsedEl.textContent = `Model used: ${data.model_used}`;
+            aiModelUsedEl.classList.remove('hidden');
+          }
+        })
+        .catch((err) => {
+          renderSuggestions(null);
+          errorEl.textContent = err.message || 'Unable to fetch supplier website.';
+          errorEl.classList.remove('hidden');
+        })
+        .finally(() => {
+          statusEl.classList.add('hidden');
+          runBtn.disabled = false;
+        });
+    });
+  }
+
+  function setAccordion(button, contentEl, expanded) {
+    if (!button || !contentEl) return;
+    if (expanded) {
+      contentEl.classList.remove('hidden');
+      button.textContent = 'Hide';
+    } else {
+      contentEl.classList.add('hidden');
+      button.textContent = 'Show';
+    }
+  }
+
+  htmlAccordionBtn?.addEventListener('click', () => {
+    const expanded = htmlAccordionContent && htmlAccordionContent.classList.contains('hidden');
+    setAccordion(htmlAccordionBtn, htmlAccordionContent, expanded);
+  });
+
+  jsonAccordionBtn?.addEventListener('click', () => {
+    const expanded = jsonAccordionContent && jsonAccordionContent.classList.contains('hidden');
+    setAccordion(jsonAccordionBtn, jsonAccordionContent, expanded);
+  });
+
+  function populateAddressFieldsFromSelection() {
+    if (!addressSelect || !addressSuggestions.length) {
+      return;
+    }
+    const idx = parseInt(addressSelect.value || '0', 10);
+    const selected = addressSuggestions[idx] || addressSuggestions[0];
+    if (!selected) {
+      return;
+    }
+    if (addressLine1Input) addressLine1Input.value = selected.line1 || selected.value || '';
+    if (addressLine2Input) addressLine2Input.value = selected.line2 || '';
+    if (addressCityInput) addressCityInput.value = selected.city || '';
+    if (addressStateInput) addressStateInput.value = selected.state || '';
+    if (addressZipInput) addressZipInput.value = selected.postal_code || '';
+  }
+
+  addressSelect?.addEventListener('change', populateAddressFieldsFromSelection);
+
+  addressApplyBtn?.addEventListener('click', () => {
+    const types = Array.from(document.querySelectorAll('.address-type-checkbox'))
+      .filter((el) => el.checked)
+      .map((el) => el.value);
+    if (!types.length) {
+      alert('Select at least one address type.');
+      return;
+    }
+    const line1 = addressLine1Input ? addressLine1Input.value.trim() : '';
+    const line2 = addressLine2Input ? addressLine2Input.value.trim() : '';
+    const city = addressCityInput ? addressCityInput.value.trim() : '';
+    const state = addressStateInput ? addressStateInput.value.trim() : '';
+    const postal_code = addressZipInput ? addressZipInput.value.trim() : '';
+    const textParts = [line1, line2, [city, state, postal_code].filter(Boolean).join(' ')].filter(Boolean);
+    const text = textParts.join(', ');
+    if (!text && !line1) {
+      alert('Please enter address details.');
+      return;
+    }
+    const payload = {
+      text,
+      line1,
+      line2,
+      city,
+      state,
+      postal_code,
+      country: '',
+      types,
+    };
+    applyAddressSuggestion(payload, types, addressApplyBtn);
+  });
+
+  copyContextBtn?.addEventListener('click', () => {
+    if (!contextPrompt || !contextPrompt.combined) {
+      alert('Run enrichment first so we can build the context prompt.');
+      return;
+    }
+    copyContextBtn.disabled = true;
+    copyTextToClipboard(contextPrompt.combined)
+      .then(() => {
+        setManualFeedback('Context prompt copied to clipboard.', { success: true });
+      })
+      .catch((err) => {
+        console.error(err);
+        setManualFeedback('Unable to copy automatically. Please copy manually from the prompt text.', { error: true });
+      })
+      .finally(() => {
+        copyContextBtn.disabled = false;
       });
   });
 
-  function renderRows(suggestions) {
-    rowsContainer.innerHTML = '';
-    let hasRows = false;
-    const fields = {
-      logo_url: 'Logo URL',
-      primary_phone: 'Phone',
-      primary_email: 'Email',
-      address: 'Address',
-    };
-    Object.keys(fields).forEach((field) => {
-      const data = suggestions[field];
-      if (!data || !data.suggested || data.suggested === data.current) return;
-      hasRows = true;
-      const row = document.createElement('div');
-      row.className = 'border border-gray-200 rounded-md p-3 flex flex-col gap-1';
-      row.dataset.field = field;
-      row.innerHTML = `
-        <div class="text-sm font-medium text-gray-900">${fields[field]}</div>
-        <div class="text-xs text-gray-600">Current: <span class="current-value">${data.current || '—'}</span></div>
-        <div class="text-xs text-gray-800">Suggested: <span class="suggested-value">${data.suggested}</span></div>
-        <div class="mt-2">
-          <button class="apply-suggestion-btn inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs rounded">Apply</button>
-        </div>
-      `;
-      rowsContainer.appendChild(row);
-    });
-    emptyMsg.classList.toggle('hidden', hasRows);
-    panel.classList.remove('hidden');
-    bindApply();
-  }
-
-  function bindApply() {
-    rowsContainer.querySelectorAll('.apply-suggestion-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const row = btn.closest('.border');
-        const field = row.dataset.field;
-        const suggested = row.querySelector('.suggested-value').textContent;
-        fetch(`/suppliers/${supplierId}/apply-enrichment/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRF(),
-          },
-          body: JSON.stringify({ field, value: suggested }),
-        })
-          .then((resp) => resp.json())
-          .then(() => {
-            row.querySelector('.current-value').textContent = suggested;
-            row.classList.add('opacity-60');
-          })
-          .catch(() => alert('Failed to apply suggestion'));
-      });
-    });
-  }
+  manualApplyBtn?.addEventListener('click', () => {
+    const raw = manualInput ? manualInput.value : '';
+    try {
+      const parsed = parseManualJson(raw);
+      aiPanel.classList.remove('hidden');
+      aiError.classList.add('hidden');
+      renderSuggestions(parsed);
+      setManualFeedback('Loaded manual JSON response.', { success: true });
+    } catch (err) {
+      setManualFeedback(err.message || 'Invalid JSON input.', { error: true });
+    }
+  });
 })();
 </script>
 {% endblock contract_content %}
+
+
+

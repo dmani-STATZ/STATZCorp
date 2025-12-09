@@ -191,3 +191,32 @@ class SupplierDocument(AuditModel):
     def __str__(self):
         label = self.get_doc_type_display() or 'Document'
         return f"{label} for {self.supplier.name if self.supplier else 'Unknown'}"
+
+
+class OpenRouterModelSetting(models.Model):
+    """Stores the shared OpenRouter model configuration."""
+
+    key = models.CharField(max_length=100, unique=True, default="default")
+    model_name = models.CharField(max_length=255, blank=True)
+    needs_update = models.BooleanField(default=False)
+    updated_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_openrouter_models",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "OpenRouter Model Setting"
+        verbose_name_plural = "OpenRouter Model Settings"
+
+    def __str__(self):
+        return self.model_name or "Unconfigured OpenRouter model"
+
+    @classmethod
+    def get_default(cls):
+        setting, _ = cls.objects.get_or_create(key="default")
+        return setting

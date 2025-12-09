@@ -13,7 +13,8 @@ from suppliers.views import (
     SupplierEnrichView,
     SupplierApplyEnrichmentView,
     SupplierEnrichPageView,
-    SuppliersInfoByType
+    SuppliersInfoByType,
+    GlobalAIModelConfigView,
 )
 
 app_name = 'suppliers'
@@ -33,4 +34,5 @@ urlpatterns = [
     path('<int:pk>/enrich/', SupplierEnrichView.as_view(), name='supplier_enrich'),
     path('<int:pk>/apply-enrichment/', SupplierApplyEnrichmentView.as_view(), name='supplier_apply_enrichment'),
     path('<int:pk>/edit/', SupplierUpdateView.as_view(), name='supplier_edit'),
+    path('ai-model/config/', GlobalAIModelConfigView.as_view(), name='global_ai_model_config'),
 ]
