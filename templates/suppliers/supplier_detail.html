@@ -245,9 +245,13 @@
           {% for contract in contracts %}
             <tr class="hover:bg-gray-50">
               <td class="px-4 py-2">
-                <a href="{% url 'contracts:contract_detail' contract.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
-                  {{ contract.contract_number|default:"Contract" }}
-                </a>
+                {% if contract %}
+                  <a href="{% url 'contracts:contract_detail' contract.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                    {{ contract.contract_number|default:"Contract" }}
+                  </a>
+                {% else %}
+                  <span class="text-sm text-gray-500">No contract</span>
+                {% endif %}
               </td>
               <td class="px-4 py-2 text-sm text-gray-900">${{ contract.contract_value|floatformat:0 }}</td>
               <td class="px-4 py-2 text-sm text-gray-900">{{ contract.status.description|default:"—" }}</td>

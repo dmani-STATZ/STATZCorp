@@ -484,13 +484,19 @@ class SupplierDetailView(DetailView):
             'conditional': supplier.conditional,
             'archived': supplier.archived,
         }
-        context['contracts'] = Contract.objects.filter(supplier=supplier).select_related('status').annotate(
-            performance_flag=Case(
-                When(due_date_late=True, then=Value('Late')),
-                default=Value(''),
-                output_field=models.CharField(),
+        context['contracts'] = (
+            Contract.objects.filter(clin__supplier=supplier)
+            .select_related('status')
+            .annotate(
+                performance_flag=Case(
+                    When(due_date_late=True, then=Value('Late')),
+                    default=Value(''),
+                    output_field=models.CharField(),
+                )
             )
-        ).order_by('-award_date', '-created_on')
+            .order_by('-award_date', '-created_on')
+            .distinct()
+        )
 
         context['clin_summary'] = Clin.objects.filter(supplier=supplier).aggregate(
             total_clins=Count('id'),

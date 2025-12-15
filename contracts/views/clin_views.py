@@ -70,16 +70,25 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
             )
             
             # Add additional attributes from the view for convenience
-            clin.contract_number = clin_view.contract.contract_number
+            clin.contract_number = getattr(clin_view.contract, "contract_number", None)
             clin.item_type_description = clin_view.item_type
-            clin.supplier_name = clin_view.supplier.name
-            clin.supplier_cage_code = clin_view.supplier.cage_code
-            clin.nsn_code = clin_view.nsn.nsn_code
-            clin.nsn_description = clin_view.nsn.description
-            clin.special_payment_terms_code = clin_view.special_payment_terms.code
-            clin.special_payment_terms_description = clin_view.special_payment_terms.terms
-            clin.created_by_username = clin_view.created_by.username
-            clin.modified_by_username = clin_view.modified_by.username
+
+            # Related objects may be null; guard each access.
+            clin.supplier_name = getattr(clin_view.supplier, "name", None)
+            clin.supplier_cage_code = getattr(clin_view.supplier, "cage_code", None)
+
+            clin.nsn_code = getattr(clin_view.nsn, "nsn_code", None)
+            clin.nsn_description = getattr(clin_view.nsn, "description", None)
+
+            if getattr(clin_view, "special_payment_terms", None):
+                clin.special_payment_terms_code = clin_view.special_payment_terms.code
+                clin.special_payment_terms_description = clin_view.special_payment_terms.terms
+            else:
+                clin.special_payment_terms_code = None
+                clin.special_payment_terms_description = None
+
+            clin.created_by_username = getattr(clin_view.created_by, "username", None)
+            clin.modified_by_username = getattr(clin_view.modified_by, "username", None)
             
             return clin
             

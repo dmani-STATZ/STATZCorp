@@ -193,9 +193,23 @@ class ContractLifecycleDashboardView(TemplateView):
             if not end_date:
                 end_date = now
 
-            past_contracts = Contract.objects.filter(company=self.request.active_company, due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
-            contracts = Contract.objects.filter(company=self.request.active_company, award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
-            clins = Clin.objects.filter(company=self.request.active_company, contract__award_date__range=(start_date, end_date)).exclude(contract__status__description='Cancelled')
+            # Normalize to full-day boundaries so dashboard counts
+            # match the metric-detail view (which also uses full days).
+            start_date = DashboardMetricDetailView._start_end_of_day(start_date)[0]
+            end_date = DashboardMetricDetailView._start_end_of_day(end_date)[1]
+
+            past_contracts = Contract.objects.filter(
+                company=self.request.active_company,
+                due_date__range=(start_date, end_date),
+            ).exclude(status__description='Cancelled')
+            contracts = Contract.objects.filter(
+                company=self.request.active_company,
+                award_date__range=(start_date, end_date),
+            ).exclude(status__description='Cancelled')
+            clins = Clin.objects.filter(
+                company=self.request.active_company,
+                contract__award_date__range=(start_date, end_date),
+            ).exclude(contract__status__description='Cancelled')
             
             return {
                 'contracts_due': past_contracts.distinct().count(),
