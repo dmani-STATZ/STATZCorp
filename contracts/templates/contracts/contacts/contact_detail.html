@@ -42,8 +42,19 @@
                             {% if contact.salutation %}{{ contact.salutation }} {% endif %}{{ contact.name }}
                         </h1>
                     </div>
-                    {% if contact.company %}
-                    <p class="text-lg text-gray-600">{{ contact.company }}</p>
+                    {% if related_suppliers %}
+                        {% for supplier in related_suppliers %}
+                        <p class="text-lg text-gray-600">
+                            <a href="{% url 'suppliers:supplier_detail' pk=supplier.id %}" class="text-blue-600 hover:text-blue-800">
+                                {{ supplier.name }}
+                            </a>
+                            {% if supplier.cage_code %}
+                            <span class="ml-2 text-sm text-gray-500">({{ supplier.cage_code }})</span>
+                            {% endif %}
+                        </p>
+                        {% endfor %}
+                    {% elif contact.company %}
+                        <p class="text-lg text-gray-600">{{ contact.company }}</p>
                     {% endif %}
                 </div>
                 
@@ -111,10 +122,26 @@
                         </div>
                         {% endif %}
                         
-                        {% if contact.company %}
+                        {% if contact.company or related_suppliers %}
                         <div class="info-section px-6 py-4">
                             <h3 class="text-sm font-medium text-gray-500 mb-1">Company</h3>
-                            <p class="text-base text-gray-900">{{ contact.company }}</p>
+                            {% if related_suppliers %}
+                                {% for supplier in related_suppliers %}
+                                <p class="text-base">
+                                    <a href="{% url 'suppliers:supplier_detail' pk=supplier.id %}" class="text-blue-600 hover:text-blue-800">
+                                        {{ supplier.name }}
+                                    </a>
+                                    {% if supplier.cage_code %}
+                                    <span class="ml-1 text-sm text-gray-500">({{ supplier.cage_code }})</span>
+                                    {% endif %}
+                                </p>
+                                {% endfor %}
+                                {% if contact.company and contact.company != related_suppliers.0.name %}
+                                <p class="text-sm text-gray-500 mt-1">Recorded as: {{ contact.company }}</p>
+                                {% endif %}
+                            {% elif contact.company %}
+                                <p class="text-base text-gray-900">{{ contact.company }}</p>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>

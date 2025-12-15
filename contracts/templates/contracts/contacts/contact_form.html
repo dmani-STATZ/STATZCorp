@@ -338,6 +338,13 @@
                         <div class="form-group md:col-span-1">
                             <label for="{{ form.company.id_for_label }}" class="form-label">Company</label>
                             {{ form.company }}
+                            {% if supplier_name_options %}
+                            <datalist id="supplier-company-options">
+                                {% for name in supplier_name_options %}
+                                <option value="{{ name }}"></option>
+                                {% endfor %}
+                            </datalist>
+                            {% endif %}
                             {% if form.company.errors %}
                             <p class="mt-1 text-red-600 text-sm">{{ form.company.errors.0 }}</p>
                             {% endif %}

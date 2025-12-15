@@ -484,9 +484,17 @@ class SupplierDetailView(DetailView):
             'conditional': supplier.conditional,
             'archived': supplier.archived,
         }
+        active_company = getattr(self.request, "active_company", None)
+
+        contracts_qs = Contract.objects.filter(clin__supplier=supplier)
+        clins_qs = Clin.objects.filter(supplier=supplier)
+
+        if active_company is not None:
+            contracts_qs = contracts_qs.filter(company=active_company)
+            clins_qs = clins_qs.filter(company=active_company)
+
         context['contracts'] = (
-            Contract.objects.filter(clin__supplier=supplier)
-            .select_related('status')
+            contracts_qs.select_related('status')
             .annotate(
                 performance_flag=Case(
                     When(due_date_late=True, then=Value('Late')),
@@ -498,7 +506,7 @@ class SupplierDetailView(DetailView):
             .distinct()
         )
 
-        context['clin_summary'] = Clin.objects.filter(supplier=supplier).aggregate(
+        context['clin_summary'] = clins_qs.aggregate(
             total_clins=Count('id'),
             total_value=Coalesce(Sum('quote_value'), 0.0, output_field=models.FloatField()),
         )

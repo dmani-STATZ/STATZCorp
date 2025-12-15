@@ -92,6 +92,10 @@ class ContactCreateView(CreateView):
         context = super().get_context_data(**kwargs)
         context['addresses'] = Address.objects.all().order_by('-id')[:10]  # Show last 10 addresses for quick selection
         context['supplier_id'] = self.request.GET.get('supplier_id')
+        from suppliers.models import Supplier
+        context['supplier_name_options'] = (
+            Supplier.objects.order_by('name').values_list('name', flat=True).distinct()[:100]
+        )
         context['title'] = 'Create New Contact'
         context['submit_text'] = 'Create Contact'
         
@@ -137,6 +141,10 @@ class ContactUpdateView(UpdateView):
         context['addresses'] = Address.objects.all().order_by('-id')[:10]  # Show last 10 addresses
         context['title'] = 'Update Contact'
         context['submit_text'] = 'Update Contact'
+        from suppliers.models import Supplier
+        context['supplier_name_options'] = (
+            Supplier.objects.order_by('name').values_list('name', flat=True).distinct()[:100]
+        )
         
         # Add the address object to the context if an address is assigned
         if self.object.address:

@@ -669,6 +669,11 @@ class ContactForm(BaseModelForm):
             })
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Suggest supplier names via HTML datalist (see template).
+        self.fields['company'].widget.attrs.setdefault('list', 'supplier-company-options')
+
 class ContractSearchForm(forms.Form):
     search_query = forms.CharField(
         required=False,

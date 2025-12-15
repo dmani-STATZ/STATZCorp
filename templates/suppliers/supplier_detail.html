@@ -169,18 +169,26 @@
     <div class="bg-white shadow-sm rounded-xl p-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
-        <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</a>
+        <a href="{% url 'contracts:contact_list' %}?supplier_id={{ supplier.id }}" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</a>
       </div>
       <div class="space-y-3">
         {% for contact in contacts %}
           <div class="border border-gray-200 rounded-lg p-3">
-            <p class="text-sm font-semibold text-gray-900">{{ contact.name }}</p>
+            <p class="text-sm font-semibold">
+              <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
+                {{ contact.name }}
+              </a>
+            </p>
             <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
             {% if contact.email %}
-              <p class="text-xs text-gray-600"><a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">{{ contact.email }}</a></p>
+              <p class="text-xs text-gray-600">
+                <a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">{{ contact.email }}</a>
+              </p>
             {% endif %}
             {% if contact.phone %}
-              <p class="text-xs text-gray-600"><a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">{{ contact.phone }}</a></p>
+              <p class="text-xs text-gray-600">
+                <a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">{{ contact.phone }}</a>
+              </p>
             {% endif %}
           </div>
         {% empty %}
@@ -246,7 +254,7 @@
             <tr class="hover:bg-gray-50">
               <td class="px-4 py-2">
                 {% if contract %}
-                  <a href="{% url 'contracts:contract_detail' contract.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                  <a href="{% url 'contracts:contract_management' contract.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                     {{ contract.contract_number|default:"Contract" }}
                   </a>
                 {% else %}
