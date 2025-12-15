@@ -25,6 +25,9 @@ This document summarizes how we integrate OpenRouter for supplier enrichment and
   - `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`)
   - `OPENROUTER_HTTP_REFERER`, `OPENROUTER_X_TITLE` (branding/attribution headers)
   - `OPENROUTER_MODEL_FALLBACKS`: comma-separated list or iterable of fallback model slugs
+- Global model storage:
+  - We store the shared model in the database (see `GlobalAIModelConfigView` and `openrouter_config.py`). It exposes `stored_model`, `effective_model`, and a `needs_update` flag.
+  - The `needs_update` flag is settable via the UI and signals that the current model stopped working or should be replaced; the frontend surfaces this status so users know to update the shared model.
 - Model selection:
   - `get_model_for_request(model_override)` chooses the explicit override or the stored/effective default.
   - Payload includes `model` and, if present, `models` for fallbacks.

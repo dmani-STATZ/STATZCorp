@@ -1,15 +1,15 @@
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // ============================================
     // LOADING STATES & TOAST NOTIFICATION SYSTEM
     // ============================================
-    
+
     function showToast(message, type = 'success', duration = 3000) {
         if (window.notify) {
             window.notify(type, message, duration);
         }
     }
-    
+
     // Button loading state helpers
     function setButtonLoading(btn, loading) {
         if (!btn) return;
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.disabled = loading;
         }
     }
-    
+
     // Search loading state
     const searchWrapper = document.getElementById('search-wrapper');
     function setSearchLoading(loading) {
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
             searchWrapper.classList.toggle('loading', loading);
         }
     }
-    
+
     // Detail panel loading overlay
     const detailOverlay = document.getElementById('detail-loading-overlay');
     function setDetailLoading(loading) {
@@ -45,14 +45,14 @@ document.addEventListener('DOMContentLoaded', function() {
             detailOverlay.classList.toggle('active', loading);
         }
     }
-    
+
     // Select loading state
     function setSelectLoading(select, loading) {
         if (!select) return;
         select.classList.toggle('loading', loading);
         select.disabled = loading;
     }
-    
+
     // Tab switching (persist tab in URL so deep links keep state)
     const tabButtons = document.querySelectorAll('[data-tab]');
     const tabPanels = document.querySelectorAll('[data-panel]');
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <span class="badge badge-neutral">View</span>
             `;
-            a.addEventListener('click', function(ev) {
+            a.addEventListener('click', function (ev) {
                 ev.preventDefault();
                 fetchDetail(item.id, true);
             });
@@ -379,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Attach click handlers to existing list
     document.querySelectorAll('.supplier-item').forEach(el => {
-        el.addEventListener('click', function(ev) {
+        el.addEventListener('click', function (ev) {
             ev.preventDefault();
             fetchDetail(this.dataset.id, true);
         });
@@ -442,12 +442,12 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 const contactId = btn.dataset.contactId;
                 if (!contactId || !currentSupplierId) return;
-                
+
                 // Add loading state to the row
                 const row = btn.closest('.contact-row');
                 if (row) row.style.opacity = '0.5';
                 btn.disabled = true;
-                
+
                 const deleteUrl = ``.replace('/0/contact/0/', `/${currentSupplierId}/contact/${contactId}/`);
                 fetch(deleteUrl, {
                     method: 'POST',
@@ -456,17 +456,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': getCookie('csrftoken')
                     }
                 })
-                .then(resp => resp.json())
-                .then(data => {
-                    currentSupplierId = data.id;
-                    setDetail(data);
-                    showToast('Contact deleted.', 'success');
-                })
-                .catch(() => {
-                    showToast('Failed to delete contact.', 'error');
-                    if (row) row.style.opacity = '1';
-                    btn.disabled = false;
-                });
+                    .then(resp => resp.json())
+                    .then(data => {
+                        currentSupplierId = data.id;
+                        setDetail(data);
+                        showToast('Contact deleted.', 'success');
+                    })
+                    .catch(() => {
+                        showToast('Failed to delete contact.', 'error');
+                        if (row) row.style.opacity = '1';
+                        btn.disabled = false;
+                    });
             });
         });
     }
@@ -495,12 +495,12 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 const cid = btn.dataset.id;
                 if (!cid || !currentSupplierId) return;
-                
+
                 // Add loading state to the row
                 const row = btn.closest('[data-cert-id]');
                 if (row) row.style.opacity = '0.5';
                 btn.disabled = true;
-                
+
                 fetch(``.replace('/0/', `/${currentSupplierId}/`).replace('/0/', `/${cid}/`), {
                     method: 'POST',
                     headers: {
@@ -508,16 +508,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': getCookie('csrftoken')
                     }
                 })
-                .then(resp => resp.json())
-                .then(() => {
-                    refreshDetail();
-                    showToast('Certification deleted.', 'success');
-                })
-                .catch(() => {
-                    showToast('Failed to delete certification.', 'error');
-                    if (row) row.style.opacity = '1';
-                    btn.disabled = false;
-                });
+                    .then(resp => resp.json())
+                    .then(() => {
+                        refreshDetail();
+                        showToast('Certification deleted.', 'success');
+                    })
+                    .catch(() => {
+                        showToast('Failed to delete certification.', 'error');
+                        if (row) row.style.opacity = '1';
+                        btn.disabled = false;
+                    });
             });
         });
     }
@@ -546,12 +546,12 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 const cid = btn.dataset.id;
                 if (!cid || !currentSupplierId) return;
-                
+
                 // Add loading state to the row
                 const row = btn.closest('[data-class-id]');
                 if (row) row.style.opacity = '0.5';
                 btn.disabled = true;
-                
+
                 fetch(``.replace('/0/', `/${currentSupplierId}/`).replace('/0/', `/${cid}/`), {
                     method: 'POST',
                     headers: {
@@ -559,16 +559,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': getCookie('csrftoken')
                     }
                 })
-                .then(resp => resp.json())
-                .then(() => {
-                    refreshDetail();
-                    showToast('Classification deleted.', 'success');
-                })
-                .catch(() => {
-                    showToast('Failed to delete classification.', 'error');
-                    if (row) row.style.opacity = '1';
-                    btn.disabled = false;
-                });
+                    .then(resp => resp.json())
+                    .then(() => {
+                        refreshDetail();
+                        showToast('Classification deleted.', 'success');
+                    })
+                    .catch(() => {
+                        showToast('Failed to delete classification.', 'error');
+                        if (row) row.style.opacity = '1';
+                        btn.disabled = false;
+                    });
             });
         });
     }
@@ -703,7 +703,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (editNameBtn) editNameBtn.addEventListener('click', openNameModal);
 
     if (nameSaveBtn) {
-        nameSaveBtn.addEventListener('click', function() {
+        nameSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId) return;
             setButtonLoading(nameSaveBtn, true);
             fetch(``.replace('0', currentSupplierId), {
@@ -718,26 +718,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     dodaac: dodaacInput ? dodaacInput.value : ''
                 })
             })
-            .then(resp => {
-                if (!resp.ok) throw new Error('Save failed');
-                return resp.json();
-            })
-            .then(data => {
-                currentSupplierId = data.id;
-                setDetail(data);
-                const listTitle = document.querySelector(`.supplier-item[data-id="${currentSupplierId}"] .text-sm.font-semibold`);
-                if (listTitle) {
-                    listTitle.textContent = data.cage_code ? `${data.name || 'N/A'} (${data.cage_code})` : (data.name || 'N/A');
-                }
-                closeNameModal();
-                showToast('Supplier updated successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to save changes. Please try again.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(nameSaveBtn, false);
-            });
+                .then(resp => {
+                    if (!resp.ok) throw new Error('Save failed');
+                    return resp.json();
+                })
+                .then(data => {
+                    currentSupplierId = data.id;
+                    setDetail(data);
+                    const listTitle = document.querySelector(`.supplier-item[data-id="${currentSupplierId}"] .text-sm.font-semibold`);
+                    if (listTitle) {
+                        listTitle.textContent = data.cage_code ? `${data.name || 'N/A'} (${data.cage_code})` : (data.name || 'N/A');
+                    }
+                    closeNameModal();
+                    showToast('Supplier updated successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to save changes. Please try again.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(nameSaveBtn, false);
+                });
         });
     }
 
@@ -761,7 +761,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 addressesCache = data.results || [];
                 populateAddressSelect(addressesCache);
             })
-            .catch(() => {});
+            .catch(() => { });
     }
 
     function populateAddressFields(field) {
@@ -801,7 +801,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (addressSaveBtn) {
-        addressSaveBtn.addEventListener('click', function() {
+        addressSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId || !activeAddressField) return;
             setButtonLoading(addressSaveBtn, true);
             fetch(``.replace('0', currentSupplierId), {
@@ -820,19 +820,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     zip: addressZip ? addressZip.value : '',
                 })
             })
-            .then(resp => resp.json())
-            .then(data => {
-                currentSupplierId = data.id;
-                setDetail(data);
-                closeAddressModal();
-                showToast('Address updated successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to save address. Please try again.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(addressSaveBtn, false);
-            });
+                .then(resp => resp.json())
+                .then(data => {
+                    currentSupplierId = data.id;
+                    setDetail(data);
+                    closeAddressModal();
+                    showToast('Address updated successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to save address. Please try again.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(addressSaveBtn, false);
+                });
         });
     }
 
@@ -861,7 +861,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (addContactBtn) addContactBtn.addEventListener('click', () => openContactModal({}));
 
     if (contactSaveBtn) {
-        contactSaveBtn.addEventListener('click', function() {
+        contactSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId) return;
             setButtonLoading(contactSaveBtn, true);
             fetch(``.replace('0', currentSupplierId), {
@@ -878,20 +878,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     title: contactTitleInput ? contactTitleInput.value : '',
                 })
             })
-            .then(resp => resp.json())
-            .then(data => {
-                currentSupplierId = data.id;
-                setDetail(data);
-                closeContactModal();
-                if (contactPhoneInput) contactPhoneInput.value = formatPhone(contactPhoneInput.value);
-                showToast('Contact saved successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to save contact. Please try again.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(contactSaveBtn, false);
-            });
+                .then(resp => resp.json())
+                .then(data => {
+                    currentSupplierId = data.id;
+                    setDetail(data);
+                    closeContactModal();
+                    if (contactPhoneInput) contactPhoneInput.value = formatPhone(contactPhoneInput.value);
+                    showToast('Contact saved successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to save contact. Please try again.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(contactSaveBtn, false);
+                });
         });
     }
 
@@ -906,18 +906,18 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: new URLSearchParams(payload)
         })
-        .then(resp => resp.json())
-        .then(data => {
-            currentSupplierId = data.id;
-            setDetail(data);
-            showToast('Updated successfully!', 'success');
-        })
-        .catch(() => {
-            showToast('Failed to update. Please try again.', 'error');
-        })
-        .finally(() => {
-            if (triggerSelect) setSelectLoading(triggerSelect, false);
-        });
+            .then(resp => resp.json())
+            .then(data => {
+                currentSupplierId = data.id;
+                setDetail(data);
+                showToast('Updated successfully!', 'success');
+            })
+            .catch(() => {
+                showToast('Failed to update. Please try again.', 'error');
+            })
+            .finally(() => {
+                if (triggerSelect) setSelectLoading(triggerSelect, false);
+            });
     }
 
     if (supplierTypeSelect) {
@@ -943,18 +943,18 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: new URLSearchParams(payload)
         })
-        .then(resp => resp.json())
-        .then(data => {
-            currentSupplierId = data.id;
-            setDetail(data);
-            showToast('Compliance updated!', 'success');
-        })
-        .catch(() => {
-            showToast('Failed to update compliance.', 'error');
-        })
-        .finally(() => {
-            if (triggerSelect) setSelectLoading(triggerSelect, false);
-        });
+            .then(resp => resp.json())
+            .then(data => {
+                currentSupplierId = data.id;
+                setDetail(data);
+                showToast('Compliance updated!', 'success');
+            })
+            .catch(() => {
+                showToast('Failed to update compliance.', 'error');
+            })
+            .finally(() => {
+                if (triggerSelect) setSelectLoading(triggerSelect, false);
+            });
     }
 
     if (primeSelect) {
@@ -1005,7 +1005,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     if (openCertBtn) openCertBtn.addEventListener('click', openCertModal);
     if (certSaveBtn) {
-        certSaveBtn.addEventListener('click', function() {
+        certSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId || !certTypeInput || !certTypeInput.value) return;
             setButtonLoading(certSaveBtn, true);
             const formData = new FormData();
@@ -1024,18 +1024,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: formData
             })
-            .then(resp => resp.json())
-            .then(() => {
-                closeCertModal();
-                refreshDetail();
-                showToast('Certification added successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to add certification.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(certSaveBtn, false);
-            });
+                .then(resp => resp.json())
+                .then(() => {
+                    closeCertModal();
+                    refreshDetail();
+                    showToast('Certification added successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to add certification.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(certSaveBtn, false);
+                });
         });
     }
 
@@ -1059,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     if (openClassBtn) openClassBtn.addEventListener('click', openClassModal);
     if (classSaveBtn) {
-        classSaveBtn.addEventListener('click', function() {
+        classSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId || !classTypeInput || !classTypeInput.value) return;
             setButtonLoading(classSaveBtn, true);
             const formData = new FormData();
@@ -1077,18 +1077,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: formData
             })
-            .then(resp => resp.json())
-            .then(() => {
-                closeClassModal();
-                refreshDetail();
-                showToast('Classification added successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to add classification.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(classSaveBtn, false);
-            });
+                .then(resp => resp.json())
+                .then(() => {
+                    closeClassModal();
+                    refreshDetail();
+                    showToast('Classification added successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to add classification.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(classSaveBtn, false);
+                });
         });
     }
 
@@ -1114,7 +1114,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (notesSaveBtn) {
-        notesSaveBtn.addEventListener('click', function() {
+        notesSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId) return;
             setButtonLoading(notesSaveBtn, true);
             fetch(``.replace('0', currentSupplierId), {
@@ -1127,19 +1127,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     notes: notesInput ? notesInput.value : ''
                 })
             })
-            .then(resp => resp.json())
-            .then(data => {
-                currentSupplierId = data.id;
-                setDetail(data);
-                closeNotesModal();
-                showToast('Notes saved successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to save notes.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(notesSaveBtn, false);
-            });
+                .then(resp => resp.json())
+                .then(data => {
+                    currentSupplierId = data.id;
+                    setDetail(data);
+                    closeNotesModal();
+                    showToast('Notes saved successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to save notes.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(notesSaveBtn, false);
+                });
         });
     }
 
@@ -1163,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (editFilesBtn) editFilesBtn.addEventListener('click', openFilesModal);
 
     if (filesSaveBtn) {
-        filesSaveBtn.addEventListener('click', function() {
+        filesSaveBtn.addEventListener('click', function () {
             if (!currentSupplierId) return;
             setButtonLoading(filesSaveBtn, true);
             fetch(``.replace('0', currentSupplierId), {
@@ -1176,19 +1176,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     files_url: filesInput ? filesInput.value : ''
                 })
             })
-            .then(resp => resp.json())
-            .then(data => {
-                currentSupplierId = data.id;
-                setDetail(data);
-                closeFilesModal();
-                showToast('Files URL saved successfully!', 'success');
-            })
-            .catch(() => {
-                showToast('Failed to save files URL.', 'error');
-            })
-            .finally(() => {
-                setButtonLoading(filesSaveBtn, false);
-            });
+                .then(resp => resp.json())
+                .then(data => {
+                    currentSupplierId = data.id;
+                    setDetail(data);
+                    closeFilesModal();
+                    showToast('Files URL saved successfully!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to save files URL.', 'error');
+                })
+                .finally(() => {
+                    setButtonLoading(filesSaveBtn, false);
+                });
         });
     }
 
@@ -1212,16 +1212,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.querySelectorAll('.toggle-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             if (this.disabled || this.dataset.disabled === 'true') return;
             const field = this.dataset.flag;
             if (!currentSupplierId || !field) return;
-            
+
             // Disable button during request
             this.disabled = true;
             const originalText = this.textContent;
             this.innerHTML = '<div class="spinner spinner-dark" style="width: 12px; height: 12px;"></div>';
-            
+
             fetch(``.replace('0', currentSupplierId), {
                 method: 'POST',
                 headers: {
@@ -1230,24 +1230,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: new URLSearchParams({ field })
             })
-            .then(resp => resp.json())
-            .then(data => {
-                currentSupplierId = data.id;
-                setDetail(data);
-                document.querySelectorAll('.toggle-btn').forEach(b => {
-                    const f = b.dataset.flag;
-                    b.classList.toggle('active', data[f] === true);
+                .then(resp => resp.json())
+                .then(data => {
+                    currentSupplierId = data.id;
+                    setDetail(data);
+                    document.querySelectorAll('.toggle-btn').forEach(b => {
+                        const f = b.dataset.flag;
+                        b.classList.toggle('active', data[f] === true);
+                    });
+                    const statusText = data[field] ? 'enabled' : 'disabled';
+                    showToast(`${field.charAt(0).toUpperCase() + field.slice(1)} ${statusText}!`, 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to update status.', 'error');
+                })
+                .finally(() => {
+                    this.disabled = false;
+                    this.textContent = originalText;
                 });
-                const statusText = data[field] ? 'enabled' : 'disabled';
-                showToast(`${field.charAt(0).toUpperCase() + field.slice(1)} ${statusText}!`, 'success');
-            })
-            .catch(() => {
-                showToast('Failed to update status.', 'error');
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.textContent = originalText;
-            });
         });
     });
 });
