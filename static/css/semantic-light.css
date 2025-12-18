@@ -1,0 +1,20 @@
+/* ================================
+   LIGHT MODE
+================================ */
+
+body.light {
+    --surface-bg: #ffffff;
+    --surface-muted-bg: #f9fafb;
+    --surface-text: #111827;
+
+    --text-muted: #6b7280;
+    --text-strong: #111827;
+
+    --border-muted: #e5e7eb;
+
+    --primary: var(--company-primary, #2563eb);
+    --primary-text: #ffffff;
+
+    background-color: #f9fafb;
+    color: #111827;
+}

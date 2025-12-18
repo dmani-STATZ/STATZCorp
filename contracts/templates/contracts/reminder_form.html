@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <div class="flex justify-between items-center mb-6">
+    <div class="row-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">
             Create Reminder
             {% if note %}
@@ -38,9 +38,9 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-md p-6">
+    <div class="card card-padded">
         {% if note %}
-            <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="card card-padded bg-gray-50 mb-6">
                 <h3 class="text-md font-semibold text-gray-700 mb-2">Related Note:</h3>
                 <p class="text-gray-600">{{ note.note|linebreaksbr }}</p>
                 <div class="mt-2 text-sm text-gray-500">
@@ -51,17 +51,17 @@
 
         <form method="post" class="space-y-6">
             {% csrf_token %}
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
                     {{ form.reminder_title|as_crispy_field }}
                     {{ form.reminder_text|as_crispy_field }}
                 </div>
-                
+
                 <div class="space-y-4">
                     {{ form.reminder_date|as_crispy_field }}
                     {{ form.reminder_completed|as_crispy_field }}
-                    
+
                     <div class="p-4 bg-blue-50 rounded-lg border border-blue-200 mt-4">
                         <h3 class="text-md font-semibold text-blue-700 mb-2">Reminder Tips:</h3>
                         <ul class="list-disc list-inside text-blue-600 space-y-1">
@@ -73,7 +73,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="flex justify-end space-x-4 mt-6">
                 <button type="submit" class="btn-primary">
                     Create Reminder
@@ -82,4 +82,4 @@
         </form>
     </div>
 </div>
-{% endblock %} 
+{% endblock %}

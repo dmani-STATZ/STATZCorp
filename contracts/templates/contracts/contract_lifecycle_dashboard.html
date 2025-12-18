@@ -8,25 +8,25 @@
 {% csrf_token %}
 <div class="container mx-auto px-4 py-4">
     <!-- Combined Header Section -->
-    <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+    <div class="card card-padded mb-4">
         <div class="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
             <h1 class="text-2xl font-bold text-gray-800">Contract Dashboard</h1>
-            
+
             <div class="w-full lg:w-1/2 px-2">
                 <div class="relative">
-                    <input type="text" 
-                           id="contract-search" 
+                    <input type="text"
+                           id="contract-search"
                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                            placeholder="Search contracts by number, PO number..."
                            autocomplete="off">
-                    <div id="search-results" 
-                         class="absolute z-50 w-full bg-white mt-1 rounded-md shadow-xl border border-gray-200 max-h-96 overflow-y-auto hidden">
+                    <div id="search-results"
+                         class="absolute z-50 w-full card mt-1 border-gray-200 max-h-96 overflow-y-auto hidden">
                     </div>
                 </div>
             </div>
 
             <div class="flex space-x-2">
-                <a href="{% url 'processing:queue' %}" class="btn-primary text-white flex items-center justify-center">
+                <a href="{% url 'processing:queue' %}" class="btn-primary text-white row justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
@@ -37,19 +37,19 @@
     </div>
 
     <!-- Main Dashboard Card -->
-    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div class="card overflow-hidden">
         <!-- Dashboard Header - Reduced padding -->
-        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 flex justify-between items-center">
-            <div class="flex items-center space-x-4">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 row-between">
+            <div class="row space-x-4">
                 <h1 class="text-lg font-semibold text-white">Dashboard</h1>
                 <!-- View Toggle -->
-                <div class="flex items-center bg-blue-700 rounded-lg p-1">
-                    <button id="table-view-btn" 
+                <div class="row bg-blue-700 rounded-lg p-1">
+                    <button id="table-view-btn"
                             class="px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 {% if dashboard_view == 'table' %}bg-white text-blue-800{% else %}text-white hover:bg-blue-600{% endif %}"
                             onclick="toggleView('table')">
                         Table
                     </button>
-                    <button id="card-view-btn" 
+                    <button id="card-view-btn"
                             class="px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 {% if dashboard_view == 'card' %}bg-white text-blue-800{% else %}text-white hover:bg-blue-600{% endif %}"
                             onclick="toggleView('card')">
                         Cards
@@ -67,31 +67,31 @@
                     <div class="flex-1">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             <!-- Contracts Due Card -->
-                            <div class="bg-white border-4 border-blue-400 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                            <div class="card card-padded border-4 border-blue-400 transform transition-transform duration-200 hover:scale-105 text-center">
                                 <h3 class="text-lg font-semibold text-gray-600 mb-2">Due</h3>
                                 <p class="text-4xl font-bold text-blue-600" id="contracts-due">{{ periods.this_week.contracts_due }}</p>
                             </div>
 
                             <!-- Contracts Due Late Card -->
-                            <div class="bg-white border-4 border-blue-500 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                            <div class="card card-padded border-4 border-blue-500 transform transition-transform duration-200 hover:scale-105 text-center">
                                 <h3 class="text-lg font-semibold text-gray-600 mb-2">Due Late</h3>
                                 <p class="text-4xl font-bold text-red-600" id="contracts-due-late">{{ periods.this_week.contracts_due_late }}</p>
                             </div>
 
                             <!-- Contracts Due OnTime Card -->
-                            <div class="bg-white border-4 border-blue-600 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                            <div class="card card-padded border-4 border-blue-600 transform transition-transform duration-200 hover:scale-105 text-center">
                                 <h3 class="text-lg font-semibold text-gray-600 mb-2">Due OnTime</h3>
                                 <p class="text-4xl font-bold text-green-600" id="contracts-due-ontime">{{ periods.this_week.contracts_due_ontime }}</p>
                             </div>
 
                             <!-- New Contracts Card -->
-                            <div class="bg-white border-4 border-blue-700 rounded-lg shadow-lg pt-6 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                            <div class="card card-padded border-4 border-blue-700 transform transition-transform duration-200 hover:scale-105 text-center">
                                 <h3 class="text-lg font-semibold text-gray-600 mb-2">New Contracts</h3>
                                 <p class="text-4xl font-bold text-blue-600" id="new-contracts">{{ periods.this_week.new_contracts }}</p>
                             </div>
 
                             <!-- New Contract Value Card -->
-                            <div class="bg-white border-4 border-blue-800 rounded-lg shadow-lg pt-4 pb-4 transform transition-transform duration-200 hover:scale-105 text-center">
+                            <div class="card card-padded border-4 border-blue-800 transform transition-transform duration-200 hover:scale-105 text-center">
                                 <h3 class="text-lg font-semibold text-gray-600 mb-2">New Contracts Value</h3>
                                 <p class="text-2xl font-bold text-blue-600" id="new-contract-value">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</p>
                             </div>
@@ -114,7 +114,7 @@
                     </div>
 
                     <!-- Total Contracts Card -->
-                    <div class="bg-white border-4 border-blue-800 rounded-lg shadow-lg p-2 transform transition-transform duration-200 hover:scale-105 w-64 flex flex-col justify-center">
+                    <div class="card card-padded border-4 border-blue-800 transform transition-transform duration-200 hover:scale-105 w-64 flex flex-col justify-center">
                         <h3 class="text-xl font-semibold text-gray-600 mb-4 text-center">Total Contracts</h3>
                         <p class="text-5xl font-bold text-blue-600 text-center" id="total-contracts">{{ total_contracts }}</p>
                     </div>
@@ -127,15 +127,15 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100">Category</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Week</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Week</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Month</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Month</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Quarter</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Quarter</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">This Year</th>
-                                <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Year</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider bg-gray-100">Category</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Week</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Week</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Month</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Month</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Quarter</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Quarter</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Year</th>
+                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Year</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -201,8 +201,8 @@
         </div>
 
         <!-- Contract List -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-            <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 flex justify-between items-center">
+        <div class="card overflow-hidden mb-6">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-2 row-between">
                 <h2 class="text-lg font-semibold text-white">Recent Contracts</h2>
                 <a href="{% url 'contracts:contract_log_view' %}" class="text-white hover:text-blue-100 text-sm font-medium">
                     Master Log
@@ -212,28 +212,28 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50 sticky top-0">
                         <tr>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 Status
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 <span class="text-green-600 font-medium">TAB #</span> / <span class="text-yellow-600 font-medium">PO #</span>
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 IDIQ #
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 Contract
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 Supplier
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 Award Date
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 Due Date
                             </th>
-                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" class="px-4 py-2 text-left label tracking-wider">
                                 Actions
                             </th>
                         </tr>
@@ -242,7 +242,7 @@
                         {% for contract in contracts %}
                         <tr class="{% if contract.status.description == 'Cancelled' %}bg-red-50{% elif contract.status.description == 'Open' %}bg-gray-50{% endif %} hover:bg-gray-100">
                             <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                     {% if contract.status.description == 'Cancelled' %}
                                         bg-red-100 text-red-800
                                     {% elif contract.status.description == 'Open' %}
@@ -341,8 +341,8 @@
         <!-- Dashboard Metrics -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <!-- Open Contracts -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center">
+            <div class="card card-padded">
+                <div class="row">
                     <div class="flex-shrink-0 bg-blue-100 rounded-md p-3">
                         <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -350,7 +350,7 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Open Contracts</dt>
+                            <dt class="label truncate">Open Contracts</dt>
                             <dd>
                                 <div class="text-lg font-medium text-gray-900">{{ metrics.open_contracts }}</div>
                             </dd>
@@ -358,7 +358,7 @@
                     </div>
                 </div>
                 <div class="mt-4">
-                    <div class="flex justify-between items-center">
+                    <div class="row-between">
                         <span class="text-sm font-medium text-red-600">Overdue: {{ metrics.overdue_contracts }}</span>
                         <span class="text-sm font-medium text-green-600">On Time: {{ metrics.on_time_contracts }}</span>
                     </div>
@@ -373,8 +373,8 @@
             </div>
 
             <!-- Contracts by Type -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center">
+            <div class="card card-padded">
+                <div class="row">
                     <div class="flex-shrink-0 bg-purple-100 rounded-md p-3">
                         <svg class="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
@@ -391,7 +391,7 @@
                 </div>
                 <div class="mt-4 space-y-2">
                     {% for type, count in metrics.contract_types.items %}
-                    <div class="flex justify-between items-center text-sm">
+                    <div class="row-between text-sm">
                         <span class="text-gray-600">{{ type }}</span>
                         <span class="font-medium text-gray-900">{{ count }}</span>
                     </div>
@@ -400,8 +400,8 @@
             </div>
 
             <!-- Upcoming Due Dates -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center">
+            <div class="card card-padded">
+                <div class="row">
                     <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
                         <svg class="h-6 w-6 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -418,7 +418,7 @@
                 </div>
                 <div class="mt-4 space-y-2">
                     {% for contract in metrics.upcoming_contracts|slice:":3" %}
-                    <div class="flex justify-between items-center text-sm">
+                    <div class="row-between text-sm">
                         <a href="{% url 'contracts:contract_management' contract.id %}" class="text-blue-600 hover:text-blue-800 truncate max-w-[180px]">
                             {{ contract.contract_number }}
                         </a>
@@ -431,8 +431,8 @@
             </div>
 
             <!-- Active Suppliers -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center">
+            <div class="card card-padded">
+                <div class="row">
                     <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
                         <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -449,7 +449,7 @@
                 </div>
                 <div class="mt-4 space-y-2">
                     {% for supplier in metrics.top_suppliers %}
-                    <div class="flex justify-between items-center text-sm">
+                    <div class="row-between text-sm">
                         <a class="text-blue-600 hover:text-blue-800 truncate max-w-[180px]" href="{% url 'suppliers:supplier_list' %}?supplier_id={{ supplier.supplier_id }}&tab=info">
                             {{ supplier.supplier__name }}
                         </a>
@@ -478,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
     searchInput.addEventListener('input', function() {
         clearTimeout(debounceTimer);
         const query = this.value;
-        
+
         if (query.length < 3) {
             searchResults.classList.add('hidden');
             return;
@@ -489,28 +489,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     searchResults.innerHTML = '';
-                    
+
                     // Handle the response format
                     const results = data.results || data;
-                    
+
                     if (results.length > 0) {
                         results.forEach(contract => {
                             const div = document.createElement('div');
                             div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
-                            
+
                             let html = `
                                 <a href="/contracts/${contract.id}/" class="block">
                                     <div class="text-sm text-blue-600">${contract.contract_number}</div>
                             `;
-                            
+
                             // Add PO numbers if available
                             if (contract.po_numbers && contract.po_numbers.length > 0) {
                                 html += `<div class="text-xs text-gray-500 mt-1">PO: ${contract.po_numbers.join(', ')}</div>`;
                             }
-                            
+
                             html += `</a>`;
                             div.innerHTML = html;
-                            
+
                             searchResults.appendChild(div);
                         });
                         searchResults.classList.remove('hidden');
@@ -543,10 +543,10 @@ function closeCancelModal() {
 
 document.getElementById('cancelContractForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = new FormData(this);
     const contractId = formData.get('contractId');
-    
+
     fetch(`/contracts/${contractId}/cancel/`, {
         method: 'POST',
         body: formData,
@@ -571,7 +571,7 @@ document.getElementById('cancelContractForm').addEventListener('submit', functio
 document.addEventListener('DOMContentLoaded', function() {
     // Get period data from Django template
     const periodsData = JSON.parse(document.getElementById('period-data').textContent);
-    
+
     const periodOrder = [
         'this_week',
         'last_week',
@@ -658,7 +658,7 @@ function toggleView(view) {
         cardView.classList.add('block');
         tableView.classList.add('hidden');
         tableView.classList.remove('block');
-        
+
         // Style card button as selected
         cardBtn.classList.add(activeBgClass, activeTextClass);
         cardBtn.classList.remove(inactiveTextClass, inactiveHoverClass);
@@ -668,7 +668,7 @@ function toggleView(view) {
         tableView.classList.add('block');
         cardView.classList.add('hidden');
         cardView.classList.remove('block');
-        
+
         // Style table button as selected
         tableBtn.classList.add(activeBgClass, activeTextClass);
         tableBtn.classList.remove(inactiveTextClass, inactiveHoverClass);
@@ -712,4 +712,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-{% endblock %} 
+{% endblock %}

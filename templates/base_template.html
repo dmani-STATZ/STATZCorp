@@ -7,7 +7,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json">
     {% if active_company %}
@@ -19,23 +19,23 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="STATZ">
-    
+
     <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" href="{% static 'images/icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" sizes="152x152" href="{% static 'images/icons/icon-152x152.png' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" sizes="167x167" href="{% static 'images/icons/icon-152x152.png' %}">
-    
+
     <!-- Microsoft Tile Images -->
     <meta name="msapplication-TileImage" content="{% static 'images/icons/icon-144x144.png' %}">
     <meta name="msapplication-TileColor" content="#004eb3">
-    
+
     <!-- Desktop PWA Support -->
     <meta name="application-name" content="STATZ Corporation">
     <meta name="msapplication-tooltip" content="STATZ Corporation Web Application">
     <meta name="msapplication-starturl" content="/">
     <meta name="msapplication-config" content="none">
-    
+
     <!-- Prevent FOUC (Flash of Unstyled Content) -->
     <style>
         .no-fouc { display: none; }
@@ -46,26 +46,34 @@
             document.documentElement.className = '';
         }
     </script>
-    
-    {% tailwind_css %}
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
 
     <!-- CSS Files with environment-aware caching -->
     {% is_development as dev_mode %}
     {% if dev_mode %}
         <!-- Development: Force reload CSS -->
         <link rel="stylesheet" href="{% static 'css/base.css' %}?v={{ cache_version }}-{{ request.id }}">
+        <link rel="stylesheet" href="{% static 'css/components.css' %}?v={{ cache_version }}-{{ request.id }}">
+        <link rel="stylesheet" href="{% static 'css/theme.css' %}?v={{ cache_version }}-{{ request.id }}">
         <link rel="stylesheet" href="{% static 'css/light-mode.css' %}?v={{ cache_version }}-{{ request.id }}">
+        <link rel="stylesheet" href="{% static 'css/semantic-light.css' %}?v={{ cache_version }}-{{ request.id }}">
         <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}-{{ request.id }}">
+        <link rel="stylesheet" href="{% static 'css/semantic-dark.css' %}?v={{ cache_version }}-{{ request.id }}">
     {% else %}
         <!-- Production: Normal caching -->
         <link rel="stylesheet" href="{% static 'css/base.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/components.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/theme.css' %}?v={{ cache_version }}">
         <link rel="stylesheet" href="{% static 'css/light-mode.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/semantic-light.css' %}?v={{ cache_version }}">
         <link rel="stylesheet" href="{% static 'css/dark-mode.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/semantic-dark.css' %}?v={{ cache_version }}">
     {% endif %}
+
+    {% tailwind_css %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
 
     {% if active_company %}
     <style>
@@ -83,7 +91,18 @@
         <title>STATZ Corporation{% if active_company %} - {{ active_company.name }}{% endif %}</title>
     {% endif %}
 </head>
-<body class="{% if user_preferences.theme == 'dark' %}dark{% endif %}" {% if active_company %}style="--company-primary: {{ active_company.get_primary_color }}; --company-secondary: {{ active_company.get_secondary_color }};"{% endif %}>
+<body
+    class="
+        theme-root
+        {% if user_preferences.theme == 'dark' %}dark{% else %}light{% endif %}
+    "
+    {% if active_company %}
+        style="
+            --company-primary: {{ active_company.get_primary_color }};
+            --company-secondary: {{ active_company.get_secondary_color }};
+        "
+    {% endif %}
+>
     <header id="header">
         <div class="flex items-center space-x-4">
         <a href="{% url 'landing' %}">
@@ -149,12 +168,12 @@
             </button>
 
             {# company switcher moved near badge #}
-            
+
             {% is_development as dev_mode %}
             {% if dev_mode %}
                 &nbsp;&nbsp;<p class="text-yellow-300 mr-4 font-medium">Development Environment</p>
             {% endif %}
-            
+
             <!-- Version Information -->
             <div class="text-xs text-gray-400 mr-4">
                 <span title="Full version info: {{ detailed_version }}">{{ display_version }}</span>
@@ -162,7 +181,7 @@
                 <br><span class="text-xs text-gray-500 cursor-pointer" id="build-number">Build: {{ version_info.build_number }}</span>
                 {% endif %}
             </div>
-            
+
             {% get_require_login as require_login %}
             {% if require_login %}
                 {% if user.is_authenticated %}
@@ -643,7 +662,7 @@
     </script>
     {% endblock %}
 </body>
-</html> 
+</html>
 
 
 

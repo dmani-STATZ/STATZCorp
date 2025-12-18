@@ -3,20 +3,20 @@
 
 {% block content %}
 <div class="py-6">
-  <div class="flex items-center justify-between mb-4">
+  <div class="row-between mb-4">
     <h1 class="text-2xl font-semibold">Companies</h1>
     <a href="{% url 'contracts:company_create' %}" class="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700">New Company</a>
   </div>
 
-  <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
+  <div class="card overflow-hidden dark:bg-gray-800 sm:rounded-md">
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
       <thead class="bg-gray-50 dark:bg-gray-700">
         <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Logo</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Slug</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Active</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Users</th>
+          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Logo</th>
+          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Name</th>
+          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Slug</th>
+          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Active</th>
+          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Users</th>
           <th class="px-6 py-3"></th>
         </tr>
       </thead>

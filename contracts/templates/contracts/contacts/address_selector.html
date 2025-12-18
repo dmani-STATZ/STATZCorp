@@ -24,7 +24,7 @@
     </style>
 </head>
 <body class="p-4">
-    <div class="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
+    <div class="card card-padded max-w-4xl mx-auto">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-xl font-bold text-gray-800">Select Address</h1>
             
@@ -36,7 +36,7 @@
         </div>
         
         <!-- Filter Section -->
-        <div class="mb-6 bg-gray-50 p-4 rounded-md border border-gray-200">
+        <div class="card card-padded mb-6 border border-gray-200">
             <form id="filter-form" class="space-y-4">
                 <input type="hidden" name="target_field" value="{{ target_field }}">
                 <input type="hidden" name="target_form" value="{{ target_form }}">
@@ -141,7 +141,7 @@
                 
                 <!-- Pagination -->
                 {% if total_pages > 1 %}
-                <div class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+                <div class="row-between border-t border-gray-200 px-4 py-3 sm:px-6">
                     <div class="flex flex-1 justify-between sm:hidden">
                         {% if has_previous %}
                         <a href="javascript:goToPage({{ previous_page }})" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">

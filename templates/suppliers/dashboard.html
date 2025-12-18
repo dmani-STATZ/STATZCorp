@@ -5,12 +5,12 @@
 <div class="container mx-auto py-6 space-y-6">
   <div class="bg-white shadow-sm rounded-lg p-4 md:p-6">
     <form class="flex flex-col gap-3">
-      <label class="text-sm font-medium text-gray-700 text-center">Search by Supplier Name, CAGE, or Contract #</label>
+      <label class="text-medium font-medium text-gray-700 text-center">Search by Supplier Name, CAGE, or Contract #</label>
       <div class="relative max-w-4xl mx-auto w-full">
         <input
           id="supplier-search"
           type="text"
-          class="w-full rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3"
+          class="w-full rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-4"
           placeholder="Start typing a supplier name, CAGE, or contract number"
           autocomplete="off"
         />
@@ -22,42 +22,42 @@
     </form>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="bg-white shadow-sm rounded-lg p-4">
-      <p class="text-xs uppercase text-gray-500">Suppliers</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-blue-100 border border-blue-700 shadow-sm rounded-lg p-4">
+        <p class="label">Suppliers</p>
       <p class="text-3xl font-semibold text-gray-900">{{ total_suppliers|default:0 }}</p>
     </div>
-    <div class="bg-white shadow-sm rounded-lg p-4">
-      <p class="text-xs uppercase text-gray-500">Contracts</p>
+      <div class="bg-red-50 border border-red-700 shadow-sm rounded-lg p-4">
+        <p class="label">Contracts</p>
       <p class="text-3xl font-semibold text-gray-900">{{ total_contracts|default:0 }}</p>
     </div>
-    <div class="bg-white shadow-sm rounded-lg p-4">
-      <p class="text-xs uppercase text-gray-500">Total Award Value</p>
+      <div class="bg-green-50 border border-green-700 shadow-sm rounded-lg p-4">
+        <p class="label">Total Award Value</p>
       <p class="text-3xl font-semibold text-gray-900">${{ total_contract_value|floatformat:0 }}</p>
     </div>
   </div>
 
   <div class="bg-white shadow-sm rounded-lg p-4">
     <h2 class="text-sm font-semibold text-gray-900 mb-3">Suppliers by Type</h2>
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-      <div class="border border-gray-200 rounded-lg p-3">
-        <p class="text-xs uppercase text-gray-500">Manufacturer</p>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="label">Manufacturer</p>
         <a href="{% url 'suppliers:supplier_info_by_type' 'manufacturer' %}" class="text-2xl font-semibold text-gray-900">{{ type_counts.manufacturer|default:0 }}</a>
       </div>
-      <div class="border border-gray-200 rounded-lg p-3">
-        <p class="text-xs uppercase text-gray-500">Distributor</p>
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="label">Distributor</p>
         <a href="{% url 'suppliers:supplier_info_by_type' 'distributor' %}" class="text-2xl font-semibold text-gray-900">{{ type_counts.distributor|default:0 }}</a>
       </div>
-      <div class="border border-gray-200 rounded-lg p-3">
-        <p class="text-xs uppercase text-gray-500">Packhouse</p>
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="label">Packhouse</p>
         <a href="{% url 'suppliers:supplier_info_by_type' 'packhouse' %}" class="text-2xl font-semibold text-gray-900">{{ type_counts.packhouse|default:0 }}</a>
       </div>
-      <div class="border border-gray-200 rounded-lg p-3">
-        <p class="text-xs uppercase text-gray-500">Other</p>
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="label">Other</p>
         <a href="{% url 'suppliers:supplier_info_by_type' 'other' %}" class="text-2xl font-semibold text-gray-900">{{ type_counts.other|default:0 }}</a>
       </div>
-      <div class="border border-gray-200 rounded-lg p-3">
-        <p class="text-xs uppercase text-gray-500">Unspecified</p>
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="label">Unspecified</p>
         <a href="{% url 'suppliers:supplier_info_by_type' 'unspecified' %}" class="text-2xl font-semibold text-gray-900">{{ type_counts.unspecified|default:0 }}</a>
       </div>
     </div>
@@ -133,7 +133,7 @@
     </div>
   </div>
 
-  <div class="bg-white shadow-sm rounded-lg p-6">
+  <div class="shadow-sm rounded-lg p-6">
     <p class="text-gray-600 mb-4">Recently active suppliers</p>
     <ul class="divide-y divide-gray-200">
       {% for item in recently_active_suppliers %}

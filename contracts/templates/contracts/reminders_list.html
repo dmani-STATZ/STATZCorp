@@ -8,7 +8,7 @@
 <div class="container mx-auto px-4 py-8">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
         <h1 class="text-2xl font-bold text-gray-800">My Reminders</h1>
-        
+
         <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
             <button onclick="showNewReminderModal()" class="btn-primary flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -18,44 +18,44 @@
             </button>
         </div>
     </div>
-    
+
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+    <div class="card card-padded mb-6">
         <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-6">
             <div>
                 <h2 class="text-sm font-medium text-gray-700 mb-2">Status</h2>
                 <div class="flex space-x-2">
-                    <a href="{% url 'contracts:reminders_list' %}" 
+                    <a href="{% url 'contracts:reminders_list' %}"
                        class="px-3 py-1 rounded-full text-sm {% if not status_filter %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         All ({{ total_count }})
                     </a>
-                    <a href="{% url 'contracts:reminders_list' %}?status=pending" 
+                    <a href="{% url 'contracts:reminders_list' %}?status=pending"
                        class="px-3 py-1 rounded-full text-sm {% if status_filter == 'pending' %}bg-yellow-100 text-yellow-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         Pending ({{ pending_count }})
                     </a>
-                    <a href="{% url 'contracts:reminders_list' %}?status=completed" 
+                    <a href="{% url 'contracts:reminders_list' %}?status=completed"
                        class="px-3 py-1 rounded-full text-sm {% if status_filter == 'completed' %}bg-green-100 text-green-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         Completed ({{ completed_count }})
                     </a>
                 </div>
             </div>
-            
+
             <div>
                 <h2 class="text-sm font-medium text-gray-700 mb-2">Time Period</h2>
                 <div class="flex flex-wrap gap-2">
-                    <a href="{% url 'contracts:reminders_list' %}{% if status_filter %}?status={{ status_filter }}{% endif %}" 
+                    <a href="{% url 'contracts:reminders_list' %}{% if status_filter %}?status={{ status_filter }}{% endif %}"
                        class="px-3 py-1 rounded-full text-sm {% if not due_filter %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         All Time
                     </a>
-                    <a href="{% url 'contracts:reminders_list' %}?due=overdue{% if status_filter %}&status={{ status_filter }}{% endif %}" 
+                    <a href="{% url 'contracts:reminders_list' %}?due=overdue{% if status_filter %}&status={{ status_filter }}{% endif %}"
                        class="px-3 py-1 rounded-full text-sm {% if due_filter == 'overdue' %}bg-red-100 text-red-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         Overdue ({{ overdue_count }})
                     </a>
-                    <a href="{% url 'contracts:reminders_list' %}?due=due{% if status_filter %}&status={{ status_filter }}{% endif %}" 
+                    <a href="{% url 'contracts:reminders_list' %}?due=due{% if status_filter %}&status={{ status_filter }}{% endif %}"
                        class="px-3 py-1 rounded-full text-sm {% if due_filter == 'due' %}bg-blue-100 text-blue-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         Due ({{ due_count }})
                     </a>
-                    <a href="{% url 'contracts:reminders_list' %}?due=upcoming{% if status_filter %}&status={{ status_filter }}{% endif %}" 
+                    <a href="{% url 'contracts:reminders_list' %}?due=upcoming{% if status_filter %}&status={{ status_filter }}{% endif %}"
                        class="px-3 py-1 rounded-full text-sm {% if due_filter == 'upcoming' %}bg-green-100 text-green-800 font-medium{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                         Upcoming ({{ upcoming_count }})
                     </a>
@@ -63,7 +63,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Overdue Alert -->
     {% if overdue_count > 0 and status_filter != 'completed' %}
     <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
@@ -81,15 +81,15 @@
         </div>
     </div>
     {% endif %}
-    
+
     <!-- Reminders List -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+    <div class="card overflow-hidden">
         {% if reminders_page %}
             <ul class="divide-y divide-gray-200">
                 {% for reminder in reminders_page %}
                 <li class="{% if reminder.reminder_completed %}bg-gray-50{% elif reminder.is_overdue %}bg-red-50{% elif reminder.reminder_date.date <= today %}bg-blue-50{% else %}bg-green-50{% endif %}">
                     <div class="px-4 py-4 sm:px-6">
-                        <div class="flex items-center justify-between">
+                        <div class="row-between">
                             <div class="flex items-center">
                                 <div class="mr-4">
                                     <form method="post" action="{% url 'contracts:toggle_reminder' reminder.id %}">
@@ -154,7 +154,7 @@
                                 </p>
                             </div>
                         </div>
-                        <div class="mt-2 flex justify-between items-center">
+                        <div class="mt-2 row-between">
                             <div>
                                 {% if reminder.note and reminder.note.content_type and reminder.note.content_object %}
                                     {% with content_object=reminder.note.content_object content_type=reminder.note.content_type %}
@@ -171,10 +171,10 @@
                                 {% endif %}
                             </div>
                             <div class="flex space-x-3">
-                                <button type="button" 
+                                <button type="button"
                                         class="edit-reminder-btn text-sm text-blue-600 hover:text-blue-800"
                                         data-id="{{ reminder.id }}"
-                                        data-title="{{ reminder.reminder_title|escapejs }}" 
+                                        data-title="{{ reminder.reminder_title|escapejs }}"
                                         data-description="{{ reminder.reminder_text|escapejs }}"
                                         data-date="{{ reminder.reminder_date|date:'Y-m-d H:i' }}">
                                     Edit
@@ -228,21 +228,21 @@
                 const title = this.dataset.title;
                 const description = this.dataset.description;
                 const date = this.dataset.date;
-                
+
                 // Fill in the edit form - mapping from reminder_title to form field names
                 document.getElementById('editReminderId').value = id;
                 document.getElementById('editReminderTitle').value = title;
                 document.getElementById('editReminderDescription').value = description;
                 document.getElementById('editReminderDate').value = date;
-                
+
                 // Update the form action
                 document.getElementById('editReminderForm').action = `/contracts/reminder/${id}/edit/`;
-                
+
                 // Show the modal
                 document.getElementById('editReminderModal').classList.add('active');
             });
         });
-        
+
         // Initialize modal forms
         if (document.getElementById('reminderDate')) {
             // Set default date to today + 1 hour
@@ -252,4 +252,4 @@
         }
     });
 </script>
-{% endblock %} 
+{% endblock %}

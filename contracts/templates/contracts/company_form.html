@@ -16,13 +16,13 @@
     </div>
     {% endif %}
 
-    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-md p-6 space-y-4">
+    <div class="card card-padded dark:bg-gray-800 sm:rounded-md space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Name</label>
         {{ form.name }}
       </div>
 
-      <div class="flex items-center space-x-4">
+      <div class="row space-x-4">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-200">Active</label>
         {{ form.is_active }}
       </div>
@@ -40,7 +40,7 @@
       <div class="grid md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Primary Color</label>
-          <div class="flex items-center space-x-3">
+          <div class="row space-x-3">
             {{ form.primary_color }}
             <span id="primary-color-swatch" class="h-8 w-8 rounded border border-gray-300" style="background-color: {{ form.instance.get_primary_color }};"></span>
             <span id="primary-color-value" class="text-xs text-gray-600 dark:text-gray-300 select-all">{{ form.instance.get_primary_color }}</span>
@@ -58,7 +58,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Secondary Color</label>
-          <div class="flex items-center space-x-3">
+          <div class="row space-x-3">
             {{ form.secondary_color }}
             <span id="secondary-color-swatch" class="h-8 w-8 rounded border border-gray-300" style="background-color: {{ form.instance.get_secondary_color }};"></span>
             <span id="secondary-color-value" class="text-xs text-gray-600 dark:text-gray-300 select-all">{{ form.instance.get_secondary_color }}</span>
@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-md p-6 space-y-3">
+    <div class="card card-padded dark:bg-gray-800 sm:rounded-md space-y-3">
       <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100">User Access</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400">Check the users who should have access to this company. The first membership created becomes the user&rsquo;s default company.</p>
       {% if form.members.errors %}
@@ -87,7 +87,7 @@
       {% endif %}
       <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {% for checkbox in form.members %}
-          <label class="flex items-center space-x-2 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 hover-brand-border">
+          <label class="row space-x-2 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 hover-brand-border">
             {{ checkbox.tag }}
             <span class="text-sm text-gray-700 dark:text-gray-200">{{ checkbox.choice_label }}</span>
           </label>

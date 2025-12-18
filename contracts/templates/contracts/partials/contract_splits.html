@@ -1,6 +1,6 @@
 <!-- Contract Splits Section -->
 <div class="section" data-contract-id="{{ contract.id|default:'' }}" data-mode="{{ mode|default:'detail' }}" data-plan-gross="{{ contract.plan_gross|default:'0.00' }}">
-    <div class="section-header flex justify-between items-center">
+    <div class="section-header row-between">
         <div class="section-title p-4">
             Contract splits
         </div>
@@ -20,11 +20,11 @@
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Value</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Paid</th>
+                    <th class="px-4 py-3 text-left label tracking-wider">Company</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Split Value</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Split Paid</th>
                     {% if mode == 'form' %}
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th class="px-4 py-3 text-center label tracking-wider">Actions</th>
                     {% endif %}
                 </tr>
             </thead>

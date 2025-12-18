@@ -1,0 +1,20 @@
+/* ================================
+   DARK MODE
+================================ */
+
+body.dark {
+    --surface-bg: #1f2937;
+    --surface-muted-bg: #374151;
+    --surface-text: #f3f4f6;
+
+    --text-muted: #9ca3af;
+    --text-strong: #f9fafb;
+
+    --border-muted: #374151;
+
+    --primary: var(--company-primary, #3b82f6);
+    --primary-text: #0b1221;
+
+    background-color: #1f2937;
+    color: #f3f4f6;
+}

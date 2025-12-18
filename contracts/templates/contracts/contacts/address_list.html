@@ -231,7 +231,7 @@
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-6xl mx-auto">
         <!-- Header Section -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="card card-padded mb-6">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                 <h1 class="text-2xl font-bold text-gray-800 mb-4 sm:mb-0">
                     <span class="text-blue-600">
@@ -325,7 +325,7 @@
         <!-- List View -->
         <div id="list-view" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for address in addresses %}
-            <div class="address-card bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="address-card card overflow-hidden">
                 <div class="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
                     <div class="flex justify-between items-start">
                         <h3 class="text-lg font-semibold text-gray-800">
@@ -403,7 +403,7 @@
                 </div>
             </div>
             {% empty %}
-            <div class="col-span-full bg-white rounded-lg shadow p-8 text-center">
+            <div class="col-span-full card p-8 text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -428,7 +428,7 @@
         
         <!-- Map View -->
         <div id="map-view" class="hidden">
-            <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="card card-padded">
                 <div class="mb-4">
                     <h2 class="text-xl font-semibold text-gray-800 mb-2">Address Map</h2>
                     <p class="text-sm text-gray-600">Visualize all addresses on the map. Click on a marker to view details.</p>
@@ -452,7 +452,7 @@
         
         <!-- Pagination -->
         {% if is_paginated %}
-        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow">
+        <div class="card px-4 py-3 row-between border-t border-gray-200 sm:px-6 mt-6">
             <div class="flex-1 flex justify-between items-center">
                 {% if page_obj.has_previous %}
                 <a href="?{% if search_query %}q={{ search_query }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">

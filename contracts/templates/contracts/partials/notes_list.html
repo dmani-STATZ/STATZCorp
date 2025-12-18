@@ -6,7 +6,7 @@
     <div class="border-l-4 {% if note_entity_type|lower == 'contract' %}border-green-500{% elif note_entity_type|lower == 'clin' %}border-blue-500{% else %}border-{{ note_color|default:'green' }}-500{% endif %} pl-4 py-2 mb-4">
         <!-- Note type indicator -->
         {% if show_note_type or combined_view %}
-        <div class="flex justify-between items-center mb-1">
+        <div class="row-between mb-1">
             <div>
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if note_entity_type|lower == 'contract' %}bg-green-100 text-green-800{% elif note_entity_type|lower == 'clin' %}bg-blue-100 text-blue-800{% else %}bg-{{ note_color|default:'green' }}-100 text-{{ note_color|default:'green' }}-800{% endif %}">
                     {{ note_entity_type|title }}
@@ -21,7 +21,7 @@
                 <p class="text-gray-700 whitespace-pre-wrap">{{ note.note|linebreaksbr }}</p>
             </div>
         </div>
-        <div class="mt-2 flex justify-between items-center">
+        <div class="mt-2 row-between">
             <div class="text-sm text-gray-500">
                 Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
             </div>

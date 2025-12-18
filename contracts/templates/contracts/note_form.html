@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <div class="flex justify-between items-center mb-6">
+    <div class="row-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">
             Add Note
             {% if content_object %}
@@ -40,7 +40,7 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-md p-6">
+    <div class="card card-padded">
         <form method="post" class="space-y-6">
             {% csrf_token %}
             

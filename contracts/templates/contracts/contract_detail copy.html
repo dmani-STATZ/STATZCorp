@@ -9,15 +9,15 @@
     <!-- Top Section Grid Layout -->
     <div class="grid grid-cols-3 gap-8 mb-6">
         <!-- CLIN Acknowledgment Section - Left Column -->
-        <div class="col-span-1 bg-white shadow-lg rounded-lg p-4">
+        <div class="col-span-1 card card-padded">
             <h2 class="text-xl font-bold text-gray-800 mb-3">CLIN Acknowledgment</h2>
             <div class="space-y-3">
-                <div class="flex items-center justify-between py-1 border-b">
+                <div class="row-between py-1 border-b">
                     <span class="text-sm text-gray-700 w-1/3">PO Acknowledge Letter</span>
                     <div class="text-center w-1/3">
-                        <button 
+                        <button
                             onclick="openAcknowledgmentLetter('{{ selected_clin.id }}')"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if not selected_clin %}bg-gray-300 text-gray-500{% else %}bg-blue-500 text-white hover:bg-blue-600{% endif %}">
                             {% if acknowledgment_letter %}Edit{% else %}Create{% endif %}
                         </button>
@@ -28,15 +28,15 @@
                         {% endif %}
                     </span>
                 </div>
-                
+
                 <!-- PO Sent to Sup -->
                 <div class="grid grid-cols-3 items-center py-1 border-b">
                     <span class="text-sm text-gray-700">PO Sent to Supplier</span>
                     <div class="text-center">
-                        <button 
+                        <button
                             onclick="toggleAcknowledgment('po_to_supplier_bool')"
                             id="po_to_supplier_bool_btn"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                             {% if acknowledgment.po_to_supplier_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
                             {% if acknowledgment.po_to_supplier_bool %}Sent{% else %}Not Sent{% endif %}
                         </button>
@@ -48,15 +48,15 @@
                         {% endif %}
                     </div>
                 </div>
-                
+
                 <!-- Acknowledged -->
                 <div class="grid grid-cols-3 items-center py-1 border-b">
                     <span class="text-sm text-gray-700">Acknowledged</span>
                     <div class="text-center">
-                        <button 
+                        <button
                             onclick="toggleAcknowledgment('clin_reply_bool')"
                             id="clin_reply_bool_btn"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                             {% if acknowledgment.clin_reply_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
                             {% if acknowledgment.clin_reply_bool %}Yes{% else %}No{% endif %}
                         </button>
@@ -68,15 +68,15 @@
                         {% endif %}
                     </div>
                 </div>
-                
+
                 <!-- PO Sent to QAR -->
                 <div class="grid grid-cols-3 items-center py-1 border-b">
                     <span class="text-sm text-gray-700">PO Sent to QAR</span>
                     <div class="text-center">
-                        <button 
+                        <button
                             onclick="toggleAcknowledgment('po_to_qar_bool')"
                             id="po_to_qar_bool_btn"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                             {% if acknowledgment.po_to_qar_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
                             {% if acknowledgment.po_to_qar_bool %}Sent{% else %}Not Sent{% endif %}
                         </button>
@@ -92,16 +92,16 @@
         </div>
 
         <!-- Contract Header - Right Columns -->
-        <div class="col-span-2 bg-white shadow-lg rounded-lg p-4">
+        <div class="col-span-2 card card-padded">
             {% if contract.status.description == 'Cancelled' %}
-                <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
+                <div class="bg-red-100 text-red-800 row-between mb-4">
                     <h1 class="text-2xl font-bold text-gray-800">
                         Contract {{ contract.contract_number }}
                     </h1>
-                    <div class="flex items-center space-x-3">
+                    <div class="row space-x-3">
                         <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
-                        <a href="{% url 'contracts:contracts_dashboard' %}" 
-                        class="hover:bg-gray-200 text-red px-4 py-2 rounded-lg flex items-center">
+                        <a href="{% url 'contracts:contracts_dashboard' %}"
+                        class="hover:bg-gray-200 text-red px-4 py-2 rounded-lg row">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                              <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
                          </svg>
@@ -110,14 +110,14 @@
                     </div>
                 </div>
             {% elif contract.status.description == 'Closed' %}
-                <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
+                <div class="bg-gray-100 text-gray-800 row-between mb-4">
                     <h1 class="text-2xl font-bold text-gray-800">
                         Contract {{ contract.contract_number }}
                     </h1>
-                    <div class="flex items-center space-x-3">
+                    <div class="row space-x-3">
                         <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
-                        <a href="{% url 'contracts:contracts_dashboard' %}" 
-                        class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                        <a href="{% url 'contracts:contracts_dashboard' %}"
+                        class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg row">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                              <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
                          </svg>
@@ -126,44 +126,44 @@
                     </div>
                 </div>
             {% else %}
-                <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4 p-2">
-                    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                <div class="bg-green-100 text-green-800 row-between mb-4 p-2">
+                    <h1 class="text-2xl font-bold text-gray-800 row">
                         Contract {{ contract.contract_number }}
                     </h1>
 
                         <!-- Contract Options Dropdown -->
                         <div class="relative inline-block text-left">
-                            <button type="button" onclick="toggleOptionsMenu()" 
-                                    class="inline-flex items-center px-4 py-2 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <button type="button" onclick="toggleOptionsMenu()"
+                                    class="inline-row px-4 py-2 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                 Options
                                 <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                                 </svg>
                             </button>
-                            <div id="optionsMenu" 
+                            <div id="optionsMenu"
                                  class="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-50">
                                 <div class="py-1">
                                     <a href="{% url 'contracts:contract_review' contract.id %}"
-                                       class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                       class="group row px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                        <svg width="20" height="20" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
                                             <path d="M12 2h40c1.1 0 2 .9 2 2v56c0 1.1-.9 2-2 2H12c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2zm0 4v52h40V6H12zm4 4h32v4H16V10zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4zm0 8h32v4H16v-4z" fill="#000"/>
-                                       </svg>                                      
+                                       </svg>
                                         {% if contract.reviewed %}Reviewed{% else %}Review Contract{% endif %}
                                     </a>
                                     <a href="{% url 'contracts:contract_update' contract.id %}"
-                                        class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                        class="group row px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                         <svg class="mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         Edit Contract
                                     </a>
                                     <a href="{% url 'contracts:finance_audit_detail' contract.id %}"
-                                        class="group flex items-center px-4 py-2 text-sm text-green-800 hover:bg-gray-100 hover:text-gray-900">
+                                        class="group row px-4 py-2 text-sm text-green-800 hover:bg-gray-100 hover:text-gray-900">
                                         <svg class="mr-3 h-5 w-5 text-green-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         Finance Audit
-                                </div>                        
+                                </div>
                                 <div class="py-1">
                                     {% if contract.status.description != 'Cancelled' %}
                                     <button onclick="showCancelModal('{{ contract.id }}', '{{ contract.contract_number }}')"
@@ -176,7 +176,7 @@
                                     {% endif %}
                                     {% if contract.status.description == 'Open' %}
                                     <a href="{% url 'contracts:contract_close' contract.id %}"
-                                       class="group flex items-center px-4 py-2 text-sm text-yellow-700 hover:bg-gray-100 hover:text-yellow-900">
+                                       class="group row px-4 py-2 text-sm text-yellow-700 hover:bg-gray-100 hover:text-yellow-900">
                                         <svg class="mr-3 h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                                         </svg>
@@ -186,12 +186,12 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-3">
+                        <div class="row space-x-3">
                         <span class="bg-white {% if contract.open %}text-green-800{% else %}text-gray-800{% endif %} px-3 py-1 rounded-full text-sm font-semibold">
                             {% if contract.open %}Open{% else %}Closed{% endif %}
                         </span>
-                        <a href="{% url 'contracts:contracts_dashboard' %}" 
-                        class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
+                        <a href="{% url 'contracts:contracts_dashboard' %}"
+                        class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg row">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
                         </svg>
@@ -211,7 +211,7 @@
                     <p class="text-sm text-gray-600">Tab Number</p>
                     <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
                 </div>
-                <div class="p-2 flex justify-between items-center">
+                <div class="p-2 row-between">
                     <div>
                         <p class="text-sm text-gray-600">Buyer</p>
                         <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
@@ -219,8 +219,8 @@
                 </div>
                 <div class="p-2">
                     {% if contract.files_url %}
-                    <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')" 
-                        class="flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-150">
+                    <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')"
+                        class="row px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-150">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clip-rule="evenodd" />
                             <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
@@ -253,8 +253,8 @@
                 Path copied to clipboard! Paste in File Explorer address bar.
             </div>
             <!-- System message for additional instructions -->
-            <div id="system-message" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg mx-4">
+            <div id="system-message" class="hidden fixed inset-0 bg-black bg-opacity-50 row justify-center z-50">
+                <div class="card card-padded max-w-lg mx-4">
                     <div class="flex justify-between items-start mb-4">
                         <h3 class="text-lg font-bold text-gray-800" id="system-message-title">Information</h3>
                         <button onclick="closeSystemMessage()" class="text-gray-500 hover:text-gray-700">
@@ -280,37 +280,37 @@
     <div class="grid grid-cols-3 gap-8">
         <!-- CLINs Section - 2/3 width -->
         <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
+            <div class="row-between mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
                 {% if contract.open %}
-                <a href="{% url 'contracts:contract_clin_create' contract.id %}" 
+                <a href="{% url 'contracts:contract_clin_create' contract.id %}"
                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
                     Add CLIN
                 </a>
                 {% endif %}
             </div>
-            
+
             <!-- CLINs Table -->
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead>
                         <tr>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
                                 Item No
                             </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
                                 Supplier
                             </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
                                 NSN
                             </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
                                 Order Qty
                             </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
                                 Due Date
                             </th>
-                            <!-- <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <!-- <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
                                 Actions
                             </th> -->
                         </tr>
@@ -360,61 +360,61 @@
                 </table>
             </div>
         </div>
-        
+
         <!-- NIST & Expedite Section - 1/3 width -->
         <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
+            <div class="row-between mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Controls</h2>
             </div>
-            
+
             <!-- NIST and Expedite sections side by side -->
             <div class="grid grid-cols-2 gap-4">
                 <!-- NIST Section -->
-                <div class="border border-gray-300 rounded-md p-2 bg-gray-50 flex items-center justify-center">
-                    <button 
+                <div class="border border-gray-300 rounded-md p-2 bg-gray-50 row justify-center">
+                    <button
                         onclick="toggleContractField('nist')"
                         id="nist_btn"
                         data-nist-state="{% if contract.nist %}true{% else %}false{% endif %}"
-                        class="w-3/4 flex items-center justify-center p-2 border border-gray-300 rounded-md shadow-sm hover:opacity-90 transition-colors duration-150 {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}">
+                        class="w-3/4 row justify-center p-2 border border-gray-300 rounded-md shadow-sm hover:opacity-90 transition-colors duration-150 {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}">
                         <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-10">
                     </button>
                 </div>
-                
+
                 <!-- Expedite Section -->
-                <div id="expedite_container" 
-                    class="border border-gray-300 rounded-md p-2 
+                <div id="expedite_container"
+                    class="border border-gray-300 rounded-md p-2
                     {% if expedite and expedite.used %}bg-fuchsia-200{% elif expedite and expedite.successful %}bg-yellow-200{% else %}bg-gray-50 dark:bg-gray-800{% endif %}">
-                    <div class="flex items-center justify-between mb-2">
+                    <div class="row-between mb-2">
                         <h3 class="font-semibold text-gray-800">Expedite</h3>
-                        <button type="button" 
+                        <button type="button"
                             onclick="resetExpedite()"
-                            class="bg-red-100 hover:bg-red-200 text-red-600 rounded-full w-6 h-6 flex items-center justify-center transition-colors duration-150">
+                            class="bg-red-100 hover:bg-red-200 text-red-600 rounded-full w-6 h-6 row justify-center transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
-                    
+
                     <div class="space-y-2">
                         <!-- Initiate button -->
                         {% if not expedite or not expedite.successful %}
-                        <button 
+                        <button
                             onclick="toggleExpediteStatus('initiate')"
                             id="expedite_initiate_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
                             {% if expedite and expedite.initiated %}disabled{% endif %}>
                             Initiate
                         </button>
                         {% endif %}
-                        
+
                         <!-- Successful button -->
                         {% if not expedite or not expedite.successful %}
-                        <button 
+                        <button
                             onclick="toggleExpediteStatus('successful')"
                             id="expedite_successful_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if not expedite or not expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% elif expedite and expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
@@ -422,13 +422,13 @@
                             Successful
                         </button>
                         {% endif %}
-                        
+
                         <!-- Use button (only shows after successful) -->
                         {% if expedite and expedite.successful %}
-                        <button 
+                        <button
                             onclick="toggleExpediteStatus('use')"
                             id="expedite_use_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
                             {% if expedite.used %}disabled{% endif %}>
@@ -436,7 +436,7 @@
                         </button>
                         {% endif %}
                     </div>
-                    
+
                     <!-- Status info display -->
                     {% if expedite and expedite.initiated %}
                     <div class="mt-2 text-xs text-gray-700">
@@ -451,7 +451,7 @@
                     {% endif %}
                 </div>
             </div>
-            
+
             <!-- <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-500 italic">
                 <p>Green = Active NIST, Gray = Inactive NIST</p>
                 <p class="mt-1">Expedite: Yellow background = Successful, Pink background = Used</p>
@@ -463,10 +463,10 @@
     <div class="grid grid-cols-3 gap-8 mt-8">
         <!-- All Notes Combined Section - 2/3 width -->
         <div class="col-span-2 bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
+            <div class="row-between mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Contract Activity Timeline</h2>
                 <div class="flex space-x-3">
-                    <button 
+                    <button
                         class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
                         data-note-action="add"
                         data-content-type-id="18"
@@ -475,7 +475,7 @@
                         <!-- onclick="console.log('Contract Note button clicked', this.dataset)" -->
                         Add Contract Note
                     </button>
-                    <button 
+                    <button
                         class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg js-add-clin-note"
                         data-note-action="add"
                         data-content-type-id="12"
@@ -497,10 +497,10 @@
 
         <!-- Future Section - 1/3 width -->
         <div class="col-span-1 bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
+            <div class="row-between mb-6">
                 <h2 class="text-xl font-bold text-gray-800">Future Section</h2>
             </div>
-            <div class="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+            <div class="card card-padded border-dashed text-center bg-gray-50">
                 <p class="text-gray-500">This section is reserved for future functionality</p>
             </div>
         </div>
@@ -515,7 +515,7 @@
 <!-- Acknowledgment Letter Modal -->
 <div id="acknowledgmentLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
     <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 550px !important; max-width: 550px !important;">
-        <div class="flex justify-between items-center pb-3">
+        <div class="row-between pb-3">
             <h3 class="text-xl font-semibold">Purchase Order Acknowledge Letter</h3>
             <button onclick="closeAcknowledgmentLetter()" class="text-gray-400 hover:text-gray-500">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -543,7 +543,7 @@
         overflow-y: auto !important;
         display: block !important;
     }
-    
+
     /* Strict container height enforcement */
     #combined-notes-container {
         overflow-y: auto !important;
@@ -551,18 +551,18 @@
         height: auto !important;
         max-height: 400px !important;
     }
-    
+
     /* Ensure individual notes don't push out the container */
     #combined-notes-container > div {
         margin-bottom: 0.75rem !important;
         flex-shrink: 0 !important;
     }
-    
+
     /* Color coding for notes */
     .contract-note {
         border-left-color: #10B981 !important; /* Green */
     }
-    
+
     .clin-note {
         border-left-color: #3B82F6 !important; /* Blue */
     }
@@ -604,11 +604,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // data.content_types.forEach(ct => {
             //      console.log(`ID: ${ct.id}, App: ${ct.app_label}, Model: ${ct.model}`);
             // });
-            
+
             // Check if our content type IDs are valid
             const contractBtn = document.querySelector('[data-entity-type="Contract"]');
             const clinBtn = document.querySelector('[data-entity-type="CLIN"]');
-            
+
             if (contractBtn) {
                 const contractTypeId = contractBtn.dataset.contentTypeId;
                 // console.log(`Contract button content type ID: ${contractTypeId}`);
@@ -619,7 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error(`No matching content type found for ID: ${contractTypeId}`);
                 }
             }
-            
+
             if (clinBtn) {
                 const clinTypeId = clinBtn.dataset.contentTypeId;
                 // console.log(`CLIN button content type ID: ${clinTypeId}`);
@@ -645,23 +645,23 @@ function copyContractPath(path) {
     tempTextArea.value = path;
     document.body.appendChild(tempTextArea);
     tempTextArea.select();
-    
+
     try {
         // Execute copy command
         document.execCommand('copy');
-        
+
         // Show toast notification
         const toast = document.getElementById('clipboard-toast');
         toast.classList.remove('hidden');
-        
+
         // Hide toast after 3 seconds
         setTimeout(() => {
             toast.classList.add('hidden');
         }, 3000);
-        
+
         // Display a system message with instructions
         showSystemMessage(
-            "Contract Files Location", 
+            "Contract Files Location",
             `<p>The file path has been copied to your clipboard:</p>
             <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm overflow-x-auto">${path}</p>
             <p class="mt-3 font-semibold">Quick Access:</p>
@@ -681,7 +681,7 @@ function copyContractPath(path) {
     } catch (err) {
         // Show error message to user
         showSystemMessage(
-            "Error Copying Path", 
+            "Error Copying Path",
             `<p>Unable to copy the path to your clipboard.</p>
             <p>Please manually copy this path and paste it into File Explorer:</p>
             <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm overflow-x-auto">${path}</p>`
@@ -699,16 +699,16 @@ function tryDirectOpen(path) {
         // Format UNC path for file protocol
         // Remove any leading or trailing spaces
         path = path.trim();
-        
+
         // Replace backslashes with forward slashes
         let formattedPath = path.replace(/\\/g, '/');
-        
+
         // Ensure proper encoding of special characters
         formattedPath = encodeURI(formattedPath);
-        
+
         // Create the file URL with the correct number of slashes for UNC
         let fileUrl = 'file:' + formattedPath;
-        
+
         // Try to open the URL
         try {
             window.open(fileUrl, '_blank');
@@ -725,7 +725,7 @@ function tryDirectOpen(path) {
             // Convert backslashes to forward slashes and encode
             let formattedPath = path.trim().replace(/\\/g, '/');
             formattedPath = encodeURI(formattedPath);
-            
+
             // Add file:/// prefix for local paths
             let fileUrl = 'file:///' + formattedPath;
             window.open(fileUrl, '_blank');
@@ -743,9 +743,9 @@ function showSystemMessage(title, content) {
     const modal = document.getElementById('system-message');
     const titleElement = document.getElementById('system-message-title');
     const contentElement = document.getElementById('system-message-content');
-    
+
     titleElement.textContent = title;
-    contentElement.innerHTML = content + 
+    contentElement.innerHTML = content +
         `<div id="try-manual" class="hidden mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p class="text-yellow-700">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -754,7 +754,7 @@ function showSystemMessage(title, content) {
                 One-click opening may be blocked by your browser. Please use the keyboard shortcuts instead.
             </p>
         </div>`;
-    
+
     modal.classList.remove('hidden');
 }
 
@@ -769,16 +769,16 @@ function generateLetter() {
     // Collect form data to send to the server
     const letterId = document.getElementById('acknowledgmentLetterForm').dataset.letterId;
     const formData = new FormData(document.getElementById('acknowledgmentLetterForm'));
-    
+
     // Add indicator that this is a document generation request, not just a save
     formData.append('action', 'generate');
-    
+
     // Show loading state
     const generateButton = document.querySelector('button[onclick="generateLetter()"]');
     const originalText = generateButton.innerHTML;
     generateButton.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...</span>';
     generateButton.disabled = true;
-    
+
     // Send request to generate letter
     fetch(`/contracts/acknowledgment-letter/${letterId}/generate/`, {
         method: 'POST',
@@ -797,17 +797,17 @@ function generateLetter() {
         // Reset button state
         generateButton.innerHTML = originalText;
         generateButton.disabled = false;
-        
+
         if (data.success) {
             // Open the document in a new window
             window.open(data.file_url, '_blank');
-            
+
             // Show success message
             const messageDiv = document.createElement('div');
             messageDiv.className = 'mt-3 p-2 bg-green-100 text-green-800 rounded-md';
             messageDiv.textContent = 'Letter generated successfully!';
             document.getElementById('acknowledgmentLetterForm').appendChild(messageDiv);
-            
+
             // Remove message after 3 seconds
             setTimeout(() => {
                 if (messageDiv.parentNode) {
@@ -838,7 +838,7 @@ function openContractFiles(path) {
         const formattedPath = 'file:////' + path.replace(/\\/g, '/');
         // Display a system message with the path information
         showSystemMessage(
-            "UNC Path Detected", 
+            "UNC Path Detected",
             `<p>Attempting to open UNC path:</p>
             <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm">${path}</p>
             <p>If the folder doesn't open automatically, please copy and paste this path into File Explorer.</p>`
@@ -847,7 +847,7 @@ function openContractFiles(path) {
     } else {
         // For local paths, use regular file:// format
         showSystemMessage(
-            "Local Path Detected", 
+            "Local Path Detected",
             `<p>Attempting to open local path:</p>
             <p class="bg-gray-100 p-2 my-2 rounded font-mono text-sm">${path}</p>
             <p>If the folder doesn't open automatically, please copy and paste this path into File Explorer.</p>`
@@ -874,7 +874,7 @@ document.addEventListener('DOMContentLoaded', function() {
             selectClin(defaultClinId, defaultClinElement);
         }
     }
-    
+
     // Initialize NIST button state
     const nistBtn = document.getElementById('nist_btn');
     if (nistBtn) {
@@ -907,11 +907,11 @@ function openEditNoteModal(button) {
 
     // Update modal title and form action
     noteModalTitle.textContent = `Edit ${entityType} Note`;
-    
+
     // Match the URL pattern and parameter name expected by Django
     noteForm.action = `/contracts/note/update/${noteId}/`;
     noteForm.method = 'POST';  // Ensure form method is POST
-    
+
     // Set form values - decode Unicode escape sequences like \u000D\u000A back to newlines
     noteTextArea.value = decodeUnicodeEscapes(noteText);
     noteContentTypeIdInput.value = contentTypeId;
@@ -932,19 +932,19 @@ function decodeUnicodeEscapes(str) {
 function selectClin(clinId, clinElement) {
     // Store contract ID in a variable to avoid template tag issues
     const contractId = "{{ contract.id }}";
-    
+
     // Remove highlight from all rows and add it to the selected row
     document.querySelectorAll('.clin-row').forEach(row => {
         row.classList.remove('selected-row');
     });
     clinElement.classList.add('selected-row');
-    
+
     // Update all CLIN Add Note buttons with the selected CLIN ID and enable them
     document.querySelectorAll('[data-entity-type="CLIN"]').forEach(btn => {
         btn.dataset.objectId = clinId;
         btn.removeAttribute('disabled');
     });
-    
+
     // Fetch combined notes
     fetchCombinedNotes(contractId, clinId);
 }
@@ -974,13 +974,13 @@ function fetchCombinedNotes(contractId, clinId) {
                 }
             } else {
                 console.error('Error loading combined notes:', data.error);
-                document.getElementById('combined-notes-container').innerHTML = 
+                document.getElementById('combined-notes-container').innerHTML =
                     '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
             }
         })
         .catch(error => {
             console.error('Error fetching combined notes:', error);
-            document.getElementById('combined-notes-container').innerHTML = 
+            document.getElementById('combined-notes-container').innerHTML =
                 '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
         });
 }
@@ -1004,7 +1004,7 @@ function toggleAcknowledgment(field) {
     // Get the current state before the toggle
     const btn = document.getElementById(`${field}_btn`);
     const initialState = btn.classList.contains('bg-green-500');
-    
+
     fetch(`/contracts/clin/${clinId}/toggle-acknowledgment/`, {
         method: 'POST',
         headers: {
@@ -1022,12 +1022,12 @@ function toggleAcknowledgment(field) {
             alert(data.error || 'An error occurred while processing your request.');
             return;
         }
-        
+
         const btn = document.getElementById(`${field}_btn`);
         if (data.status === true) {
             btn.classList.remove('bg-red-500');
             btn.classList.add('bg-green-500');
-            
+
             // Update button text based on field
             if (field.includes('po_to_supplier')) {
                 btn.textContent = 'Sent';
@@ -1036,7 +1036,7 @@ function toggleAcknowledgment(field) {
             } else if (field.includes('po_to_qar')) {
                 btn.textContent = 'Sent';
             }
-            
+
             // Update user info if provided
             if (data.user_info) {
                 const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
@@ -1047,12 +1047,12 @@ function toggleAcknowledgment(field) {
                     `;
                 }
             }
-            
+
             // If a note was created, refresh the notes section
             if (data.note_created) {
                 fetchCombinedNotes("{{ contract.id }}", clinId);
             }
-            
+
             // Show message if a reminder was created
             if (data.reminder_created) {
                 const message = `Reminder "${data.reminder_title}" created for ${data.reminder_date}`;
@@ -1063,7 +1063,7 @@ function toggleAcknowledgment(field) {
             btn.classList.remove('bg-green-500');
             btn.classList.add('bg-red-500');
             btn.textContent = field.includes('po_sent') ? 'Not Sent' : 'Not Acknowledged';
-            
+
             // Clear user info
             const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
             if (userInfoContainer) {
@@ -1081,7 +1081,7 @@ function toggleAcknowledgment(field) {
 function toggleExpediteStatus(action) {
     const contractId = "{{ contract.id }}";
     if (!contractId) return;
-    
+
     fetch(`/contracts/contract/${contractId}/toggle-expedite/`, {
         method: 'POST',
         headers: {
@@ -1098,14 +1098,14 @@ function toggleExpediteStatus(action) {
             alert(data.error || 'An error occurred while processing your request.');
             return;
         }
-        
+
         // Update UI based on current state
         const container = document.getElementById('expedite_container');
         const buttonContainer = container.querySelector('.space-y-2');
-        
+
         // Reset all background classes first
         container.classList.remove('bg-gray-50', 'bg-yellow-200', 'bg-fuchsia-200');
-        
+
         if (action === 'reset') {
             // Handle reset action specifically
             if (data.initiated === false) {
@@ -1115,35 +1115,35 @@ function toggleExpediteStatus(action) {
             } else if (data.initiated && !data.successful) {
                 // Reset from successful to initiated state
                 container.classList.add('bg-gray-50');
-                
+
                 // Recreate buttons in the right state
                 buttonContainer.innerHTML = `
                     <!-- Initiate button -->
-                    <button 
+                    <button
                         onclick="toggleExpediteStatus('initiate')"
                         id="expedite_initiate_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                             bg-gray-300 text-gray-600 cursor-not-allowed"
                         disabled>
                         Initiate
                     </button>
-                    
+
                     <!-- Successful button -->
-                    <button 
+                    <button
                         onclick="toggleExpediteStatus('successful')"
                         id="expedite_successful_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                             bg-red-200 text-red-800 hover:bg-red-300">
                         Successful
                     </button>
                 `;
-                
+
                 // Update status info
                 let statusHtml = '';
                 if (data.initiatedby) {
                     statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
                 }
-                
+
                 // Update or add status div
                 let statusDiv = container.querySelector('.mt-2.text-xs');
                 if (!statusDiv) {
@@ -1152,23 +1152,23 @@ function toggleExpediteStatus(action) {
                     container.appendChild(statusDiv);
                 }
                 statusDiv.innerHTML = statusHtml;
-                
+
                 return;
             } else if (data.initiated && data.successful && !data.used) {
                 // Reset from used to successful state
                 container.classList.add('bg-yellow-200');
-                
+
                 // Recreate just the Use Expedite button (active)
                 buttonContainer.innerHTML = `
-                    <button 
+                    <button
                         onclick="toggleExpediteStatus('use')"
                         id="expedite_use_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                             bg-red-200 text-red-800 hover:bg-red-300">
                         Use Expedite
                     </button>
                 `;
-                
+
                 // Update status info
                 let statusHtml = '';
                 if (data.initiatedby) {
@@ -1177,7 +1177,7 @@ function toggleExpediteStatus(action) {
                 if (data.successfulby) {
                     statusHtml += `<p>Successful: ${data.successfuldate} by ${data.successfulby}</p>`;
                 }
-                
+
                 // Update status div
                 let statusDiv = container.querySelector('.mt-2.text-xs');
                 if (!statusDiv) {
@@ -1186,39 +1186,39 @@ function toggleExpediteStatus(action) {
                     container.appendChild(statusDiv);
                 }
                 statusDiv.innerHTML = statusHtml;
-                
+
                 return;
             }
         }
-        
+
         // Handle normal (non-reset) actions
         if (data.initiated) {
             const initiateBtn = document.getElementById('expedite_initiate_btn');
             const successfulBtn = document.getElementById('expedite_successful_btn');
             const useBtn = document.getElementById('expedite_use_btn');
-            
+
             // Handle initiate state
             if (initiateBtn) {
                 initiateBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
                 initiateBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
                 initiateBtn.disabled = true;
             }
-            
+
             if (data.successful) {
                 // Wild color 1 - Yellow background for successful
                 container.classList.add('bg-yellow-200');
-                
+
                 // Hide initiate and successful buttons
                 if (initiateBtn) initiateBtn.parentElement.removeChild(initiateBtn);
                 if (successfulBtn) successfulBtn.parentElement.removeChild(successfulBtn);
-                
+
                 // Add/update Use Expedite button if it doesn't exist
                 if (!useBtn) {
                     const useBtnHtml = `
-                    <button 
+                    <button
                         onclick="toggleExpediteStatus('use')"
                         id="expedite_use_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 
+                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                         ${data.used ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-red-200 text-red-800 hover:bg-red-300'}"
                         ${data.used ? 'disabled' : ''}>
                         Use Expedite
@@ -1229,7 +1229,7 @@ function toggleExpediteStatus(action) {
                     useBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
                     useBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
                     useBtn.disabled = true;
-                    
+
                     // Wild color 2 - Fuchsia background for used
                     container.classList.remove('bg-yellow-200');
                     container.classList.add('bg-fuchsia-200');
@@ -1240,7 +1240,7 @@ function toggleExpediteStatus(action) {
                 successfulBtn.classList.add('bg-red-200', 'text-red-800', 'hover:bg-red-300');
                 successfulBtn.disabled = false;
             }
-            
+
             // Update status info
             let statusHtml = '';
             if (data.initiatedby) {
@@ -1252,7 +1252,7 @@ function toggleExpediteStatus(action) {
             if (data.usedby) {
                 statusHtml += `<p>Used: ${data.useddate} by ${data.usedby}</p>`;
             }
-            
+
             // Add or update status div
             let statusDiv = container.querySelector('.mt-2.text-xs');
             if (!statusDiv) {
@@ -1286,7 +1286,7 @@ function toggleContractField(field) {
     // Get the current state before the toggle
     const btn = document.getElementById(`${field}_btn`);
     const initialState = btn.classList.contains('bg-green-500');
-    
+
     fetch(`/contracts/contract/${contractId}/toggle-field/`, {
         method: 'POST',
         headers: {
@@ -1304,7 +1304,7 @@ function toggleContractField(field) {
             alert(data.error || 'An error occurred while processing your request.');
             return;
         }
-        
+
         if (field === 'nist') {
             // Toggle the button appearance
             if (data.status) {
@@ -1335,7 +1335,7 @@ function toggleOptionsMenu() {
 document.addEventListener('click', function(event) {
     const menu = document.getElementById('optionsMenu');
     const button = event.target.closest('button');
-    
+
     if (!button || !button.hasAttribute('onclick') || button.getAttribute('onclick') !== 'toggleOptionsMenu()') {
         menu.classList.add('hidden');
     }
@@ -1343,21 +1343,21 @@ document.addEventListener('click', function(event) {
 
 function openAcknowledgmentLetter(clinId) {
     console.log('Opening acknowledgment letter for CLIN:', clinId);
-    
+
     // Get the modal and content elements
     const modal = document.getElementById('acknowledgmentLetterModal');
     const modalContent = document.getElementById('acknowledgmentLetterContent');
-    
+
     // Show loading state
     modalContent.innerHTML = '<div class="flex justify-center items-center h-64"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-    
+
     // Show the modal
     modal.classList.remove('hidden');
-    
+
     // Fetch the form
     const url = `/contracts/acknowledgment-letter/${clinId}/`;
     console.log('Fetching from URL:', url);
-    
+
     fetch(url)
         .then(response => {
             console.log('Response status:', response.status);
@@ -1367,7 +1367,7 @@ function openAcknowledgmentLetter(clinId) {
             console.log('Received data:', data);
             if (data.success) {
                 modalContent.innerHTML = data.html;
-                
+
                 // Initialize form after content is loaded
                 const form = modalContent.querySelector('form');
                 if (form) {
@@ -1375,14 +1375,14 @@ function openAcknowledgmentLetter(clinId) {
                     form.querySelectorAll('input, select').forEach(input => {
                         input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
                     });
-                    
+
                     // Set up form submission
                     form.addEventListener('submit', function(e) {
                         e.preventDefault();
-                        
+
                         const formData = new FormData(form);
                         const letterId = form.dataset.letterId;
-                        
+
                         fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
                             method: 'POST',
                             body: formData,

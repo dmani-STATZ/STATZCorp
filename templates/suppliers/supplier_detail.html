@@ -151,7 +151,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         {% for key, addr in addresses.items %}
           <div class="border border-gray-200 rounded-lg p-3">
-            <p class="text-xs uppercase text-gray-500">{{ key|title }} Address</p>
+            <p class="label">{{ key|title }} Address</p>
             {% if addr %}
               {% with full_addr=addr.address_line_1|add:', '|add:addr.city|add:', '|add:addr.state|add:' '|add:addr.zip %}
                 <a href="https://www.google.com/maps/search/{{ full_addr|urlencode }}" target="_blank" rel="noopener" class="text-sm text-blue-600 hover:text-blue-800">
