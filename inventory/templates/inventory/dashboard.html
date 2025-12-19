@@ -3,9 +3,9 @@
 {% load custom_filters %}
 
 {% block body %}
-<div class="bg-white shadow rounded-lg p-6">
-    <div class="flex justify-between items-center mb-6 w-full grid grid-cols-3">
-        <div class="col-span-1 flex justify-start items-center gap-4">
+<div class="card card-padded">
+    <div class="row-between mb-6 w-full grid grid-cols-3">
+        <div class="col-span-1 row gap-4">
             <a href="{% url 'inventory:add_item' %}" class="btn btn-primary text-2xl">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -26,56 +26,56 @@
         <table class="min-w-full divide-y divide-gray-200">
             <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="nsn">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="nsn">
+                        <div class="row">
                             NSN
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="description">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="description">
+                        <div class="row">
                             Description
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="partnumber">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="partnumber">
+                        <div class="row">
                             Part Number
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="manufacturer">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="manufacturer">
+                        <div class="row">
                             Manufacturer
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="itemlocation">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="itemlocation">
+                        <div class="row">
                             Item Location
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="quantity">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="quantity">
+                        <div class="row">
                             Quantity
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="purchaseprice">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="purchaseprice">
+                        <div class="row">
                             Purchase Price
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" scope="col" data-sort="totalcost">
-                        <div class="flex items-center">
+                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="totalcost">
+                        <div class="row">
                             Total Cost
                             <span class="sort-indicator ml-1">↕</span>
                         </div>
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col"></th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col"></th>
+                    <th class="px-6 py-3 text-left tracking-wider label" scope="col"></th>
+                    <th class="px-6 py-3 text-left tracking-wider label" scope="col"></th>
                 </tr>
             </thead>
             <tbody id="inventoryTableBody" class="bg-white divide-y divide-gray-200">
@@ -120,10 +120,10 @@
             <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
         <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+ <div class="card inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div class="sm:flex sm:items-start">
-                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <div class="mx-auto flex-shrink-0 row h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
                         <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
@@ -131,7 +131,7 @@
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                         <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Confirm Deletion</h3>
                         <div class="mt-2">
-                            <p class="text-sm text-gray-500">Are you sure you want to delete <span id="itemNsn" class="font-bold"></span>? This action cannot be undone.</p>
+                            <p class="label">Are you sure you want to delete <span id="itemNsn" class="font-bold"></span>? This action cannot be undone.</p>
                         </div>
                     </div>
                 </div>
@@ -247,7 +247,7 @@
         function sortTable(column, direction) {
             const tbody = document.getElementById('inventoryTableBody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
-            
+
             // Skip sorting if there's only one row or it's the empty state row
             if (rows.length <= 1 || rows[0].querySelector('th').textContent.trim() === '-') {
                 return;

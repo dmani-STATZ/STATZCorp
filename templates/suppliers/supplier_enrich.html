@@ -3,7 +3,7 @@
 
 {% block contract_content %}
 <div class="max-w-4xl mx-auto px-4 py-8 space-y-6">
-  <div class="bg-white shadow-sm rounded-lg p-4">
+  <div class="card card-padded shadow-sm">
     <h1 class="text-2xl font-semibold text-gray-900">Enrich Supplier</h1>
     <p class="text-sm text-gray-600">Fetch public info from the supplier website and optionally apply it.</p>
     <div class="mt-3">
@@ -11,24 +11,24 @@
     </div>
   </div>
 
-  <div class="bg-white shadow-sm rounded-lg p-4 space-y-4">
-    <div class="flex items-center gap-3">
-      <label for="enrich-website-url" class="text-sm font-medium text-gray-700">Website URL</label>
+  <div class="card card-padded shadow-sm space-y-4">
+    <div class="row gap-3">
+      <label for="enrich-website-url" class="label text-gray-700">Website URL</label>
       <input id="enrich-website-url" type="url" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ supplier.website_url|default:'' }}" placeholder="https://example.com">
       <button id="save-website-btn" class="px-3 py-2 text-sm font-semibold rounded-md bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">Save URL</button>
    </div>
     <p class="text-xs text-gray-500">Saving the URL will update the supplier record before running enrichment.</p>
-    <div  class="flex items-center gap-4">
+    <div  class="row gap-4">
     <button id="run-enrichment-btn" data-supplier-id="{{ supplier.id }}" class="px-3 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700">Run Enrichment</button>
-    <label for="manual-mode-toggle" class="flex items-center gap-2 text-sm text-gray-700">
+    <label for="manual-mode-toggle" class="row gap-2 text-sm text-gray-700">
       <input type="checkbox" id="manual-mode-toggle" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
       Run manually with my own LLM (skip OpenRouter call)
     </label>  </div>
     <div id="manual-mode-section" class="hidden">
     <p class="text-xs text-gray-500">We'll still fetch the HTML and provide the full context for copying.</p></div>
     <div  id="ai-model-section" >
-    <div class="flex items-center gap-3">
-      <label for="ai-model-input" class="text-sm font-medium text-gray-700">AI Model</label>
+    <div class="row gap-3">
+      <label for="ai-model-input" class="label text-gray-700">AI Model</label>
       <input id="ai-model-input" type="text" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ default_ai_model|default:'' }}" placeholder="mistralai/mistral-small:free">
       <span class="text-xs text-gray-500">Enter an OpenRouter model slug to override the default.</span>
     </div>
@@ -44,7 +44,7 @@
       </p>
       {% if request.user.is_superuser %}
       <div class="flex flex-wrap items-center gap-3 mt-2">
-        <label class="flex items-center gap-2 text-sm text-gray-700">
+        <label class="row gap-2 text-sm text-gray-700">
           <input type="checkbox" id="ai-model-needs-update" {% if global_ai_model_info.needs_update %}checked{% endif %}>
           Model needs update
         </label>
@@ -60,8 +60,8 @@
   <div id="enrichment-status" class="hidden text-sm text-gray-600">Fetching website...</div>
   <div id="enrichment-error" class="hidden text-sm text-red-600"></div>
 
-  <div id="enrichment-panel" class="bg-white shadow-sm rounded-lg p-4 hidden">
-    <div class="flex items-center justify-between">
+  <div id="enrichment-panel" class="card card-padded shadow-sm hidden">
+    <div class="row-between">
       <div>
         <h2 class="text-lg font-semibold text-gray-900">Fetched Website HTML</h2>
         <p class="text-xs text-gray-500">Raw HTML fetched from <span id="enriched-url" class="font-mono text-gray-700"></span></p>
@@ -75,8 +75,8 @@
     </div>
   </div>
 
-  <div id="ai-panel" class="bg-white shadow-sm rounded-lg p-4 hidden">
-    <div class="flex items-center justify-between mb-2">
+  <div id="ai-panel" class="card card-padded shadow-sm hidden">
+    <div class="row-between mb-2">
       <h2 class="text-lg font-semibold text-gray-900">AI Extracted Details</h2>
       <span class="text-xs text-gray-500">Powered by OpenRouter</span>
     </div>
@@ -89,55 +89,55 @@
         <span class="text-xs text-gray-600">Copy the prompt + HTML and run it in your preferred LLM if you need a different model.</span>
       </div>
       <textarea id="ai-manual-input" rows="6" class="w-full rounded border border-gray-300 text-xs p-2 font-mono" placeholder="Paste the JSON response from your external LLM here..."></textarea>
-      <div class="flex items-center gap-3">
+      <div class="row gap-3">
         <button id="ai-manual-apply" class="px-3 py-1 text-xs font-semibold rounded bg-indigo-600 text-white">Use JSON Response</button>
         <span id="ai-manual-feedback" class="text-xs text-gray-500 hidden"></span>
       </div>
     </div>
     <div id="ai-suggestion-sections" class="space-y-5">
       <div id="ai-address-section" class="hidden">
-        <div class="flex items-center justify-between mb-1">
+        <div class="row-between mb-1">
           <h3 class="text-sm font-semibold text-gray-900">Addresses</h3>
           <span class="text-xs text-gray-500">Select one or more address types to update.</span>
         </div>
         <p id="ai-address-current" class="text-xs text-gray-500 mb-2"></p>
         <div class="space-y-2">
-          <label class="text-xs text-gray-700 font-medium" for="ai-address-select">Choose a suggested address</label>
+          <label class="label text-gray-700" for="ai-address-select">Choose a suggested address</label>
           <select id="ai-address-select" class="w-full text-xs rounded border border-gray-300 px-2 py-1"></select>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div class="space-y-1">
-              <label class="text-xs text-gray-700 font-medium" for="ai-address-line1">Address Line 1</label>
+              <label class="label text-gray-700" for="ai-address-line1">Address Line 1</label>
               <input id="ai-address-line1" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="123 Main St">
             </div>
             <div class="space-y-1">
-              <label class="text-xs text-gray-700 font-medium" for="ai-address-line2">Address Line 2</label>
+              <label class="label text-gray-700" for="ai-address-line2">Address Line 2</label>
               <input id="ai-address-line2" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="Suite 500">
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div class="space-y-1">
-              <label class="text-xs text-gray-700 font-medium" for="ai-address-city">City</label>
+              <label class="label text-gray-700" for="ai-address-city">City</label>
               <input id="ai-address-city" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="Gaithersburg">
             </div>
             <div class="space-y-1">
-              <label class="text-xs text-gray-700 font-medium" for="ai-address-state">State</label>
+              <label class="label text-gray-700" for="ai-address-state">State</label>
               <input id="ai-address-state" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="MD">
             </div>
             <div class="space-y-1">
-              <label class="text-xs text-gray-700 font-medium" for="ai-address-zip">ZIP</label>
+              <label class="label text-gray-700" for="ai-address-zip">ZIP</label>
               <input id="ai-address-zip" type="text" class="w-full text-xs rounded border border-gray-300 px-2 py-1" placeholder="20877">
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-3 text-xs text-gray-700">
-            <label class="flex items-center gap-1"><input type="checkbox" value="physical" class="address-type-checkbox"> Physical</label>
-            <label class="flex items-center gap-1"><input type="checkbox" value="shipping" class="address-type-checkbox"> Shipping</label>
-            <label class="flex items-center gap-1"><input type="checkbox" value="billing" class="address-type-checkbox"> Billing</label>
+            <label class="row gap-1"><input type="checkbox" value="physical" class="address-type-checkbox"> Physical</label>
+            <label class="row gap-1"><input type="checkbox" value="shipping" class="address-type-checkbox"> Shipping</label>
+            <label class="row gap-1"><input type="checkbox" value="billing" class="address-type-checkbox"> Billing</label>
           </div>
           <button id="ai-address-apply" class="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white w-fit">Apply Address</button>
         </div>
       </div>
       <div id="ai-phone-section" class="hidden">
-        <div class="flex items-center justify-between mb-1">
+        <div class="row-between mb-1">
           <h3 class="text-sm font-semibold text-gray-900">Phone Numbers</h3>
           <span class="text-xs text-gray-500">Choose the target phone field.</span>
         </div>
@@ -145,7 +145,7 @@
         <div id="ai-phone-list" class="space-y-3"></div>
       </div>
       <div id="ai-email-section" class="hidden">
-        <div class="flex items-center justify-between mb-1">
+        <div class="row-between mb-1">
           <h3 class="text-sm font-semibold text-gray-900">Email Addresses</h3>
           <span class="text-xs text-gray-500">Choose the target email field.</span>
         </div>
@@ -163,7 +163,7 @@
       </div>
     </div>
     <div class="mt-4">
-      <div class="flex items-center justify-between">
+      <div class="row-between">
         <h3 class="text-sm font-semibold text-gray-900">Raw JSON Output</h3>
         <button id="toggle-json-panel" class="text-sm font-semibold text-blue-600 hover:text-blue-800">Show</button>
       </div>
@@ -1071,6 +1071,4 @@ document.addEventListener("DOMContentLoaded", () => {
 })();
 </script>
 {% endblock contract_content %}
-
-
 

@@ -3,7 +3,7 @@
 
 {% block body %}
 <div class="container mx-auto py-6 space-y-6">
-  <div class="bg-white shadow-sm rounded-lg p-4 md:p-6">
+  <div class="card card-padded shadow-sm md:p-6">
     <form class="flex flex-col gap-3">
       <label class="text-medium font-medium text-gray-700 text-center">Search by Supplier Name, CAGE, or Contract #</label>
       <div class="relative max-w-4xl mx-auto w-full">
@@ -37,7 +37,7 @@
     </div>
   </div>
 
-  <div class="bg-white shadow-sm rounded-lg p-4">
+  <div class="card card-padded shadow-sm">
     <h2 class="text-sm font-semibold text-gray-900 mb-3">Suppliers by Type</h2>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div class="border border-gray-200 rounded-lg p-3">
@@ -64,15 +64,15 @@
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div class="bg-white shadow-sm rounded-lg p-6">
-      <div class="flex items-center justify-between mb-3">
+    <div class="card card-padded shadow-sm p-6">
+      <div class="row-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Top Manufacturers</h2>
         <p class="text-sm text-gray-500">By award value</p>
       </div>
       <div class="space-y-3">
         {% for supplier in top_manufacturers %}
           <div class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
-            <div class="flex items-center justify-between">
+          <div class="row-between">
               <div>
                 <a href="{% url 'suppliers:supplier_detail' supplier.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                   {{ supplier.name|default:"Unnamed Supplier" }}
@@ -98,15 +98,15 @@
       </div>
     </div>
 
-    <div class="bg-white shadow-sm rounded-lg p-6">
-      <div class="flex items-center justify-between mb-3">
+    <div class="card card-padded shadow-sm p-6">
+      <div class="row-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Top Distributors</h2>
         <p class="text-sm text-gray-500">By award value</p>
       </div>
       <div class="space-y-3">
         {% for supplier in top_distributors %}
           <div class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
-            <div class="flex items-center justify-between">
+          <div class="row-between">
               <div>
                 <a href="{% url 'suppliers:supplier_detail' supplier.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                   {{ supplier.name|default:"Unnamed Supplier" }}
@@ -133,11 +133,11 @@
     </div>
   </div>
 
-  <div class="shadow-sm rounded-lg p-6">
+  <div class="card card-padded shadow-sm p-6">
     <p class="text-gray-600 mb-4">Recently active suppliers</p>
     <ul class="divide-y divide-gray-200">
       {% for item in recently_active_suppliers %}
-        <li class="py-3 flex items-center justify-between">
+        <li class="py-3 row-between">
           <div>
             <p class="text-sm font-medium text-gray-900">{{ item.supplier.name|default:"Supplier" }}</p>
             <p class="text-xs text-gray-500">Last activity: {{ item.last_activity|date:"Y-m-d H:i" }}</p>
@@ -175,7 +175,7 @@
     items.forEach(item => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between';
+      btn.className = 'w-full text-left px-3 py-2 hover:bg-gray-50 row-between';
       const cage = item.cage_code ? `<span class="text-xs text-gray-500 font-mono">CAGE: ${item.cage_code}</span>` : '';
       btn.innerHTML = `<span class="text-sm text-gray-900">${item.supplier_name || 'Supplier'}</span>${cage}`;
       btn.addEventListener('click', () => {

@@ -1,14 +1,14 @@
-<div class="border border-gray-200 rounded-lg p-4 bg-white">
-    <div class="flex items-center justify-between gap-4">
+<div class="card card-padded border border-gray-200">
+    <div class="row-between gap-4">
         <div>
             <p class="text-sm font-semibold text-gray-800">{{ label }}</p>
             {% if description %}
                 <p class="text-xs text-gray-500 mt-1">{{ description }}</p>
             {% endif %}
         </div>
-        <label class="flex items-center gap-3 cursor-pointer">
+        <label class="row gap-3 cursor-pointer">
             {{ field }}
-            <span class="text-sm font-medium text-gray-700">
+            <span class="label text-gray-700">
                 {{ on_label|default:"Enabled" }}
             </span>
         </label>

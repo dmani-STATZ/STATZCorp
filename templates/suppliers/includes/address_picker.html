@@ -1,6 +1,6 @@
 <div class="border border-gray-200 rounded-lg p-3 h-full">
-    <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+    <div class="row-between mb-2">
+        <div class="row gap-2 text-sm font-semibold text-gray-700">
             {% if 'physical' in field.name %}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
@@ -24,7 +24,7 @@
         </div>
         {% with address_type=field.name|cut:"_address" %}
         <a href="{% url 'contracts:address_create' %}?next={% url 'suppliers:supplier_edit' object.pk %}&address_type={{ address_type }}"
-           class="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+           class="text-xs text-blue-600 hover:text-blue-800 row gap-1">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
             </svg>

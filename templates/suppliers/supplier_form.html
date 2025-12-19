@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="py-8">
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 row-between">
         <div>
             <h1 class="text-3xl font-semibold text-gray-900">Create Supplier</h1>
             <p class="mt-2 text-gray-600">
@@ -16,7 +16,7 @@
         </a>
     </div>
 
-    <form method="post" class="bg-white shadow rounded-lg p-6 space-y-6">
+    <form method="post" class="card card-padded shadow space-y-6">
         {% csrf_token %}
 
         {% if form.non_field_errors %}

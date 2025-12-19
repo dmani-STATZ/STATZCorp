@@ -5,15 +5,15 @@
 <div class="max-w-6xl mx-auto px-4 pt-6 pb-10 space-y-6">
   <!-- Header -->
   <div class="relative shadow-sm rounded-xl p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if supplier.probation %}bg-red-50 border border-red-200{% elif supplier.conditional %}bg-yellow-50 border border-yellow-200{% else %}bg-white{% endif %}">
-    <div class="absolute top-4 right-4 flex items-center gap-3">
+    <div class="absolute top-4 right-4 row gap-3">
       <a href="{% url 'suppliers:supplier_dashboard' %}" class="text-sm text-blue-700 hover:text-blue-900 underline">&larr; Back to Dashboard</a>
       <div class="h-5 w-5 rounded-full border-2 {% if supplier.archived %}bg-red-500 border-red-600{% else %}bg-green-500 border-green-600{% endif %}" title="{% if supplier.archived %}Archived{% else %}Active{% endif %}"></div>
     </div>
-    <div class="flex items-center gap-4">
+    <div class="row gap-4">
       {% if supplier.logo_url %}
         <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-16 w-16 object-contain rounded-md border border-gray-200 bg-white">
       {% else %}
-        <div class="h-16 w-16 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400 text-xl font-semibold">
+        <div class="h-16 w-16 rounded-md border border-gray-200 bg-gray-50 row justify-center text-gray-400 text-xl font-semibold">
           {{ supplier.name|default:"S"|slice:":1" }}
         </div>
       {% endif %}
@@ -32,12 +32,12 @@
         </div>
         <div class="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
           {% if supplier.primary_phone or supplier.business_phone %}
-            <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+            <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="row gap-1 text-blue-600 hover:text-blue-800">
               {{ supplier.primary_phone|default:supplier.business_phone }}
             </a>
           {% endif %}
           {% if supplier.primary_email or supplier.business_email %}
-            <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+            <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="row gap-1 text-blue-600 hover:text-blue-800">
               {{ supplier.primary_email|default:supplier.business_email }}
             </a>
           {% endif %}
@@ -62,7 +62,7 @@
 
   <!-- Status / Notes -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-    <div class="bg-white shadow-sm rounded-xl p-4">
+    <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Status Flags</h2>
       <ul class="space-y-2 text-sm text-gray-800">
         <li>Probation: {% if supplier.probation %}<span class="text-red-600 font-semibold">Yes</span> ({{ supplier.probation_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
@@ -70,7 +70,7 @@
         <li>Archived: {% if supplier.archived %}<span class="text-gray-700 font-semibold">Yes</span> ({{ supplier.archived_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
       </ul>
     </div>
-    <div class="bg-white shadow-sm rounded-xl p-4">
+    <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Compliance</h2>
       <ul class="space-y-2 text-sm text-gray-800">
         <li>ISO: {% if supplier.iso %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</li>
@@ -79,7 +79,7 @@
         <li>Supplier Type: {{ supplier.supplier_type|default:"—" }}</li>
       </ul>
     </div>
-    <div class="bg-white shadow-sm rounded-xl p-4">
+    <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Notes</h2>
       {% if supplier.notes %}
         <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
@@ -87,7 +87,7 @@
         <p class="text-sm text-gray-500">No notes provided.</p>
       {% endif %}
     </div>
-    <div class="bg-white shadow-sm rounded-xl p-4">
+    <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Contact &amp; Web</h2>
       <dl class="space-y-2 text-sm text-gray-800">
         <div class="flex items-start justify-between gap-3">
@@ -146,7 +146,7 @@
 
   <!-- Addresses / Contacts -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <div class="bg-white shadow-sm rounded-xl p-4 lg:col-span-2">
+    <div class="card card-padded shadow-sm lg:col-span-2">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Addresses</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         {% for key, addr in addresses.items %}
@@ -166,8 +166,8 @@
       </div>
     </div>
 
-    <div class="bg-white shadow-sm rounded-xl p-4">
-      <div class="flex items-center justify-between mb-3">
+    <div class="card card-padded shadow-sm">
+      <div class="row-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
         <a href="{% url 'contracts:contact_list' %}?supplier_id={{ supplier.id }}" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</a>
       </div>
@@ -199,14 +199,14 @@
   </div>
 
   <!-- Files -->
-  <div class="bg-white shadow-sm rounded-xl p-4">
-    <div class="flex items-center justify-between mb-3">
+  <div class="card card-padded shadow-sm">
+    <div class="row-between mb-3">
       <h2 class="text-lg font-semibold text-gray-900">Files & Documents</h2>
     </div>
     <div class="space-y-3">
       {% if supplier.files_url %}
         <div class="border border-gray-200 rounded-lg p-3">
-          <p class="text-sm font-medium text-gray-900">Files URL</p>
+          <p class="label text-gray-900">Files URL</p>
           <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
         </div>
       {% endif %}
@@ -223,8 +223,8 @@
     </div>
   </div>
 
-  <div id="enrichment-panel" class="bg-white shadow-sm rounded-xl p-4" style="display:none; margin-top:1rem;">
-    <div class="flex items-center justify-between mb-3">
+  <div id="enrichment-panel" class="card card-padded shadow-sm" style="display:none; margin-top:1rem;">
+  <div class="row-between mb-3">
       <h2 class="text-lg font-semibold text-gray-900">Suggested updates from {{ supplier.website_url }}</h2>
     </div>
     <p id="enrichment-empty-msg" class="text-sm text-gray-500" style="display:none;">No suggestions found.</p>
@@ -232,8 +232,8 @@
   </div>
 
   <!-- Contracts -->
-  <div class="bg-white shadow-sm rounded-xl p-6">
-    <div class="flex items-center justify-between mb-3">
+  <div class="card card-padded shadow-sm">
+  <div class="row-between mb-3">
       <h2 class="text-lg font-semibold text-gray-900">Contracts</h2>
       {% if clin_summary.total_clins %}
         <p class="text-sm text-gray-500">CLINs: {{ clin_summary.total_clins }} | Value: ${{ clin_summary.total_value|floatformat:0 }}</p>
@@ -243,10 +243,10 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Award Value</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance</th>
+            <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Contract</th>
+            <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Award Value</th>
+            <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Performance</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">

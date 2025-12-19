@@ -103,7 +103,7 @@
         <div class="flex justify-between items-start">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ supplier.name }}</h1>
-                <div class="mt-2 flex items-center space-x-4">
+                <div class="mt-2 row space-x-4">
                     {% if supplier.cage_code %}
                     <span class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">CAGE: {{ supplier.cage_code }}</span>
                     {% endif %}
@@ -166,7 +166,7 @@
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Contact Information</h3>
                     <dl class="space-y-3">
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Business Phone</dt>
+                            <dt class="label text-gray-500">Business Phone</dt>
                             <dd class="mt-1">
                                 {% if supplier.business_phone %}
                                 <a href="tel:{{ supplier.business_phone }}" class="text-indigo-600 hover:text-indigo-800">{{ supplier.business_phone }}</a>
@@ -176,11 +176,11 @@
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Business Fax</dt>
+                            <dt class="label text-gray-500">Business Fax</dt>
                             <dd class="mt-1">{{ supplier.business_fax|default:"Not provided" }}</dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Business Email</dt>
+                            <dt class="label text-gray-500">Business Email</dt>
                             <dd class="mt-1">
                                 {% if supplier.business_email %}
                                 <a href="mailto:{{ supplier.business_email }}" class="text-indigo-600 hover:text-indigo-800">{{ supplier.business_email }}</a>
@@ -211,23 +211,23 @@
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
                     <dl class="space-y-3">
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Prime</dt>
+                            <dt class="label text-gray-500">Prime</dt>
                             <dd class="mt-1">{{ supplier.prime|yesno:"Yes,No,Unknown" }}</dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">PPI</dt>
+                            <dt class="label text-gray-500">PPI</dt>
                             <dd class="mt-1">{{ supplier.ppi|yesno:"Yes,No,Unknown" }}</dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">ISO</dt>
+                            <dt class="label text-gray-500">ISO</dt>
                             <dd class="mt-1">{{ supplier.iso|yesno:"Yes,No,Unknown" }}</dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Allows GSI</dt>
+                            <dt class="label text-gray-500">Allows GSI</dt>
                             <dd class="mt-1">{{ supplier.get_allows_gsi_display }}</dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Archived</dt>
+                            <dt class="label text-gray-500">Archived</dt>
                             <dd class="mt-1">
                                 {% if supplier.archived %}
                                     Archived on {{ supplier.archived_on|date:"M d, Y H:i"|default:"Date not recorded" }}
@@ -243,7 +243,7 @@
 
         <!-- Notes Tab -->
         <div id="notes" class="tab-content {% if active_tab == 'notes' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="card card-padded shadow">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900">Notes</h3>
                     <button type="button" 
@@ -267,7 +267,7 @@
 
         <!-- Contracts Tab -->
         <div id="contracts" class="tab-content {% if active_tab == 'contracts' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="card shadow overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <h3 class="text-lg font-medium text-gray-900">Contracts</h3>
                     <div class="w-full md:w-64">
@@ -279,7 +279,7 @@
                 <div class="divide-y divide-gray-200">
                     {% for contract in contracts %}
                     <div class="p-6 contract-row" data-contract-text="{{ contract.contract_number }} {{ contract.prime|default_if_none:'' }}">
-                        <div class="flex items-center justify-between">
+                        <div class="row-between">
                             <div>
                                 <h4 class="text-lg font-medium text-gray-900">
                                     <a href="{% url 'contracts:contract_management' pk=contract.id %}" class="hover:text-indigo-600">
@@ -290,7 +290,7 @@
                                     Award Date: {{ contract.award_date|date:"M d, Y"|default:"Not set" }}
                                 </p>
                             </div>
-                            <div class="flex items-center space-x-2">
+                            <div class="row space-x-2">
                                 {% if contract.status.description == 'Open' %}
                                 <span class="status-badge success">Open</span>
                                 {% elif contract.status.description == 'Closed' %}
@@ -313,7 +313,7 @@
 
         <!-- Personnel Tab -->
         <div id="personnel" class="tab-content {% if active_tab == 'personnel' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="card shadow overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h3 class="text-lg font-medium text-gray-900">Personnel</h3>
                     <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}" 
@@ -325,7 +325,7 @@
                 <div class="divide-y divide-gray-200">
                     {% for contact in contacts %}
                     <div class="p-6">
-                        <div class="flex items-center justify-between">
+                        <div class="row-between">
                             <div>
                                 <h4 class="text-lg font-medium text-gray-900">
                                     {{ contact.salutation }} {{ contact.name }}
@@ -333,9 +333,9 @@
                                 {% if contact.title %}
                                 <p class="mt-1 text-sm text-gray-500">{{ contact.title }}</p>
                                 {% endif %}
-                                <div class="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                                <div class="mt-2 row space-x-4 text-sm text-gray-500">
                                     {% if contact.phone %}
-                                    <span class="flex items-center">
+                                    <span class="row">
                                         <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                                         </svg>
@@ -343,7 +343,7 @@
                                     </span>
                                     {% endif %}
                                     {% if contact.email %}
-                                    <span class="flex items-center">
+                                    <span class="row">
                                         <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                         </svg>
@@ -370,7 +370,7 @@
 
         <!-- Keywords Tab -->
         <div id="keywords" class="tab-content {% if active_tab == 'keywords' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="card card-padded shadow">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Keywords</h3>
                 <p class="text-gray-500">Feature coming soon - This will allow tagging and categorization of suppliers</p>
             </div>
@@ -378,7 +378,7 @@
 
         <!-- QMS Tab -->
         <div id="qms" class="tab-content {% if active_tab == 'qms' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="card card-padded shadow">
                 <!-- Certifications Section -->
                 <div class="mb-8">
                     <div class="flex justify-between items-center mb-4">
@@ -461,7 +461,7 @@
 
         <!-- Files Tab -->
         <div id="files" class="tab-content {% if active_tab == 'files' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="card card-padded shadow">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900">Files</h3>
                     {% if supplier.files_url %}
@@ -486,19 +486,19 @@
         <div id="statistics" class="tab-content {% if active_tab == 'statistics' %}active{% endif %}">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Total Contracts</dt>
+                    <dt class="label text-gray-500">Total Contracts</dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ contract_stats.total_contracts }}</dd>
                 </div>
                 <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Active Contracts</dt>
+                    <dt class="label text-gray-500">Active Contracts</dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ contract_stats.active_contracts }}</dd>
                 </div>
                 <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Total Contract Value</dt>
+                    <dt class="label text-gray-500">Total Contract Value</dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">${{ contract_stats.total_value|floatformat:2 }}</dd>
                 </div>
                 <div class="stat-card">
-                    <dt class="text-sm font-medium text-gray-500">Value (Last 12 Months)</dt>
+                    <dt class="label text-gray-500">Value (Last 12 Months)</dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">${{ contract_stats.yearly_value|floatformat:2 }}</dd>
                 </div>
             </div>
@@ -506,7 +506,7 @@
 
         <!-- Quotations Tab -->
         <div id="quotations" class="tab-content {% if active_tab == 'quotations' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="card card-padded shadow">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Quotations</h3>
                 <p class="text-gray-500">Feature coming soon - This will track and manage supplier quotations</p>
             </div>
@@ -514,7 +514,7 @@
 
         <!-- VSM Tab -->
         <div id="vsm" class="tab-content {% if active_tab == 'vsm' %}active{% endif %}">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="card card-padded shadow">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Value Stream Mapping</h3>
                 <p class="text-gray-500">Feature coming soon - This will provide value stream mapping capabilities</p>
             </div>
@@ -523,8 +523,8 @@
 </div>
 
 <!-- Certification Modal -->
-<div id="certificationModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg p-8 max-w-md w-full">
+<div id="certificationModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 row justify-center hidden z-50">
+    <div class="card card-padded p-8 max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 id="certificationModalTitle" class="text-lg font-medium text-gray-900">Add Certification</h3>
             <button data-action="hide-modal" data-modal="certificationModal" class="text-gray-400 hover:text-gray-500">
@@ -537,7 +537,7 @@
             {% csrf_token %}
             <div class="space-y-4">
                 <div>
-                    <label for="certification_type" class="block text-sm font-medium text-gray-700">Certification Type</label>
+                    <label for="certification_type" class="block label text-gray-700">Certification Type</label>
                     <select id="certification_type" name="certification_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
                         {% for type in certification_types %}
                         <option value="{{ type.id }}">{{ type.name }}</option>
@@ -545,15 +545,15 @@
                     </select>
                 </div>
                 <div>
-                    <label for="compliance_status" class="block text-sm font-medium text-gray-700">Compliance Status</label>
+                    <label for="compliance_status" class="block label text-gray-700">Compliance Status</label>
                     <input type="text" id="compliance_status" name="compliance_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
                 </div>
                 <div>
-                    <label for="certification_date" class="block text-sm font-medium text-gray-700">Certification Date</label>
+                    <label for="certification_date" class="block label text-gray-700">Certification Date</label>
                     <input type="date" id="certification_date" name="certification_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
                 <div>
-                    <label for="certification_expiration" class="block text-sm font-medium text-gray-700">Expiration Date</label>
+                    <label for="certification_expiration" class="block label text-gray-700">Expiration Date</label>
                     <input type="date" id="certification_expiration" name="certification_expiration" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </div>
@@ -570,8 +570,8 @@
 </div>
 
 <!-- Classification Modal -->
-<div id="classificationModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg p-8 max-w-md w-full">
+<div id="classificationModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 row justify-center hidden z-50">
+    <div class="card card-padded p-8 max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 id="classificationModalTitle" class="text-lg font-medium text-gray-900">Add Classification</h3>
             <button data-action="hide-modal" data-modal="classificationModal" class="text-gray-400 hover:text-gray-500">
@@ -584,7 +584,7 @@
             {% csrf_token %}
             <div class="space-y-4">
                 <div>
-                    <label for="classification_type" class="block text-sm font-medium text-gray-700">Classification Type</label>
+                    <label for="classification_type" class="block label text-gray-700">Classification Type</label>
                     <select id="classification_type" name="classification_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 h-[38px] appearance-none">
                         {% for type in classification_types %}
                         <option value="{{ type.id }}">{{ type.name }}</option>
@@ -592,11 +592,11 @@
                     </select>
                 </div>
                 <div>
-                    <label for="classification_date" class="block text-sm font-medium text-gray-700">Classification Date</label>
+                    <label for="classification_date" class="block label text-gray-700">Classification Date</label>
                     <input type="date" id="classification_date" name="classification_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
                 <div>
-                    <label for="classification_expiration" class="block text-sm font-medium text-gray-700">Expiration Date</label>
+                    <label for="classification_expiration" class="block label text-gray-700">Expiration Date</label>
                     <input type="date" id="classification_expiration" name="expiration_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </div>
@@ -613,8 +613,8 @@
 </div>
 
 <!-- Notes Modal -->
-<div id="notesModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg p-8 max-w-2xl w-full">
+<div id="notesModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 row justify-center hidden z-50">
+    <div class="card card-padded p-8 max-w-2xl w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-medium text-gray-900">Edit Notes</h3>
             <button data-action="hide-modal" data-modal="notesModal" class="text-gray-400 hover:text-gray-500">
@@ -627,7 +627,7 @@
             {% csrf_token %}
             <div class="space-y-4">
                 <div>
-                    <label for="notes" class="block text-sm font-medium text-gray-700">Notes</label>
+                    <label for="notes" class="block label text-gray-700">Notes</label>
                     <textarea id="notes" name="notes" rows="8" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ supplier.notes }}</textarea>
                 </div>
             </div>

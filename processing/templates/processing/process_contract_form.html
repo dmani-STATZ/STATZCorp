@@ -31,7 +31,7 @@
 <!-- Main Content Container -->
 <div class="container mx-auto px-4 py-6">
     <!-- Header Section -->
-    <div class="flex justify-between items-center mb-6">
+    <div class="row-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">
                 Edit Processing Contract: {{ process_contract.contract_number }}
@@ -44,34 +44,34 @@
         {% csrf_token %}
         <input type="hidden" name="status" value="{{ process_contract.status|default:'in_progress' }}">
         <input type="hidden" name="contract_id" value="{{ process_contract.id }}">
-        
+
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Contract Details Card -->
             <div class="lg:col-span-2">
-                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="card card-padded shadow-md mb-6">
                     <h2 class="text-xl font-semibold mb-4">Contract Details</h2>
                     <div class="grid grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Number</label>
+                            <label class="label block text-gray-700 mb-1">Contract Number</label>
                             <input type="text" name="cont_contract_number" value="{{ process_contract.contract_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">IDIQ Contract</label>
-                            <div class="flex gap-2 items-center">
-                                <input type="text" 
+                            <label class="label block text-gray-700 mb-1">IDIQ Contract</label>
+                            <div class="row">
+                                <input type="text"
                                        name="cont_idiq_contract_number"
-                                       value="{{ process_contract.idiq_contract.contract_number|default:'' }}" 
-                                       class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                       value="{{ process_contract.idiq_contract.contract_number|default:'' }}"
+                                       class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                        readonly>
-                                <button type="button" 
+                                <button type="button"
                                         data-action="open-idiq"
                                         data-idiq="{{ process_contract.idiq_contract.contract_number|default:'' }}"
                                         class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     Match
                                 </button>
                                 {% if process_contract.idiq_contract %}
-                                <button type="button" 
+                                <button type="button"
                                         onclick="removeIdiq()"
                                         class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">
                                     Remove
@@ -87,22 +87,22 @@
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
+                            <label class="label block text-gray-700 mb-1">PO Number</label>
                             <input type="text" name="cont_po_number" value="{{ process_contract.po_number }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Tab Number</label>
+                            <label class="label block text-gray-700 mb-1">Tab Number</label>
                             <input type="text" name="cont_tab_num" value="{{ process_contract.tab_num }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Buyer</label>
-                            <div class="flex gap-2 items-center">
-                                <input type="text" name="cont_buyer_text" value="{{ process_contract.buyer_text|default:'' }}" 
-                                       class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                            <label class="label block text-gray-700 mb-1">Buyer</label>
+                            <div class="row">
+                                <input type="text" name="cont_buyer_text" value="{{ process_contract.buyer_text|default:'' }}"
+                                       class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                        readonly>
-                                <button type="button" 
+                                <button type="button"
                                         data-action="open-buyer"
                                         data-buyer="{{ process_contract.buyer_text|default:'' }}"
                                         class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -120,7 +120,7 @@
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Type ({{ process_contract.contract_type_text }})</label>
+                            <label class="label block text-gray-700 mb-1">Contract Type ({{ process_contract.contract_type_text }})</label>
                             <select name="cont_contract_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">-------</option>
                                 {% for type in contract_types %}
@@ -129,19 +129,19 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Award Date</label>
+                            <label class="label block text-gray-700 mb-1">Award Date</label>
                             <input type="date" name="cont_award_date" value="{{ process_contract.award_date|date:'Y-m-d' }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                            <label class="label block text-gray-700 mb-1">Due Date</label>
                             <input type="date" name="cont_due_date" value="{{ process_contract.due_date|date:'Y-m-d' }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Solicitation Type</label>
+                            <label class="label block text-gray-700 mb-1">Solicitation Type</label>
                             <input type="text" name="cont_solicitation_type" value="{{ process_contract.solicitation_type }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Sales Class ({{ process_contract.sales_class_text }})</label>
+                            <label class="label block text-gray-700 mb-1">Sales Class ({{ process_contract.sales_class_text }})</label>
                             <select name="cont_sales_class" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">-------</option>
                                 {% for sales_class in sales_classes %}
@@ -150,27 +150,27 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Contract Value</label>
+                            <label class="label block text-gray-700 mb-1">Contract Value</label>
                             <input type="number" step="0.01" name="cont_contract_value" value="{{ process_contract.contract_value }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Plan Gross</label>
+                            <label class="label block text-gray-700 mb-1">Plan Gross</label>
                             <input type="number" step="0.01" name="cont_plan_gross" value="{{ process_contract.plan_gross }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Planned Split</label>
+                            <label class="label block text-gray-700 mb-1">Planned Split</label>
                             <input type="text" name="cont_planned_split" value="{{ process_contract.planned_split }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            
+
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Files URL</label>
+                            <label class="label block text-gray-700 mb-1">Files URL</label>
                             <input type="text" name="cont_files_url" value="{{ process_contract.files_url }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">NIST</label>
-                            <select name="cont_nist" 
+                            <label class="label block text-gray-700 mb-1">NIST</label>
+                            <select name="cont_nist"
                                     onchange="saveContract()"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     data-previous-value="{{ process_contract.nist|yesno:'Yes,No' }}">
@@ -182,7 +182,7 @@
 
                     <!-- Save Contract Button -->
                     <div class="mt-4">
-                        <button type="button" 
+                        <button type="button"
                                 onclick="saveContract()"
                                 class="w-1/8 px-6 py-2 bg-green-400 text-black rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-300">
                             <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
@@ -195,20 +195,20 @@
 
             <!-- Status Card -->
             <div class="lg:col-span-1">
-                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                    <div class="flex justify-between items-center mb-4">
+                <div class="card card-padded shadow-md mb-6">
+                    <div class="row-between mb-4">
                         <h2 class="text-xl font-semibold">Processing Status</h2>
-                        <a href="{% url 'processing:queue' %}" 
+                        <a href="{% url 'processing:queue' %}"
                            class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
                             Return to Queue
                         </a>
                     </div>
                     <div class="grid grid-cols-1 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Current Status</label>
+                            <label class="label block text-gray-700 mb-1">Current Status</label>
                             <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="statusChange(this.value)">
                             {% for choice in form.fields.status.choices %}
-                                <option value="{{ choice.0 }}" 
+                                <option value="{{ choice.0 }}"
                                     {% if process_contract.status == choice.0 %}selected{% endif %}
                                     class="{% if choice.0 == 'draft' %}text-gray-700
                                            {% elif choice.0 == 'in_progress' %}text-blue-700
@@ -219,7 +219,7 @@
                                 </option>
                             {% endfor %}
                             </select>
-                            <div class="mt-2 flex items-center space-x-2 text-xs">
+                            <div class="mt-2 row space-x-2 text-xs">
                                 <span class="inline-block w-3 h-3 bg-gray-200 rounded-full"></span>
                                 <span class="text-gray-600">Draft</span>
                                 <span class="inline-block w-3 h-3 bg-blue-200 rounded-full"></span>
@@ -233,25 +233,25 @@
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Created By</label>
+                            <label class="label block text-gray-700 mb-1">Created By</label>
                             <input type="text" value="{{ process_contract.created_by }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Modified</label>
+                            <label class="label block text-gray-700 mb-1">Last Modified</label>
                             <input type="text" value="{{ process_contract.modified_at }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
                         </div>
                     </div>
                 </div>
 
                 <!-- Contract Calculations Card -->
-                <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="card card-padded shadow-md">
                     <h2 class="text-xl font-semibold mb-4">Contract Actions</h2>
                     <div class="space-y-4 pt-3">
-                        <button 
+                        <button
                             type="button"
                             id="update-values-button"
                             onclick="updateContractValues()"
-                            class="w-full bg-blue-500 text-white hover:bg-blue-600 px-5 py-2 rounded flex items-center gap-2 justify-center">
+                            class="w-full bg-blue-500 text-white hover:bg-blue-600 px-5 py-2 rounded row gap-2 justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
@@ -259,14 +259,14 @@
                         </button>
                     </div>
                     <div class="space-y-4 pt-3">
-                        <button type="button" 
+                        <button type="button"
                                 onclick="confirmCancel()"
                                 class="w-full px-6 py-2 bg-gray-700 text-red-400 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
                             Cancel and Return to Queue
                         </button>
                     </div>
                     <div class="space-y-4 pt-3">
-                        <button type="button" 
+                        <button type="button"
                             onclick="finalizeContract()"
                             class="w-full px-6 py-2 bg-green-400 text-black rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-300">
                             Submit Contract and Create Email
@@ -277,63 +277,63 @@
 
             <!-- Split Information Card -->
             <div class="lg:col-span-3">
-                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                    <div class="flex justify-between items-center mb-4">
+                <div class="card card-padded shadow-md mb-6">
+                    <div class="row-between mb-4">
                         <h2 class="text-xl font-semibold">Splits Information</h2>
-                        <button type="button" 
+                        <button type="button"
                                 onclick="addNewSplit()"
                                 class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
                             Add New Split
                         </button>
                     </div>
-                    
+
                     <!-- Dynamic Splits Table -->
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200" id="splitsTable">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Value</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Split Paid</th>
-                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th class="px-4 py-3 text-left tracking-wider label">Company</th>
+                                    <th class="px-4 py-3 text-right tracking-wider label">Split Value</th>
+                                    <th class="px-4 py-3 text-right tracking-wider label">Split Paid</th>
+                                    <th class="px-4 py-3 text-center tracking-wider label">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% for split in process_contract.splits.all %}
                                 <tr class="split-row" data-id="{{ split.id }}">
                                     <td class="px-4 py-3">
-                                        <input type="text" 
-                                               name="splits-{{ split.id }}-company" 
-                                               value="{{ split.company_name }}" 
+                                        <input type="text"
+                                               name="splits-{{ split.id }}-company"
+                                               value="{{ split.company_name }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <input type="hidden" name="splits-{{ split.id }}-id" value="{{ split.id }}">
                             </td>
                             <td class="px-4 py-3">
-                                <input type="number" 
-                                       step="0.01" 
-                                       name="splits-{{ split.id }}-value" 
-                                       value="{{ split.split_value|floatformat:2 }}" 
+                                <input type="number"
+                                       step="0.01"
+                                       name="splits-{{ split.id }}-value"
+                                       value="{{ split.split_value|floatformat:2 }}"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             </td>
                             <td class="px-4 py-3">
-                                <input type="number" 
-                                       step="0.01" 
-                                       name="splits-{{ split.id }}-paid" 
-                                       value="{{ split.split_paid }}" 
+                                <input type="number"
+                                       step="0.01"
+                                       name="splits-{{ split.id }}-paid"
+                                       value="{{ split.split_paid }}"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex justify-center space-x-2">
-                                    <button type="button" 
-                                            onclick="saveSplit(this)" 
+                                    <button type="button"
+                                            onclick="saveSplit(this)"
                                             class="text-green-600 hover:text-green-900"
                                             title="Save Split">
                                         <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
                                             <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                                         </svg>
                                     </button>
-                                    <button type="button" 
-                                            onclick="removeSplit(this)" 
+                                    <button type="button"
+                                            onclick="removeSplit(this)"
                                             class="text-red-600 hover:text-red-900"
                                             title="Delete Split">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -358,10 +358,10 @@
 
     <!-- CLIN Items Card -->
     <div class="lg:col-span-3">
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex justify-between items-center mb-4">
+        <div class="card card-padded shadow-md">
+            <div class="row-between mb-4">
                 <h2 class="text-xl font-semibold text-gray-800">CLIN Items</h2>
-                <button type="button" 
+                <button type="button"
                         onclick="addNewClin()"
                         class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
                     Add New CLIN
@@ -372,11 +372,11 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIN</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSN</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                            <th class="px-4 py-3 text-left label">Actions</th>
+                            <th class="px-4 py-3 text-left label">CLIN</th>
+                            <th class="px-4 py-3 text-left label">Item Type</th>
+                            <th class="px-4 py-3 text-left label">NSN</th>
+                            <th class="px-4 py-3 text-left label">Supplier</th>
                             <!-- <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th> -->
@@ -387,12 +387,12 @@
                         <tr class="hover:bg-gray-50">
                             <!-- Actions Column -->
                             <td class="px-4 py-3 text-sm font-medium">
-                                <div class="flex items-center space-x-2">
-                                    <button type="button" 
+                                <div class="row space-x-2">
+                                    <button type="button"
                                             data-action="toggle-clin"
                                             data-index="{{ forloop.counter0 }}"
-                                            class="text-blue-600 hover:text-blue-900 flex items-center">
-                                        <span class="clin-expand-icon-{{ forloop.counter0 }} flex items-center">
+                                            class="text-blue-600 hover:text-blue-900 row">
+                                            <span class="clin-expand-icon-{{ forloop.counter0 }} row">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                                             </svg>
@@ -438,18 +438,18 @@
                                 <!-- ITEM LINE -->
                                 <div class="grid grid-cols-4 gap-4 mb-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
-                                        <input type="text" 
+                                        <label class="label block text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
+                                        <input type="text"
                                                id="item_number_{{ clin_form.instance.id }}"
-                                               name="item_number_{{ clin_form.instance.id }}" 
-                                               value="{{ clin_form.item_number.value|default:'' }}" 
+                                               name="item_number_{{ clin_form.instance.id }}"
+                                               value="{{ clin_form.item_number.value|default:'' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
+                                        <label class="label block text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
                                         <select id="item_type_{{ clin_form.instance.id }}"
-                                                name="item_type_{{ clin_form.instance.id }}" 
+                                                name="item_type_{{ clin_form.instance.id }}"
                                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 data-clin-id="{{ clin_form.instance.id }}">
                                             <option value="">-------</option>
@@ -459,27 +459,27 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="clin_po_num_{{ clin_form.instance.id }}">CLIN PO Number</label>
-                                        <input type="text" 
+                                        <label class="label block text-gray-700 mb-1" for="clin_po_num_{{ clin_form.instance.id }}">CLIN PO Number</label>
+                                        <input type="text"
                                         id="clin_po_num_{{ clin_form.instance.id }}"
-                                        name="clin_po_num_{{ clin_form.instance.id }}" 
-                                        value="{{ clin_form.clin_po_num.value }}" 
+                                        name="clin_po_num_{{ clin_form.instance.id }}"
+                                        value="{{ clin_form.clin_po_num.value }}"
                                         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="tab_num_{{ clin_form.instance.id }}">Tab Number</label>
-                                        <input type="text" 
+                                        <label class="label block text-gray-700 mb-1" for="tab_num_{{ clin_form.instance.id }}">Tab Number</label>
+                                        <input type="text"
                                         id="tab_num_{{ clin_form.instance.id }}"
-                                        name="tab_num_{{ clin_form.instance.id }}" 
-                                        value="{{ clin_form.tab_num.value }}" 
+                                        name="tab_num_{{ clin_form.instance.id }}"
+                                        value="{{ clin_form.tab_num.value }}"
                                         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="ia_{{ clin_form.instance.id }}">IA</label>
+                                        <label class="label block text-gray-700 mb-1" for="ia_{{ clin_form.instance.id }}">IA</label>
                                         <select id="ia_{{ clin_form.instance.id }}"
-                                                name="ia_{{ clin_form.instance.id }}" 
+                                                name="ia_{{ clin_form.instance.id }}"
                                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 data-clin-id="{{ clin_form.instance.id }}">
                                                 <option value="">-------</option>
@@ -488,9 +488,9 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="fob_{{ clin_form.instance.id }}">FOB</label>
+                                        <label class="label block text-gray-700 mb-1" for="fob_{{ clin_form.instance.id }}">FOB</label>
                                         <select id="fob_{{ clin_form.instance.id }}"
-                                                name="fob_{{ clin_form.instance.id }}" 
+                                                name="fob_{{ clin_form.instance.id }}"
                                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 data-clin-id="{{ clin_form.instance.id }}">
                                                 <option value="">-------</option>
@@ -509,16 +509,16 @@
                                 <div class="grid grid-cols-2 gap-4 mb-4">
                                     <!-- NSN Selection Box -->
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
-                                        <div class="flex gap-2 items-center">
-                                            <input type="text" 
+                                        <label class="label block text-gray-700 mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
+                                        <div class="row">
+                                            <input type="text"
                                                    id="nsn_{{ clin_form.instance.id }}"
                                                    name="nsn_{{ clin_form.instance.id }}"
-                                                   value="{{ clin_form.instance.nsn_text|default:'' }}" 
-                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                                   value="{{ clin_form.instance.nsn_text|default:'' }}"
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
-                                            <button type="button" 
+                                            <button type="button"
                                                     data-action="open-nsn"
                                                     data-id="{{ clin_form.instance.id }}"
                                                     data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
@@ -542,10 +542,10 @@
                                         {% endif %}
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">CLIN Due Date</label>
-                                        <input type="date" 
+                                        <label class="label block text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">CLIN Due Date</label>
+                                        <input type="date"
                                                id="due_date_{{ clin_form.instance.id }}"
-                                               name="due_date_{{ clin_form.instance.id }}" 
+                                               name="due_date_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.due_date.value|date:'Y-m-d' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                data-clin-id="{{ clin_form.instance.id }}">
@@ -555,9 +555,9 @@
                                 <div class="grid grid-cols-9 gap-4 mb-4">
                                     <div class="col-span-2">
                                         <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
-                                        <input type="number" 
+                                        <input type="number"
                                                id="order_qty_{{ clin_form.instance.id }}"
-                                               name="order_qty_{{ clin_form.instance.id }}" 
+                                               name="order_qty_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                onchange="updateTotalValue(this)"
@@ -565,18 +565,18 @@
                                     </div>
                                     <div class="col-span-1">
                                         <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="uom_{{ clin_form.instance.id }}">UOM</label>
-                                        <input type="text" 
+                                        <input type="text"
                                                id="uom_{{ clin_form.instance.id }}"
-                                               name="uom_{{ clin_form.instance.id }}" 
+                                               name="uom_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.uom.value }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                     <div class="col-span-3">
                                         <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="unit_price_{{ clin_form.instance.id }}">Unit Price</label>
-                                        <input type="number" 
+                                        <input type="number"
                                                id="unit_price_{{ clin_form.instance.id }}"
-                                               name="unit_price_{{ clin_form.instance.id }}" 
+                                               name="unit_price_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                onchange="updateTotalValue(this)"
@@ -584,15 +584,15 @@
                                     </div>
                                     <div class="col-span-3">
                                         <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="item_value_{{ clin_form.instance.id }}">Total Value</label>
-                                        <div class="flex gap-2">
-                                            <input type="number" 
+                                        <div class="row">
+                                            <input type="number"
                                                    id="item_value_{{ clin_form.instance.id }}"
-                                                   name="item_value_{{ clin_form.instance.id }}" 
+                                                   name="item_value_{{ clin_form.instance.id }}"
                                                    value="{{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}"
-                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
-                                            <button type="button" 
+                                            <button type="button"
                                                     onclick="recalculateTotal(this)"
                                                     data-clin-id="{{ clin_form.instance.id }}"
                                                     class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
@@ -607,16 +607,16 @@
                                 <!-- Supplier Selection Box -->
                                 <div class="grid grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
-                                        <div class="flex gap-2 items-center">
-                                            <input type="text" 
+                                        <label class="label block text-gray-700 mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
+                                        <div class="row">
+                                            <input type="text"
                                                    id="supplier_{{ clin_form.instance.id }}"
                                                    name="supplier_{{ clin_form.instance.id }}"
-                                                   value="{{ clin_form.instance.supplier_text|default:'' }}" 
-                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" 
+                                                   value="{{ clin_form.instance.supplier_text|default:'' }}"
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
-                                            <button type="button" 
+                                            <button type="button"
                                                     data-action="open-supplier"
                                                     data-id="{{ clin_form.instance.id }}"
                                                     data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
@@ -636,10 +636,10 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
-                                        <input type="date" 
+                                        <label class="label block text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
+                                        <input type="date"
                                                id="supplier_due_date_{{ clin_form.instance.id }}"
-                                               name="supplier_due_date_{{ clin_form.instance.id }}" 
+                                               name="supplier_due_date_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.supplier_due_date.value|date:'Y-m-d' }}"
                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                data-clin-id="{{ clin_form.instance.id }}">
@@ -648,9 +648,9 @@
 
                                 <div class="grid grid-cols-3 gap-4 mb-4">
                                     <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1" for="special_payment_terms_{{ clin_form.instance.id }}">Special Payment Terms ({{ clin_form.instance.special_payment_terms_text|default:'' }})</label>
+                                            <label class="label block text-gray-700 mb-1" for="special_payment_terms_{{ clin_form.instance.id }}">Special Payment Terms ({{ clin_form.instance.special_payment_terms_text|default:'' }})</label>
                                             <select id="special_payment_terms_{{ clin_form.instance.id }}"
-                                                    name="special_payment_terms_{{ clin_form.instance.id }}" 
+                                                    name="special_payment_terms_{{ clin_form.instance.id }}"
                                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     data-clin-id="{{ clin_form.instance.id }}">
                                                 <option value="">-------</option>
@@ -660,10 +660,10 @@
                                             </select>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Quote Price</label>
-                                        <input type="number" 
+                                        <label class="label block text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Quote Price</label>
+                                        <input type="number"
                                                id="price_per_unit_{{ clin_form.instance.id }}"
-                                               name="price_per_unit_{{ clin_form.instance.id }}" 
+                                               name="price_per_unit_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.price_per_unit.value|default:'0' }}"
                                                step="any"
                                                min="0"
@@ -672,17 +672,17 @@
                                                onchange="updateQuoteValue(this)">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Quote Total</label>
-                                        <div class="flex gap-2">
-                                            <input type="number" 
+                                        <label class="label block text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Quote Total</label>
+                                        <div class="row">
+                                            <input type="number"
                                                    id="quote_value_{{ clin_form.instance.id }}"
-                                                   step="0.01" 
-                                                   name="quote_value_{{ clin_form.instance.id }}" 
+                                                   step="0.01"
+                                                   name="quote_value_{{ clin_form.instance.id }}"
                                                    value="{{ clin_form.quote_value.value|floatformat:'2'|default:'0.00' }}"
-                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
-                                            <button type="button" 
+                                            <button type="button"
                                                     onclick="recalculateQuote(this)"
                                                     data-clin-id="{{ clin_form.instance.id }}"
                                                     class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
@@ -694,18 +694,18 @@
                                 <div class="grid grid-cols-8 gap-4 mb-4">
 
                                 <div class="mt-4 flex justify-begining space-x-4">
-                                    <button type="button" 
-                                            onclick="saveClinDetails(this)" 
+                                    <button type="button"
+                                            onclick="saveClinDetails(this)"
                                             data-clin-id="{{ clin_form.instance.id }}"
-                                            class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded flex items-center gap-2">
+                                            class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded row gap-2">
                                         <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
                                             <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                                         </svg>
                                     </button>
-                                    <button type="button" 
-                                            onclick="showDeleteModal(this)" 
+                                    <button type="button"
+                                            onclick="showDeleteModal(this)"
                                             data-clin-id="{{ clin_form.instance.id }}"
-                                            class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded flex items-center gap-2">
+                                            class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded row gap-2">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
@@ -726,7 +726,7 @@
 
 <!-- Cancel Processing Confirmation Modal -->
 <div id="cancelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div class="relative top-20 mx-auto card card-padded border w-96 shadow-lg">
         <div class="mt-3 text-center">
             <h3 class="text-lg leading-6 font-medium text-gray-900">Cancel Processing</h3>
             <div class="mt-2 px-7 py-3">
@@ -734,11 +734,11 @@
                 <p class="text-sm text-red-500 mt-2">This action cannot be undone and all progress will be lost.</p>
             </div>
             <div class="mt-4 flex justify-center space-x-4">
-                <button onclick="closeModal()" 
+                <button onclick="closeModal()"
                         class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
                     No, Keep Processing
                 </button>
-                <button onclick="cancelProcessing()" 
+                <button onclick="cancelProcessing()"
                         class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
                     Yes, Cancel Processing
                 </button>
@@ -749,9 +749,9 @@
 
 <!-- Add the delete confirmation modal -->
 <div id="deleteClinModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-[2000]">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div class="relative top-20 mx-auto card card-padded border w-96 shadow-lg">
         <div class="mt-3 text-center">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+            <div class="mx-auto row justify-center h-12 w-12 rounded-full bg-red-100">
                 <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
@@ -761,11 +761,11 @@
                 <p class="text-sm text-gray-500">Are you sure you want to delete this CLIN? This action cannot be undone.</p>
             </div>
             <div class="mt-4 flex justify-center space-x-4">
-                <button id="cancelDeleteClin" 
+                <button id="cancelDeleteClin"
                         class="bg-gray-200 text-gray-800 active:bg-gray-300 font-bold px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1">
                     Cancel
                 </button>
-                <button id="confirmDeleteClin" 
+                <button id="confirmDeleteClin"
                         class="bg-red-500 text-white active:bg-red-600 font-bold px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1">
                     Delete CLIN
                 </button>
@@ -792,13 +792,13 @@
     function saveContract() {
         const form = document.getElementById('process-contract-form');
         const formData = new FormData(form);
-        
+
         // Store current select values
         const selectValues = {};
         form.querySelectorAll('select').forEach(select => {
             selectValues[select.name] = select.value;
         });
-        
+
         // Show loading state
         const saveBtn = form.querySelector('button[onclick="saveContract()"]');
         if (saveBtn) {
@@ -873,7 +873,7 @@
         })
         .catch(error => {
             console.error('Save error:', error);
-            
+
             // Reset button state
             if (saveBtn) {
                 saveBtn.disabled = false;
@@ -962,7 +962,7 @@
             // If there's a difference, add a new split
             if (Math.abs(splitDifference) > 0.01) { // Using 0.01 to account for floating point precision
                 const processContractId = parseInt("{{ process_contract.id }}");
-                
+
                 // First save the split to the database
                 try {
                     const splitData = {
@@ -1002,38 +1002,38 @@
                         newRow.className = 'split-row';
                         newRow.innerHTML = `
                             <td class="px-4 py-3">
-                                <input type="text" 
-                                       name="splits-${data.split_id}-company" 
-                                       value="Calculation Difference" 
+                                <input type="text"
+                                       name="splits-${data.split_id}-company"
+                                       value="Calculation Difference"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <input type="hidden" name="splits-${data.split_id}-id" value="${data.split_id}">
                             </td>
                             <td class="px-4 py-3">
-                                <input type="number" 
-                                       step="0.01" 
-                                       name="splits-${data.split_id}-value" 
-                                       value="${splitDifference.toFixed(2)}" 
+                                <input type="number"
+                                       step="0.01"
+                                       name="splits-${data.split_id}-value"
+                                       value="${splitDifference.toFixed(2)}"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             </td>
                             <td class="px-4 py-3">
-                                <input type="number" 
-                                       step="0.01" 
-                                       name="splits-${data.split_id}-paid" 
-                                       value="0.00" 
+                                <input type="number"
+                                       step="0.01"
+                                       name="splits-${data.split_id}-paid"
+                                       value="0.00"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex justify-center space-x-2">
-                                    <button type="button" 
-                                            onclick="saveSplit(this)" 
+                                    <button type="button"
+                                            onclick="saveSplit(this)"
                                             class="text-green-600 hover:text-green-900"
                                             title="Save Split">
                                         <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
                                             <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                                         </svg>
                                     </button>
-                                    <button type="button" 
-                                            onclick="removeSplit(this)" 
+                                    <button type="button"
+                                            onclick="removeSplit(this)"
                                             class="text-red-600 hover:text-red-900"
                                             title="Delete Split">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1071,7 +1071,7 @@
         const quantity = Math.max(0, parseFloat(document.getElementById(`order_qty_${clinId}`).value) || 0);
         const unitPrice = Math.max(0, parseFloat(document.getElementById(`unit_price_${clinId}`).value) || 0);
         const totalValue = quantity * unitPrice;
-        
+
         // Update the total value field
         document.getElementById(`item_value_${clinId}`).value = totalValue.toFixed(2);
     }
@@ -1133,7 +1133,7 @@
     function markReadyForReview() {
         const processContractId = document.getElementById('process_contract_id').value;
         const url = `/processing/process-contract/${processContractId}/mark-ready/`;
-        
+
         fetch(url, {
             method: 'POST',
             headers: {
@@ -1169,7 +1169,7 @@
     function toggleClinDetails(index) {
         const detailsRow = document.querySelector(`.clin-details-${index}`);
         const expandIcon = document.querySelector(`.clin-expand-icon-${index}`);
-        
+
         if (detailsRow.classList.contains('hidden')) {
             detailsRow.classList.remove('hidden');
             expandIcon.innerHTML = `
@@ -1193,13 +1193,13 @@
         const table = document.querySelector('#splitsTable tbody');
         const newRow = document.createElement('tr');
         const timestamp = new Date().getTime(); // Use timestamp as temporary ID
-        
+
         newRow.className = 'split-row unsaved-split';
         newRow.innerHTML = `
             <td class="px-4 py-3 relative">
                 <div class="flex items-center gap-2">
-                    <input type="text" 
-                           name="splits-new-${timestamp}-company" 
+                    <input type="text"
+                           name="splits-new-${timestamp}-company"
                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
                     <span class="bg-yellow-200 text-yellow-800 text-xs font-medium px-2 py-1 rounded whitespace-nowrap">
                         Unsaved
@@ -1208,29 +1208,29 @@
                 <input type="hidden" name="splits-new-${timestamp}-id" value="">
             </td>
             <td class="px-4 py-3">
-                <input type="number" 
-                       step="0.01" 
-                       name="splits-new-${timestamp}-value" 
+                <input type="number"
+                       step="0.01"
+                       name="splits-new-${timestamp}-value"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
             </td>
             <td class="px-4 py-3">
-                <input type="number" 
-                       step="0.01" 
-                       name="splits-new-${timestamp}-paid" 
+                <input type="number"
+                       step="0.01"
+                       name="splits-new-${timestamp}-paid"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
             </td>
             <td class="px-4 py-3 text-center">
                 <div class="flex justify-center space-x-2">
-                    <button type="button" 
-                            onclick="saveSplit(this)" 
+                    <button type="button"
+                            onclick="saveSplit(this)"
                             class="text-green-600 hover:text-green-900 animate-pulse"
                             title="Save Split">
                         <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
                             <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                         </svg>
                     </button>
-                    <button type="button" 
-                            onclick="removeSplit(this)" 
+                    <button type="button"
+                            onclick="removeSplit(this)"
                             class="text-red-600 hover:text-red-900"
                             title="Delete Split">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1240,7 +1240,7 @@
                 </div>
             </td>
         `;
-        
+
         table.appendChild(newRow);
         updateTotalSplitValue();
     }
@@ -1261,10 +1261,10 @@
         };
 
         try {
-            const url = splitId ? 
+            const url = splitId ?
                 `/processing/contract/split/${splitId}/update/` :
                 `/processing/contract/split/create/`;
-            
+
             // If creating new split, include process_contract_id
             if (!splitId) {
                 splitData.process_contract_id = processContractId;
@@ -1292,7 +1292,7 @@
                     companyInput.name = `splits-${data.split_id}-company`;
                     valueInput.name = `splits-${data.split_id}-value`;
                     paidInput.name = `splits-${data.split_id}-paid`;
-                    
+
                     // Remove unsaved styling
                     row.classList.remove('unsaved-split');
                     const inputs = row.querySelectorAll('.bg-yellow-50');
@@ -1361,11 +1361,11 @@
     function updateTotalSplitValue() {
         const splitValues = document.querySelectorAll('input[name$="-value"]');
         let total = 0;
-        
+
         splitValues.forEach(input => {
             total += parseFloat(input.value || 0);
         });
-        
+
         document.getElementById('totalSplitValue').textContent = total.toFixed(2);
     }
 
@@ -1460,7 +1460,7 @@
     function preventEmptyCliCreation() {
         const formset = document.querySelector('tbody');
         const rows = formset.querySelectorAll('tr');
-        
+
         // If there's only one CLIN and it's empty, don't allow deletion
         if (rows.length <= 2) { // 2 because each CLIN has two rows (main + details)
             const deleteButtons = formset.querySelectorAll('button[onclick^="showDeleteModal"]');
@@ -1480,7 +1480,7 @@
     // Update the showMessage function to handle message grouping and deduplication
     function showMessage(message, type = 'info') {
         const container = document.getElementById('custom-messages');
-        
+
         // Remove any existing messages with the same text to prevent duplicates
         const existingMessages = container.querySelectorAll('.message-text');
         for (const existing of existingMessages) {
@@ -1488,16 +1488,16 @@
                 return; // Skip showing duplicate message
             }
         }
-        
+
         // Limit the number of visible messages
         const maxMessages = 3;
         const currentMessages = container.children;
         while (currentMessages.length >= maxMessages) {
             container.removeChild(currentMessages[0]);
         }
-        
+
         const messageDiv = document.createElement('div');
-        
+
         // Set message styles based on type
         const baseClasses = 'px-4 py-3 rounded relative mb-2 shadow-lg transition-all duration-500';
         const typeClasses = {
@@ -1506,7 +1506,7 @@
             'info': 'bg-blue-100 border border-blue-400 text-blue-700',
             'warning': 'bg-yellow-100 border border-yellow-400 text-yellow-700'
         };
-        
+
         messageDiv.className = `${baseClasses} ${typeClasses[type] || typeClasses.info}`;
         messageDiv.innerHTML = `
             <span class="block sm:inline message-text">${message}</span>
@@ -1517,9 +1517,9 @@
                 </svg>
             </button>
         `;
-        
+
         container.appendChild(messageDiv);
-        
+
         // Remove message after delay (longer for errors)
         const delay = type === 'error' ? 8000 : 3000;
         setTimeout(() => {
@@ -1534,18 +1534,18 @@
         const fieldName = element.name;
         const fieldValue = element.value;
         const processContractId = "{{ process_contract.id }}";
-        
+
         // Don't show saving message for every field change
         if (!['contract_value', 'plan_gross'].includes(fieldName)) {
             console.log('Saving field:', fieldName, fieldValue); // Keep logging for debugging
         } else {
             showMessage(`Saving ${fieldName}...`, 'info');
         }
-        
+
         const formData = new FormData();
         formData.append('field_name', fieldName);
         formData.append('field_value', fieldValue);
-        
+
         return fetch(`/processing/api/update-field/${processContractId}/`, {
             method: 'POST',
             body: formData,
@@ -1561,7 +1561,7 @@
                 if (['contract_value', 'plan_gross'].includes(fieldName)) {
                     showMessage(`${fieldName} saved successfully`, 'success');
                 }
-                
+
                 // Update any related fields
                 if (data.related_updates) {
                     Object.entries(data.related_updates).forEach(([relatedField, value]) => {
@@ -1604,7 +1604,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Setting up field saving...'); // Debug log
         setupFieldSaving();
-        
+
         // Initialize the custom messages container if it doesn't exist
         if (!document.getElementById('custom-messages-container')) {
             const container = document.createElement('div');
@@ -1640,7 +1640,7 @@
         try {
             const processContractId = "{{ process_contract.id }}";
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            
+
             // Show loading state
             const addButton = document.querySelector('#add-clin-button');
             if (addButton) {
@@ -1654,7 +1654,7 @@
                     Adding...
                 `;
             }
-            
+
             const response = await fetch(`/processing/api/contract/${processContractId}/clin/create/`, {
                 method: 'POST',
                 headers: {
@@ -1677,7 +1677,7 @@
         } catch (error) {
             console.error('Error adding CLIN:', error);
             alert('Error adding CLIN: ' + error.message);
-            
+
             // Reset button state if there was an error
             const addButton = document.querySelector('#add-clin-button');
             if (addButton) {
@@ -1778,7 +1778,7 @@
             const clinRow = clin.closest('tr');
             const nsnStatus = clinRow.querySelector('svg.text-red-500');
             const supplierStatus = clinRow.nextElementSibling.querySelector('svg.text-red-500');
-            
+
             if (nsnStatus || supplierStatus) {
                 isValid = false;
             }
@@ -1791,7 +1791,7 @@
         try {
             // Show processing indicator
             showMessage('Finalizing contract...', 'info');
-            
+
             // Call finalize endpoint directly
             const response = await fetch(`/processing/contract/${processContractId}/finalize-and-email/`, {
                 method: 'POST',
@@ -1804,10 +1804,10 @@
 
             if (data.success) {
                 showMessage('Contract finalized successfully', 'success');
-                
+
                 // Open email client with pre-populated email
                 window.location.href = data.mailto_url;
-                
+
                 // Redirect to queue after a short delay
                 setTimeout(() => {
                     window.location.href = "{% url 'processing:queue' %}";
@@ -1815,7 +1815,7 @@
             } else if (data.validation_errors) {
                 // Handle validation errors from the finalize endpoint
                 let errorMsg = 'Contract validation failed:';
-                
+
                 // Process contract-level validation errors
                 const validationErrors = data.validation_errors;
                 for (const [field, error] of Object.entries(validationErrors)) {
@@ -1823,7 +1823,7 @@
                         errorMsg += `\n- ${error}`;
                     }
                 }
-                
+
                 // Process CLIN validation errors
                 if (validationErrors.clins) {
                     if (typeof validationErrors.clins === 'string') {
@@ -1841,7 +1841,7 @@
                         });
                     }
                 }
-                
+
                 throw new Error(errorMsg);
             } else {
                 throw new Error(data.error || 'Failed to finalize contract');
@@ -1854,11 +1854,11 @@
 
     // Add this near the beginning of your script section
     let autoSaveTimer;
-    
+
     // Function to automatically save form data periodically
     function setupAutoSave() {
         clearTimeout(autoSaveTimer);
-        
+
         autoSaveTimer = setTimeout(async function() {
             try {
                 // Use the existing save contract endpoint
@@ -1872,28 +1872,28 @@
                         contract_id: "{{ process_contract.id }}"
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (!data.success) {
                     console.warn('Auto-save failed:', data.error);
                 } else {
                     console.log('Auto-save completed successfully');
                 }
-                
+
             } catch (error) {
                 console.warn('Auto-save error:', error);
             }
-            
+
             // Set up the next auto-save
             setupAutoSave();
         }, 300000); // Auto-save every 5 minutes
     }
-    
+
     // Start the auto-save when the page loads
     document.addEventListener('DOMContentLoaded', function() {
         setupAutoSave();
-        
+
         // Reset the auto-save timer when user interacts with the form
         const form = document.querySelector('form');
         form.addEventListener('input', function() {
@@ -1909,7 +1909,7 @@
         const quantity = Math.max(0, parseFloat(document.getElementById(`order_qty_${clinId}`).value) || 0);
         const pricePerUnit = Math.max(0, parseFloat(document.getElementById(`price_per_unit_${clinId}`).value) || 0);
         const quoteValue = quantity * pricePerUnit;
-        
+
         // Update the quote value field
         document.getElementById(`quote_value_${clinId}`).value = quoteValue.toFixed(2);
     }
@@ -1948,13 +1948,13 @@
         const clinId = button.dataset.clinId;
         const form = document.querySelector('form');
         const formData = new FormData();
-        
+
         // Add CSRF token
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
+
         // Get all inputs for this CLIN
         const clinInputs = document.querySelectorAll(`[data-clin-id="${clinId}"]`);
-        
+
         // Show loading state
         button.disabled = true;
         const originalText = button.innerHTML;
@@ -1965,7 +1965,7 @@
             </svg>
             Saving...
         `;
-        
+
         try {
             // Add all CLIN input values to formData
             clinInputs.forEach(input => {
@@ -1973,7 +1973,7 @@
                     formData.append(input.name, input.value);
                 }
             });
-            
+
             const response = await fetch(`/processing/save-clin/${clinId}/`, {
                 method: 'POST',
                 body: formData,
@@ -1981,16 +1981,16 @@
                     'X-CSRFToken': csrfToken
                 }
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 showMessage('CLIN details saved successfully', 'success');
-                
+
                 // Update calculated values if they were returned
                 if (data.data) {
                     if (data.data.item_value) {
@@ -2000,7 +2000,7 @@
                         document.getElementById(`quote_value_${clinId}`).value = data.data.quote_value;
                     }
                 }
-                
+
                 // Clear modified flags
                 clinInputs.forEach(input => {
                     input.dataset.modified = 'false';
@@ -2021,7 +2021,7 @@
     // Add event listener for the form to prevent accidental navigation
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.querySelector('form');
-        
+
         window.addEventListener('beforeunload', function(e) {
             const unsavedChanges = document.querySelectorAll('input[data-modified="true"]').length > 0;
             if (unsavedChanges) {
@@ -2084,11 +2084,11 @@
     async function updateContractValues() {
         const updateButton = document.getElementById('update-values-button');
         const originalButtonContent = updateButton ? updateButton.innerHTML : '';
-        
+
         try {
             const processContractId = "{{ process_contract.id }}";
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            
+
             // Show loading state
             if (updateButton) {
                 updateButton.disabled = true;
@@ -2118,12 +2118,12 @@
 
             if (data.success) {
                 showMessage('Contract values updated successfully', 'success');
-                
+
                 // Update the form values if they were returned
                 if (data.data) {
                     const contractValueInput = document.querySelector('input[name="contract_value"]');
                     const planGrossInput = document.querySelector('input[name="plan_gross"]');
-                    
+
                     if (contractValueInput && data.data.contract_value) {
                         contractValueInput.value = data.data.contract_value;
                     }
@@ -2131,7 +2131,7 @@
                         planGrossInput.value = data.data.plan_gross;
                     }
                 }
-                
+
                 // Reload the page to show all updated values including splits
                 window.location.reload();
             } else {

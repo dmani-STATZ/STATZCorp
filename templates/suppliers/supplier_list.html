@@ -264,7 +264,7 @@
                 {% for supplier in suppliers %}
                 <a href="#"
                    data-id="{{ supplier.id }}"
-                   class="supplier-card supplier-item flex items-center justify-between hover:border-indigo-200 py-1 {% if selected_supplier and selected_supplier.id == supplier.id %}border-indigo-300 bg-indigo-50{% endif %}">
+                   class="supplier-card supplier-item row-between hover:border-indigo-200 py-1 {% if selected_supplier and selected_supplier.id == supplier.id %}border-indigo-300 bg-indigo-50{% endif %}">
                     <div class="leading-tight">
                         <div class="text-sm font-semibold text-slate-900">{{ supplier.name }}{% if supplier.cage_code %} ({{ supplier.cage_code }}){% endif %}</div>
                     </div>
@@ -339,12 +339,12 @@
                     </div>
 
                     <div class="supplier-card">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="row-between mb-2">
                             <div class="label">Addresses</div>
                         </div>
                         <div class="grid grid-cols-3 gap-4 text-sm">
                             <div>
-                                <div class="flex items-center gap-2 label mb-1">
+                                <div class="row gap-2 label mb-1">
                                     Physical
                                     <button type="button" class="edit-address-btn text-slate-500 hover:text-indigo-600" data-field="physical" title="Edit physical address">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -353,7 +353,7 @@
                                     <div id="detail-addr-physical" class="leading-tight">{% if has_selected_supplier %}{{ detail_payload.physical_address|linebreaks|default:"None" }}{% else %}Select a supplier{% endif %}</div>
                                 </div>
                                 <div>
-                                    <div class="flex items-center gap-2 label mb-1">
+                                    <div class="row gap-2 label mb-1">
                                         Shipping
                                         <button type="button" class="edit-address-btn text-slate-500 hover:text-indigo-600" data-field="shipping" title="Edit shipping address">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -362,7 +362,7 @@
                                     <div id="detail-addr-shipping" class="leading-tight">{% if has_selected_supplier %}{{ detail_payload.shipping_address|linebreaks|default:"None" }}{% else %}Select a supplier{% endif %}</div>
                                 </div>
                                 <div>
-                                    <div class="flex items-center gap-2 label mb-1">
+                                    <div class="row gap-2 label mb-1">
                                         Billing
                                         <button type="button" class="edit-address-btn text-slate-500 hover:text-indigo-600" data-field="billing" title="Edit billing address">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -374,7 +374,7 @@
                         </div>
 
                     <div class="supplier-card">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="row-between mb-2">
                             <div class="label">Contacts</div>
                             <button type="button" id="add-contact-btn" class="text-indigo-600 text-sm font-semibold hover:underline">Add contact</button>
                         </div>
@@ -383,7 +383,7 @@
                                 {% for contact in detail_contacts %}
                                     <div class="border border-slate-200 rounded-md px-3 py-2 bg-slate-50 contact-row h-full flex flex-col justify-between" data-contact-id="{{ contact.id|default:'' }}">
                                         <div>
-                                            <div class="font-semibold text-slate-900 flex items-center gap-2">
+                                            <div class="font-semibold text-slate-900 row gap-2">
                                                 {{ contact.name }}
                                                 {% if contact.title %}<span class="text-xs text-slate-500">({{ contact.title }})</span>{% endif %}
                                             </div>
@@ -398,7 +398,7 @@
                                                 {% endif %}
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-2 justify-end mt-2">
+                                        <div class="row gap-2 justify-end mt-2">
                                             <button type="button" class="edit-contact-btn text-slate-500 hover:text-indigo-600" title="Edit contact" data-contact-id="{{ contact.id|default:'' }}" data-contact-name="{{ contact.name|default:'' }}" data-contact-email="{{ contact.email|default:'' }}" data-contact-phone="{{ contact.phone|default:'' }}" data-contact-title="{{ contact.title|default:'' }}">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                             </button>
@@ -457,21 +457,21 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-3 gap-4 text-sm pt-2 border-t border-slate-200">
-                            <div class="flex items-center gap-2">
+                            <div class="row gap-2">
                                 <button type="button" class="toggle-btn {% if detail_payload.probation %}active{% endif %}" data-flag="probation">Probation</button>
                                 <div class="flag-meta">
                                     <div>On: <span id="detail-prob-on">{{ detail_payload.probation_on|default:"" }}</span></div>
                                     <div>By: <span id="detail-prob-by">{{ detail_payload.probation_by|default:"" }}</span></div>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="row gap-2">
                                 <button type="button" class="toggle-btn {% if detail_payload.conditional %}active{% endif %}" data-flag="conditional">Conditional</button>
                                 <div class="flag-meta">
                                     <div>On: <span id="detail-cond-on">{{ detail_payload.conditional_on|default:"" }}</span></div>
                                     <div>By: <span id="detail-cond-by">{{ detail_payload.conditional_by|default:"" }}</span></div>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="row gap-2">
                                 <button type="button" class="toggle-btn {% if detail_payload.archived %}active{% endif %}" data-flag="archived">Archived</button>
                                 <div class="flag-meta">
                                     <div>On: <span id="detail-arch-on">{{ detail_payload.archived_on|default:"" }}</span></div>
@@ -482,7 +482,7 @@
                     </div>
 
                         <div class="supplier-card">
-                            <div class="flex items-center justify-between mb-1">
+                            <div class="row-between mb-1">
                                 <div class="label">Files URL</div>
                                 <button type="button" id="edit-files-btn" class="text-indigo-600 text-sm font-semibold hover:underline">Edit</button>
                             </div>
@@ -496,7 +496,7 @@
                             </div>
                         </div>
                         <div class="supplier-card">
-                            <div class="flex items-center justify-between mb-1">
+                            <div class="row-between mb-1">
                                 <div class="label">Notes</div>
                                 <button type="button" id="edit-notes-btn" class="text-indigo-600 text-sm font-semibold hover:underline">Edit</button>
                             </div>
@@ -558,7 +558,7 @@
             <div class="tab-panel" data-panel="qms">
                 <div class="space-y-3">
                     <div class="supplier-card space-y-3">
-                        <div class="flex items-center justify-between">
+                        <div class="row-between">
                             <div class="label">Certifications</div>
                             <button type="button" id="open-cert-modal" class="text-indigo-600 text-sm font-semibold hover:underline"
                                 onclick="const m=document.getElementById('cert-modal'); if(m){m.classList.remove('hidden'); m.classList.add('flex');}">
@@ -568,7 +568,7 @@
                         <div id="detail-certs" class="space-y-2 text-sm">
                             {% if detail_certifications %}
                                 {% for cert in detail_certifications %}
-                                <div class="flex items-center justify-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-cert-id="{{ cert.id|default:'' }}">
+                                <div class="row-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-cert-id="{{ cert.id|default:'' }}">
                                     <div>
                                         <div class="font-semibold text-slate-900">{{ cert.type }}</div>
                                         <div class="text-xs text-slate-600">
@@ -590,7 +590,7 @@
                     </div>
 
                     <div class="supplier-card space-y-3">
-                        <div class="flex items-center justify-between">
+                        <div class="row-between">
                             <div class="label">Classifications</div>
                             <button type="button" id="open-class-modal" class="text-indigo-600 text-sm font-semibold hover:underline"
                                 onclick="const m=document.getElementById('class-modal'); if(m){m.classList.remove('hidden'); m.classList.add('flex');}">
@@ -600,7 +600,7 @@
                         <div id="detail-classifications" class="space-y-2 text-sm">
                             {% if detail_classifications %}
                                 {% for c in detail_classifications %}
-                                <div class="flex items-center justify-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-class-id="{{ c.id|default:'' }}">
+                                <div class="row-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-class-id="{{ c.id|default:'' }}">
                                     <div>
                                         <div class="font-semibold text-slate-900">{{ c.type }}</div>
                                         <div class="text-xs text-slate-600">
@@ -658,7 +658,7 @@
 
 <!-- Quick edit modal for name, CAGE, and DODAAC -->
 <div id="name-edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-md">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Edit Supplier</h3>
@@ -698,7 +698,7 @@
 
 <!-- Address modal -->
 <div id="address-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-2xl">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Edit Address</h3>
@@ -754,7 +754,7 @@
 
 <!-- Contact modal -->
 <div id="contact-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-lg">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Add / Edit Contact</h3>
@@ -799,7 +799,7 @@
 
 <!-- Certification modal -->
 <div id="cert-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-lg">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Add Certification</h3>
@@ -857,7 +857,7 @@
 
 <!-- Classification modal -->
 <div id="class-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-lg">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Add Classification</h3>
@@ -905,7 +905,7 @@
 </div>
 <!-- Notes modal -->
 <div id="notes-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-2xl">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Edit Notes</h3>
@@ -933,7 +933,7 @@
 
 <!-- Files modal -->
 <div id="files-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6">
+    <div class="card card-padded shadow-2xl w-full max-w-2xl">
         <div class="flex items-start justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Edit Files URL</h3>
@@ -1073,11 +1073,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const a = document.createElement('a');
             a.href = "#";
             a.dataset.id = item.id;
-            a.className = 'supplier-card flex items-center justify-between hover:border-indigo-200';
+            a.className = 'supplier-card row-between hover:border-indigo-200';
             a.innerHTML = `
                 <div>
                     <div class="text-sm font-semibold text-slate-900">${item.name}</div>
-                    <div class="text-xs text-slate-500 flex items-center gap-2">
+                    <div class="text-xs text-slate-500 row gap-2">
                         ${item.cage_code ? `<span class="font-mono">CAGE: ${item.cage_code}</span>` : ''}
                     </div>
                 </div>
@@ -1376,7 +1376,7 @@ document.addEventListener('DOMContentLoaded', function() {
         list.innerHTML = contacts.map(ct => `
             <div class="border border-slate-200 rounded-md px-3 py-2 bg-slate-50 contact-row h-full flex flex-col justify-between" data-contact-id="${ct.id || ''}">
                 <div>
-                    <div class="font-semibold text-slate-900 flex items-center gap-2">
+                    <div class="font-semibold text-slate-900 row gap-2">
                         ${ct.name || ''}
                         ${ct.title ? `<span class="text-xs text-slate-500">(${ct.title})</span>` : ''}
                     </div>
@@ -1387,7 +1387,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${ct.phone ? `<a href="tel:${ct.phone}" class="text-indigo-600 hover:underline">${ct.phone}</a>` : ''}
                     </div>
                 </div>
-                <div class="flex items-center gap-2 justify-end mt-2">
+                <div class="row gap-2 justify-end mt-2">
                     <button type="button" class="edit-contact-btn text-slate-500 hover:text-indigo-600" title="Edit contact" data-contact-id="${ct.id || ''}" data-contact-name="${ct.name || ''}" data-contact-email="${ct.email || ''}" data-contact-phone="${ct.phone || ''}" data-contact-title="${ct.title || ''}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                     </button>
@@ -1448,7 +1448,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         wrap.innerHTML = certs.map(cert => `
-            <div class="flex items-center justify-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-cert-id="${cert.id || ''}">
+            <div class="row-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-cert-id="${cert.id || ''}">
                 <div>
                     <div class="font-semibold text-slate-900">${cert.type || ''}</div>
                     <div class="text-xs text-slate-600">
@@ -1499,7 +1499,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         wrap.innerHTML = classes.map(c => `
-            <div class="flex items-center justify-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-class-id="${c.id || ''}">
+            <div class="row-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50" data-class-id="${c.id || ''}">
                 <div>
                     <div class="font-semibold text-slate-900">${c.type || ''}</div>
                     <div class="text-xs text-slate-600">

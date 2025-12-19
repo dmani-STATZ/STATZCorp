@@ -108,7 +108,7 @@
                 </div>
                 <div class="w-full md:w-auto self-end">
                     <button type="submit" class="w-full md:w-auto px-6 py-3 bg-white text-indigo-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 shadow-sm transition-colors duration-200">
-                        <span class="flex items-center justify-center">
+                        <span class="row justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
@@ -119,22 +119,22 @@
             </div>
             
             <div class="flex flex-wrap gap-3 pt-2">
-                <div class="flex items-center">
+                <div class="row">
                     <input type="checkbox" name="probation" id="probation" value="true" {% if request.GET.probation == 'true' %}checked{% endif %}
                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                     <label for="probation" class="ml-2 text-sm text-white">On Probation</label>
                 </div>
-                <div class="flex items-center">
+                <div class="row">
                     <input type="checkbox" name="conditional" id="conditional" value="true" {% if request.GET.conditional == 'true' %}checked{% endif %}
                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                     <label for="conditional" class="ml-2 text-sm text-white">Conditional</label>
                 </div>
-                <div class="flex items-center">
+                <div class="row">
                     <input type="checkbox" name="iso" id="iso" value="true" {% if request.GET.iso == 'true' %}checked{% endif %}
                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                     <label for="iso" class="ml-2 text-sm text-white">ISO Certified</label>
                 </div>
-                <div class="flex items-center">
+                <div class="row">
                     <input type="checkbox" name="ppi" id="ppi" value="true" {% if request.GET.ppi == 'true' %}checked{% endif %}
                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                     <label for="ppi" class="ml-2 text-sm text-white">PPI</label>
@@ -144,7 +144,7 @@
     </div>
     
     <!-- Results Section -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="card shadow overflow-hidden">
         <div class="border-b border-gray-200 px-6 py-4 bg-gray-50">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-medium text-gray-900">Search Results</h3>
@@ -160,7 +160,7 @@
             <div class="supplier-card p-6">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
                     <div class="flex-1">
-                        <div class="flex items-center">
+                        <div class="row">
                             <h4 class="text-lg font-semibold text-gray-900">{{ supplier.name }}</h4>
                             {% if supplier.cage_code %}
                             <span class="ml-2 px-2 py-1 bg-gray-100 text-gray-800 text-xs font-mono rounded">{{ supplier.cage_code }}</span>

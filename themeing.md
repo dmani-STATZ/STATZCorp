@@ -125,92 +125,14 @@ with semantic classes such as card, label, row, btn, etc.
 
 
 ---
+Prompt 1 Collect templates
 
-Step B — You use narrow Codex prompts
+Moving on to the next app. Delete everything in the /docs/template_tracking.md file and update it  with all the templates from the suppliers app.
 
-These go directly into Cursor.
-
-🔹 Prompt 1 — Card refactor
-Refactor this Django template.
-
-Replace Tailwind utility class combinations that represent
-card-like containers (bg-white, border, rounded-*, shadow, p-*)
-with the semantic classes `card` and `card-padded`.
-
-Do NOT modify:
-- sidebar
-- menu
-- settings
-- toast
-- header
-- any JavaScript hooks
-
-Preserve all Django template logic.
-If unsure, leave the code unchanged.
-
-🔹 Prompt 2 — Label normalization
-
-Follow the project Codex House Rules in /docs/codex-house-rules.md.
-Go down the list of files, checking them off as you go, in the /docs/template_tracking.md file and do the following,
-
-Replace repeated label-style Tailwind utility classes
-(text-xs, uppercase, text-gray-500 or text-gray-600, font-medium or font-semibold)
-with the semantic class label.
-
-Preserve all other classes (e.g. truncate, spacing, layout).
-Do not modify menus, sidebar, header, settings, or toast UI.
-Do not change HTML structure or Django template logic.
+Use the same check boxes.
 
 
------
-🔹 Prompt 2 — Normalize row-between:
 
-Follow the project Codex House Rules in /docs/codex-house-rules.md.
-Go down the list of files, checking them off as you go, in the /docs/template_tracking.md file and do the following,
-
-Normalize horizontal row layouts with spaced content.
-
-Replace repeated Tailwind utility combinations equivalent to:
-flex + items-center + justify-between
-(with or without gap utilities)
-with the semantic class `row-between`.
-
-Preserve any additional utilities such as text size,
-responsive prefixes, or spacing.
-
-Do NOT modify:
-- responsive behavior
-- menus, sidebar, header, settings, or toast UI
-- Django template logic
-
-If justify-between is not present, do nothing.
-Output only the modified file.
-
-
-----
-🔹 Prompt 2 — Normalize row:
-
-Follow the project Codex House Rules in /docs/codex-house-rules.md.
-Go down the list of files, checking them off as you go, in the /docs/template_tracking.md file and do the following,
-
-Normalize simple horizontal alignment rows.
-
-Replace repeated Tailwind utility combinations equivalent to:
-flex + items-center
-with the semantic class `row`.
-
-Preserve spacing utilities (gap-*, space-x-*)
-and any non-structural classes.
-
-Do NOT modify:
-- responsive behavior
-- menus, sidebar, header, settings, or toast UI
-- Django template logic
-
-If additional layout logic is present, leave unchanged.
-Output only the modified file.
-
-----
 🔹 Prompt 2 — Normalize card:
 
 Follow the project Codex House Rules in /docs/codex-house-rules.md.
@@ -235,15 +157,91 @@ Output only the modified file.
 
 
 
-🔹 Prompt 3 — Audit only (no changes)
-Scan these templates and list elements that could be replaced
-with semantic classes (card, label, row, row-between).
+🔹 Prompt 3 — Label normalization
+
+Follow the project Codex House Rules in /docs/codex-house-rules.md.
+Go down the list of files, checking them off as you go, in the /docs/template_tracking.md file and do the following,
+
+Normalize label-style text.
+
+Replace repeated Tailwind utility combinations that indicate
+label or kicker text (e.g. text-xs or text-sm, uppercase,
+text-gray-500/text-slate-500, font-medium)
+with the semantic class `label`.
+
+Preserve non-semantic utilities such as truncate, whitespace,
+or spacing classes.
+
+Do NOT modify:
+- layout structure
+- menus, sidebar, header, settings, or toast UI
+- Django template logic
+
+If unsure, leave the code unchanged.
+Output only the modified file.
+
+
+-----
+🔹 Prompt 4 — Normalize row-between:
+
+Follow the project Codex House Rules in /docs/codex-house-rules.md.
+Go down the list of files, checking them off as you go, in the /docs/template_tracking.md file and do the following,
+
+Normalize horizontal row layouts with spaced content.
+
+Replace repeated Tailwind utility combinations equivalent to:
+flex + items-center + justify-between
+(with or without gap utilities)
+with the semantic class `row-between`.
+
+Preserve any additional utilities such as text size,
+responsive prefixes, or spacing.
+
+Do NOT modify:
+- responsive behavior
+- menus, sidebar, header, settings, or toast UI
+- Django template logic
+
+If justify-between is not present, do nothing.
+Output only the modified file.
+
+
+----
+🔹 Prompt 5 — Normalize row:
+
+Follow the project Codex House Rules in /docs/codex-house-rules.md.
+Go down the list of files, checking them off as you go, in the /docs/template_tracking.md file and do the following,
+
+Normalize simple horizontal alignment rows.
+
+Replace repeated Tailwind utility combinations equivalent to:
+flex + items-center
+with the semantic class `row`.
+
+Preserve spacing utilities (gap-*, space-x-*)
+and any non-structural classes.
+
+Do NOT modify:
+- responsive behavior
+- menus, sidebar, header, settings, or toast UI
+- Django template logic
+
+If additional layout logic is present, leave unchanged.
+Output only the modified file.
+
+----
+
+
+
+
+🔹 Prompt 6 — Audit only (no changes)
+Scan the in the /docs/template_tracking.md templates and list elements that could be replaced with semantic classes (card, label, row, row-between).
 
 Do not make any changes.
 Return a short list with line numbers.
 
 
-This prompt is extremely safe and very useful.
+
 
 ---
 
