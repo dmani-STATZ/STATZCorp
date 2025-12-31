@@ -47,9 +47,11 @@ from .views import (
     delete_supplier_contact,
     addresses_lookup,
     add_supplier_certification,
+    update_supplier_certification,
     delete_supplier_certification,
     get_supplier_certification,
     add_supplier_classification,
+    update_supplier_classification,
     delete_supplier_classification,
     get_supplier_classification,
     supplier_autocomplete,
@@ -290,6 +292,11 @@ urlpatterns = [
         name="supplier_add_certification",
     ),
     path(
+        "supplier/<int:supplier_id>/certification/<int:pk>/update/",
+        update_supplier_certification,
+        name="supplier_update_certification",
+    ),
+    path(
         "supplier/<int:supplier_id>/certification/<int:pk>/delete/",
         delete_supplier_certification,
         name="supplier_delete_certification",
@@ -303,6 +310,11 @@ urlpatterns = [
         "supplier/<int:supplier_id>/classification/add/",
         add_supplier_classification,
         name="supplier_add_classification",
+    ),
+    path(
+        "supplier/<int:supplier_id>/classification/<int:pk>/update/",
+        update_supplier_classification,
+        name="supplier_update_classification",
     ),
     path(
         "supplier/<int:supplier_id>/classification/<int:pk>/delete/",

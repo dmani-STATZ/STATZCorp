@@ -8,7 +8,7 @@
         {% csrf_token %}
         <div class="mb-6 flex items-center gap-4">
             <label for="visitor_history" class="text-gray-700 w-1/4 text-right">Previous Visitors</label>
-            <select id="visitor_history" name="visitor_history" 
+            <select id="visitor_history" name="visitor_history"
                     class="w-3/4 p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200"
                     onchange="fillVisitorInfo(this)">
                 {% for value, label in form.visitor_history.field.choices %}
@@ -24,15 +24,15 @@
                     {{ field.label }}
                 </label>
                 {% if field.name == 'is_us_citizen' %}
-                <input type="checkbox" 
-                       name="{{ field.name }}" 
+                <input type="checkbox"
+                       name="{{ field.name }}"
                        id="{{ field.id_for_label }}"
                        class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                        {% if field.value %}checked{% endif %}
                 >
                 {% else %}
-                <input type="{{ field.field.widget.input_type }}" 
-                       name="{{ field.name }}" 
+                <input type="{{ field.field.widget.input_type }}"
+                       name="{{ field.name }}"
                        id="{{ field.id_for_label }}"
                        {% if field.field.required %}required{% endif %}
                        class="w-3/4 p-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200"
@@ -54,7 +54,7 @@
             <button type="button" onclick="stageVisitor()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded">
                 Stage Visitor
             </button>
-            <a href="{% url 'accesslog:visitor_log' %}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+            <a href="{% url 'accesslog:visitor_log' %}" class="btn btn-caution px-4 py-2 rounded">
                 Cancel
             </a>
         </div>
@@ -66,16 +66,16 @@
 <script>
 function fillVisitorInfo(select) {
     console.log('Selected value:', select.value); // Debug line
-    
+
     if (select.value && select.value !== '') {
         // Reset staged_id
         document.getElementById('staged_id').value = '0';
-        
+
         if (!isNaN(select.value) && parseInt(select.value) > 0) {
             // This is a staged visitor
             const stagedId = select.value;
             document.getElementById('staged_id').value = stagedId;  // Set the staged_id
-            
+
             fetch(`/accesslog/staged-info/${stagedId}/`)
                 .then(response => response.json())
                 .then(data => {
@@ -88,7 +88,7 @@ function fillVisitorInfo(select) {
             // This is a previous visitor
             const [visitorName] = select.value.split(' - '); // Split on hyphen and take first part
             console.log('Fetching info for:', visitorName); // Debug line
-            
+
             fetch(`/accesslog/visitor-info/?name=${encodeURIComponent(visitorName)}`)
                 .then(response => response.json())
                 .then(data => {
@@ -119,4 +119,4 @@ function stageVisitor() {
     document.getElementById('visitorForm').submit();
 }
 </script>
-{% endblock extra_scripts %} 
+{% endblock extra_scripts %}

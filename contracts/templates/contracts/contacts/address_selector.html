@@ -27,21 +27,21 @@
     <div class="card card-padded max-w-4xl mx-auto">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-xl font-bold text-gray-800">Select Address</h1>
-            
+
             <div class="flex space-x-2">
-                <button id="close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                <button id="close-btn" class="px-4 py-2 btn btn-caution rounded focus:outline-none focus:ring-2 focus:ring-gray-300">
                     Cancel
                 </button>
             </div>
         </div>
-        
+
         <!-- Filter Section -->
         <div class="card card-padded mb-6 border border-gray-200">
             <form id="filter-form" class="space-y-4">
                 <input type="hidden" name="target_field" value="{{ target_field }}">
                 <input type="hidden" name="target_form" value="{{ target_form }}">
                 <input type="hidden" name="current_id" value="{{ current_id }}">
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- State/Province Filter -->
                     <div>
@@ -55,7 +55,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <!-- City Filter -->
                     <div>
                         <label for="city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
@@ -68,7 +68,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <!-- Search Filter -->
                     <div>
                         <label for="q" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
@@ -86,7 +86,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="flex justify-between">
                     <button type="button" onclick="resetFilters()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,7 +103,7 @@
                 </div>
             </form>
         </div>
-        
+
         <!-- Address List -->
         <div class="mb-6">
             <div class="flex justify-between items-center mb-2">
@@ -112,7 +112,7 @@
                     Showing {{ addresses|length }} of {{ total_count }} addresses
                 </p>
             </div>
-            
+
             {% if addresses %}
                 <div class="space-y-3 mb-4">
                     {% for address in addresses %}
@@ -125,7 +125,7 @@
                                         {{ address.city }}, {{ address.state }} {{ address.zip }}
                                     </p>
                                 </div>
-                                
+
                                 {% if current_id == address.id %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -138,7 +138,7 @@
                         </div>
                     {% endfor %}
                 </div>
-                
+
                 <!-- Pagination -->
                 {% if total_pages > 1 %}
                 <div class="row-between border-t border-gray-200 px-4 py-3 sm:px-6">
@@ -170,7 +170,7 @@
                                     </svg>
                                 </a>
                                 {% endif %}
-                                
+
                                 {% for i in total_pages|add:"1"|stringformat:"s"|slice:"1:" %}
                                     {% if forloop.counter == current_page %}
                                     <span class="relative z-10 inline-flex items-center bg-blue-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
@@ -182,7 +182,7 @@
                                     </a>
                                     {% endif %}
                                 {% endfor %}
-                                
+
                                 {% if has_next %}
                                 <a href="javascript:goToPage({{ next_page }})" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
                                     <span class="sr-only">Next</span>
@@ -208,7 +208,7 @@
                 </div>
             {% endif %}
         </div>
-        
+
         <!-- Action Buttons -->
         <div class="flex justify-between border-t border-gray-200 pt-4">
             <div>
@@ -219,9 +219,9 @@
                     Create New Address
                 </a>
             </div>
-            
+
             <div class="flex space-x-3">
-                <button id="cancel-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <button id="cancel-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium btn btn-caution focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     Cancel
                 </button>
                 <button id="select-btn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled>
@@ -230,30 +230,30 @@
             </div>
         </div>
     </div>
-    
+
     <script>
         let selectedAddressId = null;
         const targetField = "{{ target_field }}";
         const targetForm = "{{ target_form }}";
-        
+
         // Handle address selection
         function selectAddress(element) {
             // Remove selected class from all cards
             document.querySelectorAll('.address-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            
+
             // Add selected class to clicked card
             element.classList.add('selected');
-            
+
             // Store selected address ID
             selectedAddressId = element.dataset.addressId;
             console.log("Selected address ID:", selectedAddressId);
-            
+
             // Enable select button
             document.getElementById('select-btn').disabled = false;
         }
-        
+
         // Handle form submission
         document.getElementById('select-btn').addEventListener('click', function() {
             // Check if we have a selected address
@@ -261,10 +261,10 @@
                 alert("Please select an address first.");
                 return;
             }
-            
+
             console.log("Selecting address ID:", selectedAddressId);
             console.log("Target field:", targetField);
-            
+
             // Make sure the parent window exists and is accessible
             if (window.opener && !window.opener.closed) {
                 try {
@@ -273,11 +273,11 @@
                     if (!targetElement) {
                         throw new Error(`Target field '${targetField}' not found in parent window`);
                     }
-                    
+
                     // Set the value of the target field
                     targetElement.value = selectedAddressId;
                     console.log(`Set ${targetField} to ${selectedAddressId} in parent window`);
-                    
+
                     // After setting the value, either call the parent window's refresh function
                     // or simply reload the parent window
                     if (typeof window.opener.refreshAfterAddressSelection === 'function') {
@@ -293,7 +293,7 @@
                         console.log("No refresh function found, reloading parent window");
                         window.opener.location.reload();
                     }
-                    
+
                     // Close this window
                     window.close();
                 } catch (error) {
@@ -305,43 +305,43 @@
                 alert("Cannot access the parent window. It might be closed or not accessible.");
             }
         });
-        
+
         // Handle cancel button
         document.getElementById('cancel-btn').addEventListener('click', function() {
             window.close();
         });
-        
+
         document.getElementById('close-btn').addEventListener('click', function() {
             window.close();
         });
-        
+
         // Update city options based on selected state
         function updateCityOptions() {
             const stateSelect = document.getElementById('state');
             const selectedState = stateSelect.value;
-            
+
             // If a form submission is intended, just return
             if (event && event.type === 'submit') return;
-            
+
             // Update form and submit
             document.getElementById('filter-form').submit();
         }
-        
+
         // Auto-submit when city filter changes
         function updateCityFilter() {
             // If a form submission is intended, just return
             if (event && event.type === 'submit') return;
-            
+
             // Submit the form to apply the city filter
             document.getElementById('filter-form').submit();
         }
-        
+
         // Clear search field
         function clearSearch() {
             document.getElementById('q').value = '';
             document.getElementById('filter-form').submit();
         }
-        
+
         // Reset all filters
         function resetFilters() {
             document.getElementById('state').value = '';
@@ -349,7 +349,7 @@
             document.getElementById('q').value = '';
             document.getElementById('filter-form').submit();
         }
-        
+
         // Pagination
         function goToPage(page) {
             const url = new URL(window.location.href);
@@ -357,26 +357,26 @@
             window.location.href = url.toString();
             return false;
         }
-        
+
         // Open create address window
         function openCreateAddressWindow(event) {
             event.preventDefault();
             const url = "{% url 'contracts:address_create' %}?popup=true";
-            
+
             // Define popup dimensions
             const popupWidth = 600;
             const popupHeight = 800;
-            
+
             // Calculate position to center the popup on the current window
             const left = window.screenX + (window.outerWidth - popupWidth) / 2;
             const top = window.screenY + (window.outerHeight - popupHeight) / 2;
-            
+
             const newWindow = window.open(
-                url, 
-                "CreateAddress", 
+                url,
+                "CreateAddress",
                 `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
             );
-            
+
             // Check periodically if the window was closed
             const checkClosed = setInterval(function() {
                 if (newWindow.closed) {
@@ -386,7 +386,7 @@
                 }
             }, 500);
         }
-        
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             // Set the initially selected address
@@ -399,7 +399,7 @@
                     document.getElementById('select-btn').disabled = false;
                 }
             }
-            
+
             // Add click listeners to all address cards
             document.querySelectorAll('.address-card').forEach(card => {
                 card.addEventListener('click', function() {
@@ -409,4 +409,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

@@ -37,7 +37,7 @@
             <div class="font-bold mb-2">Please correct the following errors:</div>
             <ul id="error-list" class="list-disc list-inside"></ul>
         </div>
-        
+
         <!-- Django form errors -->
         {% if form.errors %}
         <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -51,16 +51,16 @@
             </ul>
         </div>
         {% endif %}
-        
+
         <form method="post" class="space-y-6" id="clin-form">
             {% csrf_token %}
-            
+
             <!-- CLIN Identification -->
             <div>
                 <h2 class="section-header">
                     CLIN Identification
                 </h2>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <!-- Row 1 -->
                     <div class="md:col-span-4">
@@ -77,7 +77,7 @@
                                     {% endif %}
                                 </div>
                                 <!-- Hidden input to preserve the contract value -->
-                                <input type="hidden" name="contract" id="id_contract" 
+                                <input type="hidden" name="contract" id="id_contract"
                                     value="{% if form.instance.contract %}{{ form.instance.contract.id }}{% elif form.initial.contract %}{{ form.initial.contract }}{% endif %}">
                             </div>
                             {% else %}
@@ -93,7 +93,7 @@
                     <div class="md:col-span-4">
                         <!-- Empty cell for alignment -->
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="item_number-field-container">
                             <label for="{{ form.item_number.id_for_label }}" class="form-label">
@@ -157,8 +157,8 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Row 3 -->                   
+
+                    <!-- Row 3 -->
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.ia.id_for_label }}" class="form-label">
@@ -173,7 +173,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.fob.id_for_label }}" class="form-label">
@@ -188,23 +188,23 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <!-- Empty cell for alignment -->
                     </div>
-            
+
                     <div class="md:col-span-3">
                         <!-- Empty cell for alignment -->
                     </div>
                 </div>
             </div>
-            
+
             <!-- Item Details -->
             <div>
                 <h2 class="section-header">
                     Item Details  (CLIN)
                 </h2>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <!-- Row 1 -->
                     <div class="md:col-span-6">
@@ -214,8 +214,8 @@
                                 <span class="text-uppercase">NSN</span><span class="asteriskField">*</span>
                             </label>
                             <div class="flex">
-                                <input type="text" id="nsn_display" class="form-control flex-grow" 
-                                       value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% elif form.nsn_value %}{{ form.nsn_value.nsn_code }} - {{ form.nsn_value.description }}{% endif %}" 
+                                <input type="text" id="nsn_display" class="form-control flex-grow"
+                                       value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% elif form.nsn_value %}{{ form.nsn_value.nsn_code }} - {{ form.nsn_value.description }}{% endif %}"
                                        readonly placeholder="Click to select NSN">
                                 <button type="button" id="select_nsn_btn" class="ml-2 bg-blue-500 text-white hover:bg-blue-600 px-3 py-2 rounded">
                                     Select
@@ -228,7 +228,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.due_date.id_for_label }}" class="form-label">
@@ -253,9 +253,9 @@
                             <label for="{{ form.order_qty.id_for_label }}" class="form-label{% if form.order_qty.field.required %} requiredField{% endif %}">
                                 Order Qty{% if form.order_qty.field.required %}<span class="asteriskField">*</span>{% endif %}
                             </label>
-                            <input type="number" name="{{ form.order_qty.html_name }}" id="{{ form.order_qty.id_for_label }}" 
+                            <input type="number" name="{{ form.order_qty.html_name }}" id="{{ form.order_qty.id_for_label }}"
                                    class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                   placeholder="Enter Order Quantity" 
+                                   placeholder="Enter Order Quantity"
                                    value="{% if form.order_qty.value %}{{ form.order_qty.value|floatformat:'0' }}{% endif %}"
                                    step="any">
                             {% if form.order_qty.errors %}
@@ -266,15 +266,15 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-1">
                         <div class="form-group">
                             <label for="{{ form.uom.id_for_label }}" class="form-label{% if form.uom.field.required %} requiredField{% endif %}">
                                 <span class="text-uppercase">UOM</span>{% if form.uom.field.required %}<span class="asteriskField">*</span>{% endif %}
                             </label>
-                            <input type="text" name="{{ form.uom.html_name }}" id="{{ form.uom.id_for_label }}" 
+                            <input type="text" name="{{ form.uom.html_name }}" id="{{ form.uom.id_for_label }}"
                                    class="form-control w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                   placeholder="EA" 
+                                   placeholder="EA"
                                    value="{{ form.uom.value|default:'EA' }}"
                                    onchange="document.getElementById('shipping_uom_display').value = this.value;">
                             {% if form.uom.errors %}
@@ -312,16 +312,16 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                 </div>
             </div>
-            
+
             <!-- Order Information -->
             <div>
                 <h2 class="section-header">
                     Order Information (Supplier)
                 </h2>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <!-- Row 1 -->
                     <div class="md:col-span-6">
@@ -331,8 +331,8 @@
                                 Supplier<span class="asteriskField">*</span>
                             </label>
                             <div class="flex">
-                                <input type="text" id="supplier_display" class="form-control flex-grow" 
-                                       value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% elif form.supplier_value %}{{ form.supplier_value.name }} ({{ form.supplier_value.cage_code }}){% endif %}" 
+                                <input type="text" id="supplier_display" class="form-control flex-grow"
+                                       value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% elif form.supplier_value %}{{ form.supplier_value.name }} ({{ form.supplier_value.cage_code }}){% endif %}"
                                        readonly placeholder="Click to select Supplier">
                                 <button type="button" id="select_supplier_btn" class="ml-2 bg-blue-500 text-white hover:bg-blue-600 px-3 py-2 rounded">
                                     Select
@@ -371,18 +371,19 @@
                                 Order Qty
                             </label>
                             <input type="number"
+                                   id="order_qty_display"
                                    class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50"
                                    value="{{ form.order_qty.value|floatformat:'0' }}"
                                    step="any" readonly disabled>
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-1">
                         <div class="form-group">
                             <label class="form-label">
                                 <span class="text-uppercase">UOM</span>
                             </label>
-                            <input type="text" id="shipping_uom_display" class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50" 
+                            <input type="text" id="shipping_uom_display" class="form-control w-full rounded-md border-gray-300 shadow-sm bg-gray-50"
                                    value="{{ form.uom.value|default:'EA' }}" readonly disabled>
                         </div>
                     </div>
@@ -418,7 +419,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Shipments Component -->
             <div class="mb-8">
                 {% include "contracts/partials/clin_shipments.html" with mode="form" %}
@@ -429,7 +430,7 @@
                 <h2 class="section-header cursor-pointer" id="financial-details-toggle">
                     Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
                 </h2>
-                
+
                 <div class="hidden" id="financial-details-section">
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <!-- Row 1 -->
@@ -458,20 +459,20 @@
                                 {% endif %}
                             </div>
                         </div>
-                                                
+
                         <div class="md:col-span-4">
                             <!-- Empty cell for alignment -->
                         </div>
-                        
+
                         <!-- Row 2 -->
                         <div class="md:col-span-4">
                             <div class="form-group">
                                 <label for="paid_amount_display" class="form-label">Paid Amount</label>
                                 <div class="relative">
                                     <input type="hidden" name="paid_amount" id="id_paid_amount" value="{{ form.paid_amount.value|default:'' }}">
-                                    <input type="text" 
-                                           id="paid_amount_display" 
-                                           class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                                    <input type="text"
+                                           id="paid_amount_display"
+                                           class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                            readonly
                                            onclick="openPaymentHistoryPopup('clin', `{{ form.instance.id|default:'' }}`, 'paid_amount', 'clin_form', document.getElementById('id_paid_amount').value);"
                                            value="{% if form.paid_amount.value %}${{ form.paid_amount.value|floatformat:2 }}{% endif %}"
@@ -484,7 +485,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        
+
                         <div class="md:col-span-4">
                             <div class="form-group">
                                 <label for="paid_date" class="form-label">Paid Date</label>
@@ -496,7 +497,7 @@
                         </div>
                         <div class="md:col-span-4">
                         </div>
-                        
+
                         <!-- Row 3 -->
                         <div class="md:col-span-4">
                             <div class="form-group">
@@ -505,9 +506,9 @@
                                 </label>
                                 <div class="relative">
                                     <input type="hidden" name="wawf_payment" id="id_wawf_payment" value="{{ form.wawf_payment.value|default:'' }}">
-                                    <input type="text" 
-                                           id="wawf_payment_display" 
-                                           class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                                    <input type="text"
+                                           id="wawf_payment_display"
+                                           class="form-control cursor-pointer w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                            readonly
                                            onclick="openPaymentHistoryPopup('clin', `{{ form.instance.id|default:'' }}`, 'wawf_payment', 'clin_form', document.getElementById('id_wawf_payment').value);"
                                            value="{% if form.wawf_payment.value %}${{ form.wawf_payment.value|floatformat:2 }}{% endif %}"
@@ -523,27 +524,27 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 {% if form.instance.pk %} <!-- Edit CLIN -->
-                    <a href="{% url 'contracts:clin_detail' form.instance.id %}" style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
+                    <a href="{% url 'contracts:clin_detail' form.instance.id %}" style="btn btn-caution padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
                         Cancel
                     </a>
-                    <button type="button" id="delete-clin-btn" class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded" data-clin-id="{{ form.instance.pk }}">
+                    <button type="button" id="delete-clin-btn" class="btn btn-delete px-4 py-2 rounded" data-clin-id="{{ form.instance.pk }}">
                         Delete CLIN
                     </button>
-                    <button type="submit" class="bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded">
+                    <button type="submit" class="btn btn-save px-4 py-2 rounded">
                         Update CLIN
                     </button>
                 {% elif form.initial.contract %} <!-- New CLIN with pre-selected contract -->
-                    <a href="{% url 'contracts:contract_management' form.initial.contract %}" style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
+                    <a href="{% url 'contracts:contract_management' form.initial.contract %}" style="btn btn-caution; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
                         Cancel
                     </a>
                     <button type="submit" class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded">
                         Create <span class="text-uppercase">CLIN</span>
                     </button>
                 {% else %} <!-- New CLIN without pre-selected contract -->
-                    <a href="{% url 'contracts:contracts_dashboard' %}" style="background-color: #D1D5DB; color: #ff0000; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
+                    <a href="{% url 'contracts:contracts_dashboard' %}" style="btn btn-caution; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;">
                         Cancel
                     </a>
                     <button type="submit" class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded">
@@ -577,14 +578,14 @@
                 </div>
                 <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
             </div>
-            
+
             <div id="nsn_search_results" class="search-results">
                 <!-- Results will be populated here -->
                 <div class="text-center text-gray-500 py-4">
                     Search for NSN by code or description
                 </div>
             </div>
-            
+
             <div id="nsn_pagination" class="search-pagination hidden">
                 <button type="button" id="nsn_prev_page" class="bg-grey-300 text-gray-700 hover:bg-grey-400 px-3 py-1 rounded disabled:opacity-50" disabled>
                     Previous
@@ -596,7 +597,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" id="cancel_nsn_selection" class="bg-grey-300 text-red hover:bg-grey-400 px-4 py-2 rounded">
+            <button type="button" id="cancel_nsn_selection" class="btn btn-caution px-4 py-2 rounded">
                 Cancel
             </button>
         </div>
@@ -625,14 +626,14 @@
                 </div>
                 <p class="text-sm text-gray-500 mt-1">Enter at least 3 characters to search</p>
             </div>
-            
+
             <div id="supplier_search_results" class="search-results">
                 <!-- Results will be populated here -->
                 <div class="text-center text-gray-500 py-4">
                     Search for supplier by name or CAGE code
                 </div>
             </div>
-            
+
             <div id="supplier_pagination" class="search-pagination hidden">
                 <button type="button" id="supplier_prev_page" class="bg-grey-300 text-gray-700 hover:bg-grey-400 px-3 py-1 rounded disabled:opacity-50" disabled>
                     Previous
@@ -644,7 +645,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" id="cancel_supplier_selection" class="bg-grey-300 text-red hover:bg-grey-400 px-4 py-2 rounded">
+            <button type="button" id="cancel_supplier_selection" class="btn btn-caution px-4 py-2 rounded">
                 Cancel
             </button>
         </div>
@@ -691,27 +692,27 @@
                 window.notify(type, msg, duration);
             }
         };
-        
+
         // Add delete CLIN functionality
         const deleteBtn = document.getElementById('delete-clin-btn');
         const deleteModal = document.getElementById('delete_confirmation_modal');
         const cancelDelete = document.getElementById('cancel_delete');
         const confirmDelete = document.getElementById('confirm_delete');
-        
+
         if (deleteBtn) {
             deleteBtn.addEventListener('click', function() {
                 // Show the confirmation modal
                 deleteModal.style.display = 'flex';
             });
         }
-        
+
         if (cancelDelete) {
             cancelDelete.addEventListener('click', function() {
                 // Hide the confirmation modal
                 deleteModal.style.display = 'none';
             });
         }
-        
+
         if (confirmDelete) {
             confirmDelete.addEventListener('click', function() {
                 // Get the CLIN ID from the delete button
@@ -725,7 +726,7 @@
                 }
             });
         }
-        
+
         // Close modal when clicking outside
         if (deleteModal) {
             deleteModal.addEventListener('click', function(e) {
@@ -734,7 +735,7 @@
                 }
             });
         }
-        
+
         // Add form submission handler for debugging and validation
         const clinForm = document.getElementById('clin-form');
         if (clinForm) {
@@ -744,48 +745,49 @@
                 document.getElementById('error-list').innerHTML = '';
                 document.getElementById('nsn_display').classList.remove('border-red-500');
                 document.getElementById('supplier_display').classList.remove('border-red-500');
-                
+
                 // Validate required fields before submitting
                 const nsnId = document.getElementById('id_nsn').value;
                 const supplierId = document.getElementById('id_supplier').value;
-                const clinType = document.getElementById('id_clin_type').value;
+                const itemTypeField = document.getElementById('id_item_type');
+                const itemType = itemTypeField ? itemTypeField.value : '';
                 const contract = document.getElementById('id_contract').value;
                 const orderQty = document.getElementById('id_order_qty').value;
-                
+
                 let errors = [];
-                
+
                 if (!nsnId || nsnId === "") {
                     errors.push("Please select an NSN");
                     console.error("NSN is required");
                     // Highlight the NSN field
                     document.getElementById('nsn_display').classList.add('border-red-500');
                 }
-                
+
                 if (!supplierId || supplierId === "") {
                     errors.push("Please select a Supplier");
                     console.error("Supplier is required");
                     // Highlight the Supplier field
                     document.getElementById('supplier_display').classList.add('border-red-500');
                 }
-                
-                if (!clinType || clinType === "") {
-                    errors.push("Please select a CLIN Type");
-                    console.error("CLIN Type is required");
+
+                if (itemTypeField && itemTypeField.required && (!itemType || itemType === "")) {
+                    errors.push("Please select an Item Type");
+                    console.error("Item Type is required");
                 }
-                
+
                 if (!contract || contract === "") {
                     errors.push("Please select a Contract");
                     console.error("Contract is required");
                 }
-                
+
                 if (!orderQty || orderQty === "") {
                     errors.push("Please enter an Order Quantity");
                     console.error("Order Quantity is required");
                 }
-                
+
                 if (errors.length > 0) {
                     e.preventDefault();
-                    
+
                     // Display errors in the error section
                     const errorList = document.getElementById('error-list');
                     errors.forEach(error => {
@@ -793,34 +795,117 @@
                         li.textContent = error;
                         errorList.appendChild(li);
                     });
-                    
+
                     document.getElementById('form-errors').classList.remove('hidden');
                     document.getElementById('form-errors').scrollIntoView({ behavior: 'smooth' });
-                    
+
                     return false;
                 }
-                
+
                 // Final debug log of all form data before submission
                 console.log("Form submission data:");
                 const formData = new FormData(clinForm);
                 for (let [key, value] of formData.entries()) {
                     console.log(`${key}: ${value}`);
                 }
-                
+
                 // If we reach here, form submission should proceed normally
                 console.log("Form validation passed - submitting form");
                 return true;
             });
         }
 
+        const orderQtyInput = document.getElementById('id_order_qty');
+        const orderQtyDisplay = document.getElementById('order_qty_display');
+        const unitPriceInput = document.getElementById('id_unit_price');
+        const itemValueInput = document.getElementById('id_item_value');
+        const pricePerUnitInput = document.getElementById('id_price_per_unit');
+        const quoteValueInput = document.getElementById('id_quote_value');
+
+        const parseNumber = (value) => {
+            if (value === null || value === undefined) {
+                return null;
+            }
+            const trimmed = value.toString().trim();
+            if (!trimmed) {
+                return null;
+            }
+            const numberValue = Number(trimmed);
+            return Number.isFinite(numberValue) ? numberValue : null;
+        };
+
+        const syncOrderQtyDisplay = () => {
+            if (orderQtyDisplay && orderQtyInput) {
+                orderQtyDisplay.value = orderQtyInput.value;
+            }
+        };
+
+        const updateCalculatedValues = (force) => {
+            const qty = parseNumber(orderQtyInput ? orderQtyInput.value : null);
+            const unitPrice = parseNumber(unitPriceInput ? unitPriceInput.value : null);
+            const pricePerUnit = parseNumber(pricePerUnitInput ? pricePerUnitInput.value : null);
+
+            if (itemValueInput && unitPriceInput) {
+                if (qty !== null && unitPrice !== null) {
+                    if (force || !itemValueInput.value.trim()) {
+                        itemValueInput.value = (qty * unitPrice).toFixed(2);
+                    }
+                } else if (force) {
+                    itemValueInput.value = '';
+                }
+            }
+
+            if (quoteValueInput && pricePerUnitInput) {
+                if (qty !== null && pricePerUnit !== null) {
+                    if (force || !quoteValueInput.value.trim()) {
+                        quoteValueInput.value = (qty * pricePerUnit).toFixed(2);
+                    }
+                } else if (force) {
+                    quoteValueInput.value = '';
+                }
+            }
+        };
+
+        if (orderQtyInput) {
+            orderQtyInput.addEventListener('input', function() {
+                syncOrderQtyDisplay();
+                updateCalculatedValues(true);
+            });
+            orderQtyInput.addEventListener('change', function() {
+                syncOrderQtyDisplay();
+                updateCalculatedValues(true);
+            });
+        }
+
+        if (unitPriceInput) {
+            unitPriceInput.addEventListener('input', function() {
+                updateCalculatedValues(true);
+            });
+            unitPriceInput.addEventListener('change', function() {
+                updateCalculatedValues(true);
+            });
+        }
+
+        if (pricePerUnitInput) {
+            pricePerUnitInput.addEventListener('input', function() {
+                updateCalculatedValues(true);
+            });
+            pricePerUnitInput.addEventListener('change', function() {
+                updateCalculatedValues(true);
+            });
+        }
+
+        syncOrderQtyDisplay();
+        updateCalculatedValues(false);
+
         // Make updateCellValue function globally available for payment history popup
         window.updateCellValue = function(clinId, fieldType, newValue) {
             console.log('Updating cell value:', { clinId, fieldType, newValue });
-            
+
             // Get the display input field and hidden form field
             const displayField = document.getElementById(`${fieldType}_display`);
             const hiddenField = document.getElementById(`id_${fieldType}`);
-            
+
             if (displayField && hiddenField) {
                 // Format the value for display
                 const numericValue = parseFloat(newValue);
@@ -830,14 +915,14 @@
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 });
-                
+
                 // Update both the display and hidden fields
                 displayField.value = formattedValue;
                 hiddenField.value = numericValue.toFixed(2);
-                
+
                 // Update the data-current-value attribute
                 displayField.setAttribute('data-current-value', numericValue.toFixed(2));
-                
+
                 // Update the current value display in the popup header if it exists
                 const currentValueElement = document.querySelector('.payment-history-popup .current-value');
                 if (currentValueElement) {
@@ -856,16 +941,16 @@
                 setTimeout(() => {
                     displayField.style.backgroundColor = '';
                 }, 1000);
-                
+
                 // Show success notification
                 notifyToast(`${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to ${formattedValue}`, 'success');
-                
+
                 return true;
             }
-            
+
             console.error(`Could not find fields for ${fieldType}`);
             notifyToast("Error: Could not update display value", 'error');
-            
+
             return false;
         };
 
@@ -904,7 +989,7 @@
                     e.preventDefault();
                     const formData = new FormData(this);
                     const fieldType = document.querySelector('.payment-history-popup').dataset.fieldType;
-                    
+
                     fetch(this.action, {
                         method: 'POST',
                         body: formData,
@@ -920,13 +1005,13 @@
                             if (tableBody && data.html) {
                                 tableBody.innerHTML = data.html;
                             }
-                            
+
                             // Update totals and field values
                             updatePaymentHistoryTotal(fieldType);
-                            
+
                             // Clear the form
                             paymentHistoryForm.reset();
-                            
+
                             notifyToast("Payment entry added successfully", 'success');
                         } else {
                             notifyToast(data.error || "Error adding payment entry", 'error');
@@ -964,47 +1049,47 @@
         const nsnPageInfo = document.getElementById('nsn_page_info');
         const nsnDisplay = document.getElementById('nsn_display');
         const nsnIdInput = document.getElementById('id_nsn');
-        
+
         let currentPage = 1;
         let totalPages = 1;
         let searchTerm = '';
-        
+
         console.log("NSN elements:", {selectNsnBtn, nsnModal, nsnDisplay});
-        
+
         // Open NSN modal
         function openNsnModal() {
             console.log("Opening NSN modal");
             nsnModal.style.display = 'flex';
             nsnSearch.focus();
         }
-        
+
         if (selectNsnBtn) {
             selectNsnBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 openNsnModal();
             });
         }
-        
+
         if (nsnDisplay) {
             nsnDisplay.addEventListener('click', function(e) {
                 e.preventDefault();
                 openNsnModal();
             });
         }
-        
+
         // Close NSN modal
         function closeNsnModal() {
             nsnModal.style.display = 'none';
         }
-        
+
         if (closeNsnModalBtn) {
             closeNsnModalBtn.addEventListener('click', closeNsnModal);
         }
-        
+
         if (cancelNsnSelection) {
             cancelNsnSelection.addEventListener('click', closeNsnModal);
         }
-        
+
         // Close modal when clicking outside
         if (nsnModal) {
             nsnModal.addEventListener('click', function(e) {
@@ -1013,7 +1098,7 @@
                 }
             });
         }
-        
+
         // Search for NSN
         function searchNsn() {
             searchTerm = nsnSearch.value.trim();
@@ -1022,15 +1107,15 @@
                 nsnPagination.classList.add('hidden');
                 return;
             }
-            
+
             currentPage = 1;
             fetchNsnResults();
         }
-        
+
         if (searchNsnBtn) {
             searchNsnBtn.addEventListener('click', searchNsn);
         }
-        
+
         // Search on enter key
         if (nsnSearch) {
             nsnSearch.addEventListener('keypress', function(e) {
@@ -1040,7 +1125,7 @@
                 }
             });
         }
-        
+
         // Pagination
         if (nsnPrevPage) {
             nsnPrevPage.addEventListener('click', function() {
@@ -1050,7 +1135,7 @@
                 }
             });
         }
-        
+
         if (nsnNextPage) {
             nsnNextPage.addEventListener('click', function() {
                 if (currentPage < totalPages) {
@@ -1059,11 +1144,11 @@
                 }
             });
         }
-        
+
         // Fetch NSN results from API
         function fetchNsnResults() {
             nsnSearchResults.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
-            
+
             fetch(`/contracts/api/options/nsn/?search=${encodeURIComponent(searchTerm)}&page=${currentPage}&page_size=10`)
                 .then(response => response.json())
                 .then(data => {
@@ -1071,7 +1156,7 @@
                         // Update pagination
                         totalPages = data.pagination.total_pages;
                         updateNsnPagination();
-                        
+
                         // Display results
                         if (data.options.length > 0) {
                             let resultsHtml = '';
@@ -1083,17 +1168,17 @@
                                 `;
                             });
                             nsnSearchResults.innerHTML = resultsHtml;
-                            
+
                             // Add click event to result items
                             document.querySelectorAll('.nsn-result-item[data-nsn-id]').forEach(item => {
                                 item.addEventListener('click', function() {
                                     const nsnId = this.getAttribute('data-nsn-id');
                                     const nsnText = this.getAttribute('data-nsn-text');
-                                    
+
                                     // Update the form fields
                                     nsnIdInput.value = nsnId;
                                     nsnDisplay.value = nsnText;
-                                    
+
                                     // Close the modal
                                     closeNsnModal();
                                 });
@@ -1110,7 +1195,7 @@
                     nsnSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
                 });
         }
-        
+
         function updateNsnPagination() {
             if (totalPages > 1) {
                 nsnPagination.classList.remove('hidden');
@@ -1121,7 +1206,7 @@
                 nsnPagination.classList.add('hidden');
             }
         }
-        
+
         // Supplier Modal Functionality
         const supplierModal = document.getElementById('supplier_modal');
         const selectSupplierBtn = document.getElementById('select_supplier_btn');
@@ -1136,47 +1221,47 @@
         const supplierPageInfo = document.getElementById('supplier_page_info');
         const supplierDisplay = document.getElementById('supplier_display');
         const supplierIdInput = document.getElementById('id_supplier');
-        
+
         let supplierCurrentPage = 1;
         let supplierTotalPages = 1;
         let supplierSearchTerm = '';
-        
+
         console.log("Supplier elements:", {selectSupplierBtn, supplierModal, supplierDisplay});
-        
+
         // Open Supplier modal
         function openSupplierModal() {
             console.log("Opening Supplier modal");
             supplierModal.style.display = 'flex';
             supplierSearch.focus();
         }
-        
+
         if (selectSupplierBtn) {
             selectSupplierBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 openSupplierModal();
             });
         }
-        
+
         if (supplierDisplay) {
             supplierDisplay.addEventListener('click', function(e) {
                 e.preventDefault();
                 openSupplierModal();
             });
         }
-        
+
         // Close Supplier modal
         function closeSupplierModal() {
             supplierModal.style.display = 'none';
         }
-        
+
         if (closeSupplierModalBtn) {
             closeSupplierModalBtn.addEventListener('click', closeSupplierModal);
         }
-        
+
         if (cancelSupplierSelection) {
             cancelSupplierSelection.addEventListener('click', closeSupplierModal);
         }
-        
+
         // Close modal when clicking outside
         if (supplierModal) {
             supplierModal.addEventListener('click', function(e) {
@@ -1185,11 +1270,11 @@
                 }
             });
         }
-        
+
         // Fetch Supplier results from API
         function fetchSupplierResults() {
             supplierSearchResults.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><p class="mt-2 text-gray-600">Loading...</p></div>';
-            
+
             fetch(`/contracts/api/options/supplier/?search=${encodeURIComponent(supplierSearchTerm)}&page=${supplierCurrentPage}&page_size=10`)
                 .then(response => response.json())
                 .then(data => {
@@ -1197,7 +1282,7 @@
                         // Update pagination
                         supplierTotalPages = data.pagination.total_pages;
                         updateSupplierPagination();
-                        
+
                         // Display results
                         if (data.options.length > 0) {
                             let resultsHtml = '';
@@ -1209,17 +1294,17 @@
                                 `;
                             });
                             supplierSearchResults.innerHTML = resultsHtml;
-                            
+
                             // Add click event to result items
                             document.querySelectorAll('.supplier-result-item').forEach(item => {
                                 item.addEventListener('click', function() {
                                     const supplierId = this.getAttribute('data-supplier-id');
                                     const supplierText = this.getAttribute('data-supplier-text');
-                                    
+
                                     // Update the form fields
                                     supplierIdInput.value = supplierId;
                                     supplierDisplay.value = supplierText;
-                                    
+
                                     // Close the modal
                                     closeSupplierModal();
                                 });
@@ -1236,7 +1321,7 @@
                     supplierSearchResults.innerHTML = '<div class="text-center text-red-500 py-4">Error loading results</div>';
                 });
         }
-        
+
         function updateSupplierPagination() {
             if (supplierTotalPages > 1) {
                 supplierPagination.classList.remove('hidden');
@@ -1247,7 +1332,7 @@
                 supplierPagination.classList.add('hidden');
             }
         }
-        
+
         // Search for Supplier
         function searchSupplier() {
             supplierSearchTerm = supplierSearch.value.trim();
@@ -1256,15 +1341,15 @@
                 supplierPagination.classList.add('hidden');
                 return;
             }
-            
+
             supplierCurrentPage = 1;
             fetchSupplierResults();
         }
-        
+
         if (searchSupplierBtn) {
             searchSupplierBtn.addEventListener('click', searchSupplier);
         }
-        
+
         // Search on enter key
         if (supplierSearch) {
             supplierSearch.addEventListener('keypress', function(e) {
@@ -1274,7 +1359,7 @@
                 }
             });
         }
-        
+
         // Pagination
         if (supplierPrevPage) {
             supplierPrevPage.addEventListener('click', function() {
@@ -1284,7 +1369,7 @@
                 }
             });
         }
-        
+
         if (supplierNextPage) {
             supplierNextPage.addEventListener('click', function() {
                 if (supplierCurrentPage < supplierTotalPages) {
@@ -1297,7 +1382,7 @@
         // Toggle financial details section
         const financialToggle = document.getElementById('financial-details-toggle');
         const financialSection = document.getElementById('financial-details-section');
-        
+
         if (financialToggle && financialSection) {
             financialToggle.addEventListener('click', function() {
                 financialSection.classList.toggle('hidden');

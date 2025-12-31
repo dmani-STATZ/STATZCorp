@@ -15,7 +15,7 @@
     <div class="row gap-3">
       <label for="enrich-website-url" class="label text-gray-700">Website URL</label>
       <input id="enrich-website-url" type="url" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ supplier.website_url|default:'' }}" placeholder="https://example.com">
-      <button id="save-website-btn" class="px-3 py-2 text-sm font-semibold rounded-md bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">Save URL</button>
+      <button id="save-website-btn" class="px-3 py-2 text-sm font-semibold rounded-md btn btn-save">Save URL</button>
    </div>
     <p class="text-xs text-gray-500">Saving the URL will update the supplier record before running enrichment.</p>
     <div  class="row gap-4">
@@ -48,7 +48,7 @@
           <input type="checkbox" id="ai-model-needs-update" {% if global_ai_model_info.needs_update %}checked{% endif %}>
           Model needs update
         </label>
-        <button id="save-default-model-btn" class="px-3 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700">Save Shared Model</button>
+        <button id="save-default-model-btn" class="px-3 py-2 text-sm font-semibold rounded-md btn btn-save">Save Shared Model</button>
       </div>
       {% else %}
       <p class="text-xs text-gray-500 mt-1">Only admins can change the shared model.</p>

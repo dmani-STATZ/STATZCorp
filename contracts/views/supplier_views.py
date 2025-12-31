@@ -1057,6 +1057,68 @@ def get_supplier_certification(request, pk):
         'certification_expiration': certification.certification_expiration.strftime('%Y-%m-%d') if certification.certification_expiration else None
     })
 
+@conditional_login_required
+def update_supplier_certification(request, supplier_id, pk):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=400)
+
+    supplier = get_object_or_404(Supplier, id=supplier_id)
+    certification = get_object_or_404(SupplierCertification, id=pk, supplier=supplier)
+    certification_type = get_object_or_404(CertificationType, id=request.POST.get('certification_type'))
+    cert_date_raw = request.POST.get('certification_date')
+    cert_exp_raw = request.POST.get('certification_expiration')
+    cert_date = parse_date_input(cert_date_raw)
+    cert_exp = parse_date_input(cert_exp_raw)
+    compliance_status = (request.POST.get('compliance_status') or '').strip() or None
+    file_obj = request.FILES.get('file')
+
+    if cert_date_raw and cert_date is None:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid certification date. Use YYYY-MM-DD.'
+        }, status=400)
+    if cert_exp_raw and cert_exp is None:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid certification expiration. Use YYYY-MM-DD.'
+        }, status=400)
+    if cert_date and cert_date.date() > timezone.localdate():
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Certification date cannot be in the future.'
+        }, status=400)
+
+    certification.certification_type = certification_type
+    certification.certification_date = cert_date
+    certification.certification_expiration = cert_exp
+    certification.compliance_status = compliance_status
+    certification.save()
+
+    if file_obj:
+        doc = SupplierDocument.objects.filter(certification=certification).order_by('-id').first()
+        if doc:
+            doc.file = file_obj
+            doc.doc_type = 'CERT'
+            doc.description = f"{certification_type.name} certification document"
+            if hasattr(doc, 'modified_by'):
+                doc.modified_by = request.user
+            doc.save()
+        else:
+            SupplierDocument.objects.create(
+                supplier=supplier,
+                certification=certification,
+                doc_type='CERT',
+                file=file_obj,
+                description=f"{certification_type.name} certification document",
+                created_by=request.user if hasattr(request, 'user') else None,
+            )
+
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Certification updated successfully',
+        'id': certification.id
+    })
+
 # Classification Views
 @conditional_login_required
 def add_supplier_classification(request, supplier_id):
@@ -1136,6 +1198,66 @@ def get_supplier_classification(request, pk):
         'classification_date': classification.classification_date.strftime('%Y-%m-%d') if classification.classification_date else None,
         'expiration_date': classification.classification_expiration.strftime('%Y-%m-%d') if classification.classification_expiration else None
     }) 
+
+@conditional_login_required
+def update_supplier_classification(request, supplier_id, pk):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=400)
+
+    supplier = get_object_or_404(Supplier, id=supplier_id)
+    classification = get_object_or_404(SupplierClassification, id=pk, supplier=supplier)
+    classification_type = get_object_or_404(ClassificationType, id=request.POST.get('classification_type'))
+    class_date_raw = request.POST.get('classification_date')
+    class_exp_raw = request.POST.get('expiration_date')
+    class_date = parse_date_input(class_date_raw)
+    class_exp = parse_date_input(class_exp_raw)
+    file_obj = request.FILES.get('file')
+
+    if class_date_raw and class_date is None:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid classification date. Use YYYY-MM-DD.'
+        }, status=400)
+    if class_exp_raw and class_exp is None:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid classification expiration. Use YYYY-MM-DD.'
+        }, status=400)
+    if class_date and class_date.date() > timezone.localdate():
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Classification date cannot be in the future.'
+        }, status=400)
+
+    classification.classification_type = classification_type
+    classification.classification_date = class_date
+    classification.classification_expiration = class_exp
+    classification.save()
+
+    if file_obj:
+        doc = SupplierDocument.objects.filter(classification=classification).order_by('-id').first()
+        if doc:
+            doc.file = file_obj
+            doc.doc_type = 'CLASS'
+            doc.description = f"{classification_type.name} classification document"
+            if hasattr(doc, 'modified_by'):
+                doc.modified_by = request.user
+            doc.save()
+        else:
+            SupplierDocument.objects.create(
+                supplier=supplier,
+                classification=classification,
+                doc_type='CLASS',
+                file=file_obj,
+                description=f"{classification_type.name} classification document",
+                created_by=request.user if hasattr(request, 'user') else None,
+            )
+
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Classification updated successfully',
+        'id': classification.id
+    })
 
 
 @conditional_login_required

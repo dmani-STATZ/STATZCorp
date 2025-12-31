@@ -5,7 +5,7 @@
 {% block body %}
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold mb-8">User Settings Management</h1>
-    
+
     <!-- User Selection Section -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-8">
         <h2 class="text-xl font-semibold mb-4">Select User</h2>
@@ -82,7 +82,7 @@ function showToast(message, isError = false) {
 function loadUserSettings() {
     let userId = document.getElementById('userSelect').value;
     log(`Loading settings for user ID: ${userId}`);
-    
+
     if (!userId) {
         showToast('Please select a user', true);
         return;
@@ -90,7 +90,7 @@ function loadUserSettings() {
 
     let settingsContainer = document.getElementById('settingsContainer');
     settingsContainer.innerHTML = '<p class="text-center py-4 text-gray-500">Loading settings...</p>';
-    
+
     fetch(`{% url "users:ajax_get_user_setting" %}?user_id=${userId}`, {
         method: 'GET',
         headers: {
@@ -118,10 +118,10 @@ function loadUserSettings() {
 // Create input field based on setting type
 function createInputForType(name, value, type) {
     let placeholder = value ? "" : "Not set for this user";
-    
+
     // Default input (string type)
     if (!type || type === 'string') {
-        return `<input type="text" 
+        return `<input type="text"
                       class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       value="${value}"
                       placeholder="${placeholder}"
@@ -129,7 +129,7 @@ function createInputForType(name, value, type) {
                       data-setting-type="string"
                       data-original-value="${value}">`;
     }
-    
+
     // Boolean type
     if (type === 'boolean') {
         const isTrue = value === true || value === 'true' || value === 'True';
@@ -141,11 +141,11 @@ function createInputForType(name, value, type) {
                   <option value="false" ${!isTrue ? 'selected' : ''}>False</option>
                 </select>`;
     }
-    
+
     // Integer type
     if (type === 'integer') {
-        return `<input type="number" 
-                      step="1" 
+        return `<input type="number"
+                      step="1"
                       class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       value="${value}"
                       placeholder="${placeholder}"
@@ -153,11 +153,11 @@ function createInputForType(name, value, type) {
                       data-setting-type="integer"
                       data-original-value="${value}">`;
     }
-    
+
     // Float type
     if (type === 'float') {
-        return `<input type="number" 
-                      step="0.01" 
+        return `<input type="number"
+                      step="0.01"
                       class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       value="${value}"
                       placeholder="${placeholder}"
@@ -165,9 +165,9 @@ function createInputForType(name, value, type) {
                       data-setting-type="float"
                       data-original-value="${value}">`;
     }
-    
+
     // Fallback to text input
-    return `<input type="text" 
+    return `<input type="text"
                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   value="${value}"
                   placeholder="${placeholder}"
@@ -196,30 +196,30 @@ function getSettingTypes() {
 function displaySettings(userSettings) {
     let settingsContainer = document.getElementById('settingsContainer');
     settingsContainer.innerHTML = '';
-    
+
     // Convert userSettings to empty object if null/undefined
     userSettings = userSettings || {};
-    
+
     // If there are no settings and no possible settings
     if (Object.keys(userSettings).length === 0 && allPossibleSettings.length === 0) {
         settingsContainer.innerHTML = '<p class="text-gray-500">No settings found for selected user or in the system.</p>';
         return;
     }
-    
+
     // Create a Set of all setting names to handle (existing + possible)
     const allSettingNames = new Set([
         ...Object.keys(userSettings),
         ...allPossibleSettings
     ]);
-    
+
     // Sort settings alphabetically
     const sortedSettings = Array.from(allSettingNames).sort();
-    
+
     // Create setting elements for each
     sortedSettings.forEach(name => {
         const value = userSettings[name] || "";
         const type = settingTypes[name] || "string";
-        
+
         const settingDiv = document.createElement('div');
         settingDiv.className = 'border rounded p-4';
         settingDiv.innerHTML = `
@@ -229,7 +229,7 @@ function displaySettings(userSettings) {
                     <div class="mt-1 text-xs text-gray-500">${type}</div>
                     <div class="mt-2 flex items-center space-x-4">
                         ${createInputForType(name, value, type)}
-                        <button class="save-btn bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700" 
+                        <button class="btn  px-4 py-2 rounded-md"
                                 onclick="saveSetting(this)">
                             Save
                         </button>
@@ -239,7 +239,7 @@ function displaySettings(userSettings) {
         `;
         settingsContainer.appendChild(settingDiv);
     });
-    
+
     // Add listeners for input changes to show visual feedback
     attachInputListeners();
 }
@@ -251,7 +251,7 @@ function attachInputListeners() {
         // Remove existing listeners to avoid duplicates
         input.removeEventListener('input', handleInputChange);
         input.removeEventListener('change', handleInputChange);
-        
+
         // Add new listeners for both input and change events
         input.addEventListener('input', handleInputChange);
         input.addEventListener('change', handleInputChange);
@@ -263,7 +263,7 @@ function handleInputChange(event) {
     const input = event.target;
     const settingType = input.dataset.settingType;
     let currentValue;
-    
+
     // Get current value based on input type
     if (settingType === 'boolean') {
         currentValue = input.value === 'true';
@@ -274,7 +274,7 @@ function handleInputChange(event) {
     } else {
         currentValue = input.value;
     }
-    
+
     // Get original value in appropriate type
     let originalValue = input.dataset.originalValue;
     if (settingType === 'boolean') {
@@ -284,7 +284,7 @@ function handleInputChange(event) {
     } else if (settingType === 'float') {
         originalValue = parseFloat(originalValue) || 0;
     }
-    
+
     // Compare and highlight the input if changed
     const hasChanged = currentValue !== originalValue;
     input.classList.toggle('border-indigo-500', hasChanged);
@@ -298,7 +298,7 @@ function saveSetting(button) {
     let settingName = input.dataset.settingName;
     let settingType = input.dataset.settingType;
     let settingValue;
-    
+
     // Get value based on input type
     if (settingType === 'boolean') {
         settingValue = input.value === 'true';
@@ -309,12 +309,12 @@ function saveSetting(button) {
     } else {
         settingValue = input.value;
     }
-    
+
     let userId = document.getElementById('userSelect').value;
-    
+
     button.textContent = 'Saving...';
     button.disabled = true;
-    
+
     fetch('{% url "users:ajax_save_setting" %}', {
         method: 'POST',
         headers: {
@@ -332,7 +332,7 @@ function saveSetting(button) {
     .then(data => {
         button.textContent = 'Save';
         button.disabled = false;
-        
+
         if (data.success) {
             // Update the original value to match current value
             if (settingType === 'boolean') {
@@ -340,10 +340,10 @@ function saveSetting(button) {
             } else {
                 input.dataset.originalValue = String(settingValue);
             }
-            
+
             // Remove the highlight
             input.classList.remove('border-indigo-500', 'ring-2', 'ring-indigo-200');
-            
+
             showToast('Setting saved successfully');
         } else {
             showToast(data.message, true);
@@ -362,12 +362,12 @@ function createNewSetting() {
     let type = document.getElementById('newSettingType').value;
     let value = document.getElementById('newSettingValue').value;
     let userId = document.getElementById('userSelect').value;
-    
+
     if (!name) {
         showToast('Setting name is required', true);
         return;
     }
-    
+
     // Convert value based on type
     if (type === 'boolean') {
         value = value.toLowerCase() === 'true';
@@ -376,7 +376,7 @@ function createNewSetting() {
     } else if (type === 'float') {
         value = parseFloat(value) || 0;
     }
-    
+
     fetch('{% url "users:ajax_save_setting" %}', {
         method: 'POST',
         headers: {
@@ -396,15 +396,15 @@ function createNewSetting() {
             showToast('Setting created successfully');
             document.getElementById('newSettingName').value = '';
             document.getElementById('newSettingValue').value = '';
-            
+
             // Add to possible settings list if new
             if (!allPossibleSettings.includes(name)) {
                 allPossibleSettings.push(name);
             }
-            
+
             // Add to setting types
             settingTypes[name] = type;
-            
+
             // Reload settings to see the new one
             loadUserSettings();
         } else {
@@ -422,10 +422,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if ('{% url "users:ajax_get_setting_types" %}' !== 'url "users:ajax_get_setting_types"') {
         getSettingTypes();
     }
-    
+
     // Load current user's settings initially
     loadUserSettings();
 });
 </script>
 
-{% endblock extra_scripts %} 
+{% endblock extra_scripts %}

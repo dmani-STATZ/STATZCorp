@@ -23,9 +23,9 @@
     <form method="post">
       {% csrf_token %}
       <button type="submit" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Delete</button>
-      <a href="{% url 'contracts:company_list' %}" class="ml-2 px-4 py-2 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200">Cancel</a>
+      <a href="{% url 'contracts:company_list' %}" class="ml-2 px-4 py-2 rounded-md btn btn-caution">Cancel</a>
     </form>
   </div>
-  
+
 </div>
 {% endblock %}

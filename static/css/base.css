@@ -22,6 +22,7 @@ font-family: "Courier New", "Consolas", monospace;
     --main-font: "Segoe UI", "Roboto", "Oxygen", sans-serif;
     --company-primary: #004eb3;
     --company-secondary: #e5e7eb;
+    --company-danger: #b91c1c;
     --header-height: 48px;
 }
 

@@ -14,7 +14,15 @@ from django.shortcuts import get_object_or_404
 from urllib.parse import urlparse
 
 from contracts.models import Contract, Clin, Address
-from suppliers.models import Supplier, SupplierDocument, SupplierType
+from suppliers.models import (
+    Supplier,
+    SupplierDocument,
+    SupplierType,
+    SupplierCertification,
+    SupplierClassification,
+    CertificationType,
+    ClassificationType,
+)
 import requests
 
 from .openrouter_config import (
@@ -473,7 +481,49 @@ class SupplierDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         supplier = self.object
         context['contacts'] = supplier.contacts.all().order_by('name')
-        context['documents'] = SupplierDocument.objects.filter(supplier=supplier).select_related('certification', 'classification')[:25]
+        documents = list(
+            SupplierDocument.objects.filter(supplier=supplier)
+            .select_related('certification', 'classification')
+            .order_by('-id')
+        )
+        context['documents'] = documents[:25]
+        certifications = SupplierCertification.objects.filter(supplier=supplier).select_related('certification_type').order_by('-certification_date', '-id')
+        classifications = SupplierClassification.objects.filter(supplier=supplier).select_related('classification_type').order_by('-classification_date', '-id')
+        context['certifications'] = certifications
+        context['classifications'] = classifications
+        cert_doc_map = {}
+        class_doc_map = {}
+        for doc in documents:
+            if doc.certification_id and doc.certification_id not in cert_doc_map:
+                cert_doc_map[doc.certification_id] = doc
+            if doc.classification_id and doc.classification_id not in class_doc_map:
+                class_doc_map[doc.classification_id] = doc
+        context['certification_rows'] = [
+            {
+                'id': cert.id,
+                'type_id': cert.certification_type_id,
+                'type_name': cert.certification_type.name,
+                'date': cert.certification_date,
+                'expires': cert.certification_expiration,
+                'compliance_status': cert.compliance_status,
+                'document': cert_doc_map.get(cert.id),
+            }
+            for cert in certifications
+        ]
+        context['classification_rows'] = [
+            {
+                'id': classification.id,
+                'type_id': classification.classification_type_id,
+                'type_name': classification.classification_type.name,
+                'date': classification.classification_date,
+                'expires': classification.classification_expiration,
+                'document': class_doc_map.get(classification.id),
+            }
+            for classification in classifications
+        ]
+        context['certification_types'] = CertificationType.objects.all().order_by('name')
+        context['classification_types'] = ClassificationType.objects.all().order_by('name')
+        context['today'] = timezone.localdate()
         context['addresses'] = {
             'billing': supplier.billing_address,
             'shipping': supplier.shipping_address,

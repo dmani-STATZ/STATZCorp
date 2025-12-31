@@ -4,18 +4,18 @@
 ================================ */
 
 .stat-value {
-    font-size: 1.875rem;
-    font-weight: 600;
-    color: var(--text-strong);
-  }
+  font-size: 1.875rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
 
-  .container-soft {
-    background-color: var(--surface-muted-bg);
-    border: 1px solid var(--border-muted);
-    border-radius: 0.5rem;
-  }
+.container-soft {
+  background-color: var(--surface-muted-bg);
+  border: 1px solid var(--border-muted);
+  border-radius: 0.5rem;
+}
 
-  /* theme.css — semantic layer only */
+/* theme.css — semantic layer only */
 
 .card {
   border-radius: 0.5rem;
@@ -67,7 +67,59 @@
 .btn-primary {
   background-color: var(--primary);
   color: var(--primary-text);
-  &:hover {
-    background-color: var(--primary-hover);
-  }
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  color: var(--primary-text-hover);
+}
+
+.btn-save {
+  background-color: var(--save);
+  color: var(--save-text);
+}
+
+.btn-save:hover {
+  background-color: var(--save-hover);
+  color: var(--save-text-hover);
+}
+
+.btn-secondary {
+  background-color: var(--secondary);
+  color: var(--secondary-text);
+}
+
+.btn-secondary:hover {
+  background-color: var(--secondary-hover);
+  color: var(--secondary-text-hover);
+}
+
+.btn-delete {
+  background-color: var(--danger);
+  color: var(--danger-text);
+}
+
+.btn-delete:hover {
+  background-color: var(--danger-hover);
+  color: var(--danger-text-hover);
+}
+
+.btn-caution {
+  background-color: var(--caution);
+  color: var(--caution-text);
+}
+
+.btn-caution:hover {
+  background-color: var(--caution-hover);
+  color: var(--caution-text-hover);
+}
+
+.btn-nav {
+  background-color: var(--nav);
+  color: var(--nav-text);
+}
+
+.btn-nav:hover {
+  background-color: var(--nav-hover);
+  color: var(--nav-text-hover);
 }

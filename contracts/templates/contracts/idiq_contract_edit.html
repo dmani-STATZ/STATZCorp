@@ -23,7 +23,7 @@
         <!-- Contract Form -->
         <form method="post">
             {% csrf_token %}
-            
+
             <!-- Contract Details -->
             <div class="form-grid-2">
                 <!-- Contract Number -->
@@ -95,8 +95,8 @@
 
             <!-- Form Actions -->
             <div class="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-                <a href="{% url 'contracts:idiq_contract_detail' object.pk %}" class="btn-secondary">Cancel</a>
-                <button type="submit" class="btn-primary">Save Changes</button>
+                <a href="{% url 'contracts:idiq_contract_detail' object.pk %}" class="btn btn-caution">Cancel</a>
+                <button type="submit" class="btn ">Save Changes</button>
             </div>
         </form>
     </div>
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
             wrapper.className = 'relative';
             select.parentNode.insertBefore(wrapper, select);
             wrapper.appendChild(select);
-            
+
             // Add custom arrow
             const arrow = document.createElement('div');
             arrow.className = 'pointer-events-none absolute inset-y-0 right-0 flex items-center px-2';
@@ -129,4 +129,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %} 
+{% endblock %}

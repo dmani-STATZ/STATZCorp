@@ -17,21 +17,21 @@
             {% if note %}
                 {% with content_object=note.content_object content_type=note.content_type %}
                     {% if content_type.model == 'contract' %}
-                        <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn-secondary">
+                        <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn btn-caution">
                             Cancel
                         </a>
                     {% elif content_type.model == 'clin' %}
-                        <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn-secondary">
+                        <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn btn-caution">
                             Cancel
                         </a>
                     {% else %}
-                        <a href="{% url 'contracts:reminders_list' %}" class="btn-secondary">
+                        <a href="{% url 'contracts:reminders_list' %}" class="btn btn-caution">
                             Cancel
                         </a>
                     {% endif %}
                 {% endwith %}
             {% else %}
-                <a href="{% url 'contracts:reminders_list' %}" class="btn-secondary">
+                <a href="{% url 'contracts:reminders_list' %}" class="btn btn-caution">
                     Cancel
                 </a>
             {% endif %}

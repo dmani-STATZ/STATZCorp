@@ -26,10 +26,10 @@
             <form method="post" class="mt-4">
                 {% csrf_token %}
                 <input type="hidden" name="account" value="{{ selected_account.id }}">
-                
+
                 <div class="bg-white rounded-lg shadow p-6">
                     <h2 class="text-xl font-semibold mb-4">Courses for: {{ selected_account.get_type_display }}</h2>
-                    
+
                     <!-- Header Row -->
                     <div class="grid grid-cols-12 gap-4 mb-4 px-4">
                         <div class="col-span-7">
@@ -74,9 +74,9 @@
                             </div>
                         {% endfor %}
                     </div>
-                    
+
                     <div class="mt-6 flex justify-end">
-                        <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                        <button type="submit" class="btn btn-save px-6 py-2 rounded  focus:outline-none focus:ring-2 focus:ring-opacity-50">
                             Save Matrix
                         </button>
                     </div>
@@ -88,14 +88,14 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const checkboxes = document.querySelectorAll('input[name="selected_courses"]');
-            
+
             checkboxes.forEach(checkbox => {
                 const courseId = checkbox.id.split('_')[1];
                 const frequencySelect = document.getElementById(`frequency_${courseId}`);
-                
+
                 // Initial state
                 frequencySelect.disabled = !checkbox.checked;
-                
+
                 // Change handler
                 checkbox.addEventListener('change', function() {
                     frequencySelect.disabled = !this.checked;

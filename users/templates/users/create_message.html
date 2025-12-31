@@ -7,10 +7,10 @@
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
         <h1 class="text-2xl font-bold mb-6">Create New Message</h1>
-        
+
         <form method="post" class="space-y-6" id="messageForm">
             {% csrf_token %}
-            
+
             <!-- Recipients Selection -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2"></label>
@@ -26,7 +26,7 @@
                 <!-- Hidden input to store user IDs -->
                 <input type="hidden" id="selectedUserIds" name="recipients">
             </div>
-            
+
             <!-- Priority Selection -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Priority:</label>
@@ -37,7 +37,7 @@
                     <option value="critical">Critical</option>
                 </select>
             </div>
-            
+
             <!-- Subject -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Subject:</label>
@@ -45,7 +45,7 @@
                        class="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                        placeholder="Enter message subject">
             </div>
-            
+
             <!-- Message Content -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Message:</label>
@@ -53,14 +53,14 @@
                           class="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                           placeholder="Type your message here..."></textarea>
             </div>
-            
+
             <!-- Action Buttons -->
             <div class="flex justify-end space-x-4">
-                <a href="{% url 'users:messages' %}" 
-                   class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                <a href="{% url 'users:messages' %}"
+                   class="px-4 py-2 border border-gray-300 rounded-md btn btn-caution">
                     Cancel
                 </a>
-                <button type="submit" 
+                <button type="submit"
                         class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
                     Send Message
                 </button>
@@ -80,22 +80,22 @@
                 </svg>
             </button>
         </div>
-        
+
         <!-- Search Box -->
         <div class="mb-4">
-            <input type="text" id="userSearch" 
+            <input type="text" id="userSearch"
                    class="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                    placeholder="Search users..."
                    onkeyup="filterUsers()">
         </div>
-        
+
         <!-- User List -->
         <div class="max-h-60 overflow-y-auto">
             <div id="userList" class="space-y-2">
                 {% for user in available_users %}
                 <div class="user-item flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
-                    <input type="checkbox" 
-                           id="user_{{ user.id }}" 
+                    <input type="checkbox"
+                           id="user_{{ user.id }}"
                            value="{{ user.id }}"
                            data-name="{{ user.get_full_name|default:user.username }}"
                            class="user-checkbox form-checkbox h-4 w-4 text-blue-600 rounded">
@@ -106,9 +106,9 @@
                 {% endfor %}
             </div>
         </div>
-        
+
         <div class="mt-4 flex justify-end">
-            <button onclick="applyUserSelection()" 
+            <button onclick="applyUserSelection()"
                     class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
                 Apply Selection
             </button>
@@ -137,7 +137,7 @@ function closeUserSelector() {
 function filterUsers() {
     const searchText = document.getElementById('userSearch').value.toLowerCase();
     const userItems = document.querySelectorAll('.user-item');
-    
+
     userItems.forEach(item => {
         const userName = item.querySelector('label').textContent.toLowerCase();
         item.style.display = userName.includes(searchText) ? 'flex' : 'none';
@@ -147,13 +147,13 @@ function filterUsers() {
 function applyUserSelection() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     selectedUsers.clear();
-    
+
     checkboxes.forEach(checkbox => {
         if (checkbox.checked) {
             selectedUsers.set(checkbox.value, checkbox.dataset.name);
         }
     });
-    
+
     updateSelectedUsersDisplay();
     closeUserSelector();
 }
@@ -161,10 +161,10 @@ function applyUserSelection() {
 function updateSelectedUsersDisplay() {
     const selectedUsersInput = document.getElementById('selectedUsers');
     const selectedUserIdsInput = document.getElementById('selectedUserIds');
-    
+
     const names = Array.from(selectedUsers.values());
     const ids = Array.from(selectedUsers.keys());
-    
+
     selectedUsersInput.value = names.join(', ');
     selectedUserIdsInput.value = ids.join(',');
 }
@@ -177,4 +177,4 @@ document.getElementById('messageForm').addEventListener('submit', function(e) {
     }
 });
 </script>
-{% endblock %} 
+{% endblock %}

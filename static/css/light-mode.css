@@ -1,6 +1,6 @@
 /**
  * STATZ Corporation - Light Mode Stylesheet
- * 
+ *
  * This file contains all light mode specific styles that are applied when the 'dark' class
  * is NOT present on the body element. The file is organized by UI component/area to mirror
  * the structure of dark-mode.css for easy comparison and maintenance.
@@ -11,8 +11,10 @@
  * Controls the main background and text color for the entire application in light mode
  */
 body {
-    background-color: #f9fafb; /* gray-50 - Main background color throughout the app */
-    color: #111827; /* gray-900 - Default text color for all content */
+    background-color: #f9fafb;
+    /* gray-50 - Main background color throughout the app */
+    color: #111827;
+    /* gray-900 - Default text color for all content */
 }
 
 /**
@@ -21,23 +23,21 @@ body {
  */
 header {
     /* Blue header with pattern design for brand identity */
-    background: repeating-linear-gradient(
-        45deg,
-        #3e3e4150,
-        #3e3e4150 2px,
-        #d0d1d450 4px,
-        #d0d1d450 6px
-    ),
-    repeating-linear-gradient(
-        90deg,
-        #3e3e4150,
-        #3e3e4150 2px,
-        #d0d1d450 4px,
-        #d0d1d450 6px
-    );
+    background: repeating-linear-gradient(45deg,
+            #3e3e4150,
+            #3e3e4150 2px,
+            #d0d1d450 4px,
+            #d0d1d450 6px),
+        repeating-linear-gradient(90deg,
+            #3e3e4150,
+            #3e3e4150 2px,
+            #d0d1d450 4px,
+            #d0d1d450 6px);
     background-blend-mode: multiply;
-    background-color: var(--company-primary); /* Brand-specific header color */
-    color: #ffffff; /* White text for contrast against blue background */
+    background-color: var(--company-primary);
+    /* Brand-specific header color */
+    color: #ffffff;
+    /* White text for contrast against blue background */
 }
 
 /**
@@ -46,23 +46,21 @@ header {
  */
 .sidebar {
     /* Red sidebar with pattern design for brand identity */
-    background: repeating-linear-gradient(
-        45deg,
-        #3e3e4150,
-        #3e3e4150 2px,
-        #d0d1d450 4px,
-        #d0d1d450 6px
-    ),
-    repeating-linear-gradient(
-        90deg,
-        #3e3e4150,
-        #3e3e4150 2px,
-        #d0d1d450 4px,
-        #d0d1d450 6px
-    );
+    background: repeating-linear-gradient(45deg,
+            #3e3e4150,
+            #3e3e4150 2px,
+            #d0d1d450 4px,
+            #d0d1d450 6px),
+        repeating-linear-gradient(90deg,
+            #3e3e4150,
+            #3e3e4150 2px,
+            #d0d1d450 4px,
+            #d0d1d450 6px);
     background-blend-mode: multiply;
-    background-color: #e00000; /* Brand red color for sidebar */
-    color: #ffffff; /* White text for contrast against red background */
+    background-color: #e00000;
+    /* Brand red color for sidebar */
+    color: #ffffff;
+    /* White text for contrast against red background */
 }
 
 /**
@@ -70,8 +68,10 @@ header {
  * Controls the background and text color for the primary content section
  */
 .content {
-    background-color: #f9fafb; /* gray-50 - Main content area background */
-    color: #111827; /* gray-900 - Text in the main content area */
+    background-color: #f9fafb;
+    /* gray-50 - Main content area background */
+    color: #111827;
+    /* gray-900 - Text in the main content area */
 }
 
 /**
@@ -79,17 +79,32 @@ header {
  * Controls backgrounds and text colors for card-like elements and other containers
  */
 .bg-white {
-    background-color: #ffffff; /* white - Background for white containers */
-    color: #111827; /* gray-900 - Text in white containers */
+    background-color: #ffffff;
+    /* white - Background for white containers */
+    color: #111827;
+    /* gray-900 - Text in white containers */
+}
+
+.portal-card {
+    background-color: #f3f4f6;
+    /* gray-100 - Slight tint for cards */
+    border-color: #d1d5db;
+    /* gray-300 - Consistent border */
+}
+
+.protal-card-text {
+    color: #3966c9;
+    /* gray-900 - Text in portal cards */
 }
 
 /* Lighter gray containers */
-.bg-gray-50, 
-.bg-gray-100, 
+.bg-gray-50,
+.bg-gray-100,
 .bg-gray-200 {
     /* These classes already have proper light mode styling in Tailwind */
     /* Background colors maintained by Tailwind's default classes */
-    color: #111827; /* gray-900 - Text in gray containers */
+    color: #111827;
+    /* gray-900 - Text in gray containers */
 }
 
 /**
@@ -106,16 +121,23 @@ header {
 
 /* Black text - already properly styled in light mode by default */
 .text-black {
-    color: #000000; /* Black text */
+    color: #000000;
+    /* Black text */
 }
 
 /**
  * HEADINGS
  * Controls the appearance of heading elements (h1, h2, h3, etc.)
  */
-h1, h2, h3, h4, h5, h6,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
 .text-gray-900 {
-    color: #111827; /* gray-900 - Heading text color */
+    color: #111827;
+    /* gray-900 - Heading text color */
 }
 
 /**
@@ -126,24 +148,30 @@ h1, h2, h3, h4, h5, h6,
 table,
 tbody,
 tr {
-    background-color: #ffffff; /* white - Table background */
-    color: #111827; /* gray-900 - Table text */
+    background-color: #ffffff;
+    /* white - Table background */
+    color: #111827;
+    /* gray-900 - Table text */
 }
 
 /* Table headers */
 th {
-    background-color: #f3f4f6; /* gray-100 - Table header background */
-    color: #111827; /* gray-900 - Table header text */
+    background-color: #f3f4f6;
+    /* gray-100 - Table header background */
+    color: #111827;
+    /* gray-900 - Table header text */
 }
 
 /* Table cell borders */
 td {
-    border-color: #e5e7eb; /* gray-200 - Table cell borders */
+    border-color: #e5e7eb;
+    /* gray-200 - Table cell borders */
 }
 
 /* Divider lines */
-.divide-y > * {
-    border-color: #e5e7eb; /* gray-200 - Divider lines between items */
+.divide-y>* {
+    border-color: #e5e7eb;
+    /* gray-200 - Divider lines between items */
 }
 
 /**
@@ -153,25 +181,31 @@ td {
 input,
 select,
 textarea {
-    background-color: #ffffff; /* white - Form control background */
-    color: #111827; /* gray-900 - Form control text */
-    border-color: #d1d5db; /* gray-300 - Form control borders */
+    background-color: #ffffff;
+    /* white - Form control background */
+    color: #111827;
+    /* gray-900 - Form control text */
+    border-color: #d1d5db;
+    /* gray-300 - Form control borders */
 }
 
 /* Form control focus states */
 input:focus,
 select:focus,
 textarea:focus {
-    border-color: #3b82f6; /* blue-500 - Focused form control borders */
+    border-color: #3b82f6;
+    /* blue-500 - Focused form control borders */
 }
 
 /**
  * BUTTONS
  * Controls the appearance of buttons that don't have specific background classes
  */
-button:not([class*="bg-"]) {
-    background-color: #f3f4f6; /* gray-100 - Default button background */
-    color: #111827; /* gray-900 - Default button text */
+button:not([class*="bg-"]):not(.btn) {
+    background-color: #374151 !important;
+    /* gray-700 - Default button background */
+    color: #f3f4f6 !important;
+    /* gray-100 - Default button text */
 }
 
 /**
@@ -179,7 +213,8 @@ button:not([class*="bg-"]) {
  * Controls the appearance of links that don't have specific text color classes
  */
 a:not([class*="text-"]) {
-    color: #2563eb; /* blue-600 - Default link color */
+    color: #2563eb;
+    /* blue-600 - Default link color */
 }
 
 /**
@@ -241,11 +276,13 @@ a:not([class*="text-"]) {
  * Controls the appearance of the theme toggle button and its icon
  */
 #theme-toggle-icon {
-    color: #111827; /* gray-900 - Theme toggle icon color */
+    color: #111827;
+    /* gray-900 - Theme toggle icon color */
 }
 
 #theme-toggle-icon path {
-    stroke: #111827; /* gray-900 - Theme toggle icon stroke color */
+    stroke: #111827;
+    /* gray-900 - Theme toggle icon stroke color */
 }
 
 /**
@@ -253,48 +290,63 @@ a:not([class*="text-"]) {
  * Controls the appearance of the reminders panel and items shown in the screenshot
  */
 .reminders-panel {
-    background-color: #ffffff; /* white - Reminders panel background */
-    border-color: #e5e7eb; /* gray-200 - Reminders panel border */
+    background-color: #ffffff;
+    /* white - Reminders panel background */
+    border-color: #e5e7eb;
+    /* gray-200 - Reminders panel border */
 }
 
 .reminder-item {
-    background-color: #f9fafb; /* gray-50 - Individual reminder background */
-    border-color: #e5e7eb; /* gray-200 - Individual reminder border */
+    background-color: #f9fafb;
+    /* gray-50 - Individual reminder background */
+    border-color: #e5e7eb;
+    /* gray-200 - Individual reminder border */
 }
 
 .reminder-header {
-    color: #111827; /* gray-900 - Reminder panel header text */
+    color: #111827;
+    /* gray-900 - Reminder panel header text */
 }
 
 .reminder-text {
-    color: #374151; /* gray-700 - Reminder text content */
+    color: #374151;
+    /* gray-700 - Reminder text content */
 }
 
 .reminder-date {
-    color: #6b7280; /* gray-500 - Reminder date text */
+    color: #6b7280;
+    /* gray-500 - Reminder date text */
 }
 
 .overdue-badge {
-    background-color: #ef4444; /* red-500 - Overdue badge background */
-    color: #ffffff; /* white - Overdue badge text */
+    background-color: #ef4444;
+    /* red-500 - Overdue badge background */
+    color: #ffffff;
+    /* white - Overdue badge text */
 }
 
 /* Reminder action buttons */
 .reminder-button {
-    background-color: #f3f4f6; /* gray-100 - Reminder button background */
-    color: #374151; /* gray-700 - Reminder button text */
+    background-color: #f3f4f6;
+    /* gray-100 - Reminder button background */
+    color: #374151;
+    /* gray-700 - Reminder button text */
 }
 
 /* View All Reminders button */
 .view-all-reminders {
-    background-color: #3b82f6; /* blue-500 - View all reminders button background */
-    color: #ffffff; /* white - View all reminders button text */
+    background-color: #3b82f6;
+    /* blue-500 - View all reminders button background */
+    color: #ffffff;
+    /* white - View all reminders button text */
 }
 
 /* New Reminder button */
 .new-reminder {
-    background-color: #3b82f6; /* blue-500 - New reminder button background */
-    color: #ffffff; /* white - New reminder button text */
+    background-color: #3b82f6;
+    /* blue-500 - New reminder button background */
+    color: #ffffff;
+    /* white - New reminder button text */
 }
 
 /**
@@ -490,4 +542,4 @@ a:not([class*="text-"]) {
 
 .nsn-pagination {
     composes: search-pagination;
-} 
+}

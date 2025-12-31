@@ -198,6 +198,80 @@
     </div>
   </div>
 
+  <!-- Certifications & Classifications -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card card-padded shadow-sm">
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Certifications</h2>
+        <button type="button" id="open-cert-modal" class="text-sm text-blue-600 hover:text-blue-800">Add Certification</button>
+      </div>
+      <div class="space-y-3">
+        {% for cert in certification_rows %}
+          <div class="border border-gray-200 rounded-lg p-3">
+            <div class="row-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-gray-900">{{ cert.type_name }}</p>
+                <p class="text-xs text-gray-600">
+                  {% if cert.date %}Date: {{ cert.date|date:"Y-m-d" }}{% endif %}
+                  {% if cert.expires %}{% if cert.date %} | {% endif %}Exp: {{ cert.expires|date:"Y-m-d" }}{% endif %}
+                  {% if cert.compliance_status %}{% if cert.date or cert.expires %} | {% endif %}Compliance: {{ cert.compliance_status }}{% endif %}
+                  {% if cert.document and cert.document.file %}{% if cert.date or cert.expires or cert.compliance_status %} | {% endif %}<a href="{{ cert.document.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="edit-cert-btn text-xs text-blue-600 hover:text-blue-800"
+                data-cert-id="{{ cert.id }}"
+                data-cert-type-id="{{ cert.type_id }}"
+                data-cert-date="{% if cert.date %}{{ cert.date|date:'Y-m-d' }}{% endif %}"
+                data-cert-exp="{% if cert.expires %}{{ cert.expires|date:'Y-m-d' }}{% endif %}"
+                data-cert-compliance="{{ cert.compliance_status|default_if_none:'' }}"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No certifications yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card card-padded shadow-sm">
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900">Classifications</h2>
+        <button type="button" id="open-class-modal" class="text-sm text-blue-600 hover:text-blue-800">Add Classification</button>
+      </div>
+      <div class="space-y-3">
+        {% for classification in classification_rows %}
+          <div class="border border-gray-200 rounded-lg p-3">
+            <div class="row-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-gray-900">{{ classification.type_name }}</p>
+                <p class="text-xs text-gray-600">
+                  {% if classification.date %}Date: {{ classification.date|date:"Y-m-d" }}{% endif %}
+                  {% if classification.expires %}{% if classification.date %} | {% endif %}Exp: {{ classification.expires|date:"Y-m-d" }}{% endif %}
+                  {% if classification.document and classification.document.file %}{% if classification.date or classification.expires %} | {% endif %}<a href="{{ classification.document.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="edit-class-btn text-xs text-blue-600 hover:text-blue-800"
+                data-class-id="{{ classification.id }}"
+                data-class-type-id="{{ classification.type_id }}"
+                data-class-date="{% if classification.date %}{{ classification.date|date:'Y-m-d' }}{% endif %}"
+                data-class-exp="{% if classification.expires %}{{ classification.expires|date:'Y-m-d' }}{% endif %}"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No classifications yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
   <!-- Files -->
   <div class="card card-padded shadow-sm">
     <div class="row-between mb-3">
@@ -213,7 +287,10 @@
       {% for doc in documents %}
         <div class="border border-gray-200 rounded-lg p-3">
           <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
-          <p class="text-xs text-gray-600">{{ doc.description|default:"Document" }}</p>
+          <p class="text-xs text-gray-600">
+            {{ doc.description|default:"Document" }}
+            {% if doc.file %} | <a href="{{ doc.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
+          </p>
         </div>
       {% empty %}
         {% if not supplier.files_url %}
@@ -281,4 +358,331 @@
     </div>
   </div>
 </div>
+
+<!-- Certification modal -->
+<div id="cert-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+  <div class="card card-padded shadow-2xl w-full max-w-lg">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 id="cert-modal-title" class="text-lg font-semibold text-gray-900">Add Certification</h3>
+        <p class="text-sm text-gray-500">Create a new supplier certification</p>
+      </div>
+      <button type="button" id="cert-modal-close" class="text-gray-500 hover:text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block label mb-1" for="cert-type-input">Type</label>
+        <select id="cert-type-input" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+          <option value="">Select type</option>
+          {% for ct in certification_types %}
+            <option value="{{ ct.id }}">{{ ct.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block label mb-1" for="cert-date-input">Date</label>
+          <input id="cert-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+        </div>
+        <div>
+          <label class="block label mb-1" for="cert-exp-input">Expiration</label>
+          <input id="cert-exp-input" type="date" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block label mb-1" for="cert-compliance-input">Compliance Status</label>
+        <input id="cert-compliance-input" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" placeholder="Enter compliance status">
+      </div>
+      <div>
+        <label class="block label mb-1" for="cert-file-input">Attach File (optional)</label>
+        <input id="cert-file-input" type="file" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white">
+      </div>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button type="button" id="cert-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
+      <button type="button" id="cert-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Classification modal -->
+<div id="class-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+  <div class="card card-padded shadow-2xl w-full max-w-lg">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 id="class-modal-title" class="text-lg font-semibold text-gray-900">Add Classification</h3>
+        <p class="text-sm text-gray-500">Create a new supplier classification</p>
+      </div>
+      <button type="button" id="class-modal-close" class="text-gray-500 hover:text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block label mb-1" for="class-type-input">Type</label>
+        <select id="class-type-input" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+          <option value="">Select type</option>
+          {% for ct in classification_types %}
+            <option value="{{ ct.id }}">{{ ct.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block label mb-1" for="class-date-input">Date</label>
+          <input id="class-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+        </div>
+        <div>
+          <label class="block label mb-1" for="class-exp-input">Expiration</label>
+          <input id="class-exp-input" type="date" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block label mb-1" for="class-file-input">Attach File (optional)</label>
+        <input id="class-file-input" type="file" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white">
+      </div>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button type="button" id="class-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
+      <button type="button" id="class-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+    </div>
+  </div>
+</div>
+
 {% endblock contract_content %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function showModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function hideModal(modal) {
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const certModal = document.getElementById('cert-modal');
+        const classModal = document.getElementById('class-modal');
+        const certModalTitle = document.getElementById('cert-modal-title');
+        const classModalTitle = document.getElementById('class-modal-title');
+        const openCertBtn = document.getElementById('open-cert-modal');
+        const openClassBtn = document.getElementById('open-class-modal');
+        const certCloseBtn = document.getElementById('cert-modal-close');
+        const certCancelBtn = document.getElementById('cert-modal-cancel');
+        const classCloseBtn = document.getElementById('class-modal-close');
+        const classCancelBtn = document.getElementById('class-modal-cancel');
+        const certSaveBtn = document.getElementById('cert-modal-save');
+        const classSaveBtn = document.getElementById('class-modal-save');
+        const certTypeInput = document.getElementById('cert-type-input');
+        const certDateInput = document.getElementById('cert-date-input');
+        const certExpInput = document.getElementById('cert-exp-input');
+        const certComplianceInput = document.getElementById('cert-compliance-input');
+        const certFileInput = document.getElementById('cert-file-input');
+        const classTypeInput = document.getElementById('class-type-input');
+        const classDateInput = document.getElementById('class-date-input');
+        const classExpInput = document.getElementById('class-exp-input');
+        const classFileInput = document.getElementById('class-file-input');
+        const addCertUrl = "{% url 'contracts:supplier_add_certification' supplier_id=supplier.id %}";
+        const updateCertUrlTemplate = "{% url 'contracts:supplier_update_certification' supplier_id=supplier.id pk=0 %}";
+        const addClassUrl = "{% url 'contracts:supplier_add_classification' supplier_id=supplier.id %}";
+        const updateClassUrlTemplate = "{% url 'contracts:supplier_update_classification' supplier_id=supplier.id pk=0 %}";
+        let editingCertId = null;
+        let editingClassId = null;
+
+        function openCertModal(payload) {
+            editingCertId = payload && payload.id ? payload.id : null;
+            if (certModalTitle) {
+                certModalTitle.textContent = editingCertId ? 'Edit Certification' : 'Add Certification';
+            }
+            if (certTypeInput) certTypeInput.value = payload && payload.typeId ? payload.typeId : '';
+            if (certDateInput) certDateInput.value = payload && payload.date ? payload.date : '';
+            if (certExpInput) certExpInput.value = payload && payload.exp ? payload.exp : '';
+            if (certComplianceInput) certComplianceInput.value = payload && payload.compliance ? payload.compliance : '';
+            if (certFileInput) certFileInput.value = '';
+            showModal(certModal);
+        }
+
+        function openClassModal(payload) {
+            editingClassId = payload && payload.id ? payload.id : null;
+            if (classModalTitle) {
+                classModalTitle.textContent = editingClassId ? 'Edit Classification' : 'Add Classification';
+            }
+            if (classTypeInput) classTypeInput.value = payload && payload.typeId ? payload.typeId : '';
+            if (classDateInput) classDateInput.value = payload && payload.date ? payload.date : '';
+            if (classExpInput) classExpInput.value = payload && payload.exp ? payload.exp : '';
+            if (classFileInput) classFileInput.value = '';
+            showModal(classModal);
+        }
+
+        function closeCertModal() {
+            editingCertId = null;
+            hideModal(certModal);
+        }
+
+        function closeClassModal() {
+            editingClassId = null;
+            hideModal(classModal);
+        }
+
+        if (openCertBtn) {
+            openCertBtn.addEventListener('click', function() {
+                openCertModal(null);
+            });
+        }
+        if (openClassBtn) {
+            openClassBtn.addEventListener('click', function() {
+                openClassModal(null);
+            });
+        }
+        document.querySelectorAll('.edit-cert-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                openCertModal({
+                    id: btn.dataset.certId,
+                    typeId: btn.dataset.certTypeId,
+                    date: btn.dataset.certDate,
+                    exp: btn.dataset.certExp,
+                    compliance: btn.dataset.certCompliance
+                });
+            });
+        });
+        document.querySelectorAll('.edit-class-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                openClassModal({
+                    id: btn.dataset.classId,
+                    typeId: btn.dataset.classTypeId,
+                    date: btn.dataset.classDate,
+                    exp: btn.dataset.classExp
+                });
+            });
+        });
+        [certCloseBtn, certCancelBtn].forEach(function(btn) {
+            if (btn) btn.addEventListener('click', closeCertModal);
+        });
+        [classCloseBtn, classCancelBtn].forEach(function(btn) {
+            if (btn) btn.addEventListener('click', closeClassModal);
+        });
+        if (certModal) {
+            certModal.addEventListener('click', function(event) {
+                if (event.target === certModal) closeCertModal();
+            });
+        }
+        if (classModal) {
+            classModal.addEventListener('click', function(event) {
+                if (event.target === classModal) closeClassModal();
+            });
+        }
+
+        if (certSaveBtn) {
+            certSaveBtn.addEventListener('click', function() {
+                if (!certTypeInput || !certTypeInput.value) {
+                    alert('Select a certification type.');
+                    return;
+                }
+                certSaveBtn.disabled = true;
+                const formData = new FormData();
+                formData.append('certification_type', certTypeInput.value);
+                formData.append('certification_date', certDateInput ? certDateInput.value : '');
+                formData.append('certification_expiration', certExpInput ? certExpInput.value : '');
+                formData.append('compliance_status', certComplianceInput ? certComplianceInput.value : '');
+                if (certFileInput && certFileInput.files && certFileInput.files[0]) {
+                    formData.append('file', certFileInput.files[0]);
+                }
+                const url = editingCertId
+                    ? updateCertUrlTemplate.replace('/0/', '/' + editingCertId + '/')
+                    : addCertUrl;
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: formData
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.status === 'success') {
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Failed to save certification.');
+                    }
+                })
+                .catch(function() {
+                    alert('Failed to save certification.');
+                })
+                .finally(function() {
+                    certSaveBtn.disabled = false;
+                });
+            });
+        }
+
+        if (classSaveBtn) {
+            classSaveBtn.addEventListener('click', function() {
+                if (!classTypeInput || !classTypeInput.value) {
+                    alert('Select a classification type.');
+                    return;
+                }
+                classSaveBtn.disabled = true;
+                const formData = new FormData();
+                formData.append('classification_type', classTypeInput.value);
+                formData.append('classification_date', classDateInput ? classDateInput.value : '');
+                formData.append('expiration_date', classExpInput ? classExpInput.value : '');
+                if (classFileInput && classFileInput.files && classFileInput.files[0]) {
+                    formData.append('file', classFileInput.files[0]);
+                }
+                const url = editingClassId
+                    ? updateClassUrlTemplate.replace('/0/', '/' + editingClassId + '/')
+                    : addClassUrl;
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: formData
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.status === 'success') {
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Failed to save classification.');
+                    }
+                })
+                .catch(function() {
+                    alert('Failed to save classification.');
+                })
+                .finally(function() {
+                    classSaveBtn.disabled = false;
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

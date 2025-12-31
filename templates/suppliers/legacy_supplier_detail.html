@@ -9,7 +9,7 @@
     .tab-container {
         border-bottom: 1px solid #e5e7eb;
     }
-    
+
     .tab {
         position: relative;
         padding: 1rem 1.5rem;
@@ -18,16 +18,16 @@
         cursor: pointer;
         transition: all 0.2s ease;
     }
-    
+
     .tab:hover {
         color: #4b5563;
     }
-    
+
     .tab.active {
         color: #3b82f6;
         font-weight: 600;
     }
-    
+
     .tab.active:after {
         content: '';
         position: absolute;
@@ -37,50 +37,50 @@
         height: 2px;
         background-color: #3b82f6;
     }
-    
+
     .tab-content {
         display: none;
     }
-    
+
     .tab-content.active {
         display: block;
     }
-    
+
     .status-badge {
         font-size: 0.75rem;
         padding: 0.25rem 0.75rem;
         border-radius: 9999px;
         font-weight: 500;
     }
-    
+
     .status-badge.warning {
         background-color: #fef3c7;
         color: #92400e;
     }
-    
+
     .status-badge.danger {
         background-color: #fee2e2;
         color: #991b1b;
     }
-    
+
     .status-badge.success {
         background-color: #dcfce7;
         color: #166534;
     }
-    
+
     .info-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 1.5rem;
     }
-    
+
     .info-card {
         background-color: white;
         border-radius: 0.5rem;
         padding: 1.5rem;
         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
     }
-    
+
     .stat-card {
         background-color: white;
         border-radius: 0.5rem;
@@ -88,7 +88,7 @@
         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
         transition: all 0.2s ease;
     }
-    
+
     .stat-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -128,14 +128,14 @@
                 </div>
             </div>
             <div class="flex space-x-3">
-                <a href="{% url 'suppliers:supplier_detail' supplier.id %}" 
+                <a href="{% url 'suppliers:supplier_detail' supplier.id %}"
                    class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     Edit
                 </a>
-                <a href="{% url 'suppliers:supplier_dashboard' %}" 
+                <a href="{% url 'suppliers:supplier_dashboard' %}"
                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Back to List
                 </a>
@@ -246,7 +246,7 @@
             <div class="card card-padded shadow">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900">Notes</h3>
-                    <button type="button" 
+                    <button type="button"
                             data-action="show-notes-modal"
                             class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -316,7 +316,7 @@
             <div class="card shadow overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h3 class="text-lg font-medium text-gray-900">Personnel</h3>
-                    <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}" 
+                    <a href="{% url 'contracts:contact_create' %}?supplier={{ supplier.id }}"
                        class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         Add Contact
                     </a>
@@ -465,7 +465,7 @@
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900">Files</h3>
                     {% if supplier.files_url %}
-                    <a href="{{ supplier.files_url }}" target="_blank" 
+                    <a href="{{ supplier.files_url }}" target="_blank"
                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -558,10 +558,10 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" data-action="hide-modal" data-modal="certificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" data-action="hide-modal" data-modal="certificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium btn btn-caution focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
-                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="submit" class="px-4 py-2 rounded-md shadow-sm text-sm font-medium btn btn-save focus:outline-none focus:ring-2 focus:ring-offset-2">
                     Save
                 </button>
             </div>
@@ -601,10 +601,10 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" data-action="hide-modal" data-modal="classificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" data-action="hide-modal" data-modal="classificationModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium btn btn-caution focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
-                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="submit" class="px-4 py-2 rounded-md shadow-sm text-sm font-medium btn btn-save focus:outline-none focus:ring-2 focus:ring-offset-2">
                     Save
                 </button>
             </div>
@@ -632,10 +632,10 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" data-action="hide-modal" data-modal="notesModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" data-action="hide-modal" data-modal="notesModal" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium btn btn-caution focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </button>
-                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="submit" class="px-4 py-2 rounded-md shadow-sm text-sm font-medium btn btn-save focus:outline-none focus:ring-2 focus:ring-offset-2">
                     Save Changes
                 </button>
             </div>
@@ -650,18 +650,18 @@
     document.addEventListener('DOMContentLoaded', function() {
         const tabs = document.querySelectorAll('.tab');
         const tabContents = document.querySelectorAll('.tab-content');
-        
+
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 // Remove active class from all tabs and contents
                 tabs.forEach(t => t.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
-                
+
                 // Add active class to clicked tab and corresponding content
                 tab.classList.add('active');
                 const tabId = tab.getAttribute('data-tab');
                 document.getElementById(tabId).classList.add('active');
-                
+
                 // Update URL with active tab
                 const url = new URL(window.location);
                 url.searchParams.set('tab', tabId);
@@ -709,7 +709,7 @@
               notesForm.addEventListener('submit', function(e) {
                   e.preventDefault();
                   const formData = new FormData(this);
-                  
+
                 fetch(this.action, {
                     method: 'POST',
                     body: formData,
@@ -779,17 +779,17 @@
             .then(data => {
                 // Update modal title
                 document.getElementById('certificationModalTitle').textContent = 'Edit Certification';
-                
+
                 // Populate form fields
                 document.getElementById('certification_type').value = data.certification_type;
                 document.getElementById('compliance_status').value = data.compliance_status;
                 document.getElementById('certification_date').value = data.certification_date;
                 document.getElementById('certification_expiration').value = data.certification_expiration;
-                
+
                 // Update form action URL
                 const form = document.getElementById('certificationForm');
                 form.action = `/contracts/supplier/{{ supplier.id }}/certification/${id}/edit/`;
-                
+
                 // Show modal
                 showModal('certificationModal');
             })
@@ -834,16 +834,16 @@
             .then(data => {
                 // Update modal title
                 document.getElementById('classificationModalTitle').textContent = 'Edit Classification';
-                
+
                 // Populate form fields
                 document.getElementById('classification_type').value = data.classification_type;
                 document.getElementById('classification_date').value = data.classification_date;
                 document.getElementById('classification_expiration').value = data.expiration_date;
-                
+
                 // Update form action URL
                 const form = document.getElementById('classificationForm');
                 form.action = `/contracts/supplier/{{ supplier.id }}/classification/${id}/edit/`;
-                
+
                 // Show modal
                 showModal('classificationModal');
             })
@@ -887,4 +887,4 @@
         }
     }
 </script>
-{% endblock %} 
+{% endblock %}

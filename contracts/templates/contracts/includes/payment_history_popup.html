@@ -1,10 +1,10 @@
 {% load static %}
 
-<div class="payment-history-modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
-     id="paymentHistoryPopup" 
-     data-source-page="" 
-     data-entity-type="" 
-     data-entity-id="" 
+<div class="payment-history-modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+     id="paymentHistoryPopup"
+     data-source-page=""
+     data-entity-type=""
+     data-entity-id=""
      data-field-type="">
     <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
         <div class="row-between mb-4">
@@ -27,34 +27,34 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label for="payment_amount" class="block text-sm font-medium text-gray-700">Amount</label>
-                    <input type="number" id="payment_amount" name="payment_amount" step="0.01" 
+                    <input type="number" id="payment_amount" name="payment_amount" step="0.01"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                            required>
                 </div>
                 <div>
                     <label for="payment_date" class="block text-sm font-medium text-gray-700">Date</label>
-                    <input type="date" id="payment_date" name="payment_date" 
+                    <input type="date" id="payment_date" name="payment_date"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                            required>
                 </div>
             </div>
             <div>
                 <label for="reference_number" class="block text-sm font-medium text-gray-700">Reference Number</label>
-                <input type="text" id="reference_number" name="reference_number" 
+                <input type="text" id="reference_number" name="reference_number"
                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
             </div>
             <div>
                 <label for="payment_info" class="block text-sm font-medium text-gray-700">Additional Information</label>
-                <textarea id="payment_info" name="payment_info" rows="3" 
+                <textarea id="payment_info" name="payment_info" rows="3"
                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
             </div>
             <div class="flex justify-end space-x-3">
-                <button type="button" onclick="closePaymentHistoryPopup()" 
-                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                <button type="button" onclick="closePaymentHistoryPopup()"
+                        class="px-4 py-2 border border-gray-300 rounded-md btn btn-caution">
                     Cancel
                 </button>
-                <button type="submit" 
-                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                <button type="submit"
+                        class="px-4 py-2 btn btn-save rounded-md">
                     Save Entry
                 </button>
             </div>
@@ -75,7 +75,7 @@ function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, 
     popup.dataset.entityId = entityId;
     popup.dataset.fieldType = paymentType;
     popup.dataset.sourcePage = sourcePage;
-    
+
     // Fetch entity details
     fetch(`/contracts/api/payment-history/${entityType}/${entityId}/details/`)
         .then(response => response.json())
@@ -83,21 +83,21 @@ function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, 
             if (data.success) {
                 const details = data.details;
                 const entityTitle = entityType === 'contract' ? 'Contract' : 'CLIN';
-                
+
                 // Update popup title and details
-                document.getElementById('popupTitle').textContent = 
+                document.getElementById('popupTitle').textContent =
                     `Payment History - ${formatFieldType(paymentType)}`;
-                document.getElementById('popupSubtitle').textContent = 
+                document.getElementById('popupSubtitle').textContent =
                     `${entityTitle}: ${details.number}${details.contract_number ? ` (Contract: ${details.contract_number})` : ''}`;
-                
+
                 // Handle the current value display with proper formatting
                 const formattedValue = currentValue ? formatCurrency(currentValue) : 'Not Available';
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
-                
+
                 loadPaymentHistory(entityType, entityId, paymentType);
             }
         });
-    
+
     popup.classList.remove('hidden');
 }
 
@@ -140,24 +140,24 @@ if (form) {
             if (data.success) {
                 // Update the history table
                 loadPaymentHistory(entityType, entityId, fieldType);
-                
+
                 // Clear the form
                 this.reset();
-                
+
                 // Update the cell value and current value display
                 console.log('Updating values with new total:', data.new_total);
-                
+
                 // Update the current value display in the popup
                 const formattedValue = formatCurrency(data.new_total);
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
-                
+
                 // Update the main form field
                 if (typeof window.updateCellValue === 'function') {
                     window.updateCellValue(entityId, fieldType, data.new_total);
                 } else {
                     console.error('updateCellValue function not found');
                 }
-                
+
                 // Show success notification
                 notifyToast("Payment history entry added successfully", 'success');
             } else {
@@ -217,11 +217,11 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                     </div>
                 `;
                 historyContent.innerHTML = html;
-                
+
                 // Update the current value display and main form field
                 const formattedTotal = formatCurrency(data.total);
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedTotal}`;
-                
+
                 // Update the main form field
                 if (typeof window.updateCellValue === 'function') {
                     window.updateCellValue(entityId, paymentType, data.total);
@@ -246,19 +246,19 @@ function formatCurrency(amount) {
     if (amount === null || amount === undefined || amount === '' || amount === 'NaN') {
         return 'Not Available';
     }
-    
-    const cleanAmount = typeof amount === 'string' 
+
+    const cleanAmount = typeof amount === 'string'
         ? amount.replace(/,/g, '').trim()
         : amount;
-    
-    const numericAmount = typeof cleanAmount === 'string' 
-        ? parseFloat(cleanAmount) 
+
+    const numericAmount = typeof cleanAmount === 'string'
+        ? parseFloat(cleanAmount)
         : cleanAmount;
-    
+
     if (isNaN(numericAmount)) {
         return 'Not Available';
     }
-    
+
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
@@ -270,4 +270,4 @@ function formatCurrency(amount) {
 function formatDate(dateString) {
     return new Date(dateString).toLocaleDateString('en-US');
 }
-</script> 
+</script>

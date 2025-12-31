@@ -30,7 +30,7 @@
             </div>
             <div class="mt-3 flex gap-2">
                 <button type="submit" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">Create</button>
-                <button type="button" onclick="toggleNewSection(false)" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+                <button type="button" onclick="toggleNewSection(false)" class="px-3 py-1 text-sm btn btn-caution rounded">Cancel</button>
             </div>
         </form>
     </div>
@@ -38,7 +38,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="portalSections">
         {% for section in portal_context.sections %}
-        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow" style="background-color: var(--company-secondary); border-color: rgba(128, 128, 128, 1);">
+        <div class="p-4 border rounded-lg hover:shadow-md transition-shadow portal-card">
             <div class="flex items-start justify-between">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800">{{ section.title }}</h3>
@@ -210,8 +210,8 @@
                     <textarea id="eventDescription" class="w-full border rounded p-2" rows="3"></textarea>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="closeAddEventModal()" class="px-3 py-1 border rounded">Cancel</button>
-                    <button type="submit" class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+                    <button type="button" onclick="closeAddEventModal()" class="px-3 py-1 border btn btn-caution rounded">Cancel</button>
+                    <button type="submit" class="px-4 py-1 btn btn-save rounded">Save</button>
                 </div>
             </form>
         </div>
@@ -275,11 +275,11 @@
     <!-- Announcements Section -->
     <div class="mt-8 p-4 border rounded-lg">
         <h2 class="text-xl font-medium mb-4 text-gray-800">Recent Announcements</h2>
-        <div class="space-y-4">
+        <div class="space-y-4 ">
             {% for announcement in announcements %}
-            <div class="p-3 bg-blue-50 rounded">
-                <p class="text-blue-800">{{ announcement.content }}</p>
-                <span class="text-sm text-blue-600">
+            <div class="p-3 portal-card rounded">
+                <p class="portal-card-text">{{ announcement.content }}</p>
+                <span class="text-sm portal-card-text">
                     Posted by: {{ announcement.posted_by.username }} on {{ announcement.posted_at|date:"F j, Y, g:i a" }}
                 </span>
                 {% if perms.users.delete_announcement %}
@@ -1279,7 +1279,7 @@
                 <div class="mt-4 flex justify-end space-x-3">
                     <button type="button"
                             onclick="hideAddAnnouncementModal()"
-                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                            class="px-4 py-2 btn btn-caution rounded">
                         Cancel
                     </button>
                     <button type="submit"
@@ -1306,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h2 class="text-2xl font-bold mb-4">Unread System Messages</h2>
                 <p class="mb-6">You have ${unreadCount} unread system message${unreadCount > 1 ? 's' : ''}.</p>
                 <div class="flex justify-end space-x-4">
-                    <button id="cancelBtn" class="px-4 py-2 text-gray-600 hover:text-gray-800 ${unreadCount >= 5 ? 'hidden' : ''}" onclick="closeModal()">
+                    <button id="cancelBtn" class="px-4 py-2 btn btn-caution ${unreadCount >= 5 ? 'hidden' : ''}" onclick="closeModal()">
                         Cancel
                     </button>
                     <a href="{% url 'users:messages' %}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">

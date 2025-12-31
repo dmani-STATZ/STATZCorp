@@ -23,11 +23,11 @@
         </h1>
         <div>
             {% if form.instance.pk %}
-                <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn-secondary">
+                <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn btn-caution">
                     Cancel
                 </a>
             {% else %}
-                <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-caution">
                     Cancel
                 </a>
             {% endif %}
@@ -38,13 +38,13 @@
     <div class="card card-padded mb-6">
         <h2 class="section-header">Upload DD Form 1155</h2>
         <p class="text-gray-600 mb-4">Upload a DD Form 1155 to automatically populate the contract form fields.</p>
-        
+
         <form id="dd1155-upload-form" enctype="multipart/form-data" class="space-y-4">
             {% csrf_token %}
             <div class="flex items-center space-x-4">
                 <div class="flex-grow">
                     <label for="dd1155-file" class="block text-sm font-medium text-gray-700 mb-1">Select DD Form 1155 (PDF)</label>
-                    <input type="file" id="dd1155-file" name="dd1155_file" accept=".pdf" 
+                    <input type="file" id="dd1155-file" name="dd1155_file" accept=".pdf"
                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
                 </div>
                 <button type="button" id="extract-dd1155-btn" class="btn-primary mt-6 flex items-center">
@@ -89,7 +89,7 @@
     <div class="card card-padded">
         <form method="post" class="space-y-6" id="contract-form">
             {% csrf_token %}
-            
+
             <!-- Contract Identification -->
             <div>
                 <h2 class="section-header">Contract Identification</h2>
@@ -155,7 +155,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.tab_num.id_for_label }}" class="form-label">
@@ -173,7 +173,7 @@
 
                         </div>
                     </div>
-                    
+
                     <!-- Row 2 -->
                     <div class="md:col-span-3">
                         <div class="form-group">
@@ -186,7 +186,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.buyer.id_for_label }}" class="form-label">
@@ -198,7 +198,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.sales_class.id_for_label }}" class="form-label">
@@ -229,7 +229,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.contract_value.id_for_label }}" class="form-label">
@@ -267,7 +267,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Contract Dates -->
             <div>
                 <h2 class="section-header">Contract Dates</h2>
@@ -283,7 +283,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-3">
                         <div class="form-group">
                             <label for="{{ form.due_date.id_for_label }}" class="form-label">
@@ -298,12 +298,12 @@
 
                     <div class="md:col-span-3">
                         <div class="form-group">
-                            
+
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Contract Splits -->
             {% include "contracts/partials/contract_splits.html" with mode="form" contract=form.instance %}
 
@@ -323,7 +323,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-4">
                         <div class="form-group">
                             <label for="{{ form.assigned_date.id_for_label }}" class="form-label">
@@ -335,7 +335,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-4">
                         <div class="form-group">
                             <label for="{{ form.reviewed.id_for_label }}" class="form-label">
@@ -360,7 +360,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="md:col-span-4">
                         <div class="form-group">
                             <label for="{{ form.reviewed_on.id_for_label }}" class="form-label">
@@ -374,17 +374,17 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 {% if form.instance.pk %}
-                    <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn-secondary">
+                    <a href="{% url 'contracts:contract_detail' form.instance.pk %}" class="btn btn-caution">
                         Cancel
                     </a>
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="btn btn-save">
                         Update Contract
                     </button>
                 {% else %}
-                    <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                    <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-caution">
                         Cancel
                     </a>
                     <button type="submit" class="btn-primary">
@@ -411,10 +411,10 @@
         const contractForm = document.getElementById('contract-form');
         const contractNumberInput = document.getElementById('id_contract_number');
         const contractValueInput = document.getElementById('id_contract_value');
-        
+
         // Store CLIN data globally for form submission
         let extractedClinData = [];
-        
+
         if (contractNumberInput) {
             contractNumberInput.addEventListener('change', async function() {
                 const contractNumber = this.value;
@@ -422,20 +422,20 @@
                     try {
                         const response = await fetch(`/contracts/check-contract-number/?number=${encodeURIComponent(contractNumber)}`);
                         const data = await response.json();
-                        
+
                         if (data.exists) {
                             // Show error message
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'text-red-500 text-sm mt-1';
                             errorDiv.id = 'contract-number-error';
                             errorDiv.textContent = 'A contract with this number already exists.';
-                            
+
                             // Remove any existing error message
                             const existingError = document.getElementById('contract-number-error');
                             if (existingError) {
                                 existingError.remove();
                             }
-                            
+
                             // Add new error message
                             this.parentNode.appendChild(errorDiv);
                         } else {
@@ -451,26 +451,26 @@
                 }
             });
         }
-        
+
         if (extractButton) {
             extractButton.addEventListener('click', function() {
                 if (!fileInput.files.length) {
                     showStatus('Please select a DD Form 1155 PDF file first.', 'error');
                     return;
                 }
-                
+
                 const file = fileInput.files[0];
                 if (!file.name.toLowerCase().endsWith('.pdf')) {
                     showStatus('Please select a PDF file.', 'error');
                     return;
                 }
-                
+
                 // Show loading status
                 showStatus('Extracting data from DD Form 1155...', 'info');
-                
+
                 const formData = new FormData();
                 formData.append('dd1155_file', file);
-                
+
                 fetch('/contracts/extract-dd1155/', {
                     method: 'POST',
                     body: formData,
@@ -482,7 +482,7 @@
                 .then(data => {
                     if (data.success) {
                         showStatus('Data extracted successfully!', 'success');
-                        
+
                         // Populate form fields
                         if (data.contract_data) {
                             Object.keys(data.contract_data).forEach(field => {
@@ -492,21 +492,21 @@
                                 }
                             });
                         }
-                        
+
                         // Store CLIN data for later use
                         if (data.clin_data) {
                             extractedClinData = data.clin_data;
-                            
+
                             // Show CLIN data section
                             const clinDataSection = document.getElementById('clin-data-section');
                             const clinCount = document.getElementById('clin-count');
                             const clinDataBody = document.getElementById('clin-data-body');
-                            
+
                             clinCount.textContent = `Found ${data.clin_data.length} CLINs`;
-                            
+
                             // Clear existing rows
                             clinDataBody.innerHTML = '';
-                            
+
                             // Add CLIN data rows
                             data.clin_data.forEach(clin => {
                                 const row = document.createElement('tr');
@@ -525,7 +525,7 @@
                                 `;
                                 clinDataBody.appendChild(row);
                             });
-                            
+
                             clinDataSection.classList.remove('hidden');
                         }
                     } else {
@@ -538,7 +538,7 @@
                 });
             });
         }
-        
+
         // Add form submission handler
         if (contractForm) {
             contractForm.addEventListener('submit', function(e) {

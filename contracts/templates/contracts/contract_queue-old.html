@@ -10,16 +10,16 @@
     <div class="card card-padded mb-4">
         <div class="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
             <h1 class="text-2xl font-bold text-gray-800">Contract Queue</h1>
-            
+
             <div class="flex space-x-2">
-                <a href="{% url 'contracts:download_csv_template' %}" 
+                <a href="{% url 'contracts:download_csv_template' %}"
                    class="btn-primary flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Download Template
                 </a>
-                <a href="{% url 'contracts:download_test_data' %}" 
+                <a href="{% url 'contracts:download_test_data' %}"
                    class="btn-primary flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -30,7 +30,7 @@
         </div>
 
         <!-- Drag and Drop Zone -->
-        <div id="dropZone" 
+        <div id="dropZone"
              class="mt-4 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors duration-200">
             <input type="file" id="csvFile" accept=".csv" class="hidden" />
             <div class="flex flex-col items-center justify-center">
@@ -120,7 +120,7 @@
                             {% else %}
                             <div class="flex space-x-2">
                                 <span class="text-gray-400">In Progress</span>
-                                <button onclick="confirmCancelProcessing('{{ contract.id }}', '{{ contract.contract_number }}')" 
+                                <button onclick="confirmCancelProcessing('{{ contract.id }}', '{{ contract.contract_number }}')"
                                         class="text-red-600 hover:text-red-900">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -167,7 +167,7 @@
                         <input type="text" id="tab_number" name="tab_number" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" readonly>
                     </div>
                     <div class="row-between">
-                        <button type="button" onclick="closeModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        <button type="button" onclick="closeModal()" class="btn btn-caution font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                             Cancel
                         </button>
                         <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
@@ -190,12 +190,12 @@
                 <p class="text-sm text-red-500 mt-2">This action cannot be undone.</p>
             </div>
             <div class="mt-4 flex justify-center space-x-4">
-                <button onclick="closeCancelModal()" 
+                <button onclick="closeCancelModal()"
                         class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                     No, Keep Processing
                 </button>
-                <button onclick="executeCancelProcessing()" 
-                        class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                <button onclick="executeCancelProcessing()"
+                        class="btn btn-caution font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                     Yes, Cancel Processing
                 </button>
             </div>
@@ -228,9 +228,9 @@ function closeModal() {
 // Handle form submission
 document.getElementById('processContractForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = new FormData(this);
-    
+
     fetch('/contracts/api/process-contract/', {
         method: 'POST',
         body: formData,
@@ -271,7 +271,7 @@ function closeCancelModal() {
 
 function executeCancelProcessing() {
     if (!cancelContractId) return;
-    
+
     fetch(`/processing/cancel-processing/${cancelContractId}/`, {
         method: 'POST',
         headers: {
@@ -308,51 +308,51 @@ document.addEventListener('DOMContentLoaded', function() {
     const dropZone = document.getElementById('dropZone');
     const uploadBtn = document.getElementById('uploadCsvBtn');
     const csvFile = document.getElementById('csvFile');
-    
+
     // Prevent default drag behaviors
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
         document.body.addEventListener(eventName, preventDefaults, false);
     });
-    
+
     // Highlight drop zone when item is dragged over it
     ['dragenter', 'dragover'].forEach(eventName => {
         dropZone.addEventListener(eventName, highlight, false);
     });
-    
+
     ['dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, unhighlight, false);
     });
-    
+
     // Handle dropped files
     dropZone.addEventListener('drop', handleDrop, false);
-    
+
     // Handle file selection via button
     uploadBtn.addEventListener('click', function() {
         csvFile.click();
     });
-    
+
     csvFile.addEventListener('change', handleFiles);
-    
+
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
-    
+
     function highlight(e) {
         dropZone.classList.add('border-blue-500', 'bg-blue-50');
     }
-    
+
     function unhighlight(e) {
         dropZone.classList.remove('border-blue-500', 'bg-blue-50');
     }
-    
+
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
         handleFiles({ target: { files: files } });
     }
-    
+
     function handleFiles(e) {
         const file = e.target.files[0];
         if (file) {
@@ -360,10 +360,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Please upload a CSV file');
                 return;
             }
-            
+
             const formData = new FormData();
             formData.append('csv_file', file);
-            
+
             fetch('{% url "contracts:upload_csv" %}', {
                 method: 'POST',
                 body: formData,
@@ -387,4 +387,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %} 
+{% endblock %}

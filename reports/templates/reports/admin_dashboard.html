@@ -54,7 +54,7 @@
             {{ sql_form.context_notes.label_tag }}
             {{ sql_form.context_notes }}
             <div class="mt-2">
-              <button class="btn primary" type="submit">Save SQL (mark Completed)</button>
+              <button class="btn btn-save" type="submit">Save SQL (mark Completed)</button>
             </div>
           </form>
 
@@ -108,7 +108,7 @@
               <input type="checkbox" id="admin-global-model-flag" {% if global_ai_model_info.needs_update %}checked{% endif %}>
               Needs update
             </label>
-            <button id="admin-global-model-save" class="btn small" type="button">Save Shared Model</button>
+            <button id="admin-global-model-save" class="btn small btn btn-save" type="button">Save Shared Model</button>
           </div>
           {% endif %}
         </div>

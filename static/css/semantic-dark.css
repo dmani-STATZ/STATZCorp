@@ -14,6 +14,33 @@ body.dark {
 
     --primary: var(--company-primary, #3b82f6);
     --primary-text: #0b1221;
+    --primary-hover: #3b82f6;
+    --primary-text-hover: #0b1221;
+
+    --secondary: var(--company-secondary, #6b7280);
+    --secondary-text: #ffffff;
+    --secondary-hover: #6f7d99;
+    --secondary-text-hover: #ffffff;
+
+    --danger: var(--company-danger, #ee0808);
+    --danger-text: #c2bcb5;
+    --danger-hover: #b81a1a;
+    --danger-text-hover: #aca4a4;
+
+    --caution: #aca4a4;
+    --caution-text: #b81a1a;
+    --caution-hover: #4b4742;
+    --caution-text-hover: #ee0808;
+
+    --save: #23e023;
+    --save-text: #ffffff;
+    --save-hover: #2ea02e;
+    --save-text-hover: #ffffff;
+
+    --nav: #6b7280;
+    --nav-text: #ffffff;
+    --nav-hover: #6b7280;
+    --nav-text-hover: #ffffff;
 
     background-color: #1f2937;
     color: #f3f4f6;

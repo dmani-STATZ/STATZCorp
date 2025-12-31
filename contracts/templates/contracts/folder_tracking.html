@@ -11,7 +11,7 @@
         color: {{ stack_colors|get_item:stack.id|get_item:'text' }} !important;
         border: 1px solid rgba(0, 0, 0, 0.1) !important;
     }
-    
+
     /* Dark mode specific overrides for stack colors */
     .dark select.stack-{{ stack.id }} {
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -26,62 +26,62 @@
         color: {{ stack_colors|get_item:stack.id|get_item:'text' }} !important;
     }
     {% endfor %}
-    
+
     /* Make highlight more vibrant but exclude first cell */
     tr.highlight-row > td:not(:first-child) {
         background-color: #ffeb3b !important;
         color: #000000 !important;
     }
-    
+
     /* Dark mode highlight adjustments */
     .dark tr.highlight-row > td:not(:first-child) {
         background-color: #ffd700 !important;
         color: #000000 !important;
     }
-    
+
     /* Ensure inputs and selects in highlighted rows maintain visibility */
     tr.highlight-row > td:not(:first-child) input:not([type="checkbox"]),
     tr.highlight-row > td:not(:first-child) select:not([class*="stack-"]) {
         background-color: inherit !important;
         color: inherit !important;
     }
-    
+
     /* Ensure select elements maintain their colors in dark mode */
     .dark select.editable-select {
         color-scheme: dark;
     }
-    
+
     /* Input and select base styles */
     .editable-input,
     .editable-select {
         background-color: transparent !important;
         border: 1px solid rgba(156, 163, 175, 0.2) !important;
     }
-    
+
     /* Dark mode input/select adjustments */
     .dark .editable-input,
     .dark .editable-select {
         border-color: rgba(156, 163, 175, 0.3) !important;
         color: #e5e7eb !important;
     }
-    
+
     /* Dark mode specific adjustments */
     .dark .editable-cell:hover {
         background-color: rgba(255, 255, 255, 0.05) !important;
     }
-    
+
     /* Checkbox styling for both modes */
     .checkbox-input {
         border-color: rgba(156, 163, 175, 0.4) !important;
     }
-    
+
     .dark .checkbox-input {
         border-color: rgba(156, 163, 175, 0.6) !important;
         background-color: transparent !important;
     }
-    
+
     /* Table compact styles with dark mode support */
-    .table-compact td, 
+    .table-compact td,
     .table-compact th {
         padding-top: 0.25rem !important;
         padding-bottom: 0.25rem !important;
@@ -89,17 +89,17 @@
         padding-right: 0.5rem !important;
         font-size: 0.75rem !important;
     }
-    
+
     .dark .table-compact th {
         color: #e5e7eb !important;
     }
-    
+
     /* Preserve stack colors in dark mode */
     .dark select.editable-select:not(.highlight-row select) {
         background-color: var(--original-bg-color, inherit) !important;
         color: var(--original-text-color, inherit) !important;
     }
-    
+
     .compact-table th, .compact-table td {
         padding: 0.5rem;
         font-size: 0.875rem;
@@ -179,7 +179,7 @@
         cursor: pointer !important;
         position: relative !important;
     }
-    
+
     .checkbox-input:checked {
         background-color: #3b82f6 !important;  /* Blue background when checked */
         border-color: #e5e7eb !important;
@@ -202,9 +202,9 @@
         outline: 2px solid #93c5fd !important;  /* Light blue focus ring */
         outline-offset: 2px !important;
     }
-    
+
     /* Table styles */
-    .table-compact td, 
+    .table-compact td,
     .table-compact th {
         padding-top: 0.25rem !important;    /* 4px */
         padding-bottom: 0.25rem !important; /* 4px */
@@ -212,7 +212,7 @@
         padding-right: 0.5rem !important;   /* 8px */
         font-size: 0.75rem !important;      /* Reduced from 0.875rem */
     }
-    
+
     /* Header specific styles */
     .table-compact th {
         padding: 1rem 0.5rem 0.5rem 0.5rem !important;  /* More top padding, standard sides/bottom */
@@ -232,7 +232,7 @@
         color: #252525 !important;
         letter-spacing: 0.05em !important;
     }
-    
+
     .table-compact .editable-input,
     .table-compact .editable-select {
         padding: 0.125rem 0.125rem !important;
@@ -240,7 +240,7 @@
         min-height: 1.50rem !important;
         font-size: 0.75rem !important;      /* Reduced from 0.875rem */
     }
-    
+
     .table-compact .checkbox-input {
         width: 1rem !important;
         height: 1rem !important;
@@ -257,9 +257,9 @@
     <div class="row-between mb-2">
         <h1 class="text-xl font-bold text-gray-900">Folder Tracking</h1>
         <div class="flex items-center space-x-4 flex-1 mx-4">
-            <input type="text" 
-                   name="search" 
-                   placeholder="Search folders by Contract Number, PO Number, Partial, or Tracking Number..." 
+            <input type="text"
+                   name="search"
+                   placeholder="Search folders by Contract Number, PO Number, Partial, or Tracking Number..."
                    value="{{ search_query }}"
                    onkeyup="handleSearch(event)"
                    class="w-full px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
@@ -272,7 +272,7 @@
                     <path d="M34 14H16" stroke="black" stroke-width="2"/>
                     <path d="M30 20H16" stroke="black" stroke-width="2"/>
                     <path d="M26 26H16" stroke="black" stroke-width="2"/>
-                  
+
                     <!-- Plus Icon -->
                     <circle cx="36" cy="34" r="9" fill="white"/>
                     <path d="M36 30V38" stroke="blue" stroke-width="2"/>
@@ -286,7 +286,7 @@
                 </svg>
                 Export to Excel
             </a>
-            <button type="button" id="togglePaginationBtn" 
+            <button type="button" id="togglePaginationBtn"
                 class="{% if pagination_disabled %}bg-red-600 hover:bg-red-700{% else %}bg-blue-600 hover:bg-blue-700{% endif %} text-white px-3 py-1.5 rounded text-sm flex items-center">
                 {% if pagination_disabled %}
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -334,12 +334,12 @@
                 {% for folder in folders %}
                 <tr class="{% if folder.highlight %}highlight-row{% endif %}" data-id="{{ folder.id }}">
                     <td class="whitespace-nowrap">
-                        <select class="editable-select stack-{{ folder.stack_id.id }}" 
-                                data-id="{{ folder.id }}" 
-                                data-field="stack_id" 
+                        <select class="editable-select stack-{{ folder.stack_id.id }}"
+                                data-id="{{ folder.id }}"
+                                data-field="stack_id"
                                 onchange="updateField(this)">
                             {% for stack in stacks %}
-                            <option value="{{ stack.id }}" 
+                            <option value="{{ stack.id }}"
                                     {% if folder.stack_id.id == stack.id %}selected{% endif %}>
                                 {{ stack.name }}
                             </option>
@@ -354,7 +354,7 @@
                                placeholder="Enter partial...">
                     </td>
                     <td class="whitespace-nowrap checkbox-cell">
-                        <input type="checkbox" class="checkbox-input" 
+                        <input type="checkbox" class="checkbox-input"
                                {% if folder.rts_email %}checked{% endif %}
                                data-id="{{ folder.id }}" data-field="rts_email" onchange="updateField(this)">
                     </td>
@@ -430,7 +430,7 @@
                 Previous
             </a>
             {% endif %}
-            
+
             {% for i in folders.paginator.page_range %}
                 {% if folders.number == i %}
                 <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
@@ -465,7 +465,7 @@
                                 Search Contract
                             </h3>
                             <div class="mt-2">
-                                <input type="text" 
+                                <input type="text"
                                        id="contractSearch"
                                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                        placeholder="Search by Contract Number or PO Number..."
@@ -489,7 +489,7 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                    <button type="button" id="cancelBtn" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">
+                    <button type="button" id="cancelBtn" class="mt-3 inline-flex w-full justify-center rounded-md btn btn-caution px-3 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-gray-300 sm:mt-0 sm:w-auto">
                         Cancel
                     </button>
                 </div>
@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', function() {
         togglePaginationBtn.addEventListener('click', function() {
             const formData = new FormData();
             formData.append('toggle_pagination', 'true');
-            
+
             fetch(window.location.pathname, {
                 method: 'POST',
                 headers: {
@@ -713,21 +713,21 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.status === 'success') {
                     console.log('Pagination toggled successfully:', data);
-                    
+
                     // Preserve search query if it exists
                     const currentUrl = new URL(window.location.href);
                     const searchQuery = currentUrl.searchParams.get('search');
                     const newUrl = new URL(window.location.pathname, window.location.origin);
-                    
+
                     if (searchQuery) {
                         newUrl.searchParams.set('search', searchQuery);
                     }
-                    
+
                     // Preserve page parameter if pagination is enabled and we have a page
                     if (!data.pagination_disabled && currentUrl.searchParams.has('page')) {
                         newUrl.searchParams.set('page', currentUrl.searchParams.get('page'));
                     }
-                    
+
                     // Reload the page with the new state
                     window.location.href = newUrl.toString();
                 } else {
@@ -743,4 +743,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %} 
+{% endblock %}

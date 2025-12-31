@@ -9,7 +9,7 @@
     <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-gray-900">System Messages</h1>
         <div class="flex space-x-4">
-            <a href="{% url 'users:create-message' %}" 
+            <a href="{% url 'users:create-message' %}"
                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
                 Create Message
             </a>
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const messageDiv = this.closest('[data-message-id]');
             const messageId = messageDiv.dataset.messageId;
-            
+
             fetch(`/users/messages/mark-read/${messageId}/`, {
                 method: 'POST',
                 headers: {
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     countElement.classList.add('hidden');
                 }
             }
-            
+
             // Hide the "Mark All as Read" button if no unread messages
             if (count === 0 && markAllBtn) {
                 markAllBtn.remove();
@@ -139,4 +139,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %} 
+{% endblock %}

@@ -155,6 +155,7 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
         
         # Explicitly ensure we're working with a Clin instance
         self.object = form.save(commit=False)
+        contract_id = self.kwargs.get('contract_id') or self.request.POST.get('contract')
         
         # Verify that NSN and Supplier objects exist before saving
         nsn_id = self.request.POST.get('nsn')
@@ -177,12 +178,25 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
             else:
                 form.add_error('supplier', 'Supplier is required')
                 return self.form_invalid(form)
+
+            if not self.object.contract_id:
+                if contract_id:
+                    contract_qs = Contract.objects
+                    if getattr(self.request, 'active_company', None):
+                        contract_qs = contract_qs.filter(company=self.request.active_company)
+                    self.object.contract = contract_qs.get(id=contract_id)
+                else:
+                    form.add_error('contract', 'Contract is required')
+                    return self.form_invalid(form)
                 
             # Set the created_by and modified_by fields
             self.object.created_by = self.request.user
             self.object.modified_by = self.request.user
-            if not self.object.company_id and getattr(self.request, 'active_company', None):
-                self.object.company = self.request.active_company
+            if not self.object.company_id:
+                if getattr(self.object, 'contract', None) and self.object.contract.company_id:
+                    self.object.company_id = self.object.contract.company_id
+                elif getattr(self.request, 'active_company', None):
+                    self.object.company = self.request.active_company
 
             # Save the Clin instance directly
             self.object.save()
@@ -203,6 +217,9 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
         except Supplier.DoesNotExist:
             form.add_error('supplier', 'Selected Supplier does not exist')
             return self.form_invalid(form)
+        except Contract.DoesNotExist:
+            form.add_error('contract', 'Selected Contract does not exist')
+            return self.form_invalid(form)
         except Exception as e:
             print(f"Error saving CLIN: {str(e)}")
             form.add_error(None, f"Error saving CLIN: {str(e)}")
@@ -211,9 +228,12 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
     def form_invalid(self, form):
         # Log form errors for debugging
         print("Form invalid with errors:", form.errors)
+        messages.error(self.request, 'Unable to save CLIN. Please correct the errors below.')
         return super().form_invalid(form)
     
     def get_success_url(self):
+        if self.object.contract_id:
+            return reverse('contracts:contract_management', kwargs={'pk': self.object.contract_id})
         return reverse('contracts:clin_detail', kwargs={'pk': self.object.pk})
 
 

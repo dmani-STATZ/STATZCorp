@@ -8,7 +8,7 @@
     <div class="max-w-3xl mx-auto">
         <div class="bg-white shadow rounded-lg p-6">
             <h1 class="text-2xl font-bold mb-6">User Settings</h1>
-            
+
             <div class="space-y-6">
                 {% for setting_name, value in settings.items %}
                 <div class="border-b pb-4">
@@ -39,7 +39,7 @@
             <form id="settingForm" class="mt-4">
                 {% csrf_token %}
                 <input type="hidden" id="settingName" name="setting_name">
-                
+
                 <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-bold mb-2" for="settingValue">
                         Value
@@ -47,15 +47,15 @@
                     <input type="text" id="settingValue" name="value"
                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                 </div>
-                
+
                 <div class="mt-4 flex justify-end space-x-3">
-                    <button type="button" 
+                    <button type="button"
                             onclick="closeModal()"
-                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                            class="px-4 py-2 btn btn-caution rounded">
                         Cancel
                     </button>
-                    <button type="submit" 
-                            class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    <button type="submit"
+                            class="px-4 py-2 btn btn-save rounded">
                         Save
                     </button>
                 </div>
@@ -73,12 +73,12 @@ function editSetting(settingName) {
     const titleEl = document.getElementById('modalTitle');
     const nameInput = document.getElementById('settingName');
     const valueInput = document.getElementById('settingValue');
-    
+
     // Set up the modal
     titleEl.textContent = `Edit ${settingName}`;
     nameInput.value = settingName;
     valueInput.value = '{{ settings|get:settingName }}';
-    
+
     // Show the modal
     modal.classList.remove('hidden');
 }
@@ -89,9 +89,9 @@ function closeModal() {
 
 document.getElementById('settingForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const formData = new FormData(this);
-    
+
     try {
         const response = await fetch("{% url 'users:settings-save' %}", {
             method: 'POST',
@@ -104,7 +104,7 @@ document.getElementById('settingForm').addEventListener('submit', async function
                 value: formData.get('value')
             })
         });
-        
+
         if (response.ok) {
             window.location.reload();
         } else {
@@ -116,4 +116,4 @@ document.getElementById('settingForm').addEventListener('submit', async function
     }
 });
 </script>
-{% endblock %} 
+{% endblock %}

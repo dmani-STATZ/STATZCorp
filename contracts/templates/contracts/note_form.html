@@ -20,20 +20,20 @@
         <div>
             {% if content_object %}
                 {% if content_type_id == 15 %}
-                    <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn-secondary">
+                    <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn btn-caution">
                         Cancel
                     </a>
                 {% elif content_type_id == 16 %}
-                    <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn-secondary">
+                    <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn btn-caution">
                         Cancel
                     </a>
                 {% else %}
-                    <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                    <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-caution">
                         Cancel
                     </a>
                 {% endif %}
             {% else %}
-                <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-caution">
                     Cancel
                 </a>
             {% endif %}
@@ -43,11 +43,11 @@
     <div class="card card-padded">
         <form method="post" class="space-y-6">
             {% csrf_token %}
-            
+
             <div class="space-y-4">
                 {{ form.note|as_crispy_field }}
             </div>
-            
+
             <div class="flex justify-between space-x-4 pt-6 border-t border-gray-200">
                 <div>
                     <a href="{% url 'contracts:add_reminder' %}" class="text-blue-600 hover:text-blue-800 flex items-center">
@@ -60,24 +60,24 @@
                 <div class="flex space-x-4">
                     {% if content_object %}
                         {% if content_type_id == 15 %}
-                            <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn-secondary">
+                            <a href="{% url 'contracts:contract_management' content_object.id %}" class="btn btn-caution">
                                 Cancel
                             </a>
                         {% elif content_type_id == 16 %}
-                            <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn-secondary">
+                            <a href="{% url 'contracts:clin_detail' content_object.id %}" class="btn btn-caution">
                                 Cancel
                             </a>
                         {% else %}
-                            <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                            <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-caution">
                                 Cancel
                             </a>
                         {% endif %}
                     {% else %}
-                        <a href="{% url 'contracts:contracts_dashboard' %}" class="btn-secondary">
+                        <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-caution">
                             Cancel
                         </a>
                     {% endif %}
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="btn-save">
                         Save Note
                     </button>
                 </div>
@@ -85,4 +85,4 @@
         </form>
     </div>
 </div>
-{% endblock %} 
+{% endblock %}

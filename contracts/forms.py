@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 from django.contrib.auth import get_user_model
 from users.models import UserCompanyMembership
 from products.models import Nsn
@@ -567,6 +568,29 @@ class ClinForm(BaseModelForm):
         if 'supplier' in self._errors:
             # We handle Supplier validation in the view, so remove the error here
             del self._errors['supplier']
+
+        order_qty = cleaned_data.get('order_qty')
+        unit_price = cleaned_data.get('unit_price')
+        if (
+            order_qty is not None
+            and unit_price is not None
+            and cleaned_data.get('item_value') is None
+        ):
+            try:
+                cleaned_data['item_value'] = Decimal(str(order_qty)) * unit_price
+            except (InvalidOperation, TypeError):
+                pass
+
+        price_per_unit = cleaned_data.get('price_per_unit')
+        if (
+            order_qty is not None
+            and price_per_unit is not None
+            and cleaned_data.get('quote_value') is None
+        ):
+            try:
+                cleaned_data['quote_value'] = Decimal(str(order_qty)) * price_per_unit
+            except (InvalidOperation, TypeError):
+                pass
             
         return cleaned_data
 

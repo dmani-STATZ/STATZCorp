@@ -5,7 +5,7 @@
 
     <style>
         /* main {
-            
+
         } */
 
         .form-container {
@@ -42,7 +42,7 @@
         .form-lower-container {
             padding: 1rem;
         }
-           
+
         .input-row {
             width: 100%;
             max-width: 600px; /* Ensure rows do not exceed the container's max width */
@@ -51,7 +51,7 @@
             align-items: center;
             margin-bottom: .5rem;
         }
-    
+
         .input-label {
             color: #1f2937;
             font-weight: 500;
@@ -59,7 +59,7 @@
             text-align: right;
             width: 150px;
         }
-    
+
         .input-field {
             width: 250px;
             padding: 0.5rem;
@@ -68,17 +68,17 @@
             border-radius: 2rem;
             transition: all 0.2s;
         }
-    
+
         .input-field:focus {
             outline: none;
             border-color: #002561;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
-    
+
         .input-field:hover {
             border-color: #60a5fa;
         }
-    
+
         .back-button {
             display: inline-flex;
             align-items: center;
@@ -91,7 +91,7 @@
             font-weight: 500;
             transition: all 0.2s;
         }
-    
+
         .back-button:hover {
             color: white;
             background-color: #374151;
@@ -134,18 +134,18 @@
                             {{ field.label }}
                         {% endif %} :
                     </label>
-                    <input type="{% if field.label == 'Purchaseprice' %}number{% else %}{{ field.field.widget.input_type }}{% endif %}" 
-                           name="{{ field.name }}" 
-                           id="{{ field.id_for_label }}" 
+                    <input type="{% if field.label == 'Purchaseprice' %}number{% else %}{{ field.field.widget.input_type }}{% endif %}"
+                           name="{{ field.name }}"
+                           id="{{ field.id_for_label }}"
                            class="input-field {% if field.name == 'nsn' %}autocomplete-nsn{% elif field.name == 'description' %}autocomplete-description{% elif field.name == 'manufacturer' %}autocomplete-manufacturer{% endif %}"
                            {% if field.label == 'Purchaseprice' %}step="0.01"{% endif %}
                            {% if field.value %}value="{{ field.value }}"{% endif %}>
                 </div>
                 {% endfor %}
-                
+
                 <div class="text-center mt-6">
-                    <button type="submit" 
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium 
+                    <button type="submit"
+                            class="btn btn-save px-6 py-3 rounded-lg font-medium
                                    shadow-md hover:shadow-lg transition-all duration-200">
                         Save Item
                     </button>
@@ -162,12 +162,12 @@
             source: "{% url 'inventory:autocomplete_nsn' %}",
             minLength: 1
         });
-        
+
         $(".autocomplete-description").autocomplete({
             source: "{% url 'inventory:autocomplete_description' %}",
             minLength: 1
         });
-        
+
         $(".autocomplete-manufacturer").autocomplete({
             source: "{% url 'inventory:autocomplete_manufacturer' %}",
             minLength: 1

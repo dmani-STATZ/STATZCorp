@@ -4,7 +4,7 @@
     <!-- Form -->
     <form id="acknowledgmentLetterForm" method="POST" data-letter-id="{{ letter.id }}" class="space-y-3">
         {% csrf_token %}
-        
+
         <!-- Letter Date -->
         <div class="grid grid-cols-3 gap-3 items-center">
             <div class="col-span-1">
@@ -117,8 +117,8 @@
 
         <!-- Action Buttons -->
         <div class="flex justify-end space-x-3 pt-3">
-            <button type="button" 
-                    class="px-3 py-1.5 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+            <button type="button"
+                    class="px-3 py-1.5 bg-gray-300 btn btn-caution"
                     onclick="closeAcknowledgmentLetter()">
                 Cancel
             </button>
@@ -128,7 +128,7 @@
                 Generate Letter
             </button>
             <button type="submit"
-                    class="px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600">
+                    class="px-3 py-1.5 btn btn-save rounded">
                 Save
             </button>
         </div>
@@ -138,18 +138,18 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('acknowledgmentLetterForm');
-    
+
     // Style all form inputs
     form.querySelectorAll('input, select').forEach(input => {
         input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
     });
-    
+
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const letterId = this.dataset.letterId;
         const formData = new FormData(this);
-        
+
         try {
             // Save the letter (the server will also save user settings)
             const response = await fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
@@ -157,15 +157,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
             const result = await response.json();
-            
+
             if (!result.success) {
                 throw new Error('Failed to save letter: ' + JSON.stringify(result.errors));
             }
-            
+
             // Close modal and refresh page
             closeAcknowledgmentLetter();
             location.reload();
-            
+
         } catch (error) {
             console.error('Error:', error);
             alert(error.message || 'Error saving form data');
@@ -179,7 +179,7 @@ function closeAcknowledgmentLetter() {
     if (contentDiv) {
         contentDiv.innerHTML = '';
     }
-    
+
     // Hide the modal and refresh the page
     const modal = document.getElementById('acknowledgmentLetterModal');
     if (modal) {
@@ -189,4 +189,4 @@ function closeAcknowledgmentLetter() {
 }
 
 // The generateLetter function has been moved to the parent template (contract_management.html)
-</script> 
+</script>
