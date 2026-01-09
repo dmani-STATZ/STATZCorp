@@ -70,6 +70,7 @@ class Matrix(models.Model):
         null=True,
         choices=FREQUENCY_CHOICES
     )
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.account.get_type_display()} - {self.course}"

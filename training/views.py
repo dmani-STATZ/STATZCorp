@@ -86,7 +86,10 @@ def dashboard(request):
     # User-specific CMMC data
     today = timezone.now().date()
     user_account_ids = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
-    user_required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).distinct()
+    user_required_matrix_entries = Matrix.objects.filter(
+        account__in=user_account_ids,
+        is_active=True,
+    ).distinct()
     user_total_required_courses = user_required_matrix_entries.count()
     user_completions = (
         Tracker.objects
@@ -116,7 +119,10 @@ def dashboard(request):
 
     for user_id in cmmc_users_with_accounts:
         user_account_ids = UserAccount.objects.filter(user_id=user_id).values_list('account_id', flat=True)
-        required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).distinct()
+        required_matrix_entries = Matrix.objects.filter(
+            account__in=user_account_ids,
+            is_active=True,
+        ).distinct()
         total_possible_cmmc_trainings += required_matrix_entries.count()
 
         completions = (
@@ -178,7 +184,7 @@ def manage_matrix(request):
         try:
             account_id = int(request.GET.get('account'))
             selected_account = get_object_or_404(Account, pk=account_id)
-            existing_matrix_entries = Matrix.objects.filter(account=selected_account)
+            existing_matrix_entries = Matrix.objects.filter(account=selected_account, is_active=True)
         except (ValueError, Account.DoesNotExist):
             messages.error(request, "Invalid account selected.")
     
@@ -188,17 +194,17 @@ def manage_matrix(request):
             selected_account = get_object_or_404(Account, pk=request.POST.get('account'))
             selected_courses = request.POST.getlist('selected_courses')
             
-            # Delete existing entries for this account
-            Matrix.objects.filter(account=selected_account).delete()
+            # Soft-deactivate existing entries for this account
+            Matrix.objects.filter(account=selected_account, is_active=True).update(is_active=False)
             
-            # Create new entries
+            # Create or reactivate entries
             for course_id in selected_courses:
                 frequency = request.POST.get(f'frequency_{course_id}')
                 if frequency:  # Only create if frequency is selected
-                    Matrix.objects.create(
+                    Matrix.objects.update_or_create(
                         account=selected_account,
                         course_id=course_id,
-                        frequency=frequency
+                        defaults={'frequency': frequency, 'is_active': True},
                     )
             
             messages.success(request, f"Training matrix updated for {selected_account.get_type_display()}")
@@ -221,8 +227,11 @@ def manage_matrix(request):
 @login_required
 def user_training_requirements(request):
     user = request.user
-    active_user_accounts = UserAccount.objects.filter(user=user)
-    required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in active_user_accounts]).distinct()
+    active_user_account_ids = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+    required_matrix_entries = Matrix.objects.filter(
+        account__in=active_user_account_ids,
+        is_active=True,
+    ).distinct()
     today = timezone.now().date()
     tracked_completions = (
         Tracker.objects
@@ -295,10 +304,14 @@ def mark_complete(request, course_id):
         try:
             course = get_object_or_404(Course, pk=course_id)
             user = request.user
-            active_user_accounts = UserAccount.objects.filter(user=user)
+            active_user_account_ids = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
 
             # Find the relevant Matrix entry for this user's account and the course
-            matrix_entry = Matrix.objects.filter(account__in=[ua.account for ua in active_user_accounts], course=course).first()
+            matrix_entry = Matrix.objects.filter(
+                account__in=active_user_account_ids,
+                course=course,
+                is_active=True,
+            ).first()
 
             if matrix_entry:
                 Tracker.objects.get_or_create(
@@ -367,14 +380,16 @@ def training_audit(request):  # This audit is for non-staff users and is the CMM
     courses = Course.objects.all().order_by('name')
     today = timezone.now().date()
     audit_data = []
-    today = timezone.now().date()
 
     for user in users:
         user_accounts_qs = UserAccount.objects.filter(user=user).select_related('account')
         user_account_ids = [ua.account_id for ua in user_accounts_qs]
         account_labels = sorted({ua.account.get_type_display() for ua in user_accounts_qs})
         accounts_display = ", ".join(account_labels)
-        required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).select_related('course')
+        required_matrix_entries = Matrix.objects.filter(
+            account__in=user_account_ids,
+            is_active=True,
+        ).select_related('course')
         required_courses_for_user = {entry.course_id for entry in required_matrix_entries}
         frequency_by_course = {}
         for entry in required_matrix_entries:
@@ -441,6 +456,7 @@ def training_audit_export(request):
 
     title = "Training Completion Audit"
     generated = timezone.now().strftime("%m/%d/%Y")
+    today = timezone.now().date()
 
     def draw_page_header():
         p.setFont("Helvetica-Bold", 18)
@@ -457,7 +473,10 @@ def training_audit_export(request):
         user_account_ids = [ua.account_id for ua in user_accounts_qs]
         account_labels = sorted({ua.account.get_type_display() for ua in user_accounts_qs})
         accounts_display = ", ".join(account_labels)
-        required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).select_related('course')
+        required_matrix_entries = Matrix.objects.filter(
+            account__in=user_account_ids,
+            is_active=True,
+        ).select_related('course')
         required_courses_for_user = {entry.course_id for entry in required_matrix_entries}
         frequency_by_course = {}
         for entry in required_matrix_entries:
@@ -1000,7 +1019,8 @@ def admin_cmmc_upload(request):
                 user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
                 matrix_entry = Matrix.objects.filter(
                     account__in=user_accounts,
-                    course=course
+                    course=course,
+                    is_active=True,
                 ).first()
                 
                 if not matrix_entry:
@@ -1053,7 +1073,7 @@ def admin_cmmc_upload(request):
     ).select_related('user', 'matrix__course').order_by('-completed_date')[:10]
     
     account_courses = defaultdict(dict)
-    for entry in Matrix.objects.select_related('course').values('account_id', 'course_id', 'course__name'):
+    for entry in Matrix.objects.filter(is_active=True).select_related('course').values('account_id', 'course_id', 'course__name'):
         account_courses[entry['account_id']][entry['course_id']] = entry['course__name']
 
     user_course_map = defaultdict(dict)

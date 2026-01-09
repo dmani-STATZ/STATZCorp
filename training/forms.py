@@ -134,7 +134,8 @@ class CmmcDocumentUploadForm(BaseForm):
             user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
             valid_matrix = Matrix.objects.filter(
                 account__in=user_accounts,
-                course=course
+                course=course,
+                is_active=True,
             ).exists()
 
             if not valid_matrix:
