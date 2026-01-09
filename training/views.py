@@ -167,7 +167,7 @@ def dashboard(request):
         'total_possible_aw_completions': total_possible_aw_completions,
         'total_actual_aw_completions': total_actual_aw_completions,
         'uncompleted_aw_completions': uncompleted_aw_completions,
-        'is_staff': request.user.is_staff,
+        'is_superuser': request.user.is_superuser,
     }
     return render(request, 'training/dashboard.html', context)
 
