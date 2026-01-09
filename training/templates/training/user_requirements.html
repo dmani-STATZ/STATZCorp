@@ -10,7 +10,7 @@
         {% if required_courses_data %}
             <ul class="space-y-4">
                 {% for item in required_courses_data %}
-                    <li class="bg-white rounded-lg shadow p-4">
+                    <li class="bg-white rounded-lg shadow p-4 border-l-4 {% if item.is_current %}border-green-500{% else %}border-red-500{% endif %}">
                         <h2 class="text-xl font-semibold">{{ item.matrix_entry.course.name }}</h2>
                         {% if item.matrix_entry.course.description %}
                             <p class="text-gray-600 mt-1">{{ item.matrix_entry.course.description }}</p>
@@ -26,7 +26,18 @@
                         {% endif %}
 
                         {% if item.completed and item.tracker_id %}
-                            <div class="mt-4 text-green-500 font-semibold">Completed on: {{ item.completion_date|date:"F j, Y" }}</div>
+                            <div class="mt-4 font-semibold {% if item.is_current %}text-green-500{% else %}text-red-500{% endif %}">
+                                Completed on: {{ item.completion_date|date:"F j, Y" }}
+                            </div>
+                            {% if item.expiration_date %}
+                                <div class="text-sm {% if item.is_current %}text-gray-600{% else %}text-red-600{% endif %}">
+                                    {% if item.is_current %}
+                                        Expires on: {{ item.expiration_date|date:"F j, Y" }}
+                                    {% else %}
+                                        Expired on: {{ item.expiration_date|date:"F j, Y" }}
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                             {% if item.matrix_entry.course.upload %}
                                 {% if item.document and item.tracker_id and item.document_name %}
                                     <p class="mt-2"><a href="{% url 'training:view_document' item.tracker_id %}" class="text-blue-500 hover:underline" target="_blank">View Document ({{ item.document_name }})</a></p>
@@ -49,14 +60,15 @@
                                     </form>
                                 {% endif %}
                             {% endif %}
-                        {% else %}
+                        {% endif %}
+                        {% if not item.is_current %}
                             <form method="post" action="{% url 'training:mark_complete' item.matrix_entry.course.id %}" class="mt-4">
                                 {% csrf_token %}
                                 <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 text-sm">
-                                    Mark as Completed
+                                    {% if item.completed %}Mark as Completed Again{% else %}Mark as Completed{% endif %}
                                 </button>
                             </form>
-                            {% if item.matrix_entry.course.upload %}    
+                            {% if item.matrix_entry.course.upload and not item.completed %}
                                 <button type="button" class="text-sm text-blue-500 hover:underline mt-1" onclick="toggleUpload('upload_{{ item.matrix_entry.id }}')">Upload Document</button>
                                 <form method="post" action="{% url 'training:upload_document' item.matrix_entry.id %}" enctype="multipart/form-data" class="mt-2 hidden" id="upload_{{ item.matrix_entry.id }}">
                                     {% csrf_token %}

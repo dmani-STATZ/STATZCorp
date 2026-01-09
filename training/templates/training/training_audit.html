@@ -80,21 +80,27 @@
                             </td>
                             {% for course in courses %}
                                 {% with status=user_data.courses|get_item:course.id %}
-                                    <td class="{% if status.required %} {% if status.completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %} {% endif %}">
+                                    <td class="{% if status.required %}{% if status.is_current %} bg-green-200 {% else %} bg-red-200 {% endif %}{% endif %}">
                                         {% if status and status.completed_date %}
                                             {% if status.document and status.tracker_id %}
                                                 <a href="{% url 'training:view_document' status.tracker_id %}" 
-                                                   class="text-blue-600 hover:text-blue-800 hover:underline text-xs block font-medium cursor-pointer" 
+                                                   class="{% if status.required and not status.is_current %}text-red-700{% else %}text-blue-600 hover:text-blue-800{% endif %} hover:underline text-xs block font-medium cursor-pointer" 
                                                    title="Click to view uploaded document: {{ status.document_name|default:'Document' }}">
                                                     📄 {{ status.completed_date|date:"n/j/Y" }}
                                                 </a>
+                                                {% if status.required and not status.is_current %}
+                                                    <small class="text-red-700">(Expired)</small>
+                                                {% endif %}
                                             {% else %}
-                                                <span class="text-xs block text-gray-700">
+                                                <span class="text-xs block {% if status.required and not status.is_current %}text-red-700{% else %}text-gray-700{% endif %}">
                                                     {{ status.completed_date|date:"n/j/Y" }}
                                                     {% if status.tracker_id %}
                                                         <br><small class="text-gray-500">(No doc)</small>
                                                     {% endif %}
                                                 </span>
+                                                {% if status.required and not status.is_current %}
+                                                    <small class="text-red-700">(Expired)</small>
+                                                {% endif %}
                                             {% endif %}
                                         {% endif %}
                                     </td>

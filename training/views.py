@@ -19,21 +19,92 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 
 from .forms import MatrixManagementForm, ArcticWolfCourseForm, CmmcDocumentUploadForm
-from .models import Matrix, Account, Course, UserAccount, Tracker, ArcticWolfCourse, ArcticWolfCompletion, CourseReviewClick
+from .models import (
+    Matrix,
+    Account,
+    Course,
+    UserAccount,
+    Tracker,
+    ArcticWolfCourse,
+    ArcticWolfCompletion,
+    CourseReviewClick,
+    get_frequency_expiration_date,
+)
+
+
+def get_completion_status(completed_date, frequency, today=None):
+    if not completed_date:
+        return False, None
+    if today is None:
+        today = timezone.now().date()
+    expiration_date = get_frequency_expiration_date(completed_date, frequency)
+    if not expiration_date:
+        return True, None
+    return expiration_date >= today, expiration_date
+
+
+def latest_completion_by_matrix(completions):
+    latest = {}
+    for completion in completions:
+        if completion.matrix_id not in latest:
+            latest[completion.matrix_id] = completion
+    return latest
+
+
+def latest_completion_by_course(completions):
+    latest = {}
+    for completion in completions:
+        course_id = completion.matrix.course_id
+        if course_id not in latest:
+            latest[course_id] = completion
+    return latest
+
+
+def frequency_months(frequency):
+    if frequency == 'bi-annually':
+        return 6
+    if frequency == 'annually':
+        return 12
+    return None
+
+
+def pick_strictest_frequency(existing, candidate):
+    if not existing:
+        return candidate
+    existing_months = frequency_months(existing)
+    candidate_months = frequency_months(candidate)
+    if existing_months is None:
+        return candidate
+    if candidate_months is None:
+        return existing
+    return candidate if candidate_months < existing_months else existing
 
 @login_required
 def dashboard(request):
     user = request.user
 
     # User-specific CMMC data
-    user_accounts = UserAccount.objects.filter(user=user)
-    user_required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in user_accounts]).distinct()
-    user_completed_trainings = Tracker.objects.filter(
-        user=user,
-        matrix__in=user_required_matrix_entries,
-        completed_date__isnull=False
-    ).count()
+    today = timezone.now().date()
+    user_account_ids = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
+    user_required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).distinct()
     user_total_required_courses = user_required_matrix_entries.count()
+    user_completions = (
+        Tracker.objects
+        .filter(user=user, matrix__in=user_required_matrix_entries)
+        .select_related('matrix')
+        .order_by('-completed_date', '-id')
+    )
+    latest_user_completions = latest_completion_by_matrix(user_completions)
+    user_completed_trainings = 0
+    for matrix_entry in user_required_matrix_entries:
+        completion = latest_user_completions.get(matrix_entry.id)
+        is_current, _ = get_completion_status(
+            completion.completed_date if completion else None,
+            matrix_entry.frequency,
+            today,
+        )
+        if is_current:
+            user_completed_trainings += 1
 
     # CMMC Data for Pie Chart (considering non-staff users with accounts)
     # CMMC Training Matrix: Shows users where is_active=True AND is_staff=False
@@ -44,16 +115,26 @@ def dashboard(request):
     total_completed_cmmc_trainings = 0
 
     for user_id in cmmc_users_with_accounts:
-        user_accounts = UserAccount.objects.filter(user_id=user_id)
-        required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in user_accounts]).distinct()
+        user_account_ids = UserAccount.objects.filter(user_id=user_id).values_list('account_id', flat=True)
+        required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).distinct()
         total_possible_cmmc_trainings += required_matrix_entries.count()
 
-        completed_required_trainings_for_user = Tracker.objects.filter(
-            user_id=user_id,
-            matrix__in=required_matrix_entries,
-            completed_date__isnull=False
-        ).count()
-        total_completed_cmmc_trainings += completed_required_trainings_for_user
+        completions = (
+            Tracker.objects
+            .filter(user_id=user_id, matrix__in=required_matrix_entries)
+            .select_related('matrix')
+            .order_by('-completed_date', '-id')
+        )
+        latest_completions = latest_completion_by_matrix(completions)
+        for matrix_entry in required_matrix_entries:
+            completion = latest_completions.get(matrix_entry.id)
+            is_current, _ = get_completion_status(
+                completion.completed_date if completion else None,
+                matrix_entry.frequency,
+                today,
+            )
+            if is_current:
+                total_completed_cmmc_trainings += 1
 
     uncompleted_cmmc_trainings = total_possible_cmmc_trainings - total_completed_cmmc_trainings if total_possible_cmmc_trainings > 0 else 0
 
@@ -142,14 +223,29 @@ def user_training_requirements(request):
     user = request.user
     active_user_accounts = UserAccount.objects.filter(user=user)
     required_matrix_entries = Matrix.objects.filter(account__in=[ua.account for ua in active_user_accounts]).distinct()
-    tracked_completions = Tracker.objects.filter(user=user)
+    today = timezone.now().date()
+    tracked_completions = (
+        Tracker.objects
+        .filter(user=user, matrix__in=required_matrix_entries)
+        .select_related('matrix')
+        .order_by('-completed_date', '-id')
+    )
+    completion_map = latest_completion_by_matrix(tracked_completions)
 
     required_courses_data = []
     for matrix_entry in required_matrix_entries:
-        completion = tracked_completions.filter(matrix=matrix_entry).first()
+        completion = completion_map.get(matrix_entry.id)
+        is_current, expiration_date = get_completion_status(
+            completion.completed_date if completion else None,
+            matrix_entry.frequency,
+            today,
+        )
         required_courses_data.append({
             'matrix_entry': matrix_entry,
             'completed': bool(completion),
+            'is_current': is_current,
+            'is_expired': bool(completion) and expiration_date and expiration_date < today,
+            'expiration_date': expiration_date,
             'completion_date': completion.completed_date if completion else None,
             'document': completion.document if completion else None,
             'tracker_id': completion.id if completion else None,
@@ -205,7 +301,11 @@ def mark_complete(request, course_id):
             matrix_entry = Matrix.objects.filter(account__in=[ua.account for ua in active_user_accounts], course=course).first()
 
             if matrix_entry:
-                Tracker.objects.get_or_create(user=user, matrix=matrix_entry, completed_date=timezone.now())
+                Tracker.objects.get_or_create(
+                    user=user,
+                    matrix=matrix_entry,
+                    completed_date=timezone.now().date(),
+                )
                 messages.success(request, f"Course '{course.name}' marked as completed.")
             else:
                 messages.error(request, "No training requirement found for this course and your account.")
@@ -221,7 +321,15 @@ def upload_document(request, matrix_id):  # Changed from matrix_entry_id to matr
     if request.method == 'POST' and request.FILES.get('document'):
         try:
             matrix = get_object_or_404(Matrix, pk=matrix_id) # Changed to matrix
-            tracker_entry = Tracker.objects.get(user=request.user, matrix=matrix)
+            tracker_entry = (
+                Tracker.objects
+                .filter(user=request.user, matrix=matrix)
+                .order_by('-completed_date', '-id')
+                .first()
+            )
+            if not tracker_entry:
+                messages.error(request, "Completion record not found.")
+                return redirect('training:user_requirements')
             uploaded_file = request.FILES['document']
 
             tracker_entry.document = uploaded_file.read()  # Read the file content into binary data
@@ -230,8 +338,6 @@ def upload_document(request, matrix_id):  # Changed from matrix_entry_id to matr
             messages.success(request, f"Document uploaded for '{matrix.course.name}'.")
         except Matrix.DoesNotExist:
             messages.error(request, "Invalid training requirement.")
-        except Tracker.DoesNotExist:
-            messages.error(request, "Completion record not found.")
         except Exception as e:
             messages.error(request, f"Error uploading document: {e}")
 
@@ -259,34 +365,49 @@ def training_audit(request):  # This audit is for non-staff users and is the CMM
 
     users = User.objects.filter(is_active=True).order_by('username')
     courses = Course.objects.all().order_by('name')
+    today = timezone.now().date()
     audit_data = []
+    today = timezone.now().date()
 
     for user in users:
         user_accounts_qs = UserAccount.objects.filter(user=user).select_related('account')
         user_account_ids = [ua.account_id for ua in user_accounts_qs]
         account_labels = sorted({ua.account.get_type_display() for ua in user_accounts_qs})
         accounts_display = ", ".join(account_labels)
-        user_completion_status = Tracker.objects.filter(user=user).values('matrix__course_id', 'completed_date', 'document', 'document_name', 'id')
-        required_courses_for_user = Matrix.objects.filter(account__in=user_account_ids).values_list('course_id', flat=True).distinct()
+        required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).select_related('course')
+        required_courses_for_user = {entry.course_id for entry in required_matrix_entries}
+        frequency_by_course = {}
+        for entry in required_matrix_entries:
+            frequency_by_course[entry.course_id] = pick_strictest_frequency(
+                frequency_by_course.get(entry.course_id),
+                entry.frequency,
+            )
 
-        completion_dict = {item['matrix__course_id']: item for item in user_completion_status}
+        completions = (
+            Tracker.objects
+            .filter(user=user)
+            .select_related('matrix')
+            .order_by('-completed_date', '-id')
+        )
+        completion_dict = latest_completion_by_course(completions)
         user_row = {'user': user, 'accounts_display': accounts_display, 'courses': {}}
 
         for course in courses:
             is_required = course.id in required_courses_for_user
             completion_info = completion_dict.get(course.id)
-
-            # Check if document exists and is not empty
-            has_document = False
-            if completion_info and completion_info['document']:
-                has_document = True
+            completed_date = completion_info.completed_date if completion_info else None
+            has_document = bool(completion_info and completion_info.document)
+            frequency = frequency_by_course.get(course.id)
+            is_current, expiration_date = get_completion_status(completed_date, frequency, today)
 
             status = {
                 'required': is_required,
-                'completed_date': completion_info['completed_date'] if completion_info else None,
-                'document': completion_info['document'] if completion_info and has_document else None,
-                'document_name': completion_info['document_name'] if completion_info else None,
-                'tracker_id': completion_info['id'] if completion_info else None,
+                'completed_date': completed_date,
+                'document': completion_info.document if completion_info and has_document else None,
+                'document_name': completion_info.document_name if completion_info else None,
+                'tracker_id': completion_info.id if completion_info else None,
+                'is_current': is_current,
+                'expiration_date': expiration_date,
             }
             user_row['courses'][course.id] = status
         audit_data.append(user_row)
@@ -336,17 +457,25 @@ def training_audit_export(request):
         user_account_ids = [ua.account_id for ua in user_accounts_qs]
         account_labels = sorted({ua.account.get_type_display() for ua in user_accounts_qs})
         accounts_display = ", ".join(account_labels)
-        required_courses_for_user = set(
-            Matrix.objects.filter(account__in=user_account_ids).values_list('course_id', flat=True).distinct()
-        )
+        required_matrix_entries = Matrix.objects.filter(account__in=user_account_ids).select_related('course')
+        required_courses_for_user = {entry.course_id for entry in required_matrix_entries}
+        frequency_by_course = {}
+        for entry in required_matrix_entries:
+            frequency_by_course[entry.course_id] = pick_strictest_frequency(
+                frequency_by_course.get(entry.course_id),
+                entry.frequency,
+            )
 
         if not required_courses_for_user:
             continue
 
-        user_completion_status = Tracker.objects.filter(user=user).values(
-            'matrix__course_id', 'completed_date', 'document'
+        completions = (
+            Tracker.objects
+            .filter(user=user)
+            .select_related('matrix')
+            .order_by('-completed_date', '-id')
         )
-        completion_dict = {item['matrix__course_id']: item for item in user_completion_status}
+        completion_dict = latest_completion_by_course(completions)
 
         # Build list of required courses for this user
         user_courses = []
@@ -354,9 +483,11 @@ def training_audit_export(request):
             if course.id not in required_courses_for_user:
                 continue
             completion_info = completion_dict.get(course.id)
-            completed_date = completion_info['completed_date'] if completion_info else None
-            has_document = bool(completion_info and completion_info['document'])
-            user_courses.append((course.name, completed_date, has_document))
+            completed_date = completion_info.completed_date if completion_info else None
+            has_document = bool(completion_info and completion_info.document)
+            frequency = frequency_by_course.get(course.id)
+            is_current, _ = get_completion_status(completed_date, frequency, today)
+            user_courses.append((course.name, completed_date, has_document, is_current))
 
         if not user_courses:
             continue
@@ -386,7 +517,7 @@ def training_audit_export(request):
 
         p.setFont("Helvetica", 9)
 
-        for course_name, completed_date, has_document in user_courses:
+        for course_name, completed_date, has_document, is_current in user_courses:
             # New page in middle of user's courses
             if y < 50:
                 p.showPage()
@@ -412,10 +543,10 @@ def training_audit_export(request):
             p.setFillColor(colors.black)
             p.drawString(70, y, course_name[:45])
 
-            # Date column: green if complete, red if not
+            # Date column: green if current, red if not current
             if completed_date:
                 date_text = completed_date.strftime("%m/%d/%Y")
-                p.setFillColor(colors.green)
+                p.setFillColor(colors.green if is_current else colors.red)
             else:
                 date_text = "Not Complete"
                 p.setFillColor(colors.red)
@@ -863,7 +994,7 @@ def admin_cmmc_upload(request):
             try:
                 user = form.cleaned_data['user']
                 course = form.cleaned_data['course']
-                uploaded_file = form.cleaned_data['file']
+                uploaded_file = form.cleaned_data.get('file')
                 
                 # Find the relevant Matrix entry for this user/course combination
                 user_accounts = UserAccount.objects.filter(user=user).values_list('account_id', flat=True)
@@ -874,29 +1005,45 @@ def admin_cmmc_upload(request):
                 
                 if not matrix_entry:
                     messages.error(request, "No valid matrix entry found for the selected user/course combination.")
-                    return render(request, 'training/admin_cmmc_upload.html', {'form': form})
+
+                if not uploaded_file:
+                    form.add_error('file', 'This field is required.')
                 
-                # Create or update the Tracker entry
-                tracker_entry, created = Tracker.objects.get_or_create(
-                    user=user,
-                    matrix=matrix_entry,
-                    defaults={'completed_date': timezone.now().date()}
-                )
-                
-                # Store the uploaded file
-                tracker_entry.document = uploaded_file.read()
-                tracker_entry.document_name = get_valid_filename(uploaded_file.name)
-                tracker_entry.save()
-                
-                action = "created" if created else "updated"
-                messages.success(
-                    request, 
-                    f"Document successfully {action} for {user.get_full_name() or user.username} - {course.name}"
-                )
-                return redirect('training:admin_cmmc_upload')
+                if matrix_entry and uploaded_file:
+                    # Create or update the Tracker entry for today's completion
+                    today = timezone.now().date()
+                    tracker_entry = (
+                        Tracker.objects
+                        .filter(user=user, matrix=matrix_entry, completed_date=today)
+                        .order_by('-id')
+                        .first()
+                    )
+                    created = False
+                    if not tracker_entry:
+                        tracker_entry = Tracker.objects.create(
+                            user=user,
+                            matrix=matrix_entry,
+                            completed_date=today,
+                        )
+                        created = True
+                    
+                    # Store the uploaded file
+                    tracker_entry.document = uploaded_file.read()
+                    tracker_entry.document_name = get_valid_filename(uploaded_file.name)
+                    tracker_entry.save()
+                    
+                    action = "created" if created else "updated"
+                    messages.success(
+                        request, 
+                        f"Document successfully {action} for {user.get_full_name() or user.username} - {course.name}"
+                    )
+                    return redirect('training:admin_cmmc_upload')
                 
             except Exception as e:
                 messages.error(request, f"Error uploading document: {str(e)}")
+        else:
+            if form.non_field_errors():
+                messages.error(request, "No valid matrix entry found for the selected user/course combination.")
     else:
         form = CmmcDocumentUploadForm()
     

@@ -1,9 +1,28 @@
+import calendar
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import User  # Import the User model
-import uuid
 from django.utils import timezone
-from datetime import timedelta
 from django.utils.text import slugify
+
+
+def add_months(source_date, months):
+    month = source_date.month - 1 + months
+    year = source_date.year + month // 12
+    month = month % 12 + 1
+    day = min(source_date.day, calendar.monthrange(year, month)[1])
+    return source_date.replace(year=year, month=month, day=day)
+
+
+def get_frequency_expiration_date(completed_date, frequency):
+    if not completed_date:
+        return None
+    if frequency == 'annually':
+        return add_months(completed_date, 12)
+    if frequency == 'bi-annually':
+        return add_months(completed_date, 6)
+    return None
 
 class Course(models.Model):
     name = models.CharField(max_length=255)
@@ -40,7 +59,7 @@ class Matrix(models.Model):
     FREQUENCY_CHOICES = [
         ('once', 'Once'),
         ('annually', 'Annually'),
-        ('bi-annually', 'Bi-Annually'),
+        ('bi-annually', 'Semi-Annual'),
     ]
 
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -78,11 +97,7 @@ class Tracker(models.Model):
 
     @property
     def expiration_date(self):
-        if self.matrix.frequency == 'annually':
-            return self.completed_date + timedelta(days=365)
-        elif self.matrix.frequency == 'bi-annually':
-            return self.completed_date + timedelta(days=730)
-        return None
+        return get_frequency_expiration_date(self.completed_date, self.matrix.frequency)
 
     def __str__(self):
         return f"{self.user.username} - {self.matrix} (Completed: {self.completed_date})"

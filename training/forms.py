@@ -114,7 +114,8 @@ class CmmcDocumentUploadForm(BaseForm):
     )
     file = forms.FileField(
         label="Document",
-        help_text="Upload supporting document for this training completion"
+        help_text="Upload supporting document for this training completion",
+        required=False,
     )
 
     def __init__(self, *args, **kwargs):
