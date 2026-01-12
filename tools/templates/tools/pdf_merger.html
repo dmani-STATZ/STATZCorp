@@ -1,0 +1,351 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block body %}
+<div class="space-y-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <p class="text-sm text-gray-600 dark:text-gray-300">Tools</p>
+            <h1 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">PDF Merger</h1>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                Upload PDFs, arrange them, preview each file, then export a single merged PDF.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button id="exportBtn" type="button" class="btn btn-save px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                Export file
+            </button>
+            <button id="clearBtn" type="button" class="btn btn-caution px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                Clear list
+            </button>
+        </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-4">
+        <div class="space-y-4">
+            <div class="p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-gray-100">Upload PDF files</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">PDF only • Max 25 MB each • Up to 20 files</p>
+                    </div>
+                    <button id="uploadTrigger" type="button" class="btn btn-save px-3 py-2 rounded">
+                        Select files
+                    </button>
+                </div>
+                <input id="fileInput" type="file" accept="application/pdf" multiple class="hidden">
+            </div>
+
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-auto" style="max-height: calc(100vh - 260px);">
+                <div class="p-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-gray-100">File order</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Click a file to preview. Use arrows to reorder.</p>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        <span id="fileCount">0</span> files
+                    </span>
+                </div>
+                <div id="fileList" class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <div class="p-4 text-sm text-gray-500 dark:text-gray-400" id="fileListEmpty">
+                        No files uploaded yet. Use "Select files" to begin.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
+            <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <p class="font-medium text-gray-800 dark:text-gray-100">Preview</p>
+                <span class="text-xs text-gray-500 dark:text-gray-400" id="previewMeta">No file selected</span>
+            </div>
+            <div class="relative bg-gray-50 dark:bg-gray-900 rounded-b-lg overflow-hidden flex-1" style="min-height: 700px; height: calc(100vh - 220px);">
+                <div id="previewPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <p>Select a file from the list to preview</p>
+                </div>
+                <iframe id="previewFrame" title="PDF preview" class="w-full h-full hidden" loading="lazy"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusBar" class="hidden text-sm px-4 py-3 rounded border"></div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+    const MAX_FILES = 20;
+    const files = [];
+    let selectedId = null;
+
+    const fileInput = document.getElementById('fileInput');
+    const uploadTrigger = document.getElementById('uploadTrigger');
+    const fileList = document.getElementById('fileList');
+    const fileListEmpty = document.getElementById('fileListEmpty');
+    const fileCount = document.getElementById('fileCount');
+    const previewFrame = document.getElementById('previewFrame');
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const previewMeta = document.getElementById('previewMeta');
+    const exportBtn = document.getElementById('exportBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusBar = document.getElementById('statusBar');
+    const mergeUrl = "{% url 'tools:merge_pdfs' %}";
+    let dragIndex = null;
+
+    uploadTrigger.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleUpload);
+    exportBtn.addEventListener('click', exportMergedPdf);
+    clearBtn.addEventListener('click', clearFiles);
+
+    function handleUpload(event) {
+        const incoming = Array.from(event.target.files || []);
+        if (!incoming.length) return;
+
+        incoming.forEach(file => {
+            if (files.length >= MAX_FILES) {
+                showStatus(`Only ${MAX_FILES} files are allowed per merge.`, 'warn');
+                return;
+            }
+            if (file.type !== 'application/pdf') {
+                showStatus(`${file.name} skipped (not a PDF).`, 'warn');
+                return;
+            }
+            const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+            files.push({
+                id,
+                file,
+                url: URL.createObjectURL(file),
+                name: file.name,
+                size: file.size
+            });
+            selectedId = id;
+        });
+
+        fileInput.value = '';
+        renderList();
+        updatePreview();
+    }
+
+    function renderList() {
+        fileList.innerHTML = '';
+        if (!files.length) {
+            fileList.appendChild(fileListEmpty);
+            fileListEmpty.classList.remove('hidden');
+            fileCount.textContent = '0';
+            exportBtn.disabled = true;
+            clearBtn.disabled = true;
+            return;
+        }
+
+        fileListEmpty.classList.add('hidden');
+        fileCount.textContent = files.length.toString();
+        exportBtn.disabled = false;
+        clearBtn.disabled = false;
+
+        files.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.className = `flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                item.id === selectedId ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-600' : ''
+            }`;
+            row.draggable = true;
+            row.dataset.index = idx;
+            row.onclick = () => {
+                selectedId = item.id;
+                updatePreview();
+                renderList();
+            };
+            row.addEventListener('dragstart', onDragStart);
+            row.addEventListener('dragover', onDragOver);
+            row.addEventListener('drop', onDrop);
+
+            const order = document.createElement('div');
+            order.className = 'w-8 text-xs font-semibold text-gray-500';
+            order.textContent = idx + 1;
+
+            const details = document.createElement('div');
+            details.className = 'flex-1 overflow-hidden';
+            details.innerHTML = `
+                <p class="text-sm text-gray-800 dark:text-gray-100 truncate">${item.name}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">${formatBytes(item.size)}</p>
+            `;
+
+            const actions = document.createElement('div');
+            actions.className = 'flex items-center gap-1';
+
+            actions.appendChild(actionButton('↑', () => move(idx, -1), idx === 0));
+            actions.appendChild(actionButton('↓', () => move(idx, 1), idx === files.length - 1));
+            actions.appendChild(actionButton('✕', () => removeFile(item.id), false, 'text-red-600'));
+
+            row.appendChild(order);
+            row.appendChild(details);
+            row.appendChild(actions);
+            fileList.appendChild(row);
+        });
+    }
+
+    function actionButton(label, handler, disabled, extraClasses = '') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        btn.className = `text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 ${extraClasses}`;
+        btn.disabled = disabled;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            handler();
+        };
+        return btn;
+    }
+
+    function move(index, delta) {
+        const target = index + delta;
+        if (target < 0 || target >= files.length) return;
+        const [item] = files.splice(index, 1);
+        files.splice(target, 0, item);
+        renderList();
+        updatePreview();
+    }
+
+    function onDragStart(e) {
+        dragIndex = Number(e.currentTarget.dataset.index);
+        e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function onDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function onDrop(e) {
+        e.preventDefault();
+        const targetIndex = Number(e.currentTarget.dataset.index);
+        if (dragIndex === null || targetIndex === dragIndex) return;
+        const [item] = files.splice(dragIndex, 1);
+        files.splice(targetIndex, 0, item);
+        dragIndex = null;
+        renderList();
+        updatePreview();
+    }
+
+    function removeFile(id) {
+        const idx = files.findIndex(f => f.id === id);
+        if (idx === -1) return;
+        URL.revokeObjectURL(files[idx].url);
+        files.splice(idx, 1);
+        if (selectedId === id) {
+            selectedId = files[0]?.id || null;
+        }
+        renderList();
+        updatePreview();
+    }
+
+    function clearFiles() {
+        files.forEach(f => URL.revokeObjectURL(f.url));
+        files.length = 0;
+        selectedId = null;
+        renderList();
+        updatePreview();
+    }
+
+    function updatePreview() {
+        if (!files.length || !selectedId) {
+            previewFrame.classList.add('hidden');
+            previewPlaceholder.classList.remove('hidden');
+            previewMeta.textContent = 'No file selected';
+            previewFrame.src = 'about:blank';
+            return;
+        }
+        const current = files.find(f => f.id === selectedId) || files[0];
+        selectedId = current.id;
+        previewFrame.src = current.url;
+        previewMeta.textContent = `${current.name} • ${formatBytes(current.size)}`;
+        previewPlaceholder.classList.add('hidden');
+        previewFrame.classList.remove('hidden');
+    }
+
+    async function exportMergedPdf() {
+        if (!files.length) return;
+        exportBtn.disabled = true;
+        clearBtn.disabled = true;
+        showStatus('Merging files...', 'info');
+
+        const formData = new FormData();
+        files.forEach(item => formData.append('files', item.file, item.name));
+
+        try {
+            const response = await fetch(mergeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const data = await parseError(response);
+                throw new Error(data.error || 'Unable to merge files right now.');
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'merged.pdf';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            showStatus('Merged PDF downloaded successfully.', 'success');
+        } catch (err) {
+            showStatus(err.message, 'error');
+        } finally {
+            exportBtn.disabled = !files.length;
+            clearBtn.disabled = !files.length;
+        }
+    }
+
+    function formatBytes(bytes) {
+        if (!bytes && bytes !== 0) return '';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const index = Math.min(Math.floor(Math.log(bytes || 1) / Math.log(1024)), units.length - 1);
+        const value = bytes / Math.pow(1024, index);
+        return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie ? document.cookie.split('; ') : [];
+        for (const cookie of cookies) {
+            const [key, value] = cookie.split('=');
+            if (key === name) return decodeURIComponent(value);
+        }
+        return '';
+    }
+
+    async function parseError(response) {
+        try {
+            return await response.json();
+        } catch (_) {
+            return { error: `Merge failed with status ${response.status}.` };
+        }
+    }
+
+    function showStatus(message, variant = 'info') {
+        statusBar.textContent = message;
+        statusBar.classList.remove('hidden');
+        statusBar.className = `text-sm px-4 py-3 rounded border ${
+            variant === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : variant === 'error'
+                    ? 'bg-red-50 border-red-200 text-red-800'
+                    : variant === 'warn'
+                        ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                        : 'bg-blue-50 border-blue-200 text-blue-800'
+        }`;
+    }
+
+    renderList();
+})();
+</script>
+{% endblock extra_scripts %}
