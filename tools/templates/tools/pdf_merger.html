@@ -23,11 +23,11 @@
 
     <div class="grid lg:grid-cols-3 gap-4">
         <div class="space-y-4">
-            <div class="p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
+            <div id="dropZone" class="p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 transition-colors">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="font-medium text-gray-800 dark:text-gray-100">Upload PDF files</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">PDF only • Max 25 MB each • Up to 20 files</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">PDF only • Max 25 MB each • Up to 20 files • Drag & drop supported</p>
                     </div>
                     <button id="uploadTrigger" type="button" class="btn btn-save px-3 py-2 rounded">
                         Select files
@@ -95,9 +95,11 @@
     const statusBar = document.getElementById('statusBar');
     const mergeUrl = "{% url 'tools:merge_pdfs' %}";
     let dragIndex = null;
+    const dropZone = document.getElementById('dropZone');
 
     uploadTrigger.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleUpload);
+    enableDropUpload();
     exportBtn.addEventListener('click', exportMergedPdf);
     clearBtn.addEventListener('click', clearFiles);
 
@@ -128,6 +130,32 @@
         fileInput.value = '';
         renderList();
         updatePreview();
+    }
+
+    function enableDropUpload() {
+        const enter = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-blue-50/60');
+        };
+        const leave = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50/60');
+        };
+        const over = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        };
+        const drop = (e) => {
+            e.preventDefault();
+            leave(e);
+            const items = Array.from(e.dataTransfer.files || []);
+            if (!items.length) return;
+            handleUpload({ target: { files: items } });
+        };
+        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, enter));
+        ['dragleave', 'dragend'].forEach(ev => dropZone.addEventListener(ev, leave));
+        dropZone.addEventListener('dragover', over);
+        dropZone.addEventListener('drop', drop);
     }
 
     function renderList() {
