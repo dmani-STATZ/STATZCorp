@@ -211,14 +211,22 @@
 
     <!-- Sidebar Menu -->
     <div class="sidebar inactive" id="sidebar">
+        <style>
+            /* Show submenu on hover/focus within */
+            .sidebar .submenu { display: none; }
+            .sidebar li:hover > .submenu,
+            .sidebar li:focus-within > .submenu { display: block; }
+        </style>
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corp" class="h-12 w-18 m-8">
         <div class="px-4 pb-8">
             <ul class="mt-10 space-y-1">
-                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer group relative">
                     <a href="{% url 'index' %}" class="px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                </li>
-                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                    <a href="{% url 'about' %}" class="px-3 py-2 rounded-md text-sm font-medium">About</a>
+                    <ul class="mt-1 pl-4 space-y-1 submenu">
+                        <li>
+                            <a href="{% url 'about' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">About</a>
+                        </li>
+                    </ul>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'training:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Training</a>
@@ -234,8 +242,16 @@
                     <a href="{% url 'contracts:company_list' %}" class="px-3 py-2 rounded-md text-sm font-medium">Companies</a>
                 </li>
                 {% endif %}
-                <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                    <a href="{% url 'reports:my_requests' %}" class="px-3 py-2 rounded-md text-sm font-medium">Reports</a>
+                <li class="py-3 px-6 hover:text-green-700 cursor-pointer group relative">
+                    Tools
+                    <ul class="mt-1 pl-4 space-y-1 submenu">
+                        <li>
+                            <a href="{% url 'tools:index' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">PDF Merger</a>
+                        </li>
+                        <li>
+                            <a href="{% url 'reports:my_requests' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Reports</a>
+                        </li>
+                    </ul>
                 </li>
                 <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                     <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-2 rounded-md text-sm font-medium">Folder Tracking</a>
