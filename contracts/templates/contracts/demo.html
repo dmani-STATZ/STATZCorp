@@ -1,0 +1,248 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Contract Workspace Demo{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 space-y-6">
+    <!-- Universal Search + Quick Actions -->
+    <div class="card card-padded">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div class="flex-1">
+                <label class="form-label text-sm">Universal Search</label>
+                <div class="relative">
+                    <input
+                        type="text"
+                        class="form-input w-full pl-10"
+                        placeholder="Search by contract #, PO, supplier, CLIN, status"
+                        value="SPE4A7-26-D-0187"
+                    />
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.6-5.15a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z" />
+                        </svg>
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Typeahead shows status, supplier, due date, and late flag.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button class="btn-primary text-sm">Add Note</button>
+                <button class="btn-secondary text-sm">Add Reminder</button>
+                <button class="btn-secondary text-sm">Toggle Expedite</button>
+                <button class="btn-secondary text-sm">Toggle NIST</button>
+                <button class="btn-secondary text-sm">Generate Letter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contract Workspace Header -->
+    <div class="card card-padded">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-800">Contract SPE4A7-26-D-0187</h1>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Open</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Late</span>
+                </div>
+                <div class="text-sm text-gray-600 mt-2">
+                    Buyer: J. Smith • PO: 2026-0091 • Award: Jan 06, 2026 • Due: Jan 14, 2026
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn-secondary text-sm">Contract Drawer</button>
+                <a href="#" class="btn-secondary text-sm">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two Pane Workspace -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left Rail -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="card card-padded">
+                <h2 class="text-lg font-semibold mb-3">Contract Summary</h2>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-gray-500">Tab #</p>
+                        <p class="font-medium">1132</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Value</p>
+                        <p class="font-medium">$128,450</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Supplier</p>
+                        <p class="font-medium">AeroCore LLC</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">CAGE</p>
+                        <p class="font-medium">3G9N2</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center gap-2">
+                    <span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">Expedite: On</span>
+                    <span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">NIST: Yes</span>
+                </div>
+            </div>
+
+            <div class="card card-padded">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold">CLINs</h2>
+                    <button class="btn-primary text-xs">Add CLIN</button>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 mb-3">
+                    <input class="form-input" placeholder="Filter CLINs by text" />
+                    <select class="form-select">
+                        <option>All Suppliers</option>
+                        <option selected>AeroCore LLC</option>
+                        <option>Vector Dynamics</option>
+                    </select>
+                </div>
+
+                <div class="space-y-2">
+                    <!-- CLIN Row (Expanded) -->
+                    <div class="border rounded-md bg-gray-50">
+                        <button class="w-full text-left px-3 py-2 flex items-center justify-between">
+                            <div>
+                                <div class="font-semibold text-sm">CLIN 0001 • NSN 2840-01-234-5678</div>
+                                <div class="text-xs text-gray-500">AeroCore LLC • Qty 12 • Due Jan 14</div>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Acknowledged</span>
+                        </button>
+                        <div class="border-t px-3 py-2 text-xs text-gray-600">
+                            Inline details preview (shipments, acknowledgments, quick actions).
+                        </div>
+                    </div>
+
+                    <!-- CLIN Row (Collapsed) -->
+                    <div class="border rounded-md">
+                        <button class="w-full text-left px-3 py-2 flex items-center justify-between">
+                            <div>
+                                <div class="font-semibold text-sm">CLIN 0002 • NSN 2840-01-999-1010</div>
+                                <div class="text-xs text-gray-500">Vector Dynamics • Qty 4 • Due Jan 21</div>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded bg-red-100 text-red-700">Late</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Pane -->
+        <div class="lg:col-span-8 space-y-6">
+            <div class="card card-padded">
+                <div class="flex flex-wrap gap-2 border-b pb-3 mb-4 text-sm">
+                    <button class="px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">Overview</button>
+                    <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">Notes & Reminders</button>
+                    <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">Shipments</button>
+                    <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">Payments</button>
+                    <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">Documents</button>
+                    <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">History</button>
+                </div>
+
+                <!-- Overview Content -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div class="border rounded-md p-3">
+                        <h3 class="font-semibold mb-2">Selected CLIN Overview</h3>
+                        <div class="space-y-1 text-gray-600">
+                            <div>CLIN: 0001</div>
+                            <div>Supplier: AeroCore LLC</div>
+                            <div>NSN: 2840-01-234-5678</div>
+                            <div>Order Qty: 12 EA</div>
+                            <div>Quote Value: $48,900</div>
+                        </div>
+                    </div>
+                    <div class="border rounded-md p-3">
+                        <h3 class="font-semibold mb-2">Acknowledgment</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="btn-secondary text-xs">PO Sent</button>
+                            <button class="btn-secondary text-xs">Acknowledged</button>
+                            <button class="btn-secondary text-xs">Sent to QAR</button>
+                            <button class="btn-secondary text-xs">Generate Letter</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes & Reminders Timeline -->
+            <div class="card card-padded">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">Notes & Reminders</h2>
+                    <div class="flex gap-2">
+                        <button class="btn-primary text-xs">Add Note</button>
+                        <button class="btn-secondary text-xs">Add Reminder</button>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="border rounded-md p-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Contract</span>
+                            <span class="text-xs text-gray-500">Jan 12, 2026 • J. Smith</span>
+                        </div>
+                        <p class="text-sm text-gray-700">Waiting on supplier acknowledgement. Follow up tomorrow.</p>
+                    </div>
+                    <div class="border rounded-md p-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700">CLIN 0001</span>
+                            <span class="text-xs text-gray-500">Jan 13, 2026 • A. Lee</span>
+                        </div>
+                        <p class="text-sm text-gray-700">Shipment 1 scheduled for Jan 15. Reminder set.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shipments + Payments Preview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card card-padded">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-semibold">Shipments</h2>
+                        <button class="btn-secondary text-xs">Add Shipment</button>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span>Shipment 1 • Jan 15</span>
+                            <span class="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Scheduled</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Shipment 2 • Jan 20</span>
+                            <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">Pending</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-padded">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-semibold">Payments</h2>
+                        <button class="btn-secondary text-xs">Add Payment</button>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span>Paid to Date</span>
+                            <span class="font-semibold">$32,000</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Balance</span>
+                            <span class="font-semibold text-red-600">$16,900</span>
+                        </div>
+                        <a href="#" class="text-xs text-blue-600 hover:text-blue-800">Open Finance Audit</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documents Preview -->
+            <div class="card card-padded">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold">Documents</h2>
+                    <div class="flex gap-2">
+                        <button class="btn-secondary text-xs">View Letter</button>
+                        <button class="btn-secondary text-xs">Export DD1155</button>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-600">
+                    Files Path: \\contracts\2026\PO-2026-0091
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

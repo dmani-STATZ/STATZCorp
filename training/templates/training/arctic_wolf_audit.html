@@ -63,10 +63,12 @@
     tbody tr:nth-child(even) td { background-color: #ffffff; }
     tbody tr td.bg-green-200 { background-color: #bbf7d0 !important; }
     tbody tr td.bg-red-200 { background-color: #fecaca !important; }
+    tbody tr td.bg-gray-100 { background-color: #f3f4f6 !important; }
 
     .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; }
     .legend .done { background: #22c55e; }
     .legend .todo { background: #ef4444; }
+    .legend .na { background: #e5e7eb; }
 </style>
 
 
@@ -76,6 +78,7 @@
             <div class="legend">
                 <span class="done"></span> Completed
                 <span class="ml-4 todo"></span> Not Completed
+                <span class="ml-4 na"></span> Not Required
             </div>
             <div class="flex items-center gap-3">
                 <a href="{% url 'training:dashboard' %}"
@@ -91,7 +94,7 @@
                 <button id="copy-audit" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded">Copy Table</button>
             </div>
         </div>
-        <div style="overflow: auto;"> 
+        <div style="overflow: auto;">
             <table>
                 <thead>
                     <tr>
@@ -104,15 +107,18 @@
                     </tr>
                 </thead>
                 <tbody>
-                <tbody>
                     {% for user_data in audit_data %}
                     <tr>
                         <td class="font-medium bg-white">{{ user_data.user.first_name }}&nbsp;{{ user_data.user.last_name }}</td>
                         {% for course in courses %}
-                            {% with completed_date=user_data.courses|get_item:course.id %}
-                                <td data-course-id="{{ course.id }}" class="{% if completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %}">
-                                    {% if completed_date %}
-                                        <span class="text-xs block">{{ completed_date|date:"n/j/Y" }}</span>
+                            {% with course_status=user_data.courses|get_item:course.id %}
+                                <td data-course-id="{{ course.id }}"
+                                    data-status="{% if course_status.not_required %}na{% elif course_status.completed_date %}complete{% else %}incomplete{% endif %}"
+                                    class="{% if course_status.not_required %} bg-gray-100 text-gray-500 {% elif course_status.completed_date %} bg-green-200 {% else %} bg-red-200 {% endif %}">
+                                    {% if course_status.not_required %}
+                                        <span class="text-xs block">N/A</span>
+                                    {% elif course_status.completed_date %}
+                                        <span class="text-xs block">{{ course_status.completed_date|date:"n/j/Y" }}</span>
                                     {% endif %}
                                 </td>
                             {% endwith %}
@@ -127,8 +133,8 @@
     </div>
     <script>
         (function(){
-            const usersCount = {{ users_count|default:0 }};
             const colCounts = JSON.parse('{{ column_completed_counts|safe|escapejs }}'.replaceAll("'", '"'));
+            const eligibleCounts = JSON.parse('{{ eligible_counts_by_course|safe|escapejs }}'.replaceAll("'", '"'));
             const table = document.querySelector('table');
             const toggleCourses = document.getElementById('toggle-incomplete-only');
             const toggleUsers = document.getElementById('toggle-users-incomplete-only');
@@ -142,7 +148,7 @@
                 const ths = table.querySelectorAll('thead th[data-course-id]');
                 ths.forEach(th => {
                     const id = th.getAttribute('data-course-id');
-                    const full = (colCounts[id] || 0) >= usersCount;
+                    const full = (colCounts[id] || 0) >= (eligibleCounts[id] || 0);
                     const show = !showIncompleteColsOnly || !full;
                     th.style.display = show ? '' : 'none';
                 });
@@ -151,10 +157,10 @@
                     let userHasIncomplete = false;
                     row.querySelectorAll('td[data-course-id]').forEach(td => {
                         const id = td.getAttribute('data-course-id');
-                        const full = (colCounts[id] || 0) >= usersCount;
+                        const full = (colCounts[id] || 0) >= (eligibleCounts[id] || 0);
                         const showCol = !showIncompleteColsOnly || !full;
                         td.style.display = showCol ? '' : 'none';
-                        if (showCol && td.classList.contains('bg-red-200')) userHasIncomplete = true;
+                        if (showCol && td.dataset.status === 'incomplete') userHasIncomplete = true;
                     });
                     row.style.display = (!showUsersIncompleteOnly || userHasIncomplete) ? '' : 'none';
                 });

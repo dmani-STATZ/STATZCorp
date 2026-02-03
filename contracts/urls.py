@@ -180,6 +180,11 @@ urlpatterns = [
     # Dashboard views
     path("", ContractLifecycleDashboardView.as_view(), name="contracts_dashboard"),
     path(
+        "contract/demo/",
+        TemplateView.as_view(template_name="contracts/demo.html"),
+        name="contract_workspace_demo",
+    ),
+    path(
         "dashboard/metric-detail/",
         DashboardMetricDetailView.as_view(),
         name="dashboard_metric_detail",
