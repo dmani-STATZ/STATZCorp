@@ -28,6 +28,7 @@ from .models import (
     ArcticWolfCourse,
     ArcticWolfCompletion,
     CourseReviewClick,
+    TrainingDoc,
     get_frequency_expiration_date,
 )
 
@@ -48,6 +49,22 @@ def latest_completion_by_matrix(completions):
     for completion in completions:
         if completion.matrix_id not in latest:
             latest[completion.matrix_id] = completion
+    return latest
+
+
+def latest_training_docs_by_course_ids(course_ids):
+    if not course_ids:
+        return {}
+    docs = (
+        TrainingDoc.objects.filter(course_id__in=course_ids)
+        .order_by("course_id", "-uploaded_at", "-id")
+        .values("id", "course_id", "file_date", "file_name")
+    )
+    latest = {}
+    for doc in docs:
+        course_id = doc["course_id"]
+        if course_id not in latest:
+            latest[course_id] = doc
     return latest
 
 
@@ -285,10 +302,14 @@ def user_training_requirements(request):
     active_user_account_ids = UserAccount.objects.filter(user=user).values_list(
         "account_id", flat=True
     )
-    required_matrix_entries = Matrix.objects.filter(
-        account__in=active_user_account_ids,
-        is_active=True,
-    ).distinct()
+    required_matrix_entries = (
+        Matrix.objects.filter(
+            account__in=active_user_account_ids,
+            is_active=True,
+        )
+        .select_related("course")
+        .distinct()
+    )
     today = timezone.now().date()
     tracked_completions = (
         Tracker.objects.filter(user=user, matrix__in=required_matrix_entries)
@@ -296,6 +317,13 @@ def user_training_requirements(request):
         .order_by("-completed_date", "-id")
     )
     completion_map = latest_completion_by_matrix(tracked_completions)
+    course_ids = [entry.course_id for entry in required_matrix_entries]
+    latest_docs = latest_training_docs_by_course_ids(course_ids)
+    review_clicks = CourseReviewClick.objects.filter(
+        user=user,
+        matrix__in=required_matrix_entries,
+    ).select_related("reviewed_doc")
+    review_click_map = {click.matrix_id: click for click in review_clicks}
 
     required_courses_data = []
     for matrix_entry in required_matrix_entries:
@@ -305,6 +333,11 @@ def user_training_requirements(request):
             matrix_entry.frequency,
             today,
         )
+        latest_doc = latest_docs.get(matrix_entry.course_id)
+        review_click = review_click_map.get(matrix_entry.id)
+        review_outdated = False
+        if latest_doc and review_click and review_click.reviewed_doc_id:
+            review_outdated = review_click.reviewed_doc_id != latest_doc["id"]
         required_courses_data.append(
             {
                 "matrix_entry": matrix_entry,
@@ -318,6 +351,8 @@ def user_training_requirements(request):
                 "document": completion.document if completion else None,
                 "tracker_id": completion.id if completion else None,
                 "document_name": completion.document_name if completion else None,
+                "latest_doc": latest_doc,
+                "review_outdated": review_outdated,
             }
         )
 
@@ -342,8 +377,14 @@ def review_course_link(request, matrix_id):
         messages.error(request, "You do not have access to this course link.")
         return redirect("training:user_requirements")
 
-    if not matrix.course.link:
-        messages.error(request, "No review link is available for this course.")
+    latest_doc = (
+        TrainingDoc.objects.filter(course=matrix.course)
+        .order_by("-uploaded_at", "-id")
+        .first()
+    )
+
+    if not latest_doc and not matrix.course.link:
+        messages.error(request, "No review file is available for this course.")
         return redirect("training:user_requirements")
 
     now = timezone.now()
@@ -353,11 +394,21 @@ def review_course_link(request, matrix_id):
         defaults={
             "first_clicked": now,
             "last_clicked": now,
+            "reviewed_doc": latest_doc,
         },
     )
     if not created:
-        CourseReviewClick.objects.filter(pk=review_click.pk).update(last_clicked=now)
+        CourseReviewClick.objects.filter(pk=review_click.pk).update(
+            last_clicked=now,
+            reviewed_doc=latest_doc,
+        )
 
+    if latest_doc:
+        response = HttpResponse(
+            latest_doc.file_blob, content_type="application/octet-stream"
+        )
+        response["Content-Disposition"] = f'inline; filename="{latest_doc.file_name}"'
+        return response
     return redirect(matrix.course.link)
 
 

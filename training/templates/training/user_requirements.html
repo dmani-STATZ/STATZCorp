@@ -15,7 +15,7 @@
                         {% if item.matrix_entry.course.description %}
                             <p class="text-gray-600 mt-1">{{ item.matrix_entry.course.description }}</p>
                         {% endif %}
-                        {% if item.matrix_entry.course.link %}
+                        {% if item.latest_doc or item.matrix_entry.course.link %}
                             <p class="mt-2">
                                 <a href="{% url 'training:review_course_link' item.matrix_entry.id %}"
                                    class="text-blue-500 hover:underline"
@@ -23,6 +23,11 @@
                                     Review File
                                 </a>
                             </p>
+                            {% if item.review_outdated %}
+                                <p class="text-xs text-amber-600 mt-1">
+                                    File updated since your last review{% if item.latest_doc.file_date %} (current: {{ item.latest_doc.file_date|date:"F j, Y" }}){% endif %}.
+                                </p>
+                            {% endif %}
                         {% endif %}
 
                         {% if item.completed and item.tracker_id %}
