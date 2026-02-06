@@ -44,6 +44,11 @@ body.dark header {
  * Controls the appearance of the side navigation menu, preserving brand identity
  */
 body.dark .sidebar {
+    color: #f3f4f6;
+    /* Light text for contrast against red background */
+}
+
+body.dark .sidebar-surface {
     /* Preserve the red sidebar with original pattern design for brand consistency */
     background: repeating-linear-gradient(45deg,
             #3e3e4150,
@@ -58,8 +63,6 @@ body.dark .sidebar {
     background-blend-mode: multiply;
     background-color: #e00000;
     /* Brand red color for sidebar */
-    color: #f3f4f6;
-    /* Light text for contrast against red background */
 }
 
 /**

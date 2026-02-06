@@ -45,6 +45,11 @@ header {
  * Controls the appearance of the side navigation menu
  */
 .sidebar {
+    color: #ffffff;
+    /* White text for contrast against red background */
+}
+
+.sidebar-surface {
     /* Red sidebar with pattern design for brand identity */
     background: repeating-linear-gradient(45deg,
             #3e3e4150,
@@ -59,8 +64,6 @@ header {
     background-blend-mode: multiply;
     background-color: #e00000;
     /* Brand red color for sidebar */
-    color: #ffffff;
-    /* White text for contrast against red background */
 }
 
 /**

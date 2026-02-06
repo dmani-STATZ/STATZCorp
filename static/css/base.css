@@ -157,8 +157,6 @@ header {
 }
 
 .sidebar {
-    clip-path: polygon(0% 0%, 75% 5%, 101% 50%, 75% 95%, 0% 100%);
-    border-radius: 15px 50% 50% 15px;
     width: 16rem;
     height: calc(75vh - 60px);
     position: fixed;
@@ -166,6 +164,22 @@ header {
     left: 0;
     z-index: 1100;
     transition: transform 0.3s;
+    overflow: visible;
+}
+
+.sidebar-surface {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(0% 0%, 75% 5%, 101% 50%, 75% 95%, 0% 100%);
+    border-radius: 15px 50% 50% 15px;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.sidebar-content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
 }
 
 .sidebar.active {
