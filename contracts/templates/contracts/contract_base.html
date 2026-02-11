@@ -401,7 +401,15 @@
         </div>
     </div>
 
-    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 dark:bg-gray-800 dark:border-gray-700">
+    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 dark:bg-gray-800 dark:border-gray-700 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+            <label for="reminder-upcoming-days" class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Future days:</label>
+            <select id="reminder-upcoming-days" class="text-sm border border-gray-300 rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" title="Show reminders from today (0) up to 7 days ahead">
+                {% for n in "01234567" %}
+                <option value="{{ forloop.counter0 }}" {% if reminder_sidebar_upcoming_days|default:0 == forloop.counter0 %}selected{% endif %}>{{ forloop.counter0 }}{% if forloop.counter0 == 0 %} (today only){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
         <a href="{% url 'contracts:reminders_list' %}" class="flex items-center justify-center w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -413,10 +421,9 @@
     <div class="overflow-y-auto flex-grow p-4">
         {% if reminders %}
             <div class="space-y-3">
-                {% if due_count > 0 or overdue_count > 0 %}
-                    {% for reminder in reminders %}
+                {% for reminder in reminders %}
                         {% if not reminder.completed %}
-                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800/50{% else %}bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/50{% endif %} shadow-sm cursor-pointer reminder-item"
+                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800/50{% elif reminder.is_upcoming %}bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800/50{% else %}bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/50{% endif %} shadow-sm cursor-pointer reminder-item"
                                  data-reminder-id="{{ reminder.id }}"
                                  data-reminder-title="{{ reminder.title|escapejs }}"
                                  data-reminder-text="{{ reminder.description|escapejs }}"
@@ -458,6 +465,8 @@
                                     <div>
                                         {% if reminder.is_overdue %}
                                             <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs">Overdue</span>
+                                        {% elif reminder.is_upcoming %}
+                                            <span class="inline-block px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs">Upcoming</span>
                                         {% else %}
                                             <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 text-xs">Due</span>
                                         {% endif %}
@@ -465,15 +474,14 @@
                                 </div>
                             </div>
                         {% endif %}
-                    {% endfor %}
-                {% else %}
+                {% empty %}
                     <div class="text-center text-gray-500 py-8 dark:text-gray-400">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <p>No due or overdue reminders!</p>
+                        <p>No reminders in this range.</p>
                     </div>
-                {% endif %}
+                {% endfor %}
             </div>
         {% else %}
             <div class="text-center text-gray-500 py-8 dark:text-gray-400">
@@ -494,6 +502,31 @@
         </button>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const upcomingSelect = document.getElementById('reminder-upcoming-days');
+    if (upcomingSelect) {
+        upcomingSelect.addEventListener('change', function() {
+            const value = this.value;
+            const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (typeof getCookie === 'function' && getCookie('csrftoken'));
+            if (!csrf) return;
+            fetch("{% url 'users:settings-save' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({
+                    user_id: "{{ user.id }}",
+                    setting_name: 'reminder_sidebar_upcoming_days',
+                    setting_value: value,
+                    setting_type: 'integer'
+                })
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                if (data.success) window.location.reload();
+            });
+        });
+    }
+});
+</script>
 
 {% endblock body %}
 

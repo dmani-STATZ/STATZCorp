@@ -42,16 +42,24 @@ def add_note(request, content_type_id, object_id):
             
             # If this is an AJAX request, return the updated notes list
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                notes = Note.objects.filter(
+                notes = list(Note.objects.filter(
                     content_type=content_type,
                     object_id=object_id
-                ).order_by('-created_on')
-                
+                ).order_by('-created_on'))
+                for note in notes:
+                    setattr(note, 'entity_type', content_type.model)
+                    setattr(note, 'content_type_id', content_type.id)
+                    setattr(note, 'object_id', object_id)
+
                 notes_html = render_to_string('contracts/partials/notes_list.html', {
                     'notes': notes,
-                    'content_object': content_object
+                    'content_object': content_object,
+                    'entity_type': content_type.model,
+                    'content_type_id': content_type.id,
+                    'object_id': object_id,
+                    'show_note_type': False,
                 })
-                
+
                 return JsonResponse({
                     'success': True,
                     'notes_html': notes_html

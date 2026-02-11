@@ -22,6 +22,15 @@ from .clin_views import (
     clin_delete,
 )
 
+from .gov_action_views import (
+    get_clin_details,
+    get_supplier_info,
+    get_clin_log_fields,
+    save_clin_log_fields,
+    gov_action_create,
+    gov_action_delete,
+)
+
 from .supplier_views import (
     SupplierListView,
     SupplierSearchView,

@@ -16,7 +16,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus
+from ..models import Contract, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus, GovAction
 from processing.models import SequenceNumber
 from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
 from .mixins import ActiveCompanyQuerysetMixin
@@ -32,6 +32,10 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        try:
+            context['supplier_info_url_base'] = reverse('contracts:get_supplier_info', args=[0]).replace('0/info/', '')
+        except Exception:
+            context['supplier_info_url_base'] = '/contracts/supplier/'
         contract = self.get_object()
         clins = contract.clin_set.all().select_related(
             'clin_type', 'supplier', 'nsn'
@@ -41,10 +45,23 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         # Get the CanceledReason model
         cancel_reason = CanceledReason.objects.all()
         context['cancel_reasons'] = cancel_reason
+
+        # Gov Actions for this contract
+        active_company = getattr(self.request, 'active_company', None)
+        context['gov_actions'] = GovAction.objects.filter(contract=contract, company=active_company).order_by('-date_submitted', '-created_on') if active_company else GovAction.objects.none()
         
-        # Get contract notes
-        context['contract_notes'] = contract.notes.all().order_by('-created_on')
-        
+        # Get contract notes with entity_type for template
+        contract_type = ContentType.objects.get_for_model(Contract)
+        clin_type = ContentType.objects.get_for_model(Clin)
+        contract_notes_qs = contract.notes.all().order_by('-created_on')
+        for note in contract_notes_qs:
+            setattr(note, 'entity_type', 'contract')
+            setattr(note, 'content_type_id', contract_type.id)
+            setattr(note, 'object_id', contract.id)
+        context['contract_notes'] = contract_notes_qs
+        context['contract_content_type_id'] = contract_type.id
+        context['clin_content_type_id'] = clin_type.id
+
         # Get expedite data for this contract
         try:
             context['expedite'] = Expedite.objects.get(contract=contract)
@@ -54,8 +71,13 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
         context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
         if context['selected_clin']:
-            # Get CLIN notes
-            context['clin_notes'] = context['selected_clin'].notes.all().order_by('-created_on')
+            # Get CLIN notes with entity_type for template
+            clin_notes_qs = context['selected_clin'].notes.all().order_by('-created_on')
+            for note in clin_notes_qs:
+                setattr(note, 'entity_type', 'clin')
+                setattr(note, 'content_type_id', clin_type.id)
+                setattr(note, 'object_id', context['selected_clin'].id)
+            context['clin_notes'] = clin_notes_qs
             try:
                 context['acknowledgment'] = context['selected_clin'].clinacknowledgment_set.first()
             except:
@@ -319,6 +341,7 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, UpdateView):
 @conditional_login_required
 def contract_search(request):
     query = request.GET.get('q', '')
+    status_filter = request.GET.get('status', 'both')  # open | closed | both
     if len(query) < 3:
         return JsonResponse([], safe=False)
 
@@ -327,10 +350,21 @@ def contract_search(request):
         Q(contract_number__icontains=query) |
         (Q(contract_number__iendswith=query[-6:]) if len(query) >= 6 else Q()) |
         Q(po_number__icontains=query)  # Search Contract's po_number field
-    ).values(
-        'id', 
+    )
+    # Company scope
+    if getattr(request, 'active_company', None):
+        contracts = contracts.filter(company=request.active_company)
+    # Open / Closed / Both filter
+    if status_filter == 'open':
+        contracts = contracts.filter(status__description='Open')
+    elif status_filter == 'closed':
+        contracts = contracts.filter(status__description='Closed')
+    elif status_filter == 'both':
+        contracts = contracts.filter(status__description__in=['Open', 'Closed'])
+    contracts = contracts.values(
+        'id',
         'contract_number',
-        'po_number'  # Include contract's PO number in results
+        'po_number'
     ).order_by('contract_number')[:10]
     
     # Format the results

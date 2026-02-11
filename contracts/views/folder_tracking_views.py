@@ -156,22 +156,33 @@ def folder_tracking(request):
 @login_required
 def search_contracts(request):
     search_query = request.GET.get('q', '')
+    status_filter = request.GET.get('status', 'open')  # open | closed | both
     search_performed = bool(search_query)
     contracts = []
     
     if search_query:
-        contracts = Contract.objects.filter(
+        qs = Contract.objects.filter(
             Q(contract_number__icontains=search_query) |
-            Q(po_number__icontains=search_query),
-            status__description='Open'
-        ).order_by('contract_number')[:10]  # Limit to 10 results for performance
+            Q(po_number__icontains=search_query)
+        )
+        # Company scope
+        if getattr(request, 'active_company', None):
+            qs = qs.filter(company=request.active_company)
+        # Open / Closed / Both filter
+        if status_filter == 'open':
+            qs = qs.filter(status__description='Open')
+        elif status_filter == 'closed':
+            qs = qs.filter(status__description='Closed')
+        elif status_filter == 'both':
+            qs = qs.filter(status__description__in=['Open', 'Closed'])
+        contracts = list(qs.order_by('contract_number')[:50])  # Increased limit with filter
     
     context = {
         'contracts': contracts,
         'search_performed': search_performed,
+        'status_filter': status_filter,
     }
     
-    # Return direct HTML instead of JSON
     return render(request, 'contracts/includes/contract_search_results.html', context)
 
 @login_required

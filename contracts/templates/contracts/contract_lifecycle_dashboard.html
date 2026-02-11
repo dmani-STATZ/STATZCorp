@@ -12,16 +12,31 @@
         <div class="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
             <h1 class="text-2xl font-bold text-gray-800">Contract Dashboard</h1>
 
-            <div class="w-full lg:w-1/2 px-2">
-                <div class="relative">
+            <div class="w-full lg:w-1/2 px-2 flex items-center gap-4">
+                <div class="relative flex-1">
                     <input type="text"
                            id="contract-search"
                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                           placeholder="Search contracts by number, PO number..."
+                           placeholder="Search by contract number, last 4 digits, or PO number..."
                            autocomplete="off">
                     <div id="search-results"
                          class="absolute z-50 w-full card mt-1 border-gray-200 max-h-96 overflow-y-auto hidden">
                     </div>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                    <span class="text-sm font-medium text-gray-700">Status:</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-status" value="open" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700">Open</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-status" value="closed" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700">Closed</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-status" value="both" checked class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700">Both</span>
+                    </label>
                 </div>
             </div>
 
@@ -485,7 +500,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         debounceTimer = setTimeout(() => {
-            fetch(`/contracts/search/?q=${encodeURIComponent(query)}`)
+            const status = document.querySelector('input[name="contract-status"]:checked')?.value || 'both';
+            fetch(`/contracts/search/?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`)
                 .then(response => response.json())
                 .then(data => {
                     searchResults.innerHTML = '';
@@ -519,6 +535,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
         }, 300);
+    });
+
+    // Re-search when status radio changes (if there's a query)
+    document.querySelectorAll('input[name="contract-status"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (searchInput.value.length >= 3) {
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
     });
 
     // Hide search results when clicking outside

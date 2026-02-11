@@ -158,7 +158,27 @@ class Contract(AuditModel):
     @property
     def total_split_paid(self):
         return self.splits.aggregate(Sum('split_paid'))['split_paid__sum'] or 0
-    
+
+    def get_sharepoint_documents_url(self):
+        """
+        Build SharePoint folder URL for this contract's documents.
+        Uses V87/aFed-DOD path; Closed/Cancelled contracts use Closed Contracts subfolder.
+        Returns None if contract_number is missing.
+        """
+        from urllib.parse import quote
+        if not self.contract_number:
+            return None
+        base = 'https://statzcorpgcch.sharepoint.us/sites/Statz/Shared%20Documents/Forms/AllItems.aspx'
+        root = '/sites/Statz/Shared Documents/Statz-Public/data/V87/aFed-DOD'
+        status_desc = (self.status.description or '').strip() if self.status else ''
+        if status_desc in ('Closed', 'Cancelled'):
+            path = f'{root}/Closed Contracts/Contract {self.contract_number}'
+        else:
+            path = f'{root}/Contract {self.contract_number}'
+        viewid = 'd4837fde%2D32f5%2D41cc%2Db723%2D09d5f692b2ea'
+        return f'{base}?id={quote(path)}&viewid={viewid}'
+
+
 class ContractStatus(models.Model):
     description = models.TextField(null=True, blank=True)
 
@@ -219,6 +239,9 @@ class Clin(AuditModel):
     special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
 
+    # Log Fields (from old Gov Actions / Log section)
+    log_status = models.TextField(null=True, blank=True)
+    log_notes = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'contracts_clin'
@@ -532,6 +555,55 @@ class ClinAcknowledgment(AuditModel):
 
     def __str__(self):
         return f"Acknowledgment for CLIN {self.clin.id}"
+
+
+class GovAction(AuditModel):
+    """Gov Actions linked to Contract (PAR, RFV, ECP, QN, NCR tracking)."""
+    ACTION_CHOICES = [
+        ('PAR', 'PAR'),
+        ('RFV', 'RFV'),
+        ('ECP', 'ECP'),
+        ('QN', 'QN'),
+        ('NCR', 'NCR'),
+    ]
+    REQUEST_CHOICES = [
+        ('Admin', 'Admin'),
+        ('Technical', 'Technical'),
+        ('Extension', 'Extension'),
+        ('Cancellation', 'Cancellation'),
+        ('Qty Change', 'Qty Change'),
+        ('Litigation', 'Litigation'),
+        ('Price', 'Price'),
+        ('Other', 'Other'),
+    ]
+    INITIATED_CHOICES = [
+        ('STATZ', 'STATZ'),
+        ('Gov', 'Gov'),
+        ('Supplier', 'Supplier'),
+    ]
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='gov_actions')
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='gov_actions')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, null=True, blank=True)
+    number = models.CharField(max_length=50, null=True, blank=True)
+    request = models.CharField(max_length=30, choices=REQUEST_CHOICES, null=True, blank=True)
+    date_submitted = models.DateField(null=True, blank=True)
+    date_closed = models.DateField(null=True, blank=True)
+    initiated = models.CharField(max_length=20, choices=INITIATED_CHOICES, null=True, blank=True)
+
+    class Meta:
+        db_table = 'contracts_govaction'
+        ordering = ['-date_submitted', '-created_on']
+        verbose_name = 'Gov Action'
+        verbose_name_plural = 'Gov Actions'
+
+    def __str__(self):
+        return f"{self.get_action_display() or self.action} {self.number or ''} - {self.contract.contract_number}"
+
+    def save(self, *args, **kwargs):
+        if not self.company_id and self.contract_id:
+            self.company_id = self.contract.company_id
+        super().save(*args, **kwargs)
+
 
 class Address(models.Model):
     address_line_1 = models.TextField(null=True, blank=True)

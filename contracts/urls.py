@@ -29,6 +29,12 @@ from .views import (
     get_clin_notes,
     toggle_clin_acknowledgment,
     clin_delete,
+    get_clin_details,
+    get_supplier_info,
+    get_clin_log_fields,
+    save_clin_log_fields,
+    gov_action_create,
+    gov_action_delete,
     # NSN and Supplier views
     NsnUpdateView,
     SupplierUpdateView,
@@ -373,6 +379,12 @@ urlpatterns = [
     # API endpoints
     path("search/", contract_search, name="contract_search"),
     path("clin/<int:clin_id>/notes/", get_clin_notes, name="get_clin_notes"),
+    path("clin/<int:clin_id>/details/", get_clin_details, name="get_clin_details"),
+    path("supplier/<int:supplier_id>/info/", get_supplier_info, name="get_supplier_info"),
+    path("clin/<int:clin_id>/log-fields/", get_clin_log_fields, name="get_clin_log_fields"),
+    path("clin/<int:clin_id>/save-log-fields/", save_clin_log_fields, name="save_clin_log_fields"),
+    path("contract/<int:contract_id>/gov-action/create/", gov_action_create, name="gov_action_create"),
+    path("gov-action/<int:pk>/delete/", gov_action_delete, name="gov_action_delete"),
     path(
         "clin/<int:clin_id>/toggle-acknowledgment/",
         toggle_clin_acknowledgment,

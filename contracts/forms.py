@@ -32,6 +32,7 @@ from .models import (
     IdiqContractDetails,
     FolderTracking,
     Company,
+    GovAction,
 )
 
 User = get_user_model()
@@ -784,3 +785,13 @@ class ClinTypeForm(BaseModelForm):
     class Meta:
         model = ClinType
         fields = ['description', 'raw_text']
+
+
+class GovActionForm(BaseModelForm):
+    class Meta:
+        model = GovAction
+        fields = ['action', 'number', 'request', 'date_submitted', 'date_closed', 'initiated']
+        widgets = {
+            'date_submitted': forms.DateInput(attrs={'type': 'date'}),
+            'date_closed': forms.DateInput(attrs={'type': 'date'}),
+        }

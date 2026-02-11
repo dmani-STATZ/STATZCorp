@@ -5,13 +5,13 @@
 <form id="csrf-form">
     {% csrf_token %}
 </form>
-    <div class="container mx-auto px-4 py-6">
+    <div class="container mx-auto px-2 py-2">
     <!-- Top Section Grid Layout -->
-    <div class="grid grid-cols-3 gap-8 mb-6">
+    <div class="grid grid-cols-3 gap-4 mb-2">
         <!-- CLIN Acknowledgment Section - Left Column -->
-        <div class="col-span-1 card card-padded">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">CLIN Acknowledgment</h2>
-            <div class="space-y-3">
+        <div class="col-span-1 card card-padded !p-2">
+            <h2 class="text-lg font-bold text-gray-800 mb-1">CLIN Acknowledgment</h2>
+            <div class="space-y-1">
                 <div class="row-between py-1 border-b">
                     <span class="text-sm text-gray-700 w-1/3">PO Acknowledge Letter</span>
                     <div class="text-center w-1/3">
@@ -92,16 +92,20 @@
         </div>
 
         <!-- Contract Header - Right Columns -->
-        <div class="col-span-2 card card-padded">
+        <div class="col-span-2 card card-padded !p-2">
             {% if contract.status.description == 'Cancelled' %}
-                <div class="bg-red-100 text-red-800 flex justify-between items-center mb-4">
+                <div class="bg-red-100 text-red-800 flex justify-between items-center mb-2 p-1">
                     <a href="{% url 'contracts:contract_detail' contract.id %}">
-                        <h1 class="text-2xl font-bold text-gray-800">
+                        <h1 class="text-xl font-bold text-gray-800">
                             Contract {{ contract.contract_number }}
                         </h1>
                     </a>
                     <div class="flex items-center space-x-3">
                         <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                        <button type="button" onclick="openContractSearchModal()" class="text-gray-800 hover:bg-gray-200 px-4 py-2 rounded-lg flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            Contract Search
+                        </button>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class="hover:bg-gray-200 text-red px-4 py-2 rounded-lg flex items-center">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -112,13 +116,17 @@
                     </div>
                 </div>
             {% elif not contract.status.description == 'Open' %}
-                <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-4">
+                <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-2 p-1">
                     <a href="{% url 'contracts:contract_detail' contract.id %}">
-                    <h1 class="text-2xl font-bold text-gray-800">
+                    <h1 class="text-xl font-bold text-gray-800">
                         Contract {{ contract.contract_number }}
                     </h1></a>
                     <div class="flex items-center space-x-3">
                         <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                        <button type="button" onclick="openContractSearchModal()" class="text-gray-800 hover:bg-gray-200 px-4 py-2 rounded-lg flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            Contract Search
+                        </button>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -129,7 +137,7 @@
                     </div>
                 </div>
             {% else %}
-                <div class="bg-green-100 text-green-800 flex justify-between items-center mb-4 p-2">
+                <div class="bg-green-100 text-green-800 flex justify-between items-center mb-2 p-1">
                     <a href="{% url 'contracts:contract_detail' contract.id %}">
                     <h1 class="text-2xl font-bold text-gray-800 flex items-center">
                         Contract {{ contract.contract_number }}
@@ -193,6 +201,10 @@
                         <span class="bg-white {% if contract.status.description == 'Open' %}text-green-800{% else %}text-gray-800{% endif %} px-3 py-1 rounded-full text-sm font-semibold">
                             {% if contract.status.description == 'Open' %}Open{% else %}Closed{% endif %}
                         </span>
+                        <button type="button" onclick="openContractSearchModal()" class="text-gray-800 hover:bg-gray-200 px-4 py-2 rounded-lg flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            Contract Search
+                        </button>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -204,51 +216,102 @@
                 </div>
             {% endif %}
 
-            <!-- Contract Details Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="p-2">
-                    <p class="text-sm text-gray-600">PO Number</p>
-                    <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
-                </div>
-                <div class="p-2">
-                    <p class="text-sm text-gray-600">Tab Number</p>
-                    <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
-                </div>
-                <div class="p-2 flex justify-between items-center">
-                    <div>
-                        <p class="text-sm text-gray-600">Buyer</p>
-                        <p class="font-medium">{{ contract.buyer.description|default:"N/A" }}</p>
+            <!-- Contract Details + Controls -->
+            <div class="flex gap-3 items-start flex-wrap">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-0.5 flex-1 min-w-0">
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">PO Number</p>
+                        <p class="font-medium text-sm">{{ contract.po_number|default:"N/A" }}</p>
                     </div>
-                </div>
-                <div class="p-2">
-                    {% if contract.files_url %}
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">Tab Number</p>
+                        <p class="font-medium text-sm">{{ contract.tab_num|default:"N/A" }}</p>
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">Buyer</p>
+                        <p class="font-medium text-sm">{{ contract.buyer.description|default:"N/A" }}</p>
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                    {% with sharepoint_url=contract.get_sharepoint_documents_url %}
+                    {% if sharepoint_url %}
+                    <a href="{{ sharepoint_url }}" target="_blank" rel="noopener noreferrer"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-0.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" /></svg>
+                        Documents
+                    </a>
+                    {% elif contract.files_url %}
                     <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')"
-                        class="flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clip-rule="evenodd" />
-                            <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
-                        </svg>
-                        Files
+                        class="flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-0.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clip-rule="evenodd" /><path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" /></svg>
+                        Copy Path
                     </button>
                     {% endif %}
+                    {% endwith %}
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">Award Date</p>
+                        <p class="font-medium text-sm">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">Due Date</p>
+                        <p class="font-medium text-sm {% if contract.due_date_late %}text-red-600{% endif %}">
+                            {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
+                        </p>
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">Sales Class</p>
+                        <p class="font-medium text-sm">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">Solicitation Type</p>
+                        <p class="font-medium text-sm">{{ contract.solicitation_type|default:"N/A" }}</p>
+                    </div>
                 </div>
-                <div class="p-2">
-                    <p class="text-sm text-gray-600">Award Date</p>
-                    <p class="font-medium">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
-                </div>
-                <div class="p-2">
-                    <p class="text-sm text-gray-600">Due Date</p>
-                    <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
-                        {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
-                    </p>
-                </div>
-                <div class="p-2">
-                    <p class="text-sm text-gray-600">Sales Class</p>
-                    <p class="font-medium">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
-                </div>
-                <div class="p-2">
-                    <p class="text-sm text-gray-600">Solisitation Type</p>
-                    <p class="font-medium">{{ contract.solicitation_type|default:"N/A" }}</p>
+                <!-- Contract Controls: Expedite (top) + NIST (below) -->
+                <div class="shrink-0 flex flex-col gap-2 border-l border-gray-200 pl-3">
+                    <!-- Expedite panel: bordered, title + X top, buttons stacked vertically -->
+                    <div id="expedite_container" class="border border-gray-300 rounded-md p-1.5
+                        {% if expedite and expedite.used %}bg-fuchsia-200{% elif expedite and expedite.successful %}bg-yellow-200{% else %}bg-gray-50{% endif %}">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-sm font-semibold text-gray-800">Expedite</span>
+                            <button type="button" onclick="resetExpedite()"
+                                class="bg-red-100 hover:bg-red-200 text-red-600 rounded p-1 flex items-center justify-center transition-colors" title="Reset">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div class="space-y-2">
+                            {% if not expedite or not expedite.successful %}
+                            <button onclick="toggleExpediteStatus('initiate')" id="expedite_initiate_btn"
+                                class="w-full px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+                                    {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed{% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                                {% if expedite and expedite.initiated %}disabled{% endif %}>Initiate</button>
+                            <button onclick="toggleExpediteStatus('successful')" id="expedite_successful_btn"
+                                class="w-full px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+                                    {% if not expedite or not expedite.initiated or expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed{% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                                {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>Successful</button>
+                            {% endif %}
+                            {% if expedite and expedite.successful %}
+                            <button onclick="toggleExpediteStatus('use')" id="expedite_use_btn"
+                                class="w-full px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+                                    {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed{% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
+                                {% if expedite.used %}disabled{% endif %}>Use Expedite</button>
+                            {% endif %}
+                        </div>
+                        {% if expedite and expedite.initiated %}
+                        <div class="mt-1 text-xs text-gray-700">
+                            {% if expedite.successful %}<span>✓ Successful</span>{% endif %}
+                            {% if expedite.used %}<span>Used</span>{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <!-- NIST button below Expedite -->
+                    <div class="flex justify-center">
+                        <button onclick="toggleContractField('nist')" id="nist_btn"
+                            data-nist-state="{% if contract.nist %}true{% else %}false{% endif %}"
+                            class="flex items-center justify-center p-1.5 border border-gray-300 rounded shadow-sm hover:opacity-90 transition-colors {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}" title="NIST">
+                            <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-7">
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- Toast message for clipboard copy -->
@@ -279,39 +342,32 @@
         </div>
     </div>
 
-    <!-- Main Content Grid -->
-    <div class="grid grid-cols-3 gap-8">
-        <!-- CLINs Section - 2/3 width -->
-        <div class="col-span-2 card card-padded">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Contract Line Items (CLINs)</h2>
-                {% if contract.status.description == 'Open' %}
-                <a href="{% url 'contracts:contract_clin_create' contract.id %}"
-                   class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                    Add CLIN
-                </a>
-                {% endif %}
-            </div>
-
-            <!-- CLINs Table -->
-            <div class="overflow-x-auto">
+    <!-- CLINs Section: Table + Details (combined) -->
+    <div class="card card-padded !p-2 mt-2">
+        <div class="flex justify-between items-center mb-1">
+            <h2 class="text-lg font-bold text-gray-800">Contract Line Items (CLINs)</h2>
+            {% if contract.status.description == 'Open' %}
+            <a href="{% url 'contracts:contract_clin_create' contract.id %}"
+               class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-sm rounded-md">
+                Add CLIN
+            </a>
+            {% endif %}
+        </div>
+        <div class="grid grid-cols-12 gap-2">
+            <!-- CLIN Table - left ~35% -->
+            <div class="col-span-4 overflow-x-auto max-h-[220px] overflow-y-auto border border-gray-200 rounded">
+            <div class="min-w-full">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead>
                         <tr>
-                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
+                            <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
                                 Item No
                             </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
+                            <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
+                                Item Type
+                            </th>
+                            <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
                                 Supplier
-                            </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
-                                NSN
-                            </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
-                                Order Qty
-                            </th>
-                            <th class="px-6 py-3 bg-gray-50 text-left label tracking-wider">
-                                Due Date
                             </th>
                         </tr>
                     </thead>
@@ -319,39 +375,20 @@
                         {% for clin in clins %}
                         <tr id="clin-row-{{ clin.id }}"
                             data-clin-id="{{ clin.id }}"
-                            class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
-                                    {{ clin.item_number|default:"0000" }}
-                                </a>
+                            class="{% if selected_clin and clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
+                            <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
+                                {{ clin.item_number|default:"0000" }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ clin.supplier.name|default:"N/A" }}
+                            <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
+                                {{ clin.get_item_type_display|default:"—" }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ clin.nsn.nsn_code|default:"N/A" }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm {% if clin.due_date_late %}text-red-600{% endif %}">
-                                {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
-                            </td>
-                            <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="event.stopPropagation();">Edit</button>
-                                <button class="text-red-600 hover:text-red-800" onclick="event.stopPropagation();">Delete</button>
-                            </td> -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <a href="{% url 'contracts:clin_update' clin.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                </a>
+                            <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
+                                {% if clin.supplier %}{{ clin.supplier.name }}{% else %}N/A{% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            <td colspan="3" class="px-3 py-2 text-center text-gray-500 text-sm">
                                 No CLINs found for this contract
                             </td>
                         </tr>
@@ -359,149 +396,178 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <!-- NIST & Expedite Section - 1/3 width -->
-        <div class="col-span-1 card card-padded">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Contract Controls</h2>
             </div>
-
-            <!-- NIST and Expedite sections side by side -->
-            <div class="grid grid-cols-2 gap-4">
-                <!-- NIST Section -->
-                <div class="border border-gray-300 rounded-md p-2 bg-gray-50 flex items-center justify-center">
-                    <button
-                        onclick="toggleContractField('nist')"
-                        id="nist_btn"
-                        data-nist-state="{% if contract.nist %}true{% else %}false{% endif %}"
-                        class="w-3/4 flex items-center justify-center p-2 border border-gray-300 rounded-md shadow-sm hover:opacity-90 transition-colors duration-150 {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}">
-                        <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-10">
-                    </button>
-                </div>
-
-                <!-- Expedite Section -->
-                <div id="expedite_container"
-                    class="border border-gray-300 rounded-md p-2
-                    {% if expedite and expedite.used %}bg-fuchsia-200{% elif expedite and expedite.successful %}bg-yellow-200{% else %}bg-gray-50 dark:bg-gray-800{% endif %}">
-                    <div class="row-between mb-2">
-                        <h3 class="font-semibold text-gray-800">Expedite</h3>
-                        <button type="button"
-                            onclick="resetExpedite()"
-                            class="bg-red-100 hover:bg-red-200 text-red-600 rounded-full w-6 h-6 flex items-center justify-center transition-colors duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+            <!-- CLIN Details Panel - right ~65% -->
+            <div class="col-span-8 border border-gray-200 rounded bg-gray-50 p-2 min-h-[200px]" id="clin-details-panel">
+                <div id="clin-details-content" class="text-sm">
+                    {% if selected_clin %}
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div><span class="text-gray-600">Type:</span> <span id="cd-type">{{ selected_clin.get_item_type_display|default:"—" }}</span></div>
+                        <div><span class="text-gray-600">Sub PO #:</span> <span id="cd-po">{{ selected_clin.clin_po_num|default:selected_clin.po_number|default:"—" }}</span></div>
+                        <div class="col-span-2"><span class="text-gray-600">Supplier:</span>
+                            {% if selected_clin.supplier %}
+                            <span id="cd-supplier-name">{% if selected_clin.supplier.name %}{{ selected_clin.supplier.name }}{% else %}N/A{% endif %}</span>
+                            <button type="button" onclick="openSupplierInfoModal({{ selected_clin.supplier.id }})" class="ml-1 text-xs text-blue-600 hover:text-blue-800 underline">Supplier Info</button>
+                            {% else %}<span id="cd-supplier">N/A</span>{% endif %}
+                        </div>
+                        <div class="col-span-2"><span class="text-gray-600">NSN:</span>
+                            {% if selected_clin.nsn %}
+                            <a href="{% url 'contracts:nsn_edit' selected_clin.nsn.id %}" target="_blank" class="text-blue-600 hover:text-blue-800" id="cd-nsn-link">{{ selected_clin.nsn.nsn_code }}{% if selected_clin.nsn.description %} ({{ selected_clin.nsn.description }}){% endif %}</a>
+                            {% else %}<span id="cd-nsn">N/A</span>{% endif %}
+                        </div>
+                        <div><span class="text-gray-600">I&A:</span> <span id="cd-ia">{% if selected_clin.ia %}{{ selected_clin.get_ia_display }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600">FOB:</span> <span id="cd-fob">{% if selected_clin.fob %}{{ selected_clin.get_fob_display }}{% else %}—{% endif %}</span></div>
+                        <div class="col-span-2"><span class="text-gray-600">Special Payment Terms:</span> <span id="cd-spt">{% if selected_clin.special_payment_terms %}{{ selected_clin.special_payment_terms }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600">Sub Due Date:</span> <span id="cd-sub-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
+                        <div><span class="text-gray-600">Quoted Due Date:</span> <span id="cd-quoted-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% elif selected_clin.due_date %}{{ selected_clin.due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
+                        <div><span class="text-gray-600">Order Qty:</span> <span id="cd-order-qty">{{ selected_clin.order_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span></div>
+                        <div><span class="text-gray-600">Ship Qty:</span> <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span></div>
+                        <div><span class="text-gray-600">Ship Date:</span> <span id="cd-ship-date">{% if selected_clin.ship_date %}{{ selected_clin.ship_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600">Item Value:</span> <span id="cd-item-value">{% if selected_clin.item_value %}${% endif %}{{ selected_clin.item_value|floatformat:2|default:"—" }}</span></div>
+                        <div class="col-span-2 flex gap-2 items-center">
+                            <a href="{% url 'contracts:clin_update' selected_clin.id %}" class="text-indigo-600 hover:text-indigo-900 text-xs font-medium">Edit CLIN</a>
+                            <a href="{% url 'contracts:clin_detail' selected_clin.id %}" class="text-blue-600 hover:text-blue-800 text-xs">View Full</a>
+                        </div>
                     </div>
-
-                    <div class="space-y-2">
-                        <!-- Initiate button -->
-                        {% if not expedite or not expedite.successful %}
-                        <button
-                            onclick="toggleExpediteStatus('initiate')"
-                            id="expedite_initiate_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                                {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
-                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
-                            {% if expedite and expedite.initiated %}disabled{% endif %}>
-                            Initiate
-                        </button>
-                        {% endif %}
-
-                        <!-- Successful button -->
-                        {% if not expedite or not expedite.successful %}
-                        <button
-                            onclick="toggleExpediteStatus('successful')"
-                            id="expedite_successful_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                                {% if not expedite or not expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
-                                {% elif expedite and expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed
-                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
-                            {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>
-                            Successful
-                        </button>
-                        {% endif %}
-
-                        <!-- Use button (only shows after successful) -->
-                        {% if expedite and expedite.successful %}
-                        <button
-                            onclick="toggleExpediteStatus('use')"
-                            id="expedite_use_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                                {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed
-                                {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
-                            {% if expedite.used %}disabled{% endif %}>
-                            Use Expedite
-                        </button>
-                        {% endif %}
-                    </div>
-
-                    <!-- Status info display -->
-                    {% if expedite and expedite.initiated %}
-                    <div class="mt-2 text-xs text-gray-700">
-                        <p>Initiated: {{ expedite.initiateddate|date:"M d, Y H:i" }} by {{ expedite.initiatedby }}</p>
-                        {% if expedite.successful %}
-                        <p>Successful: {{ expedite.successfuldate|date:"M d, Y H:i" }} by {{ expedite.successfulby }}</p>
-                        {% endif %}
-                        {% if expedite.used %}
-                        <p>Used: {{ expedite.useddate|date:"M d, Y H:i" }} by {{ expedite.usedby }}</p>
-                        {% endif %}
-                    </div>
+                    {% else %}
+                    <p id="clin-details-placeholder" class="text-gray-500">Select a CLIN above to view details.</p>
+                    <div id="clin-details-fetched" class="hidden"></div>
                     {% endif %}
                 </div>
             </div>
-
-            <!-- <div class="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-500 italic">
-                <p>Green = Active NIST, Gray = Inactive NIST</p>
-                <p class="mt-1">Expedite: Yellow background = Successful, Pink background = Used</p>
-            </div> -->
         </div>
     </div>
 
-    <!-- Bottom Sections Grid -->
-    <div class="grid grid-cols-3 gap-8 mt-8">
-        <!-- All Notes Combined Section - 2/3 width -->
-        <div class="col-span-2 card card-padded">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Contract Activity Timeline</h2>
+    <!-- Notes & Gov Actions (higher priority) -->
+    <div class="grid grid-cols-3 gap-4 mt-2">
+        <!-- Notes Section - Contract and CLIN tabs -->
+        <div class="col-span-2 card card-padded !p-2">
+            <div class="flex justify-between items-center mb-1">
+                <h2 class="text-lg font-bold text-gray-800">Notes</h2>
                 <div class="flex space-x-3">
                     <button
-                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+                        class="notes-add-contract-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-sm rounded-md"
                         data-note-action="add"
-                        data-content-type-id="18"
+                        data-content-type-id="{{ contract_content_type_id|default:'18' }}"
                         data-object-id="{{ contract.id }}"
                         data-entity-type="Contract"
-                        <!-- onclick="console.log('Contract Note button clicked', this.dataset)" -->
+                    >
                         Add Contract Note
                     </button>
                     <button
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg js-add-clin-note"
+                        class="notes-add-clin-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-sm rounded-md js-add-clin-note"
                         data-note-action="add"
-                        data-content-type-id="12"
+                        data-content-type-id="{{ clin_content_type_id|default:'12' }}"
                         data-object-id="{{ selected_clin.id|default:'' }}"
                         data-entity-type="CLIN"
                         {% if not selected_clin %}disabled{% endif %}
-                        onclick="console.log('CLIN Note button clicked', this.dataset)"
                     >
                         Add CLIN Note
                     </button>
                 </div>
             </div>
-            <div id="combined-notes-container" class="combined-notes-container space-y-4 max-h-[400px] overflow-y-auto" style="max-height: 400px !important; overflow-y: auto !important; display: block !important;">
-                {% with combined_notes=all_notes %}
-                    {% include "contracts/partials/notes_list.html" with notes=combined_notes combined_view=True show_note_type=True entity_type="Note" content_type_id="" contract_content_type_id="18" clin_content_type_id="12" object_id=contract.id %}
-                {% endwith %}
+            <!-- Tabs -->
+            <div class="border-b border-gray-200 mb-2">
+                <nav class="flex space-x-2" aria-label="Notes tabs">
+                    <button type="button" id="notes-tab-contract" onclick="switchNotesTab('contract')"
+                        class="notes-tab-btn py-1 px-2 border-b-2 font-medium text-sm
+                        border-green-500 text-green-600 bg-green-50">
+                        Contract
+                    </button>
+                    {% for clin in clins %}
+                    <button type="button" id="notes-tab-clin-{{ clin.id }}" data-clin-id="{{ clin.id }}" onclick="switchToClinTab({{ clin.id }})"
+                        class="notes-tab-btn py-1 px-2 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        CLIN ({{ clin.item_number|default:"—" }})
+                    </button>
+                    {% endfor %}
+                </nav>
+            </div>
+            <!-- Contract tab content -->
+            <div id="notes-panel-contract" class="notes-panel space-y-2 max-h-[360px] overflow-y-auto">
+                {% include "contracts/partials/notes_list.html" with notes=contract_notes entity_type="contract" show_note_type=False content_type_id=contract_content_type_id object_id=contract.id note_empty_msg="No contract notes" %}
+            </div>
+            <!-- CLIN tab content (single panel, populated via fetch when a CLIN tab is clicked) -->
+            <div id="notes-panel-clin" class="notes-panel hidden space-y-2 max-h-[360px] overflow-y-auto">
+                {% if selected_clin %}
+                {% include "contracts/partials/notes_list.html" with notes=clin_notes entity_type="clin" show_note_type=False content_type_id=clin_content_type_id object_id=selected_clin.id note_empty_msg="No CLIN notes" %}
+                {% else %}
+                <p class="text-gray-500 text-center py-2 text-sm">{% if clins %}Click a CLIN tab above to view its notes.{% else %}No CLINs in this contract.{% endif %}</p>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Future Section - 1/3 width -->
-        <div class="col-span-1 card card-padded">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">Future Section</h2>
+        <!-- Gov Actions & Log Fields - 1/3 width -->
+        <div class="col-span-1 card card-padded !p-2">
+            <div class="border-b border-gray-200 mb-2">
+                <nav class="flex space-x-2" aria-label="Gov Actions and Log Fields tabs">
+                    <button type="button" id="gov-tab-govactions" onclick="switchGovLogTab('govactions')"
+                        class="gov-log-tab-btn py-1 px-2 border-b-2 font-medium text-sm border-blue-500 text-blue-600 bg-blue-50">
+                        Gov Actions
+                    </button>
+                    <button type="button" id="gov-tab-logfields" onclick="switchGovLogTab('logfields')"
+                        class="gov-log-tab-btn py-1 px-2 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Log Fields
+                    </button>
+                </nav>
             </div>
-            <div class="card card-padded border-dashed text-center bg-gray-50">
-                <p class="text-gray-500">This section is reserved for future functionality</p>
+            <!-- Gov Actions tab -->
+            <div id="gov-panel-govactions" class="gov-log-panel">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-medium text-gray-700">Contract Gov Actions</span>
+                    <button type="button" onclick="openGovActionModal()" class="text-blue-600 hover:text-blue-800 inline-flex items-center" title="Add Gov Action">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                        <span class="ml-1 text-sm">New</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto max-h-[220px] overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600">Action</th>
+                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600">Number</th>
+                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600">Request</th>
+                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600">Date Sub.</th>
+                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600">Date Closed</th>
+                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600">Initiated</th>
+                                <th class="px-2 py-1 w-8"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="gov-actions-tbody">
+                            {% for ga in gov_actions %}
+                            <tr data-gov-action-id="{{ ga.id }}">
+                                <td class="px-2 py-1">{{ ga.get_action_display|default:ga.action|default:"—" }}</td>
+                                <td class="px-2 py-1">{{ ga.number|default:"—" }}</td>
+                                <td class="px-2 py-1">{{ ga.get_request_display|default:ga.request|default:"—" }}</td>
+                                <td class="px-2 py-1">{{ ga.date_submitted|date:"m/d/Y"|default:"—" }}</td>
+                                <td class="px-2 py-1">{{ ga.date_closed|date:"m/d/Y"|default:"—" }}</td>
+                                <td class="px-2 py-1">{{ ga.get_initiated_display|default:ga.initiated|default:"—" }}</td>
+                                <td class="px-2 py-1">
+                                    <button type="button" onclick="confirmDeleteGovAction({{ ga.id }})" class="text-red-600 hover:text-red-800" title="Delete">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr data-empty-gov-row><td colspan="7" class="px-2 py-4 text-center text-gray-500">No gov actions. Click New to add.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Log Fields tab (tied to selected CLIN; populated via JS when switching CLINs) -->
+            <div id="gov-panel-logfields" class="gov-log-panel hidden">
+                <p id="log-fields-clin-label" class="text-xs text-gray-500 mb-1">{% if selected_clin %}For CLIN {{ selected_clin.item_number|default:"—" }}{% else %}Select a CLIN above{% endif %}</p>
+                <div class="space-y-2" id="log-fields-form-wrap">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-0.5">Status</label>
+                        <textarea id="log-field-status" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" placeholder="Enter status...">{% if selected_clin %}{{ selected_clin.log_status|default:"" }}{% endif %}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-0.5">Notes</label>
+                        <textarea id="log-field-notes" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" placeholder="Enter notes...">{% if selected_clin %}{{ selected_clin.log_notes|default:"" }}{% endif %}</textarea>
+                    </div>
+                    <button type="button" onclick="saveLogFields()" id="log-fields-save-btn" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md" {% if not selected_clin %}disabled{% endif %}>Save</button>
+                </div>
             </div>
         </div>
     </div>
@@ -510,6 +576,180 @@
 <!-- Include Note Modal -->
 {% include "contracts/partials/note_modal.html" %}
 {% include "contracts/includes/cancel_contract_modal.html" %}
+
+<!-- Gov Action Modal -->
+<div id="govActionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeGovActionModal()">
+    <div class="relative top-16 mx-auto p-6 border shadow-lg rounded-md bg-white" style="width: 480px !important; max-width: 95%;" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-gray-800">Add Gov Action</h3>
+            <button type="button" onclick="closeGovActionModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form id="gov-action-form" onsubmit="submitGovAction(event)">
+            {% csrf_token %}
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Action</label>
+                    <select name="action" id="gov-action-action" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">—</option>
+                        <option value="PAR">PAR</option>
+                        <option value="RFV">RFV</option>
+                        <option value="ECP">ECP</option>
+                        <option value="QN">QN</option>
+                        <option value="NCR">NCR</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Number</label>
+                    <input type="text" name="number" id="gov-action-number" class="w-full rounded-md border-gray-300 shadow-sm" placeholder="Number">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Request</label>
+                    <select name="request" id="gov-action-request" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">—</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Technical">Technical</option>
+                        <option value="Extension">Extension</option>
+                        <option value="Cancellation">Cancellation</option>
+                        <option value="Qty Change">Qty Change</option>
+                        <option value="Litigation">Litigation</option>
+                        <option value="Price">Price</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Date Submitted</label>
+                    <input type="date" name="date_submitted" id="gov-action-date-submitted" class="w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Date Closed</label>
+                    <input type="date" name="date_closed" id="gov-action-date-closed" class="w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Initiated</label>
+                    <select name="initiated" id="gov-action-initiated" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">—</option>
+                        <option value="STATZ">STATZ</option>
+                        <option value="Gov">Gov</option>
+                        <option value="Supplier">Supplier</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" onclick="closeGovActionModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Supplier Info Modal -->
+<div id="supplierInfoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeSupplierInfoModal()">
+    <div class="relative top-10 mx-auto p-6 border shadow-lg rounded-md bg-white max-w-2xl mb-10" onclick="event.stopPropagation()">
+        <div id="supplier-info-loading" class="text-center py-8 text-gray-500">Loading...</div>
+        <div id="supplier-info-content" class="hidden">
+            <div class="flex justify-between items-start mb-4">
+                <h3 id="supplier-info-name" class="text-xl font-semibold text-gray-800">Supplier Name</h3>
+                <button type="button" onclick="closeSupplierInfoModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div><span class="text-gray-600 font-medium">CAGE Code:</span> <span id="supplier-info-cage">—</span></div>
+                <div><span class="text-gray-600 font-medium">Supplier Contact:</span> <span id="supplier-info-contact">—</span></div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-gray-600 font-medium">Email:</span>
+                    <span id="supplier-info-email" class="mr-2">—</span>
+                    <button type="button" onclick="copyToClipboard(document.getElementById('supplier-info-email').dataset.value || document.getElementById('supplier-info-email').textContent, 'Email')" class="text-xs px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded" title="Copy">Copy</button>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-gray-600 font-medium">Phone:</span>
+                    <span id="supplier-info-phone" class="mr-2">—</span>
+                    <button type="button" onclick="copyToClipboard(document.getElementById('supplier-info-phone').dataset.value || document.getElementById('supplier-info-phone').textContent, 'Phone')" class="text-xs px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded" title="Copy">Copy</button>
+                </div>
+                <!-- Probation & Conditional indicators -->
+                <div class="flex gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-600 font-medium">Probation:</span>
+                        <span id="supplier-info-probation" class="inline-block w-4 h-4 rounded border border-gray-300" title="Probation"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-600 font-medium">Conditions:</span>
+                        <span id="supplier-info-conditional" class="inline-block w-4 h-4 rounded border border-gray-300" title="Conditional"></span>
+                    </div>
+                </div>
+                <!-- Address tabs: Physical, Billing, Shipping -->
+                <div>
+                    <div class="text-gray-600 font-medium mb-1">Addresses</div>
+                    <div class="border border-gray-200 rounded">
+                        <div class="flex border-b border-gray-200">
+                            <button type="button" data-addr-tab="physical" class="supplier-addr-tab px-3 py-2 text-sm font-medium border-b-2 border-blue-500 text-blue-600">Physical</button>
+                            <button type="button" data-addr-tab="billing" class="supplier-addr-tab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500">Billing</button>
+                            <button type="button" data-addr-tab="shipping" class="supplier-addr-tab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500">Shipping</button>
+                        </div>
+                        <div id="supplier-addr-physical" class="supplier-addr-panel p-3 text-gray-700"></div>
+                        <div id="supplier-addr-billing" class="supplier-addr-panel hidden p-3 text-gray-700"></div>
+                        <div id="supplier-addr-shipping" class="supplier-addr-panel hidden p-3 text-gray-700"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-gray-600 font-medium mb-1">Supplier Notes</div>
+                    <div id="supplier-info-notes" class="p-2 bg-gray-50 rounded text-gray-700 whitespace-pre-wrap max-h-32 overflow-y-auto">—</div>
+                </div>
+            </div>
+            <div class="mt-4 flex justify-end">
+                <a id="supplier-info-full-link" href="#" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">View Full Supplier Page →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contract Search Modal -->
+<div id="contractSearchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
+    <div class="relative top-20 mx-auto p-6 border shadow-lg rounded-md bg-white" style="width: 520px !important; max-width: 95%;" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-gray-800">Jump to Contract</h3>
+            <button type="button" onclick="closeContractSearchModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="space-y-4">
+            <div class="flex items-center gap-4 flex-wrap">
+                <div class="relative flex-1 min-w-[200px]">
+                    <input type="text" id="contract-search-modal-input"
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="Search by contract number, last 4 digits, or PO number..."
+                        autocomplete="off">
+                    <div id="contract-search-modal-results"
+                        class="absolute z-50 w-full card mt-1 border-gray-200 max-h-64 overflow-y-auto hidden">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                    <span class="text-sm font-medium text-gray-700">Status:</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-search-status" value="open" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700">Open</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-search-status" value="closed" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700">Closed</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-search-status" value="both" checked class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700">Both</span>
+                    </label>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500">Type at least 3 characters (e.g. last 4 digits of contract number). Click a contract to jump to it.</p>
+        </div>
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" onclick="closeContractSearchModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- Acknowledgment Letter Modal -->
 <div id="acknowledgmentLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
@@ -543,18 +783,9 @@
         display: block !important;
     }
 
-    /* Strict container height enforcement */
-    #combined-notes-container {
+    /* Notes panels */
+    .notes-panel {
         overflow-y: auto !important;
-        display: block !important;
-        height: auto !important;
-        max-height: 400px !important;
-    }
-
-    /* Ensure individual notes don't push out the container */
-    #combined-notes-container > div {
-        margin-bottom: 0.75rem !important;
-        flex-shrink: 0 !important;
     }
 
     /* Color coding for notes */
@@ -592,6 +823,72 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
+<script>
+// Contract Search Modal
+function openContractSearchModal() {
+    const modal = document.getElementById('contractSearchModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.getElementById('contract-search-modal-input').value = '';
+        document.getElementById('contract-search-modal-results').innerHTML = '';
+        document.getElementById('contract-search-modal-results').classList.add('hidden');
+        setTimeout(() => document.getElementById('contract-search-modal-input').focus(), 100);
+    }
+}
+function closeContractSearchModal() {
+    const modal = document.getElementById('contractSearchModal');
+    if (modal) modal.classList.add('hidden');
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('contract-search-modal-input');
+    const searchResults = document.getElementById('contract-search-modal-results');
+    if (!searchInput || !searchResults) return;
+    let debounceTimer;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const query = this.value;
+        if (query.length < 3) {
+            searchResults.classList.add('hidden');
+            return;
+        }
+        debounceTimer = setTimeout(() => {
+            const status = document.querySelector('input[name="contract-search-status"]:checked')?.value || 'both';
+            fetch(`/contracts/search/?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`)
+                .then(response => response.json())
+                .then(data => {
+                    searchResults.innerHTML = '';
+                    const results = data.results || data;
+                    if (results.length > 0) {
+                        results.forEach(contract => {
+                            const div = document.createElement('div');
+                            div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                            let html = `<div class="text-sm text-blue-600">${contract.contract_number}</div>`;
+                            if (contract.po_numbers && contract.po_numbers.length > 0) {
+                                html += `<div class="text-xs text-gray-500 mt-1">PO: ${contract.po_numbers.join(', ')}</div>`;
+                            }
+                            div.innerHTML = html;
+                            div.addEventListener('click', function() { window.location.href = "{% url 'contracts:contract_management' 0 %}".replace('/0/', '/' + contract.id + '/'); });
+                            searchResults.appendChild(div);
+                        });
+                        searchResults.classList.remove('hidden');
+                    } else {
+                        searchResults.classList.add('hidden');
+                    }
+                });
+        }, 300);
+    });
+    document.querySelectorAll('input[name="contract-search-status"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (searchInput.value.length >= 3) searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target) && !e.target.closest('#contractSearchModal button')) {
+            searchResults.classList.add('hidden');
+        }
+    });
+});
+</script>
 <script>
 // Debug ContentType IDs
 document.addEventListener('DOMContentLoaded', function() {
@@ -929,9 +1226,6 @@ function decodeUnicodeEscapes(str) {
 }
 
 function selectClin(clinId, clinElement) {
-    // Store contract ID in a variable to avoid template tag issues
-    const contractId = "{{ contract.id }}";
-
     // Remove highlight from all rows and add it to the selected row
     document.querySelectorAll('.clin-row').forEach(row => {
         row.classList.remove('selected-row');
@@ -939,48 +1233,374 @@ function selectClin(clinId, clinElement) {
     clinElement.classList.add('selected-row');
 
     // Update all CLIN Add Note buttons with the selected CLIN ID and enable them
-    document.querySelectorAll('[data-entity-type="CLIN"]').forEach(btn => {
+    document.querySelectorAll('.notes-add-clin-btn, [data-entity-type="CLIN"]').forEach(btn => {
         btn.dataset.objectId = clinId;
         btn.removeAttribute('disabled');
     });
 
-    // Fetch combined notes
-    fetchCombinedNotes(contractId, clinId);
+    // Fetch CLIN details, notes, and log fields
+    fetchClinDetails(clinId);
+    fetchClinNotes(clinId);
+    fetchLogFields(clinId);
+}
+
+function switchToClinTab(clinId) {
+    // Sync row selection
+    document.querySelectorAll('.clin-row').forEach(row => {
+        row.classList.remove('selected-row');
+        if (row.dataset.clinId === String(clinId)) row.classList.add('selected-row');
+    });
+    document.querySelectorAll('.notes-add-clin-btn, [data-entity-type="CLIN"]').forEach(btn => {
+        btn.dataset.objectId = clinId;
+        btn.removeAttribute('disabled');
+    });
+    fetchClinDetails(clinId);
+    fetchClinNotes(clinId);
+    fetchLogFields(clinId);
+}
+
+// Gov Actions & Log Fields
+let currentClinIdForLogFields = '{{ selected_clin.id|default:"" }}';
+
+function switchGovLogTab(tab) {
+    document.querySelectorAll('.gov-log-panel').forEach(panel => panel.classList.add('hidden'));
+    document.querySelectorAll('.gov-log-tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'text-blue-600', 'bg-blue-50');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    const panel = document.getElementById(`gov-panel-${tab}`);
+    const tabBtn = document.getElementById(`gov-tab-${tab}`);
+    if (panel) panel.classList.remove('hidden');
+    if (tabBtn) {
+        tabBtn.classList.remove('border-transparent', 'text-gray-500');
+        tabBtn.classList.add('border-blue-500', 'text-blue-600', 'bg-blue-50');
+    }
+}
+
+function openGovActionModal() {
+    document.getElementById('govActionModal').classList.remove('hidden');
+    document.getElementById('gov-action-form').reset();
+}
+
+function closeGovActionModal() {
+    document.getElementById('govActionModal').classList.add('hidden');
+}
+
+let currentSupplierInfoData = null;
+
+function openSupplierInfoModal(supplierId) {
+    const modal = document.getElementById('supplierInfoModal');
+    const loading = document.getElementById('supplier-info-loading');
+    const content = document.getElementById('supplier-info-content');
+    if (!modal || !supplierId) return;
+    modal.classList.remove('hidden');
+    loading.textContent = 'Loading...';
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+    const url = "{{ supplier_info_url_base|default:'/contracts/supplier/' }}" + supplierId + "/info/";
+    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            loading.classList.add('hidden');
+            if (!data.success) {
+                content.classList.remove('hidden');
+                content.innerHTML = '<p class="text-red-600">Failed to load supplier info.</p>';
+                return;
+            }
+            currentSupplierInfoData = data;
+            document.getElementById('supplier-info-name').textContent = data.name;
+            document.getElementById('supplier-info-cage').textContent = data.cage_code;
+            document.getElementById('supplier-info-contact').textContent = data.contact_name;
+            document.getElementById('supplier-info-email').textContent = data.contact_email;
+            document.getElementById('supplier-info-email').dataset.value = data.contact_email;
+            document.getElementById('supplier-info-phone').textContent = data.contact_phone;
+            document.getElementById('supplier-info-phone').dataset.value = data.contact_phone;
+            document.getElementById('supplier-info-notes').textContent = data.notes;
+            document.getElementById('supplier-info-probation').className = 'inline-block w-4 h-4 rounded border ' + (data.probation ? 'bg-red-500 border-red-600' : 'bg-green-500 border-green-600');
+            document.getElementById('supplier-info-probation').title = data.probation ? 'On Probation' : 'Not on Probation';
+            document.getElementById('supplier-info-conditional').className = 'inline-block w-4 h-4 rounded border ' + (data.conditional ? 'bg-red-500 border-red-600' : 'bg-green-500 border-green-600');
+            document.getElementById('supplier-info-conditional').title = data.conditional ? 'Conditional' : 'Not Conditional';
+            const fmtAddr = (a) => a && a.display ? a.display : '—';
+            document.getElementById('supplier-addr-physical').textContent = fmtAddr(data.physical_address);
+            document.getElementById('supplier-addr-billing').textContent = fmtAddr(data.billing_address);
+            document.getElementById('supplier-addr-shipping').textContent = fmtAddr(data.shipping_address);
+            const fullUrl = "{% url 'suppliers:supplier_detail' 0 %}".replace('/0/', `/${supplierId}/`);
+            const fullLink = document.getElementById('supplier-info-full-link');
+            fullLink.href = fullUrl;
+            fullLink.classList.remove('hidden');
+            content.classList.remove('hidden');
+            document.querySelectorAll('.supplier-addr-tab').forEach(btn => btn.classList.remove('border-blue-500', 'text-blue-600', 'border-transparent', 'text-gray-500'));
+            document.querySelector('[data-addr-tab="physical"]').classList.add('border-blue-500', 'text-blue-600');
+            document.querySelectorAll('.supplier-addr-panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById('supplier-addr-physical').classList.remove('hidden');
+        })
+        .catch(() => {
+            loading.innerHTML = '<p class="text-red-600 py-4">Failed to load supplier info.</p>';
+        });
+}
+
+function closeSupplierInfoModal() {
+    document.getElementById('supplierInfoModal').classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.supplier-addr-tab').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tab = this.dataset.addrTab;
+            document.querySelectorAll('.supplier-addr-tab').forEach(b => { b.classList.remove('border-blue-500', 'text-blue-600'); b.classList.add('border-transparent', 'text-gray-500'); });
+            this.classList.remove('border-transparent', 'text-gray-500');
+            this.classList.add('border-blue-500', 'text-blue-600');
+            document.querySelectorAll('.supplier-addr-panel').forEach(p => p.classList.add('hidden'));
+            const panel = document.getElementById('supplier-addr-' + tab);
+            if (panel) panel.classList.remove('hidden');
+        });
+    });
+});
+
+function copyToClipboard(text, label) {
+    const val = (typeof text === 'string' ? text : '').trim();
+    if (!val || val === '—') return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(() => {
+            const toast = document.getElementById('clipboard-toast');
+            if (toast) { toast.textContent = (label || 'Value') + ' copied!'; toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 2000); }
+        });
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = val;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        const toast = document.getElementById('clipboard-toast');
+        if (toast) { toast.textContent = (label || 'Value') + ' copied!'; toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 2000); }
+    }
+}
+
+function submitGovAction(e) {
+    e.preventDefault();
+    const form = document.getElementById('gov-action-form');
+    const formData = new FormData(form);
+    formData.append('csrfmiddlewaretoken', document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value);
+    fetch("{% url 'contracts:gov_action_create' contract.id %}", {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            closeGovActionModal();
+            const tbody = document.getElementById('gov-actions-tbody');
+            const emptyRow = tbody.querySelector('tr[data-empty-gov-row]');
+            if (emptyRow) emptyRow.remove();
+            const tr = document.createElement('tr');
+            tr.dataset.govActionId = data.id;
+            tr.innerHTML = `<td class="px-2 py-1">${data.action || '—'}</td><td class="px-2 py-1">${data.number || '—'}</td><td class="px-2 py-1">${data.request || '—'}</td><td class="px-2 py-1">${data.date_submitted ? new Date(data.date_submitted).toLocaleDateString() : '—'}</td><td class="px-2 py-1">${data.date_closed ? new Date(data.date_closed).toLocaleDateString() : '—'}</td><td class="px-2 py-1">${data.initiated || '—'}</td><td class="px-2 py-1"><button type="button" onclick="confirmDeleteGovAction(${data.id})" class="text-red-600 hover:text-red-800" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>`;
+            tbody.appendChild(tr);
+        } else {
+            alert(data.error || data.errors || 'Failed to add Gov Action.');
+        }
+    })
+    .catch(err => { console.error(err); alert('Error adding Gov Action.'); });
+}
+
+function confirmDeleteGovAction(id) {
+    if (confirm('Are you sure you want to delete this Gov Action?')) {
+        deleteGovAction(id);
+    }
+}
+
+function deleteGovAction(id) {
+    fetch(`/contracts/gov-action/${id}/delete/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const row = document.querySelector(`tr[data-gov-action-id="${id}"]`);
+            if (row) row.remove();
+            const tbody = document.getElementById('gov-actions-tbody');
+            if (tbody && tbody.querySelectorAll('tr').length === 0) {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-empty-gov-row', '');
+                tr.innerHTML = '<td colspan="7" class="px-2 py-4 text-center text-gray-500">No gov actions. Click New to add.</td>';
+                tbody.appendChild(tr);
+            }
+        }
+    });
+}
+
+function fetchClinDetails(clinId) {
+    const panel = document.getElementById('clin-details-content');
+    if (!panel) return;
+    if (!clinId) {
+        panel.innerHTML = '<p id="clin-details-placeholder" class="text-gray-500">Select a CLIN above to view details.</p>';
+        return;
+    }
+    const url = "{% url 'contracts:get_clin_details' 0 %}".replace('/0/', `/${clinId}/`);
+    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                panel.innerHTML = '<p class="text-red-600">Failed to load CLIN details.</p>';
+                return;
+            }
+            const d = data;
+            const fmt = (v) => (v === null || v === undefined || v === '') ? '—' : String(v);
+            const qty = d.order_qty !== '—' ? (Number(d.order_qty) === d.order_qty ? d.order_qty.toFixed(0) : d.order_qty) : '—';
+            const shipQty = d.ship_qty !== '—' ? (Number(d.ship_qty) === d.ship_qty ? d.ship_qty.toFixed(0) : d.ship_qty) : '—';
+            const itemVal = d.item_value !== '—' ? '$' + (Number(d.item_value) ? parseFloat(d.item_value).toFixed(2) : d.item_value) : '—';
+            const supplierHtml = d.supplier_id
+                ? `<span>${fmt(d.supplier_name)}</span> <button type="button" onclick="event.stopPropagation(); openSupplierInfoModal(${d.supplier_id})" class="ml-1 text-xs text-blue-600 hover:text-blue-800 underline">Supplier Info</button>`
+                : 'N/A';
+            const nsnUrl = d.nsn_id ? "{% url 'contracts:nsn_edit' 0 %}".replace('/0/', `/${d.nsn_id}/`) : null;
+            const nsnHtml = nsnUrl
+                ? `<a href="${nsnUrl}" target="_blank" class="text-blue-600 hover:text-blue-800">${fmt(d.nsn)}</a>`
+                : fmt(d.nsn);
+            const lateClass = d.supplier_due_date_late ? 'text-red-600' : '';
+            const editUrl = "{% url 'contracts:clin_update' 0 %}".replace('/0/', `/${d.id}/`);
+            const viewUrl = "{% url 'contracts:clin_detail' 0 %}".replace('/0/', `/${d.id}/`);
+            panel.innerHTML = `
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div><span class="text-gray-600">Type:</span> <span>${fmt(d.item_type)}</span></div>
+                    <div><span class="text-gray-600">Sub PO #:</span> <span>${fmt(d.clin_po_num)}</span></div>
+                    <div class="col-span-2"><span class="text-gray-600">Supplier:</span> ${supplierHtml}</div>
+                    <div class="col-span-2"><span class="text-gray-600">NSN:</span> ${nsnHtml}</div>
+                    <div><span class="text-gray-600">I&A:</span> <span>${fmt(d.ia)}</span></div>
+                    <div><span class="text-gray-600">FOB:</span> <span>${fmt(d.fob)}</span></div>
+                    <div class="col-span-2"><span class="text-gray-600">Special Payment Terms:</span> <span>${fmt(d.special_payment_terms)}</span></div>
+                    <div><span class="text-gray-600">Sub Due Date:</span> <span class="${lateClass}">${fmt(d.supplier_due_date)}</span></div>
+                    <div><span class="text-gray-600">Quoted Due Date:</span> <span class="${lateClass}">${fmt(d.quoted_due_date)}</span></div>
+                    <div><span class="text-gray-600">Order Qty:</span> <span>${qty} ${d.uom || 'EA'}</span></div>
+                    <div><span class="text-gray-600">Ship Qty:</span> <span>${shipQty}</span></div>
+                    <div><span class="text-gray-600">Ship Date:</span> <span>${fmt(d.ship_date)}</span></div>
+                    <div><span class="text-gray-600">Item Value:</span> <span>${itemVal}</span></div>
+                    <div class="col-span-2 flex gap-2 items-center">
+                        <a href="${editUrl}" class="text-indigo-600 hover:text-indigo-900 text-xs font-medium">Edit CLIN</a>
+                        <a href="${viewUrl}" class="text-blue-600 hover:text-blue-800 text-xs">View Full</a>
+                    </div>
+                </div>`;
+        })
+        .catch(() => {
+            panel.innerHTML = '<p class="text-red-600">Failed to load CLIN details.</p>';
+        });
+}
+
+function fetchLogFields(clinId) {
+    currentClinIdForLogFields = clinId;
+    const label = document.getElementById('log-fields-clin-label');
+    const statusEl = document.getElementById('log-field-status');
+    const notesEl = document.getElementById('log-field-notes');
+    const saveBtn = document.getElementById('log-fields-save-btn');
+    if (!clinId) {
+        if (label) label.textContent = 'Select a CLIN above';
+        if (statusEl) statusEl.value = '';
+        if (notesEl) notesEl.value = '';
+        if (saveBtn) saveBtn.disabled = true;
+        return;
+    }
+    const itemNum = document.querySelector(`.clin-row[data-clin-id="${clinId}"] td:first-child a`)?.textContent?.trim() || clinId;
+    if (label) label.textContent = `For CLIN ${itemNum}`;
+    if (saveBtn) saveBtn.disabled = false;
+    const url = "{% url 'contracts:get_clin_log_fields' 0 %}".replace('/0/', `/${clinId}/`);
+    fetch(url, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (statusEl) statusEl.value = data.log_status || '';
+            if (notesEl) notesEl.value = data.log_notes || '';
+        }
+    });
+}
+
+function saveLogFields() {
+    const clinId = currentClinIdForLogFields;
+    if (!clinId) return;
+    const status = document.getElementById('log-field-status')?.value || '';
+    const notes = document.getElementById('log-field-notes')?.value || '';
+    const url = "{% url 'contracts:save_clin_log_fields' 0 %}".replace('/0/', `/${clinId}/`);
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ log_status: status, log_notes: notes })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Could add a brief toast - for now silent
+        } else {
+            alert(data.error || 'Failed to save.');
+        }
+    });
+}
+
+function switchNotesTab(tab, clinId) {
+    document.querySelectorAll('.notes-panel').forEach(panel => panel.classList.add('hidden'));
+    document.querySelectorAll('.notes-tab-btn').forEach(btn => {
+        btn.classList.remove('border-green-500', 'text-green-600', 'bg-green-50', 'border-blue-500', 'text-blue-600', 'bg-blue-50');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    const panel = document.getElementById(tab === 'contract' ? 'notes-panel-contract' : 'notes-panel-clin');
+    let tabBtn = document.getElementById('notes-tab-contract');
+    if (tab === 'clin' && clinId) {
+        tabBtn = document.getElementById(`notes-tab-clin-${clinId}`);
+    }
+    if (panel) panel.classList.remove('hidden');
+    if (tabBtn) {
+        tabBtn.classList.remove('border-transparent', 'text-gray-500');
+        const activeClasses = tab === 'contract' ? ['border-green-500', 'text-green-600', 'bg-green-50'] : ['border-blue-500', 'text-blue-600', 'bg-blue-50'];
+        tabBtn.classList.add(...activeClasses);
+    }
 }
 
 function fetchClinNotes(clinId) {
-    // This function is now only used for fetching CLIN notes for the combined view
-    // So we'll just call fetchCombinedNotes instead
-    const contractId = "{{ contract.id }}";
-    fetchCombinedNotes(contractId, clinId);
-}
-
-function fetchCombinedNotes(contractId, clinId) {
-    fetch(`/contracts/contract/${contractId}/clin/${clinId}/combined-notes/`)
+    const container = document.getElementById('notes-panel-clin');
+    if (!container) return;
+    if (!clinId) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">Select a CLIN to view its notes.</p>';
+        return;
+    }
+    const url = "{% url 'contracts:get_clin_notes' 0 %}".replace('/0/', `/${clinId}/`);
+    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(response => {
+            const contentType = response.headers.get('content-type') || '';
             if (!response.ok) {
-                throw new Error(`Server responded with status: ${response.status}`);
+                if (contentType.includes('application/json')) {
+                    return response.json().then(data => { throw new Error(data.error || `Request failed (${response.status})`); });
+                }
+                throw new Error(`Request failed (${response.status}). Please try again.`);
+            }
+            if (!contentType.includes('application/json')) {
+                throw new Error('Invalid response from server.');
             }
             return response.json();
         })
         .then(data => {
-            if (data.success) {
-                const combinedNotesContainer = document.getElementById('combined-notes-container');
-                if (combinedNotesContainer) {
-                    combinedNotesContainer.innerHTML = data.notes_html;
-                    setupEditButtons(combinedNotesContainer);
-                    console.log('Combined notes updated successfully');
-                }
+            if (data.success && data.notes_html) {
+                container.innerHTML = data.notes_html;
+                setupEditButtons(container);
             } else {
-                console.error('Error loading combined notes:', data.error);
-                document.getElementById('combined-notes-container').innerHTML =
-                    '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">No notes for this CLIN.</p>';
             }
+            switchNotesTab('clin', clinId);
         })
         .catch(error => {
-            console.error('Error fetching combined notes:', error);
-            document.getElementById('combined-notes-container').innerHTML =
-                '<div class="alert alert-danger">Error loading notes. Please try again.</div>';
+            console.error('Error fetching CLIN notes:', error);
+            container.innerHTML = '<div class="text-red-600 text-center py-4">' + (error.message || 'Error loading notes. Please try again.') + '</div>';
         });
 }
 
@@ -1047,9 +1667,9 @@ function toggleAcknowledgment(field) {
                 }
             }
 
-            // If a note was created, refresh the notes section
+            // If a note was created, refresh the CLIN notes tab
             if (data.note_created) {
-                fetchCombinedNotes("{{ contract.id }}", clinId);
+                fetchClinNotes(clinId);
             }
 
             // Show message if a reminder was created

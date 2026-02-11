@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, Http404
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
@@ -281,11 +281,13 @@ class ClinAcknowledgmentUpdateView(UpdateView):
 @conditional_login_required
 def get_clin_notes(request, clin_id):
     try:
-        clin = get_object_or_404(Clin, id=clin_id, company=request.active_company)
+        active_company = getattr(request, 'active_company', None)
+        if not active_company:
+            return JsonResponse({'success': False, 'error': 'No company selected. Please select a company from the header.'}, status=400)
+        clin = get_object_or_404(Clin, id=clin_id, company=active_company)
         
         # Get notes for this CLIN
         clin_type = ContentType.objects.get_for_model(Clin)
-        print(f"CLIN ContentType: {clin_type.id} - {clin_type.app_label}.{clin_type.model}")
         
         notes = Note.objects.filter(
             content_type=clin_type,
@@ -315,7 +317,8 @@ def get_clin_notes(request, clin_id):
             'content_object': clin,
             'entity_type': 'clin',
             'content_type_id': str(clin_type.id),
-            'object_id': clin.id
+            'object_id': clin.id,
+            'note_empty_msg': 'No CLIN notes'
         })
         
         return JsonResponse({
@@ -323,6 +326,8 @@ def get_clin_notes(request, clin_id):
             'notes': notes_data,
             'notes_html': notes_html
         })
+    except Http404:
+        return JsonResponse({'success': False, 'error': 'CLIN not found.'}, status=404)
     except Exception as e:
         import traceback
         print(f"Error in get_clin_notes: {str(e)}")

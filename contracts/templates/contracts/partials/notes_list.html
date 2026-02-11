@@ -3,7 +3,7 @@
     {% with note_entity_type=note.entity_type|default:entity_type|default:'note' %}
     {% with note_content_type_id=note.content_type_id|default:content_type_id %}
     {% with note_object_id=note.object_id|default:object_id|default:"0" %}
-    <div class="border-l-4 {% if note_entity_type|lower == 'contract' %}border-green-500{% elif note_entity_type|lower == 'clin' %}border-blue-500{% else %}border-{{ note_color|default:'green' }}-500{% endif %} pl-4 py-2 mb-4">
+    <div class="border-l-4 {% if note_entity_type|lower == 'contract' %}border-green-500{% elif note_entity_type|lower == 'clin' %}border-blue-500{% else %}border-{{ note_color|default:'green' }}-500{% endif %} pl-3 py-1 mb-2">
         <!-- Note type indicator -->
         {% if show_note_type or combined_view %}
         <div class="row-between mb-1">
@@ -21,7 +21,7 @@
                 <p class="text-gray-700 whitespace-pre-wrap">{{ note.note|linebreaksbr }}</p>
             </div>
         </div>
-        <div class="mt-2 row-between">
+        <div class="mt-1 row-between">
             <div class="text-sm text-gray-500">
                 Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
             </div>
@@ -62,5 +62,5 @@
     {% endwith %}
     {% endfor %}
 {% else %}
-    <p class="text-gray-500 text-center py-4">No {{ entity_type|default:'note' }}s found</p>
+    <p class="text-gray-500 text-center py-2 text-sm">{{ note_empty_msg|default:"No notes found" }}</p>
 {% endif %} 
