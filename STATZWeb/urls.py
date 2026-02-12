@@ -128,6 +128,7 @@ urlpatterns = [
     path("training/", include("training.urls")),
     path("health/", health_check, name="health_check"),
     path("reports/", include("reports.urls")),
+    path("transactions/", include("transactions.urls")),
     # Announcement URLs
     path("announcement/add/", views.add_announcement, name="add_announcement"),
     path(

@@ -139,7 +139,7 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
         initial = super().get_initial()
         contract_id = self.kwargs.get('contract_id')
         if contract_id:
-            contract_data = Contract.objects.filter(company=self.request.active_company).get(id=contract_id)
+            contract_data = Contract.objects.filter(company=self.request.active_company).select_related('idiq_contract', 'status').get(id=contract_id)
             initial['contract'] = contract_id
             initial['contract_number'] = contract_data.contract_number
             initial['po_number'] = contract_data.po_number

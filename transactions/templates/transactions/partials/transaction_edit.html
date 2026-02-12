@@ -1,0 +1,126 @@
+{% load humanize %}
+<div class="space-y-4" id="transaction-edit-container" data-content-type-id="{{ content_type_id }}" data-object-id="{{ object_id }}" data-field-name="{{ field_name }}">
+  <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+    <div>
+      <dt class="text-gray-500 dark:text-gray-400">Table</dt>
+      <dd class="font-medium text-gray-900 dark:text-gray-100">{{ table_name }}</dd>
+    </div>
+    <div>
+      <dt class="text-gray-500 dark:text-gray-400">Field</dt>
+      <dd class="font-medium text-gray-900 dark:text-gray-100">{{ field_label }}</dd>
+    </div>
+  </dl>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current value</label>
+    <div class="form-input block w-full rounded-md border-gray-300 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-2 px-3">
+      {{ old_value_display|default:"—" }}
+    </div>
+  </div>
+
+  <form id="transaction-edit-form" method="post" action="" class="space-y-4">
+    {% csrf_token %}
+    <div>
+      <label for="id_new_value" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New value</label>
+      {{ form.new_value }}
+      {% if form.new_value.errors %}
+        <p class="text-sm text-red-600 mt-1">{{ form.new_value.errors.0 }}</p>
+      {% endif %}
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" id="transaction-edit-save" class="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium">
+        Save
+      </button>
+      <button type="button" id="transaction-edit-cancel" class="px-4 py-2 rounded-md border border-gray-300 bg-white dark:bg-gray-700 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 text-sm font-medium">
+        Cancel
+      </button>
+    </div>
+  </form>
+
+  <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
+    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Change history</h3>
+    <div class="overflow-x-auto max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg text-sm">
+      <table class="min-w-full">
+        <thead class="bg-gray-100 dark:bg-gray-700 sticky top-0">
+          <tr>
+            <th class="text-left py-1.5 px-2 text-gray-700 dark:text-gray-300">Date</th>
+            <th class="text-left py-1.5 px-2 text-gray-700 dark:text-gray-300">User</th>
+            <th class="text-left py-1.5 px-2 text-gray-700 dark:text-gray-300">Old → New</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr class="border-t border-gray-200 dark:border-gray-600">
+            <td class="py-1.5 px-2 text-gray-600 dark:text-gray-400">{{ tx.created_at|date:"M j, Y g:i A" }}</td>
+            <td class="py-1.5 px-2">{{ tx.user.get_full_name|default:tx.user.username|default:"—" }}</td>
+            <td class="py-1.5 px-2">
+              <span class="text-gray-500 line-through">{{ tx.old_value|truncatewords:4|default:"—" }}</span>
+              <span class="mx-1">→</span>
+              <span>{{ tx.new_value|truncatewords:4|default:"—" }}</span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="py-3 px-2 text-center text-gray-500 dark:text-gray-400">No changes yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const form = document.getElementById('transaction-edit-form');
+  const cancelBtn = document.getElementById('transaction-edit-cancel');
+  const container = document.getElementById('transaction-edit-container');
+  if (!form || !container) return;
+
+  const ctId = container.dataset.contentTypeId;
+  const objId = container.dataset.objectId;
+  const fieldName = container.dataset.fieldName;
+  form.action = '/transactions/edit/' + ctId + '/' + objId + '/' + fieldName + '/';
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function() {
+      if (typeof closeTransactionsModal === 'function') closeTransactionsModal();
+    });
+  }
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const saveBtn = document.getElementById('transaction-edit-save');
+    if (saveBtn) saveBtn.disabled = true;
+    const formData = new FormData(form);
+    const csrf = form.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrf) formData.set('csrfmiddlewaretoken', csrf.value);
+
+    var headers = {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json',
+    };
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken && csrfToken.value) {
+      headers['X-CSRFToken'] = csrfToken.value;
+    }
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: headers,
+      credentials: 'same-origin',
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && typeof window.onTransactionSaved === 'function') {
+        window.onTransactionSaved(data);
+      }
+      if (typeof closeTransactionsModal === 'function') closeTransactionsModal();
+    })
+    .catch(function() {
+      if (saveBtn) saveBtn.disabled = false;
+      alert('Failed to save.');
+    });
+  });
+})();
+</script>

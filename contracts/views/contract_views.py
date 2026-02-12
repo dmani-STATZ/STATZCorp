@@ -30,6 +30,9 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
     template_name = 'contracts/contract_management.html'
     context_object_name = 'contract'
 
+    def get_queryset(self):
+        return super().get_queryset().select_related('idiq_contract', 'status', 'company')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         try:
@@ -155,6 +158,9 @@ class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
     model = Contract
     template_name = 'contracts/contract_detail.html'
     context_object_name = 'contract'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('idiq_contract', 'status', 'company')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -405,7 +411,7 @@ def toggle_contract_field(request, contract_id):
     Toggle boolean fields on the Contract model (e.g., nist)
     """
     try:
-        contract = get_object_or_404(Contract, id=contract_id)
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status', 'company'), id=contract_id)
         data = json.loads(request.body)
         field = data.get('field')
         
@@ -440,7 +446,7 @@ def toggle_expedite_status(request, contract_id):
     Handle expedite actions: initiate, successful, use, reset
     """
     try:
-        contract = get_object_or_404(Contract, id=contract_id)
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status', 'company'), id=contract_id)
         data = json.loads(request.body)
         action = data.get('action')  # 'initiate', 'successful', 'use', or 'reset'
         
@@ -529,6 +535,9 @@ class ContractReviewView(DetailView):
     template_name = 'contracts/contract_review.html'
     context_object_name = 'contract'
 
+    def get_queryset(self):
+        return super().get_queryset().select_related('idiq_contract', 'status', 'company')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contract = self.get_object()
@@ -554,7 +563,7 @@ class ContractReviewView(DetailView):
 @conditional_login_required
 def mark_contract_reviewed(request, pk):
     if request.method == 'POST':
-        contract = get_object_or_404(Contract, pk=pk)
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status', 'company'), pk=pk)
         contract.reviewed = True
         contract.reviewed_by = request.user
         contract.reviewed_on = timezone.now()

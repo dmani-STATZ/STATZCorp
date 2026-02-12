@@ -1,0 +1,1 @@
+With every prompt if you are unclear with any part of the context stop the codeing ask the questions you heve before continueing with creating your genious.

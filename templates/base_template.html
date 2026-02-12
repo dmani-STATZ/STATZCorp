@@ -103,8 +103,8 @@
         "
     {% endif %}
 >
-    <header id="header">
-        <div class="flex items-center space-x-4">
+    <header id="header" class="flex items-center justify-between w-full">
+        <div class="flex items-center space-x-4 flex-shrink-0">
         <a href="{% url 'landing' %}">
             {% if active_company and active_company.logo_url %}
                 <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" style="height: 30px;">
@@ -152,9 +152,18 @@
             </div>
             {% endwith %}
         {% endif %}
+        </div>
 
-    </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center justify-center flex-1 min-w-0">
+            {% if request.resolver_match.app_name == 'contracts' %}
+            <button type="button" onclick="typeof openContractSearchModal === 'function' && openContractSearchModal();" class="flex items-center gap-2 text-white/90 hover:text-white hover:bg-white/15 px-4 py-2 rounded-lg transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <span class="font-medium">Contract Search</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center space-x-4 flex-shrink-0">
             <button id="theme-toggle" class="ml-4 p-2 rounded-lg bg-white border border-gray-300 shadow-sm hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600" title="Toggle dark mode">
                 <svg id="theme-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800 dark:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     {% if user_preferences.theme == 'dark' %}

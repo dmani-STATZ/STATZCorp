@@ -1,0 +1,98 @@
+{% load static %}
+{# Transactions modal: include this where you need the transactions popup. #}
+{# Data attributes: data-content-type-id, data-object-id for loading list. #}
+<div id="transactionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 9999;" aria-labelledby="transactionsModalTitle" aria-modal="true">
+  <div class="relative top-10 mx-auto p-6 border shadow-lg rounded-lg bg-white dark:bg-gray-800 w-full max-w-3xl" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-center mb-4">
+      <h2 id="transactionsModalTitle" class="text-xl font-semibold text-gray-800 dark:text-gray-200">Field change history</h2>
+      <button type="button" onclick="closeTransactionsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="transactionsModalBody" class="min-h-[200px]">
+      {# List or detail partial is loaded here via JS #}
+      <p class="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const modal = document.getElementById('transactionsModal');
+  const body = document.getElementById('transactionsModalBody');
+  const titleEl = document.getElementById('transactionsModalTitle');
+
+  window.openTransactionsModal = function(contentTypeId, objectId) {
+    if (!modal || !body) return;
+    if (titleEl) titleEl.textContent = 'Field change history';
+    modal.classList.remove('hidden');
+    body.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    var url = '/transactions/list/' + contentTypeId + '/' + objectId + '/';
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.text(); })
+      .then(function(html) { body.innerHTML = html; })
+      .catch(function() { body.innerHTML = '<p class="text-red-600">Failed to load transactions.</p>'; });
+  };
+
+  /** Open modal to edit a specific field (table, field, old value, new value input + history). Save updates DB and triggers onTransactionSaved. */
+  window.openTransactionsEditModal = function(contentTypeId, objectId, fieldName) {
+    if (!modal || !body) return;
+    if (titleEl) titleEl.textContent = 'Edit field';
+    modal.classList.remove('hidden');
+    body.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    var editUrl = '/transactions/edit/' + contentTypeId + '/' + objectId + '/' + encodeURIComponent(fieldName) + '/';
+    fetch(editUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        body.innerHTML = html;
+        var form = body.querySelector('#transaction-edit-form');
+        var cancelBtn = body.querySelector('#transaction-edit-cancel');
+        if (form) {
+          form.action = editUrl;
+          form.onsubmit = function(e) {
+            e.preventDefault();
+            var saveBtn = body.querySelector('#transaction-edit-save');
+            if (saveBtn) saveBtn.disabled = true;
+            var formData = new FormData(form);
+            var headers = { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' };
+            var csrf = form.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrf && csrf.value) headers['X-CSRFToken'] = csrf.value;
+            fetch(editUrl, { method: 'POST', body: formData, headers: headers, credentials: 'same-origin' })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.success && typeof window.onTransactionSaved === 'function') window.onTransactionSaved(data);
+                closeTransactionsModal();
+              })
+              .catch(function() {
+                if (saveBtn) saveBtn.disabled = false;
+                alert('Failed to save.');
+              });
+          };
+        }
+        if (cancelBtn) cancelBtn.onclick = closeTransactionsModal;
+      })
+      .catch(function() { body.innerHTML = '<p class="text-red-600">Failed to load.</p>'; });
+  };
+
+  window.closeTransactionsModal = function() {
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.showTransactionDetail = function(pk) {
+    if (!body) return;
+    body.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    fetch('/transactions/' + pk + '/')
+      .then(function(r) { return r.text(); })
+      .then(function(html) { body.innerHTML = html; })
+      .catch(function() { body.innerHTML = '<p class="text-red-600">Failed to load transaction.</p>'; });
+  };
+
+  window.backToTransactionsList = function(contentTypeId, objectId) {
+    if (contentTypeId && objectId) openTransactionsModal(contentTypeId, objectId);
+  };
+
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeTransactionsModal();
+  });
+})();
+</script>

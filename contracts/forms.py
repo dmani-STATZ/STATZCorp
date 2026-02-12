@@ -279,7 +279,10 @@ class CompanyForm(BaseModelForm):
 
     class Meta:
         model = Company
-        fields = ['name', 'is_active', 'logo', 'primary_color', 'secondary_color']
+        fields = [
+            'name', 'is_active', 'logo', 'primary_color', 'secondary_color',
+            'sharepoint_base_url', 'sharepoint_site_name', 'sharepoint_documents_path',
+        ]
         widgets = {
             'logo': forms.ClearableFileInput(attrs={
                 'class': 'form-input'
@@ -299,6 +302,11 @@ class CompanyForm(BaseModelForm):
                 'type': 'color',
                 'class': 'h-10 w-20 rounded border border-gray-300 cursor-pointer'
             })
+
+        # SharePoint documents URL fields
+        for fname in ('sharepoint_base_url', 'sharepoint_site_name', 'sharepoint_documents_path'):
+            if fname in self.fields:
+                self.fields[fname].widget.attrs.setdefault('class', 'form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100')
 
         # Members field initial data
         if 'members' in self.fields:

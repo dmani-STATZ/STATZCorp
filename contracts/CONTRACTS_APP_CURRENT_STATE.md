@@ -303,7 +303,7 @@ So migration is already in place (weekly sync). The blocker to adoption is **UX 
 - [x] **Gov Actions section** — Implemented: Gov Actions tab (unlimited per contract, modal add, delete with confirm); Log Fields tab (status/notes per selected CLIN); replaces "Future Section".
 - [x] **CLIN line due date** — Implemented: CLIN table now shows Quoted Due Date (supplier_due_date) with fallback to due_date; column header updated.
 - [x] **Contract documents / SharePoint** — Implemented: "Open Documents" link on contract management opens SharePoint folder in browser (built from contract_number + status; Open vs Closed Contracts path). Falls back to "Copy Path" when files_url exists but no SharePoint URL.
-- [ ] **Do we want to add base URL into the Company table?** — Store the SharePoint document-library base path (or root segment like `V87/aFed-DOD`) per Company so different companies can have different document paths; would support the "Company-specific paths" note in Section 11.
+- [x] **Do we want to add base URL into the Company table?** — Store the SharePoint document-library base path (or root segment like `V87/aFed-DOD`) per Company so different companies can have different document paths; would support the "Company-specific paths" note in Section 11.
 - [x] **Link CLIN to supplier page for emails** — Implemented: supplier name in CLIN table links to `/suppliers/{id}` (suppliers app detail page) for emails and correspondence.
 - [x] **Item Type on CLIN line** — Implemented: Item Type column added to CLIN table on contract details page, between Item No and Supplier; shows Production, GFAT, CFAT, PLT, or Miscellaneous.
 

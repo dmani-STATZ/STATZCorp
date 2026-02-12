@@ -75,6 +75,31 @@
       </div>
     </div>
 
+    <div class="card card-padded dark:bg-gray-800 sm:rounded-md space-y-4">
+      <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100">SharePoint Documents</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Used to build the &ldquo;Documents&rdquo; link on contracts. Base URL should go down to <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">/sites/</code>. Leave blank to use the default STATZ path.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1" for="id_sharepoint_base_url">Base URL (through /sites/)</label>
+        {{ form.sharepoint_base_url }}
+        <p class="text-xs text-gray-500 mt-1">e.g. https://statzcorpgcch.sharepoint.us/sites</p>
+        {% if form.sharepoint_base_url.errors %}<p class="text-sm text-red-600 mt-1">{{ form.sharepoint_base_url.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1" for="id_sharepoint_site_name">Site name</label>
+          {{ form.sharepoint_site_name }}
+          <p class="text-xs text-gray-500 mt-1">e.g. Statz, JVIC</p>
+          {% if form.sharepoint_site_name.errors %}<p class="text-sm text-red-600 mt-1">{{ form.sharepoint_site_name.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1" for="id_sharepoint_documents_path">Documents path</label>
+          {{ form.sharepoint_documents_path }}
+          <p class="text-xs text-gray-500 mt-1">Path under Shared Documents, e.g. Statz-Public/data/V87/aFed-DOD</p>
+          {% if form.sharepoint_documents_path.errors %}<p class="text-sm text-red-600 mt-1">{{ form.sharepoint_documents_path.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+
     <div class="card card-padded dark:bg-gray-800 sm:rounded-md space-y-3">
       <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100">User Access</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400">Check the users who should have access to this company. The first membership created becomes the user&rsquo;s default company.</p>

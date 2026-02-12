@@ -164,7 +164,7 @@ def search_contracts(request):
         qs = Contract.objects.filter(
             Q(contract_number__icontains=search_query) |
             Q(po_number__icontains=search_query)
-        )
+        ).select_related('idiq_contract', 'status')
         # Company scope
         if getattr(request, 'active_company', None):
             qs = qs.filter(company=request.active_company)
@@ -189,7 +189,7 @@ def search_contracts(request):
 def add_folder_tracking(request):
     if request.method == 'POST':
         contract_id = request.POST.get('contract')
-        contract = get_object_or_404(Contract, id=contract_id)
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status'), id=contract_id)
         
         # Check if a folder already exists for this contract
         if FolderTracking.objects.filter(contract=contract, closed=False).exists():

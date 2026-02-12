@@ -132,12 +132,11 @@ class ContractLifecycleDashboardView(TemplateView):
     def get_contracts(self):
         # Get the last 20 contracts entered that have cancelled=False
         last_20_contracts = Contract.objects.filter(
-                status__description__in=['Open']
-            , company=self.request.active_company
-            ).prefetch_related(
-                'idiq_contract',
+                status__description__in=['Open'],
+                company=self.request.active_company,
+            ).select_related('idiq_contract', 'status').prefetch_related(
                 'clin_set',
-                'clin_set__supplier'
+                'clin_set__supplier',
             ).order_by('-award_date')[:20]
         
         # Prepare the data for rendering or serialization

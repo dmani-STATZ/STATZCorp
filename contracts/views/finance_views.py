@@ -35,7 +35,7 @@ class FinanceAuditView(DetailView):
     def get_object(self, queryset=None):
         if self.kwargs.get('pk'):
             return get_object_or_404(
-                Contract.objects.select_related('buyer', 'contract_type', 'status'),
+                Contract.objects.select_related('buyer', 'contract_type', 'status', 'idiq_contract', 'company'),
                 pk=self.kwargs['pk']
             )
         return None

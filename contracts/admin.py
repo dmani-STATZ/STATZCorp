@@ -19,9 +19,17 @@ class ContractAdmin(ActiveUserAdminMixin, admin.ModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'is_active')
+    list_display = ('name', 'slug', 'is_active', 'sharepoint_site_name')
     search_fields = ('name', 'slug')
     list_filter = ('is_active',)
+    fieldsets = (
+        (None, {'fields': ('name', 'slug', 'is_active', 'logo', 'primary_color', 'secondary_color')}),
+        ('SharePoint documents', {
+            'fields': ('sharepoint_base_url', 'sharepoint_site_name', 'sharepoint_documents_path'),
+            'description': 'Base URL down to /sites/ (e.g. https://statzcorpgcch.sharepoint.us/sites). '
+                         'Site name: Statz, JVIC. Documents path: folder under Shared Documents (e.g. Statz-Public/data/V87/aFed-DOD).',
+        }),
+    )
 
 @admin.register(Reminder)
 class ReminderAdmin(ActiveUserAdminMixin, admin.ModelAdmin):

@@ -23,6 +23,10 @@ class Company(models.Model):
     logo = models.FileField(upload_to='company-logos/', null=True, blank=True)
     primary_color = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color like #004eb3")
     secondary_color = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color like #e5e7eb")
+    # SharePoint documents base URL (down to /sites/ inclusive). e.g. https://statzcorpgcch.sharepoint.us/sites
+    sharepoint_base_url = models.CharField(max_length=255, null=True, blank=True, help_text="SharePoint base URL down to /sites/ (e.g. https://statzcorpgcch.sharepoint.us/sites)")
+    sharepoint_site_name = models.CharField(max_length=64, null=True, blank=True, help_text="Site name after /sites/ (e.g. Statz, JVIC)")
+    sharepoint_documents_path = models.CharField(max_length=255, null=True, blank=True, help_text="Path under Shared Documents to contract root (e.g. Statz-Public/data/V87/aFed-DOD)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -162,19 +166,31 @@ class Contract(AuditModel):
     def get_sharepoint_documents_url(self):
         """
         Build SharePoint folder URL for this contract's documents.
-        Uses V87/aFed-DOD path; Closed/Cancelled contracts use Closed Contracts subfolder.
+        Uses Company.sharepoint_base_url, sharepoint_site_name, sharepoint_documents_path when set;
+        otherwise falls back to STATZ defaults.
+        Closed/Cancelled contracts use Closed Contracts subfolder.
+        For contracts under an IDIQ, path is: Contract {IDIQ number}/Delivery Order {this contract number}.
         Returns None if contract_number is missing.
         """
         from urllib.parse import quote
         if not self.contract_number:
             return None
-        base = 'https://statzcorpgcch.sharepoint.us/sites/Statz/Shared%20Documents/Forms/AllItems.aspx'
-        root = '/sites/Statz/Shared Documents/Statz-Public/data/V87/aFed-DOD'
+        company = getattr(self, 'company', None)
+        base_url = (company.sharepoint_base_url or '').strip().rstrip('/') if company else ''
+        site_name = (company.sharepoint_site_name or '').strip() if company else ''
+        docs_path = (company.sharepoint_documents_path or '').strip().rstrip('/') if company else ''
+        if not base_url or not site_name or not docs_path:
+            base_url = 'https://statzcorpgcch.sharepoint.us/sites'
+            site_name = 'Statz'
+            docs_path = 'Statz-Public/data/V87/aFed-DOD'
+        base = f'{base_url}/{site_name}/Shared%20Documents/Forms/AllItems.aspx'
+        root = f'/sites/{site_name}/Shared Documents/{docs_path}'
         status_desc = (self.status.description or '').strip() if self.status else ''
-        if status_desc in ('Closed', 'Cancelled'):
-            path = f'{root}/Closed Contracts/Contract {self.contract_number}'
+        closed_prefix = f'{root}/Closed Contracts/' if status_desc in ('Closed', 'Cancelled') else f'{root}/'
+        if self.idiq_contract and getattr(self.idiq_contract, 'contract_number', None):
+            path = f'{closed_prefix}Contract {self.idiq_contract.contract_number}/Delivery Order {self.contract_number}'
         else:
-            path = f'{root}/Contract {self.contract_number}'
+            path = f'{closed_prefix}Contract {self.contract_number}'
         viewid = 'd4837fde%2D32f5%2D41cc%2Db723%2D09d5f692b2ea'
         return f'{base}?id={quote(path)}&viewid={viewid}'
 

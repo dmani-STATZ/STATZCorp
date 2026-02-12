@@ -50,7 +50,7 @@ def get_select_options(request, field_name):
 
         elif field_name == 'contract':
             # Existing contract search logic
-            queryset = Contract.objects.filter(company=request.active_company)
+            queryset = Contract.objects.filter(company=request.active_company).select_related('idiq_contract', 'status')
             
             if search_term:
                 queryset = queryset.filter(
@@ -60,7 +60,7 @@ def get_select_options(request, field_name):
             
             if specific_contract_id:
                 try:
-                    specific_contract = Contract.objects.get(id=specific_contract_id, company=request.active_company)
+                    specific_contract = Contract.objects.select_related('idiq_contract', 'status').get(id=specific_contract_id, company=request.active_company)
                     # Add the specific contract to the start of the list
                     options.append({
                         'value': specific_contract.id,
@@ -89,7 +89,7 @@ def get_select_options(request, field_name):
                 # If there was an error but we have a specific contract ID, try to include just that
                 if specific_contract_id:
                     try:
-                        specific_contract = Contract.objects.get(id=specific_contract_id, company=request.active_company)
+                        specific_contract = Contract.objects.select_related('idiq_contract', 'status').get(id=specific_contract_id, company=request.active_company)
                         options.append({
                             'value': specific_contract.id,
                             'label': f"{specific_contract.contract_number or 'Unknown'}"

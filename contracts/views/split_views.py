@@ -9,7 +9,7 @@ def create_split(request):
     """Create a new contract split."""
     try:
         data = json.loads(request.body)
-        contract = get_object_or_404(Contract, id=data.get('contract_id'))
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status'), id=data.get('contract_id'))
         
         # Create new split
         split = ContractSplit.objects.create(
@@ -76,7 +76,7 @@ def get_contract_splits(request, contract_id):
     """Get HTML for contract splits section."""
     from django.template.loader import render_to_string
     
-    contract = get_object_or_404(Contract, id=contract_id)
+    contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status'), id=contract_id)
     html = render_to_string('contracts/partials/contract_splits.html', {
         'contract': contract,
         'mode': request.GET.get('mode', 'detail')

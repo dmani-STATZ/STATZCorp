@@ -1,4 +1,4 @@
-﻿"""
+"""
 Django settings for STATZWeb project.
 
 Handles both development and production environments.
@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     "suppliers",
     "products",
     "tools.apps.ToolsConfig",
+    "transactions.apps.TransactionsConfig",
 ]
 
 # Middleware - Environment aware
@@ -93,6 +94,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "users.middleware.ActiveCompanyMiddleware",
+    "transactions.middleware.TransactionUserMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "STATZWeb.middleware.LoginRequiredMiddleware",

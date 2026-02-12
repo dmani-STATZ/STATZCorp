@@ -85,6 +85,121 @@
 
 <div class="overlay hidden fixed inset-0 bg-black opacity-30 z-40" id="overlay" onclick="toggleReminderbar()"></div>
 
+<!-- Contract Search Modal (header button lives in base_template; modal + script here for all contract app pages) -->
+<div id="contractSearchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
+    <div class="relative top-20 mx-auto p-6 border shadow-lg rounded-md bg-white dark:bg-gray-800" style="width: 520px !important; max-width: 95%;" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Jump to Contract</h3>
+            <button type="button" onclick="closeContractSearchModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="space-y-4">
+            <div class="flex items-center gap-4 flex-wrap">
+                <div class="relative flex-1 min-w-[200px]">
+                    <input type="text" id="contract-search-modal-input"
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                        placeholder="Search by contract number, last 4 digits, or PO number..."
+                        autocomplete="off">
+                    <div id="contract-search-modal-results"
+                        class="absolute z-50 w-full card mt-1 border-gray-200 max-h-64 overflow-y-auto hidden dark:bg-gray-700 dark:border-gray-600">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-search-status" value="open" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Open</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-search-status" value="closed" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Closed</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="contract-search-status" value="both" checked class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Both</span>
+                    </label>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Type at least 3 characters (e.g. last 4 digits of contract number). Click a contract to jump to it.</p>
+        </div>
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" onclick="closeContractSearchModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Contract Search Modal (used by header button in base_template when app_name == 'contracts')
+function openContractSearchModal() {
+    const modal = document.getElementById('contractSearchModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        var inp = document.getElementById('contract-search-modal-input');
+        var res = document.getElementById('contract-search-modal-results');
+        if (inp) inp.value = '';
+        if (res) { res.innerHTML = ''; res.classList.add('hidden'); }
+        setTimeout(function() { if (inp) inp.focus(); }, 100);
+    }
+}
+function closeContractSearchModal() {
+    const modal = document.getElementById('contractSearchModal');
+    if (modal) modal.classList.add('hidden');
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('contract-search-modal-input');
+    var searchResults = document.getElementById('contract-search-modal-results');
+    if (!searchInput || !searchResults) return;
+    var debounceTimer;
+    var contractManagementUrl = "{% url 'contracts:contract_management' 0 %}".replace('/0/', '/');
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var query = this.value;
+        if (query.length < 3) {
+            searchResults.classList.add('hidden');
+            return;
+        }
+        debounceTimer = setTimeout(function() {
+            var status = (document.querySelector('input[name="contract-search-status"]:checked') || {}).value || 'both';
+            fetch('/contracts/search/?q=' + encodeURIComponent(query) + '&status=' + encodeURIComponent(status))
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    searchResults.innerHTML = '';
+                    var results = data.results || data;
+                    if (results.length > 0) {
+                        results.forEach(function(contract) {
+                            var div = document.createElement('div');
+                            div.className = 'px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer';
+                            var html = '<div class="text-sm text-blue-600 dark:text-blue-400">' + contract.contract_number + '</div>';
+                            if (contract.po_numbers && contract.po_numbers.length > 0) {
+                                html += '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">PO: ' + contract.po_numbers.join(', ') + '</div>';
+                            }
+                            div.innerHTML = html;
+                            div.addEventListener('click', function() { window.location.href = contractManagementUrl + contract.id + '/'; });
+                            searchResults.appendChild(div);
+                        });
+                        searchResults.classList.remove('hidden');
+                    } else {
+                        searchResults.classList.add('hidden');
+                    }
+                });
+        }, 300);
+    });
+    document.querySelectorAll('input[name="contract-search-status"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (searchInput.value.length >= 3) searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target) && !e.target.closest('#contractSearchModal button')) {
+            searchResults.classList.add('hidden');
+        }
+    });
+});
+</script>
+
 <script>
     function toggleReminderbar() {
         const reminderbar = document.getElementById('reminderbar');

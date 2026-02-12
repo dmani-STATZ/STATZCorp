@@ -148,7 +148,7 @@ class SupplierListView(ListView):
                 'display': format_address_single_line(addr)
             }
 
-        contracts_qs = Contract.objects.filter(clin__supplier=supplier).distinct().order_by('-created_on')
+        contracts_qs = Contract.objects.filter(clin__supplier=supplier).select_related('idiq_contract', 'status').distinct().order_by('-created_on')
         contracts = contracts_qs[:10]
         contacts = list(Contact.objects.filter(supplier=supplier))
         if supplier.contact and supplier.contact not in contacts:
@@ -707,7 +707,7 @@ class SupplierDetailView(DetailView):
         # Get related contracts
         contracts = Contract.objects.filter(
             clin__supplier=supplier
-        ).distinct().order_by('-created_on')
+        ).select_related('idiq_contract', 'status').distinct().order_by('-created_on')
         
         # Get related contacts
         contacts = Contact.objects.filter(supplier=supplier)

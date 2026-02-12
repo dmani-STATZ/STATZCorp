@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block content %}
+{% include "transactions/transaction_modal.html" %}
 <form id="csrf-form">
     {% csrf_token %}
 </form>
@@ -102,10 +103,6 @@
                     </a>
                     <div class="flex items-center space-x-3">
                         <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
-                        <button type="button" onclick="openContractSearchModal()" class="text-gray-800 hover:bg-gray-200 px-4 py-2 rounded-lg flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                            Contract Search
-                        </button>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class="hover:bg-gray-200 text-red px-4 py-2 rounded-lg flex items-center">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -123,10 +120,6 @@
                     </h1></a>
                     <div class="flex items-center space-x-3">
                         <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
-                        <button type="button" onclick="openContractSearchModal()" class="text-gray-800 hover:bg-gray-200 px-4 py-2 rounded-lg flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                            Contract Search
-                        </button>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -201,10 +194,6 @@
                         <span class="bg-white {% if contract.status.description == 'Open' %}text-green-800{% else %}text-gray-800{% endif %} px-3 py-1 rounded-full text-sm font-semibold">
                             {% if contract.status.description == 'Open' %}Open{% else %}Closed{% endif %}
                         </span>
-                        <button type="button" onclick="openContractSearchModal()" class="text-gray-800 hover:bg-gray-200 px-4 py-2 rounded-lg flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                            Contract Search
-                        </button>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -220,16 +209,28 @@
             <div class="flex gap-3 items-start flex-wrap">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-0.5 flex-1 min-w-0">
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">PO Number</p>
-                        <p class="font-medium text-sm">{{ contract.po_number|default:"N/A" }}</p>
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'contract_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Contract Number</button>
+                        </p>
+                        <p id="contract-contract-number-value" class="font-medium text-sm">{{ contract.contract_number|default:"N/A" }}</p>
                     </div>
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">Tab Number</p>
-                        <p class="font-medium text-sm">{{ contract.tab_num|default:"N/A" }}</p>
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'po_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">PO Number</button>
+                        </p>
+                        <p id="contract-po-number-value" class="font-medium text-sm">{{ contract.po_number|default:"N/A" }}</p>
                     </div>
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">Buyer</p>
-                        <p class="font-medium text-sm">{{ contract.buyer.description|default:"N/A" }}</p>
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'tab_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Tab Number</button>
+                        </p>
+                        <p id="contract-tab-num-value" class="font-medium text-sm">{{ contract.tab_num|default:"N/A" }}</p>
+                    </div>
+                    <div class="px-0.5 py-0.5">
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'buyer')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Buyer</button>
+                        </p>
+                        <p id="contract-buyer-value" class="font-medium text-sm">{{ contract.buyer.description|default:"N/A" }}</p>
                     </div>
                     <div class="px-0.5 py-0.5">
                     {% with sharepoint_url=contract.get_sharepoint_documents_url %}
@@ -249,22 +250,30 @@
                     {% endwith %}
                     </div>
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">Award Date</p>
-                        <p class="font-medium text-sm">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'award_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Award Date</button>
+                        </p>
+                        <p id="contract-award-date-value" class="font-medium text-sm">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
                     </div>
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">Due Date</p>
-                        <p class="font-medium text-sm {% if contract.due_date_late %}text-red-600{% endif %}">
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Due Date</button>
+                        </p>
+                        <p id="contract-due-date-value" class="font-medium text-sm {% if contract.due_date_late %}text-red-600{% endif %}">
                             {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
                         </p>
                     </div>
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">Sales Class</p>
-                        <p class="font-medium text-sm">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'sales_class')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sales Class</button>
+                        </p>
+                        <p id="contract-sales-class-value" class="font-medium text-sm">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
                     </div>
                     <div class="px-0.5 py-0.5">
-                        <p class="text-xs text-gray-600">Solicitation Type</p>
-                        <p class="font-medium text-sm">{{ contract.solicitation_type|default:"N/A" }}</p>
+                        <p class="text-xs text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'solicitation_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Solicitation Type</button>
+                        </p>
+                        <p id="contract-solicitation-type-value" class="font-medium text-sm">{{ contract.solicitation_type|default:"N/A" }}</p>
                     </div>
                 </div>
                 <!-- Contract Controls: Expedite (top) + NIST (below) -->
@@ -402,28 +411,29 @@
                 <div id="clin-details-content" class="text-sm">
                     {% if selected_clin %}
                     <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                        <div><span class="text-gray-600">Type:</span> <span id="cd-type">{{ selected_clin.get_item_type_display|default:"—" }}</span></div>
-                        <div><span class="text-gray-600">Sub PO #:</span> <span id="cd-po">{{ selected_clin.clin_po_num|default:selected_clin.po_number|default:"—" }}</span></div>
-                        <div class="col-span-2"><span class="text-gray-600">Supplier:</span>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Type:</button></span> <span id="cd-type">{{ selected_clin.get_item_type_display|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('clin_po_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub PO #:</button></span> <span id="cd-po">{{ selected_clin.clin_po_num|default:selected_clin.po_number|default:"—" }}</span></div>
+                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></span>
                             {% if selected_clin.supplier %}
                             <span id="cd-supplier-name">{% if selected_clin.supplier.name %}{{ selected_clin.supplier.name }}{% else %}N/A{% endif %}</span>
                             <button type="button" onclick="openSupplierInfoModal({{ selected_clin.supplier.id }})" class="ml-1 text-xs text-blue-600 hover:text-blue-800 underline">Supplier Info</button>
                             {% else %}<span id="cd-supplier">N/A</span>{% endif %}
                         </div>
-                        <div class="col-span-2"><span class="text-gray-600">NSN:</span>
+                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('nsn')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">NSN:</button></span>
                             {% if selected_clin.nsn %}
                             <a href="{% url 'contracts:nsn_edit' selected_clin.nsn.id %}" target="_blank" class="text-blue-600 hover:text-blue-800" id="cd-nsn-link">{{ selected_clin.nsn.nsn_code }}{% if selected_clin.nsn.description %} ({{ selected_clin.nsn.description }}){% endif %}</a>
                             {% else %}<span id="cd-nsn">N/A</span>{% endif %}
                         </div>
-                        <div><span class="text-gray-600">I&A:</span> <span id="cd-ia">{% if selected_clin.ia %}{{ selected_clin.get_ia_display }}{% else %}—{% endif %}</span></div>
-                        <div><span class="text-gray-600">FOB:</span> <span id="cd-fob">{% if selected_clin.fob %}{{ selected_clin.get_fob_display }}{% else %}—{% endif %}</span></div>
-                        <div class="col-span-2"><span class="text-gray-600">Special Payment Terms:</span> <span id="cd-spt">{% if selected_clin.special_payment_terms %}{{ selected_clin.special_payment_terms }}{% else %}—{% endif %}</span></div>
-                        <div><span class="text-gray-600">Sub Due Date:</span> <span id="cd-sub-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
-                        <div><span class="text-gray-600">Quoted Due Date:</span> <span id="cd-quoted-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% elif selected_clin.due_date %}{{ selected_clin.due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
-                        <div><span class="text-gray-600">Order Qty:</span> <span id="cd-order-qty">{{ selected_clin.order_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span></div>
-                        <div><span class="text-gray-600">Ship Qty:</span> <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span></div>
-                        <div><span class="text-gray-600">Ship Date:</span> <span id="cd-ship-date">{% if selected_clin.ship_date %}{{ selected_clin.ship_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></div>
-                        <div><span class="text-gray-600">Item Value:</span> <span id="cd-item-value">{% if selected_clin.item_value %}${% endif %}{{ selected_clin.item_value|floatformat:2|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">I&A:</button></span> <span id="cd-ia">{% if selected_clin.ia %}{{ selected_clin.get_ia_display }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('fob')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">FOB:</button></span> <span id="cd-fob">{% if selected_clin.fob %}{{ selected_clin.get_fob_display }}{% else %}—{% endif %}</span></div>
+                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('special_payment_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Payment Terms:</button></span> <span id="cd-spt">{% if selected_clin.special_payment_terms %}{{ selected_clin.special_payment_terms }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span id="cd-sub-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span id="cd-quoted-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% elif selected_clin.due_date %}{{ selected_clin.due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span id="cd-order-qty">{{ selected_clin.order_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span id="cd-ship-date">{% if selected_clin.ship_date %}{{ selected_clin.ship_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span id="cd-item-value">{% if selected_clin.item_value %}${% endif %}{{ selected_clin.item_value|floatformat:2|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span id="cd-uom">{{ selected_clin.uom|default:"EA" }}</span></div>
                         <div class="col-span-2 flex gap-2 items-center">
                             <a href="{% url 'contracts:clin_update' selected_clin.id %}" class="text-indigo-600 hover:text-indigo-900 text-xs font-medium">Edit CLIN</a>
                             <a href="{% url 'contracts:clin_detail' selected_clin.id %}" class="text-blue-600 hover:text-blue-800 text-xs">View Full</a>
@@ -705,52 +715,6 @@
     </div>
 </div>
 
-<!-- Contract Search Modal -->
-<div id="contractSearchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
-    <div class="relative top-20 mx-auto p-6 border shadow-lg rounded-md bg-white" style="width: 520px !important; max-width: 95%;" onclick="event.stopPropagation()">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold text-gray-800">Jump to Contract</h3>
-            <button type="button" onclick="closeContractSearchModal()" class="text-gray-400 hover:text-gray-600">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-        <div class="space-y-4">
-            <div class="flex items-center gap-4 flex-wrap">
-                <div class="relative flex-1 min-w-[200px]">
-                    <input type="text" id="contract-search-modal-input"
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                        placeholder="Search by contract number, last 4 digits, or PO number..."
-                        autocomplete="off">
-                    <div id="contract-search-modal-results"
-                        class="absolute z-50 w-full card mt-1 border-gray-200 max-h-64 overflow-y-auto hidden">
-                    </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                    <span class="text-sm font-medium text-gray-700">Status:</span>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="radio" name="contract-search-status" value="open" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700">Open</span>
-                    </label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="radio" name="contract-search-status" value="closed" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700">Closed</span>
-                    </label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="radio" name="contract-search-status" value="both" checked class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700">Both</span>
-                    </label>
-                </div>
-            </div>
-            <p class="text-sm text-gray-500">Type at least 3 characters (e.g. last 4 digits of contract number). Click a contract to jump to it.</p>
-        </div>
-        <div class="mt-6 flex justify-end gap-2">
-            <button type="button" onclick="closeContractSearchModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                Cancel
-            </button>
-        </div>
-    </div>
-</div>
-
 <!-- Acknowledgment Letter Modal -->
 <div id="acknowledgmentLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
     <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 550px !important; max-width: 550px !important;">
@@ -823,72 +787,6 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
-<script>
-// Contract Search Modal
-function openContractSearchModal() {
-    const modal = document.getElementById('contractSearchModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        document.getElementById('contract-search-modal-input').value = '';
-        document.getElementById('contract-search-modal-results').innerHTML = '';
-        document.getElementById('contract-search-modal-results').classList.add('hidden');
-        setTimeout(() => document.getElementById('contract-search-modal-input').focus(), 100);
-    }
-}
-function closeContractSearchModal() {
-    const modal = document.getElementById('contractSearchModal');
-    if (modal) modal.classList.add('hidden');
-}
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('contract-search-modal-input');
-    const searchResults = document.getElementById('contract-search-modal-results');
-    if (!searchInput || !searchResults) return;
-    let debounceTimer;
-    searchInput.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        const query = this.value;
-        if (query.length < 3) {
-            searchResults.classList.add('hidden');
-            return;
-        }
-        debounceTimer = setTimeout(() => {
-            const status = document.querySelector('input[name="contract-search-status"]:checked')?.value || 'both';
-            fetch(`/contracts/search/?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`)
-                .then(response => response.json())
-                .then(data => {
-                    searchResults.innerHTML = '';
-                    const results = data.results || data;
-                    if (results.length > 0) {
-                        results.forEach(contract => {
-                            const div = document.createElement('div');
-                            div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
-                            let html = `<div class="text-sm text-blue-600">${contract.contract_number}</div>`;
-                            if (contract.po_numbers && contract.po_numbers.length > 0) {
-                                html += `<div class="text-xs text-gray-500 mt-1">PO: ${contract.po_numbers.join(', ')}</div>`;
-                            }
-                            div.innerHTML = html;
-                            div.addEventListener('click', function() { window.location.href = "{% url 'contracts:contract_management' 0 %}".replace('/0/', '/' + contract.id + '/'); });
-                            searchResults.appendChild(div);
-                        });
-                        searchResults.classList.remove('hidden');
-                    } else {
-                        searchResults.classList.add('hidden');
-                    }
-                });
-        }, 300);
-    });
-    document.querySelectorAll('input[name="contract-search-status"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            if (searchInput.value.length >= 3) searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-    });
-    document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target) && !e.target.closest('#contractSearchModal button')) {
-            searchResults.classList.add('hidden');
-        }
-    });
-});
-</script>
 <script>
 // Debug ContentType IDs
 document.addEventListener('DOMContentLoaded', function() {
@@ -1151,6 +1049,36 @@ function openContractFiles(path) {
         window.open('file://' + path.replace(/\\/g, '/'), '_blank');
     }
 }
+
+// Transactions edit modal: open by field, save updates page
+window.contractContentTypeId = {{ contract_content_type_id }};
+window.clinContentTypeId = {{ clin_content_type_id }};
+window.contractId = {{ contract.id }};
+
+function openTransactionsEditModalForClin(fieldName) {
+    const clinId = typeof currentClinIdForLogFields !== 'undefined' ? currentClinIdForLogFields : '';
+    if (!clinId) {
+        alert('Please select a CLIN first.');
+        return;
+    }
+    if (typeof openTransactionsEditModal === 'function') {
+        openTransactionsEditModal(window.clinContentTypeId, clinId, fieldName);
+    }
+}
+
+window.onTransactionSaved = function(data) {
+    if (!data || !data.success) return;
+    var fn = data.field_name;
+    var displayVal = data.display_value || '';
+    if (data.content_type_id === window.contractContentTypeId && data.object_id === window.contractId) {
+        var contractEl = document.getElementById('contract-' + fn.replace(/_/g, '-') + '-value');
+        if (contractEl) contractEl.textContent = displayVal || 'N/A';
+    }
+    if (data.content_type_id === window.clinContentTypeId) {
+        var clinId = typeof currentClinIdForLogFields !== 'undefined' ? currentClinIdForLogFields : '';
+        if (clinId && typeof fetchClinDetails === 'function') fetchClinDetails(clinId);
+    }
+};
 
 document.addEventListener('DOMContentLoaded', function() {
     // Add click handlers to all CLIN rows
@@ -1471,19 +1399,20 @@ function fetchClinDetails(clinId) {
             const viewUrl = "{% url 'contracts:clin_detail' 0 %}".replace('/0/', `/${d.id}/`);
             panel.innerHTML = `
                 <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div><span class="text-gray-600">Type:</span> <span>${fmt(d.item_type)}</span></div>
-                    <div><span class="text-gray-600">Sub PO #:</span> <span>${fmt(d.clin_po_num)}</span></div>
-                    <div class="col-span-2"><span class="text-gray-600">Supplier:</span> ${supplierHtml}</div>
-                    <div class="col-span-2"><span class="text-gray-600">NSN:</span> ${nsnHtml}</div>
-                    <div><span class="text-gray-600">I&A:</span> <span>${fmt(d.ia)}</span></div>
-                    <div><span class="text-gray-600">FOB:</span> <span>${fmt(d.fob)}</span></div>
-                    <div class="col-span-2"><span class="text-gray-600">Special Payment Terms:</span> <span>${fmt(d.special_payment_terms)}</span></div>
-                    <div><span class="text-gray-600">Sub Due Date:</span> <span class="${lateClass}">${fmt(d.supplier_due_date)}</span></div>
-                    <div><span class="text-gray-600">Quoted Due Date:</span> <span class="${lateClass}">${fmt(d.quoted_due_date)}</span></div>
-                    <div><span class="text-gray-600">Order Qty:</span> <span>${qty} ${d.uom || 'EA'}</span></div>
-                    <div><span class="text-gray-600">Ship Qty:</span> <span>${shipQty}</span></div>
-                    <div><span class="text-gray-600">Ship Date:</span> <span>${fmt(d.ship_date)}</span></div>
-                    <div><span class="text-gray-600">Item Value:</span> <span>${itemVal}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Type:</button></span> <span>${fmt(d.item_type)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('clin_po_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub PO #:</button></span> <span>${fmt(d.clin_po_num)}</span></div>
+                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></span> ${supplierHtml}</div>
+                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('nsn')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">NSN:</button></span> ${nsnHtml}</div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">I&A:</button></span> <span>${fmt(d.ia)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('fob')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">FOB:</button></span> <span>${fmt(d.fob)}</span></div>
+                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('special_payment_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Payment Terms:</button></span> <span>${fmt(d.special_payment_terms)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span class="${lateClass}">${fmt(d.supplier_due_date)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span class="${lateClass}">${fmt(d.quoted_due_date)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span>${qty} ${d.uom || 'EA'}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span>${shipQty}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span>${fmt(d.ship_date)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span>${itemVal}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span>${fmt(d.uom) || 'EA'}</span></div>
                     <div class="col-span-2 flex gap-2 items-center">
                         <a href="${editUrl}" class="text-indigo-600 hover:text-indigo-900 text-xs font-medium">Edit CLIN</a>
                         <a href="${viewUrl}" class="text-blue-600 hover:text-blue-800 text-xs">View Full</a>

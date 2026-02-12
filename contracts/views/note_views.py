@@ -298,7 +298,7 @@ def get_combined_notes(request, contract_id, clin_id=None):
     Returns both sets of notes sorted by creation date.
     """
     try:
-        contract = get_object_or_404(Contract, id=contract_id)
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status'), id=contract_id)
         contract_type = ContentType.objects.get_for_model(Contract)
         clin_type = ContentType.objects.get_for_model(Clin)
         

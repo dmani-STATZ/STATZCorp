@@ -24,7 +24,7 @@ class IdiqContractDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         
         # Get associated contracts
-        context['contracts'] = Contract.objects.filter(idiq_contract=self.object).order_by('-award_date')
+        context['contracts'] = Contract.objects.filter(idiq_contract=self.object).select_related('idiq_contract', 'status').order_by('-award_date')
         
         # Get IDIQ contract details
         context['idiq_details'] = IdiqContractDetails.objects.filter(

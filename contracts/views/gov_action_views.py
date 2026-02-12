@@ -137,7 +137,7 @@ def gov_action_create(request, contract_id):
         active_company = getattr(request, 'active_company', None)
         if not active_company:
             return JsonResponse({'success': False, 'error': 'No company selected.'}, status=400)
-        contract = get_object_or_404(Contract, id=contract_id, company=active_company)
+        contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status'), id=contract_id, company=active_company)
         form = GovActionForm(request.POST)
         if form.is_valid():
             gov_action = form.save(commit=False)

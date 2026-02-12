@@ -104,7 +104,7 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
         # Update the contract or CLIN total
             if entity_type == 'contract':
                 try:
-                    contract = Contract.objects.get(id=entity_id)
+                    contract = Contract.objects.select_related('idiq_contract', 'status').get(id=entity_id)
                     if payment_type == 'contract_value':
                         contract.contract_value = new_total
                     elif payment_type == 'plan_gross':
