@@ -8,6 +8,7 @@ from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 
 from contracts.models import Contract, Clin
+from suppliers.models import Supplier
 from .models import Transaction
 from .middleware import get_current_user
 
@@ -35,6 +36,22 @@ TRACKED = [
     (Clin, "ship_date"),
     (Clin, "item_value"),
     (Clin, "uom"),
+    # Supplier (supplier detail page)
+    (Supplier, "cage_code"),
+    (Supplier, "dodaac"),
+    (Supplier, "allows_gsi"),
+    (Supplier, "probation"),
+    (Supplier, "conditional"),
+    (Supplier, "archived"),
+    (Supplier, "iso"),
+    (Supplier, "ppi"),
+    (Supplier, "special_terms"),
+    (Supplier, "supplier_type"),
+    (Supplier, "business_phone"),
+    (Supplier, "primary_phone"),
+    (Supplier, "business_email"),
+    (Supplier, "primary_email"),
+    (Supplier, "website_url"),
 ]
 
 # Request-scoped store of "old" instance state before save (keyed by model class + pk)
@@ -115,6 +132,33 @@ def store_old_state(sender, instance, **kwargs):
                     "ship_date": _serialize(row.get("ship_date")),
                     "item_value": _serialize(row.get("item_value")),
                     "uom": _serialize(row.get("uom")),
+                }
+        except Exception:
+            pass
+    elif sender is Supplier:
+        try:
+            row = Supplier.objects.filter(pk=instance.pk).values(
+                "cage_code", "dodaac", "allows_gsi", "probation", "conditional", "archived",
+                "iso", "ppi", "special_terms_id", "supplier_type_id",
+                "business_phone", "primary_phone", "business_email", "primary_email", "website_url",
+            ).first()
+            if row is not None:
+                old_state[key] = {
+                    "cage_code": _serialize(row.get("cage_code")),
+                    "dodaac": _serialize(row.get("dodaac")),
+                    "allows_gsi": _serialize(row.get("allows_gsi")),
+                    "probation": _serialize(row.get("probation")),
+                    "conditional": _serialize(row.get("conditional")),
+                    "archived": _serialize(row.get("archived")),
+                    "iso": _serialize(row.get("iso")),
+                    "ppi": _serialize(row.get("ppi")),
+                    "special_terms": _serialize(row.get("special_terms_id")),
+                    "supplier_type": _serialize(row.get("supplier_type_id")),
+                    "business_phone": _serialize(row.get("business_phone")),
+                    "primary_phone": _serialize(row.get("primary_phone")),
+                    "business_email": _serialize(row.get("business_email")),
+                    "primary_email": _serialize(row.get("primary_email")),
+                    "website_url": _serialize(row.get("website_url")),
                 }
         except Exception:
             pass

@@ -10,6 +10,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.generic import TemplateView, DetailView, View, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.shortcuts import get_object_or_404
 from urllib.parse import urlparse
 
@@ -480,6 +481,7 @@ class SupplierDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         supplier = self.object
+        context['supplier_content_type_id'] = ContentType.objects.get_for_model(Supplier).id
         context['contacts'] = supplier.contacts.all().order_by('name')
         documents = list(
             SupplierDocument.objects.filter(supplier=supplier)

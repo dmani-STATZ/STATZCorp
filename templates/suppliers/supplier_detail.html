@@ -22,9 +22,18 @@
         <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
         <h1 class="text-3xl font-semibold text-gray-900">{{ supplier.name|default:"Supplier" }}</h1>
         <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">CAGE: {{ supplier.cage_code|default:"—" }}</span>
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">DoDAAC: {{ supplier.dodaac|default:"—" }}</span>
-          {% if supplier.allows_gsi %}<span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200">GSI: {{ supplier.get_allows_gsi_display }}</span>{% endif %}
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'cage_code')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">CAGE:</button>
+            <span id="supplier-cage-code-value">{{ supplier.cage_code|default:"—" }}</span>
+          </span>
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'dodaac')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">DoDAAC:</button>
+            <span id="supplier-dodaac-value">{{ supplier.dodaac|default:"—" }}</span>
+          </span>
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'allows_gsi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">GSI:</button>
+            <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
+          </span>
           {% if supplier.website_url %}
             <a href="{{ supplier.website_url }}" target="_blank" rel="noopener" class="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 hover:text-blue-900">
               {{ supplier.website_url }}
@@ -66,18 +75,39 @@
     <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Status Flags</h2>
       <ul class="space-y-2 text-sm text-gray-800">
-        <li>Probation: {% if supplier.probation %}<span class="text-red-600 font-semibold">Yes</span> ({{ supplier.probation_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
-        <li>Conditional: {% if supplier.conditional %}<span class="text-orange-600 font-semibold">Yes</span> ({{ supplier.conditional_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
-        <li>Archived: {% if supplier.archived %}<span class="text-gray-700 font-semibold">Yes</span> ({{ supplier.archived_on|date:"Y-m-d" }}){% else %}No{% endif %}</li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'probation')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Probation:</button>
+          <span id="supplier-probation-value">{% if supplier.probation %}<span class="text-red-600 font-semibold">Yes</span> ({{ supplier.probation_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'conditional')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Conditional:</button>
+          <span id="supplier-conditional-value">{% if supplier.conditional %}<span class="text-orange-600 font-semibold">Yes</span> ({{ supplier.conditional_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'archived')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Archived:</button>
+          <span id="supplier-archived-value">{% if supplier.archived %}<span class="text-gray-700 font-semibold">Yes</span> ({{ supplier.archived_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
+        </li>
       </ul>
     </div>
     <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Compliance</h2>
       <ul class="space-y-2 text-sm text-gray-800">
-        <li>ISO: {% if supplier.iso %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</li>
-        <li>PPI: {% if supplier.ppi %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</li>
-        <li>Special Terms: {{ supplier.special_terms|default:"—" }}</li>
-        <li>Supplier Type: {{ supplier.supplier_type|default:"—" }}</li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'iso')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">ISO:</button>
+          <span id="supplier-iso-value">{% if supplier.iso %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'ppi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">PPI:</button>
+          <span id="supplier-ppi-value">{% if supplier.ppi %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'special_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Terms:</button>
+          <span id="supplier-special-terms-value">{{ supplier.special_terms|default:"—" }}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'supplier_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Supplier Type:</button>
+          <span id="supplier-supplier-type-value">{{ supplier.supplier_type|default:"—" }}</span>
+        </li>
       </ul>
     </div>
     <div class="card card-padded shadow-sm">
@@ -92,8 +122,10 @@
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Contact &amp; Web</h2>
       <dl class="space-y-2 text-sm text-gray-800">
         <div class="flex items-start justify-between gap-3">
-          <dt class="text-gray-600">Business phone</dt>
-          <dd>
+          <dt class="text-gray-600">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'business_phone')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Business phone</button>
+          </dt>
+          <dd id="supplier-business-phone-value">
             {% if supplier.business_phone %}
               <a href="tel:{{ supplier.business_phone }}" class="text-blue-600 hover:text-blue-800">{{ supplier.business_phone }}</a>
             {% else %}
@@ -102,8 +134,10 @@
           </dd>
         </div>
         <div class="flex items-start justify-between gap-3">
-          <dt class="text-gray-600">Primary phone</dt>
-          <dd>
+          <dt class="text-gray-600">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'primary_phone')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Primary phone</button>
+          </dt>
+          <dd id="supplier-primary-phone-value">
             {% if supplier.primary_phone %}
               <a href="tel:{{ supplier.primary_phone }}" class="text-blue-600 hover:text-blue-800">{{ supplier.primary_phone }}</a>
             {% else %}
@@ -112,8 +146,10 @@
           </dd>
         </div>
         <div class="flex items-start justify-between gap-3">
-          <dt class="text-gray-600">Business email</dt>
-          <dd>
+          <dt class="text-gray-600">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'business_email')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Business email</button>
+          </dt>
+          <dd id="supplier-business-email-value">
             {% if supplier.business_email %}
               <a href="mailto:{{ supplier.business_email }}" class="text-blue-600 hover:text-blue-800">{{ supplier.business_email }}</a>
             {% else %}
@@ -122,8 +158,10 @@
           </dd>
         </div>
         <div class="flex items-start justify-between gap-3">
-          <dt class="text-gray-600">Primary email</dt>
-          <dd>
+          <dt class="text-gray-600">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'primary_email')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Primary email</button>
+          </dt>
+          <dd id="supplier-primary-email-value">
             {% if supplier.primary_email %}
               <a href="mailto:{{ supplier.primary_email }}" class="text-blue-600 hover:text-blue-800">{{ supplier.primary_email }}</a>
             {% else %}
@@ -132,8 +170,10 @@
           </dd>
         </div>
         <div class="flex items-start justify-between gap-3">
-          <dt class="text-gray-600">Website</dt>
-          <dd class="break-all">
+          <dt class="text-gray-600">
+            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'website_url')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Website</button>
+          </dt>
+          <dd id="supplier-website-url-value" class="break-all">
             {% if supplier.website_url %}
               <a href="{{ supplier.website_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">{{ supplier.website_url }}</a>
             {% else %}
@@ -369,6 +409,8 @@
   </div>
 </div>
 
+{% include "transactions/transaction_modal.html" %}
+
 <!-- Certification modal -->
 <div id="cert-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
   <div class="card card-padded shadow-2xl w-full max-w-lg">
@@ -469,6 +511,29 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+<script>
+    window.supplierContentTypeId = {{ supplier_content_type_id }};
+    window.supplierId = {{ supplier.id }};
+    window.onTransactionSaved = function(data) {
+        if (!data || !data.success) return;
+        var fn = data.field_name;
+        var displayVal = data.display_value || '';
+        if (data.content_type_id !== window.supplierContentTypeId || data.object_id !== window.supplierId) return;
+        var id = 'supplier-' + fn.replace(/_/g, '-') + '-value';
+        var el = document.getElementById(id);
+        if (!el) return;
+        var emptyVal = displayVal === '' || displayVal === null || displayVal === undefined;
+        if (fn === 'business_phone' || fn === 'primary_phone') {
+            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="tel:' + displayVal + '" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+        } else if (fn === 'business_email' || fn === 'primary_email') {
+            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="mailto:' + displayVal + '" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+        } else if (fn === 'website_url') {
+            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="' + displayVal + '" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+        } else {
+            el.textContent = emptyVal ? '—' : displayVal;
+        }
+    };
+</script>
 <script>
     function getCookie(name) {
         let cookieValue = null;
