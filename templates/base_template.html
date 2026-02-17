@@ -222,23 +222,52 @@
     <div class="sidebar inactive" id="sidebar">
         <style>
             .sidebar .has-submenu { position: relative; }
+            .sidebar a,
+            .sidebar .menu-label {
+                color: #ffffff;
+                text-shadow: none;
+            }
+            .sidebar a:hover,
+            .sidebar .menu-label:hover {
+                color: var(--company-secondary);
+            }
+            .sidebar a:focus-visible,
+            .sidebar .menu-label:focus-visible {
+                outline: 2px solid rgba(255, 255, 255, 0.7);
+                outline-offset: 2px;
+            }
             .sidebar .submenu {
                 position: absolute;
                 left: 100%;
                 top: 0;
-                margin-left: 12px;
+                margin-left: 4px;
                 min-width: 170px;
                 padding: 6px 0;
                 border-radius: 10px;
-                background: rgba(0, 0, 0, 0.35);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+                background: var(--company-primary);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
                 z-index: 1200;
                 opacity: 0;
                 visibility: hidden;
                 pointer-events: none;
                 transform: translateX(-4px);
                 transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+            }
+            .sidebar .submenu::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                right: 100%;
+                width: 8px;
+                height: 100%;
+            }
+            .sidebar .submenu a {
+                display: block;
+            }
+            .sidebar .submenu a:hover {
+                background: rgba(255, 255, 255, 0.12);
+                color: #ffffff;
             }
             .sidebar .has-submenu:hover > .submenu,
             .sidebar .has-submenu:focus-within > .submenu {
@@ -254,7 +283,7 @@
             <div class="px-4 pb-8">
                 <ul class="mt-10 space-y-1">
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer group relative has-submenu">
-                        <a href="{% url 'index' %}" class="px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                        <a href="{% url 'index' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Home</a>
                         <ul class="mt-1 pl-4 space-y-1 submenu">
                             <li>
                                 <a href="{% url 'about' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">About</a>
@@ -262,21 +291,24 @@
                         </ul>
                     </li>
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'training:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Training</a>
+                        <a href="{% url 'training:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Training</a>
                     </li>
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Inventory</a>
+                        <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Inventory</a>
                     </li>
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium">Contracts</a>
+                        <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Contracts</a>
+                    </li>
+                    <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                        <a href="{% url 'suppliers:supplier_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Suppliers</a>
                     </li>
                     {% if user.is_authenticated and user.is_superuser %}
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'contracts:company_list' %}" class="px-3 py-2 rounded-md text-sm font-medium">Companies</a>
+                        <a href="{% url 'contracts:company_list' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Companies</a>
                     </li>
                     {% endif %}
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer group relative has-submenu">
-                        Tools
+                        <span class="px-3 py-2 rounded-md text-sm font-medium menu-label">Tools</span>
                         <ul class="mt-1 pl-4 space-y-1 submenu">
                             <li>
                                 <a href="{% url 'tools:index' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">PDF Merger</a>
@@ -284,13 +316,16 @@
                             <li>
                                 <a href="{% url 'reports:my_requests' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Reports</a>
                             </li>
+                            <li>
+                                <a href="{% url 'inventory:dashboard' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Inventory</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Folder Tracking</a>
+                            </li>
                         </ul>
                     </li>
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-2 rounded-md text-sm font-medium">Folder Tracking</a>
-                    </li>
-                    <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="https://www.salespatriot.com/" class="px-3 py-2 rounded-md text-sm font-medium">Sales Patriot</a>
+                        <a href="https://www.salespatriot.com/" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Sales Patriot</a>
                     </li>
                 </ul>
             </div>
