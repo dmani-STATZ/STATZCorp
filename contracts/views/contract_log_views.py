@@ -22,7 +22,18 @@ class ContractLogView(ListView):
     template_name = 'contracts/contract_log_view.html'
     context_object_name = 'clins'
     paginate_by = 25
-    
+    allowed_per_page = (25, 50, 100)
+
+    def get_paginate_by(self, queryset):
+        """Allow per_page from GET (25, 50, 100) for easier scanning."""
+        try:
+            per = int(self.request.GET.get('per_page', self.paginate_by))
+            if per in self.allowed_per_page:
+                return per
+        except (TypeError, ValueError):
+            pass
+        return self.paginate_by
+
     def get_queryset(self):
         """Get the list of CLINs for this view."""
         clins = Clin.objects.filter(company=self.request.active_company).select_related(
@@ -146,7 +157,14 @@ class ContractLogView(ListView):
         context['search_query'] = self.request.GET.get('search', '')
         context['status_filter'] = self.request.GET.get('status', '')
         context['supplier_filter'] = self.request.GET.get('supplier', '')
-        
+        paginator = context.get('paginator')
+        context['current_per_page'] = paginator.per_page if paginator else self.paginate_by
+        context['allowed_per_page'] = self.allowed_per_page
+        # Base query string for pagination links (preserves search, status, supplier, per_page)
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        context['pagination_query_string'] = params.urlencode()
+
         # Add suppliers list for the dropdown
         context['suppliers'] = Supplier.objects.all().order_by('name')
         

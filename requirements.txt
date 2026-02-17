@@ -23,11 +23,11 @@ django-cors-headers==4.4.0
 python-docx==1.1.0
 docx2pdf==0.1.8
 openpyxl==3.1.5
-Pillow==11.1.0
+Pillow==12.1.1
 reportlab==4.3.0
 
 # PDF processing - Migrated to pypdf for better security and maintenance
-pypdf==6.6.0  # Latest version with enhanced security and performance
+pypdf==6.6.2  # Latest version with enhanced security and performance
 pdfplumber==0.11.5
 
 # Utilities
@@ -43,7 +43,7 @@ django-browser-reload==1.15.0
 python-dotenv==1.0.1
 
 # Security
-cryptography==44.0.1
+cryptography==46.0.5
 
 #Extras
 pyOpenSSL==25.0.0

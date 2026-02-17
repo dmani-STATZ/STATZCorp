@@ -267,13 +267,13 @@
 
     <!-- Pagination -->
         {% if is_paginated %}
-        <div class="card mt-2 px-4 py-1">
-            <div class="flex flex-col items-center justify-center space-y-1">
+        <div class="card mt-2 px-4 py-2" data-pagination-base="{% if pagination_query_string %}{{ pagination_query_string }}{% endif %}" data-num-pages="{{ paginator.num_pages }}">
+            <div class="flex flex-col items-center justify-center space-y-2">
                 <div class="bg-blue-700 text-white rounded-md p-1 pr-4 pl-4">
-                    <nav class="relative z-0 inline-flex rounded-md shadow-sm items-center space-x-2">
+                    <nav class="relative z-0 inline-flex flex-wrap rounded-md shadow-sm items-center gap-x-2 gap-y-1">
                         <!-- First Page -->
                         {% if page_obj.has_previous %}
-                            <a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
+                            <a href="?page=1{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}"
                                class="btn-pagination underline">First</a>
                         {% else %}
                             <span class="btn-pagination opacity-50 cursor-not-allowed">First</span>
@@ -281,29 +281,27 @@
 
                         <!-- Previous Page -->
                         {% if page_obj.has_previous %}
-                            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
+                            <a href="?page={{ page_obj.previous_page_number }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}"
                                class="btn-pagination underline">Prev</a>
                         {% else %}
                             <span class="btn-pagination opacity-50 cursor-not-allowed">Prev</span>
                         {% endif %}
 
                         <!-- Page Range -->
-                        {% with ''|center:5 as range %}
-                            {% for i in paginator.page_range %}
-                                {% if i >= page_obj.number|add:"-3" and i <= page_obj.number|add:"3" %}
-                                    {% if page_obj.number == i %}
-                                        <span class="btn-pagination-active mx-1">{{ i }}</span>
-                                    {% else %}
-                                        <a href="?page={{ i }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
-                                           class="btn-pagination mx-1 underline">{{ i }}</a>
-                                    {% endif %}
+                        {% for i in paginator.page_range %}
+                            {% if i >= page_obj.number|add:"-3" and i <= page_obj.number|add:"3" %}
+                                {% if page_obj.number == i %}
+                                    <span class="btn-pagination-active mx-1">{{ i }}</span>
+                                {% else %}
+                                    <a href="?page={{ i }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}"
+                                       class="btn-pagination mx-1 underline">{{ i }}</a>
                                 {% endif %}
-                            {% endfor %}
-                        {% endwith %}
+                            {% endif %}
+                        {% endfor %}
 
                         <!-- Next Page -->
                         {% if page_obj.has_next %}
-                            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
+                            <a href="?page={{ page_obj.next_page_number }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}"
                                class="btn-pagination underline">Next</a>
                         {% else %}
                             <span class="btn-pagination opacity-50 cursor-not-allowed">Next</span>
@@ -311,14 +309,32 @@
 
                         <!-- Last Page -->
                         {% if page_obj.has_next %}
-                            <a href="?page={{ paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
+                            <a href="?page={{ paginator.num_pages }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}"
                                class="btn-pagination underline">Last</a>
                         {% else %}
                             <span class="btn-pagination opacity-50 cursor-not-allowed">Last</span>
                         {% endif %}
+
+                        <!-- Jump to page -->
+                        <span class="ml-2 inline-flex items-center gap-1 text-white">
+                            <label for="jumpToPage" class="text-xs">Jump to</label>
+                            <input type="number" id="jumpToPage" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}"
+                                   class="w-14 px-1 py-0.5 text-sm text-gray-900 rounded border border-gray-300">
+                            <button type="button" id="jumpToPageBtn" class="btn-pagination text-xs py-0.5 px-2 rounded">Go</button>
+                        </span>
+
+                        <!-- Per page selector -->
+                        <span class="ml-2 inline-flex items-center gap-1 text-white">
+                            <label for="perPageSelect" class="text-xs">Per page</label>
+                            <select id="perPageSelect" class="px-1 py-0.5 text-sm text-gray-900 rounded border border-gray-300 min-w-0">
+                                {% for n in allowed_per_page %}
+                                    <option value="{{ n }}" {% if current_per_page == n %}selected{% endif %}>{{ n }}</option>
+                                {% endfor %}
+                            </select>
+                        </span>
                     </nav>
                 </div>
-                <div class="bg-blue-300 rounded-md p-1">
+                <div class="bg-blue-300 rounded-md p-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                     <p class="text-sm text-black">
                     Showing <span class="font-medium">{{ page_obj.start_index }}</span> to
                     <span class="font-medium">{{ page_obj.end_index }}</span> of
@@ -493,6 +509,40 @@
         }
 
         exportBtn.addEventListener('click', exportContractLog);
+
+        // Jump to page
+        const jumpCard = document.querySelector('[data-pagination-base]');
+        if (jumpCard) {
+            const baseParams = jumpCard.dataset.paginationBase || '';
+            const numPages = parseInt(jumpCard.dataset.numPages || '1', 10);
+            const jumpInput = document.getElementById('jumpToPage');
+            const jumpBtn = document.getElementById('jumpToPageBtn');
+            if (jumpInput && jumpBtn) {
+                function buildQuery(extra) {
+                    const parts = baseParams ? [baseParams] : [];
+                    if (extra) parts.push(extra);
+                    return parts.length ? '?' + parts.join('&') : '';
+                }
+                jumpBtn.addEventListener('click', function() {
+                    let p = parseInt(jumpInput.value, 10);
+                    if (isNaN(p) || p < 1) p = 1;
+                    if (p > numPages) p = numPages;
+                    window.location.href = window.location.pathname + buildQuery('page=' + p);
+                });
+                jumpInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') jumpBtn.click();
+                });
+            }
+            // Per page selector
+            const perPageSelect = document.getElementById('perPageSelect');
+            if (perPageSelect) {
+                perPageSelect.addEventListener('change', function() {
+                    const per = this.value;
+                    const q = baseParams ? baseParams + '&' : '';
+                    window.location.href = window.location.pathname + '?' + q + 'per_page=' + per + '&page=1';
+                });
+            }
+        }
     });
 </script>
 {% endblock %}

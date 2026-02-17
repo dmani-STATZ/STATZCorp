@@ -360,13 +360,13 @@ def contract_search(request):
     # Company scope
     if getattr(request, 'active_company', None):
         contracts = contracts.filter(company=request.active_company)
-    # Open / Closed / Both filter
+    # Open / Closed / Both filter (Closed includes Cancelled)
     if status_filter == 'open':
         contracts = contracts.filter(status__description='Open')
     elif status_filter == 'closed':
-        contracts = contracts.filter(status__description='Closed')
+        contracts = contracts.filter(status__description__in=['Closed', 'Cancelled'])
     elif status_filter == 'both':
-        contracts = contracts.filter(status__description__in=['Open', 'Closed'])
+        contracts = contracts.filter(status__description__in=['Open', 'Closed', 'Cancelled'])
     contracts = contracts.values(
         'id',
         'contract_number',
