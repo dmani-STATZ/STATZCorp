@@ -46,4 +46,4 @@ python-dotenv==1.0.1
 cryptography==46.0.5
 
 #Extras
-pyOpenSSL
+pyOpenSSL==25.3.0
