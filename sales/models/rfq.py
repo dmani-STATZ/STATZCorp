@@ -9,6 +9,7 @@ from django.db import models
 class SupplierRFQ(models.Model):
     """RFQ sent to a supplier for a solicitation line."""
     STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
         ('SENT', 'Sent'),
         ('RESPONDED', 'Responded'),
         ('NO_RESPONSE', 'No Response'),
@@ -32,9 +33,14 @@ class SupplierRFQ(models.Model):
         blank=True,
         related_name='sales_rfqs_sent',
     )
-    email_sent_to = models.EmailField()
+    email_sent_to = models.EmailField(null=True, blank=True)
     response_received_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SENT')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    email_message_id = models.CharField(max_length=255, null=True, blank=True)
+    follow_up_sent_at = models.DateTimeField(null=True, blank=True)
+    follow_up_count = models.IntegerField(default=0)
+    notes = models.TextField(null=True, blank=True)
+    declined_reason = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_supplier_rfq'

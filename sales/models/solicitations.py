@@ -3,6 +3,7 @@ Solicitation, SolicitationLine, ImportBatch — Section 3.1.
 Tables: dibbs_solicitation, dibbs_solicitation_line, tbl_ImportBatch.
 """
 from django.db import models
+from django.utils import timezone
 
 
 class ImportBatch(models.Model):
@@ -25,12 +26,27 @@ class Solicitation(models.Model):
     """One row per solicitation (from IN/BQ)."""
     STATUS_CHOICES = [
         ('New', 'New'),
-        ('Reviewing', 'Reviewing'),
-        ('RFQ Sent', 'RFQ Sent'),
-        ('Bid Submitted', 'Bid Submitted'),
-        ('No Bid', 'No Bid'),
-        ('Won', 'Won'),
-        ('Lost', 'Lost'),
+        ('Matching', 'Matching'),
+        ('RFQ_PENDING', 'RFQ Pending'),
+        ('RFQ_SENT', 'RFQ Sent'),
+        ('QUOTING', 'Quoting'),
+        ('BID_READY', 'Bid Ready'),
+        ('BID_SUBMITTED', 'Bid Submitted'),
+        ('WON', 'Won'),
+        ('LOST', 'Lost'),
+        ('NO_BID', 'No Bid'),
+    ]
+    BUCKET_CHOICES = [
+        ('UNSET', 'Not Yet Triaged'),
+        ('SDVOSB', 'SDVOSB Priority'),
+        ('HUBZONE', 'HUBZone'),
+        ('GROWTH', 'Growth'),
+        ('SKIP', 'Skip'),
+    ]
+    BUCKET_ASSIGNED_BY_CHOICES = [
+        ('auto', 'Auto'),
+        ('manual', 'Manual'),
+        ('hubzone', 'HUBZone'),
     ]
     solicitation_number = models.CharField(max_length=13, unique=True, db_index=True)
     solicitation_type = models.CharField(max_length=1, null=True, blank=True)  # F/I/P
@@ -47,11 +63,39 @@ class Solicitation(models.Model):
         related_name='solicitations',
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
+    bucket = models.CharField(
+        max_length=10,
+        choices=BUCKET_CHOICES,
+        default='UNSET',
+        db_index=True,
+    )
+    bucket_assigned_by = models.CharField(
+        max_length=10,
+        choices=BUCKET_ASSIGNED_BY_CHOICES,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         db_table = 'dibbs_solicitation'
         verbose_name = 'Solicitation'
         verbose_name_plural = 'Solicitations'
+
+    @property
+    def days_remaining(self):
+        """Days until return_by_date; None if no date or already past."""
+        if not self.return_by_date:
+            return None
+        today = timezone.now().date()
+        delta = (self.return_by_date - today).days
+        return max(0, delta) if delta >= 0 else 0
+
+    @property
+    def dibbs_pdf_url(self):
+        if self.pdf_file_name and self.solicitation_number:
+            subdir = self.solicitation_number[-1].upper()
+            return f"https://dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/{self.pdf_file_name.upper()}"
+        return None
 
 
 class SolicitationLine(models.Model):
@@ -76,6 +120,8 @@ class SolicitationLine(models.Model):
     trade_agreements_indicator = models.CharField(max_length=1, null=True, blank=True)
     buy_american_indicator = models.CharField(max_length=1, null=True, blank=True)
     higher_level_quality_indicator = models.CharField(max_length=1, null=True, blank=True)
+    # Original BQ row (121 columns) for export overlay; populated at import when BQ file present
+    bq_raw_columns = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_solicitation_line'

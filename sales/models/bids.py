@@ -38,6 +38,12 @@ class GovernmentBid(models.Model):
     manufacturer_dealer = models.CharField(max_length=2)  # MM/DD/QM/QD
     mfg_source_cage = models.CharField(max_length=5, null=True, blank=True)
     fob_point = models.CharField(max_length=1, default='D')
+    payment_terms = models.CharField(max_length=2, null=True, blank=True)
+    material_requirements = models.CharField(max_length=1, default='0')  # 0-4
+    hazardous_material = models.CharField(max_length=1, default='N')
+    part_number_offered_code = models.CharField(max_length=1, null=True, blank=True)
+    part_number_offered_cage = models.CharField(max_length=5, null=True, blank=True)
+    part_number_offered = models.CharField(max_length=40, null=True, blank=True)
     bid_status = models.CharField(max_length=20, choices=BID_STATUS, default='DRAFT')
     submitted_at = models.DateTimeField(null=True, blank=True)
     exported_bq_file = models.CharField(max_length=255, null=True, blank=True)

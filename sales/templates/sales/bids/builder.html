@@ -1,0 +1,261 @@
+{% extends "sales/base.html" %}
+{% block content %}
+<style>
+  .mono { font-family: ui-monospace, monospace; }
+  .price-compare { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; flex-wrap: wrap; }
+  .price-block { flex: 1; min-width: 140px; }
+  .price-block.bid .price-value { color: var(--company-primary, #004eb3); font-weight: 700; }
+  .price-label { font-size: 0.7rem; font-weight: 600; color: #6b7280; text-transform: uppercase; }
+  .price-value { font-size: 1.25rem; margin-top: 0.25rem; }
+  .price-arrow { font-size: 1.5rem; color: #94a3b8; }
+  .margin-pill { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; margin-top: 0.35rem; }
+  .form-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  .form-section-title { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem 1.25rem; }
+  .form-group { display: flex; flex-direction: column; }
+  .form-label { font-size: 0.7rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; }
+  .form-control { padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; }
+  .form-hint { font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+</style>
+
+<div style="margin-bottom: 1rem;">
+  <a href="{% url 'sales:bids_ready' %}" style="font-size: 0.875rem; color: #6b7280; text-decoration: none;">← Bid Center</a>
+  <span style="color: #9ca3af;"> / </span>
+  <span class="mono">{{ solicitation.solicitation_number }}</span>
+</div>
+
+<!-- Price anchor -->
+<div class="price-compare">
+  <div class="price-block">
+    <div class="price-label">Supplier Cost</div>
+    <div class="price-value">${{ selected_quote.unit_price }}</div>
+    <div style="font-size: 12px; color: #6b7280;">{{ selected_quote.supplier.name|default:selected_quote.supplier.cage_code }}</div>
+  </div>
+  <div class="price-arrow">→</div>
+  <div class="price-block bid">
+    <div class="price-label">Your Bid Price</div>
+    <div class="price-value" id="live-bid-price">${{ initial_price|floatformat:5 }}</div>
+    <div class="margin-pill" id="live-margin">0% margin</div>
+  </div>
+</div>
+
+<form method="post" action="{% url 'sales:bid_builder' sol_number=solicitation.solicitation_number %}">
+  {% csrf_token %}
+  <input type="hidden" name="line" value="{{ line.id }}">
+
+  <!-- Quote selection -->
+  <div class="form-card">
+    <div class="form-section-title">Supplier quote (select one)</div>
+    <table style="width:100%; font-size:0.875rem;">
+      <thead><tr><th>Supplier</th><th>Unit Price</th><th>Lead Time</th><th></th></tr></thead>
+      <tbody>
+        {% for q in quotes %}
+        <tr>
+          <td>{{ q.supplier.name|default:q.supplier.cage_code }}</td>
+          <td>${{ q.unit_price }}</td>
+          <td>{{ q.lead_time_days }}d</td>
+          <td>
+            {% if q.id == selected_quote.id %}<span style="color:#16a34a;">Selected</span>{% else %}
+            <form method="post" action="{% url 'sales:bid_select_quote' %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="quote_id" value="{{ q.id }}"><button type="submit" class="btn btn-ghost btn-sm">Use This Quote</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 01: Identity -->
+  <div class="form-card">
+    <div class="form-section-title">01 · Quote Identity</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Quoter CAGE *</label>
+        <select name="quoter_cage" class="form-control" required>
+          {% for cage in company_cages %}
+          <option value="{{ cage.cage_code }}" {% if initial_cage == cage.cage_code %}selected{% endif %}>{{ cage.cage_code }} — {{ cage.company_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Quote For CAGE *</label>
+        <select name="quote_for_cage" class="form-control" required>
+          {% for cage in company_cages %}
+          <option value="{{ cage.cage_code }}" {% if initial_quote_cage == cage.cage_code %}selected{% endif %}>{{ cage.cage_code }} — {{ cage.company_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bid Type *</label>
+        <select name="bid_type_code" class="form-control" required id="bid-type-select">
+          <option value="BI" {% if initial_bid_type == 'BI' %}selected{% endif %}>BI — Bid Without Exception</option>
+          <option value="BW" {% if initial_bid_type == 'BW' %}selected{% endif %}>BW — Bid With Exception</option>
+          <option value="AB" {% if initial_bid_type == 'AB' %}selected{% endif %}>AB — Alternate Bid</option>
+          <option value="DQ" {% if initial_bid_type == 'DQ' %}selected{% endif %}>DQ — No Bid</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 02: Pricing & Delivery -->
+  <div class="form-card">
+    <div class="form-section-title">02 · Pricing & Delivery</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Unit Price *</label>
+        <input type="number" name="unit_price" step="0.00001" min="0" required id="unit-price-input" class="form-control" value="{{ initial_price }}">
+        <div class="form-hint">Supplier: ${{ selected_quote.unit_price }} · Markup {{ default_markup_pct }}%</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Delivery Days *</label>
+        <input type="number" name="delivery_days" min="0" max="9999" required class="form-control" value="{{ initial_delivery }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">FOB Point</label>
+        <select name="fob_point" class="form-control">
+          <option value="D" {% if initial_fob == 'D' %}selected{% endif %}>D — Destination</option>
+          <option value="O" {% if initial_fob == 'O' %}selected{% endif %}>O — Origin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Terms</label>
+        <input type="text" name="payment_terms" class="form-control" maxlength="2" value="{{ initial_payment }}" placeholder="1">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 03: Supply Source -->
+  <div class="form-card">
+    <div class="form-section-title">03 · Supply Source</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Manufacturer / Dealer *</label>
+        <select name="manufacturer_dealer" class="form-control" required id="mfg-dealer-select">
+          <option value="MM" {% if initial_md == 'MM' %}selected{% endif %}>MM — Manufacturer</option>
+          <option value="DD" {% if initial_md == 'DD' %}selected{% endif %}>DD — Dealer</option>
+          <option value="QM" {% if initial_md == 'QM' %}selected{% endif %}>QM — QPL Manufacturer</option>
+          <option value="QD" {% if initial_md == 'QD' %}selected{% endif %}>QD — QPL Dealer</option>
+        </select>
+      </div>
+      <div class="form-group" id="mfg-cage-group" style="display: {% if initial_md == 'DD' or initial_md == 'QD' %}flex{% else %}none{% endif %};">
+        <label class="form-label">Mfg CAGE *</label>
+        <input type="text" name="mfg_source_cage" class="form-control mono" maxlength="5" value="{{ initial_mfg_cage }}" placeholder="5-char CAGE">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Material Requirements</label>
+        <select name="material_requirements" class="form-control">
+          <option value="0" {% if initial_material == '0' %}selected{% endif %}>0 — New</option>
+          <option value="1" {% if initial_material == '1' %}selected{% endif %}>1 — Other Than New</option>
+          <option value="2" {% if initial_material == '2' %}selected{% endif %}>2 — Reconditioned</option>
+          <option value="3" {% if initial_material == '3' %}selected{% endif %}>3 — Remanufactured</option>
+          <option value="4" {% if initial_material == '4' %}selected{% endif %}>4 — Unused Gov't Surplus</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hazardous Material</label>
+        <select name="hazardous_material" class="form-control">
+          <option value="N" {% if initial_hazmat == 'N' %}selected{% endif %}>N — No</option>
+          <option value="Y" {% if initial_hazmat == 'Y' %}selected{% endif %}>Y — Yes</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {% if show_part_number_section %}
+  <!-- Section 04: Part Number -->
+  <div class="form-card">
+    <div class="form-section-title">04 · Part Number Offered</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Part Number Code</label>
+        <input type="text" name="part_number_offered_code" class="form-control" maxlength="1" value="{{ initial_pn_code }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">CAGE of Part Offered</label>
+        <input type="text" name="part_number_offered_cage" class="form-control mono" maxlength="5" value="{{ initial_pn_cage }}">
+      </div>
+      <div class="form-group" style="grid-column: span 2;">
+        <label class="form-label">Part Number</label>
+        <input type="text" name="part_number_offered" class="form-control mono" maxlength="40" value="{{ initial_pn }}">
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Section 05: Compliance (read-only) -->
+  <div class="form-card">
+    <div class="form-section-title">05 · Compliance (from CAGE)</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">SB Representations</label>
+        <input class="form-control" value="{{ default_cage.sb_representations_code|default:'' }}" readonly style="background:#f0f0f0;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Affirmative Action</label>
+        <input class="form-control" value="{{ default_cage.affirmative_action_code|default:'' }}" readonly style="background:#f0f0f0;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Previous Contracts</label>
+        <input class="form-control" value="{{ default_cage.previous_contracts_code|default:'' }}" readonly style="background:#f0f0f0;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Child Labor</label>
+        <input class="form-control" value="{{ default_cage.default_child_labor_code|default:'N' }}" readonly style="background:#f0f0f0;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 06: Remarks (BW/AB only) -->
+  <div class="form-card" id="remarks-card" style="display: {% if initial_bid_type == 'BW' or initial_bid_type == 'AB' %}block{% else %}none{% endif %};">
+    <div class="form-section-title">06 · Quote Remarks (required for BW/AB)</div>
+    <div class="form-group">
+      <textarea name="bid_remarks" class="form-control" rows="3" maxlength="255" placeholder="Explain the exception...">{{ initial_remarks }}</textarea>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 0.75rem; justify-content: flex-end; padding-top: 0.5rem;">
+    <a href="{% url 'sales:bids_ready' %}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" name="action" value="save_draft" class="btn btn-ghost">Save Draft</button>
+    <button type="submit" name="action" value="mark_ready" class="btn btn-primary">Mark Ready to Export</button>
+  </div>
+</form>
+
+<script>
+(function() {
+  var supplierCost = {{ selected_quote.unit_price|floatformat:5 }};
+  var bidInput = document.getElementById('unit-price-input');
+  var livePrice = document.getElementById('live-bid-price');
+  var liveMargin = document.getElementById('live-margin');
+
+  function updateMargin(bidPrice) {
+    var price = parseFloat(bidPrice);
+    if (!price || !supplierCost) return;
+    var margin = ((price - supplierCost) / price * 100).toFixed(1);
+    livePrice.textContent = '$' + parseFloat(bidPrice).toFixed(5);
+    liveMargin.textContent = margin + '% margin';
+    liveMargin.style.background = margin >= 3 ? 'rgba(45,198,83,0.12)' : (margin >= 1 ? 'rgba(244,162,97,0.15)' : 'rgba(230,57,70,0.15)');
+    liveMargin.style.color = margin >= 3 ? '#16a34a' : (margin >= 1 ? '#ea580c' : '#b91c1c');
+  }
+  if (bidInput) {
+    bidInput.addEventListener('input', function() { updateMargin(this.value); });
+    updateMargin(bidInput.value);
+  }
+
+  function toggleMfgCage(val) {
+    var group = document.getElementById('mfg-cage-group');
+    group.style.display = ['DD','QD'].indexOf(val) >= 0 ? 'flex' : 'none';
+  }
+  var mfgSelect = document.getElementById('mfg-dealer-select');
+  if (mfgSelect) mfgSelect.addEventListener('change', function() { toggleMfgCage(this.value); });
+
+  var bidTypeSelect = document.querySelector('[name="bid_type_code"]');
+  if (bidTypeSelect) bidTypeSelect.addEventListener('change', function() {
+    document.getElementById('remarks-card').style.display = ['BW','AB'].indexOf(this.value) >= 0 ? 'block' : 'none';
+  });
+})();
+</script>
+{% endblock content %}

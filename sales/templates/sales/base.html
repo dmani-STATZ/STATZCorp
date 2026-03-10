@@ -4,8 +4,28 @@
 {% block body %}
 <div style="padding: 0 2rem 2rem;">
 
+    {# ── Topbar search ──────────────────────────────────────────────────── #}
+    <div class="topbar" style="display:flex; align-items:center; margin-bottom:1rem;">
+        <form action="{% url 'sales:global_search' %}" method="get" style="position:relative; margin:0 16px 0 0; flex:1; max-width:360px;">
+            <input type="text" name="q" id="topbar-search"
+                   placeholder="Search sol#, NSN, nomenclature…"
+                   autocomplete="off"
+                   style="width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-color,#d1d5db); border-radius:6px; font-size:0.875rem;">
+            <div id="search-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; margin-top:4px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:100; max-height:320px; overflow-y:auto;"></div>
+        </form>
+    </div>
+
     {# ── Sales sub-navigation ───────────────────────────────────────────── #}
     <nav style="display:flex; gap:0.25rem; border-bottom:2px solid var(--border-color, #e5e7eb); margin-bottom:1.75rem; padding-top:1.25rem;">
+        <a href="{% url 'sales:dashboard' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'dashboard' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            Dashboard
+        </a>
         <a href="{% url 'sales:solicitation_list' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
                   {% if request.resolver_match.url_name == 'solicitation_list' %}
@@ -14,6 +34,33 @@
                       color: var(--text-muted, #6b7280);
                   {% endif %}">
             Solicitations
+        </a>
+        <a href="{% url 'sales:rfq_center' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'rfq_pending' or request.resolver_match.url_name == 'rfq_sent' or request.resolver_match.url_name == 'rfq_center' or request.resolver_match.url_name == 'rfq_center_detail' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            RFQ Center
+        </a>
+        <a href="{% url 'sales:bids_ready' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'bids_ready' or request.resolver_match.url_name == 'bid_builder' or request.resolver_match.url_name == 'bids_export_queue' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            Bid Center
+        </a>
+        <a href="{% url 'sales:supplier_list' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_detail' or request.resolver_match.url_name == 'supplier_add_nsn' or request.resolver_match.url_name == 'supplier_add_fsc' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            Suppliers
         </a>
         <a href="{% url 'sales:import_upload' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
@@ -39,5 +86,46 @@
 
     {% block content %}{% endblock content %}
 
+    {# Global search typeahead #}
+    <script>
+    (function() {
+        var form = document.querySelector('form[action*="global_search"]');
+        if (!form) return;
+        var input = document.getElementById('topbar-search');
+        var dropdown = document.getElementById('search-dropdown');
+        if (!input || !dropdown) return;
+        var searchUrl = '{% url "sales:global_search" %}';
+        var debounceTimer;
+        input.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            var q = (input.value || '').trim();
+            if (q.length < 2) { dropdown.style.display = 'none'; return; }
+            debounceTimer = setTimeout(function() {
+                fetch(searchUrl + '?q=' + encodeURIComponent(q) + '&fmt=json')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data.results || !data.results.length) {
+                            dropdown.innerHTML = '<div style="padding:12px 16px; font-size:13px; color:#6b7280;">No results</div>';
+                        } else {
+                            dropdown.innerHTML = data.results.map(function(item) {
+                                return '<a href="' + item.url + '" style="display:block; padding:10px 16px; font-size:13px; color:#111827; text-decoration:none; border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'none\'">' +
+                                    '<span class="mono" style="font-weight:600;">' + (item.sol_number || '') + '</span> ' +
+                                    (item.nomenclature ? ' — ' + item.nomenclature : '') + '</a>';
+                            }).join('');
+                        }
+                        dropdown.style.display = 'block';
+                    })
+                    .catch(function() { dropdown.style.display = 'none'; });
+            }, 300);
+        });
+        input.addEventListener('blur', function() { setTimeout(function() { dropdown.style.display = 'none'; }, 150); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') { dropdown.style.display = 'none'; input.blur(); }
+        });
+        document.addEventListener('click', function(e) {
+            if (dropdown && dropdown.style.display === 'block' && !form.contains(e.target)) dropdown.style.display = 'none';
+        });
+    })();
+    </script>
 </div>
 {% endblock body %}

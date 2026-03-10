@@ -1,0 +1,48 @@
+{% extends "sales/base.html" %}
+{% block content %}
+<style>
+  .mono { font-family: ui-monospace, monospace; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 0.625rem 1rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  td { padding: 0.625rem 1rem; border-bottom: 1px solid #f3f4f6; }
+</style>
+
+<div style="margin-bottom: 1.25rem;">
+  <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0;">Suppliers</h1>
+  <form method="get" style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; flex-wrap: wrap;">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search name or CAGE" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; width: 220px;">
+    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.875rem;"><input type="checkbox" name="has_nsn" value="1" {% if has_nsn %}checked{% endif %}> Has NSN capabilities</label>
+    <button type="submit" class="btn btn-ghost">Search</button>
+  </form>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Supplier Name</th>
+      <th>CAGE</th>
+      <th>NSN Capabilities</th>
+      <th>FSC Capabilities</th>
+      <th>Quote Count</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in suppliers %}
+    <tr>
+      <td>{{ s.name|default:"—" }}</td>
+      <td class="mono">{{ s.cage_code|default:"—" }}</td>
+      <td>{{ s.nsn_count|default:0 }}</td>
+      <td>{{ s.fsc_count|default:0 }}</td>
+      <td>{{ s.quote_count|default:0 }}</td>
+      <td><a href="{% url 'sales:supplier_detail' supplier_id=s.id %}" class="btn btn-primary btn-sm">View</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" style="padding: 1.5rem; color: #6b7280;">No suppliers found.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock content %}

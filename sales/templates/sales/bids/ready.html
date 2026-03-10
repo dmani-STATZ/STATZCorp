@@ -1,0 +1,53 @@
+{% extends "sales/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  .mono { font-family: ui-monospace, monospace; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .return-red { color: #b91c1c; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 0.625rem 1rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; }
+  td { padding: 0.625rem 1rem; border-bottom: 1px solid #f3f4f6; }
+</style>
+
+<div style="margin-bottom: 1.25rem;">
+  <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0;">Ready to Bid ({{ total_count }} lines)</h1>
+  {% if bid_lines %}
+  <p style="font-size: 0.875rem; color: #6b7280; margin: 0.25rem 0 0;">Best opportunity: {{ bid_lines.0.line.nomenclature|default:"—"|truncatewords:8 }}</p>
+  {% endif %}
+</div>
+
+{% if not bid_lines %}
+<p style="padding: 1.5rem; background: #f9fafb; border-radius: 8px; color: #6b7280;">No lines ready yet — enter supplier quotes from the RFQ Center.</p>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Sol#</th>
+      <th>NSN</th>
+      <th>Nomenclature</th>
+      <th>Return By</th>
+      <th>Best Supplier Price</th>
+      <th>Suggested Bid @ {{ default_markup_pct }}%</th>
+      <th>Quotes</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in bid_lines %}
+    <tr>
+      <td class="mono"><a href="{% url 'sales:solicitation_detail' sol_number=item.solicitation.solicitation_number %}">{{ item.solicitation.solicitation_number }}</a></td>
+      <td class="mono">{{ item.line.nsn|default:"—" }}</td>
+      <td>{{ item.line.nomenclature|default:"—"|truncatewords:6 }}</td>
+      <td class="{% if item.solicitation.return_by_date and item.solicitation.days_remaining != None and item.solicitation.days_remaining <= 2 %}return-red{% endif %}">{{ item.solicitation.return_by_date|date:"M j, Y"|default:"—" }}</td>
+      <td>${{ item.best_quote.unit_price }}</td>
+      <td>${{ item.suggested_bid|floatformat:5 }}</td>
+      <td>{{ item.quote_count }}</td>
+      <td><a href="{% url 'sales:bid_builder' sol_number=item.solicitation.solicitation_number %}?line={{ item.line.id }}" class="btn btn-primary">Build Bid</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock content %}

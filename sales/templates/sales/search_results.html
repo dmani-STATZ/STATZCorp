@@ -1,0 +1,39 @@
+{% extends "sales/base.html" %}
+{% load static %}
+{% block content %}
+<div style="margin-bottom:1.5rem;">
+  <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Results for: {{ query }}</h1>
+</div>
+{% if solicitations %}
+<div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden;">
+  <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+    <thead>
+      <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Sol #</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">NSN</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Nomenclature</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Return By</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Status</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Open</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sol in solicitations %}
+      <tr style="border-bottom:1px solid #eef2f8;">
+        <td style="padding:0.625rem 1rem;"><a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:ui-monospace, monospace;">{{ sol.solicitation_number }}</a></td>
+        <td style="padding:0.625rem 1rem; font-family:ui-monospace, monospace;">{{ sol.first_line.nsn|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem; max-width:14rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ sol.first_line.nomenclature|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem;">{{ sol.return_by_date|date:"M j, Y"|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem;"><span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#f3f4f6; color:#374151;">{{ sol.status }}</span></td>
+        <td style="padding:0.625rem 1rem;"><a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="padding:3rem; text-align:center; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; color:#6b7280;">
+  No results found.
+</div>
+{% endif %}
+{% endblock content %}

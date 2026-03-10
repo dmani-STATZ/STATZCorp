@@ -2,13 +2,74 @@
 Sales (DIBBS Bidding) app URL configuration.
 """
 from django.urls import path
-from .views import dashboard, import_upload, solicitation_list, backfill_nsn
+from .views import (
+    dashboard,
+    import_upload,
+    solicitation_list,
+    solicitation_detail,
+    no_bid,
+    global_search,
+    backfill_nsn,
+    rfq_pending,
+    rfq_sent,
+    rfq_send_single,
+    rfq_send_batch,
+    rfq_center,
+    rfq_center_detail,
+    rfq_enter_quote,
+    rfq_send_followup,
+    rfq_mark_no_response,
+    rfq_mark_declined,
+    quote_select_for_bid,
+    bids_ready,
+    bid_builder,
+    bid_select_quote,
+    bids_export_queue,
+    bids_export_download,
+    supplier_list,
+    supplier_detail,
+    supplier_add_nsn,
+    supplier_add_fsc,
+    supplier_remove_nsn,
+    supplier_remove_fsc,
+)
 
-app_name = 'sales'
+app_name = "sales"
 
 urlpatterns = [
-    path('', dashboard, name='dashboard'),
-    path('import/', import_upload, name='import_upload'),
-    path('solicitations/', solicitation_list, name='solicitation_list'),
-    path('suppliers/backfill-nsn/', backfill_nsn, name='backfill_nsn'),
+    path("", dashboard, name="dashboard"),
+    path("import/", import_upload, name="import_upload"),
+    path("solicitations/", solicitation_list, name="solicitation_list"),
+    path("solicitations/<str:sol_number>/", solicitation_detail, name="solicitation_detail"),
+    path("solicitations/<str:sol_number>/nobid/", no_bid, name="no_bid"),
+    path("dashboard/", dashboard, name="dashboard"),
+    path("search/", global_search, name="global_search"),
+    path("suppliers/backfill-nsn/", backfill_nsn, name="backfill_nsn"),
+    # RFQ Center
+    path("rfq/", rfq_pending, name="rfq_pending"),
+    path("rfq/pending/", rfq_pending, name="rfq_pending"),
+    path("rfq/center/", rfq_center, name="rfq_center"),
+    path("rfq/center/<int:rfq_id>/detail/", rfq_center_detail, name="rfq_center_detail"),
+    path("rfq/sent/", rfq_sent, name="rfq_sent"),
+    path("rfq/send/", rfq_send_single, name="rfq_send_single"),
+    path("rfq/<str:sol_number>/send-batch/", rfq_send_batch, name="rfq_send_batch"),
+    path("rfq/<int:rfq_id>/quote/", rfq_enter_quote, name="rfq_enter_quote"),
+    path("rfq/<int:rfq_id>/followup/", rfq_send_followup, name="rfq_send_followup"),
+    path("rfq/<int:rfq_id>/no-response/", rfq_mark_no_response, name="rfq_mark_no_response"),
+    path("rfq/<int:rfq_id>/declined/", rfq_mark_declined, name="rfq_mark_declined"),
+    path("quotes/<int:quote_id>/select-for-bid/", quote_select_for_bid, name="quote_select_for_bid"),
+    # Bid Center
+    path("bids/", bids_ready, name="bids_ready"),
+    path("bids/ready/", bids_ready, name="bids_ready"),
+    path("bids/<str:sol_number>/build/", bid_builder, name="bid_builder"),
+    path("bids/select-quote/", bid_select_quote, name="bid_select_quote"),
+    path("bids/export/", bids_export_queue, name="bids_export_queue"),
+    path("bids/export/download/", bids_export_download, name="bids_export_download"),
+    # Suppliers (DIBBS capability management)
+    path("suppliers/", supplier_list, name="supplier_list"),
+    path("suppliers/<int:supplier_id>/", supplier_detail, name="supplier_detail"),
+    path("suppliers/<int:supplier_id>/nsn/add/", supplier_add_nsn, name="supplier_add_nsn"),
+    path("suppliers/<int:supplier_id>/fsc/add/", supplier_add_fsc, name="supplier_add_fsc"),
+    path("suppliers/<int:supplier_id>/nsn/remove/", supplier_remove_nsn, name="supplier_remove_nsn"),
+    path("suppliers/<int:supplier_id>/fsc/remove/", supplier_remove_fsc, name="supplier_remove_fsc"),
 ]

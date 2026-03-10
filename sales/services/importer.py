@@ -2,6 +2,7 @@
 Persistence layer for DIBBS daily import.
 Takes parsed results from parser (in sales.services.admin) and saves to the database.
 """
+import io
 import logging
 import re
 from datetime import date, datetime
@@ -72,6 +73,19 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
         if hasattr(f, "seek"):
             f.seek(0)
 
+    # Django InMemoryUploadedFile yields bytes; csv.reader needs text strings.
+    # Wrap each file in TextIOWrapper so the parser always receives decoded lines.
+    def _as_text(f):
+        if isinstance(f.read(0), bytes):
+            f.seek(0)
+            return io.TextIOWrapper(f, encoding="utf-8", errors="replace")
+        f.seek(0)
+        return f
+
+    in_file  = _as_text(in_file)
+    bq_file  = _as_text(bq_file)
+    as_file  = _as_text(as_file)
+
     parsed = parse_import_batch(in_file, bq_file, as_file)
     solicitations = parsed["solicitations"]
     approved_sources = parsed["approved_sources"]
@@ -130,6 +144,8 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
                     "import_date": import_date,
                     "import_batch": batch,
                     "status": "New",
+                    "bucket": triage_bucket,
+                    "bucket_assigned_by": "auto",
                 },
             )
             if sol_created:
@@ -145,30 +161,38 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
                 st = sol_type_by_number.get(ps.solicitation_number)
                 if st:
                     solicitation.solicitation_type = st
-                solicitation.save(update_fields=[
+                update_fields = [
                     "return_by_date", "small_business_set_aside", "pdf_file_name",
                     "buyer_code", "import_date", "import_batch", "solicitation_type",
-                ])
+                ]
+                if solicitation.bucket == "UNSET":
+                    solicitation.bucket = triage_bucket
+                    solicitation.bucket_assigned_by = "auto"
+                    update_fields.extend(["bucket", "bucket_assigned_by"])
+                solicitation.save(update_fields=update_fields)
 
             # NSN: use formatted for storage (consistent)
             nsn_val = ps.nsn_formatted or ps.nsn_raw or ""
             bq = bq_by_sol_nsn.get((ps.solicitation_number, ps.nsn_raw.replace("-", "").strip()))
 
+            defaults = {
+                "line_number": (bq.line_number[:4] if bq and bq.line_number else None) or None,
+                "purchase_request_number": (ps.purchase_request or "")[:13] or None,
+                "fsc": (ps.fsc or "")[:4] or None,
+                "niin": (ps.niin or "")[:9] or None,
+                "unit_of_issue": (ps.unit_of_issue or "")[:2] or None,
+                "quantity": ps.quantity,
+                "delivery_days": bq.required_delivery_days if bq else None,
+                "nomenclature": (ps.nomenclature or "")[:21] or None,
+                "amsc": (ps.amsc or "")[:1] or None,
+                "item_type_indicator": (ps.item_type or "")[:1] or None,
+            }
+            if bq and getattr(bq, "raw_columns", None):
+                defaults["bq_raw_columns"] = bq.raw_columns
             line, line_created = SolicitationLine.objects.get_or_create(
                 solicitation=solicitation,
                 nsn=nsn_val[:46],
-                defaults={
-                    "line_number": (bq.line_number[:4] if bq and bq.line_number else None) or None,
-                    "purchase_request_number": (ps.purchase_request or "")[:13] or None,
-                    "fsc": (ps.fsc or "")[:4] or None,
-                    "niin": (ps.niin or "")[:9] or None,
-                    "unit_of_issue": (ps.unit_of_issue or "")[:2] or None,
-                    "quantity": ps.quantity,
-                    "delivery_days": bq.required_delivery_days if bq else None,
-                    "nomenclature": (ps.nomenclature or "")[:21] or None,
-                    "amsc": (ps.amsc or "")[:1] or None,
-                    "item_type_indicator": (ps.item_type or "")[:1] or None,
-                },
+                defaults=defaults,
             )
             if line_created:
                 created_lines += 1
@@ -183,10 +207,15 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
                 if bq:
                     line.line_number = (bq.line_number or "")[:4] or line.line_number
                     line.delivery_days = bq.required_delivery_days
-                line.save(update_fields=[
+                    if getattr(bq, "raw_columns", None):
+                        line.bq_raw_columns = bq.raw_columns
+                update_fields = [
                     "quantity", "nomenclature", "unit_of_issue", "purchase_request_number",
                     "fsc", "niin", "line_number", "delivery_days",
-                ])
+                ]
+                if bq and getattr(bq, "raw_columns", None):
+                    update_fields.append("bq_raw_columns")
+                line.save(update_fields=update_fields)
 
         # Unique solicitations count for batch
         batch.solicitation_count = Solicitation.objects.filter(import_batch=batch).count()

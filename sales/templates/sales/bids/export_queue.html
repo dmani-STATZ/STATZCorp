@@ -1,0 +1,80 @@
+{% extends "sales/base.html" %}
+{% block content %}
+<style>
+  .mono { font-family: ui-monospace, monospace; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 0.625rem 1rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  td { padding: 0.625rem 1rem; border-bottom: 1px solid #f3f4f6; }
+  .alert-danger { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+</style>
+
+<div style="margin-bottom: 1.25rem;">
+  <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0;">Export BQ File</h1>
+  <p style="font-size: 0.875rem; color: #6b7280; margin: 0.25rem 0 0;">{{ total_count }} bid(s) ready to export.</p>
+</div>
+
+{% if export_errors %}
+<div class="alert-danger">
+  <strong>Validation failed — fix before export:</strong>
+  <ul style="margin: 0.5rem 0 0 1.25rem;">
+    {% for err in export_errors %}<li>{{ err }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'sales:bids_export_download' %}" id="export-form">
+  {% csrf_token %}
+  <div style="margin-bottom: 0.75rem;">
+    <button type="button" class="btn btn-ghost btn-sm" id="select-all">Select All</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="select-none">Select None</button>
+    <button type="submit" class="btn btn-primary">Export Selected as BQ File</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:2.5rem;"><input type="checkbox" id="check-all"></th>
+        <th>Sol#</th>
+        <th>NSN</th>
+        <th>Nomenclature</th>
+        <th>Bid Price</th>
+        <th>Margin %</th>
+        <th>Delivery</th>
+        <th>Type</th>
+        <th>Supplier</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bid in export_bids %}
+      <tr>
+        <td><input type="checkbox" name="bid_ids[]" value="{{ bid.id }}" class="bid-cb"></td>
+        <td class="mono">{{ bid.solicitation.solicitation_number }}</td>
+        <td class="mono">{{ bid.line.nsn|default:"—" }}</td>
+        <td>{{ bid.line.nomenclature|default:"—"|truncatewords:5 }}</td>
+        <td>${{ bid.unit_price|floatformat:5 }}</td>
+        <td>{% if bid.margin_pct != None %}{{ bid.margin_pct|floatformat:1 }}%{% else %}—{% endif %}</td>
+        <td>{{ bid.delivery_days }}d</td>
+        <td>{{ bid.bid_type_code }}</td>
+        <td>{{ bid.selected_quote.supplier.name|default:bid.selected_quote.supplier.cage_code|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" style="padding: 1.5rem; color: #6b7280;">No bids in export queue. Build bids from <a href="{% url 'sales:bids_ready' %}">Ready to Bid</a> and mark them ready.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+
+<script>
+(function() {
+  var checkAll = document.getElementById('check-all');
+  var cbs = document.querySelectorAll('.bid-cb');
+  if (checkAll && cbs.length) {
+    checkAll.addEventListener('change', function() { cbs.forEach(function(cb) { cb.checked = checkAll.checked; }); });
+  }
+  document.getElementById('select-all').addEventListener('click', function() { cbs.forEach(function(cb) { cb.checked = true; }); if (checkAll) checkAll.checked = true; });
+  document.getElementById('select-none').addEventListener('click', function() { cbs.forEach(function(cb) { cb.checked = false; }); if (checkAll) checkAll.checked = false; });
+})();
+</script>
+{% endblock content %}

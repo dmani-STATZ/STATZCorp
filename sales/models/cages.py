@@ -23,6 +23,7 @@ class CompanyCAGE(models.Model):
     )
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    smtp_reply_to = models.EmailField(null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_company_cage'

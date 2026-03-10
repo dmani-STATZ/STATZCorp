@@ -1,0 +1,237 @@
+{% extends "sales/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  .rfq-center { display: grid; grid-template-columns: 240px 1fr 380px; gap: 0; min-height: calc(100vh - 12rem); }
+  .rfq-left { width: 240px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow: hidden; }
+  .rfq-left-search { padding: 0.75rem; border-bottom: 1px solid #e5e7eb; }
+  .rfq-left-search input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; }
+  .rfq-queue { flex: 1; overflow-y: auto; }
+  .rfq-group { border-bottom: 1px solid #e5e7eb; }
+  .rfq-group-header { padding: 0.5rem 0.75rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; }
+  .rfq-group-header.collapsed + .rfq-group-body { display: none; }
+  .rfq-row { padding: 0.5rem 0.75rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 0.8125rem; transition: background 0.15s; }
+  .rfq-row:hover { background: #f9fafb; }
+  .rfq-row.selected { background: #eff6ff; border-left: 3px solid var(--company-primary, #004eb3); }
+  .rfq-row .supplier-name { font-weight: 600; color: #111827; }
+  .rfq-row .sol-num { font-family: ui-monospace, monospace; font-size: 0.7rem; color: #6b7280; }
+  .rfq-row .nomen { color: #4b5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .rfq-row .badge { font-size: 0.65rem; padding: 0.15rem 0.35rem; border-radius: 4px; margin-top: 0.25rem; display: inline-block; }
+  .rfq-row .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 0.25rem; }
+  .rfq-center-panel { padding: 1rem; overflow-y: auto; background: #fafafa; }
+  .rfq-center-placeholder { color: #9ca3af; font-size: 0.9375rem; padding: 2rem; text-align: center; }
+  .rfq-right { width: 380px; border-left: 1px solid #e5e7eb; background: #fff; transform: translateX(100%); transition: transform 0.25s ease; overflow-y: auto; }
+  .rfq-right.open { transform: translateX(0); }
+  .mono { font-family: ui-monospace, monospace; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+  .form-label { font-size: 0.7rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 0.25rem; }
+  .errorlist { list-style: none; padding: 0; margin: 0.25rem 0 0; font-size: 0.8125rem; color: #b91c1c; }
+  .badge-red { background: #fef2f2; color: #b91c1c; }
+  .badge-orange { background: #fff7ed; color: #ea580c; }
+  .badge-gray { background: #f3f4f6; color: #6b7280; }
+</style>
+
+<div class="rfq-center">
+  <div class="rfq-left">
+    <div class="rfq-left-search">
+      <input type="text" id="rfq-queue-search" placeholder="Search supplier, sol#, NSN…" autocomplete="off">
+    </div>
+    <div class="rfq-queue">
+      {% for group_key, group_label, rfq_list, accent in rfq_groups_display %}
+      <div class="rfq-group" data-group="{{ group_key }}">
+        <div class="rfq-group-header {% if group_key == 'closed' %}collapsed{% endif %}" data-collapse="{{ group_key }}">
+          {{ group_label }} ({{ rfq_list|length }})
+        </div>
+        <div class="rfq-group-body">
+          {% for r in rfq_list %}
+          <div class="rfq-row" data-rfq-id="{{ r.id }}" data-supplier="{{ r.supplier.name|default:r.supplier.cage_code|default:'' }}" data-sol="{{ r.line.solicitation.solicitation_number }}" data-nsn="{{ r.line.nsn|default:'' }}" data-nomen="{{ r.line.nomenclature|default:'' }}">
+            <span class="status-dot" style="background: {{ accent }};"></span>
+            <span class="supplier-name">{{ r.supplier.name|default:r.supplier.cage_code|default:"—" }}</span>
+            <span class="sol-num">{{ r.line.solicitation.solicitation_number }}</span>
+            <div class="nomen" title="{{ r.line.nomenclature|default:'' }}">{{ r.line.nomenclature|default:"—"|truncatewords:5 }}</div>
+            {% with sol=r.line.solicitation %}
+              {% if sol.return_by_date %}
+              <span class="badge {% if sol.days_remaining != None and sol.days_remaining <= 2 %}badge-red{% elif sol.days_remaining != None and sol.days_remaining <= 5 %}badge-orange{% else %}badge-gray{% endif %}" data-days="{{ sol.days_remaining|default:0 }}">
+                {% if sol.days_remaining == None or sol.return_by_date < today %}—{% else %}{{ sol.days_remaining }}d{% endif %}
+              </span>
+              {% endif %}
+            {% endwith %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="rfq-center-panel" id="rfq-center-content">
+    <div class="rfq-center-placeholder" id="rfq-center-placeholder">← Select an RFQ to view details</div>
+    <div id="rfq-center-detail" style="display: none;"></div>
+  </div>
+
+  <div class="rfq-right" id="rfq-quote-panel">
+    <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb;">
+      <h3 style="font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem;">Enter Quote</h3>
+      <p id="rfq-quote-context" style="font-size: 0.8125rem; color: #6b7280; margin: 0;"></p>
+    </div>
+    <form id="rfq-quote-form" style="padding: 1rem;" action="" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="from_center" value="1">
+      <input type="hidden" name="rfq_id" id="rfq-quote-rfq-id" value="">
+      <label class="form-label" for="id_unit_price">Unit Price ($) *</label>
+      <input type="number" step="0.00001" min="0" name="unit_price" id="id_unit_price" required placeholder="0.00000" style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; margin-bottom:0.75rem;">
+      <div id="err_unit_price" class="errorlist" style="display:none;"></div>
+      <label class="form-label" for="id_lead_time_days">Lead Time (days) *</label>
+      <input type="number" min="0" name="lead_time_days" id="id_lead_time_days" required placeholder="0" style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; margin-bottom:0.75rem;">
+      <div id="err_lead_time_days" class="errorlist" style="display:none;"></div>
+      <div style="font-size:0.75rem; color:#6b7280; margin-bottom:1rem;">Suggested bid: <strong id="rfq-suggested-bid">$0.00000</strong> ({{ default_markup_pct }}% markup)</div>
+      <details style="margin-bottom:1rem;">
+        <summary style="cursor:pointer; font-size:0.8125rem; color:#6b7280;">Part Number, Qty Available, Notes</summary>
+        <div style="margin-top:0.75rem;">
+          <label class="form-label" for="id_part_number_offered">Part Number</label>
+          <input type="text" name="part_number_offered" id="id_part_number_offered" maxlength="100" style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; margin-bottom:0.5rem;">
+          <label class="form-label" for="id_quantity_available">Qty Available</label>
+          <input type="number" min="0" name="quantity_available" id="id_quantity_available" style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; margin-bottom:0.5rem;">
+          <label class="form-label" for="id_notes">Notes</label>
+          <textarea name="notes" id="id_notes" rows="2" style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px;"></textarea>
+        </div>
+      </details>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="submit" class="btn btn-primary">Save Quote</button>
+        <button type="button" class="btn btn-ghost" id="rfq-quote-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var centerUrlBase = "{% url 'sales:rfq_center_detail' rfq_id=0 %}".replace(/\/0\/detail\//, '/');
+  var quoteSubmitUrlBase = "{% url 'sales:rfq_enter_quote' rfq_id=0 %}".replace(/\/0\/quote\//, '/');
+  var markup = {{ default_markup_pct }};
+  var selectedRfqId = {{ selected_rfq_id|default:0 }};
+
+  function loadCenterPanel(rfqId) {
+    var placeholder = document.getElementById('rfq-center-placeholder');
+    var detail = document.getElementById('rfq-center-detail');
+    if (!rfqId) { placeholder.style.display = 'block'; if (detail) detail.style.display = 'none'; return; }
+    placeholder.style.display = 'none';
+    fetch(centerUrlBase + rfqId + '/detail/')
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        var container = document.getElementById('rfq-center-detail');
+        container.innerHTML = html;
+        container.style.display = 'block';
+        document.querySelectorAll('.rfq-row').forEach(function(row) {
+          row.classList.remove('selected');
+          if (parseInt(row.getAttribute('data-rfq-id'), 10) === rfqId) row.classList.add('selected');
+        });
+        var enterBtn = container.querySelector('[data-action="enter-quote"]');
+        if (enterBtn) {
+          enterBtn.addEventListener('click', function() { openQuotePanel(rfqId); });
+        }
+      })
+      .catch(function() { placeholder.style.display = 'block'; });
+  }
+
+  function openQuotePanel(rfqId) {
+    document.getElementById('rfq-quote-rfq-id').value = rfqId;
+    document.getElementById('rfq-quote-panel').classList.add('open');
+    var form = document.getElementById('rfq-quote-form');
+    form.action = quoteSubmitUrlBase + rfqId + '/quote/';
+    document.getElementById('rfq-quote-context').textContent = 'RFQ #' + rfqId;
+    document.getElementById('id_unit_price').value = '';
+    var inner = document.querySelector('#rfq-center-detail .rfq-detail-inner');
+    var defaultLead = inner ? inner.getAttribute('data-default-lead-days') : '';
+    document.getElementById('id_lead_time_days').value = defaultLead || '';
+    document.getElementById('rfq-suggested-bid').textContent = '$0.00000';
+  }
+
+  function closeQuotePanel() {
+    document.getElementById('rfq-quote-panel').classList.remove('open');
+  }
+
+  document.getElementById('rfq-quote-cancel').addEventListener('click', closeQuotePanel);
+
+  document.querySelectorAll('.rfq-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var id = parseInt(row.getAttribute('data-rfq-id'), 10);
+      loadCenterPanel(id);
+      history.replaceState(null, '', '?rfq=' + id);
+    });
+  });
+
+  document.getElementById('rfq-quote-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = this;
+    var fd = new FormData(form);
+    var errEls = document.querySelectorAll('#rfq-quote-form .errorlist');
+    errEls.forEach(function(el) { el.style.display = 'none'; el.innerHTML = ''; });
+    fetch(form.action, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          closeQuotePanel();
+          loadCenterPanel(data.rfq_id);
+          var row = document.querySelector('.rfq-row[data-rfq-id="' + data.rfq_id + '"]');
+          if (row) {
+            var respondedBody = document.querySelector('.rfq-group[data-group="responded"] .rfq-group-body');
+            if (respondedBody) {
+              row.remove();
+              respondedBody.appendChild(row);
+              var dot = row.querySelector('.status-dot');
+              if (dot) dot.style.background = '#16a34a';
+            }
+          }
+        } else if (data.errors) {
+          for (var k in data.errors) {
+            var el = document.getElementById('err_' + k);
+            if (el) {
+              var msg = data.errors[k];
+              el.style.display = 'block';
+              el.innerHTML = Array.isArray(msg) ? msg.join(' ') : (msg || '');
+            }
+          }
+        }
+      })
+      .catch(function() { form.submit(); });
+    return false;
+  });
+
+  document.getElementById('id_unit_price').addEventListener('input', function() {
+    var up = parseFloat(this.value) || 0;
+    var suggested = up * (1 + markup / 100);
+    document.getElementById('rfq-suggested-bid').textContent = '$' + suggested.toFixed(5);
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      var panel = document.getElementById('rfq-quote-panel');
+      if (panel && panel.classList.contains('open')) {
+        document.getElementById('rfq-quote-form').requestSubmit();
+      }
+    }
+  });
+
+  document.getElementById('rfq-queue-search').addEventListener('input', function() {
+    var q = (this.value || '').toLowerCase().trim();
+    document.querySelectorAll('.rfq-row').forEach(function(row) {
+      var show = !q || (row.getAttribute('data-supplier') || '').toLowerCase().indexOf(q) >= 0 ||
+        (row.getAttribute('data-sol') || '').toLowerCase().indexOf(q) >= 0 ||
+        (row.getAttribute('data-nsn') || '').toLowerCase().indexOf(q) >= 0 ||
+        (row.getAttribute('data-nomen') || '').toLowerCase().indexOf(q) >= 0;
+      row.style.display = show ? '' : 'none';
+    });
+  });
+
+  document.querySelectorAll('.rfq-group-header').forEach(function(h) {
+    h.addEventListener('click', function() { this.classList.toggle('collapsed'); });
+  });
+
+  if (selectedRfqId) loadCenterPanel(selectedRfqId);
+})();
+</script>
+{% endblock content %}

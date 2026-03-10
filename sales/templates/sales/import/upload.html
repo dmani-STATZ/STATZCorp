@@ -3,117 +3,530 @@
 
 {% block content %}
 
+<style>
+  /* ── Step indicator ──────────────────────────────────────────────────── */
+  .step-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 28px;
+    max-width: 520px;
+  }
+  .step-item { display: flex; align-items: center; gap: 8px; }
+  .step-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800; font-size: 15px; flex-shrink: 0;
+    transition: background .3s, color .3s;
+  }
+  .step-label { font-size: 13px; transition: color .3s, font-weight .3s; }
+  .step-connector { flex: 1; height: 2px; background: #eef2f8; margin: 0 12px; min-width: 40px; }
+
+  /* ── Drop zone ───────────────────────────────────────────────────────── */
+  .drop-zone {
+    border: 2px dashed #c8d6e8;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--company-primary, #004eb3);
+    background: #eef4ff;
+  }
+  .drop-zone-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+  .drop-zone-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: #1a2940; margin-bottom: 4px; }
+  .drop-zone-sub { font-size: 13px; color: #7a90b0; margin-bottom: 14px; }
+
+  /* ── File check rows ─────────────────────────────────────────────────── */
+  .file-check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eef2f8;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; color: #1a2940;
+  }
+  .file-check-row:last-child { border: none; padding-bottom: 0; }
+  .file-check-row .fname { flex: 1; }
+  .chk-ok   { color: #16a34a; font-size: 16px; font-weight: 700; }
+  .chk-fail { color: #dc2626; font-size: 16px; font-weight: 700; }
+  .chk-wait { color: #9ca3af; font-size: 14px; }
+
+  /* ── Stat cards ──────────────────────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+  .istat {
+    border-radius: 8px; padding: 14px 16px;
+    border: 1px solid transparent;
+  }
+  .istat-accent  { background: #fff8e8; border-color: #fde68a; }
+  .istat-navy    { background: #eef4ff; border-color: #bfdbfe; }
+  .istat-success { background: #f0fdf4; border-color: #bbf7d0; }
+  .istat-warn    { background: #fffbeb; border-color: #fde68a; }
+  .istat .slabel { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #7a90b0; margin-bottom: 4px; }
+  .istat .svalue { font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 800; color: #0a1628; line-height: 1; }
+  .istat .ssub   { font-size: 11px; color: #7a90b0; margin-top: 2px; }
+
+  /* ── Misc ────────────────────────────────────────────────────────────── */
+  .format-hint {
+    background: #f0f4f8; border-radius: 8px;
+    padding: 16px 20px; margin-top: 20px;
+  }
+  .format-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .text-xs { font-size: 12px; }
+  .text-muted { color: #7a90b0; }
+  .btn-primary-lg {
+    font-size: 15px; padding: 12px 32px;
+    background: var(--company-primary, #004eb3);
+    color: #fff; border: none; border-radius: 7px;
+    font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn-primary-lg:hover { opacity: .88; }
+  .btn-ghost-sm {
+    font-size: 13px; padding: 9px 18px;
+    background: transparent; color: #4b6080;
+    border: 1px solid #cbd5e1; border-radius: 7px;
+    font-weight: 500; cursor: pointer;
+  }
+  .btn-ghost-sm:hover { background: #f1f5f9; }
+  .alert-info {
+    display: flex; gap: 10px; padding: 12px 16px;
+    background: #eff6ff; border: 1px solid #bfdbfe;
+    border-radius: 8px; font-size: 13px; color: #1e40af;
+    margin-bottom: 18px;
+  }
+  .alert-warn {
+    display: flex; gap: 10px; padding: 12px 16px;
+    background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: 8px; font-size: 13px; color: #854d0e;
+    margin-bottom: 18px;
+  }
+  .complete-icon {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: rgba(45,198,83,.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; margin: 0 auto 18px;
+  }
+</style>
+
 <div style="max-width:680px;">
 
-    <h1 style="font-size:1.375rem; font-weight:600; margin:0 0 0.375rem;">Daily Import</h1>
-    <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0 0 1.75rem;">
-        Upload the three DIBBS files downloaded each morning. Solicitations, approved sources,
-        and batch quote data will be imported and matched automatically.
-    </p>
+  {# ── Step indicator ──────────────────────────────────────────────────── #}
+  <div class="step-bar" id="step-bar">
+    <div class="step-item">
+      <div class="step-circle" id="sc1" style="background:var(--company-primary,#004eb3); color:#fff;">1</div>
+      <span class="step-label" id="sl1" style="font-weight:600; color:#1a2940;">Upload Files</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step-item">
+      <div class="step-circle" id="sc2" style="background:#eef2f8; color:#a0aec0;">2</div>
+      <span class="step-label" id="sl2" style="font-weight:500; color:#a0aec0;">Confirm &amp; Submit</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step-item">
+      <div class="step-circle" id="sc3" style="background:#eef2f8; color:#a0aec0;">3</div>
+      <span class="step-label" id="sl3" style="font-weight:500; color:#a0aec0;">Complete</span>
+    </div>
+  </div>
 
-    {# ── Success result card ─────────────────────────────────────────────── #}
-    {% if result %}
-    <div style="border:1px solid #bbf7d0; border-radius:8px; background:#f0fdf4;
-                padding:1.25rem 1.5rem; margin-bottom:1.75rem;">
-        <div style="display:flex; align-items:center; gap:0.625rem; margin-bottom:0.875rem;">
-            <svg xmlns="http://www.w3.org/2000/svg" style="width:1.125rem;height:1.125rem;flex-shrink:0;color:#16a34a;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <span style="font-weight:600; font-size:0.9375rem; color:#166534;">Import complete — {{ result.import_date }}</span>
-        </div>
+<!--  /*{# ════════════════════════════════════════════════════════════════════════*/
+  /*   STEP 3 — shown immediately if Django returned a result (POST success)*/
+ /* ════════════════════════════════════════════════════════════════════════ #}*/ -->
+  {% if result %}
+  <div id="step3">
+    <div class="complete-icon">✅</div>
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="font-family:'Barlow Condensed',sans-serif; font-size:30px; font-weight:800;
+                  color:#0a1628; margin-bottom:6px;">Import Complete</div>
+      <div style="font-size:14px; color:#7a90b0;">
+        {{ result.solicitations_created }} solicitation{{ result.solicitations_created|pluralize }} created,
+        {{ result.solicitations_updated }} updated.
+      </div>
+    </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem 2rem; font-size:0.875rem; color:#166534;">
-            <div>Solicitations created: <strong>{{ result.solicitations_created }}</strong></div>
-            <div>Solicitations updated: <strong>{{ result.solicitations_updated }}</strong></div>
-            <div>Lines created: <strong>{{ result.lines_created }}</strong></div>
-            <div>Lines updated: <strong>{{ result.lines_updated }}</strong></div>
-            <div>Approved sources: <strong>{{ result.approved_sources_loaded }}</strong></div>
-        </div>
+    <div class="stat-grid-3">
+      <div class="istat istat-navy">
+        <div class="slabel">Import Date</div>
+        <div class="svalue" style="font-size:22px;">{{ result.import_date }}</div>
+      </div>
+      <div class="istat istat-success">
+        <div class="slabel">Sol Created</div>
+        <div class="svalue">{{ result.solicitations_created }}</div>
+      </div>
+      <div class="istat istat-accent">
+        <div class="slabel">Sol Updated</div>
+        <div class="svalue">{{ result.solicitations_updated }}</div>
+      </div>
+    </div>
 
-        {% if result.match_summary %}
-        <div style="margin-top:0.875rem; padding-top:0.875rem; border-top:1px solid #bbf7d0;">
-            <div style="font-size:0.875rem; color:#166534;">
-                Supplier matches found: <strong>{{ result.match_summary.matches_found }}</strong>
-                <span style="margin-left:0.75rem; font-size:0.8125rem; color:#4ade80;">
-                    Tier 1: {{ match_tier_1|default:0 }}
-                    &nbsp;·&nbsp;
-                    Tier 2: {{ match_tier_2|default:0 }}
-                    &nbsp;·&nbsp;
-                    Tier 3: {{ match_tier_3|default:0 }}
-                </span>
-            </div>
-        </div>
-        {% endif %}
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:20px;">
+      <div class="istat istat-navy">
+        <div class="slabel">Lines Created</div>
+        <div class="svalue">{{ result.lines_created }}</div>
+      </div>
+      <div class="istat istat-navy">
+        <div class="slabel">Lines Updated</div>
+        <div class="svalue">{{ result.lines_updated }}</div>
+      </div>
+      <div class="istat istat-navy">
+        <div class="slabel">Approved Sources</div>
+        <div class="svalue">{{ result.approved_sources_loaded }}</div>
+      </div>
+    </div>
 
-        {% if result.parse_error_count and result.solicitations_with_errors %}
-        <div style="margin-top:0.875rem; padding:0.75rem 1rem; border-radius:6px;
-                    background:#fefce8; border:1px solid #fde68a;">
-            <p style="font-size:0.8125rem; font-weight:600; color:#854d0e; margin:0 0 0.25rem;">
-                Parse warnings on {{ result.parse_error_count }} solicitation{{ result.parse_error_count|pluralize }}:
-            </p>
-            <p style="font-size:0.75rem; color:#92400e; margin:0; font-family:monospace;">
-                {{ result.solicitations_with_errors|join:", " }}
-            </p>
+    {% if result.match_summary %}
+    <div style="border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff;
+                padding:14px 18px; margin-bottom:20px;">
+      <div style="font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+                  color:#1e40af; margin-bottom:10px;">Supplier Matches</div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px;">
+        <div>
+          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Total</div>
+          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
+            {{ result.match_summary.matches_found }}
+          </div>
         </div>
-        {% endif %}
-
-        <div style="margin-top:1rem;">
-            <a href="{% url 'sales:solicitation_list' %}"
-               style="font-size:0.875rem; color:var(--company-primary,#004eb3); text-decoration:none; font-weight:500;">
-                View solicitations →
-            </a>
+        <div>
+          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Tier 1 — NSN</div>
+          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
+            {{ result.match_summary.by_tier.1|default:0 }}
+          </div>
         </div>
+        <div>
+          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Tier 2 — CAGE</div>
+          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
+            {{ result.match_summary.by_tier.2|default:0 }}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Tier 3 — FSC</div>
+          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
+            {{ result.match_summary.by_tier.3|default:0 }}
+          </div>
+        </div>
+      </div>
     </div>
     {% endif %}
 
-    {# ── Upload form ─────────────────────────────────────────────────────── #}
-    <div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px;
-                background:var(--surface,#fff); padding:1.5rem;">
+    {% if result.parse_error_count and result.solicitations_with_errors %}
+    <div class="alert-warn">
+      <span>⚠</span>
+      <div>
+        <strong>Parse warnings on {{ result.parse_error_count }} solicitation{{ result.parse_error_count|pluralize }}:</strong>
+        <div style="margin-top:4px; font-family:monospace; font-size:12px;">
+          {{ result.solicitations_with_errors|join:", " }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
-        <form method="post" action="{% url 'sales:import_upload' %}" enctype="multipart/form-data">
-            {% csrf_token %}
+    <div style="display:flex; gap:12px; justify-content:center; margin-top:8px;">
+      <a href="{% url 'sales:solicitation_list' %}"
+         style="display:inline-block; padding:11px 24px; background:var(--company-primary,#004eb3);
+                color:#fff; border-radius:7px; font-size:14px; font-weight:600;
+                text-decoration:none;">
+        📋 View Solicitations →
+      </a>
+      <a href="{% url 'sales:import_upload' %}"
+         style="display:inline-block; padding:11px 24px; background:transparent;
+                color:#4b6080; border:1px solid #cbd5e1; border-radius:7px;
+                font-size:14px; font-weight:500; text-decoration:none;">
+        Import Another
+      </a>
+    </div>
+  </div>
 
-            <div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">
+  {# ── Set step indicator to step 3 (done) ─────────────────────────────── #}
+  <script>setStep(3);</script>
 
-                {% for field in form %}
-                <div>
-                    <label for="{{ field.id_for_label }}"
-                           style="display:block; font-size:0.875rem; font-weight:500;
-                                  color:var(--text,#111827); margin-bottom:0.375rem;">
-                        {{ field.label }}
-                        <span style="font-size:0.75rem; font-weight:400; color:var(--text-muted,#9ca3af); margin-left:0.5rem;">
-                            {% if field.name == 'in_file' %}IN######.TXT
-                            {% elif field.name == 'bq_file' %}bq######.txt
-                            {% elif field.name == 'as_file' %}as######.txt
-                            {% endif %}
-                        </span>
-                    </label>
-                    {{ field }}
-                    {% if field.errors %}
-                    <p style="margin:0.25rem 0 0; font-size:0.8125rem; color:#dc2626;">{{ field.errors.0 }}</p>
-                    {% endif %}
-                </div>
-                {% endfor %}
+  {% else %}
+<!--  /*{# ════════════════════════════════════════════════════════════════════════*/
+  /*   STEP 1 — Upload / Drop Zone*/
+ /* ════════════════════════════════════════════════════════════════════════ #}*/ -->
+  <div id="step1">
 
-            </div>
-
-            <button type="submit"
-                    style="padding:0.5rem 1.5rem; border:none; border-radius:6px; cursor:pointer;
-                           background:var(--company-primary,#004eb3); color:#fff;
-                           font-size:0.9375rem; font-weight:500;">
-                Run Import
-            </button>
-        </form>
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800;
+                  color:#0a1628; margin-bottom:8px;">Upload Today's DIBBS Files</div>
+      <div style="font-size:13px; color:#7a90b0; max-width:420px; margin:0 auto;">
+        Download the IN, BQ, and AS files from DIBBS for the same date,
+        then drop them all here or select them individually.
+      </div>
     </div>
 
-    {# ── Help note ───────────────────────────────────────────────────────── #}
-    <p style="margin-top:1rem; font-size:0.8125rem; color:var(--text-muted,#9ca3af);">
-        Files are downloaded from
-        <a href="https://www.dibbs.bsm.dla.mil" target="_blank" rel="noopener"
-           style="color:var(--company-primary,#004eb3); text-decoration:none;">dibbs.bsm.dla.mil</a>
-        each morning. Re-importing the same file is safe — existing records will be updated, not duplicated.
-    </p>
+    {# Real Django form — hidden until step 2 confirm #}
+    <form id="import-form" method="post" action="{% url 'sales:import_upload' %}"
+          enctype="multipart/form-data" style="display:none;">
+      {% csrf_token %}
+      {{ form.in_file }}
+      {{ form.bq_file }}
+      {{ form.as_file }}
+    </form>
 
-</div>
+    {# Visible drop zone — feeds the hidden form fields #}
+    <div class="drop-zone" id="drop-zone"
+         ondragover="event.preventDefault(); this.classList.add('dragover');"
+         ondragleave="this.classList.remove('dragover');"
+         ondrop="handleDrop(event)"
+         onclick="document.getElementById('multi-input').click()">
+      <span class="drop-zone-icon">📁</span>
+      <div class="drop-zone-title">Drop all three files here</div>
+      <div class="drop-zone-sub">or click to browse</div>
+      <button type="button" class="btn-ghost-sm"
+              onclick="event.stopPropagation(); document.getElementById('multi-input').click()">
+        Browse Files
+      </button>
+      <input type="file" id="multi-input" multiple accept=".txt,.TXT"
+             style="display:none;" onchange="handleFiles(this.files)">
+    </div>
+
+    {# File status card — revealed after files picked #}
+    <div id="file-status" style="display:none; margin-top:18px;">
+      <div style="border:1px solid #e5e7eb; border-radius:8px; background:#fff;
+                  padding:16px 20px;">
+        <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+                    letter-spacing:.08em; text-transform:uppercase; color:#1a2940; margin-bottom:12px;">
+          File Check
+        </div>
+        <div id="row-in"   class="file-check-row"><span class="chk-wait">○</span> <span class="fname text-muted">IN file — not detected</span></div>
+        <div id="row-bq"   class="file-check-row"><span class="chk-wait">○</span> <span class="fname text-muted">BQ file — not detected</span></div>
+        <div id="row-as"   class="file-check-row"><span class="chk-wait">○</span> <span class="fname text-muted">AS file — not detected</span></div>
+        <div id="row-date" class="file-check-row"><span class="chk-wait">○</span> <span class="fname text-muted">Date consistency — pending</span></div>
+      </div>
+    </div>
+
+    <div id="step1-submit" style="display:none; text-align:center; margin-top:22px;">
+      <button type="button" class="btn-primary-lg" onclick="goToStep2()">
+        Preview Import →
+      </button>
+    </div>
+
+    <div class="format-hint">
+      <div class="mono text-xs text-muted" style="letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px;">
+        Expected Filenames
+      </div>
+      <div class="format-grid">
+        <div>
+          <div class="mono" style="font-size:13px;">
+            <span style="color:var(--company-primary,#004eb3);">in</span><span style="color:#7a90b0;">YYMMDD</span><span style="color:#1a2940;">.txt</span>
+          </div>
+          <div class="text-xs text-muted" style="margin-top:2px;">Solicitation Index</div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:13px;">
+            <span style="color:var(--company-primary,#004eb3);">bq</span><span style="color:#7a90b0;">YYMMDD</span><span style="color:#1a2940;">.txt</span>
+          </div>
+          <div class="text-xs text-muted" style="margin-top:2px;">Batch Quote Template</div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:13px;">
+            <span style="color:var(--company-primary,#004eb3);">as</span><span style="color:#7a90b0;">YYMMDD</span><span style="color:#1a2940;">.txt</span>
+          </div>
+          <div class="text-xs text-muted" style="margin-top:2px;">Approved Sources</div>
+        </div>
+      </div>
+      <div class="text-xs text-muted" style="margin-top:10px; font-style:italic;">
+        Example for March 8, 2026:
+        <span class="mono">in260308.txt</span>,
+        <span class="mono">bq260308.txt</span>,
+        <span class="mono">as260308.txt</span>
+      </div>
+    </div>
+
+  </div>{# /step1 #}
+
+<!--  {# ════════════════════════════════════════════════════════════════════════*/
+     STEP 2 — Confirm & Submit*/
+  ════════════════════════════════════════════════════════════════════════ #}*/ -->
+  <div id="step2" style="display:none;">
+
+    <div class="alert-info">
+      <span>ℹ</span>
+      <div>Files look good. Click <strong>Confirm Import</strong> to parse and load into the database.</div>
+    </div>
+
+    <div style="border:1px solid #e5e7eb; border-radius:8px; background:#fff;
+                padding:16px 20px; margin-bottom:20px;">
+      <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+                  letter-spacing:.08em; text-transform:uppercase; color:#1a2940; margin-bottom:12px;">
+        Files QueuedSS
+      </div>
+      <div id="confirm-in"   class="file-check-row"></div>
+      <div id="confirm-bq"   class="file-check-row"></div>
+      <div id="confirm-as"   class="file-check-row"></div>
+      <div id="confirm-date" class="file-check-row"></div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <button type="button" class="btn-ghost-sm" onclick="goToStep1()">← Start Over</button>
+      <button type="button" class="btn-primary-lg" id="confirm-btn" onclick="submitImport()">
+        ✓ Confirm Import
+      </button>
+    </div>
+
+  </div>{# /step2 #}
+
+  {% endif %}{# /if result #}
+
+</div>{# /max-width wrapper #}
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  let detectedFiles = { in: null, bq: null, as: null };
+  let confirmRows   = [];
+
+  // ── Step indicator ─────────────────────────────────────────────────────
+  function setStep(n) {
+    [1,2,3].forEach(i => {
+      const c = document.getElementById('sc'+i);
+      if (!c) return;
+      const done   = i < n;
+      const active = i === n;
+      c.style.background = done ? '#16a34a' : active ? 'var(--company-primary,#004eb3)' : '#eef2f8';
+      c.style.color = (done || active) ? '#fff' : '#a0aec0';
+      c.textContent = done ? '✓' : i;
+      const lbl = document.getElementById('sl'+i);
+      if (lbl) {
+        lbl.style.color = active ? '#1a2940' : done ? '#16a34a' : '#a0aec0';
+        lbl.style.fontWeight = active ? '600' : '500';
+      }
+    });
+  }
+
+  // ── File handling ──────────────────────────────────────────────────────
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  }
+
+  function handleFiles(files) {
+    detectedFiles = { in: null, bq: null, as: null };
+    const arr = Array.from(files);
+
+    arr.forEach(f => {
+      const name = f.name.toLowerCase();
+      if (name.startsWith('in')) detectedFiles.in = f;
+      else if (name.startsWith('bq')) detectedFiles.bq = f;
+      else if (name.startsWith('as')) detectedFiles.as = f;
+    });
+
+    // Wire detected files into the hidden form inputs
+    const formIn = document.querySelector('#import-form [name="in_file"]');
+    const formBq = document.querySelector('#import-form [name="bq_file"]');
+    const formAs = document.querySelector('#import-form [name="as_file"]');
+
+    // Build synthetic FileList-like objects via DataTransfer
+    [['in', formIn], ['bq', formBq], ['as', formAs]].forEach(([key, input]) => {
+      if (detectedFiles[key] && input) {
+        const dt = new DataTransfer();
+        dt.items.add(detectedFiles[key]);
+        input.files = dt.files;
+      }
+    });
+
+    renderFileCheck();
+  }
+
+  function extractDate(filename) {
+    const m = filename.match(/(\d{6})/);
+    return m ? m[1] : null;
+  }
+
+  function renderFileCheck() {
+    document.getElementById('file-status').style.display = 'block';
+
+    const checks = [
+      { id: 'row-in',   file: detectedFiles.in,  label: 'Solicitation Index',   prefix: 'IN' },
+      { id: 'row-bq',   file: detectedFiles.bq,  label: 'Batch Quote Template', prefix: 'BQ' },
+      { id: 'row-as',   file: detectedFiles.as,  label: 'Approved Sources',      prefix: 'AS' },
+    ];
+
+    const dates = [];
+    confirmRows = [];
+
+    checks.forEach(({ id, file, label, prefix }) => {
+      const el = document.getElementById(id);
+      if (file) {
+        const d = extractDate(file.name);
+        if (d) dates.push(d);
+        const kb = (file.size / 1024).toFixed(0);
+        el.innerHTML = `<span class="fi">📄</span>
+          <span class="fname"><strong>${file.name}</strong> — ${label} <span class="text-muted">(${kb} KB)</span></span>
+          <span class="chk-ok">✓</span>`;
+        confirmRows.push({ id: 'confirm-' + prefix.toLowerCase(), name: file.name, label, ok: true });
+      } else {
+        el.innerHTML = `<span class="fi">📄</span>
+          <span class="fname text-muted">${prefix} file — not detected</span>
+          <span class="chk-fail">✗</span>`;
+        confirmRows.push({ id: 'confirm-' + prefix.toLowerCase(), name: prefix + ' file not found', label, ok: false });
+      }
+    });
+
+    // Date consistency
+    const dateEl = document.getElementById('row-date');
+    const uniqueDates = [...new Set(dates)];
+    const dateOk = uniqueDates.length === 1 && dates.length === 3;
+    let dateLabel, confirmDateLabel;
+    if (dateOk) {
+      const d = uniqueDates[0];
+      dateLabel = `Date match: <strong>${d}</strong> — all three files consistent`;
+      confirmDateLabel = `Import date: ${d}`;
+    } else if (dates.length === 0) {
+      dateLabel = 'Date — could not parse from filenames';
+      confirmDateLabel = 'Date: unknown';
+    } else {
+      dateLabel = `Date mismatch: ${dates.join(', ')} — files may be from different days`;
+      confirmDateLabel = 'Date: MISMATCH — verify files';
+    }
+    dateEl.innerHTML = `<span class="fi">📅</span>
+      <span class="fname">${dateLabel}</span>
+      <span class="${dateOk ? 'chk-ok' : 'chk-fail'}">${dateOk ? '✓' : '⚠'}</span>`;
+    confirmRows.push({ id: 'confirm-date', name: confirmDateLabel, label: '', ok: dateOk });
+
+    const allOk = detectedFiles.in && detectedFiles.bq && detectedFiles.as;
+    document.getElementById('step1-submit').style.display = allOk ? 'block' : 'none';
+  }
+
+  // ── Step navigation ────────────────────────────────────────────────────
+  function goToStep2() {
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = '';
+
+    // Populate confirm rows
+    confirmRows.forEach(r => {
+      const el = document.getElementById(r.id);
+      if (!el) return;
+      el.innerHTML = `<span class="fi">📄</span>
+        <span class="fname">${r.name}${r.label ? ' — ' + r.label : ''}</span>
+        <span class="${r.ok ? 'chk-ok' : 'chk-fail'}">${r.ok ? '✓' : '✗'}</span>`;
+    });
+
+    setStep(2);
+  }
+
+  function goToStep1() {
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step1').style.display = '';
+    setStep(1);
+  }
+
+  function submitImport() {
+    const btn = document.getElementById('confirm-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Importing…';
+    document.getElementById('import-form').submit();
+  }
+
+  // ── Init: if result already present, mark step 3 done ─────────────────
+  {% if result %}
+  setStep(3);
+  {% endif %}
+</script>
 
 {% endblock content %}

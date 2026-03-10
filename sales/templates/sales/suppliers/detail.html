@@ -1,0 +1,93 @@
+{% extends "sales/base.html" %}
+{% block content %}
+<style>
+  .mono { font-family: ui-monospace, monospace; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+  .tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #e5e7eb; margin-bottom: 1rem; }
+  .tabs a { padding: 0.5rem 1rem; font-size: 0.875rem; text-decoration: none; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tabs a.active { border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 0.5rem 0.75rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #f3f4f6; }
+</style>
+
+<div style="margin-bottom: 1rem;">
+  <a href="{% url 'sales:supplier_list' %}" style="font-size: 0.875rem; color: #6b7280;">← Suppliers</a>
+</div>
+<h1 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem;">{{ supplier.name|default:supplier.cage_code|default:"Supplier" }}</h1>
+<p style="font-size: 0.875rem; color: #6b7280; margin: 0;">CAGE: <span class="mono">{{ supplier.cage_code|default:"—" }}</span></p>
+
+<div class="tabs">
+  <a href="?tab=profile" class="{% if request.GET.tab != 'capabilities' and request.GET.tab != 'quotes' %}active{% endif %}">Profile</a>
+  <a href="?tab=capabilities" class="{% if request.GET.tab == 'capabilities' %}active{% endif %}">Capabilities</a>
+  <a href="?tab=quotes" class="{% if request.GET.tab == 'quotes' %}active{% endif %}">Quote History</a>
+</div>
+
+{% if request.GET.tab == 'capabilities' %}
+  <div style="margin-bottom: 1rem;">
+    <a href="{% url 'sales:supplier_add_nsn' supplier_id=supplier.id %}" class="btn btn-primary btn-sm">Add NSN Capability</a>
+    <a href="{% url 'sales:supplier_add_fsc' supplier_id=supplier.id %}" class="btn btn-ghost btn-sm">Add FSC Capability</a>
+  </div>
+  <h2 style="font-size: 1rem; margin: 0 0 0.5rem;">NSN</h2>
+  <table style="margin-bottom: 1.5rem;">
+    <thead><tr><th>NSN</th><th>Match Score</th><th>Source</th><th></th></tr></thead>
+    <tbody>
+      {% for n in nsn_capabilities %}
+      <tr>
+        <td class="mono">{{ n.nsn }}</td>
+        <td>{{ n.match_score }}</td>
+        <td>{{ n.source|default:"manual" }}</td>
+        <td>
+          <form method="post" action="{% url 'sales:supplier_remove_nsn' supplier_id=supplier.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="nsn_id" value="{{ n.id }}"><button type="submit" class="btn btn-ghost btn-sm">Remove</button></form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" style="color:#6b7280;">None. <a href="{% url 'sales:supplier_add_nsn' supplier_id=supplier.id %}">Add NSN</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h2 style="font-size: 1rem; margin: 0 0 0.5rem;">FSC</h2>
+  <table>
+    <thead><tr><th>FSC Code</th><th></th></tr></thead>
+    <tbody>
+      {% for f in fsc_capabilities %}
+      <tr>
+        <td class="mono">{{ f.fsc_code }}</td>
+        <td>
+          <form method="post" action="{% url 'sales:supplier_remove_fsc' supplier_id=supplier.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="fsc_id" value="{{ f.id }}"><button type="submit" class="btn btn-ghost btn-sm">Remove</button></form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="2" style="color:#6b7280;">None. <a href="{% url 'sales:supplier_add_fsc' supplier_id=supplier.id %}">Add FSC</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% elif request.GET.tab == 'quotes' %}
+  <table>
+    <thead><tr><th>Date</th><th>Sol#</th><th>NSN</th><th>Price</th><th>Lead Time</th></tr></thead>
+    <tbody>
+      {% for q in quote_history %}
+      <tr>
+        <td>{{ q.quote_date|date:"M j, Y" }}</td>
+        <td class="mono"><a href="{% url 'sales:solicitation_detail' sol_number=q.line.solicitation.solicitation_number %}">{{ q.line.solicitation.solicitation_number }}</a></td>
+        <td class="mono">{{ q.nsn|default:"—" }}</td>
+        <td>${{ q.unit_price }}</td>
+        <td>{{ q.lead_time_days }}d</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="color:#6b7280;">No quotes yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <div style="max-width: 32rem;">
+    <p><strong>Name</strong> {{ supplier.name|default:"—" }}</p>
+    <p><strong>CAGE</strong> <span class="mono">{{ supplier.cage_code|default:"—" }}</span></p>
+    <p><strong>Email</strong> {{ supplier.primary_email|default:supplier.business_email|default:"—" }}</p>
+    <p><strong>Phone</strong> {{ supplier.primary_phone|default:supplier.business_phone|default:"—" }}</p>
+  </div>
+{% endif %}
+{% endblock content %}

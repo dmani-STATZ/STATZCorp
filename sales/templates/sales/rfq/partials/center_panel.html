@@ -1,0 +1,63 @@
+<div class="rfq-detail-inner" data-default-lead-days="{{ line.delivery_days|default:'' }}">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem;">
+    <div>
+      <h2 style="font-size:1.125rem; font-weight:600; margin:0 0 0.25rem;">{{ rfq.supplier.name|default:rfq.supplier.cage_code|default:"Supplier" }}</h2>
+      <p style="font-size:0.8125rem; color:#6b7280; margin:0;">CAGE: <span class="mono">{{ rfq.supplier.cage_code|default:"—" }}</span> {% if rfq.email_sent_to %} · Sent to: {{ rfq.email_sent_to }}{% endif %}</p>
+    </div>
+    <a href="{% url 'sales:solicitation_detail' sol_number=solicitation.solicitation_number %}" class="mono" style="font-size:0.875rem; color:var(--company-primary,#004eb3);">{{ solicitation.solicitation_number }}</a>
+  </div>
+
+  <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; margin-bottom:1rem;">
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:0.75rem; font-size:0.875rem;">
+      <div><span style="color:#6b7280;">NSN</span><br><span class="mono">{{ line.nsn|default:"—" }}</span></div>
+      <div><span style="color:#6b7280;">Nomenclature</span><br>{{ line.nomenclature|default:"—"|truncatewords:8 }}</div>
+      <div><span style="color:#6b7280;">Qty</span><br>{{ line.quantity|default:"—" }}</div>
+      <div><span style="color:#6b7280;">Return by</span><br>{{ solicitation.return_by_date|date:"M j, Y"|default:"—" }}</div>
+      <div><span style="color:#6b7280;">Days left</span><br>{% if solicitation.return_by_date %}{% if solicitation.days_remaining != None %}{{ solicitation.days_remaining }}{% else %}—{% endif %}{% else %}—{% endif %}</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:1rem;">
+    <h3 style="font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; margin:0 0 0.5rem;">Contact log</h3>
+    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+      {% for log in contact_log %}
+      <div style="padding:0.5rem 0.75rem; border-bottom:1px solid #f3f4f6; font-size:0.8125rem;">
+        <span style="color:#6b7280;">{{ log.logged_at|date:"M j, g:i A" }}</span>
+        {% if log.method == 'EMAIL_OUT' %}📤{% elif log.method == 'EMAIL_IN' %}📥{% elif log.method == 'FOLLOWUP' %}🔄{% elif log.method == 'PHONE' %}📞{% else %}📝{% endif %}
+        {{ log.get_method_display }} · {{ log.summary|truncatewords:12 }}
+        {% if log.logged_by %}<span style="color:#9ca3af;">· {{ log.logged_by.get_full_name|default:log.logged_by.username }}</span>{% endif %}
+      </div>
+      {% empty %}
+      <p style="padding:0.75rem; margin:0; color:#9ca3af; font-size:0.875rem;">No activity yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+    {% if rfq.status == 'SENT' %}
+    <button type="button" class="btn btn-primary btn-sm" data-action="enter-quote" data-rfq-id="{{ rfq.id }}">Enter Quote</button>
+    <form method="post" action="{% url 'sales:rfq_send_followup' rfq_id=rfq.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Send Follow-Up</button></form>
+    <form method="post" action="{% url 'sales:rfq_mark_no_response' rfq_id=rfq.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Mark No Response</button></form>
+    <form method="post" action="{% url 'sales:rfq_mark_declined' rfq_id=rfq.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Mark Declined</button></form>
+    {% elif rfq.status == 'RESPONDED' %}
+    {% if quotes %}
+    <a href="{% url 'sales:rfq_enter_quote' rfq_id=rfq.id %}" class="btn btn-primary btn-sm">View / Edit Quote</a>
+    {% else %}
+    <button type="button" class="btn btn-primary btn-sm" data-action="enter-quote" data-rfq-id="{{ rfq.id }}">Enter Quote</button>
+    {% endif %}
+    {% else %}
+    <span style="font-size:0.8125rem; color:#9ca3af;">{{ rfq.get_status_display }}</span>
+    {% endif %}
+  </div>
+
+  {% if quotes %}
+  <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid #e5e7eb;">
+    <h3 style="font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; margin:0 0 0.5rem;">Quotes</h3>
+    <ul style="list-style:none; padding:0; margin:0; font-size:0.875rem;">
+      {% for q in quotes %}
+      <li style="padding:0.35rem 0;">${{ q.unit_price }} / {{ q.lead_time_days }}d {% if q.part_number_offered %}({{ q.part_number_offered }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>

@@ -11,13 +11,37 @@
     </span>
 </div>
 
+{# ── Bucket tab strip ────────────────────────────────────────────────────── #}
+<div style="display:flex; gap:0; border-bottom:2px solid #eef2f8; margin-bottom:20px;">
+    <a href="{% url 'sales:solicitation_list' %}"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if not bucket_filter %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+        All Active
+    </a>
+    <a href="?bucket=SDVOSB"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'SDVOSB' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
+        SDVOSB <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.SDVOSB|default:0 }}</span>
+    </a>
+    <a href="?bucket=HUBZONE"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'HUBZONE' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
+        HUBZone <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.HUBZONE|default:0 }}</span>
+    </a>
+    <a href="?bucket=GROWTH"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'GROWTH' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
+        Growth <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.GROWTH|default:0 }}</span>
+    </a>
+    <a href="?bucket=SKIP"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'SKIP' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
+        Skip <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.SKIP|default:0 }}</span>
+    </a>
+</div>
+
 {# ── Filter bar ─────────────────────────────────────────────────────────── #}
 <form method="get" action="{% url 'sales:solicitation_list' %}"
       style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
              background:var(--surface-secondary, #f9fafb);
              border:1px solid var(--border-color, #e5e7eb);
              border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
-
+    {% if bucket_filter %}<input type="hidden" name="bucket" value="{{ bucket_filter }}">{% endif %}
     <div style="display:flex; flex-direction:column; gap:0.25rem;">
         <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Set-Aside</label>
         <select name="set_aside"
@@ -90,6 +114,7 @@
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Nomenclature</th>
                 <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Qty</th>
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Set-Aside</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Bucket</th>
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Return By</th>
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Status</th>
                 <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Matches</th>
@@ -112,12 +137,11 @@
                               style="display:inline-block; width:6px; height:6px; border-radius:50%;
                                      background:var(--company-primary,#004eb3); flex-shrink:0;"></span>
                         {% endif %}
-                        <a href="#" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
+                        <a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
                             {{ sol.solicitation_number }}
                         </a>
                     </div>
                 </td>
-
                 <td style="padding:0.625rem 1rem; font-family:monospace; font-size:0.8125rem; color:var(--text-muted,#6b7280); white-space:nowrap;">
                     {{ sol.first_line.nsn|default:"—" }}
                 </td>
@@ -150,6 +174,10 @@
                     {% endif %}
                 </td>
 
+                <td style="padding:0.625rem 1rem;">
+                    <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#eef2f8; color:#374151;">{{ sol.get_bucket_display|default:sol.bucket }}</span>
+                </td>
+
                 <td style="padding:0.625rem 1rem; white-space:nowrap; font-size:0.8125rem;
                            {% if sol.is_overdue %}color:#dc2626;{% endif %}">
                     {{ sol.return_by_date|date:"M j, Y"|default:"—" }}
@@ -158,13 +186,13 @@
                 <td style="padding:0.625rem 1rem;">
                     <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500;
                         {% if sol.status == 'New' %}background:#f0fdf4; color:#166534;
-                        {% elif sol.status == 'RFQ Sent' %}background:#eff6ff; color:#1d4ed8;
-                        {% elif sol.status == 'Bid Submitted' %}background:#fefce8; color:#854d0e;
-                        {% elif sol.status == 'Won' %}background:#f0fdf4; color:#166534;
-                        {% elif sol.status == 'Lost' or sol.status == 'No Bid' %}background:#fef2f2; color:#991b1b;
+                        {% elif sol.status == 'RFQ_SENT' %}background:#eff6ff; color:#1d4ed8;
+                        {% elif sol.status == 'BID_SUBMITTED' %}background:#fefce8; color:#854d0e;
+                        {% elif sol.status == 'WON' %}background:#f0fdf4; color:#166534;
+                        {% elif sol.status == 'LOST' or sol.status == 'NO_BID' %}background:#fef2f2; color:#991b1b;
                         {% else %}background:var(--surface-secondary,#f3f4f6); color:var(--text-muted,#374151);
                         {% endif %}">
-                        {{ sol.status }}
+                        {{ sol.get_status_display|default:sol.status }}
                     </span>
                 </td>
 
@@ -182,7 +210,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
+                <td colspan="9" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
                     No solicitations found.
                     {% if current_filters.set_aside or current_filters.status or current_filters.q %}
                     <br><a href="{% url 'sales:solicitation_list' %}" style="color:var(--company-primary,#004eb3); text-decoration:none; font-size:0.875rem;">Clear filters</a>
@@ -196,7 +224,6 @@
 
 {# ── Pagination ─────────────────────────────────────────────────────────── #}
 {% if page_obj.has_other_pages %}
-{% with cf=current_filters %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.25rem;">
     <span style="font-size:0.8125rem; color:var(--text-muted,#6b7280);">
         Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
@@ -204,14 +231,14 @@
     </span>
     <div style="display:flex; gap:0.5rem;">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if cf.q %}&q={{ cf.q }}{% endif %}{% if cf.set_aside %}&set_aside={{ cf.set_aside }}{% endif %}{% if cf.status %}&status={{ cf.status }}{% endif %}{% if cf.item_type %}&item_type={{ cf.item_type }}{% endif %}"
+        <a href="?{{ filter_querystring }}&page={{ page_obj.previous_page_number }}"
            style="padding:0.375rem 0.875rem; border:1px solid var(--border-color,#d1d5db); border-radius:6px;
                   text-decoration:none; font-size:0.875rem; color:var(--text,#374151);">
             ← Previous
         </a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if cf.q %}&q={{ cf.q }}{% endif %}{% if cf.set_aside %}&set_aside={{ cf.set_aside }}{% endif %}{% if cf.status %}&status={{ cf.status }}{% endif %}{% if cf.item_type %}&item_type={{ cf.item_type }}{% endif %}"
+        <a href="?{{ filter_querystring }}&page={{ page_obj.next_page_number }}"
            style="padding:0.375rem 0.875rem; border:1px solid var(--border-color,#d1d5db); border-radius:6px;
                   text-decoration:none; font-size:0.875rem; color:var(--text,#374151);">
             Next →
@@ -219,7 +246,6 @@
         {% endif %}
     </div>
 </div>
-{% endwith %}
 {% endif %}
 
 {% endblock content %}

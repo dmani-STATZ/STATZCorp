@@ -1,16 +1,98 @@
-{% extends "base_template.html" %}
+{% extends "sales/base.html" %}
 {% load static %}
+{% block content %}
 
-{% block title %}{{ page_title|default:"Sales Dashboard" }}{% endblock %}
-
-{% block body %}
-<div class="container mx-auto px-4 py-6">
-    <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
-        {{ page_title|default:"Sales Dashboard" }}
-    </h1>
-    <p class="text-gray-600 dark:text-gray-400">
-        DIBBS Government Bidding — today's pipeline at a glance. This area will be populated in the next phase
-        (solicitations, imports, matching, RFQ, quoting, bids).
-    </p>
+{# Topbar: breadcrumb + last import #}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.75rem;">
+  <div style="display:flex; align-items:center; gap:0.5rem;">
+    <a href="{% url 'sales:dashboard' %}" style="font-size:0.875rem; font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none;">Dashboard</a>
+  </div>
+  {% if latest_batch %}
+  <span style="font-size:0.75rem; padding:0.25rem 0.625rem; border-radius:6px; background:#eef2f8; color:#5a7090;">Last import: {{ latest_batch.import_date|date:"M j, Y" }}</span>
+  {% endif %}
 </div>
-{% endblock body %}
+
+{# Urgent alert #}
+{% if urgent_count > 0 %}
+<div style="background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:1rem 1.25rem; border-radius:8px; margin-bottom:1.5rem; font-size:0.9375rem; font-weight:500;">
+  {{ urgent_count }} solicitation{{ urgent_count|pluralize }} expire within 3 days
+</div>
+{% endif %}
+
+{# Stat row — 5 cards #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+  <div style="background:linear-gradient(135deg, var(--company-primary,#004eb3) 0%, #003d8f 100%); color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">Total Active</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ total_active }}</div>
+  </div>
+  <div style="background:#0a1628; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">SDVOSB Priority</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.SDVOSB|default:0 }}</div>
+  </div>
+  <div style="background:{% if urgent_count > 0 %}#dc2626{% else %}#0a1628{% endif %}; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">Urgent (≤3d)</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ urgent_count }}</div>
+  </div>
+  <div style="background:#0a1628; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">New Today</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_status.New|default:0 }}</div>
+  </div>
+  <div style="background:#b45309; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">RFQ Pending</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_status.RFQ_PENDING|default:0 }}</div>
+  </div>
+</div>
+
+{# Bucket breakdown row — 4 mini-cards with links #}
+<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; margin-bottom:1.5rem;">
+  <a href="{% url 'sales:solicitation_list' %}?bucket=SDVOSB" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">SDVOSB</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.SDVOSB|default:0 }}</div>
+  </a>
+  <a href="{% url 'sales:solicitation_list' %}?bucket=HUBZONE" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">HUBZone</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.HUBZONE|default:0 }}</div>
+  </a>
+  <a href="{% url 'sales:solicitation_list' %}?bucket=GROWTH" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Growth</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.GROWTH|default:0 }}</div>
+  </a>
+  <a href="{% url 'sales:solicitation_list' %}?bucket=SKIP" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Skip</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.SKIP|default:0 }}</div>
+  </a>
+</div>
+
+{# Recent solicitations table #}
+<div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden;">
+  <div style="padding:1rem 1.25rem; background:#f9fafb; border-bottom:1px solid #e5e7eb; font-size:0.9375rem; font-weight:600;">Recent solicitations</div>
+  <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+    <thead>
+      <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Sol #</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">NSN</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Nomenclature</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Return By</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Bucket</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Status</th>
+        <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Open</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sol in recent_solicitations %}
+      <tr style="border-bottom:1px solid #eef2f8;">
+        <td style="padding:0.625rem 1rem;"><a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:ui-monospace, monospace;">{{ sol.solicitation_number }}</a></td>
+        <td style="padding:0.625rem 1rem; font-family:ui-monospace, monospace;">{{ sol.first_line.nsn|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem; max-width:14rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ sol.first_line.nomenclature|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem;">{{ sol.return_by_date|date:"M j, Y"|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem;"><span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#eef2f8; color:#374151;">{{ sol.get_bucket_display|default:sol.bucket }}</span></td>
+        <td style="padding:0.625rem 1rem;"><span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#f3f4f6; color:#374151;">{{ sol.status }}</span></td>
+        <td style="padding:0.625rem 1rem;"><a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">Open</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" style="padding:2rem; text-align:center; color:#9ca3af;">No recent solicitations.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock content %}

@@ -1,0 +1,117 @@
+{% extends "sales/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  .form-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .form-label { font-size: 0.7rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 0.25rem; }
+  .mono { font-family: ui-monospace, monospace; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+  input[type="text"], input[type="number"], textarea { width: 100%; max-width: 20rem; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9375rem; }
+  .suggested-bid { font-size: 1.125rem; font-weight: 700; color: var(--company-primary, #004eb3); }
+  .optional-toggle { cursor: pointer; font-size: 0.8125rem; color: #6b7280; margin-top: 0.5rem; }
+  .optional-section { margin-top: 1rem; }
+  .errorlist { list-style: none; padding: 0; margin: 0.25rem 0 0; font-size: 0.8125rem; color: #b91c1c; }
+</style>
+
+<div style="max-width: 36rem;">
+  <div style="margin-bottom: 1.25rem;">
+    <a href="{% url 'sales:rfq_sent' %}" class="btn btn-ghost btn-sm">← Sent RFQs</a>
+  </div>
+
+  <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0 0 1rem;">Enter Quote</h1>
+
+  {# Read-only context #}
+  <div class="form-card">
+    <div class="form-label">Context</div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1.5rem; font-size: 0.875rem;">
+      <div><span style="color: #6b7280;">Supplier</span><br><strong>{{ rfq.supplier.name|default:rfq.supplier.cage_code|default:"—" }}</strong> <span class="mono" style="color: #5a7090;">{{ rfq.supplier.cage_code|default:"" }}</span></div>
+      <div><span style="color: #6b7280;">NSN</span><br><span class="mono">{{ line.nsn|default:"—" }}</span></div>
+      <div><span style="color: #6b7280;">Nomenclature</span><br>{{ line.nomenclature|default:"—" }}</div>
+      <div><span style="color: #6b7280;">Solicitation #</span><br><a href="{% url 'sales:solicitation_detail' sol_number=solicitation.solicitation_number %}" class="mono" style="color: var(--company-primary,#004eb3);">{{ solicitation.solicitation_number }}</a></div>
+      <div><span style="color: #6b7280;">Return By</span><br>{{ solicitation.return_by_date|date:"N j, Y"|default:"—" }}</div>
+    </div>
+  </div>
+
+  <form method="post" id="quote-form" action="">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.GET.next|default:'' }}">
+
+    <div class="form-card">
+      <label class="form-label" for="id_unit_price">Unit Price ($) *</label>
+      <input type="number" step="0.00001" min="0" name="unit_price" id="id_unit_price" required
+             value="{{ request.POST.unit_price|default:'' }}"
+             placeholder="0.00000" style="font-size: 1.125rem; font-weight: 600;">
+      {% if form.errors.unit_price %}<ul class="errorlist"><li>{{ form.errors.unit_price }}</li></ul>{% endif %}
+
+      <label class="form-label" for="id_lead_time_days" style="margin-top: 1rem;">Lead Time (days ARO) *</label>
+      <input type="number" min="0" name="lead_time_days" id="id_lead_time_days" required
+             value="{{ request.POST.lead_time_days|default:line.delivery_days|default:'' }}"
+             placeholder="0">
+      {% if form.errors.lead_time_days %}<ul class="errorlist"><li>{{ form.errors.lead_time_days }}</li></ul>{% endif %}
+
+      <div style="margin-top: 1rem;">
+        <span class="form-label">Suggested Bid Price</span>
+        <div class="suggested-bid" id="suggested-bid">$0.00000</div>
+        <span style="font-size: 0.75rem; color: #6b7280;">Unit price × (1 + {{ default_markup_pct }}% markup)</span>
+      </div>
+    </div>
+
+    <div class="form-card optional-section" id="optional-section" style="display: none;">
+      <div class="form-label">Optional</div>
+      <label class="form-label" for="id_part_number_offered">Part Number Offered</label>
+      <input type="text" name="part_number_offered" id="id_part_number_offered" maxlength="100" value="{{ request.POST.part_number_offered|default:'' }}" style="margin-bottom: 0.75rem;">
+      <label class="form-label" for="id_quantity_available">Quantity Available</label>
+      <input type="number" min="0" name="quantity_available" id="id_quantity_available" value="{{ request.POST.quantity_available|default:'' }}" style="margin-bottom: 0.75rem;">
+      <label class="form-label" for="id_notes">Notes</label>
+      <textarea name="notes" id="id_notes" rows="3" placeholder="Optional notes">{{ request.POST.notes|default:'' }}</textarea>
+    </div>
+    <div class="optional-toggle" id="toggle-optional">+ Part Number, Qty Available, Notes</div>
+
+    <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; align-items: center;">
+      <button type="submit" class="btn btn-primary">Save Quote</button>
+      <a href="{% url 'sales:rfq_sent' %}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+
+  <p style="font-size: 0.75rem; color: #6b7280; margin-top: 1rem;">Tip: Ctrl+Enter (Cmd+Enter on Mac) submits the form.</p>
+</div>
+
+<script>
+(function() {
+  var markupPct = {{ default_markup_pct }};
+  var unitInput = document.getElementById('id_unit_price');
+  var suggestedEl = document.getElementById('suggested-bid');
+  function updateSuggested() {
+    var v = parseFloat(unitInput.value);
+    if (isNaN(v) || v < 0) { suggestedEl.textContent = '$0.00000'; return; }
+    var suggested = v * (1 + markupPct / 100);
+    suggestedEl.textContent = '$' + suggested.toFixed(5);
+  }
+  unitInput.addEventListener('input', updateSuggested);
+  unitInput.addEventListener('change', updateSuggested);
+  updateSuggested();
+
+  document.getElementById('toggle-optional').addEventListener('click', function() {
+    var section = document.getElementById('optional-section');
+    var toggle = this;
+    if (section.style.display === 'none') {
+      section.style.display = 'block';
+      toggle.textContent = '− Hide optional fields';
+    } else {
+      section.style.display = 'none';
+      toggle.textContent = '+ Part Number, Qty Available, Notes';
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('quote-form').submit();
+    }
+  });
+})();
+</script>
+{% endblock content %}

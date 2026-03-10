@@ -62,6 +62,15 @@
     - 11.3 RFQ Center Search — In-Queue Lookup
     - 11.4 PDF Files — Decision
     - 11.5 Summary of Decisions
+12. [Sales Team Feedback — Demo Review](#12-sales-team-feedback--demo-review-mar-2026)
+    - 12.1 Overall Reaction
+    - 12.2 The Three-Bucket Triage Model (SDVOSB / HUBZone / Growth / Skip)
+    - 12.3 Supplier Capability Data — Contracts Database
+    - 12.3.1 Contract History Weighting
+    - 12.4 Multiple CAGE Support
+    - 12.5 RFQ Auto-Build Confirmation
+    - 12.6 Dark Mode
+    - 12.7 Timeline
 
 ---
 
@@ -69,38 +78,49 @@
 
 Progress tracker for the DIBBS build. Each item links to the spec section with the detailed requirements.
 
-### Phase 1 — Critical Path *(target: Weeks 1–2)*
+### Phase 1 — Critical Path *(target: Weeks 1–2)* ✅ COMPLETE
 
-| Status | Task | Spec Section |
-|--------|------|-------------|
-| ✅ Done | Django `sales` app created, added to `INSTALLED_APPS` | §6.0 |
-| ✅ Done | All `dibbs_*` database models defined and migrated | §3, §6.1 |
-| ⬜ Todo | IN / BQ / AS file parser (`services/parser.py`) | §2, §5 |
-| ⬜ Todo | Daily import view + file upload UI (`views/imports.py`) | §9.9 |
-| ⬜ Todo | Solicitation browse & search UI (`views/solicitations.py`) | §9.6 |
-| ⬜ Todo | Solicitation detail page — Overview tab (`views/solicitations.py`) | §9.7 |
-| ⬜ Todo | Global search endpoint + topbar search UI | §11.2 |
-| ⬜ Todo | Manual BQ field entry form (`views/bids.py`) | §9.8 |
-| ⬜ Todo | BQ export scaffold — all 121 columns (`services/bq_export.py`) | §5, §5.0.1 |
-| ⬜ Todo | Basic bid status tracking (status field updates through pipeline) | §3.1 |
-| ⬜ Todo | Dashboard (`views/dashboard.py`) | §9.5 |
-| ⬜ Todo | `sales/urls.py` wired into project `urls.py` | §6.1 |
+| Status | Task | Spec Section | Session |
+|--------|------|-------------|---------|
+| ✅ Done | Django `sales` app created, added to `INSTALLED_APPS` | §6.0 | S0 |
+| ✅ Done | All `dibbs_*` database models defined and migrated | §3, §6.1 | S0 |
+| ✅ Done | IN / BQ / AS file parser (`services/parser.py`) | §2, §5 | S1 |
+| ✅ Done | Daily import view + file upload UI — 3-step wizard (`views/imports.py`) | §9.9 | S1 |
+| ✅ Done | Solicitation browse & search UI with bucket tab strip (`views/solicitations.py`) | §9.6 | S1, S3 |
+| ✅ Done | Solicitation detail page — Overview + Matches tabs, pipeline track | §9.7 | S3 |
+| ✅ Done | Global search endpoint + topbar search UI with typeahead | §11.2 | S3 |
+| ✅ Done | Basic bid status tracking (status field + pipeline steps UI) | §3.1 | S3 |
+| ✅ Done | Dashboard — live counts, bucket breakdown, urgent alert | §9.5 | S3 |
+| ✅ Done | `sales/urls.py` wired into project `urls.py` | §6.1 | S1 |
+| ✅ Done | Solicitation triage buckets — `bucket` field + `assign_triage_bucket()` auto-assign on import | §12.2 | S1, S3 |
+| ✅ Done | Triage UI — bucket filter tab strip on solicitation list (SDVOSB / HUBZone / Growth / Skip) | §12.2 | S3 |
+| ✅ Done | No-bid action — POST endpoint, status update, redirect | §9.7 | S3 |
+| ⏩ Deferred | Manual BQ field entry form (`views/bids.py`) | §9.8 | Phase 2 |
+| ⏩ Deferred | BQ export scaffold — all 121 columns (`services/bq_export.py`) | §5, §5.0.1 | Phase 2 |
 
-### Phase 2 — Core Automation *(target: Weeks 3–4)*
+### Phase 2 — Core Automation *(target: Weeks 3–4)* 🔄 IN PROGRESS
 
-| Status | Task | Spec Section |
-|--------|------|-------------|
-| ⬜ Todo | 3-tier supplier matching engine (`services/matching.py`) | §4 |
-| ⬜ Todo | Match review UI on solicitation detail — Matches tab | §9.7 |
-| ⬜ Todo | RFQ email generation (`services/email.py`) — outbound template | §10.2, §10.7 |
-| ⬜ Todo | RFQ dispatch — send from Pending Send queue (`views/rfq.py`) | §10.5, §10.8 |
-| ⬜ Todo | RFQ Center — Sent & Tracking three-panel UI | §10.8 |
-| ⬜ Todo | Supplier quote entry form — inline right panel | §10.4 |
-| ⬜ Todo | Contact log — note entry, activity feed per RFQ | §10.6, §10.9 |
-| ⬜ Todo | Follow-up email dispatch (`services/email.py`) | §10.5, §10.7 |
-| ⬜ Todo | Price history per NSN | §7 Phase 2 |
-| ⬜ Todo | Bid assembly with margin calculation (`views/bids.py`) | §9.8 |
-| ⬜ Todo | Supplier capability management — NSN/FSC (`views/suppliers.py`) | §6.1 |
+| Status | Task | Spec Section | Session |
+|--------|------|-------------|---------|
+| ✅ Done | 3-tier supplier matching engine (`services/matching.py`) | §4, §12.3 | S2 |
+| ✅ Done | Contract history backfill — `backfill_nsn_from_contracts()` one-time seed of `dibbs_supplier_nsn` | §4.2, §12.3 | S2 |
+| ✅ Done | Backfill trigger — view + URL + template (`suppliers/backfill-nsn/`) | §4.2 | S2 |
+| ✅ Done | Match review UI on solicitation detail — Matches tab with tier badges | §9.7 | S3 |
+| ⬜ Todo | HUBZone flag UI — manually mark solicitations as HUBZone requested | §12.2 | S5 |
+| ✅ Done | RFQ email generation (`services/email.py`) — outbound + follow-up templates | §10.2, §10.7 | S4 |
+| ✅ Done | RFQ dispatch — Pending queue + send batch/single (`views/rfq.py`) | §10.5, §10.8 | S4 |
+| ✅ Done | RFQ Sent list — Overdue / Urgent / Awaiting / Responded / Closed sections | §10.8 | S4 |
+| ✅ Done | Supplier quote entry form — Unit Price + Lead Time, live suggested bid, Ctrl+Enter | §10.4 | S4 |
+| ✅ Done | Contact log — `SupplierContactLog` model + activity feed on solicitation detail | §10.6, §10.9 | S4 |
+| ✅ Done | Follow-up email dispatch — `send_followup_email()`, follow_up_count tracking | §10.5, §10.7 | S4 |
+| ✅ Done | `CompanyCAGE` model — `smtp_reply_to`, `default_markup_pct`, `is_default` | §8.1 | S4 |
+| ✅ Done | `Solicitation.dibbs_pdf_url` property — constructs DIBBS PDF link from `pdf_file_name` | §11.4 | S4 |
+| ✅ Done | `quote_select_for_bid` view — sets `is_selected_for_bid=True`; does not auto-clear other quotes | §9.7 | S4 |
+| ✅ Done | Solicitation detail — Matches tab Send RFQ wired; RFQs, Quotes, Activity tabs populated | §9.7 | S4 |
+| ⬜ Todo | Price history per NSN | §7 Phase 2 | S5 |
+| ⬜ Todo | Bid assembly with margin calculation (`views/bids.py`) | §9.8 | S5 |
+| ⬜ Todo | BQ export scaffold — all 121 columns (`services/bq_export.py`) | §5, §5.0.1 | S5 |
+| ⬜ Todo | Supplier capability management — NSN/FSC add views (`views/suppliers.py`) | §6.1 | S5 |
 
 ### Phase 3 — Polish & Reporting *(target: Weeks 5–6)*
 
@@ -111,12 +131,27 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | ⬜ Todo | Price history trending | §7 Phase 3 |
 | ⬜ Todo | Bulk actions — no-bid batches, mass RFQ send | §7 Phase 3 |
 | ⬜ Todo | Role-based access control | §7 Phase 3 |
+| ⬜ Todo | Dark mode | §12.6 |
+
+### ⚠ Open Action Items
+
+| Priority | Item | Owner | Section | Status |
+|----------|------|-------|---------|--------|
+| ✅ Resolved | `is_packhouse=True` on `contracts_supplier` identifies packaging facilities | Dev | §12.3 | Confirmed, implemented in `backfill_nsn_from_contracts()` |
+| ✅ Resolved | `award_date` is the field name on the Contract model | Dev | §12.3.1 | Confirmed, implemented in matching engine |
+| 🟡 Med | Establish process for HUBZone partner to send solicitation lists | Sales | §12.2 | Pending |
+| ✅ Resolved | Phase 1 complete before end of March 2026 | — | §12.7 | ✅ Complete |
+| 🟡 Med | Email settings not configured in `STATZWeb/settings.py` — configure `EMAIL_*` + `DEFAULT_FROM_EMAIL` + default `CompanyCAGE` with `smtp_reply_to` before RFQ emails will send | Dev | §10.2 | Pending |
+| 🟡 Med | `quote_select_for_bid` does not clear `is_selected_for_bid` on other quotes for the same line — Bid Builder (S5) must handle "find best/selected quote" defensively (cheapest if none flagged, or add clear-others logic on select) | Dev | §9.7 | Known gap, fix in S5 |
 
 ### Cursor Session Log
 
-| Date | Session | Cost | Tokens | Output |
-|------|---------|------|--------|--------|
-| Mar 2026 | Models + initial migration | $0.35 | ~1M | All `dibbs_*` models, migration file |
+| Date | Session | Output |
+|------|---------|--------|
+| Mar 2026 | S0 — Models + initial migration | All `dibbs_*` models, migration file |
+| Mar 2026 | S1 — Import pipeline + solicitation list | `parser.py`, `importer.py`, `views/imports.py`, `views/solicitations.py` (list), `urls.py`, `base.html`, `upload.html`, `list.html` |
+| Mar 2026 | S2 — Matching engine + backfill | `services/matching.py` (3-tier engine + `backfill_nsn_from_contracts()`), backfill view/URL/template, matching wired into import |
+| Mar 2026 | S4 — RFQ dispatch, quote entry, email service | `services/email.py` (send_rfq_email, send_followup_email), `models/cages.py` (CompanyCAGE + smtp_reply_to), `models/rfq.py` (SupplierRFQ extra fields, SupplierContactLog), `views/rfq.py` (9 views), `solicitations.py` detail updated (rfqs/quotes/contact_log/activity tabs), `base.html` RFQ Center nav, `rfq/pending.html`, `rfq/sent.html`, `rfq/quote_entry.html`, `urls.py` updated |
 
 ---
 
@@ -477,15 +512,109 @@ class GovernmentBid(models.Model):
 
 When a daily import completes, the matching engine runs automatically and attempts to link each solicitation line to one or more capable suppliers. Three matching tiers are applied in priority order.
 
+**Key asset: 20+ years of contract history.** STATZ has 10,000+ contracts in the existing database. The `contracts_clin` table links NSNs directly to suppliers through won contracts. This history is synced into `dibbs_supplier_nsn` via a dedicated sync job (see §4.2), so the matching engine runs entirely within the `sales` app and never queries `contracts` directly at match time.
+
+**Architecture principle:** `contracts` and `sales` are kept separate. The contracts database is the *source* that populates DIBBS tables; it is not a live dependency during matching. All matching reads only from `dibbs_*` tables.
+
 ### 4.1 Matching Tiers
 
 | Priority | Method | Source Table | Logic |
 |----------|--------|-------------|-------|
-| 1 — Direct NSN | Exact NSN match | dibbs_supplier_nsn | `SupplierNSN.objects.filter(nsn=line.nsn, supplier__archived=False)` |
-| 2 — Approved Source | AS file CAGE cross-ref | dibbs_approved_source + contracts_supplier | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
-| 3 — FSC Category | 4-digit FSC match | dibbs_supplier_fsc | `SupplierFSC.objects.filter(fsc_code=line.fsc, supplier__archived=False)` |
+| 1 — Direct NSN | Exact NSN match | `dibbs_supplier_nsn` | Query by NSN, order by `match_score` desc — score is pre-calculated from contract history at sync time |
+| 2 — Approved Source | AS file CAGE cross-ref | `dibbs_approved_source` + `contracts_supplier` | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
+| 3 — FSC Category | 4-digit FSC match | `dibbs_supplier_fsc` | `SupplierFSC.objects.filter(fsc_code=line.fsc, supplier__archived=False)` |
 
-A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found. Tier 1 matches are flagged as preferred. Suppliers with `probation=True` or `conditional=True` are included but visually flagged so staff can review before RFQs are sent. Suppliers with `archived=True` are excluded entirely.
+A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found. Tier 1 matches carry a `match_score` pre-calculated during the sync job. Suppliers with `probation=True` or `conditional=True` are included but visually flagged. Suppliers with `archived=True` are excluded entirely.
+
+**`match_score` field:** Add to `dibbs_supplier_match`:
+```python
+match_score = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+# Tier 1: recency-weighted contract win score, pre-calculated at sync time (see §4.2, §12.3.1)
+# Tier 2: 1.0 fixed (approved source is a strong signal)
+# Tier 3: 0.5 fixed (FSC is a weak/broad signal)
+```
+
+### 4.2 Contract History Backfill
+
+The `dibbs_supplier_nsn` table is seeded **once** from `contracts_clin` via a one-time backfill job. This is the only point where `sales` ever reads from `contracts` data. After the backfill, `dibbs_supplier_nsn` grows organically — new supplier-NSN relationships are written directly by the sales app when quotes are won, with no further dependency on the contracts database.
+
+```
+DAY 1 — ONE TIME:
+contracts_clin ──[backfill]──→ dibbs_supplier_nsn  (seeded with 20 years of history)
+
+ONGOING:
+New won quote ──[sales app]──→ dibbs_supplier_nsn  (grows from new DIBBS activity)
+```
+
+**Backfill logic (`services/matching.py` → `backfill_nsn_from_contracts()`):**
+
+```python
+def sync_nsn_from_contracts():
+    """
+    Read contracts_clin, calculate recency-weighted scores per NSN+supplier,
+    upsert into dibbs_supplier_nsn. Excludes packaging facilities.
+    Run nightly or on-demand from Settings.
+    """
+    from contracts.models import CLIN  # only import at sync time
+    from datetime import date
+
+    today = date.today()
+
+    # Group CLINs by (nsn, supplier), excluding packaging facilities
+    # ⚠ Confirm packaging facility filter field with dev (see §12.3)
+    clins = (
+        CLIN.objects
+        .exclude(supplier__is_packhouse=True)
+        .select_related('supplier', 'contract')
+        .values('nsn', 'supplier_id', 'contract__award_date')
+    )
+
+    # Build score map: {(nsn, supplier_id): weighted_score}
+    score_map = {}
+    for clin in clins:
+        key = (clin['nsn'], clin['supplier_id'])
+        age_years = (today - clin['contract__award_date']).days / 365
+        if age_years <= 2:
+            weight = 1.0
+        elif age_years <= 5:
+            weight = 0.6
+        elif age_years <= 10:
+            weight = 0.3
+        else:
+            weight = 0.1
+        score_map[key] = round(score_map.get(key, 0) + weight, 2)
+
+    # Upsert into dibbs_supplier_nsn
+    for (nsn, supplier_id), score in score_map.items():
+        SupplierNSN.objects.update_or_create(
+            nsn=nsn,
+            supplier_id=supplier_id,
+            defaults={
+                'match_score': score,
+                'source': 'contract_history',
+                'last_synced': today,
+            }
+        )
+```
+
+**Add fields to `dibbs_supplier_nsn`:**
+```python
+match_score  = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+source       = models.CharField(max_length=20, default='manual')
+# 'contract_history' = populated by sync job
+# 'manual' = added by staff directly
+last_synced  = models.DateField(null=True, blank=True)
+```
+
+**When to run:**
+- **Once**, on initial deployment, from the Settings page ("Load Contract History" button)
+- Can be re-run manually if needed (e.g. after a large batch of new contracts is entered) but this is not expected to be routine
+- Does not need to be scheduled or automated
+
+**What it does NOT do:**
+- Does not delete manually-added `dibbs_supplier_nsn` records (`source='manual'`)
+- Does not modify any data in the `contracts` app
+- Does not run automatically — it is a one-time on-demand operation
 
 #### `dibbs_supplier_match` *(new)* — results of matching engine
 
@@ -3075,3 +3204,208 @@ Solicitation PDF: https://www.dibbs.bsm.dla.mil/Docs/RFQ/{pdf_filename}
 | How do salespeople view PDFs? | "View on DIBBS" button opens URL in new tab | Same approach — no storage needed anywhere |
 | How do salespeople look up a supplier reply? | Global topbar search, `/` shortcut, matches sol#/NSN/name/CAGE/part# | Works from any page without navigation; handles any identifier in the email |
 | Search field normalization | Strip hyphens from NSN input before matching | `8465017225469` and `8465-01-722-5469` both hit the same record |
+
+---
+
+## 12. Sales Team Feedback — Demo Review (Mar 2026)
+
+*Captured from sales team demo session transcript.*
+
+---
+
+### 12.1 Overall Reaction
+
+Positive. The pipeline layout, matching logic, and RFQ center all resonated immediately. The team understood the workflow without explanation. Primary concern is build timeline — the existing platform (Sales Patriot) has until end of month.
+
+---
+
+### 12.2 The Three-Bucket Triage Model ⚠ NEW REQUIREMENT
+
+This is the most significant design addition from the demo session. The sales team does **not** work all 544 daily solicitations equally. They described a three-tier mental model that needs to be built into the app as a triage/filter step between import and RFQ dispatch:
+
+| Bucket | Label | Criteria | How Assigned |
+|--------|-------|----------|--------------|
+| 🟢 | **Priority 1 — SDVOSB** | Set-aside code = SDVOSB | Auto on import — STATZ is a Service Disabled Veteran Owned Small Business, these are the core business |
+| 🔵 | **Priority 2 — HUBZone** | Flagged by HUBZone partner | Manually flagged — partner sends a list, staff marks these in the app |
+| 🟡 | **Growth** | Tier 1 or Tier 2 supplier match exists | Auto on import — matching engine found a known supplier via contract history or approved source |
+| ⚫ | **Skip** | Unrestricted, IDC, no match found | Auto on import — default for anything that doesn't meet above criteria |
+
+**Key quote:** *"We need to figure out which ones we know for sure we're not even going to look at, cross those off the list, and then there will be the ones on the other spectrum — these are the ones we know we're going to get on."*
+
+**Why SDVOSB is Priority 1:** STATZ is an SDVOSB. These set-asides are reserved for companies like STATZ — they are the highest-probability wins and should always be worked first.
+
+**Why HUBZone is manually flagged not auto-detected:** HUBZone bids come through a partner company, not directly from STATZ's set-aside status. The partner sends over a list of solicitations they want worked. These can't be auto-detected from the IN file set-aside code alone — they need to be marked by staff when the partner's list arrives. The `bucket` field supports a `HUBZONE` value and a `hubzone_requested_by` note field for this purpose.
+
+**Why unrestricted is Skip:** Any unrestricted solicitation can be bid by the supplier directly. Suppliers routinely quote for the company then undercut and bid direct. In 4 months the team has seen ~5 unrestricted wins. Not worth pursuing as a rule, though staff can manually promote any Skip to Growth if there's a compelling reason.
+
+**Why IDCs are Skip:** Low value, high back-and-forth, government uses them to drive prices down. Default skip, can be manually promoted.
+
+**Implementation — Solicitation Filter Rules (`dibbs_filter_rule` table):**
+
+```python
+class SolicitationFilterRule(models.Model):
+    BUCKET = [
+        ('SDVOSB',   'Priority 1 — SDVOSB'),
+        ('HUBZONE',  'Priority 2 — HUBZone'),
+        ('GROWTH',   'Growth — Supplier Match'),
+        ('SKIP',     'Skip — Do Not Work'),
+    ]
+    rule_name         = models.CharField(max_length=100)
+    bucket            = models.CharField(max_length=10, choices=BUCKET)
+    # Match criteria — any combination triggers the rule
+    set_aside_code    = models.CharField(max_length=10, blank=True)
+    # 'SDVOSB' auto-assigns Priority 1; blank = unrestricted → Skip
+    solicitation_type = models.CharField(max_length=10, blank=True)
+    # e.g. 'IDC' to skip all IDC solicitations
+    fsc_code          = models.CharField(max_length=4, blank=True)
+    # skip entire FSC categories the company never bids
+    notes             = models.TextField(blank=True)
+    is_active         = models.BooleanField(default=True)
+    created_by        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at        = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'dibbs_filter_rule'
+```
+
+**Add `bucket` field to `dibbs_solicitation`:**
+```python
+BUCKET_CHOICES = [
+    ('UNSET',    'Not Yet Triaged'),
+    ('SDVOSB',   'Priority 1 — SDVOSB'),
+    ('HUBZONE',  'Priority 2 — HUBZone'),
+    ('GROWTH',   'Growth'),
+    ('SKIP',     'Skip'),
+]
+bucket              = models.CharField(max_length=10, choices=BUCKET_CHOICES, default='UNSET')
+bucket_assigned_by  = models.CharField(max_length=20, default='auto')
+# 'auto' = filter rules on import; 'manual' = staff override; 'hubzone' = HUBZone partner flag
+hubzone_requested_by = models.CharField(max_length=100, blank=True)
+# Name/note of who from the HUBZone partner requested this solicitation be worked
+```
+
+**Seeded filter rules (applied on every import automatically):**
+
+| Rule | Set-Aside Code | → Bucket |
+|------|---------------|---------|
+| SDVOSB Set-Aside | `SDVOSB` | Priority 1 — SDVOSB |
+| Unrestricted | *(blank)* | Skip |
+| IDC | solicitation_type = `IDC` | Skip |
+| *All others* | — | UNSET → Growth if match found, else Skip |
+
+**Triage logic runs at import time:**
+After parsing the IN file, the import service runs each new solicitation through the active filter rules and assigns a bucket automatically. Users can manually override any assignment.
+
+**Pipeline and solicitation list filter by bucket:**
+- Dashboard shows counts by bucket
+- Default solicitation list view shows PRIORITY first, then GROWTH, SKIP collapsed/hidden
+- A "Skip Queue" view exists for audit purposes — nothing disappears, it just moves out of the active working set
+
+---
+
+### 12.3 Supplier Capability Data — Contracts Database ✅ RESOLVED
+
+**The NSN-to-supplier history already exists in the company's own database.** STATZ has 20+ years and 10,000+ completed or in-progress contracts. The data model is:
+
+```
+contracts_contract
+  └── contracts_clin (one-to-many)
+        ├── supplier_fk  →  contracts_supplier
+        └── nsn_fk       →  (NSN record)
+```
+
+**Architecture decision:** `contracts` and `sales` remain separate apps and are not directly coupled at query time. The contract history is synced into `dibbs_supplier_nsn` via a dedicated sync job (§4.2). The matching engine then reads only from `dibbs_supplier_nsn` — it never queries `contracts_clin` directly during normal operation.
+
+```
+contracts_clin ──[one-time backfill]──→ dibbs_supplier_nsn ──[matching engine]──→ dibbs_supplier_match
+                                              ↑
+                              new won quotes added here by sales app
+```
+
+**Packaging facility filter:**
+The CLIN table links both suppliers and packaging facilities via the same `supplier_fk + nsn_fk` pattern. The sync job must exclude packaging facilities so they never enter `dibbs_supplier_nsn`. There is a distinguishing field on the supplier record (type, category, or flag — confirm exact field name with dev) that identifies packaging facilities.
+
+**Confirmed:** `is_packhouse=True` on `contracts_supplier` identifies packaging facilities. Exclude with `.exclude(supplier__is_packhouse=True)`.
+
+---
+
+### 12.3.1 Contract History Weighting
+
+Raw contract count is not enough — a supplier win from 2006 should carry less weight than one from 2024. The matching engine should apply a recency-weighted score when ranking Tier 1 matches so the most relevant suppliers surface first.
+
+**Proposed weighting tiers:**
+
+| Contract Age | Weight Multiplier |
+|---|---|
+| 0–2 years | 1.0 × (full weight) |
+| 2–5 years | 0.6 × |
+| 5–10 years | 0.3 × |
+| 10+ years | 0.1 × |
+
+**Proposed match score formula:**
+```python
+def contract_match_score(clins):
+    from datetime import date
+    score = 0
+    today = date.today()
+    for clin in clins:
+        age_years = (today - clin.contract.award_date).days / 365
+        if age_years <= 2:
+            weight = 1.0
+        elif age_years <= 5:
+            weight = 0.6
+        elif age_years <= 10:
+            weight = 0.3
+        else:
+            weight = 0.1
+        score += weight
+    return round(score, 2)
+```
+
+**Volume bonus:** Each additional CLIN win on the same NSN adds to the score, so a supplier with 8 wins on an NSN outranks one with a single win even within the same recency tier.
+
+**What this score drives:**
+- Rank order of Tier 1 matches shown on the solicitation Matches tab
+- Surfacing the "best" supplier to send the RFQ to first when auto-dispatching
+- Over time, recent quotes and wins from `dibbs_supplier_quote` feed back into the score as new contract records are created
+
+**Implementation note:** The matching engine queries `contracts_clin` filtered by NSN, excludes packaging facilities, groups by supplier, computes the weighted score, and returns ranked results. This is a read-only query on the existing contracts data — no migration or data movement required.
+
+**Confirmed:** `award_date` is the field name on the Contract model. `is_packhouse=True` is the field that identifies packaging facilities on the Supplier model.
+
+---
+
+### 12.4 Multiple CAGE Support
+
+Currently the company bids under a single CAGE. EDP submits to DIBBS on their behalf and takes a percentage. The `dibbs_company_cage` table already supports multiple CAGEs — no design change needed, but the Settings page should make it easy to add a second CAGE if the relationship with EDP changes or additional CAGEs are acquired.
+
+---
+
+### 12.5 RFQ Auto-Build Confirmation
+
+The team confirmed the RFQ email only needs 5–6 fields, all of which are present in the IN file:
+
+- Solicitation number
+- NSN
+- Nomenclature
+- Quantity + Unit of Issue
+- Required delivery days
+- Return-by date
+- Set-aside type (if applicable)
+
+All of these are already parsed into `dibbs_solicitation` and `dibbs_solicitation_line` at import time. The RFQ email can be fully auto-generated with no manual data entry. This is already specced in §10.2 and §10.7.
+
+---
+
+### 12.6 Dark Mode
+
+Requested explicitly by the sales team. Add to Phase 3 polish items.
+
+---
+
+### 12.7 Timeline
+
+**Hard deadline: End of March 2026.** Sales Patriot platform access ends. The app needs to be functional enough to handle daily imports and RFQ dispatch by that date. Phase 1 completion is the minimum viable cutover target.
+
+---
+
