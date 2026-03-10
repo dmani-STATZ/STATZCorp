@@ -17,6 +17,7 @@ from sales.models import (
     SupplierQuote,
     SupplierRFQ,
 )
+from sales.services.matching import backfill_nsn_from_contracts
 
 
 def _staff_required(user):
