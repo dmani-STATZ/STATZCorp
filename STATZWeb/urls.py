@@ -121,6 +121,7 @@ urlpatterns = [
     # path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
     path("inventory/", include("inventory.urls")),
     path("contracts/", include("contracts.urls")),
+    path("sales/", include("sales.urls")),
     path("suppliers/", include("suppliers.urls")),
     path("products/", include("products.urls")),
     path("accesslog/", include("accesslog.urls")),

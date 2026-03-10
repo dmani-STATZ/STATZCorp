@@ -1,0 +1,228 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block content %}
+
+{# ── Page header ────────────────────────────────────────────────────────── #}
+<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.25rem;">
+    <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Solicitations</h1>
+    <span style="font-size:0.8125rem; color:var(--text-muted,#6b7280);">
+        {{ page_obj.paginator.count }} total
+    </span>
+</div>
+
+{# ── Filter bar ─────────────────────────────────────────────────────────── #}
+<form method="get" action="{% url 'sales:solicitation_list' %}"
+      style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
+             background:var(--surface-secondary, #f9fafb);
+             border:1px solid var(--border-color, #e5e7eb);
+             border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
+
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+        <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Set-Aside</label>
+        <select name="set_aside"
+                style="border:1px solid var(--border-color,#d1d5db); border-radius:6px;
+                       padding:0.375rem 0.625rem; font-size:0.875rem;
+                       background:var(--surface,#fff); color:var(--text,#111827); min-width:11rem;">
+            {% for value, label in set_aside_choices %}
+            <option value="{{ value }}" {% if current_filters.set_aside == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+        <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Status</label>
+        <select name="status"
+                style="border:1px solid var(--border-color,#d1d5db); border-radius:6px;
+                       padding:0.375rem 0.625rem; font-size:0.875rem;
+                       background:var(--surface,#fff); color:var(--text,#111827); min-width:10rem;">
+            <option value="">All statuses</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+        <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Item Type</label>
+        <select name="item_type"
+                style="border:1px solid var(--border-color,#d1d5db); border-radius:6px;
+                       padding:0.375rem 0.625rem; font-size:0.875rem;
+                       background:var(--surface,#fff); color:var(--text,#111827); min-width:8rem;">
+            <option value="">All</option>
+            <option value="1" {% if current_filters.item_type == "1" %}selected{% endif %}>NSN</option>
+            <option value="2" {% if current_filters.item_type == "2" %}selected{% endif %}>Part Number</option>
+        </select>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:0.25rem; flex:1; min-width:12rem;">
+        <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Search</label>
+        <input type="text" name="q" value="{{ current_filters.q }}"
+               placeholder="Sol# or nomenclature"
+               style="border:1px solid var(--border-color,#d1d5db); border-radius:6px;
+                      padding:0.375rem 0.625rem; font-size:0.875rem;
+                      background:var(--surface,#fff); color:var(--text,#111827); width:100%;">
+    </div>
+
+    <div style="display:flex; gap:0.5rem;">
+        <button type="submit"
+                style="padding:0.375rem 1rem; border-radius:6px; border:none; cursor:pointer;
+                       background:var(--company-primary,#004eb3); color:#fff; font-size:0.875rem; font-weight:500;">
+            Filter
+        </button>
+        {% if current_filters.set_aside or current_filters.status or current_filters.item_type or current_filters.q %}
+        <a href="{% url 'sales:solicitation_list' %}"
+           style="padding:0.375rem 1rem; border-radius:6px; border:1px solid var(--border-color,#d1d5db);
+                  text-decoration:none; color:var(--text-muted,#6b7280); font-size:0.875rem;">
+            Clear
+        </a>
+        {% endif %}
+    </div>
+</form>
+
+{# ── Table ──────────────────────────────────────────────────────────────── #}
+<div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+        <thead>
+            <tr style="background:var(--surface-secondary,#f9fafb); border-bottom:1px solid var(--border-color,#e5e7eb);">
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Sol #</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">NSN</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Nomenclature</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Qty</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Set-Aside</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Return By</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Status</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Matches</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sol in page_obj %}
+
+            {# Row background — SDVOSB gets a subtle priority highlight #}
+            {% if sol.small_business_set_aside == 'R' %}
+            <tr style="border-bottom:1px solid var(--border-color,#e5e7eb); background:rgba(0,78,179,0.04);">
+            {% else %}
+            <tr style="border-bottom:1px solid var(--border-color,#e5e7eb);">
+            {% endif %}
+
+                <td style="padding:0.625rem 1rem; white-space:nowrap;">
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        {% if sol.small_business_set_aside == 'R' %}
+                        <span title="SDVOSB Set-Aside"
+                              style="display:inline-block; width:6px; height:6px; border-radius:50%;
+                                     background:var(--company-primary,#004eb3); flex-shrink:0;"></span>
+                        {% endif %}
+                        <a href="#" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
+                            {{ sol.solicitation_number }}
+                        </a>
+                    </div>
+                </td>
+
+                <td style="padding:0.625rem 1rem; font-family:monospace; font-size:0.8125rem; color:var(--text-muted,#6b7280); white-space:nowrap;">
+                    {{ sol.first_line.nsn|default:"—" }}
+                </td>
+
+                <td style="padding:0.625rem 1rem; max-width:14rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                    title="{{ sol.first_line.nomenclature|default:'' }}">
+                    {{ sol.first_line.nomenclature|default:"—" }}
+                </td>
+
+                <td style="padding:0.625rem 1rem; text-align:center; white-space:nowrap;">
+                    {{ sol.first_line.quantity|default:"—" }}
+                    {% if sol.first_line.unit_of_issue %}
+                    <span style="font-size:0.75rem; color:var(--text-muted,#9ca3af);">{{ sol.first_line.unit_of_issue }}</span>
+                    {% endif %}
+                </td>
+
+                <td style="padding:0.625rem 1rem; white-space:nowrap;">
+                    {% if sol.small_business_set_aside == 'R' %}
+                    <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:600;
+                                 background:rgba(0,78,179,0.1); color:var(--company-primary,#004eb3);">
+                        SDVOSB
+                    </span>
+                    {% elif sol.small_business_set_aside == 'N' or not sol.small_business_set_aside %}
+                    <span style="font-size:0.8125rem; color:var(--text-muted,#9ca3af);">Unrestricted</span>
+                    {% else %}
+                    <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500;
+                                 background:var(--surface-secondary,#f3f4f6); color:var(--text,#374151);">
+                        {{ sol.set_aside_display }}
+                    </span>
+                    {% endif %}
+                </td>
+
+                <td style="padding:0.625rem 1rem; white-space:nowrap; font-size:0.8125rem;
+                           {% if sol.return_by_date %}
+                               {% now "Y-m-d" as today_str %}
+                               {% if sol.return_by_date|date:"Y-m-d" <= today_str %}color:#dc2626;{% endif %}
+                           {% endif %}">
+                    {{ sol.return_by_date|date:"M j, Y"|default:"—" }}
+                </td>
+
+                <td style="padding:0.625rem 1rem;">
+                    <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500;
+                        {% if sol.status == 'New' %}background:#f0fdf4; color:#166534;
+                        {% elif sol.status == 'RFQ Sent' %}background:#eff6ff; color:#1d4ed8;
+                        {% elif sol.status == 'Bid Submitted' %}background:#fefce8; color:#854d0e;
+                        {% elif sol.status == 'Won' %}background:#f0fdf4; color:#166534;
+                        {% elif sol.status == 'Lost' or sol.status == 'No Bid' %}background:#fef2f2; color:#991b1b;
+                        {% else %}background:var(--surface-secondary,#f3f4f6); color:var(--text-muted,#374151);
+                        {% endif %}">
+                        {{ sol.status }}
+                    </span>
+                </td>
+
+                <td style="padding:0.625rem 1rem; text-align:center;">
+                    {% if sol.total_match_count > 0 %}
+                    <span style="display:inline-block; padding:0.125rem 0.625rem; border-radius:10px; font-size:0.75rem; font-weight:600;
+                                 background:rgba(0,78,179,0.1); color:var(--company-primary,#004eb3);">
+                        {{ sol.total_match_count }}
+                    </span>
+                    {% else %}
+                    <span style="color:var(--text-muted,#d1d5db); font-size:0.875rem;">—</span>
+                    {% endif %}
+                </td>
+
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
+                    No solicitations found.
+                    {% if current_filters.set_aside or current_filters.status or current_filters.q %}
+                    <br><a href="{% url 'sales:solicitation_list' %}" style="color:var(--company-primary,#004eb3); text-decoration:none; font-size:0.875rem;">Clear filters</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# ── Pagination ─────────────────────────────────────────────────────────── #}
+{% if page_obj.has_other_pages %}
+{% with cf=current_filters %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.25rem;">
+    <span style="font-size:0.8125rem; color:var(--text-muted,#6b7280);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        &nbsp;·&nbsp; {{ page_obj.paginator.count }} results
+    </span>
+    <div style="display:flex; gap:0.5rem;">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if cf.q %}&q={{ cf.q }}{% endif %}{% if cf.set_aside %}&set_aside={{ cf.set_aside }}{% endif %}{% if cf.status %}&status={{ cf.status }}{% endif %}{% if cf.item_type %}&item_type={{ cf.item_type }}{% endif %}"
+           style="padding:0.375rem 0.875rem; border:1px solid var(--border-color,#d1d5db); border-radius:6px;
+                  text-decoration:none; font-size:0.875rem; color:var(--text,#374151);">
+            ← Previous
+        </a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if cf.q %}&q={{ cf.q }}{% endif %}{% if cf.set_aside %}&set_aside={{ cf.set_aside }}{% endif %}{% if cf.status %}&status={{ cf.status }}{% endif %}{% if cf.item_type %}&item_type={{ cf.item_type }}{% endif %}"
+           style="padding:0.375rem 0.875rem; border:1px solid var(--border-color,#d1d5db); border-radius:6px;
+                  text-decoration:none; font-size:0.875rem; color:var(--text,#374151);">
+            Next →
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endwith %}
+{% endif %}
+
+{% endblock content %}

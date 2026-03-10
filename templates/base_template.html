@@ -300,6 +300,9 @@
                         <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Contracts</a>
                     </li>
                     <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
+                        <a href="{% url 'sales:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">STATZ Sales</a>
+                    </li>
+                    <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'suppliers:supplier_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Suppliers</a>
                     </li>
                     {% if user.is_authenticated and user.is_superuser %}
@@ -323,9 +326,6 @@
                                 <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Folder Tracking</a>
                             </li>
                         </ul>
-                    </li>
-                    <li class="py-3 px-6 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="https://www.salespatriot.com/" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Sales Patriot</a>
                     </li>
                 </ul>
             </div>

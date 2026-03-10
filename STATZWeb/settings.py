@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "inventory.apps.InventoryConfig",
     "contracts.apps.ContractsConfig",
+    "sales.apps.SalesConfig",
     "accesslog.apps.AccesslogConfig",
     "td_now.apps.TDNowConfig",
     "crispy_forms",

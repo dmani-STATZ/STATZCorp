@@ -1,0 +1,119 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div style="max-width:680px;">
+
+    <h1 style="font-size:1.375rem; font-weight:600; margin:0 0 0.375rem;">Daily Import</h1>
+    <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0 0 1.75rem;">
+        Upload the three DIBBS files downloaded each morning. Solicitations, approved sources,
+        and batch quote data will be imported and matched automatically.
+    </p>
+
+    {# ── Success result card ─────────────────────────────────────────────── #}
+    {% if result %}
+    <div style="border:1px solid #bbf7d0; border-radius:8px; background:#f0fdf4;
+                padding:1.25rem 1.5rem; margin-bottom:1.75rem;">
+        <div style="display:flex; align-items:center; gap:0.625rem; margin-bottom:0.875rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" style="width:1.125rem;height:1.125rem;flex-shrink:0;color:#16a34a;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span style="font-weight:600; font-size:0.9375rem; color:#166534;">Import complete — {{ result.import_date }}</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem 2rem; font-size:0.875rem; color:#166534;">
+            <div>Solicitations created: <strong>{{ result.solicitations_created }}</strong></div>
+            <div>Solicitations updated: <strong>{{ result.solicitations_updated }}</strong></div>
+            <div>Lines created: <strong>{{ result.lines_created }}</strong></div>
+            <div>Lines updated: <strong>{{ result.lines_updated }}</strong></div>
+            <div>Approved sources: <strong>{{ result.approved_sources_loaded }}</strong></div>
+        </div>
+
+        {% if result.match_summary %}
+        <div style="margin-top:0.875rem; padding-top:0.875rem; border-top:1px solid #bbf7d0;">
+            <div style="font-size:0.875rem; color:#166534;">
+                Supplier matches found: <strong>{{ result.match_summary.matches_found }}</strong>
+                <span style="margin-left:0.75rem; font-size:0.8125rem; color:#4ade80;">
+                    Tier 1: {{ match_tier_1|default:0 }}
+                    &nbsp;·&nbsp;
+                    Tier 2: {{ match_tier_2|default:0 }}
+                    &nbsp;·&nbsp;
+                    Tier 3: {{ match_tier_3|default:0 }}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.parse_error_count and result.solicitations_with_errors %}
+        <div style="margin-top:0.875rem; padding:0.75rem 1rem; border-radius:6px;
+                    background:#fefce8; border:1px solid #fde68a;">
+            <p style="font-size:0.8125rem; font-weight:600; color:#854d0e; margin:0 0 0.25rem;">
+                Parse warnings on {{ result.parse_error_count }} solicitation{{ result.parse_error_count|pluralize }}:
+            </p>
+            <p style="font-size:0.75rem; color:#92400e; margin:0; font-family:monospace;">
+                {{ result.solicitations_with_errors|join:", " }}
+            </p>
+        </div>
+        {% endif %}
+
+        <div style="margin-top:1rem;">
+            <a href="{% url 'sales:solicitation_list' %}"
+               style="font-size:0.875rem; color:var(--company-primary,#004eb3); text-decoration:none; font-weight:500;">
+                View solicitations →
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── Upload form ─────────────────────────────────────────────────────── #}
+    <div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px;
+                background:var(--surface,#fff); padding:1.5rem;">
+
+        <form method="post" action="{% url 'sales:import_upload' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">
+
+                {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}"
+                           style="display:block; font-size:0.875rem; font-weight:500;
+                                  color:var(--text,#111827); margin-bottom:0.375rem;">
+                        {{ field.label }}
+                        <span style="font-size:0.75rem; font-weight:400; color:var(--text-muted,#9ca3af); margin-left:0.5rem;">
+                            {% if field.name == 'in_file' %}IN######.TXT
+                            {% elif field.name == 'bq_file' %}bq######.txt
+                            {% elif field.name == 'as_file' %}as######.txt
+                            {% endif %}
+                        </span>
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <p style="margin:0.25rem 0 0; font-size:0.8125rem; color:#dc2626;">{{ field.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+            </div>
+
+            <button type="submit"
+                    style="padding:0.5rem 1.5rem; border:none; border-radius:6px; cursor:pointer;
+                           background:var(--company-primary,#004eb3); color:#fff;
+                           font-size:0.9375rem; font-weight:500;">
+                Run Import
+            </button>
+        </form>
+    </div>
+
+    {# ── Help note ───────────────────────────────────────────────────────── #}
+    <p style="margin-top:1rem; font-size:0.8125rem; color:var(--text-muted,#9ca3af);">
+        Files are downloaded from
+        <a href="https://www.dibbs.bsm.dla.mil" target="_blank" rel="noopener"
+           style="color:var(--company-primary,#004eb3); text-decoration:none;">dibbs.bsm.dla.mil</a>
+        each morning. Re-importing the same file is safe — existing records will be updated, not duplicated.
+    </p>
+
+</div>
+
+{% endblock content %}
