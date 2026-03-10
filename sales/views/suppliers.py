@@ -1,6 +1,8 @@
 """
 Supplier-related views (e.g. NSN backfill from contract history).
 """
+import traceback
+
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_http_methods
@@ -19,23 +21,29 @@ def backfill_nsn(request):
     """
     GET:  show confirmation page
     POST: run backfill_nsn_from_contracts(), show results
-    Dry-run option via ?dry_run=1 on GET or POST
+    Dry-run option via POST field dry_run=1
     """
-    dry_run = request.GET.get("dry_run") == "1" or (
-        request.method == "POST" and request.POST.get("dry_run") == "1"
-    )
     result = None
+    error = None
+    run_dry = False
 
     if request.method == "POST":
         run_dry = "dry_run" in request.POST
-        result = backfill_nsn_from_contracts(dry_run=run_dry)
+        try:
+            result = backfill_nsn_from_contracts(dry_run=run_dry)
+        except Exception as e:
+            error = {
+                "message": str(e),
+                "traceback": traceback.format_exc(),
+            }
 
     return render(
         request,
         "sales/suppliers/backfill_nsn.html",
         {
-            "dry_run": dry_run,
+            "dry_run": run_dry,
             "result": result,
+            "error": error,
             "page_title": "Backfill NSN from Contract History",
         },
     )

@@ -151,10 +151,7 @@
                 </td>
 
                 <td style="padding:0.625rem 1rem; white-space:nowrap; font-size:0.8125rem;
-                           {% if sol.return_by_date %}
-                               {% now "Y-m-d" as today_str %}
-                               {% if sol.return_by_date|date:"Y-m-d" <= today_str %}color:#dc2626;{% endif %}
-                           {% endif %}">
+                           {% if sol.is_overdue %}color:#dc2626;{% endif %}">
                     {{ sol.return_by_date|date:"M j, Y"|default:"—" }}
                 </td>
 

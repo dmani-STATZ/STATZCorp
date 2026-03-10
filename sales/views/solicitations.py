@@ -1,61 +1,51 @@
 """
-Solicitation list and filters.
+Solicitation list and detail views.
 """
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
-from django.db.models import Count, Q, Prefetch
+from django.db.models import Count, Prefetch
 
 from sales.models import Solicitation, SolicitationLine, SupplierMatch
 
-
-# Set-aside codes for filter dropdown (STATZ spec)
 SET_ASIDE_CHOICES = [
-    ('', 'All set-asides'),
+    ('',  'All set-asides'),
+    ('R', 'SDVOSB'),
+    ('H', 'HUBZone'),
+    ('Y', 'Small Business'),
+    ('L', 'WOSB'),
+    ('A', '8(a)'),
+    ('E', 'EDWOSB'),
     ('N', 'Unrestricted'),
-    ('Y', 'Small Business Set-Aside'),
-    ('H', 'HUBZone Set-Aside'),
-    ('R', 'SDVOSB Set-Aside'),
-    ('L', 'WOSB Set-Aside'),
-    ('A', '8(a) Set-Aside'),
-    ('E', 'EDWOSB Set-Aside'),
 ]
+
+SET_ASIDE_LABELS = {v: label for v, label in SET_ASIDE_CHOICES if v}
 
 
 @login_required
 def solicitation_list(request):
     """
-    Lists all solicitations ordered by return_by_date ascending.
-
-    Filters (all optional, via GET params):
-        ?set_aside=R          # filter by SmallBusinessSetAside code
-        ?item_type=1          # filter by ItemTypeIndicator (on lines)
-        ?status=New           # filter by Status
-        ?q=search_term        # search solicitation_number or nomenclature
-
-    Context:
-        solicitations  — queryset (paginated, 50/page)
-        set_aside_choices  — for filter dropdown
-        status_choices     — for filter dropdown
-        current_filters    — dict of active filters for template
+    Lists solicitations with filtering and pagination.
+    Annotates each solicitation with first_line and total_match_count.
     """
+    from django.core.paginator import Paginator
+    import datetime
+
+    q           = request.GET.get('q', '').strip()
+    set_aside   = request.GET.get('set_aside', '')
+    status      = request.GET.get('status', '')
+    item_type   = request.GET.get('item_type', '')
+
     qs = (
         Solicitation.objects
         .prefetch_related(
             Prefetch(
                 'lines',
-                queryset=SolicitationLine.objects.annotate(
-                    match_count=Count('supplier_matches')
-                )
+                queryset=SolicitationLine.objects.order_by('line_number', 'id'),
             )
         )
+        .annotate(total_match_count=Count('lines__supplier_matches', distinct=True))
         .order_by('return_by_date', 'solicitation_number')
     )
-
-    set_aside = request.GET.get('set_aside', '').strip()
-    item_type = request.GET.get('item_type', '').strip()
-    status = request.GET.get('status', '').strip()
-    q = request.GET.get('q', '').strip()
 
     if set_aside:
         qs = qs.filter(small_business_set_aside=set_aside)
@@ -64,40 +54,33 @@ def solicitation_list(request):
     if item_type:
         qs = qs.filter(lines__item_type_indicator=item_type).distinct()
     if q:
+        from django.db.models import Q
         qs = qs.filter(
-            Q(solicitation_number__icontains=q)
-            | Q(lines__nomenclature__icontains=q)
+            Q(solicitation_number__icontains=q) |
+            Q(lines__nomenclature__icontains=q)
         ).distinct()
+
+    today = datetime.date.today()
 
     paginator = Paginator(qs, 50)
     page_number = request.GET.get('page', 1)
-    page = paginator.get_page(page_number)
+    page_obj = paginator.get_page(page_number)
 
-    set_aside_labels = dict((v, l) for v, l in SET_ASIDE_CHOICES if v)
-    # Annotate each solicitation with total match count, first line, and set-aside label
-    solicitations = page.object_list
-    for sol in solicitations:
-        lines_list = list(sol.lines.all())
-        sol.total_match_count = sum(
-            getattr(line, 'match_count', 0) or 0
-            for line in lines_list
-        )
-        sol.first_line = lines_list[0] if lines_list else None
-        sol.set_aside_display = set_aside_labels.get(
-            sol.small_business_set_aside or '', sol.small_business_set_aside or '—'
-        )
+    # Attach first_line and overdue flag to each solicitation in the page
+    for sol in page_obj:
+        sol_lines = list(sol.lines.all())
+        sol.first_line = sol_lines[0] if sol_lines else None
+        sol.set_aside_display = SET_ASIDE_LABELS.get(sol.small_business_set_aside or '', '')
+        sol.is_overdue = bool(sol.return_by_date and sol.return_by_date < today)
 
-    context = {
-        'solicitations': page,
-        'page_obj': page,
+    return render(request, 'sales/solicitations/list.html', {
+        'page_obj':         page_obj,
         'set_aside_choices': SET_ASIDE_CHOICES,
-        'status_choices': Solicitation.STATUS_CHOICES,
+        'status_choices':   Solicitation.STATUS_CHOICES,
         'current_filters': {
-            'set_aside': set_aside,
-            'item_type': item_type,
-            'status': status,
-            'q': q,
+            'q':          q,
+            'set_aside':  set_aside,
+            'status':     status,
+            'item_type':  item_type,
         },
-        'page_title': 'Solicitations',
-    }
-    return render(request, 'sales/solicitations/list.html', context)
+    })
