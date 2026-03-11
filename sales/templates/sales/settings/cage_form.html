@@ -58,8 +58,8 @@
                 </label>
                 <select name="sb_representations_code"
                         style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
-                    {% for val in "ABCEFGMPX" %}
-                    <option value="{{ val }}" {% if cage.sb_representations_code == val or not cage and val == 'B' %}selected{% endif %}>{{ val }}</option>
+                    {% for val, lbl in sb_representations_choices %}
+                    <option value="{{ val }}" {% if cage.sb_representations_code == val or not cage and val == 'N' %}selected{% endif %}>{{ lbl }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -94,8 +94,8 @@
                 </label>
                 <select name="alternate_disputes_resolution"
                         style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
-                    <option value="A" {% if cage.alternate_disputes_resolution == "A" or not cage %}selected{% endif %}>A — Agency Procedures</option>
-                    <option value="B" {% if cage.alternate_disputes_resolution == "B" %}selected{% endif %}>B — Other ADR</option>
+                    <option value="A" {% if cage.alternate_disputes_resolution == "A" or not cage %}selected{% endif %}>A — Agree To Use Alternate Disputes Resolution</option>
+                    <option value="B" {% if cage.alternate_disputes_resolution == "B" %}selected{% endif %}>B — Do Not Agree To Use Alternate Disputes Resolution</option>
                 </select>
             </div>
 
