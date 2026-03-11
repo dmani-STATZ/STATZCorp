@@ -104,11 +104,57 @@
     </div>
 </form>
 
-{# ── Table ──────────────────────────────────────────────────────────────── #}
+{# ── Bulk reassign form + table ──────────────────────────────────────────── #}
+<form method="post" id="bulk-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reassign_bucket">
+
+    <div id="bulk-toolbar"
+         style="display:none; align-items:center; gap:0.75rem; padding:0.625rem 1rem;
+                background:#fffbeb; border:1px solid #fbbf24; border-radius:8px;
+                margin-bottom:1rem; flex-wrap:wrap;">
+
+        <span id="bulk-count" style="font-size:0.875rem; font-weight:600; color:#92400e;">
+            0 selected
+        </span>
+
+        <select name="new_bucket"
+                style="padding:0.375rem 0.625rem; border:1px solid #d1d5db; border-radius:6px;
+                       font-size:0.8125rem; background:#fff; min-width:160px;">
+            <option value="">— Move to bucket —</option>
+            <option value="SDVOSB">🟢 SDVOSB</option>
+            <option value="HUBZONE">🔵 HUBZone</option>
+            <option value="GROWTH">🟡 Growth</option>
+            <option value="SKIP">⚫ Skip</option>
+        </select>
+
+        <input type="text" name="bucket_note"
+               placeholder="Note / partner name (optional)"
+               style="padding:0.375rem 0.625rem; border:1px solid #d1d5db; border-radius:6px;
+                      font-size:0.8125rem; width:210px;">
+
+        <button type="submit"
+                style="padding:0.375rem 0.875rem; border-radius:6px; border:none; cursor:pointer;
+                       background:var(--company-primary,#004eb3); color:#fff;
+                       font-size:0.8125rem; font-weight:500;">
+            Reassign
+        </button>
+
+        <button type="button" onclick="clearAll()"
+                style="padding:0.375rem 0.625rem; border-radius:6px; border:1px solid #d1d5db;
+                       background:#fff; font-size:0.8125rem; color:#6b7280; cursor:pointer;">
+            Clear
+        </button>
+    </div>
+
 <div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden;">
     <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
         <thead>
             <tr style="background:var(--surface-secondary,#f9fafb); border-bottom:1px solid var(--border-color,#e5e7eb);">
+                <th style="padding:0.625rem 0.75rem; width:36px;">
+                    <input type="checkbox" id="select-all" title="Select all on this page"
+                           style="cursor:pointer; width:14px; height:14px;">
+                </th>
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Sol #</th>
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">NSN</th>
                 <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Nomenclature</th>
@@ -130,6 +176,10 @@
             <tr style="border-bottom:1px solid var(--border-color,#e5e7eb);">
             {% endif %}
 
+                <td style="padding:0.625rem 0.75rem; text-align:center;">
+                    <input type="checkbox" name="sol_ids" value="{{ sol.id }}"
+                           class="row-checkbox" style="cursor:pointer; width:14px; height:14px;">
+                </td>
                 <td style="padding:0.625rem 1rem; white-space:nowrap;">
                     <div style="display:flex; align-items:center; gap:0.5rem;">
                         {% if sol.small_business_set_aside == 'R' %}
@@ -210,7 +260,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
+                <td colspan="10" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
                     No solicitations found.
                     {% if current_filters.set_aside or current_filters.status or current_filters.q %}
                     <br><a href="{% url 'sales:solicitation_list' %}" style="color:var(--company-primary,#004eb3); text-decoration:none; font-size:0.875rem;">Clear filters</a>
@@ -247,5 +297,41 @@
     </div>
 </div>
 {% endif %}
+</form>
+
+<script>
+(function() {
+    var selectAll = document.getElementById('select-all');
+    var toolbar   = document.getElementById('bulk-toolbar');
+    var countEl   = document.getElementById('bulk-count');
+
+    function updateToolbar() {
+        var checked = document.querySelectorAll('.row-checkbox:checked');
+        toolbar.style.display = checked.length > 0 ? 'flex' : 'none';
+        countEl.textContent = checked.length + ' selected';
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+                cb.checked = selectAll.checked;
+            });
+            updateToolbar();
+        });
+    }
+
+    document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+        cb.addEventListener('change', updateToolbar);
+    });
+
+    window.clearAll = function() {
+        document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+            cb.checked = false;
+        });
+        if (selectAll) selectAll.checked = false;
+        updateToolbar();
+    };
+})();
+</script>
 
 {% endblock content %}

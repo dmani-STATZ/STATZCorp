@@ -43,6 +43,13 @@
                       color: var(--text-muted, #6b7280);
                   {% endif %}">
             RFQ Center
+            {% if overdue_rfq_count %}
+            <span style="display:inline-block; background:#dc2626; color:#fff; font-size:0.6875rem;
+                         font-weight:700; padding:1px 6px; border-radius:10px; margin-left:4px;
+                         vertical-align:middle; line-height:1.4;">
+                {{ overdue_rfq_count }}
+            </span>
+            {% endif %}
         </a>
         <a href="{% url 'sales:bids_ready' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
@@ -64,14 +71,32 @@
         </a>
         <a href="{% url 'sales:import_upload' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if request.resolver_match.url_name == 'import_upload' %}
+                  {% if request.resolver_match.url_name == 'import_upload' or request.resolver_match.url_name == 'import_history' %}
                       border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
                   {% else %}
                       color: var(--text-muted, #6b7280);
                   {% endif %}">
             Import
         </a>
-        {% if request.user.is_staff %}
+        <a href="{% url 'sales:bids_history' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'bids_history' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            Bid History
+        </a>
+        <a href="{% url 'sales:settings_cages' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if 'settings' in request.resolver_match.url_name %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            Settings
+        </a>
+<!--        {% if request.user.is_superuser %}
         <a href="{% url 'sales:backfill_nsn' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
                   {% if request.resolver_match.url_name == 'backfill_nsn' %}
@@ -81,7 +106,7 @@
                   {% endif %}">
             NSN Backfill
         </a>
-        {% endif %}
+        {% endif %} -->
     </nav>
 
     {% block content %}{% endblock content %}

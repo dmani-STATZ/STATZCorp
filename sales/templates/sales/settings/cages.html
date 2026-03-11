@@ -1,0 +1,84 @@
+{% extends "sales/base.html" %}
+{% block content %}
+
+<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem;">
+    <div>
+        <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Company CAGEs</h1>
+        <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0.25rem 0 0;">
+            CAGE codes used when building and exporting BQ bids.
+        </p>
+    </div>
+    <a href="{% url 'sales:settings_cage_add' %}"
+       style="padding:0.5rem 1.125rem; background:var(--company-primary,#004eb3); color:#fff;
+              border-radius:6px; text-decoration:none; font-size:0.875rem; font-weight:500;">
+        + Add CAGE
+    </a>
+</div>
+
+{% if messages %}
+    {% for msg in messages %}
+    <div style="padding:0.75rem 1rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                color:#166534; font-size:0.875rem; margin-bottom:1rem;">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+{% if not cages %}
+<div style="padding:3rem; text-align:center; background:#fffbeb; border:1px solid #fbbf24;
+            border-radius:8px; color:#92400e;">
+    <p style="font-size:1rem; font-weight:600; margin:0 0 0.5rem;">⚠ No CAGE records found</p>
+    <p style="font-size:0.875rem; margin:0 0 1rem;">The bid builder and BQ export require at least one CAGE. Add your CAGE code to get started.</p>
+    <a href="{% url 'sales:settings_cage_add' %}"
+       style="padding:0.5rem 1.25rem; background:#004eb3; color:#fff; border-radius:6px;
+              text-decoration:none; font-size:0.875rem; font-weight:500;">
+        Add CAGE Now
+    </a>
+</div>
+{% else %}
+<div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+        <thead>
+            <tr style="background:var(--surface-secondary,#f9fafb); border-bottom:1px solid #e5e7eb;">
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">CAGE</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">Company</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">Reply-To Email</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">Markup %</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">Default</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">Active</th>
+                <th style="padding:0.625rem 1rem;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cage in cages %}
+            <tr style="border-bottom:1px solid #e5e7eb; {% if cage.is_default %}background:rgba(0,78,179,0.03);{% endif %}">
+                <td style="padding:0.625rem 1rem; font-family:monospace; font-weight:600;">
+                    {{ cage.cage_code }}
+                </td>
+                <td style="padding:0.625rem 1rem;">{{ cage.company_name }}</td>
+                <td style="padding:0.625rem 1rem; color:var(--text-muted,#6b7280); font-size:0.8125rem;">
+                    {{ cage.smtp_reply_to|default:"—" }}
+                </td>
+                <td style="padding:0.625rem 1rem; text-align:center;">{{ cage.default_markup_pct }}%</td>
+                <td style="padding:0.625rem 1rem; text-align:center;">
+                    {% if cage.is_default %}
+                    <span style="background:#dbeafe; color:#1d4ed8; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:600;">DEFAULT</span>
+                    {% else %}—{% endif %}
+                </td>
+                <td style="padding:0.625rem 1rem; text-align:center;">
+                    {% if cage.is_active %}
+                    <span style="color:#16a34a; font-size:0.875rem;">✓</span>
+                    {% else %}
+                    <span style="color:#dc2626; font-size:0.875rem;">✗</span>
+                    {% endif %}
+                </td>
+                <td style="padding:0.625rem 1rem; text-align:right;">
+                    <a href="{% url 'sales:settings_cage_edit' cage.id %}"
+                       style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock content %}

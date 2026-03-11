@@ -137,6 +137,7 @@ TEMPLATES = [
                 "users.context_processors.unread_messages",
                 "users.context_processors.active_company",
                 "STATZWeb.context_processors.version_context",
+                "sales.context_processors.rfq_counts",
             ],
         },
     },

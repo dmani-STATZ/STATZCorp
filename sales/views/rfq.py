@@ -257,7 +257,7 @@ def rfq_center(request):
         pass
 
     cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
-    default_markup_pct = float(cage.default_markup_pct) if cage else 3.50
+    default_markup_pct = Decimal(str(cage.default_markup_pct)) if cage else Decimal("3.50")
 
     rfq_groups_display = [
         ("overdue", "🔴 Overdue", overdue, "#dc2626"),
@@ -280,6 +280,7 @@ def rfq_center(request):
 def rfq_center_detail(request, rfq_id):
     """
     Returns the center panel HTML fragment for the selected RFQ (for fetch() from JS).
+    Context: rfq, quotes, approved_sources, default_markup_pct, suggested_bid.
     """
     rfq = get_object_or_404(
         SupplierRFQ.objects.select_related("supplier", "line__solicitation").prefetch_related(
@@ -294,6 +295,13 @@ def rfq_center_detail(request, rfq_id):
     approved_sources = list(ApprovedSource.objects.filter(nsn=nsn_normalized)[:20])
     contact_log = list(rfq.contact_log.select_related("logged_by").order_by("-logged_at"))
 
+    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
+    default_markup_pct = Decimal(str(cage.default_markup_pct)) if cage else Decimal("3.50")
+    best_quote = min(quotes, key=lambda q: q.unit_price) if quotes else None
+    suggested_bid = (
+        (best_quote.unit_price * (1 + default_markup_pct / 100)) if best_quote else None
+    )
+
     return render(request, "sales/rfq/partials/center_panel.html", {
         "rfq": rfq,
         "line": line,
@@ -301,6 +309,8 @@ def rfq_center_detail(request, rfq_id):
         "quotes": quotes,
         "approved_sources": approved_sources,
         "contact_log": contact_log,
+        "default_markup_pct": default_markup_pct,
+        "suggested_bid": suggested_bid,
     })
 
 

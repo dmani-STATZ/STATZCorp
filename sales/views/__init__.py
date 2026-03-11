@@ -2,7 +2,7 @@
 Sales app views.
 """
 from sales.views.dashboard import dashboard
-from sales.views.imports import import_upload
+from sales.views.imports import import_upload, import_history
 from sales.views.solicitations import (
     solicitation_list,
     solicitation_detail,
@@ -37,11 +37,19 @@ from sales.views.bids import (
     bid_select_quote,
     bids_export_queue,
     bids_export_download,
+    bids_history,
+)
+from sales.views.settings import (
+    settings_index,
+    settings_cages,
+    settings_cage_add,
+    settings_cage_edit,
 )
 
 __all__ = [
     "dashboard",
     "import_upload",
+    "import_history",
     "solicitation_list",
     "solicitation_detail",
     "no_bid",
@@ -69,4 +77,9 @@ __all__ = [
     "bid_select_quote",
     "bids_export_queue",
     "bids_export_download",
+    "bids_history",
+    "settings_index",
+    "settings_cages",
+    "settings_cage_add",
+    "settings_cage_edit",
 ]

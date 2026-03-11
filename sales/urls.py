@@ -5,6 +5,7 @@ from django.urls import path
 from .views import (
     dashboard,
     import_upload,
+    import_history,
     solicitation_list,
     solicitation_detail,
     no_bid,
@@ -26,12 +27,17 @@ from .views import (
     bid_select_quote,
     bids_export_queue,
     bids_export_download,
+    bids_history,
     supplier_list,
     supplier_detail,
     supplier_add_nsn,
     supplier_add_fsc,
     supplier_remove_nsn,
     supplier_remove_fsc,
+    settings_index,
+    settings_cages,
+    settings_cage_add,
+    settings_cage_edit,
 )
 
 app_name = "sales"
@@ -39,6 +45,7 @@ app_name = "sales"
 urlpatterns = [
     path("", dashboard, name="dashboard"),
     path("import/", import_upload, name="import_upload"),
+    path("import/history/", import_history, name="import_history"),
     path("solicitations/", solicitation_list, name="solicitation_list"),
     path("solicitations/<str:sol_number>/", solicitation_detail, name="solicitation_detail"),
     path("solicitations/<str:sol_number>/nobid/", no_bid, name="no_bid"),
@@ -65,6 +72,7 @@ urlpatterns = [
     path("bids/select-quote/", bid_select_quote, name="bid_select_quote"),
     path("bids/export/", bids_export_queue, name="bids_export_queue"),
     path("bids/export/download/", bids_export_download, name="bids_export_download"),
+    path("bids/history/", bids_history, name="bids_history"),
     # Suppliers (DIBBS capability management)
     path("suppliers/", supplier_list, name="supplier_list"),
     path("suppliers/<int:supplier_id>/", supplier_detail, name="supplier_detail"),
@@ -72,4 +80,9 @@ urlpatterns = [
     path("suppliers/<int:supplier_id>/fsc/add/", supplier_add_fsc, name="supplier_add_fsc"),
     path("suppliers/<int:supplier_id>/nsn/remove/", supplier_remove_nsn, name="supplier_remove_nsn"),
     path("suppliers/<int:supplier_id>/fsc/remove/", supplier_remove_fsc, name="supplier_remove_fsc"),
+    # Settings
+    path("settings/", settings_index, name="settings_index"),
+    path("settings/cages/", settings_cages, name="settings_cages"),
+    path("settings/cages/add/", settings_cage_add, name="settings_cage_add"),
+    path("settings/cages/<int:cage_id>/edit/", settings_cage_edit, name="settings_cage_edit"),
 ]

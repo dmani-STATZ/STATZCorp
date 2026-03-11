@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.contrib import messages
 from django.http import HttpResponse
 from django.urls import reverse
+from django.core.paginator import Paginator
 
 from sales.models import (
     Solicitation,
@@ -65,6 +66,7 @@ def bids_ready(request):
             "quote_count": len(quotes),
             "existing_bid": existing_bid,
         })
+    bid_lines.sort(key=lambda item: (item["solicitation"].return_by_date or date.max, item["line"].id))
 
     return render(request, "sales/bids/ready.html", {
         "bid_lines": bid_lines,
@@ -143,6 +145,13 @@ def bid_builder(request, sol_number):
         elif not quoter_cage or len(quoter_cage) != 5:
             messages.error(request, "Quoter CAGE must be 5 characters.")
         else:
+            selected_quote_id = request.POST.get("selected_quote_id")
+            if selected_quote_id:
+                try:
+                    q = SupplierQuote.objects.get(pk=int(selected_quote_id), line=line)
+                    selected_quote = q
+                except (ValueError, TypeError, SupplierQuote.DoesNotExist):
+                    pass
             supplier_cost = float(selected_quote.unit_price)
             margin_pct = (float(up) - supplier_cost) / float(up) * 100 if up else None
 
@@ -220,6 +229,7 @@ def bid_builder(request, sol_number):
         "approved_sources": approved_sources,
         "quotes": quotes_list,
         "selected_quote": selected_quote,
+        "bid": existing_bid,
         "existing_bid": existing_bid,
         "company_cages": company_cages,
         "default_cage": default_cage,
@@ -248,7 +258,7 @@ def bid_builder(request, sol_number):
 @login_required
 @require_POST
 def bid_select_quote(request):
-    """Set is_selected_for_bid=True for quote_id; clear others for same line. Redirect to bid_builder."""
+    """Set is_selected_for_bid=True for quote_id; clear others for same line. Redirect to next or bids_ready."""
     quote_id = request.POST.get("quote_id")
     if not quote_id:
         messages.warning(request, "No quote selected.")
@@ -261,30 +271,34 @@ def bid_select_quote(request):
     quote.is_selected_for_bid = True
     quote.save(update_fields=["is_selected_for_bid"])
     messages.success(request, "Quote selected for bid.")
-    return redirect("sales:bid_builder", sol_number=quote.line.solicitation.solicitation_number)
+    next_url = request.POST.get("next") or reverse("sales:bids_ready")
+    return redirect(next_url)
 
 
 @login_required
 def bids_export_queue(request):
     """List GovernmentBid in DRAFT where solicitation status is BID_READY."""
+    export_errors = request.session.pop("export_errors", [])
     export_bids = (
         GovernmentBid.objects.filter(
             bid_status="DRAFT",
             solicitation__status="BID_READY",
         )
         .select_related("solicitation", "line", "selected_quote", "selected_quote__supplier")
+        .order_by("solicitation__return_by_date")
     )
     total_count = export_bids.count()
     return render(request, "sales/bids/export_queue.html", {
         "export_bids": export_bids,
         "total_count": total_count,
+        "export_errors": export_errors,
     })
 
 
 @login_required
 @require_POST
 def bids_export_download(request):
-    """POST: bid_ids[]. Generate BQ file, return download. On validation error re-render export_queue with errors."""
+    """POST: bid_ids[]. Generate BQ file, return download. On BQExportError store errors in session and redirect."""
     bid_ids = request.POST.getlist("bid_ids[]") or request.POST.getlist("bid_ids")
     bid_ids = [int(x) for x in bid_ids if str(x).isdigit()]
     if not bid_ids:
@@ -294,18 +308,11 @@ def bids_export_download(request):
     try:
         content = generate_bq_file(bid_ids)
     except BQExportError as e:
-        export_bids = (
-            GovernmentBid.objects.filter(bid_status="DRAFT", solicitation__status="BID_READY")
-            .select_related("solicitation", "line", "selected_quote")
-        )
-        return render(request, "sales/bids/export_queue.html", {
-            "export_bids": export_bids,
-            "total_count": export_bids.count(),
-            "export_errors": e.errors,
-        })
+        request.session["export_errors"] = e.errors
+        return redirect("sales:bids_export_queue")
 
     from django.utils import timezone
-    filename = f"bq{date.today().strftime('%y%m%d')}.txt"
+    filename = f"BQ_export_{date.today().isoformat()}.txt"
     for bid in GovernmentBid.objects.filter(pk__in=bid_ids):
         bid.bid_status = "SUBMITTED"
         bid.submitted_at = timezone.now()
@@ -317,3 +324,33 @@ def bids_export_download(request):
     response = HttpResponse(content, content_type="text/plain")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+@login_required
+def bids_history(request):
+    """
+    All submitted bids with outcome tracking.
+    POST action=set_outcome: mark solicitation WON or LOST.
+    """
+    if request.method == 'POST':
+        bid_id = request.POST.get('bid_id')
+        outcome = request.POST.get('outcome', '').strip().upper()
+        if bid_id and outcome in ('WON', 'LOST', 'NO_BID'):
+            bid = get_object_or_404(GovernmentBid, pk=bid_id)
+            bid.solicitation.status = outcome
+            bid.solicitation.save(update_fields=['status'])
+            messages.success(request, f"Marked {bid.solicitation.solicitation_number} as {outcome}.")
+        return redirect('sales:bids_history')
+
+    qs = (
+        GovernmentBid.objects
+        .filter(bid_status__in=['SUBMITTED', 'ACCEPTED', 'REJECTED'])
+        .select_related('solicitation', 'line', 'selected_quote__supplier')
+        .order_by('-submitted_at')
+    )
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'sales/bids/history.html', {
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+    })

@@ -4,9 +4,11 @@ Daily DIBBS import upload view.
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 
 from sales.forms import ImportUploadForm
 from sales.services.importer import run_import
+from sales.models import ImportBatch
 
 
 @login_required
@@ -55,3 +57,15 @@ def import_upload(request):
         context['match_tier_2'] = by_tier.get(2, 0)
         context['match_tier_3'] = by_tier.get(3, 0)
     return render(request, 'sales/import/upload.html', context)
+
+
+@login_required
+def import_history(request):
+    """List all past import batches ordered most-recent first."""
+    qs = ImportBatch.objects.order_by('-import_date', '-imported_at')
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'sales/import/history.html', {
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+    })

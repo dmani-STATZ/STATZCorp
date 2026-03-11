@@ -1,7 +1,8 @@
 # DIBBS Government Bidding System
 ## Technical Architecture & Design Specification
-**Version 1.0  |  March 2026**
+**Version 2.0  |  March 2026**
 *Django + SQL Server  |  Procurement Pipeline Replacement*
+*Updated March 11, 2026 — Sessions 5 & 6 complete. Phase 2 substantially done.*
 
 ---
 
@@ -71,6 +72,10 @@
     - 12.5 RFQ Auto-Build Confirmation
     - 12.6 Dark Mode
     - 12.7 Timeline
+13. [Session 7 — Remaining Work & Go-Live Checklist](#13-session-7--remaining-work--go-live-checklist)
+    - 13.1 Go-Live Blockers
+    - 13.2 Session 7 Recommended Build Tasks
+    - 13.3 Complete Daily Workflow
 
 ---
 
@@ -78,7 +83,7 @@
 
 Progress tracker for the DIBBS build. Each item links to the spec section with the detailed requirements.
 
-### Phase 1 — Critical Path *(target: Weeks 1–2)* ✅ COMPLETE
+### Phase 1 — Critical Path *(target: Weeks 1–2)* ✅ COMPLETE (including originally-deferred BQ items)
 
 | Status | Task | Spec Section | Session |
 |--------|------|-------------|---------|
@@ -95,10 +100,10 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | ✅ Done | Solicitation triage buckets — `bucket` field + `assign_triage_bucket()` auto-assign on import | §12.2 | S1, S3 |
 | ✅ Done | Triage UI — bucket filter tab strip on solicitation list (SDVOSB / HUBZone / Growth / Skip) | §12.2 | S3 |
 | ✅ Done | No-bid action — POST endpoint, status update, redirect | §9.7 | S3 |
-| ⏩ Deferred | Manual BQ field entry form (`views/bids.py`) | §9.8 | Phase 2 |
-| ⏩ Deferred | BQ export scaffold — all 121 columns (`services/bq_export.py`) | §5, §5.0.1 | Phase 2 |
+| ✅ Done | Manual BQ field entry form + bid builder (`views/bids.py`) | §9.8 | S5/S6 |
+| ✅ Done | BQ export scaffold — all 121 columns (`services/bq_export.py`) | §5, §5.0.1 | S5 |
 
-### Phase 2 — Core Automation *(target: Weeks 3–4)* 🔄 IN PROGRESS
+### Phase 2 — Core Automation *(target: Weeks 3–4)* ✅ SUBSTANTIALLY COMPLETE
 
 | Status | Task | Spec Section | Session |
 |--------|------|-------------|---------|
@@ -106,30 +111,39 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | ✅ Done | Contract history backfill — `backfill_nsn_from_contracts()` one-time seed of `dibbs_supplier_nsn` | §4.2, §12.3 | S2 |
 | ✅ Done | Backfill trigger — view + URL + template (`suppliers/backfill-nsn/`) | §4.2 | S2 |
 | ✅ Done | Match review UI on solicitation detail — Matches tab with tier badges | §9.7 | S3 |
-| ⬜ Todo | HUBZone flag UI — manually mark solicitations as HUBZone requested | §12.2 | S5 |
+| ⬜ Todo | HUBZone flag UI — bulk-mark solicitations as HUBZone from solicitation list | §12.2 | S7 |
 | ✅ Done | RFQ email generation (`services/email.py`) — outbound + follow-up templates | §10.2, §10.7 | S4 |
 | ✅ Done | RFQ dispatch — Pending queue + send batch/single (`views/rfq.py`) | §10.5, §10.8 | S4 |
 | ✅ Done | RFQ Sent list — Overdue / Urgent / Awaiting / Responded / Closed sections | §10.8 | S4 |
+| ✅ Done | 3-panel RFQ Center — fetch-driven, inline quote entry, live queue filter | §10.8 | S5/S6 |
 | ✅ Done | Supplier quote entry form — Unit Price + Lead Time, live suggested bid, Ctrl+Enter | §10.4 | S4 |
 | ✅ Done | Contact log — `SupplierContactLog` model + activity feed on solicitation detail | §10.6, §10.9 | S4 |
 | ✅ Done | Follow-up email dispatch — `send_followup_email()`, follow_up_count tracking | §10.5, §10.7 | S4 |
 | ✅ Done | `CompanyCAGE` model — `smtp_reply_to`, `default_markup_pct`, `is_default` | §8.1 | S4 |
-| ✅ Done | `Solicitation.dibbs_pdf_url` property — constructs DIBBS PDF link from `pdf_file_name` | §11.4 | S4 |
-| ✅ Done | `quote_select_for_bid` view — sets `is_selected_for_bid=True`; does not auto-clear other quotes | §9.7 | S4 |
+| ✅ Done | `Solicitation.dibbs_pdf_url` — correct URL: `dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/` | §11.4 | S4/S5 |
+| ✅ Done | `bid_select_quote` — clears `is_selected_for_bid` on other quotes for same line before setting | §9.7 | S6 |
 | ✅ Done | Solicitation detail — Matches tab Send RFQ wired; RFQs, Quotes, Activity tabs populated | §9.7 | S4 |
-| ⬜ Todo | Price history per NSN | §7 Phase 2 | S5 |
-| ⬜ Todo | Bid assembly with margin calculation (`views/bids.py`) | §9.8 | S5 |
-| ⬜ Todo | BQ export scaffold — all 121 columns (`services/bq_export.py`) | §5, §5.0.1 | S5 |
-| ⬜ Todo | Supplier capability management — NSN/FSC add views (`views/suppliers.py`) | §6.1 | S5 |
+| ✅ Done | Bid assembly with margin calculation — `bid_builder`, `bids_ready`, `bid_select_quote` | §9.8 | S5/S6 |
+| ✅ Done | BQ export service — 121-column overlay + validation (`services/bq_export.py`) | §5, §5.0.1 | S5 |
+| ✅ Done | BQ export queue + download — `bids_export_queue`, `bids_export_download` | §5.2 | S5/S6 |
+| ✅ Done | Supplier list + detail — Profile / Capabilities / Quote History tabs | §9.1 | S5/S6 |
+| ✅ Done | Supplier NSN/FSC add & remove views | §6.1 | S5/S6 |
+| ✅ Done | Import performance rewrite — bulk fetch/diff/bulk_create (~12 queries vs ~10,000) | §2.2 | S5 |
+| ⏩ Deferred | Price history per NSN (trending charts) | §7 Phase 3 | Phase 3 |
 
-### Phase 3 — Polish & Reporting *(target: Weeks 5–6)*
+### Phase 3 — Polish & Reporting *(target: post go-live)*
 
 | Status | Task | Spec Section |
 |--------|------|-------------|
+| ⬜ Todo | HUBZone flag UI — bulk-mark from solicitation list (moved from Phase 2) | §12.2 |
+| ⬜ Todo | Settings page — CompanyCAGE management UI (`/sales/settings/cages/`) | §8.1 |
+| ⬜ Todo | Email settings — configure `EMAIL_*` in `settings.py` + default CompanyCAGE with `smtp_reply_to` | §10.2 |
 | ⬜ Todo | BQ export full 121-column validation ruleset | §5 |
+| ⬜ Todo | Bid History page — `/sales/bids/history/` all submitted bids with outcome tracking | §9.1 |
+| ⬜ Todo | Import History page — `/sales/import/history/` all past import batches | §9.1 |
 | ⬜ Todo | Win/loss reporting and analytics | §7 Phase 3 |
-| ⬜ Todo | Price history trending | §7 Phase 3 |
-| ⬜ Todo | Bulk actions — no-bid batches, mass RFQ send | §7 Phase 3 |
+| ⬜ Todo | Price history per NSN — trending charts | §7 Phase 3 |
+| ⬜ Todo | Bulk no-bid actions | §7 Phase 3 |
 | ⬜ Todo | Role-based access control | §7 Phase 3 |
 | ⬜ Todo | Dark mode | §12.6 |
 
@@ -137,12 +151,18 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 
 | Priority | Item | Owner | Section | Status |
 |----------|------|-------|---------|--------|
-| ✅ Resolved | `is_packhouse=True` on `contracts_supplier` identifies packaging facilities | Dev | §12.3 | Confirmed, implemented in `backfill_nsn_from_contracts()` |
-| ✅ Resolved | `award_date` is the field name on the Contract model | Dev | §12.3.1 | Confirmed, implemented in matching engine |
-| 🟡 Med | Establish process for HUBZone partner to send solicitation lists | Sales | §12.2 | Pending |
+| ✅ Resolved | `is_packhouse=True` on `contracts_supplier` identifies packaging facilities | Dev | §12.3 | Confirmed, implemented |
+| ✅ Resolved | `award_date` is the field name on the Contract model | Dev | §12.3.1 | Confirmed, implemented |
 | ✅ Resolved | Phase 1 complete before end of March 2026 | — | §12.7 | ✅ Complete |
-| 🟡 Med | Email settings not configured in `STATZWeb/settings.py` — configure `EMAIL_*` + `DEFAULT_FROM_EMAIL` + default `CompanyCAGE` with `smtp_reply_to` before RFQ emails will send | Dev | §10.2 | Pending |
-| 🟡 Med | `quote_select_for_bid` does not clear `is_selected_for_bid` on other quotes for the same line — Bid Builder (S5) must handle "find best/selected quote" defensively (cheapest if none flagged, or add clear-others logic on select) | Dev | §9.7 | Known gap, fix in S5 |
+| ✅ Resolved | `dibbs_pdf_url` using wrong domain/path | Dev | §11.4 | Fixed: uses `dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/` |
+| ✅ Resolved | `quote_select_for_bid` did not clear other quotes — `bid_select_quote` now clears first | Dev | §9.7 | Fixed in S6 |
+| ✅ Resolved | Import timing out on large files (500 error) | Dev | §2.2 | Fixed: bulk rewrite in S5, ~12 queries total |
+| ✅ Resolved | `Supplier.objects.filter(archived=False)` in `supplier_list` — `archived` field confirmed on `contracts_supplier` (`BooleanField(default=False)`) | Dev | §3.3 | Confirmed valid |
+| 🟡 Med | Email settings not configured in `settings.py` — configure `EMAIL_*` + `DEFAULT_FROM_EMAIL` + create default `CompanyCAGE` record with `smtp_reply_to` before RFQ emails will send | Dev | §10.2 | Pending — required before go-live |
+| 🟡 Med | Establish process for HUBZone partner to send solicitation lists + build bulk-flag UI | Sales/Dev | §12.2 | Pending — S7 |
+| 🔴 High | `hubzone_requested_by` field missing from `Solicitation` model — must add + migrate before S7 HUBZone UI | Dev | §12.2 | S7 prerequisite — add `CharField(max_length=100, blank=True, default='')` to `dibbs_solicitation` |
+| 🔴 S7 Prereq | `hubzone_requested_by` field missing from `Solicitation` model — add `CharField(max_length=100, blank=True, default="")` + run migration before S7 HUBZone UI | Dev | §12.2 | Needs migration |
+| 🟡 Med | CompanyCAGE record must be created in Django admin before bid builder will work | Dev/Admin | §8.1 | Pending — required before go-live |
 
 ### Cursor Session Log
 
@@ -151,7 +171,9 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | Mar 2026 | S0 — Models + initial migration | All `dibbs_*` models, migration file |
 | Mar 2026 | S1 — Import pipeline + solicitation list | `parser.py`, `importer.py`, `views/imports.py`, `views/solicitations.py` (list), `urls.py`, `base.html`, `upload.html`, `list.html` |
 | Mar 2026 | S2 — Matching engine + backfill | `services/matching.py` (3-tier engine + `backfill_nsn_from_contracts()`), backfill view/URL/template, matching wired into import |
-| Mar 2026 | S4 — RFQ dispatch, quote entry, email service | `services/email.py` (send_rfq_email, send_followup_email), `models/cages.py` (CompanyCAGE + smtp_reply_to), `models/rfq.py` (SupplierRFQ extra fields, SupplierContactLog), `views/rfq.py` (9 views), `solicitations.py` detail updated (rfqs/quotes/contact_log/activity tabs), `base.html` RFQ Center nav, `rfq/pending.html`, `rfq/sent.html`, `rfq/quote_entry.html`, `urls.py` updated |
+| Mar 2026 | S4 — RFQ dispatch, quote entry, email service | `services/email.py`, `models/cages.py` (CompanyCAGE), `models/rfq.py` (SupplierRFQ + SupplierContactLog), `views/rfq.py` (9 views), solicitation detail tabs, `rfq/pending.html`, `rfq/sent.html`, `rfq/quote_entry.html` |
+| Mar 11, 2026 | S5 — BQ export, bid views, supplier views, import rewrite, RFQ Center + templates | `services/bq_export.py`, `services/importer.py` (perf rewrite), `views/bids.py` (stubs), `views/suppliers.py` (stubs), all templates: `rfq/center.html`, `rfq/partials/center_panel.html`, `bids/ready.html`, `bids/builder.html`, `bids/export_queue.html`, `suppliers/list.html`, `suppliers/detail.html`, `suppliers/add_nsn.html`, `suppliers/add_fsc.html` |
+| Mar 11, 2026 | S6 — Missing view functions wired up | `views/rfq.py` (`rfq_center`, `rfq_center_detail`), `views/bids.py` (all 5 views complete), `views/suppliers.py` (all views complete, `backfill_nsn` preserved), `views/__init__.py` updated |
 
 ---
 
@@ -382,6 +404,7 @@ class SupplierFSC(models.Model):
 ```python
 class SupplierRFQ(models.Model):
     STATUS_CHOICES = [
+        ('PENDING', 'Pending'),   # created but email not yet sent
         ('SENT', 'Sent'),
         ('RESPONDED', 'Responded'),
         ('NO_RESPONSE', 'No Response'),
@@ -389,13 +412,18 @@ class SupplierRFQ(models.Model):
     ]
     line = models.ForeignKey('SolicitationLine', on_delete=models.CASCADE,
                               related_name='rfqs')
-    supplier = models.ForeignKey('contracts.Supplier', on_delete=models.CASCADE,
+    supplier = models.ForeignKey('suppliers.Supplier', on_delete=models.CASCADE,
                                   related_name='dibbs_rfqs')
     sent_at = models.DateTimeField(null=True, blank=True)
-    sent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    email_sent_to = models.EmailField()   # snapshot of address at send time
+    sent_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    email_sent_to = models.EmailField(null=True, blank=True)   # snapshot of address at send time
     response_received_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SENT')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    email_message_id = models.CharField(max_length=255, null=True, blank=True)
+    follow_up_sent_at = models.DateTimeField(null=True, blank=True)
+    follow_up_count = models.IntegerField(default=0)
+    notes = models.TextField(null=True, blank=True)
+    declined_reason = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_supplier_rfq'
@@ -3177,18 +3205,21 @@ https://www.dibbs.bsm.dla.mil/Docs/RFQ/{pdf_filename}
 
 The app stores the `pdf_file_name` from the IN file (already in `dibbs_solicitation.pdf_file_name`) and constructs the URL at runtime. Suppliers receive the direct DIBBS link in the RFQ email body. There is nothing to store, nothing to sync, and the supplier always gets the authoritative document straight from the government source.
 
-**Model property** (add to `Solicitation`):
+**Model property** (implemented in `sales/models/solicitations.py`):
 ```python
 @property
 def dibbs_pdf_url(self):
-    if self.pdf_file_name:
-        return f"https://www.dibbs.bsm.dla.mil/Docs/RFQ/{self.pdf_file_name}"
+    if self.pdf_file_name and self.solicitation_number:
+        subdir = self.solicitation_number[-1].upper()
+        return f"https://dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/{self.pdf_file_name.upper()}"
     return None
 ```
 
+> ⚠ **Note:** The original spec URL (`https://www.dibbs.bsm.dla.mil/Docs/RFQ/{filename}`) was incorrect. The live URL format uses `dibbs2.bsm.dla.mil/Downloads/RFQ/{last_char_of_sol_number}/{filename}` — subdirectory is derived from the last character of the solicitation number. Already corrected in production.
+
 **In the RFQ email template**, include the link in the body:
 ```
-Solicitation PDF: https://www.dibbs.bsm.dla.mil/Docs/RFQ/{pdf_filename}
+Solicitation PDF: https://dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/{pdf_filename}
 ```
 
 **In the app UI**, all "View PDF" buttons open this URL in a new tab.
@@ -3204,6 +3235,48 @@ Solicitation PDF: https://www.dibbs.bsm.dla.mil/Docs/RFQ/{pdf_filename}
 | How do salespeople view PDFs? | "View on DIBBS" button opens URL in new tab | Same approach — no storage needed anywhere |
 | How do salespeople look up a supplier reply? | Global topbar search, `/` shortcut, matches sol#/NSN/name/CAGE/part# | Works from any page without navigation; handles any identifier in the email |
 | Search field normalization | Strip hyphens from NSN input before matching | `8465017225469` and `8465-01-722-5469` both hit the same record |
+
+---
+
+## 13. Session 7 — Remaining Work & Go-Live Checklist
+
+*What remains before the app is fully operational for daily use.*
+
+### 13.1 Go-Live Blockers (Must Complete Before Cutover)
+
+| # | Item | Action | Notes |
+|---|------|--------|-------|
+| 1 | Email not configured | Set `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` in `settings.py` | RFQ emails will silently fail until this is done |
+| 2 | No CompanyCAGE record | Create via Django admin — set `is_default=True`, populate all fields including `smtp_reply_to` | Bid builder and BQ export will error without it |
+| 3 | ~~`supplier_list` `archived` field~~ | ✅ Resolved — `archived = BooleanField(default=False)` confirmed on `contracts_supplier`. No change needed. | |
+| 4 | `hubzone_requested_by` missing from `Solicitation` model | Add `hubzone_requested_by = CharField(max_length=100, blank=True, default='')` to `sales/models/solicitations.py` + run migration | Required before HUBZone bulk-flag UI in S7 can be built |
+
+### 13.2 Session 7 — Recommended Build Tasks
+
+These are the highest-value remaining items that can be completed in one Cursor session:
+
+| Priority | Task | Detail |
+|----------|------|--------|
+| 🔴 High | HUBZone bulk-flag UI | Add checkboxes to solicitation list + "Mark as HUBZone" POST action. Travis sends a daily screenshot — staff needs to quickly mark 5–15 solicitations. One button, one POST, done. |
+| 🔴 High | Settings page — CompanyCAGE management | `/sales/settings/cages/` — list, add, edit CompanyCAGE records. Required so non-dev staff can set up the CAGE without Django admin access. |
+| 🟡 Med | `no_bid` action on solicitation detail | Verify the existing `no_bid` view is wired to the solicitation detail Bid tab's "No Bid" button |
+| 🟡 Med | Import History page | `/sales/import/history/` — simple table of ImportBatch records with date, file names, row counts |
+| 🟡 Med | Bid History page | `/sales/bids/history/` — submitted bids with outcome tracking (WON/LOST/NO_BID assignment) |
+| 🟢 Nice | Dashboard urgent badge on nav | Show count of RFQs overdue in the RFQ Center nav item |
+
+### 13.3 What a Complete Daily Workflow Looks Like
+
+After Session 7, the full daily cycle should be:
+
+```
+1. David downloads IN + BQ + AS files from DIBBS
+2. Upload at /sales/import/ → matching runs automatically
+3. Review new solicitations → triage buckets (SDVOSB auto, HUBZone manual, Growth/Skip auto)
+4. RFQ Center Pending → review matches → Send RFQs
+5. RFQ Center → monitor responses → Enter Quotes as suppliers respond
+6. Bid Center Ready to Bid → Build Bid for each quoted line
+7. Export Queue → Export BQ file → Upload to DIBBS
+```
 
 ---
 

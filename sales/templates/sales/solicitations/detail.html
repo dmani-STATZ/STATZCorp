@@ -323,6 +323,18 @@
 {# Bid Tab #}
 {% if active_tab == 'bid' %}
 <div class="alert-info">Bid builder coming in a later session.</div>
+{% if solicitation.status != 'NO_BID' and solicitation.status != 'BID_SUBMITTED' and solicitation.status != 'WON' and solicitation.status != 'LOST' %}
+<form method="post" action="{% url 'sales:no_bid' sol_number=solicitation.solicitation_number %}"
+      style="display:inline;">
+    {% csrf_token %}
+    <button type="submit"
+            onclick="return confirm('Mark this solicitation as No Bid?')"
+            style="padding:0.5rem 1rem; background:#dc2626; color:#fff; border:none;
+                   border-radius:6px; font-size:0.875rem; font-weight:500; cursor:pointer;">
+        No Bid
+    </button>
+</form>
+{% endif %}
 {% endif %}
 
 {# Activity Feed — visible on all tabs #}

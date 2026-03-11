@@ -75,6 +75,12 @@ class Solicitation(models.Model):
         null=True,
         blank=True,
     )
+    hubzone_requested_by = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Name or note from HUBZone partner who requested this solicitation be worked.",
+    )
 
     class Meta:
         db_table = 'dibbs_solicitation'

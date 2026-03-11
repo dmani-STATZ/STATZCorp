@@ -71,6 +71,24 @@ def solicitation_list(request):
     Lists solicitations with filtering and pagination.
     Annotates each solicitation with first_line and total_match_count.
     """
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        sol_ids = request.POST.getlist('sol_ids')
+        if action == 'reassign_bucket' and sol_ids:
+            new_bucket = request.POST.get('new_bucket', '').strip()
+            bucket_note = request.POST.get('bucket_note', '').strip()
+            valid_buckets = [b[0] for b in Solicitation.BUCKET_CHOICES]
+            if new_bucket in valid_buckets:
+                update_kwargs = {
+                    'bucket': new_bucket,
+                    'bucket_assigned_by': 'manual',
+                    'hubzone_requested_by': bucket_note,
+                }
+                Solicitation.objects.filter(id__in=sol_ids).update(**update_kwargs)
+                label = dict(Solicitation.BUCKET_CHOICES).get(new_bucket, new_bucket)
+                messages.success(request, f"{len(sol_ids)} solicitation(s) moved to {label}.")
+        return redirect(request.get_full_path())
+
     from django.core.paginator import Paginator
     import datetime
 
