@@ -2,7 +2,18 @@
 Sales app views.
 """
 from sales.views.dashboard import dashboard
-from sales.views.imports import import_upload, import_history
+from sales.views.imports import (
+    import_upload,
+    import_history,
+    import_batch_delete,
+    import_job_progress,
+    import_step_parse,
+    import_step_solicitations,
+    import_step_lines,
+    import_step_match,
+    import_step_awards,
+    sync_awards_view,
+)
 from sales.views.solicitations import (
     solicitation_list,
     solicitation_detail,
@@ -45,11 +56,20 @@ from sales.views.settings import (
     settings_cage_add,
     settings_cage_edit,
 )
+from sales.views.entity_lookup import entity_lookup
 
 __all__ = [
     "dashboard",
     "import_upload",
     "import_history",
+    "import_batch_delete",
+    "import_job_progress",
+    "import_step_parse",
+    "import_step_solicitations",
+    "import_step_lines",
+    "import_step_match",
+    "import_step_awards",
+    "sync_awards_view",
     "solicitation_list",
     "solicitation_detail",
     "no_bid",
@@ -82,4 +102,5 @@ __all__ = [
     "settings_cages",
     "settings_cage_add",
     "settings_cage_edit",
+    "entity_lookup",
 ]

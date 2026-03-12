@@ -22,6 +22,40 @@ class ImportBatch(models.Model):
         verbose_name_plural = 'Import batches'
 
 
+class ImportJob(models.Model):
+    """
+    Tracks a multi-step AJAX import in progress.
+    Created when files are uploaded; updated as each step completes.
+    Allows the progress page to survive a browser refresh.
+    """
+    STATUS_UPLOADED   = 'uploaded'
+    STATUS_PARSING    = 'parsing'
+    STATUS_SOLS       = 'solicitations'
+    STATUS_LINES      = 'lines'
+    STATUS_MATCHING   = 'matching'
+    STATUS_COMPLETE   = 'complete'
+    STATUS_ERROR      = 'error'
+
+    job_id        = models.CharField(max_length=36, unique=True)   # UUID
+    status        = models.CharField(max_length=20, default=STATUS_UPLOADED)
+    in_file_path  = models.CharField(max_length=500, null=True, blank=True)
+    bq_file_path  = models.CharField(max_length=500, null=True, blank=True)
+    as_file_path  = models.CharField(max_length=500, null=True, blank=True)
+    in_file_name  = models.CharField(max_length=100, null=True, blank=True)
+    bq_file_name  = models.CharField(max_length=100, null=True, blank=True)
+    as_file_name  = models.CharField(max_length=100, null=True, blank=True)
+    import_date   = models.DateField(null=True, blank=True)
+    batch_id      = models.IntegerField(null=True, blank=True)   # FK to ImportBatch after step 1
+    step_results  = models.TextField(default='{}')               # JSON: accumulated per-step results
+    imported_by   = models.CharField(max_length=100, null=True, blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    error_message = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'tbl_ImportJob'
+        verbose_name = 'Import job'
+
+
 class Solicitation(models.Model):
     """One row per solicitation (from IN/BQ)."""
     STATUS_CHOICES = [

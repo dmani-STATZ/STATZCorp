@@ -36,6 +36,8 @@
   .data-table-wrap td { padding: 0.625rem 1rem; border-bottom: 1px solid #eef2f8; }
   .badge-sb { background: #e8eaf6; color: #283593; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }
   .badge-warn { background: #fff3e0; color: #bf360c; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+  .form-control { padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
+  .form-card + .form-card { margin-top: 0.75rem; }
 </style>
 
 {# Pipeline Track #}
@@ -152,10 +154,36 @@
   {% if approved_sources %}
   <div class="data-table-wrap">
     <table>
-      <thead><tr><th>CAGE</th><th>Part Number</th><th>Company Name</th></tr></thead>
+      <thead><tr><th>CAGE</th><th>Part Number</th><th>Company Name</th><th></th></tr></thead>
       <tbody>
         {% for src in approved_sources %}
-        <tr><td class="mono">{{ src.approved_cage }}</td><td class="mono">{{ src.part_number|default:"—" }}</td><td>{{ src.company_name|default:"—" }}</td></tr>
+        <tr>
+          <td class="mono">
+            {% if src.matched_supplier %}
+              <a href="{% url 'suppliers:supplier_detail' src.matched_supplier.pk %}" style="font-weight:600; color:#0a1628; text-decoration:none;">{{ src.approved_cage }}</a>
+            {% else %}
+              {{ src.approved_cage }}
+            {% endif %}
+          </td>
+          <td class="mono">{{ src.part_number|default:"—" }}</td>
+          <td>
+            {% if src.matched_supplier %}
+              <a href="{% url 'suppliers:supplier_detail' src.matched_supplier.pk %}" style="color:#1a2940; text-decoration:none;">{{ src.matched_supplier.name }}</a>
+            {% else %}
+              {{ src.company_name|default:"—" }}
+            {% endif %}
+          </td>
+          <td>
+            {% if src.matched_supplier %}
+              <span style="font-size:0.75rem; background:rgba(45,198,83,0.1); color:#166534; border:1px solid rgba(45,198,83,0.3); padding:0.15rem 0.5rem; border-radius:4px;">In system</span>
+            {% else %}
+              <a href="{% url 'sales:entity_cage_lookup' cage_code=src.approved_cage %}" target="_blank" rel="noopener noreferrer"
+                 style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:600; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:0.15rem 0.5rem; border-radius:4px; text-decoration:none; white-space:nowrap;">
+                &#128269; Lookup on SAM.gov
+              </a>
+            {% endif %}
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -168,6 +196,59 @@
 
 {# Matches Tab #}
 {% if active_tab == 'matches' %}
+
+{# Approved Sources section — always shown on Matches tab #}
+<div class="data-table-wrap" style="margin-bottom:1.5rem;">
+  <div class="table-header">
+    <div class="table-title">Approved Sources <span style="font-size:0.75rem; font-weight:400; color:#6b7280;">(DIBBS data for this NSN)</span></div>
+  </div>
+  {% if approved_sources %}
+  <table>
+    <thead>
+      <tr>
+        <th>CAGE</th>
+        <th>Part Number</th>
+        <th>Company Name</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for src in approved_sources %}
+      <tr>
+        <td class="mono">
+          {% if src.matched_supplier %}
+            <a href="{% url 'suppliers:supplier_detail' src.matched_supplier.pk %}" style="font-weight:600; color:#0a1628; text-decoration:none;">{{ src.approved_cage }}</a>
+          {% else %}
+            {{ src.approved_cage }}
+          {% endif %}
+        </td>
+        <td class="mono">{{ src.part_number|default:"—" }}</td>
+        <td>
+          {% if src.matched_supplier %}
+            <a href="{% url 'suppliers:supplier_detail' src.matched_supplier.pk %}" style="color:#1a2940; text-decoration:none;">{{ src.matched_supplier.name }}</a>
+          {% else %}
+            {{ src.company_name|default:"—" }}
+          {% endif %}
+        </td>
+        <td>
+          {% if src.matched_supplier %}
+            <span style="font-size:0.75rem; background:rgba(45,198,83,0.1); color:#166534; border:1px solid rgba(45,198,83,0.3); padding:0.15rem 0.5rem; border-radius:4px;">In system</span>
+          {% else %}
+            <a href="{% url 'sales:entity_cage_lookup' cage_code=src.approved_cage %}" target="_blank" rel="noopener noreferrer"
+               style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:600; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:0.15rem 0.5rem; border-radius:4px; text-decoration:none; white-space:nowrap;">
+              &#128269; Lookup on SAM.gov
+            </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:1rem 1.25rem; color:#9ca3af; font-size:0.875rem;">No approved sources on file for this NSN.</div>
+  {% endif %}
+</div>
+
 {% if not match_count %}
 <div class="alert-info">No matches found — consider adding supplier NSN/FSC capability manually.</div>
 {% else %}
@@ -322,18 +403,305 @@
 
 {# Bid Tab #}
 {% if active_tab == 'bid' %}
-<div class="alert-info">Bid builder coming in a later session.</div>
-{% if solicitation.status != 'NO_BID' and solicitation.status != 'BID_SUBMITTED' and solicitation.status != 'WON' and solicitation.status != 'LOST' %}
-<form method="post" action="{% url 'sales:no_bid' sol_number=solicitation.solicitation_number %}"
-      style="display:inline;">
-    {% csrf_token %}
-    <button type="submit"
-            onclick="return confirm('Mark this solicitation as No Bid?')"
-            style="padding:0.5rem 1rem; background:#dc2626; color:#fff; border:none;
-                   border-radius:6px; font-size:0.875rem; font-weight:500; cursor:pointer;">
+
+{% if existing_bid and existing_bid.bid_status == 'SUBMITTED' %}
+{# ── Submitted: read-only summary ── #}
+<div class="form-card" style="border-left: 4px solid #2dc653;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+    <div class="form-label" style="margin:0;">Bid Submitted</div>
+    <span style="font-size:0.75rem; color:#6b7280;">{{ existing_bid.submitted_at|date:"M j, Y H:i" }}</span>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:0.75rem; font-size:0.875rem;">
+    <div><div class="form-label">Unit Price</div><div class="mono" style="font-weight:700; color:#004eb3;">${{ existing_bid.unit_price }}</div></div>
+    <div><div class="form-label">Delivery</div><div>{{ existing_bid.delivery_days }} days</div></div>
+    <div><div class="form-label">Bid Type</div><div>{{ existing_bid.bid_type_code }}</div></div>
+    <div><div class="form-label">Quoter CAGE</div><div class="mono">{{ existing_bid.quoter_cage }}</div></div>
+    <div><div class="form-label">Supplier Cost</div><div class="mono">${{ existing_bid.selected_quote.unit_price|default:"—" }}</div></div>
+    <div><div class="form-label">Margin</div><div>{{ existing_bid.margin_pct|floatformat:1 }}%</div></div>
+  </div>
+</div>
+
+{% elif not quotes %}
+{# ── No quotes yet ── #}
+<div class="form-card" style="text-align:center; padding:2rem; color:#6b7280;">
+  <div style="font-size:1.5rem; margin-bottom:0.5rem;">💬</div>
+  <div style="font-weight:600; margin-bottom:0.25rem;">No quotes yet</div>
+  <div style="font-size:0.875rem;">Send RFQs to suppliers and enter their quotes before building a bid.</div>
+</div>
+
+{% else %}
+{# ── Bid builder form ── #}
+
+{# Price compare bar #}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.25rem; padding:1rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; flex-wrap:wrap;">
+  <div style="flex:1; min-width:130px;">
+    <div class="form-label">Supplier Cost</div>
+    <div class="mono" style="font-size:1.2rem; margin-top:0.2rem;">${{ selected_quote_for_bid.unit_price }}</div>
+    <div style="font-size:11px; color:#6b7280;">{{ selected_quote_for_bid.supplier.name|default:selected_quote_for_bid.supplier.cage_code }}</div>
+  </div>
+  <div style="font-size:1.4rem; color:#94a3b8;">→</div>
+  <div style="flex:1; min-width:130px;">
+    <div class="form-label">Your Bid Price</div>
+    <div class="mono" style="font-size:1.2rem; font-weight:700; color:#004eb3; margin-top:0.2rem;" id="bid-live-price">${{ bid_iv.price }}</div>
+    <div id="bid-live-margin" style="display:inline-block; padding:0.2rem 0.45rem; border-radius:5px; font-size:0.7rem; font-weight:600; margin-top:0.2rem;">—</div>
+  </div>
+  {% if existing_bid %}
+  <div style="flex:0 0 auto;">
+    <span style="padding:0.25rem 0.65rem; border-radius:6px; font-size:0.75rem; font-weight:600;
+      {% if existing_bid.bid_status == 'DRAFT' %}background:rgba(251,191,36,0.15); color:#d97706;{% else %}background:rgba(45,198,83,0.15); color:#16a34a;{% endif %}">
+      {{ existing_bid.get_bid_status_display }}
+    </span>
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" action="{% url 'sales:bid_builder' sol_number=solicitation.solicitation_number %}" id="bid-builder-form">
+  {% csrf_token %}
+  <input type="hidden" name="line" value="{{ line.id }}">
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+  {# Quote selector #}
+  <div class="form-card">
+    <div class="form-label" style="margin-bottom:0.5rem;">Supplier Quote</div>
+    <table style="width:100%; font-size:0.875rem; border-collapse:collapse;">
+      <thead><tr style="font-size:0.7rem; color:#6b7280; text-transform:uppercase;">
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Select</th>
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Supplier</th>
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Part #</th>
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Unit Price</th>
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Lead Time</th>
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Suggested Bid</th>
+      </tr></thead>
+      <tbody>
+        {% for q in quotes %}
+        <tr style="border-top:1px solid #f3f4f6;">
+          <td style="padding:0.4rem 0.5rem;">
+            <input type="radio" name="selected_quote_id" value="{{ q.id }}"
+              {% if q.id == selected_quote_for_bid.id %}checked{% endif %}
+              onchange="updateCostFromQuote({{ q.unit_price }}, {{ q.lead_time_days }})">
+          </td>
+          <td style="padding:0.4rem 0.5rem;">{{ q.supplier.name|default:q.supplier.cage_code }}</td>
+          <td style="padding:0.4rem 0.5rem;" class="mono">{{ q.part_number_offered|default:"—" }}</td>
+          <td style="padding:0.4rem 0.5rem;" class="mono">${{ q.unit_price }}</td>
+          <td style="padding:0.4rem 0.5rem;">{{ q.lead_time_days }}d</td>
+          <td style="padding:0.4rem 0.5rem;" class="mono">${{ q.suggested_bid|floatformat:5 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Section 01: Quote Identity #}
+  <div class="form-card">
+    <div class="form-label" style="margin-bottom:0.5rem;">01 · Quote Identity</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:0.75rem 1.25rem;">
+      <div>
+        <label class="form-label">Quoter CAGE *</label>
+        <select name="quoter_cage" class="form-control" required>
+          {% for cage in company_cages %}
+          <option value="{{ cage.cage_code }}" {% if bid_iv.cage == cage.cage_code %}selected{% endif %}>{{ cage.cage_code }} — {{ cage.company_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Quote For CAGE *</label>
+        <select name="quote_for_cage" class="form-control" required>
+          {% for cage in company_cages %}
+          <option value="{{ cage.cage_code }}" {% if bid_iv.quote_cage == cage.cage_code %}selected{% endif %}>{{ cage.cage_code }} — {{ cage.company_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Bid Type *</label>
+        <select name="bid_type_code" class="form-control" required id="bid-type-sel">
+          <option value="BI" {% if bid_iv.type == 'BI' %}selected{% endif %}>BI — Bid Without Exception</option>
+          <option value="BW" {% if bid_iv.type == 'BW' %}selected{% endif %}>BW — Bid With Exception</option>
+          <option value="AB" {% if bid_iv.type == 'AB' %}selected{% endif %}>AB — Alternate Bid</option>
+          <option value="DQ" {% if bid_iv.type == 'DQ' %}selected{% endif %}>DQ — No Bid</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {# Section 02: Pricing & Delivery #}
+  <div class="form-card">
+    <div class="form-label" style="margin-bottom:0.5rem;">02 · Pricing &amp; Delivery</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:0.75rem 1.25rem;">
+      <div>
+        <label class="form-label">Unit Price *</label>
+        <input type="number" name="unit_price" step="0.00001" min="0" required id="bid-unit-price"
+               class="form-control mono" value="{{ bid_iv.price }}">
+        <div style="font-size:0.7rem; color:#9ca3af; margin-top:0.2rem;">
+          Supplier: ${{ selected_quote_for_bid.unit_price }} · {{ default_markup_pct }}% markup → ${{ suggested_bid_price_for_tab|floatformat:5 }}
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Delivery Days *</label>
+        <input type="number" name="delivery_days" min="0" max="9999" required
+               class="form-control" value="{{ bid_iv.delivery }}">
+      </div>
+      <div>
+        <label class="form-label">FOB Point</label>
+        <select name="fob_point" class="form-control">
+          <option value="D" {% if bid_iv.fob == 'D' %}selected{% endif %}>D — Destination</option>
+          <option value="O" {% if bid_iv.fob == 'O' %}selected{% endif %}>O — Origin</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Payment Terms</label>
+        <input type="text" name="payment_terms" class="form-control" maxlength="2" value="{{ bid_iv.payment }}" placeholder="1">
+      </div>
+    </div>
+  </div>
+
+  {# Section 03: Supply Source #}
+  <div class="form-card">
+    <div class="form-label" style="margin-bottom:0.5rem;">03 · Supply Source</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:0.75rem 1.25rem;">
+      <div>
+        <label class="form-label">Manufacturer / Dealer *</label>
+        <select name="manufacturer_dealer" class="form-control" required id="bid-md-sel">
+          <option value="MM" {% if bid_iv.md == 'MM' %}selected{% endif %}>MM — Manufacturer</option>
+          <option value="DD" {% if bid_iv.md == 'DD' %}selected{% endif %}>DD — Dealer</option>
+          <option value="QM" {% if bid_iv.md == 'QM' %}selected{% endif %}>QM — QPL Manufacturer</option>
+          <option value="QD" {% if bid_iv.md == 'QD' %}selected{% endif %}>QD — QPL Dealer</option>
+        </select>
+      </div>
+      <div id="bid-mfg-cage-group" style="display:{% if bid_iv.md == 'DD' or bid_iv.md == 'QD' %}flex{% else %}none{% endif %}; flex-direction:column;">
+        <label class="form-label">Mfg Source CAGE</label>
+        <input type="text" name="mfg_source_cage" class="form-control mono" maxlength="5" value="{{ bid_iv.mfg_cage }}" placeholder="5-char CAGE">
+      </div>
+      <div>
+        <label class="form-label">Material Requirements</label>
+        <select name="material_requirements" class="form-control">
+          <option value="0" {% if bid_iv.material == '0' %}selected{% endif %}>0 — New</option>
+          <option value="1" {% if bid_iv.material == '1' %}selected{% endif %}>1 — Other Than New</option>
+          <option value="2" {% if bid_iv.material == '2' %}selected{% endif %}>2 — Reconditioned</option>
+          <option value="3" {% if bid_iv.material == '3' %}selected{% endif %}>3 — Remanufactured</option>
+          <option value="4" {% if bid_iv.material == '4' %}selected{% endif %}>4 — Unused Gov't Surplus</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Hazardous Material</label>
+        <select name="hazardous_material" class="form-control">
+          <option value="N" {% if bid_iv.hazmat == 'N' %}selected{% endif %}>N — No</option>
+          <option value="Y" {% if bid_iv.hazmat == 'Y' %}selected{% endif %}>Y — Yes</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {% if bid_show_pn %}
+  {# Section 04: Part Number #}
+  <div class="form-card">
+    <div class="form-label" style="margin-bottom:0.5rem;">04 · Part Number Offered</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:0.75rem 1.25rem;">
+      <div>
+        <label class="form-label">Part Number Code</label>
+        <input type="text" name="part_number_offered_code" class="form-control" maxlength="1" value="{{ bid_iv.pn_code }}">
+      </div>
+      <div>
+        <label class="form-label">CAGE of Part Offered</label>
+        <input type="text" name="part_number_offered_cage" class="form-control mono" maxlength="5" value="{{ bid_iv.pn_cage }}">
+      </div>
+      <div style="grid-column:span 2;">
+        <label class="form-label">Part Number</label>
+        <input type="text" name="part_number_offered" class="form-control mono" maxlength="40" value="{{ bid_iv.pn }}">
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Section 05: Compliance (read-only) #}
+  {% if default_cage_obj %}
+  <div class="form-card">
+    <div class="form-label" style="margin-bottom:0.5rem;">05 · Compliance</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:0.75rem 1.25rem;">
+      <div>
+        <label class="form-label">SB Representations</label>
+        <input class="form-control" value="{{ default_cage_obj.sb_representations_code|default:'' }}" readonly style="background:#f0f0f0;">
+      </div>
+      <div>
+        <label class="form-label">Affirmative Action</label>
+        <input class="form-control" value="{{ default_cage_obj.affirmative_action_code|default:'' }}" readonly style="background:#f0f0f0;">
+      </div>
+      <div>
+        <label class="form-label">Previous Contracts</label>
+        <input class="form-control" value="{{ default_cage_obj.previous_contracts_code|default:'' }}" readonly style="background:#f0f0f0;">
+      </div>
+      <div>
+        <label class="form-label">Child Labor</label>
+        <input class="form-control" value="{{ default_cage_obj.default_child_labor_code|default:'N' }}" readonly style="background:#f0f0f0;">
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Section 06: Remarks (BW/AB only) #}
+  <div class="form-card" id="bid-remarks-card" style="display:{% if bid_iv.type == 'BW' or bid_iv.type == 'AB' %}block{% else %}none{% endif %};">
+    <div class="form-label" style="margin-bottom:0.5rem;">06 · Quote Remarks (required for BW / AB)</div>
+    <textarea name="bid_remarks" class="form-control" rows="3" maxlength="255" style="width:100%;" placeholder="Explain the exception...">{{ bid_iv.remarks }}</textarea>
+  </div>
+
+  {# Action buttons #}
+  <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; padding-top:0.5rem;">
+    <button type="submit" name="action" value="save_draft" class="btn btn-ghost">Save Draft</button>
+    <button type="submit" name="action" value="mark_ready" class="btn btn-primary">Mark Ready to Export</button>
+    <span style="flex:1;"></span>
+    {% if solicitation.status != 'NO_BID' and solicitation.status != 'BID_SUBMITTED' and solicitation.status != 'WON' and solicitation.status != 'LOST' %}
+    <form method="post" action="{% url 'sales:no_bid' sol_number=solicitation.solicitation_number %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" onclick="return confirm('Mark this solicitation as No Bid?')"
+              style="padding:0.5rem 1rem; background:#dc2626; color:#fff; border:none; border-radius:6px; font-size:0.875rem; font-weight:500; cursor:pointer;">
         No Bid
-    </button>
+      </button>
+    </form>
+    {% endif %}
+  </div>
 </form>
+
+<script>
+(function () {
+  var supplierCost = {{ selected_quote_for_bid.unit_price|floatformat:5 }};
+  var bidInput = document.getElementById('bid-unit-price');
+  var livePrice = document.getElementById('bid-live-price');
+  var liveMargin = document.getElementById('bid-live-margin');
+
+  function updateMargin(bidPrice) {
+    var price = parseFloat(bidPrice);
+    if (!price || !supplierCost) return;
+    var margin = ((price - supplierCost) / price * 100).toFixed(1);
+    if (livePrice) livePrice.textContent = '$' + parseFloat(bidPrice).toFixed(5);
+    if (liveMargin) {
+      liveMargin.textContent = margin + '% margin';
+      liveMargin.style.background = margin >= 3 ? 'rgba(45,198,83,0.12)' : (margin >= 1 ? 'rgba(244,162,97,0.15)' : 'rgba(230,57,70,0.15)');
+      liveMargin.style.color = margin >= 3 ? '#16a34a' : (margin >= 1 ? '#ea580c' : '#b91c1c');
+    }
+  }
+  if (bidInput) {
+    bidInput.addEventListener('input', function () { updateMargin(this.value); });
+    updateMargin(bidInput.value);
+  }
+
+  window.updateCostFromQuote = function (unitPrice, leadTime) {
+    supplierCost = unitPrice;
+    var deliveryInput = document.querySelector('[name="delivery_days"]');
+    if (deliveryInput) deliveryInput.value = leadTime;
+    if (bidInput) updateMargin(bidInput.value);
+  };
+
+  var mdSel = document.getElementById('bid-md-sel');
+  if (mdSel) mdSel.addEventListener('change', function () {
+    var grp = document.getElementById('bid-mfg-cage-group');
+    grp.style.display = ['DD', 'QD'].indexOf(this.value) >= 0 ? 'flex' : 'none';
+  });
+
+  var typeSel = document.getElementById('bid-type-sel');
+  if (typeSel) typeSel.addEventListener('change', function () {
+    document.getElementById('bid-remarks-card').style.display = ['BW', 'AB'].indexOf(this.value) >= 0 ? 'block' : 'none';
+  });
+})();
+</script>
 {% endif %}
 {% endif %}
 

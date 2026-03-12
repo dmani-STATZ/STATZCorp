@@ -1,0 +1,420 @@
+{% extends "sales/base.html" %}
+{% block content %}
+
+<style>
+  /* ── Progress bar ─────────────────────────────────────────────── */
+  .prog-track {
+    height: 6px; background: #e5e7eb; border-radius: 99px;
+    margin-bottom: 2rem; overflow: hidden;
+  }
+  .prog-fill {
+    height: 100%; border-radius: 99px;
+    background: var(--company-primary, #004eb3);
+    width: 0%; transition: width 0.5s ease;
+  }
+
+  /* ── Step rows ────────────────────────────────────────────────── */
+  .step-row {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #e5e7eb; border-radius: 8px;
+    margin-bottom: 0.625rem;
+    background: #fff;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .step-row.running  { border-color: #93c5fd; background: #eff6ff; }
+  .step-row.done     { border-color: #bbf7d0; background: #f0fdf4; }
+  .step-row.errored  { border-color: #fca5a5; background: #fff1f2; }
+
+  .step-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; flex-shrink: 0;
+    border: 2px solid #d1d5db; color: #9ca3af;
+    background: #f9fafb;
+  }
+  .step-icon.running { border-color: #93c5fd; background: #dbeafe; color: #2563eb; }
+  .step-icon.done    { border-color: #86efac; background: #dcfce7; color: #16a34a; font-size: 1.1rem; }
+  .step-icon.errored { border-color: #fca5a5; background: #fee2e2; color: #dc2626; }
+
+  .step-label  { font-weight: 600; font-size: 0.9375rem; color: #1a2940; flex: 1; }
+  .step-detail { font-size: 0.8125rem; color: #6b7280; margin-top: 2px; }
+  .step-result { font-size: 0.8125rem; color: #374151; text-align: right; white-space: nowrap; }
+
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.9); opacity: 1; }
+    70%  { transform: scale(1.15); opacity: 0.6; }
+    100% { transform: scale(0.9); opacity: 1; }
+  }
+  .pulse { animation: pulse-ring 1.2s ease-in-out infinite; }
+
+  /* ── Summary cards ────────────────────────────────────────────── */
+  .sum-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 1.5rem; }
+  .sum-card {
+    border-radius: 8px; padding: 14px 16px;
+    border: 1px solid #bfdbfe; background: #eff6ff;
+  }
+  .sum-card .label { font-size: 11px; font-weight: 600; letter-spacing: .07em;
+                     text-transform: uppercase; color: #1e40af; margin-bottom: 4px; }
+  .sum-card .value { font-family: 'Barlow Condensed', sans-serif;
+                     font-size: 30px; font-weight: 800; color: #1e3a8a; line-height: 1; }
+  .sum-card .sub   { font-size: 11px; color: #3b82f6; margin-top: 2px; }
+
+  .sum-grid-sol { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 0.75rem; }
+  .sum-card-sm  { border-radius: 8px; padding: 12px 14px; border: 1px solid #d1fae5; background: #f0fdf4; }
+  .sum-card-sm .label { font-size: 11px; font-weight: 600; letter-spacing: .07em;
+                        text-transform: uppercase; color: #15803d; margin-bottom: 4px; }
+  .sum-card-sm .value { font-family: 'Barlow Condensed', sans-serif;
+                        font-size: 26px; font-weight: 800; color: #14532d; line-height: 1; }
+
+  .done-header {
+    text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .done-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(22,163,74,.12); display: flex; align-items: center;
+    justify-content: center; font-size: 2rem; margin: 0 auto 0.75rem;
+  }
+</style>
+
+<div style="max-width:680px;">
+
+  <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.25rem;">
+    <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Daily Import</h1>
+    <a href="{% url 'sales:import_history' %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">View History →</a>
+  </div>
+
+  {# File names #}
+  <div style="font-size:0.8125rem; color:#6b7280; font-family:monospace; margin-bottom:1.25rem;">
+    {{ job.in_file_name }} &nbsp;·&nbsp; {{ job.bq_file_name }} &nbsp;·&nbsp; {{ job.as_file_name }}
+  </div>
+
+  {# Progress bar #}
+  <div class="prog-track">
+    <div class="prog-fill" id="prog-fill"></div>
+  </div>
+
+  {# Step rows #}
+  <div id="steps-container">
+    <div class="step-row" id="row-parse">
+      <div class="step-icon" id="icon-parse">1</div>
+      <div style="flex:1;">
+        <div class="step-label">Parse Files</div>
+        <div class="step-detail" id="detail-parse">Reading IN, BQ, and AS files…</div>
+      </div>
+      <div class="step-result" id="result-parse"></div>
+    </div>
+
+    <div class="step-row" id="row-sols">
+      <div class="step-icon" id="icon-sols">2</div>
+      <div style="flex:1;">
+        <div class="step-label">Save Solicitations</div>
+        <div class="step-detail" id="detail-sols">Waiting…</div>
+      </div>
+      <div class="step-result" id="result-sols"></div>
+    </div>
+
+    <div class="step-row" id="row-lines">
+      <div class="step-icon" id="icon-lines">3</div>
+      <div style="flex:1;">
+        <div class="step-label">Save Lines &amp; Sources</div>
+        <div class="step-detail" id="detail-lines">Waiting…</div>
+      </div>
+      <div class="step-result" id="result-lines"></div>
+    </div>
+
+    <div class="step-row" id="row-match">
+      <div class="step-icon" id="icon-match">4</div>
+      <div style="flex:1;">
+        <div class="step-label">Match Suppliers</div>
+        <div class="step-detail" id="detail-match">Waiting…</div>
+      </div>
+      <div class="step-result" id="result-match"></div>
+    </div>
+
+    <div class="step-row" id="row-awards">
+      <div class="step-icon" id="icon-awards">5</div>
+      <div style="flex:1;">
+        <div class="step-label">Sync SAM Awards</div>
+        <div class="step-detail" id="detail-awards">Waiting…</div>
+      </div>
+      <div class="step-result" id="result-awards"></div>
+    </div>
+  </div>
+
+  {# Summary — hidden until complete #}
+  <div id="summary-panel" style="display:none; margin-top:1.75rem;">
+    <div class="done-header">
+      <div class="done-icon">✅</div>
+      <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.75rem; font-weight:800; color:#0a1628;">
+        Import Complete
+      </div>
+      <div style="font-size:0.875rem; color:#6b7280; margin-top:4px;" id="sum-date-line"></div>
+    </div>
+
+    <div class="sum-grid-sol">
+      <div class="sum-card-sm">
+        <div class="label">Sol Created</div>
+        <div class="value" id="sum-sol-created">—</div>
+      </div>
+      <div class="sum-card-sm">
+        <div class="label">Sol Updated</div>
+        <div class="value" id="sum-sol-updated">—</div>
+      </div>
+      <div class="sum-card-sm">
+        <div class="label">Appr. Sources</div>
+        <div class="value" id="sum-as">—</div>
+      </div>
+    </div>
+
+    <div class="sum-grid-sol" style="margin-top:0.5rem;">
+      <div class="sum-card-sm" style="border-color:#e9d5ff; background:#faf5ff;">
+        <div class="label" style="color:#7e22ce;">Awards Synced</div>
+        <div class="value" style="color:#581c87;" id="sum-awards-synced">—</div>
+      </div>
+      <div class="sum-card-sm" style="border-color:#e9d5ff; background:#faf5ff;">
+        <div class="label" style="color:#7e22ce;">Sol Matched</div>
+        <div class="value" style="color:#581c87;" id="sum-awards-matched">—</div>
+      </div>
+      <div class="sum-card-sm" style="border-color:#e9d5ff; background:#faf5ff;">
+        <div class="label" style="color:#7e22ce;">We Won</div>
+        <div class="value" style="color:#581c87;" id="sum-awards-won">—</div>
+      </div>
+    </div>
+
+    <div class="sum-grid">
+      <div class="sum-card">
+        <div class="label">Matches</div>
+        <div class="value" id="sum-matches">—</div>
+        <div class="sub">Total suppliers</div>
+      </div>
+      <div class="sum-card">
+        <div class="label">Tier 1</div>
+        <div class="value" id="sum-t1">—</div>
+        <div class="sub">Direct NSN</div>
+      </div>
+      <div class="sum-card">
+        <div class="label">Tier 2</div>
+        <div class="value" id="sum-t2">—</div>
+        <div class="sub">Approved CAGE</div>
+      </div>
+      <div class="sum-card">
+        <div class="label">Tier 3</div>
+        <div class="value" id="sum-t3">—</div>
+        <div class="sub">FSC Category</div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.25rem; display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+      <a href="{% url 'sales:solicitation_list' %}"
+         style="padding:0.5625rem 1.5rem; background:var(--company-primary,#004eb3);
+                color:#fff; text-decoration:none; border-radius:7px;
+                font-size:0.9375rem; font-weight:600;">
+        View Solicitations →
+      </a>
+      <a href="{% url 'sales:import_upload' %}"
+         style="padding:0.5625rem 1.25rem; border:1px solid #d1d5db; border-radius:7px;
+                text-decoration:none; font-size:0.875rem; color:#6b7280;">
+        New Import
+      </a>
+      {% if user.is_staff %}
+      <button id="btn-sync-awards" onclick="syncAwards()"
+              style="padding:0.5625rem 1.25rem; border:1px solid #a3bffa; border-radius:7px;
+                     background:#eff6ff; color:#1d4ed8; font-size:0.875rem; font-weight:600;
+                     cursor:pointer;">
+        Sync Awards
+      </button>
+      <span id="sync-awards-result" style="font-size:0.8125rem; color:#374151;"></span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Error panel — hidden unless a step fails #}
+  <div id="error-panel" style="display:none; margin-top:1.25rem;
+       background:#fff1f2; border:1px solid #fca5a5; border-radius:8px; padding:1rem 1.25rem;">
+    <div style="font-weight:600; color:#b91c1c; margin-bottom:0.375rem;">Import Error</div>
+    <div id="error-msg" style="font-size:0.875rem; color:#7f1d1d; font-family:monospace;"></div>
+    <div style="margin-top:0.75rem;">
+      <a href="{% url 'sales:import_upload' %}"
+         style="font-size:0.875rem; color:#b91c1c; text-decoration:underline;">
+        ← Try Again
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const CSRF  = '{{ csrf_token }}';
+  const JOB   = '{{ job.job_id }}';
+  const BASE  = '/sales/import/job/' + JOB + '/step/';
+
+  const steps = [
+    {
+      key:  'parse',
+      url:  BASE + 'parse/',
+      onOk: (d) => d.sol_count.toLocaleString() + ' sol · ' + d.bq_count.toLocaleString() + ' BQ · ' + d.as_count.toLocaleString() + ' sources',
+      detail: 'Parsing IN, BQ, and AS files…',
+    },
+    {
+      key:  'sols',
+      url:  BASE + 'solicitations/',
+      onOk: (d) => d.created.toLocaleString() + ' created · ' + d.updated.toLocaleString() + ' updated',
+      detail: 'Writing solicitations to database…',
+    },
+    {
+      key:  'lines',
+      url:  BASE + 'lines/',
+      onOk: (d) => d.lines_created.toLocaleString() + ' lines · ' + d.as_loaded.toLocaleString() + ' sources',
+      detail: 'Writing lines and approved sources…',
+    },
+    {
+      key:  'match',
+      url:  BASE + 'match/',
+      onOk: (d) => d.matches_found.toLocaleString() + ' supplier matches',
+      detail: 'Running supplier matching engine…',
+    },
+    {
+      key:  'awards',
+      url:  BASE + 'awards/',
+      onOk: (d) => d.skipped
+        ? '⚠ Skipped — ' + (d.reason || 'no API key')
+        : (d.created || 0).toLocaleString() + ' created · ' + (d.updated || 0).toLocaleString() + ' updated · ' + (d.matched || 0).toLocaleString() + ' matched',
+      detail: 'Fetching DLA award notices from SAM.gov…',
+    },
+  ];
+
+  let results = {};
+
+  function setProgress(pct) {
+    document.getElementById('prog-fill').style.width = pct + '%';
+  }
+
+  function setRunning(key) {
+    const row  = document.getElementById('row-'  + key);
+    const icon = document.getElementById('icon-' + key);
+    row.classList.add('running');
+    icon.classList.add('running', 'pulse');
+    icon.textContent = '●';
+    document.getElementById('detail-' + key).textContent = steps.find(s => s.key === key).detail;
+  }
+
+  function setDone(key, label) {
+    const row  = document.getElementById('row-'  + key);
+    const icon = document.getElementById('icon-' + key);
+    row.classList.remove('running'); row.classList.add('done');
+    icon.classList.remove('running', 'pulse'); icon.classList.add('done');
+    icon.textContent = '✓';
+    document.getElementById('detail-' + key).textContent = 'Complete';
+    document.getElementById('result-' + key).textContent = label;
+  }
+
+  function setError(key, msg) {
+    const row  = document.getElementById('row-'  + key);
+    const icon = document.getElementById('icon-' + key);
+    row.classList.remove('running'); row.classList.add('errored');
+    icon.classList.remove('running', 'pulse'); icon.classList.add('errored');
+    icon.textContent = '✗';
+    document.getElementById('detail-' + key).textContent = 'Failed';
+    document.getElementById('error-panel').style.display = 'block';
+    document.getElementById('error-msg').textContent  = msg;
+  }
+
+  function runStep(idx) {
+    if (idx >= steps.length) {
+      showSummary();
+      return Promise.resolve();
+    }
+    const step = steps[idx];
+    setRunning(step.key);
+    setProgress(Math.round((idx / steps.length) * 100));
+
+    return fetch(step.url, {
+      method:  'POST',
+      headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) throw new Error(data.error || 'Unknown error');
+        results[step.key] = data;
+        setDone(step.key, step.onOk(data));
+        return runStep(idx + 1);
+      })
+      .catch(err => {
+        setError(step.key, err.message || String(err));
+      });
+  }
+
+  function showSummary() {
+    setProgress(100);
+    const pr = results.parse  || {};
+    const sr = results.sols   || {};
+    const lr = results.lines  || {};
+    const mr = results.match  || {};
+    const ar = results.awards || {};
+
+    document.getElementById('sum-date-line').textContent =
+      'Import date: ' + (pr.import_date || '—') +
+      '  ·  ' + (pr.sol_count || 0).toLocaleString() + ' solicitations processed';
+
+    document.getElementById('sum-sol-created').textContent = (sr.created || 0).toLocaleString();
+    document.getElementById('sum-sol-updated').textContent = (sr.updated || 0).toLocaleString();
+    document.getElementById('sum-as').textContent          = (lr.as_loaded || 0).toLocaleString();
+    document.getElementById('sum-matches').textContent     = (mr.matches_found || 0).toLocaleString();
+    document.getElementById('sum-t1').textContent          = (mr.tier1 || 0).toLocaleString();
+    document.getElementById('sum-t2').textContent          = (mr.tier2 || 0).toLocaleString();
+    document.getElementById('sum-t3').textContent          = (mr.tier3 || 0).toLocaleString();
+
+    const awardsSynced = ar.skipped ? '—' : ((ar.created || 0) + (ar.updated || 0)).toLocaleString();
+    document.getElementById('sum-awards-synced').textContent  = awardsSynced;
+    document.getElementById('sum-awards-matched').textContent = ar.skipped ? '—' : (ar.matched || 0).toLocaleString();
+    document.getElementById('sum-awards-won').textContent     = ar.skipped ? '—' : (ar.won || 0).toLocaleString();
+
+    document.getElementById('summary-panel').style.display = 'block';
+  }
+
+  // Kick off step 1 immediately on page load
+  runStep(0);
+})();
+
+function syncAwards() {
+  const btn = document.getElementById('btn-sync-awards');
+  const out = document.getElementById('sync-awards-result');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  out.textContent = '';
+  fetch('{% url "sales:sync_awards" %}', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.skipped) {
+        out.textContent = 'Skipped: ' + d.reason;
+      } else if (d.success) {
+        out.textContent =
+          'Done — created: ' + (d.created || 0) +
+          ', updated: ' + (d.updated || 0) +
+          ', matched: ' + (d.matched || 0) +
+          ', won: ' + (d.won || 0) +
+          (d.errors ? ', errors: ' + d.errors : '');
+      } else {
+        out.style.color = '#b91c1c';
+        out.textContent = 'Error: ' + (d.error || 'Unknown');
+      }
+    })
+    .catch(err => {
+      out.style.color = '#b91c1c';
+      out.textContent = 'Request failed: ' + err;
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = 'Sync Awards';
+    });
+}
+</script>
+
+{% endblock content %}

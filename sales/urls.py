@@ -6,6 +6,13 @@ from .views import (
     dashboard,
     import_upload,
     import_history,
+    import_batch_delete,
+    import_job_progress,
+    import_step_parse,
+    import_step_solicitations,
+    import_step_lines,
+    import_step_match,
+    import_step_awards,
     solicitation_list,
     solicitation_detail,
     no_bid,
@@ -38,6 +45,8 @@ from .views import (
     settings_cages,
     settings_cage_add,
     settings_cage_edit,
+    sync_awards_view,
+    entity_lookup,
 )
 
 app_name = "sales"
@@ -46,6 +55,13 @@ urlpatterns = [
     path("", dashboard, name="dashboard"),
     path("import/", import_upload, name="import_upload"),
     path("import/history/", import_history, name="import_history"),
+    path("import/batch/<int:batch_id>/delete/", import_batch_delete, name="import_batch_delete"),
+    path("import/job/<str:job_id>/", import_job_progress, name="import_job_progress"),
+    path("import/job/<str:job_id>/step/parse/", import_step_parse, name="import_step_parse"),
+    path("import/job/<str:job_id>/step/solicitations/", import_step_solicitations, name="import_step_solicitations"),
+    path("import/job/<str:job_id>/step/lines/", import_step_lines, name="import_step_lines"),
+    path("import/job/<str:job_id>/step/match/", import_step_match, name="import_step_match"),
+    path("import/job/<str:job_id>/step/awards/", import_step_awards, name="import_step_awards"),
     path("solicitations/", solicitation_list, name="solicitation_list"),
     path("solicitations/<str:sol_number>/", solicitation_detail, name="solicitation_detail"),
     path("solicitations/<str:sol_number>/nobid/", no_bid, name="no_bid"),
@@ -85,4 +101,8 @@ urlpatterns = [
     path("settings/cages/", settings_cages, name="settings_cages"),
     path("settings/cages/add/", settings_cage_add, name="settings_cage_add"),
     path("settings/cages/<int:cage_id>/edit/", settings_cage_edit, name="settings_cage_edit"),
+    # SAM.gov awards sync
+    path("awards/sync/", sync_awards_view, name="sync_awards"),
+    # SAM.gov entity lookup (read-only, no DB writes)
+    path("entity/cage/<str:cage_code>/", entity_lookup, name="entity_cage_lookup"),
 ]

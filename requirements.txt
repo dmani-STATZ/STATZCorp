@@ -1,6 +1,6 @@
 # Core Django and Azure dependencies
 # Froce redeploy
-Django==4.2.28  # Latest LTS with security fixes
+Django>=4.2.29  # Latest LTS with security fixes
 gunicorn==23.0.0  # Latest version with security fixes
 whitenoise==6.6.0
 
@@ -27,7 +27,7 @@ Pillow==12.1.1
 reportlab==4.3.0
 
 # PDF processing - Migrated to pypdf for better security and maintenance
-pypdf==6.6.2  # Latest version with enhanced security and performance
+pypdf==6.7.1  # Latest version with enhanced security and performance
 pdfplumber==0.11.5
 
 # Utilities

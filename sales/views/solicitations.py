@@ -20,7 +20,9 @@ from sales.models import (
     SupplierQuote,
     SupplierContactLog,
     CompanyCAGE,
+    GovernmentBid,
 )
+from suppliers.models import Supplier
 
 PIPELINE = [
     ("New", "📥", "New"),
@@ -209,7 +211,20 @@ def solicitation_detail(request, sol_number):
     )
 
     nsn_normalized = (line.nsn or "").replace("-", "").strip() if line else ""
-    approved_sources = ApprovedSource.objects.filter(nsn=nsn_normalized)
+    approved_sources = list(ApprovedSource.objects.filter(nsn=nsn_normalized))
+
+    # Annotate each approved source with its matching Supplier (if known to us)
+    if approved_sources:
+        cage_codes = [src.approved_cage for src in approved_sources if src.approved_cage]
+        supplier_by_cage = {
+            s.cage_code.strip().upper(): s
+            for s in Supplier.objects.filter(cage_code__in=cage_codes)
+            if s.cage_code
+        }
+        for src in approved_sources:
+            src.matched_supplier = supplier_by_cage.get(
+                (src.approved_cage or "").strip().upper()
+            )
 
     solicitation.set_aside_display = SET_ASIDE_LABELS.get(
         solicitation.small_business_set_aside or "", ""
@@ -223,6 +238,64 @@ def solicitation_detail(request, sol_number):
         if m.rfq_sent:
             m.rfq_obj = rfq_by_match_key.get((m.line_id, m.supplier_id))
             m.rfq_status_display = m.rfq_obj.get_status_display() if m.rfq_obj else "Sent"
+
+    # Bid tab context
+    company_cages = CompanyCAGE.objects.filter(is_active=True).order_by("-is_default")
+    default_cage_obj = company_cages.filter(is_default=True).first() or company_cages.first()
+    existing_bid = (
+        GovernmentBid.objects.filter(line=line)
+        .select_related("selected_quote__supplier")
+        .first()
+    ) if line else None
+    selected_quote_for_bid = (
+        next((q for q in quotes if q.is_selected_for_bid), None) or
+        (quotes[0] if quotes else None)
+    )
+    suggested_bid_price_for_tab = (
+        float(selected_quote_for_bid.unit_price) * (1 + default_markup_pct / 100)
+        if selected_quote_for_bid else None
+    )
+    _first_as = approved_sources[0] if approved_sources else None
+    if existing_bid:
+        bid_iv = {
+            "price": existing_bid.unit_price,
+            "delivery": existing_bid.delivery_days,
+            "cage": existing_bid.quoter_cage,
+            "quote_cage": existing_bid.quote_for_cage,
+            "type": existing_bid.bid_type_code,
+            "fob": existing_bid.fob_point,
+            "payment": existing_bid.payment_terms or "",
+            "md": existing_bid.manufacturer_dealer,
+            "mfg_cage": existing_bid.mfg_source_cage or "",
+            "material": existing_bid.material_requirements,
+            "hazmat": existing_bid.hazardous_material,
+            "remarks": existing_bid.bid_remarks or "",
+            "pn_code": existing_bid.part_number_offered_code or "",
+            "pn_cage": existing_bid.part_number_offered_cage or "",
+            "pn": existing_bid.part_number_offered or "",
+        }
+    else:
+        bid_iv = {
+            "price": f"{suggested_bid_price_for_tab:.5f}" if suggested_bid_price_for_tab else "",
+            "delivery": selected_quote_for_bid.lead_time_days if selected_quote_for_bid else "",
+            "cage": default_cage_obj.cage_code if default_cage_obj else "",
+            "quote_cage": default_cage_obj.cage_code if default_cage_obj else "",
+            "type": "BI",
+            "fob": (default_cage_obj.default_fob_point if default_cage_obj else "D") or "D",
+            "payment": (default_cage_obj.default_payment_terms if default_cage_obj else "1") or "1",
+            "md": "DD",
+            "mfg_cage": (
+                (selected_quote_for_bid.supplier.cage_code or "")[:5]
+                if selected_quote_for_bid and selected_quote_for_bid.supplier else ""
+            ),
+            "material": "0",
+            "hazmat": "N",
+            "remarks": "",
+            "pn_code": "",
+            "pn_cage": _first_as.approved_cage if _first_as else "",
+            "pn": (_first_as.part_number[:40] if _first_as and _first_as.part_number else ""),
+        }
+    bid_show_pn = bool(line and (line.item_description_indicator or "") in "PBN")
 
     return render(
         request,
@@ -241,6 +314,14 @@ def solicitation_detail(request, sol_number):
             "contact_log": contact_log,
             "approved_sources": approved_sources,
             "pdf_url": pdf_url,
+            "company_cages": company_cages,
+            "default_cage_obj": default_cage_obj,
+            "existing_bid": existing_bid,
+            "selected_quote_for_bid": selected_quote_for_bid,
+            "suggested_bid_price_for_tab": suggested_bid_price_for_tab,
+            "bid_iv": bid_iv,
+            "bid_show_pn": bid_show_pn,
+            "default_markup_pct": default_markup_pct,
         },
     )
 

@@ -534,6 +534,10 @@ else:
     }
     SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
+# SAM.gov API integration
+SAM_API_KEY = os.environ.get('SAM_API_KEY', '')   # Required for awards sync
+SAM_OUR_CAGE = os.environ.get('SAM_OUR_CAGE', '')  # e.g. '1ABC2' — used to detect we_won
+
 # Print environment summary
 # print(f"   Settings loaded - Environment: {'PRODUCTION' if IS_PRODUCTION else 'DEVELOPMENT'}")
 # print(f"   Debug: {DEBUG}")

@@ -135,121 +135,10 @@
     <div class="step-connector"></div>
     <div class="step-item">
       <div class="step-circle" id="sc3" style="background:#eef2f8; color:#a0aec0;">3</div>
-      <span class="step-label" id="sl3" style="font-weight:500; color:#a0aec0;">Complete</span>
+      <span class="step-label" id="sl3" style="font-weight:500; color:#a0aec0;">Processing</span>
     </div>
   </div>
 
-<!--  /*{# ════════════════════════════════════════════════════════════════════════*/
-  /*   STEP 3 — shown immediately if Django returned a result (POST success)*/
- /* ════════════════════════════════════════════════════════════════════════ #}*/ -->
-  {% if result %}
-  <div id="step3">
-    <div class="complete-icon">✅</div>
-    <div style="text-align:center; margin-bottom:28px;">
-      <div style="font-family:'Barlow Condensed',sans-serif; font-size:30px; font-weight:800;
-                  color:#0a1628; margin-bottom:6px;">Import Complete</div>
-      <div style="font-size:14px; color:#7a90b0;">
-        {{ result.solicitations_created }} solicitation{{ result.solicitations_created|pluralize }} created,
-        {{ result.solicitations_updated }} updated.
-      </div>
-    </div>
-
-    <div class="stat-grid-3">
-      <div class="istat istat-navy">
-        <div class="slabel">Import Date</div>
-        <div class="svalue" style="font-size:22px;">{{ result.import_date }}</div>
-      </div>
-      <div class="istat istat-success">
-        <div class="slabel">Sol Created</div>
-        <div class="svalue">{{ result.solicitations_created }}</div>
-      </div>
-      <div class="istat istat-accent">
-        <div class="slabel">Sol Updated</div>
-        <div class="svalue">{{ result.solicitations_updated }}</div>
-      </div>
-    </div>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:20px;">
-      <div class="istat istat-navy">
-        <div class="slabel">Lines Created</div>
-        <div class="svalue">{{ result.lines_created }}</div>
-      </div>
-      <div class="istat istat-navy">
-        <div class="slabel">Lines Updated</div>
-        <div class="svalue">{{ result.lines_updated }}</div>
-      </div>
-      <div class="istat istat-navy">
-        <div class="slabel">Approved Sources</div>
-        <div class="svalue">{{ result.approved_sources_loaded }}</div>
-      </div>
-    </div>
-
-    {% if result.match_summary %}
-    <div style="border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff;
-                padding:14px 18px; margin-bottom:20px;">
-      <div style="font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-                  color:#1e40af; margin-bottom:10px;">Supplier Matches</div>
-      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px;">
-        <div>
-          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Total</div>
-          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
-            {{ result.match_summary.matches_found }}
-          </div>
-        </div>
-        <div>
-          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Tier 1 — NSN</div>
-          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
-            {{ result.match_summary.by_tier.1|default:0 }}
-          </div>
-        </div>
-        <div>
-          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Tier 2 — CAGE</div>
-          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
-            {{ result.match_summary.by_tier.2|default:0 }}
-          </div>
-        </div>
-        <div>
-          <div style="font-size:11px; color:#3b82f6; text-transform:uppercase; letter-spacing:.06em;">Tier 3 — FSC</div>
-          <div style="font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#1e3a8a;">
-            {{ result.match_summary.by_tier.3|default:0 }}
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if result.parse_error_count and result.solicitations_with_errors %}
-    <div class="alert-warn">
-      <span>⚠</span>
-      <div>
-        <strong>Parse warnings on {{ result.parse_error_count }} solicitation{{ result.parse_error_count|pluralize }}:</strong>
-        <div style="margin-top:4px; font-family:monospace; font-size:12px;">
-          {{ result.solicitations_with_errors|join:", " }}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <div style="display:flex; gap:12px; justify-content:center; margin-top:8px;">
-      <a href="{% url 'sales:solicitation_list' %}"
-         style="display:inline-block; padding:11px 24px; background:var(--company-primary,#004eb3);
-                color:#fff; border-radius:7px; font-size:14px; font-weight:600;
-                text-decoration:none;">
-        📋 View Solicitations →
-      </a>
-      <a href="{% url 'sales:import_upload' %}"
-         style="display:inline-block; padding:11px 24px; background:transparent;
-                color:#4b6080; border:1px solid #cbd5e1; border-radius:7px;
-                font-size:14px; font-weight:500; text-decoration:none;">
-        Import Another
-      </a>
-    </div>
-  </div>
-
-  {# ── Set step indicator to step 3 (done) ─────────────────────────────── #}
-  <script>setStep(3);</script>
-
-  {% else %}
 <!--  /*{# ════════════════════════════════════════════════════════════════════════*/
   /*   STEP 1 — Upload / Drop Zone*/
  /* ════════════════════════════════════════════════════════════════════════ #}*/ -->
@@ -359,7 +248,7 @@
                 padding:16px 20px; margin-bottom:20px;">
       <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
                   letter-spacing:.08em; text-transform:uppercase; color:#1a2940; margin-bottom:12px;">
-        Files QueuedSS
+        Files Queued
       </div>
       <div id="confirm-in"   class="file-check-row"></div>
       <div id="confirm-bq"   class="file-check-row"></div>
@@ -376,7 +265,6 @@
 
   </div>{# /step2 #}
 
-  {% endif %}{# /if result #}
 
 </div>{# /max-width wrapper #}
 
@@ -528,10 +416,8 @@
     document.getElementById('import-form').submit();
   }
 
-  // ── Init: if result already present, mark step 3 done ─────────────────
-  {% if result %}
-  setStep(3);
-  {% endif %}
+  // ── Init ───────────────────────────────────────────────────────────────
+  setStep(1);
 </script>
 
 {% endblock content %}

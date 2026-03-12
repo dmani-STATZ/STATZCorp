@@ -31,6 +31,7 @@
         <th>Solicitations</th>
         <th>Imported By</th>
         <th>Imported At</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -47,10 +48,21 @@
         </td>
         <td style="color:#6b7280; font-size:0.8125rem;">{{ batch.imported_by|default:"—" }}</td>
         <td style="color:#6b7280; font-size:0.8125rem;">{{ batch.imported_at|date:"M j, Y g:i A" }}</td>
+        <td>
+          <form method="post" action="{% url 'sales:import_batch_delete' batch.id %}"
+                onsubmit="return confirm('Delete this import batch and all New solicitations it created?');">
+            {% csrf_token %}
+            <button type="submit"
+                    style="padding:2px 10px; font-size:0.75rem; border:1px solid #fca5a5;
+                           border-radius:4px; background:#fff1f2; color:#b91c1c; cursor:pointer;">
+              Delete
+            </button>
+          </form>
+        </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7" style="padding:2rem; text-align:center; color:#6b7280;">
+        <td colspan="8" style="padding:2rem; text-align:center; color:#6b7280;">
           No imports yet. <a href="{% url 'sales:import_upload' %}">Run your first import.</a>
         </td>
       </tr>

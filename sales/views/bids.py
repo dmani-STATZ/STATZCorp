@@ -186,7 +186,8 @@ def bid_builder(request, sol_number):
                 messages.success(request, "Bid marked ready to export.")
             else:
                 messages.success(request, "Draft saved.")
-            return redirect("sales:bids_ready")
+            next_url = request.POST.get("next", "").strip()
+            return redirect(next_url if next_url else "sales:bids_ready")
 
     # GET: prefill from existing_bid or defaults
     if existing_bid:

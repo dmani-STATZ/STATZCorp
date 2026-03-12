@@ -1,0 +1,262 @@
+{% extends "sales/base.html" %}
+{% block content %}
+<style>
+  :root { --navy: #0a1628; --accent: #00b4d8; }
+  .info-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.75rem; max-width: 860px; }
+  .info-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eef2f8; }
+  .field-label { font-size: 0.7rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .field-value { font-size: 0.9375rem; color: #111827; }
+  .field-value.mono { font-family: ui-monospace, monospace; }
+  .section-title { font-size: 0.75rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.06em; margin: 1.25rem 0 0.75rem; }
+  .pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin: 2px; }
+  .pill-blue  { background: rgba(0,180,216,0.1); color: #00849e; border: 1px solid rgba(0,180,216,0.25); }
+  .pill-green { background: rgba(45,198,83,0.1); color: #1a8a3a; border: 1px solid rgba(45,198,83,0.25); }
+  .pill-gray  { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
+  .pill-red   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .alert-warn  { background: #fff3e0; border: 1px solid #fbbf24; color: #92400e; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
+  .alert-info  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
+  .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
+  .sam-notice { background: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.8125rem; margin-bottom: 1.5rem; }
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .btn-primary { background: #0a1628; color: #fff; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  .excluded-banner { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 1rem 1.25rem; color: #7f1d1d; font-weight: 600; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  @media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+</style>
+
+{# Back nav #}
+<div style="margin-bottom: 1.25rem;">
+  <button onclick="
+    if (window.opener && !window.opener.closed) {
+      window.close();
+    } else if (window.history.length > 1) {
+      history.back();
+    } else {
+      window.close();
+    }
+  " class="btn btn-ghost" style="font-size:0.8125rem;">&larr; Back</button>
+</div>
+
+<div class="info-card">
+
+  {# ── Error state ── #}
+  {% if error %}
+  <div class="alert-error">
+    <strong>Lookup failed:</strong> {{ error }}
+  </div>
+  <p style="color:#6b7280; font-size:0.875rem;">
+    You can still search for this entity directly on
+    <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a>.
+  </p>
+  {% elif not entity or not entity.found %}
+
+  {# ── Not found state ── #}
+  <div class="alert-info">
+    No entity found on SAM.gov for CAGE code <strong class="mono">{{ cage_code }}</strong>.
+    This company may not be registered in SAM.gov, or the CAGE code may be incorrect.
+  </div>
+  <p style="color:#6b7280; font-size:0.875rem;">
+    Search manually on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a>.
+  </p>
+
+  {% else %}
+
+  {# ── Found — main info card ── #}
+
+  {# SAM notice #}
+  <div class="sam-notice">
+    &#8505; This data is from SAM.gov and is <strong>not saved in your system</strong>. It is read-only and reflects the entity&rsquo;s current public registration.
+  </div>
+
+  {# Exclusion warning #}
+  {% if entity.exclusion_status %}
+  <div class="excluded-banner">
+    &#9888; This entity is <strong>EXCLUDED / DEBARRED</strong> in SAM.gov. Do not award contracts to excluded parties.
+  </div>
+  {% endif %}
+
+  {# Header row #}
+  <div class="info-card-header">
+    <div>
+      <div class="field-label">Legal Business Name</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: #0a1628;">{{ entity.legal_name|default:"—" }}</div>
+      <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <span class="pill {% if entity.registration_status == 'Active' %}pill-green{% else %}pill-red{% endif %}">
+          {{ entity.registration_status|default:"Unknown" }}
+        </span>
+        {% if entity.exclusion_status %}
+        <span class="pill pill-red">Excluded</span>
+        {% endif %}
+        {% if entity.set_aside_flags.sdvosb %}<span class="pill pill-blue">SDVOSB</span>{% endif %}
+        {% if entity.set_aside_flags.hubzone %}<span class="pill pill-blue">HUBZone</span>{% endif %}
+        {% if entity.set_aside_flags.wosb %}<span class="pill pill-blue">WOSB</span>{% endif %}
+        {% if entity.set_aside_flags.edwosb %}<span class="pill pill-blue">EDWOSB</span>{% endif %}
+        {% if entity.set_aside_flags.8a %}<span class="pill pill-blue">8(a)</span>{% endif %}
+        {% if entity.set_aside_flags.small_business %}<span class="pill pill-gray">Small Business</span>{% endif %}
+      </div>
+    </div>
+    <div style="text-align:right; flex-shrink:0;">
+      {% if entity.sam_url %}
+      <a href="{{ entity.sam_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+        View on SAM.gov &rarr;
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Core identifiers #}
+  <div class="grid-3" style="margin-bottom: 1rem;">
+    <div>
+      <div class="field-label">CAGE Code</div>
+      <div class="field-value mono">{{ entity.cage_code }}</div>
+    </div>
+    <div>
+      <div class="field-label">UEI</div>
+      <div class="field-value mono">{{ entity.uei|default:"—" }}</div>
+    </div>
+    <div>
+      <div class="field-label">Registration Expiry</div>
+      <div class="field-value">{{ entity.registration_expiry|default:"—" }}</div>
+    </div>
+  </div>
+
+  {# Entity URL #}
+  {% if entity.entity_url %}
+  <div style="margin-bottom: 1rem;">
+    <div class="field-label">Website</div>
+    <div class="field-value">
+      <a href="http://{{ entity.entity_url }}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;">{{ entity.entity_url }}</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Addresses #}
+  <div class="grid-2" style="margin-bottom: 1rem;">
+    <div>
+      <div class="section-title">Physical Address</div>
+      <div style="font-size: 0.9375rem; color: #374151; line-height: 1.6;">
+        {% with a=entity.address %}
+        {% if a.street %}{{ a.street }}<br>{% endif %}
+        {% if a.street2 %}{{ a.street2 }}<br>{% endif %}
+        {% if a.city or a.state or a.zip %}{{ a.city }}{% if a.city and a.state %}, {% endif %}{{ a.state }} {{ a.zip }}{% endif %}
+        {% if a.country and a.country != "USA" %}<br>{{ a.country }}{% endif %}
+        {% if not a.street and not a.city %}—{% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Mailing Address</div>
+      {% if entity.addresses_same %}
+      <div style="font-size: 0.875rem; color: #6b7280; font-style: italic;">Same as physical address</div>
+      {% else %}
+      <div style="font-size: 0.9375rem; color: #374151; line-height: 1.6;">
+        {% with a=entity.mailing_address %}
+        {% if a.street %}{{ a.street }}<br>{% endif %}
+        {% if a.street2 %}{{ a.street2 }}<br>{% endif %}
+        {% if a.city or a.state or a.zip %}{{ a.city }}{% if a.city and a.state %}, {% endif %}{{ a.state }} {{ a.zip }}{% endif %}
+        {% if a.country and a.country != "USA" %}<br>{{ a.country }}{% endif %}
+        {% if not a.street and not a.city %}—{% endif %}
+        {% endwith %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Business Types #}
+  {% if entity.business_types %}
+  <div class="section-title">Business Types <span style="font-size:0.7rem; font-weight:400; color:#6b7280; text-transform:none; letter-spacing:0;">(confirmed registrations from SAM.gov)</span></div>
+  <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+    {% for bt in entity.business_types %}
+    <span style="display:inline-flex; align-items:center; gap:5px; padding:0.3rem 0.75rem; border-radius:20px; font-size:0.8rem; font-weight:600; background:rgba(45,198,83,0.1); color:#166534; border:1px solid rgba(45,198,83,0.3);">
+      <span style="font-size:0.85rem;">&#10003;</span> {{ bt }}
+    </span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="section-title">Business Types</div>
+  <p style="font-size:0.875rem; color:#6b7280;">No business types listed.</p>
+  {% endif %}
+
+  {# SBA Certifications #}
+  <div class="section-title">SBA Set-Aside Certifications</div>
+  <div class="grid-3" style="font-size: 0.875rem; gap: 0.5rem;">
+    {% with f=entity.set_aside_flags %}
+    <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0.6rem; border-radius:6px; background:{% if f.sdvosb %}rgba(45,198,83,0.08); border:1px solid rgba(45,198,83,0.25){% else %}#fef2f2; border:1px solid #fecaca{% endif %};">
+      <span style="font-size:0.9rem; font-weight:700; color:{% if f.sdvosb %}#166534{% else %}#b91c1c{% endif %};">{% if f.sdvosb %}&#10003;{% else %}&#10007;{% endif %}</span>
+      <span style="color:{% if f.sdvosb %}#166534{% else %}#6b7280{% endif %}; font-weight:{% if f.sdvosb %}600{% else %}400{% endif %};">SDVOSB</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0.6rem; border-radius:6px; background:{% if f.hubzone %}rgba(45,198,83,0.08); border:1px solid rgba(45,198,83,0.25){% else %}#fef2f2; border:1px solid #fecaca{% endif %};">
+      <span style="font-size:0.9rem; font-weight:700; color:{% if f.hubzone %}#166534{% else %}#b91c1c{% endif %};">{% if f.hubzone %}&#10003;{% else %}&#10007;{% endif %}</span>
+      <span style="color:{% if f.hubzone %}#166534{% else %}#6b7280{% endif %}; font-weight:{% if f.hubzone %}600{% else %}400{% endif %};">HUBZone</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0.6rem; border-radius:6px; background:{% if f.wosb %}rgba(45,198,83,0.08); border:1px solid rgba(45,198,83,0.25){% else %}#fef2f2; border:1px solid #fecaca{% endif %};">
+      <span style="font-size:0.9rem; font-weight:700; color:{% if f.wosb %}#166534{% else %}#b91c1c{% endif %};">{% if f.wosb %}&#10003;{% else %}&#10007;{% endif %}</span>
+      <span style="color:{% if f.wosb %}#166534{% else %}#6b7280{% endif %}; font-weight:{% if f.wosb %}600{% else %}400{% endif %};">WOSB</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0.6rem; border-radius:6px; background:{% if f.edwosb %}rgba(45,198,83,0.08); border:1px solid rgba(45,198,83,0.25){% else %}#fef2f2; border:1px solid #fecaca{% endif %};">
+      <span style="font-size:0.9rem; font-weight:700; color:{% if f.edwosb %}#166534{% else %}#b91c1c{% endif %};">{% if f.edwosb %}&#10003;{% else %}&#10007;{% endif %}</span>
+      <span style="color:{% if f.edwosb %}#166534{% else %}#6b7280{% endif %}; font-weight:{% if f.edwosb %}600{% else %}400{% endif %};">EDWOSB</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0.6rem; border-radius:6px; background:{% if f.8a %}rgba(45,198,83,0.08); border:1px solid rgba(45,198,83,0.25){% else %}#fef2f2; border:1px solid #fecaca{% endif %};">
+      <span style="font-size:0.9rem; font-weight:700; color:{% if f.8a %}#166534{% else %}#b91c1c{% endif %};">{% if f.8a %}&#10003;{% else %}&#10007;{% endif %}</span>
+      <span style="color:{% if f.8a %}#166534{% else %}#6b7280{% endif %}; font-weight:{% if f.8a %}600{% else %}400{% endif %};">8(a)</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0.6rem; border-radius:6px; background:{% if f.small_business %}rgba(45,198,83,0.08); border:1px solid rgba(45,198,83,0.25){% else %}#fef2f2; border:1px solid #fecaca{% endif %};">
+      <span style="font-size:0.9rem; font-weight:700; color:{% if f.small_business %}#166534{% else %}#b91c1c{% endif %};">{% if f.small_business %}&#10003;{% else %}&#10007;{% endif %}</span>
+      <span style="color:{% if f.small_business %}#166534{% else %}#6b7280{% endif %}; font-weight:{% if f.small_business %}600{% else %}400{% endif %};">Small Business</span>
+    </div>
+    {% endwith %}
+  </div>
+  <p style="font-size:0.8rem; color:#6b7280; margin-top:0.6rem; line-height:1.5;">
+    <strong style="color:#374151;">Note:</strong> These reflect SBA-program certification data as stored in SAM.gov.
+    A company may self-report as Women-Owned, Veteran-Owned, etc. under <em>Business Types</em> above without holding the corresponding SBA certification &mdash;
+    but <strong style="color:#374151;">SAM.gov certification data can also lag behind actual status</strong>, particularly for SDVOSB
+    (which transferred from VA to SBA certification in 2023). A red &#10007; does not necessarily mean the company is uncertified.
+    Verify directly on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;">SAM.gov</a> or the
+    <a href="https://veterans.certify.sba.gov" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;">SBA Veteran Certification portal</a> when eligibility is in question.
+  </p>
+
+  {# Temporary raw data debug panel — staff only. Set display:block to re-enable. #}
+  {% if request.user.is_staff and debug_raw %}
+  <div style="display:none; margin-top:1.25rem; background:#0f172a; border-radius:6px; padding:1rem;">
+    <div style="font-size:0.7rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.75rem;">
+      DEBUG — Raw SAM.gov API response (staff only)
+    </div>
+    <pre style="font-size:0.75rem; color:#e2e8f0; font-family:ui-monospace,monospace; white-space:pre-wrap; word-break:break-all; margin:0; max-height:600px; overflow-y:auto;">{{ debug_raw }}</pre>
+  </div>
+  {% endif %}
+
+  {# NAICS Codes #}
+  {% if entity.naics_codes %}
+  <div class="section-title">NAICS Codes</div>
+  <div style="font-size: 0.875rem;">
+    {% for n in entity.naics_codes %}
+    <div style="padding: 0.3rem 0; border-bottom: 1px solid #f3f4f6; display:flex; gap:0.5rem; align-items:baseline;">
+      <span class="mono" style="font-weight:600; color:#0a1628; min-width:60px;">{{ n.code }}</span>
+      <span style="color:#374151;">{{ n.desc }}</span>
+      {% if n.primary %}<span class="pill pill-blue" style="font-size:0.7rem;">Primary</span>{% endif %}
+      {% if n.small_business %}<span class="pill pill-green" style="font-size:0.7rem;">SBA Small Biz</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# PSC Codes #}
+  {% if entity.psc_codes %}
+  <div class="section-title">PSC Codes</div>
+  <div style="font-size: 0.875rem;">
+    {% for p in entity.psc_codes %}
+    <div style="padding: 0.3rem 0; border-bottom: 1px solid #f3f4f6; display:flex; gap:0.5rem; align-items:baseline;">
+      <span class="mono" style="font-weight:600; color:#0a1628; min-width:60px;">{{ p.code }}</span>
+      <span style="color:#374151;">{{ p.desc }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% endif %}{# end found #}
+
+</div>
+{% endblock content %}
