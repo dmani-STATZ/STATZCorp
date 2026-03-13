@@ -33,7 +33,7 @@
   <tbody>
     {% for s in suppliers %}
     <tr>
-      <td>{{ s.name|default:"—" }}</td>
+      <td>{{ s.name|default:"—" }}{% if '[STUB]' in s.notes|default:'' %}<span style="background:rgba(244,162,97,.2); color:var(--accent-warm, #e07c3a); border:1px solid rgba(244,162,97,.3); border-radius:3px; padding:1px 6px; font-size:10px; font-family:'IBM Plex Mono',monospace; margin-left:6px; vertical-align:middle;">INCOMPLETE</span>{% endif %}</td>
       <td class="mono">{{ s.cage_code|default:"—" }}</td>
       <td>{{ s.nsn_count|default:0 }}</td>
       <td>{{ s.fsc_count|default:0 }}</td>

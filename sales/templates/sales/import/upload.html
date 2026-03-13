@@ -162,6 +162,27 @@
       {{ form.as_file }}
     </form>
 
+    {# Fetch from DIBBS (default: yesterday; optional date for weekend/other days) #}
+    <form method="post" action="{% url 'sales:import_fetch_dibbs' %}" id="fetch-dibbs-form" style="margin-bottom:18px;">
+      {% csrf_token %}
+      <div class="alert-info" style="margin-bottom:0;">
+        <span>↓</span>
+        <div>
+          <strong>Fetch from DIBBS</strong> — Downloads IN + BQ+AS from DIBBS for the selected date (default: yesterday).
+          Pick another date to pull weekend or older files. Requires network access to DIBBS.
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px;">
+        <label for="fetch-date" style="font-size:13px; font-weight:600; color:#1a2940;">Import date:</label>
+        <input type="date" id="fetch-date" name="fetch_date" value="{{ default_fetch_date|default:'' }}"
+               style="font-size:14px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; min-width:140px;"
+               title="Default is yesterday. Change to get weekend or other dates.">
+        <button type="submit" class="btn-primary-lg" id="fetch-dibbs-btn">
+          Fetch from DIBBS &amp; Import
+        </button>
+      </div>
+    </form>
+
     {# Visible drop zone — feeds the hidden form fields #}
     <div class="drop-zone" id="drop-zone"
          ondragover="event.preventDefault(); this.classList.add('dragover');"
@@ -415,6 +436,15 @@
     btn.textContent = '⏳ Importing…';
     document.getElementById('import-form').submit();
   }
+
+  // ── Fetch from DIBBS button loading state ──────────────────────────────
+  document.getElementById('fetch-dibbs-form')?.addEventListener('submit', function() {
+    const btn = document.getElementById('fetch-dibbs-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Fetching from DIBBS…';
+    }
+  });
 
   // ── Init ───────────────────────────────────────────────────────────────
   setStep(1);

@@ -1,0 +1,94 @@
+{% extends "sales/base.html" %}
+{% block content %}
+
+<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem;">
+    <div>
+        <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Email Templates</h1>
+        <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0.25rem 0 0;">
+            RFQ email subject and body templates. Use variables like {supplier_name}, {sol_number}, {nsn}.
+        </p>
+    </div>
+    <a href="{% url 'sales:email_template_new' %}"
+       style="padding:0.5rem 1.125rem; background:var(--company-primary,#004eb3); color:#fff;
+              border-radius:6px; text-decoration:none; font-size:0.875rem; font-weight:500;">
+        + New Template
+    </a>
+</div>
+
+{% if error %}
+<div style="padding:0.75rem 1rem; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;
+            color:#b91c1c; font-size:0.875rem; margin-bottom:1rem;">{{ error }}</div>
+{% endif %}
+
+{% if messages %}
+    {% for msg in messages %}
+    <div style="padding:0.75rem 1rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                color:#166534; font-size:0.875rem; margin-bottom:1rem;">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.8125rem; color:#475569;">
+    <strong>Available variables:</strong>
+    {supplier_name}, {sol_number}, {nsn}, {nomenclature}, {qty}, {unit_of_issue}, {return_date}, {your_name}, {your_email}
+</div>
+
+{% if not templates %}
+<div style="padding:3rem; text-align:center; background:#fffbeb; border:1px solid #fbbf24;
+            border-radius:8px; color:#92400e;">
+    <p style="font-size:1rem; font-weight:600; margin:0 0 0.5rem;">No email templates yet</p>
+    <p style="font-size:0.875rem; margin:0 0 1rem;">Create a template to pre-fill RFQ emails when using Open RFQ Email.</p>
+    <a href="{% url 'sales:email_template_new' %}"
+       style="padding:0.5rem 1.25rem; background:#004eb3; color:#fff; border-radius:6px;
+              text-decoration:none; font-size:0.875rem; font-weight:500;">
+        + New Template
+    </a>
+</div>
+{% else %}
+<div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+        <thead>
+            <tr style="background:var(--surface-secondary,#f9fafb); border-bottom:1px solid #e5e7eb;">
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Name</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Default</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Updated</th>
+                <th style="padding:0.625rem 1rem; text-align:right; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in templates %}
+            <tr style="border-bottom:1px solid #e5e7eb; {% if t.is_default %}background:rgba(0,78,179,0.03);{% endif %}">
+                <td style="padding:0.625rem 1rem; font-weight:600;">{{ t.name }}</td>
+                <td style="padding:0.625rem 1rem; text-align:center;">
+                    {% if t.is_default %}
+                    <span style="background:#dbeafe; color:#1d4ed8; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:600;">DEFAULT</span>
+                    {% else %}
+                    <form method="post" action="{% url 'sales:email_template_set_default' t.pk %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" style="padding:2px 10px; font-size:0.75rem; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; cursor:pointer;">Set Default</button>
+                    </form>
+                    {% endif %}
+                </td>
+                <td style="padding:0.625rem 1rem; color:var(--text-muted,#6b7280); font-size:0.8125rem;">{{ t.updated_at|date:"M j, Y" }}</td>
+                <td style="padding:0.625rem 1rem; text-align:right;">
+                    <a href="{% url 'sales:email_template_edit' t.pk %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none; margin-right:0.75rem;">Edit</a>
+                    {% if t.is_default %}
+                    <span style="font-size:0.75rem; color:#9ca3af;" title="Set another template as default first">Delete</span>
+                    {% else %}
+                    <form method="post" action="{% url 'sales:email_template_delete' t.pk %}" style="display:inline;" onsubmit="return confirm('Delete this template?');">
+                        {% csrf_token %}
+                        <button type="submit" style="padding:0; font-size:0.8125rem; color:#dc2626; background:none; border:none; cursor:pointer;">Delete</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<p style="margin-top:1.5rem;">
+    <a href="{% url 'sales:settings_cages' %}" style="font-size:0.875rem; color:var(--company-primary,#004eb3); text-decoration:none;">← Back to Settings</a>
+</p>
+
+{% endblock content %}

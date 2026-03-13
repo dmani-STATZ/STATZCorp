@@ -18,6 +18,7 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -28,6 +29,7 @@ from django.views.decorators.http import require_POST
 
 from sales.forms import ImportUploadForm
 from sales.models import ImportBatch, ImportJob
+from sales.services.dibbs_fetch import DibbsFetchError, fetch_dibbs_archive_files
 from sales.services.importer import (
     _import_date_from_filename,
     create_import_batch,
@@ -49,17 +51,21 @@ def import_upload(request):
           redirect to the progress page.
     """
     if request.method != "POST":
+        default_fetch_date = (date.today() - timedelta(days=1)).isoformat()
         return render(request, "sales/import/upload.html", {
             "form": ImportUploadForm(),
             "page_title": "Daily Import",
+            "default_fetch_date": default_fetch_date,
         })
 
     form = ImportUploadForm(request.POST, request.FILES)
     if not form.is_valid():
         messages.error(request, "Please correct the errors below.")
+        default_fetch_date = (date.today() - timedelta(days=1)).isoformat()
         return render(request, "sales/import/upload.html", {
             "form": form,
             "page_title": "Daily Import",
+            "default_fetch_date": default_fetch_date,
         })
 
     in_file  = form.cleaned_data["in_file"]
@@ -81,9 +87,11 @@ def import_upload(request):
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         messages.error(request, f"Failed to save uploaded files: {exc}")
+        default_fetch_date = (date.today() - timedelta(days=1)).isoformat()
         return render(request, "sales/import/upload.html", {
             "form": form,
             "page_title": "Daily Import",
+            "default_fetch_date": default_fetch_date,
         })
 
     job = ImportJob.objects.create(
@@ -98,6 +106,57 @@ def import_upload(request):
         imported_by  = imported_by,
     )
 
+    return redirect("sales:import_job_progress", job_id=job.job_id)
+
+
+def _default_fetch_date():
+    """Default DIBBS fetch date: yesterday (e.g. get Friday's files on Monday)."""
+    return date.today() - timedelta(days=1)
+
+
+@login_required
+@require_POST
+def import_fetch_dibbs(request):
+    """
+    Fetch IN + BQ+AS from DIBBS for the chosen date (default: yesterday).
+    Discovery on www.dibbs, then Playwright download on dibbs2. Creates ImportJob, redirects to progress.
+    """
+    imported_by = request.user.get_full_name() or request.user.username or ""
+    fetch_date_str = request.POST.get("fetch_date", "").strip()
+    if fetch_date_str:
+        try:
+            target_date = date.fromisoformat(fetch_date_str)
+        except ValueError:
+            target_date = _default_fetch_date()
+            messages.warning(request, f"Invalid date {fetch_date_str!r}; using {target_date}.")
+    else:
+        target_date = _default_fetch_date()
+
+    default_fetch_date = target_date.isoformat()
+    ctx = {"form": ImportUploadForm(), "page_title": "Daily Import", "default_fetch_date": default_fetch_date}
+    try:
+        result = fetch_dibbs_archive_files(target_date=target_date)
+    except DibbsFetchError as e:
+        logger.warning("DIBBS fetch failed: %s", e)
+        messages.error(request, str(e))
+        return render(request, "sales/import/upload.html", ctx)
+    except Exception as e:
+        logger.exception("DIBBS fetch error")
+        messages.error(request, f"Fetch failed: {e}")
+        return render(request, "sales/import/upload.html", ctx)
+
+    job = ImportJob.objects.create(
+        job_id=str(uuid.uuid4()),
+        status=ImportJob.STATUS_UPLOADED,
+        in_file_path=result["in_path"],
+        bq_file_path=result["bq_path"],
+        as_file_path=result["as_path"],
+        in_file_name=result["in_file_name"],
+        bq_file_name=result["bq_file_name"],
+        as_file_name=result["as_file_name"],
+        imported_by=imported_by,
+    )
+    messages.success(request, "Files fetched from DIBBS. Processing import…")
     return redirect("sales:import_job_progress", job_id=job.job_id)
 
 

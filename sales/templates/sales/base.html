@@ -89,12 +89,21 @@
         </a>
         <a href="{% url 'sales:settings_cages' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if 'settings' in request.resolver_match.url_name %}
+                  {% if 'settings' in request.resolver_match.url_name and 'email_template' not in request.resolver_match.url_name %}
                       border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
                   {% else %}
                       color: var(--text-muted, #6b7280);
                   {% endif %}">
             Settings
+        </a>
+        <a href="{% url 'sales:email_template_list' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if 'email_template' in request.resolver_match.url_name %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            Email Templates
         </a>
 <!--        {% if request.user.is_superuser %}
         <a href="{% url 'sales:backfill_nsn' %}"

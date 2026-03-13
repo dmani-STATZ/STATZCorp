@@ -1,0 +1,35 @@
+{#
+  Include with:
+    {% include "sales/rfq/partials/mailto_buttons.html" with match=match %}
+
+  `match` must have: match.id, match.supplier.name,
+  and `match.rfq_sent` (bool) + `match.rfq_status_display` (str) if annotated.
+#}
+<div class="rfq-action-cell" data-match-id="{{ match.id }}">
+
+  {% if match.rfq_sent %}
+    {# Already sent — show status badge and allow re-send #}
+    <span class="rfq-sent-badge">
+      ✓ {{ match.rfq_status_display|default:"Sent" }}
+    </span>
+    <button type="button" class="btn-mailto btn-sm"
+            data-match-id="{{ match.id }}"
+            onclick="openMailto({{ match.id }}, this)">
+      ✉ Re-send Email
+    </button>
+
+  {% else %}
+    {# Not yet sent #}
+    <button type="button" class="btn-mailto btn-sm"
+            data-match-id="{{ match.id }}"
+            onclick="openMailto({{ match.id }}, this)">
+      ✉ Open RFQ Email
+    </button>
+    <button type="button" class="btn-mark-sent btn-sm btn-secondary"
+            data-match-id="{{ match.id }}"
+            onclick="markSent({{ match.id }}, this)">
+      ✓ Mark Sent
+    </button>
+  {% endif %}
+
+</div>

@@ -34,6 +34,7 @@ pdfplumber==0.11.5
 python-dateutil==2.9.0.post0
 requests==2.32.4  # Latest version with .netrc fix
 beautifulsoup4==4.12.3
+playwright==1.49.0  # DIBBS fetch: consent + file downloads on dibbs2
 python-slugify==8.0.4
 webcolors==1.13
 

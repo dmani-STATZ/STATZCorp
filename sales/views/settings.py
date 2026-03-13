@@ -1,13 +1,16 @@
 """
-Settings views — CompanyCAGE management.
+Settings views — CompanyCAGE and EmailTemplate management.
 URL: /sales/settings/
 """
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse
 
-from sales.models import CompanyCAGE
+from sales.models import CompanyCAGE, EmailTemplate
+from sales.models.email_templates import _SafeDict
 
 
 @login_required
@@ -116,3 +119,132 @@ def _cage_from_post(data, instance=None):
     cage.is_default = "is_default" in data
     cage.is_active = "is_active" in data
     return cage
+
+
+# ---------- Email Templates ----------
+
+
+@login_required
+def email_template_list(request):
+    """GET /sales/settings/email/ — list all templates."""
+    templates = EmailTemplate.objects.all()
+    return render(
+        request,
+        "sales/settings/email_templates.html",
+        {"templates": templates, "active_nav": "settings"},
+    )
+
+
+@login_required
+def email_template_edit(request, pk=None):
+    """
+    GET/POST /sales/settings/email/new/
+    GET/POST /sales/settings/email/<pk>/edit/
+    Create or edit a template.
+    """
+    template = get_object_or_404(EmailTemplate, pk=pk) if pk else None
+
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        subject = request.POST.get("subject_template", "").strip()
+        body = request.POST.get("body_template", "").strip()
+        errors = {}
+
+        if not name:
+            errors["name"] = "Required."
+        if not subject:
+            errors["subject_template"] = "Required."
+        if not body:
+            errors["body_template"] = "Required."
+
+        if not errors:
+            if template:
+                template.name = name
+                template.subject_template = subject
+                template.body_template = body
+                template.save()
+            else:
+                template = EmailTemplate.objects.create(
+                    name=name,
+                    subject_template=subject,
+                    body_template=body,
+                    created_by=request.user,
+                )
+            return redirect("sales:email_template_list")
+
+        return render(
+            request,
+            "sales/settings/email_template_form.html",
+            {
+                "template": template,
+                "errors": errors,
+                "active_nav": "settings",
+            },
+        )
+
+    return render(
+        request,
+        "sales/settings/email_template_form.html",
+        {"template": template, "active_nav": "settings"},
+    )
+
+
+@login_required
+@require_POST
+def email_template_delete(request, pk):
+    """POST /sales/settings/email/<pk>/delete/"""
+    template = get_object_or_404(EmailTemplate, pk=pk)
+    if template.is_default:
+        templates = EmailTemplate.objects.all()
+        return render(
+            request,
+            "sales/settings/email_templates.html",
+            {
+                "templates": templates,
+                "error": "Cannot delete the default template. Set another template as default first.",
+                "active_nav": "settings",
+            },
+        )
+    template.delete()
+    return redirect("sales:email_template_list")
+
+
+@login_required
+@require_POST
+def email_template_set_default(request, pk):
+    """POST /sales/settings/email/<pk>/set-default/ — makes this template the default."""
+    template = get_object_or_404(EmailTemplate, pk=pk)
+    EmailTemplate.objects.filter(is_default=True).update(is_default=False)
+    template.is_default = True
+    template.save(update_fields=["is_default"])
+    return redirect("sales:email_template_list")
+
+
+@login_required
+def email_template_preview(request):
+    """
+    GET /sales/settings/email/preview/?subject=...&body=...
+    Returns JSON with rendered preview using sample data.
+    """
+    sample = {
+        "supplier_name": "Acme Defense Supply",
+        "sol_number": "SPE1C126T0694",
+        "nsn": "2530-01-123-4567",
+        "nomenclature": "BRACKET, ANGLE",
+        "qty": "25",
+        "unit_of_issue": "EA",
+        "return_date": "04/15/2026",
+        "your_name": request.user.get_full_name() or request.user.username,
+        "your_email": request.user.email or "bids@statz.com",
+    }
+
+    subject_raw = request.GET.get("subject", "")
+    body_raw = request.GET.get("body", "")
+
+    try:
+        subject_rendered = subject_raw.format_map(_SafeDict(sample))
+        body_rendered = body_raw.format_map(_SafeDict(sample))
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+    return JsonResponse({"subject": subject_rendered, "body": body_rendered})

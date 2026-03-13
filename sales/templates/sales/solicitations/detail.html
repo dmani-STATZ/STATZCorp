@@ -38,6 +38,53 @@
   .badge-warn { background: #fff3e0; color: #bf360c; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
   .form-control { padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
   .form-card + .form-card { margin-top: 0.75rem; }
+  /* RFQ mailto button pair */
+  .rfq-action-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn-mailto { background: var(--accent); color: #fff; border: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-family: 'Barlow', sans-serif; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .btn-mailto:hover { opacity: 0.85; }
+  .btn-mailto:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-mark-sent { background: transparent; color: var(--text-muted, #6b7280); border: 1px solid var(--border-color, #e5e7eb); padding: 5px 12px; border-radius: 4px; font-size: 12px; font-family: 'Barlow', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-mark-sent:hover { border-color: var(--success); color: var(--success); }
+  .btn-mark-sent--ready { border-color: var(--success); color: var(--success); animation: pulse-green 1.5s ease-in-out 2; }
+  @keyframes pulse-green { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 0 3px rgba(45, 198, 83, 0.3); } }
+  .rfq-sent-badge { background: rgba(45, 198, 83, 0.15); color: var(--success); border: 1px solid rgba(45, 198, 83, 0.3); padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+  .rfq-sent-meta { color: var(--text-muted, #6b7280); font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+  .inline-alert { font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-top: 4px; width: 100%; }
+  .inline-alert--warning { background: rgba(244,162,97,0.15); color: var(--accent-warm, #e07c3a); }
+  .inline-alert--error { background: rgba(230,57,70,0.15); color: var(--danger, #dc2626); }
+  /* Ad-hoc RFQ dispatch */
+  .btn-rfq { display: inline-block; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-family: 'Barlow', sans-serif; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn-rfq:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-rfq-open { background: var(--accent, #00b4d8); color: #fff; }
+  .btn-rfq-open:hover:not(:disabled) { opacity: 0.85; }
+  .btn-rfq-mark { background: transparent; color: var(--text-muted, #6b7280); border: 1px solid var(--border-color, #e5e7eb); }
+  .btn-rfq-mark--ready { border-color: var(--success, #2dc653); color: var(--success, #2dc653); }
+  .badge-sent { background: rgba(45,198,83,0.15); color: var(--success, #2dc653); border: 1px solid rgba(45,198,83,0.3); padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+  .adhoc-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted, #6b7280); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; font-family: 'IBM Plex Mono', monospace; }
+  .adhoc-input { width: 100%; padding: 5px 9px; border: 1px solid var(--border, #e5e7eb); border-radius: 4px; background: var(--navy, #0a1628); color: var(--text-primary, #1a2940); font-family: 'Barlow', sans-serif; font-size: 13px; box-sizing: border-box; }
+  .adhoc-input:focus { outline: none; border-color: var(--accent, #00b4d8); }
+  .sam-field { margin-bottom: 5px; font-size: 12px; }
+  .sam-field-label { font-family: 'IBM Plex Mono', monospace; color: var(--text-muted, #6b7280); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; display: block; }
+  .sam-badge-ok   { background: rgba(45,198,83,.2);  color: var(--success, #2dc653);       border: 1px solid rgba(45,198,83,.3);  border-radius: 3px; padding: 1px 7px; font-size: 10px; font-family: 'IBM Plex Mono', monospace; }
+  .sam-badge-warn { background: rgba(244,162,97,.2); color: var(--accent-warm, #e07c3a);   border: 1px solid rgba(244,162,97,.3); border-radius: 3px; padding: 1px 7px; font-size: 10px; font-family: 'IBM Plex Mono', monospace; }
+  .sam-badge-bad  { background: rgba(230,57,70,.15); color: var(--danger, #dc2626);         border: 1px solid rgba(230,57,70,.3);  border-radius: 3px; padding: 1px 7px; font-size: 10px; font-family: 'IBM Plex Mono', monospace; }
+  /* Adhoc panel tab bar */
+  .adhoc-tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 6px 14px 8px; font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-muted, #6b7280); cursor: pointer; transition: color .15s, border-color .15s; margin-bottom: -1px; }
+  .adhoc-tab:hover { color: var(--text-primary, #1a2940); }
+  .adhoc-tab--active { color: var(--accent, #00b4d8); border-bottom-color: var(--accent, #00b4d8); }
+  /* Selected supplier panel: light text on dark background */
+  #supplier-selected-panel .supplier-selected-name { font-weight: 600; font-size: 14px; color: #f1f5f9; }
+  #supplier-selected-panel .supplier-selected-email { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  #supplier-selected-panel .adhoc-label { color: #94a3b8; }
+  #supplier-selected-panel .adhoc-input { background: rgba(255,255,255,0.1); color: #f1f5f9; border-color: rgba(255,255,255,0.25); }
+  #supplier-selected-panel .adhoc-input::placeholder { color: #64748b; }
+  /* Supplier search result rows */
+  .supplier-result-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 4px; background: #f9fafb; cursor: pointer; transition: border-color .15s, background .15s; }
+  .supplier-result-row:hover { border-color: #00b4d8; background: #eff9fd; }
+  .supplier-result-row--matched { border-color: rgba(45,198,83,.5); background: rgba(45,198,83,.07); }
+  .supplier-result-name { font-weight: 600; font-size: 13px; color: #111827; flex: 1; }
+  .supplier-result-cage { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6b7280; }
+  .supplier-result-email { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6b7280; }
 </style>
 
 {# Pipeline Track #}
@@ -210,6 +257,7 @@
         <th>Part Number</th>
         <th>Company Name</th>
         <th>Status</th>
+        <th>ACTION</th>
       </tr>
     </thead>
     <tbody>
@@ -238,6 +286,33 @@
                style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:600; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:0.15rem 0.5rem; border-radius:4px; text-decoration:none; white-space:nowrap;">
               &#128269; Lookup on SAM.gov
             </a>
+          {% endif %}
+        </td>
+        <td id="as-cell-{{ src.approved_cage }}" style="min-width:180px;">
+          <button class="btn-rfq btn-rfq-open"
+                  onclick="asSendRfq({{ src.id }}, {{ line.id }}, '', this)">
+            ✉ Send RFQ
+          </button>
+          {% if not src.matched_supplier %}
+          <div id="as-email-prompt-{{ src.approved_cage }}"
+               style="display:none; margin-top:6px;">
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">
+              SAM.gov has no email for this entity. Enter one:
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="email" id="as-email-{{ src.approved_cage }}"
+                     class="adhoc-input" style="flex:1; font-size:12px;"
+                     placeholder="contact@supplier.com">
+              <button class="btn-rfq btn-rfq-open"
+                      onclick="asSendRfq({{ src.id }}, {{ line.id }},
+                        document.getElementById('as-email-{{ src.approved_cage }}').value,
+                        this)">
+                Send
+              </button>
+            </div>
+            <div id="as-err-{{ src.approved_cage }}"
+                 style="color:var(--danger);font-size:11px;margin-top:3px;display:none;"></div>
+          </div>
           {% endif %}
         </td>
       </tr>
@@ -285,17 +360,10 @@
         <td>{% if match.supplier.probation %}<span class="badge-warn">Probation</span>{% elif match.supplier.conditional %}<span class="badge-warn">Conditional</span>{% else %}<span style="color:#2dc653; font-size:12px;">Clear</span>{% endif %}</td>
         <td><span class="mono" style="font-size:11px; color:#5a7090;">{{ match.supplier.primary_email|default:match.supplier.business_email|default:"—" }}</span></td>
         <td>
-          {% if match.rfq_sent %}
-          <span class="badge" style="background:#eef2f8; color:#5a7090; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.75rem;">{{ match.rfq_status_display }}</span>
-          {% elif not match.is_excluded %}
-          <form method="post" action="{% url 'sales:rfq_send_single' %}" style="display:inline;">
-            {% csrf_token %}
-            <input type="hidden" name="match_id" value="{{ match.id }}">
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <button type="submit" class="btn btn-primary btn-sm">Send RFQ</button>
-          </form>
-          {% else %}
+          {% if match.is_excluded %}
           <span style="color:#a0aec0; font-size:12px;">Excluded</span>
+          {% else %}
+          {% include "sales/rfq/partials/mailto_buttons.html" with match=match %}
           {% endif %}
         </td>
       </tr>
@@ -308,6 +376,169 @@
   </form>
 </div>
 {% endif %}
+
+{# ── Send RFQ to Unlisted Supplier ──────────────────── #}
+<div style="margin-top:24px;">
+  <button class="btn-rfq btn-rfq-mark" id="adhoc-toggle"
+          onclick="toggleAdhoc()" style="font-size:12px;">
+    + Send RFQ to unlisted supplier
+  </button>
+
+  <div id="adhoc-panel" style="display:none; margin-top:12px; max-width:520px;
+       background:var(--navy-mid); border:1px solid var(--border);
+       border-radius:6px; padding:16px;">
+
+    {# ── Tab bar ─────────────────────────────────────── #}
+    <div style="display:flex; gap:0; margin-bottom:16px;
+                border-bottom:1px solid var(--border);">
+      <button id="tab-search-btn"
+              class="adhoc-tab adhoc-tab--active"
+              onclick="switchAdhocTab('search')">
+        Search My Suppliers
+      </button>
+      <button id="tab-sam-btn"
+              class="adhoc-tab"
+              onclick="switchAdhocTab('sam')">
+        Add New via SAM.gov
+      </button>
+    </div>
+
+    {# ════════════════════════════════════════════════ #}
+    {# TAB 1 — Search existing suppliers               #}
+    {# ════════════════════════════════════════════════ #}
+    <div id="adhoc-tab-search">
+
+      <label class="adhoc-label">Search by name or CAGE</label>
+      <input type="text" id="supplier-search-input" class="adhoc-input"
+             placeholder="e.g. Acme Supply or 1Q8T8"
+             oninput="scheduleSupplierSearch({% if line %}{{ line.id }}{% else %}0{% endif %}, this.value)"
+             autocomplete="off">
+
+      {# Results list #}
+      <div id="supplier-search-results" style="margin-top:8px;"></div>
+
+      {# Selected supplier + email prompt (shown after picking one) #}
+      <div id="supplier-selected-panel" style="display:none; margin-top:12px;
+           background:var(--navy); border:1px solid var(--border);
+           border-radius:4px; padding:12px;">
+        <div id="supplier-selected-info" style="margin-bottom:10px;"></div>
+        <div id="supplier-email-row" style="display:none; margin-bottom:10px;">
+          <label class="adhoc-label">
+            Email Address
+            <span style="color:var(--accent-warm); font-weight:400; text-transform:none;">
+              (no email on file — enter one)
+            </span>
+          </label>
+          <input type="email" id="supplier-email-override" class="adhoc-input"
+                 placeholder="contact@supplier.com">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-rfq btn-rfq-open"
+                  id="supplier-send-btn"
+                  onclick="sendToExistingSupplier({% if line %}{{ line.id }}{% else %}0{% endif %}, this)">
+            ✉ Open RFQ Email
+          </button>
+          <button class="btn-rfq btn-rfq-mark"
+                  onclick="clearSupplierSelection()">
+            ← Back to search
+          </button>
+        </div>
+        <div id="supplier-send-error"
+             style="color:var(--danger);font-size:11px;margin-top:4px;display:none;"></div>
+      </div>
+
+      <div id="supplier-search-result-area" style="margin-top:10px;"></div>
+    </div>
+
+    {# ════════════════════════════════════════════════ #}
+    {# TAB 2 — Add new supplier via SAM.gov            #}
+    {# ════════════════════════════════════════════════ #}
+    <div id="adhoc-tab-sam" style="display:none;">
+
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+        For suppliers not yet in your database. Enter their CAGE code and
+        we'll pull their details from SAM.gov automatically.
+      </div>
+
+      {# Step 1: CAGE input #}
+      <div id="sam-step-cage">
+        <label class="adhoc-label">CAGE Code</label>
+        <div style="display:flex; gap:8px; align-items:flex-end;">
+          <input type="text" id="sam-cage-input" class="adhoc-input"
+                 style="max-width:140px; font-family:'IBM Plex Mono',monospace;
+                        text-transform:uppercase;"
+                 maxlength="5" placeholder="e.g. 1Q8T8"
+                 oninput="this.value=this.value.toUpperCase()">
+          <button class="btn-rfq btn-rfq-open"
+                  onclick="samLookup({{ line.id }}, this)">
+            Look Up on SAM.gov
+          </button>
+        </div>
+        <div id="sam-cage-error"
+             style="color:var(--danger);font-size:11px;margin-top:4px;display:none;"></div>
+      </div>
+
+      {# Step 2: SAM entity confirmation card #}
+      <div id="sam-step-confirm" style="display:none; margin-top:14px;">
+        <div id="sam-entity-card"
+             style="background:var(--navy); border:1px solid var(--border);
+                    border-radius:4px; padding:12px; margin-bottom:12px;"></div>
+        <div style="margin-bottom:10px;">
+          <label class="adhoc-label">
+            Email Address
+            <span style="color:var(--accent-warm); font-weight:400; text-transform:none;">
+              (SAM.gov doesn't include email — enter supplier contact)
+            </span>
+          </label>
+          <input type="email" id="sam-email" class="adhoc-input"
+                 placeholder="contact@supplier.com">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-rfq btn-rfq-open"
+                  onclick="samConfirmSend({{ line.id }}, this)">
+            ✉ Confirm &amp; Open RFQ Email
+          </button>
+          <button class="btn-rfq btn-rfq-mark" onclick="samReset()">
+            ← Change CAGE
+          </button>
+        </div>
+        <div id="sam-confirm-error"
+             style="color:var(--danger);font-size:11px;margin-top:4px;display:none;"></div>
+      </div>
+
+      {# Step 3: result #}
+      <div id="sam-step-result" style="display:none; margin-top:14px;"></div>
+
+      {# Manual fallback — SAM not found #}
+      <div id="sam-step-manual" style="display:none; margin-top:14px;">
+        <div style="font-size:12px; color:var(--accent-warm); margin-bottom:10px;">
+          CAGE not found on SAM.gov. Enter details manually:
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+          <div>
+            <label class="adhoc-label">Name <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="sam-manual-name" class="adhoc-input">
+          </div>
+          <div>
+            <label class="adhoc-label">Email <span style="color:var(--danger)">*</span></label>
+            <input type="email" id="sam-manual-email" class="adhoc-input">
+          </div>
+        </div>
+        <button class="btn-rfq btn-rfq-open"
+                onclick="samManualSend({{ line.id }}, this)">
+          ✉ Open RFQ Email
+        </button>
+        <div id="sam-manual-error"
+             style="color:var(--danger);font-size:11px;margin-top:4px;display:none;"></div>
+      </div>
+
+    </div>{# end tab-sam #}
+
+    {# Shared result area (shown after any successful send) #}
+    <div id="adhoc-shared-result" style="display:none; margin-top:14px;"></div>
+
+  </div>{# end adhoc-panel #}
+</div>
 {% endif %}
 
 {# RFQs Tab #}
@@ -722,4 +953,494 @@
   <p style="color:#9ca3af; margin:0;">No activity yet.</p>
   {% endif %}
 </div>
+
+<script>window.CSRF_TOKEN = '{{ csrf_token }}';</script>
+<script>
+async function openMailto(matchId, btn) {
+  var original = btn.textContent;
+  btn.textContent = 'Opening…';
+  btn.disabled = true;
+  try {
+    var resp = await fetch('/sales/rfq/mailto/' + matchId + '/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    var data = await resp.json();
+    if (data.missing_email) {
+      showMatchAlert(matchId, 'warning', '⚠ No email address on file for this supplier.');
+    } else {
+      window.location.href = data.mailto_url;
+      setTimeout(function() {
+        var cell = document.querySelector('.rfq-action-cell[data-match-id="' + matchId + '"]');
+        if (cell) {
+          var markBtn = cell.querySelector('.btn-mark-sent');
+          if (markBtn) markBtn.classList.add('btn-mark-sent--ready');
+        }
+      }, 1200);
+    }
+  } catch (e) {
+    showMatchAlert(matchId, 'error', 'Failed to generate email link. Please try again.');
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+async function markSent(matchId, btn) {
+  if (!confirm('Mark this RFQ as sent? This will record it in the system.')) return;
+  var original = btn.textContent;
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+  try {
+    var resp = await fetch('/sales/rfq/' + matchId + '/mark-sent/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    var data = await resp.json();
+    if (data.success) {
+      var cell = document.querySelector('.rfq-action-cell[data-match-id="' + matchId + '"]');
+      if (cell) {
+        cell.innerHTML = '<span class="rfq-sent-badge">✓ Sent</span><small class="rfq-sent-meta">' + (data.to_email || '') + ' · ' + (data.sent_at || '') + '</small>';
+      }
+    } else {
+      showMatchAlert(matchId, 'error', 'Could not mark as sent. Please refresh and try again.');
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  } catch (e) {
+    showMatchAlert(matchId, 'error', 'Network error. Please try again.');
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+function showMatchAlert(matchId, type, message) {
+  var cell = document.querySelector('.rfq-action-cell[data-match-id="' + matchId + '"]');
+  if (!cell) return;
+  var alert = document.createElement('div');
+  alert.className = 'inline-alert inline-alert--' + type;
+  alert.textContent = message;
+  cell.appendChild(alert);
+  setTimeout(function() { alert.remove(); }, 5000);
+}
+
+/* ── rfqMarkSent — shared helper for ad-hoc and approved-source flows ── */
+async function rfqMarkSent(matchId, btn) {
+  if (!confirm('Mark this RFQ as sent? This will record it in the system.')) return;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    const res  = await fetch('/sales/rfq/' + matchId + '/mark-sent/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      btn.parentElement.innerHTML =
+        '<span class="badge-sent">✓ Sent</span>' +
+        '<small style="color:var(--text-muted,#6b7280);font-size:10px;font-family:\'IBM Plex Mono\',monospace;margin-left:6px;">' +
+        (data.to_email || '') + ' · ' + (data.sent_at || '') + '</small>';
+    } else {
+      alert('Could not mark as sent. Please refresh and try again.');
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch {
+    alert('Network error. Please try again.');
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+/* ── Approved Source RFQ dispatch ──────────────────────────────────── */
+
+async function asSendRfq(approvedSourceId, lineId, email, btn) {
+  const orig = btn.textContent;
+  btn.textContent = 'Working…'; btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('approved_source_id', approvedSourceId);
+  fd.append('line_id', lineId);
+  if (email) fd.append('email', email);
+
+  try {
+    const res  = await fetch('/sales/rfq/send-to-approved-source/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd,
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      window.location.href = data.mailto_url;
+      const cell = btn.closest('[id^="as-cell-"]') || btn.closest('td');
+      if (cell) {
+        cell.innerHTML =
+          '<span class="rfq-sent-meta">✉ Opened — ' + data.to_email + '</span>' +
+          '<button class="btn-rfq btn-rfq-mark btn-rfq-mark--ready" style="margin-left:6px;"' +
+          ' onclick="rfqMarkSent(' + data.match_id + ', this)">✓ Mark Sent</button>';
+      }
+    } else if (data.needs_email) {
+      btn.textContent = orig; btn.disabled = false;
+      const cell = btn.closest('[id^="as-cell-"]');
+      if (cell) {
+        const cage   = cell.id.replace('as-cell-', '');
+        const prompt = document.getElementById('as-email-prompt-' + cage);
+        if (prompt) prompt.style.display = 'block';
+      }
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch {
+    alert('Network error. Please try again.');
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   AD-HOC RFQ PANEL — supplier search + SAM.gov
+   ═══════════════════════════════════════════════════════ */
+
+let _selectedSupplierId = null;
+let _selectedSupplierName = '';
+let _samCage = '';
+let _supplierSearchTimer = null;
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  const t = String(s);
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function toggleAdhoc() {
+  const panel = document.getElementById('adhoc-panel');
+  const btn   = document.getElementById('adhoc-toggle');
+  const shown = panel.style.display !== 'none';
+  panel.style.display = shown ? 'none' : 'block';
+  btn.textContent = shown ? '+ Send RFQ to unlisted supplier' : '− Close';
+  if (!shown) {
+    switchAdhocTab('search');
+    clearSupplierSelection();
+  }
+}
+
+function switchAdhocTab(tab) {
+  document.getElementById('adhoc-tab-search').style.display = tab === 'search' ? 'block' : 'none';
+  document.getElementById('adhoc-tab-sam').style.display    = tab === 'sam'    ? 'block' : 'none';
+  document.getElementById('tab-search-btn').classList.toggle('adhoc-tab--active', tab === 'search');
+  document.getElementById('tab-sam-btn').classList.toggle('adhoc-tab--active',    tab === 'sam');
+}
+
+
+/* ── TAB 1: Supplier search ─────────────────────────── */
+
+function scheduleSupplierSearch(lineId, value) {
+  clearTimeout(_supplierSearchTimer);
+  const resultsEl = document.getElementById('supplier-search-results');
+  if (value.length < 2) { resultsEl.innerHTML = ''; return; }
+  _supplierSearchTimer = setTimeout(() => runSupplierSearch(lineId, value), 300);
+}
+
+async function runSupplierSearch(lineId, q) {
+  const resultsEl = document.getElementById('supplier-search-results');
+  resultsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Searching…</div>';
+
+  try {
+    const res  = await fetch(
+      `/sales/rfq/supplier-search/?q=${encodeURIComponent(q)}&line_id=${lineId}`,
+      { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+    );
+    const data = await res.json();
+
+    if (!data.results.length) {
+      resultsEl.innerHTML =
+        `<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">
+           No suppliers found.
+           <a href="#" onclick="switchAdhocTab('sam');return false;"
+              style="color:var(--accent);margin-left:4px;">
+             Try SAM.gov lookup →
+           </a>
+         </div>`;
+      return;
+    }
+
+    resultsEl.innerHTML = data.results.map(s => {
+      const flags = [];
+      if (s.flags.probation)   flags.push(`<span class="sam-badge-warn">⚠ Probation</span>`);
+      if (s.flags.conditional) flags.push(`<span class="sam-badge-warn">⚠ Conditional</span>`);
+      const alreadyNote = s.already_matched
+        ? `<span class="sam-badge-ok" style="margin-left:4px;">Already matched</span>` : '';
+      const emailNote = s.has_email
+        ? `<span class="supplier-result-email">${s.email}</span>`
+        : `<span style="font-size:10px;color:var(--accent-warm);">No email on file</span>`;
+
+      return `
+        <div class="supplier-result-row ${s.already_matched ? 'supplier-result-row--matched' : ''}"
+             onclick="selectSupplier(${s.id}, '${s.name.replace(/'/g,"\\'")}',
+                                     '${s.email}', ${s.has_email})">
+          <div class="supplier-result-name">
+            ${s.name}
+            ${flags.join('')}${alreadyNote}
+          </div>
+          <span class="supplier-result-cage">${s.cage_code || '—'}</span>
+          ${emailNote}
+        </div>`;
+    }).join('');
+
+  } catch {
+    resultsEl.innerHTML =
+      '<div style="font-size:12px;color:var(--danger);">Search failed. Please try again.</div>';
+  }
+}
+
+function selectSupplier(id, name, email, hasEmail) {
+  _selectedSupplierId   = id;
+  _selectedSupplierName = name;
+
+  document.getElementById('supplier-search-results').innerHTML = '';
+  document.getElementById('supplier-search-input').value = '';
+
+  const infoEl = document.getElementById('supplier-selected-info');
+  infoEl.innerHTML =
+    `<div class="supplier-selected-name">${escapeHtml(name)}</div>
+     ${email ? `<div class="supplier-selected-email">${escapeHtml(email)}</div>` : ''}`;
+
+  const emailRow = document.getElementById('supplier-email-row');
+  emailRow.style.display = hasEmail ? 'none' : 'block';
+
+  document.getElementById('supplier-selected-panel').style.display = 'block';
+  document.getElementById('supplier-send-error').style.display     = 'none';
+}
+
+function clearSupplierSelection() {
+  _selectedSupplierId   = null;
+  _selectedSupplierName = '';
+  document.getElementById('supplier-selected-panel').style.display = 'none';
+  document.getElementById('supplier-search-results').innerHTML      = '';
+  document.getElementById('supplier-search-input').value            = '';
+}
+
+async function sendToExistingSupplier(lineId, btn) {
+  if (!_selectedSupplierId) return;
+  const errEl    = document.getElementById('supplier-send-error');
+  const emailOvr = (document.getElementById('supplier-email-override')?.value || '').trim();
+  errEl.style.display = 'none';
+
+  const orig = btn.textContent;
+  btn.textContent = 'Working…'; btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('supplier_id', _selectedSupplierId);
+  fd.append('line_id', lineId);
+  if (emailOvr) fd.append('email_override', emailOvr);
+
+  try {
+    const res  = await fetch('/sales/rfq/send-to-existing/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd,
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      window.location.href = data.mailto_url;
+      showAdhocResult(data);
+    } else {
+      errEl.textContent = data.error || 'Error. Please try again.';
+      errEl.style.display = 'block';
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch {
+    errEl.textContent = 'Network error.';
+    errEl.style.display = 'block';
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+
+/* ── TAB 2: SAM.gov lookup ──────────────────────────── */
+
+function samReset() {
+  _samCage = '';
+  document.getElementById('sam-step-cage').style.display    = 'block';
+  document.getElementById('sam-step-confirm').style.display = 'none';
+  document.getElementById('sam-step-result').style.display  = 'none';
+  document.getElementById('sam-step-manual').style.display  = 'none';
+  document.getElementById('sam-cage-input').value           = '';
+  document.getElementById('sam-cage-error').style.display   = 'none';
+}
+
+async function samLookup(lineId, btn) {
+  const cage  = document.getElementById('sam-cage-input').value.trim().toUpperCase();
+  const errEl = document.getElementById('sam-cage-error');
+  errEl.style.display = 'none';
+  if (cage.length < 3) {
+    errEl.textContent = 'Enter a valid CAGE code.'; errEl.style.display = 'block'; return;
+  }
+  _samCage = cage;
+  const orig = btn.textContent;
+  btn.textContent = 'Looking up…'; btn.disabled = true;
+
+  try {
+    const res  = await fetch(`/sales/rfq/cage-preview/?cage=${encodeURIComponent(cage)}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await res.json();
+
+    if (data.found) {
+      if (data.already_in_db) {
+        errEl.innerHTML =
+          `CAGE ${cage} is already in your supplier database.
+           <a href="#" onclick="switchAdhocTab('search');
+             document.getElementById('supplier-search-input').value='${cage}';
+             scheduleSupplierSearch(${lineId},'${cage}');return false;"
+              style="color:var(--accent);margin-left:4px;">
+             Search for them →
+           </a>`;
+        errEl.style.display = 'block';
+        btn.textContent = orig; btn.disabled = false;
+        return;
+      }
+
+      const setAsides = Object.entries(data.set_aside_flags || {})
+        .filter(([,v]) => v).map(([k]) => k.toUpperCase()).join(', ') || 'None';
+      const regBadge = data.registration_status === 'Active'
+        ? `<span class="sam-badge-ok">✓ Active</span>`
+        : `<span class="sam-badge-warn">${data.registration_status || 'Unknown'}</span>`;
+      const exclWarn = (data.exclusion_status && data.exclusion_status !== 'Active')
+        ? `<span class="sam-badge-bad" style="margin-left:6px;">⚠ EXCLUDED</span>` : '';
+      const addr = data.address
+        ? [data.address.city, data.address.state].filter(Boolean).join(', ') : '';
+
+      document.getElementById('sam-entity-card').innerHTML = `
+        <div class="sam-field">
+          <span class="sam-field-label">Entity</span>
+          <strong style="color:var(--text-primary);font-size:14px;">${data.legal_name}</strong>
+        </div>
+        <div class="sam-field">
+          <span class="sam-field-label">SAM Registration</span>
+          ${regBadge}${exclWarn}
+          ${data.registration_expiry
+            ? `<span style="font-size:11px;color:var(--text-muted);margin-left:6px;">
+                 expires ${data.registration_expiry}</span>` : ''}
+        </div>
+        ${addr ? `<div class="sam-field"><span class="sam-field-label">Location</span>${addr}</div>` : ''}
+        <div class="sam-field">
+          <span class="sam-field-label">Set-Asides</span>
+          <span style="font-size:12px;color:var(--text-primary);">${setAsides}</span>
+        </div>
+        ${data.uei ? `<div class="sam-field"><span class="sam-field-label">UEI</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${data.uei}</span>
+        </div>` : ''}
+      `;
+      document.getElementById('sam-step-cage').style.display    = 'none';
+      document.getElementById('sam-step-confirm').style.display = 'block';
+
+    } else if (data.no_api_key) {
+      document.getElementById('sam-step-cage').style.display   = 'none';
+      document.getElementById('sam-step-manual').style.display = 'block';
+    } else {
+      errEl.textContent = data.error || `CAGE ${cage} not found on SAM.gov.`;
+      errEl.style.display = 'block';
+      document.getElementById('sam-step-manual').style.display = 'block';
+    }
+  } catch {
+    errEl.textContent = 'Lookup failed. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+async function samConfirmSend(lineId, btn) {
+  const email = (document.getElementById('sam-email')?.value || '').trim();
+  const errEl = document.getElementById('sam-confirm-error');
+  errEl.style.display = 'none';
+
+  const orig = btn.textContent;
+  btn.textContent = 'Sending…'; btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('line_id', lineId); fd.append('cage', _samCage);
+  if (email) fd.append('email', email);
+
+  try {
+    const res  = await fetch('/sales/rfq/send-to-adhoc/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd,
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = data.mailto_url;
+      document.getElementById('sam-step-confirm').style.display = 'none';
+      showAdhocResult(data);
+    } else if (data.needs_manual) {
+      errEl.textContent = data.error; errEl.style.display = 'block';
+      document.getElementById('sam-step-confirm').style.display = 'none';
+      document.getElementById('sam-step-manual').style.display  = 'block';
+    } else {
+      errEl.textContent = data.error || 'Error.'; errEl.style.display = 'block';
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch {
+    errEl.textContent = 'Network error.'; errEl.style.display = 'block';
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+async function samManualSend(lineId, btn) {
+  const name  = (document.getElementById('sam-manual-name')?.value  || '').trim();
+  const email = (document.getElementById('sam-manual-email')?.value || '').trim();
+  const errEl = document.getElementById('sam-manual-error');
+  errEl.style.display = 'none';
+  if (!name)  { errEl.textContent = 'Name required.';  errEl.style.display = 'block'; return; }
+  if (!email) { errEl.textContent = 'Email required.'; errEl.style.display = 'block'; return; }
+
+  const orig = btn.textContent;
+  btn.textContent = 'Sending…'; btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('line_id', lineId); fd.append('cage', _samCage);
+  fd.append('name', name); fd.append('email', email);
+
+  try {
+    const res  = await fetch('/sales/rfq/send-to-adhoc/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd,
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = data.mailto_url; showAdhocResult(data);
+    } else {
+      errEl.textContent = data.error || 'Error.'; errEl.style.display = 'block';
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch {
+    errEl.textContent = 'Network error.'; errEl.style.display = 'block';
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+
+/* ── Shared result display ───────────────────────────── */
+
+function showAdhocResult(data) {
+  document.getElementById('adhoc-tab-search').style.display = 'none';
+  document.getElementById('adhoc-tab-sam').style.display    = 'none';
+  document.querySelector('.adhoc-tab--active')?.classList.remove('adhoc-tab--active');
+
+  const el = document.getElementById('adhoc-shared-result');
+  el.style.display = 'block';
+  el.innerHTML =
+    `<span class="badge-sent">✉ Email opened — ${data.to_email || data.email || ''}</span>
+     <button class="btn-rfq btn-rfq-mark btn-rfq-mark--ready" style="margin-left:8px;"
+             onclick="rfqMarkSent(${data.match_id}, this)">
+       ✓ Mark Sent
+     </button>
+     <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+       <strong style="color:var(--text-primary);">${data.supplier_name}</strong>
+       ${data.was_created
+         ? ` added to your supplier database.
+             <a href="/sales/suppliers/" style="color:var(--accent);">View Suppliers →</a>`
+         : '.'}
+     </div>`;
+}
+</script>
 {% endblock content %}

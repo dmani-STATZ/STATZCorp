@@ -16,6 +16,7 @@ from sales.models.quotes import SupplierQuote
 from sales.models.bids import GovernmentBid
 from sales.models.cages import CompanyCAGE
 from sales.models.awards import DibbsAward
+from sales.models.email_templates import EmailTemplate
 
 __all__ = [
     'ImportBatch',
@@ -32,4 +33,5 @@ __all__ = [
     'GovernmentBid',
     'CompanyCAGE',
     'DibbsAward',
+    'EmailTemplate',
 ]

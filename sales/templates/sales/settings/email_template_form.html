@@ -1,0 +1,101 @@
+{% extends "sales/base.html" %}
+{% block content %}
+
+<div style="margin-bottom:1.5rem;">
+    <h1 style="font-size:1.375rem; font-weight:600; margin:0;">
+        {% if template %}Edit Template{% else %}New Email Template{% endif %}
+    </h1>
+    <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0.25rem 0 0;">
+        Use variables in Subject and Body: {supplier_name}, {sol_number}, {nsn}, {nomenclature}, {qty}, {unit_of_issue}, {return_date}, {your_name}, {your_email}
+    </p>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; align-items:start;">
+    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1.5rem;">
+        <form method="post" action="{% if template %}{% url 'sales:email_template_edit' template.pk %}{% else %}{% url 'sales:email_template_new' %}{% endif %}">
+            {% csrf_token %}
+            <div style="margin-bottom:1rem;">
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Name</label>
+                <input type="text" name="name" value="{{ template.name|default:'' }}"
+                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; box-sizing:border-box;"
+                       placeholder="e.g. Standard RFQ">
+                {% if errors.name %}<span style="font-size:0.75rem; color:#dc2626;">{{ errors.name }}</span>{% endif %}
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Subject</label>
+                <input type="text" name="subject_template" id="id_subject_template" value="{{ template.subject_template|default:'' }}"
+                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; box-sizing:border-box;"
+                       placeholder="RFQ – {sol_number} / NSN {nsn} – Due {return_date}">
+                {% if errors.subject_template %}<span style="font-size:0.75rem; color:#dc2626;">{{ errors.subject_template }}</span>{% endif %}
+            </div>
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Body</label>
+                <textarea name="body_template" id="id_body_template" rows="14"
+                          style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; font-family:inherit; box-sizing:border-box; resize:vertical;"
+                          placeholder="Dear {supplier_name},&#10;&#10;...">{{ template.body_template|default:'' }}</textarea>
+                {% if errors.body_template %}<span style="font-size:0.75rem; color:#dc2626;">{{ errors.body_template }}</span>{% endif %}
+            </div>
+            <div style="display:flex; gap:0.75rem;">
+                <button type="submit" style="padding:0.5rem 1.25rem; background:var(--company-primary,#004eb3); color:#fff; border:none; border-radius:6px; font-size:0.875rem; font-weight:500; cursor:pointer;">Save</button>
+                <a href="{% url 'sales:email_template_list' %}" style="padding:0.5rem 1.25rem; background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; text-decoration:none;">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:1.25rem; position:sticky; top:1rem;">
+        <div style="font-size:0.7rem; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.75rem;">Preview (sample data)</div>
+        <div id="preview-subject" style="font-size:0.8125rem; font-weight:600; color:#111827; margin-bottom:0.5rem; word-break:break-word;">—</div>
+        <div id="preview-body" style="font-size:0.8125rem; color:#374151; white-space:pre-wrap; word-break:break-word; max-height:360px; overflow-y:auto; border-top:1px solid #e5e7eb; padding-top:0.75rem;">—</div>
+    </div>
+</div>
+
+<p style="margin-top:1.5rem;">
+    <a href="{% url 'sales:email_template_list' %}" style="font-size:0.875rem; color:var(--company-primary,#004eb3); text-decoration:none;">← Back to Email Templates</a>
+</p>
+
+<script>
+(function() {
+  var subjectEl = document.getElementById('id_subject_template');
+  var bodyEl = document.getElementById('id_body_template');
+  var previewSubject = document.getElementById('preview-subject');
+  var previewBody = document.getElementById('preview-body');
+  var debounceTimer;
+
+  function updatePreview() {
+    var subject = (subjectEl && subjectEl.value) || '';
+    var body = (bodyEl && bodyEl.value) || '';
+    if (!subject && !body) {
+      previewSubject.textContent = '—';
+      previewBody.textContent = '—';
+      return;
+    }
+    var url = '/sales/settings/email/preview/?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          previewSubject.textContent = 'Error';
+          previewBody.textContent = data.error;
+        } else {
+          previewSubject.textContent = data.subject || '—';
+          previewBody.textContent = data.body || '—';
+        }
+      })
+      .catch(function() {
+        previewSubject.textContent = '—';
+        previewBody.textContent = 'Preview failed to load.';
+      });
+  }
+
+  function schedulePreview() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(updatePreview, 400);
+  }
+
+  if (subjectEl) subjectEl.addEventListener('input', schedulePreview);
+  if (bodyEl) bodyEl.addEventListener('input', schedulePreview);
+  updatePreview();
+})();
+</script>
+
+{% endblock content %}

@@ -13,6 +13,14 @@ echo "[startup] Running migrations (with --fake-initial safety)"
 # First try a normal migrate but allow fake-initial to mark initial migration as applied
 python manage.py migrate --noinput --fake-initial || true
 
+# Playwright: required for DIBBS fetch (headless browser). Skip if DISABLE_PLAYWRIGHT=1.
+# On Azure App Service Linux, install-deps may need to run in the build step (e.g. in a custom Dockerfile).
+if [ "${DISABLE_PLAYWRIGHT:-0}" != "1" ]; then
+  echo "[startup] Installing Playwright Chromium (for DIBBS fetch)"
+  python -m playwright install-deps chromium 2>/dev/null || true
+  python -m playwright install chromium || true
+fi
+
 # Optional emergency toggle: reset only the reports app migrations at runtime (non-destructive/fake)
 if [ "${RESET_REPORTS:-0}" = "1" ]; then
   echo "[startup] RESET_REPORTS=1 → faking down and re-applying reports migrations"

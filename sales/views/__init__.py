@@ -4,6 +4,7 @@ Sales app views.
 from sales.views.dashboard import dashboard
 from sales.views.imports import (
     import_upload,
+    import_fetch_dibbs,
     import_history,
     import_batch_delete,
     import_job_progress,
@@ -34,6 +35,8 @@ from sales.views.rfq import (
     rfq_sent,
     rfq_send_single,
     rfq_send_batch,
+    rfq_mailto,
+    rfq_mark_sent,
     rfq_center,
     rfq_center_detail,
     rfq_enter_quote,
@@ -41,6 +44,11 @@ from sales.views.rfq import (
     rfq_mark_no_response,
     rfq_mark_declined,
     quote_select_for_bid,
+    rfq_cage_preview,
+    rfq_send_to_approved_source,
+    rfq_send_to_adhoc,
+    rfq_supplier_search,
+    rfq_send_to_existing,
 )
 from sales.views.bids import (
     bids_ready,
@@ -55,12 +63,18 @@ from sales.views.settings import (
     settings_cages,
     settings_cage_add,
     settings_cage_edit,
+    email_template_list,
+    email_template_edit,
+    email_template_delete,
+    email_template_set_default,
+    email_template_preview,
 )
 from sales.views.entity_lookup import entity_lookup
 
 __all__ = [
     "dashboard",
     "import_upload",
+    "import_fetch_dibbs",
     "import_history",
     "import_batch_delete",
     "import_job_progress",
@@ -85,6 +99,8 @@ __all__ = [
     "rfq_sent",
     "rfq_send_single",
     "rfq_send_batch",
+    "rfq_mailto",
+    "rfq_mark_sent",
     "rfq_center",
     "rfq_center_detail",
     "rfq_enter_quote",
@@ -92,6 +108,11 @@ __all__ = [
     "rfq_mark_no_response",
     "rfq_mark_declined",
     "quote_select_for_bid",
+    "rfq_cage_preview",
+    "rfq_send_to_approved_source",
+    "rfq_send_to_adhoc",
+    "rfq_supplier_search",
+    "rfq_send_to_existing",
     "bids_ready",
     "bid_builder",
     "bid_select_quote",
@@ -102,5 +123,10 @@ __all__ = [
     "settings_cages",
     "settings_cage_add",
     "settings_cage_edit",
+    "email_template_list",
+    "email_template_edit",
+    "email_template_delete",
+    "email_template_set_default",
+    "email_template_preview",
     "entity_lookup",
 ]
