@@ -4,34 +4,30 @@
 # Include production requirements
 -r requirements.txt
 
-# Development-specific packages
+# Development-specific packages (used in settings or daily workflow)
 django-debug-toolbar==4.4.6
 django-extensions==3.2.3
 django-browser-reload==1.15.0
-
-# Development database tools
-django-sql-explorer==2.0.0
 
 # Code quality and testing
 pytest==8.3.4
 pytest-django==4.9.0
 pytest-cov==6.0.0
-black==24.10.0
+black==26.3.1
 flake8==7.1.1
 isort==5.13.2
 
 # Development utilities
 python-dotenv==1.0.1
 ipython==8.29.0
-jupyter==1.1.1
 
-# Optional: For advanced debugging
-django-silk==5.0.4
-memory-profiler==0.61.0
-
-# Optional: For API development
-djangorestframework==3.15.2
-django-cors-headers==4.4.0
-
-# Development server
-django-livereload-server==0.3.2
+# ---------------------------------------------------------------------------
+# Removed / optional (install only if you need them):
+# - jupyter: caused Windows Long Path install errors; use ipython for REPL.
+#   To use Jupyter, enable Long Paths then: pip install jupyter
+# - django-sql-explorer: not in INSTALLED_APPS
+# - django-silk: not in INSTALLED_APPS
+# - djangorestframework: not in INSTALLED_APPS (cors is in requirements.txt)
+# - memory-profiler: use when profiling memory
+# django-cors-headers is in requirements.txt
+# ---------------------------------------------------------------------------

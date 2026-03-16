@@ -1,275 +1,161 @@
-# DIBBS Sales App — Build Context
+# Sales Context
 
-Django app (`sales`) for managing DIBBS solicitations, supplier matching, RFQ dispatch, bid building, and SAM.gov integration. SQL Server backend throughout — no Postgres-specific queries anywhere.
+## 1. Purpose
+The `sales` app owns the DIBBS bidding workflow: it ingests the daily IN/BQ/AS export from DIBBS, triages solicitations, surfaces supplier matches, issues RFQs via `mailto:` flows, captures quotes, builds GovernmentBids, exports the BQ submission file, and tracks SAM.gov awards. It also exposes supplier capability tooling (NSN/FSC lists, backfill from contracts) plus settings for Company CAGE metadata and email templates. Everything is driven by Django views/templates with no background workers; long-running work happens synchronously via the AJAX/stepper import UI.
 
----
+## 2. App Identity
+- **Django app name:** `sales`
+- **AppConfig:** `SalesConfig` (`sales/apps.py`) with label `sales` and verbose name “Sales (DIBBS Bidding)”
+- **Filesystem path:** `/sales`
+- **Role:** Feature app implementing the DIBBS import → matching → RFQ → bid export lifecycle; tightly coupled to procurement operations rather than generic admin/support utilities.
 
-## Architecture Overview
+## 3. High-Level Responsibilities
+- Parse and persist DIBBS IN/BQ/AS rows (`sales/services/parser.py`, `sales/services/importer.py`) into `Solicitation`, `SolicitationLine`, `ApprovedSource`, and `ImportBatch`.
+- Rank suppliers per line through the three-tier `SupplierMatch` engine plus contract-history backfill (`sales/services/matching.py`).
+- Coordinate RFQ dispatch, follow-ups, and `SupplierContactLog` tracking via mailto flows, RFQ Center, and quotes (`sales/views/rfq.py`, `sales/services/email.py`).
+- Drive quote-to-bid workflows: select quotes, build `GovernmentBid` drafts, validate/export the BQ submission (`sales/views/bids.py`, `sales/services/bq_export.py`).
+- Surface supplier capability tooling for NSN/FSC counts and manual edits, plus searching suppliers with quotes (`sales/views/suppliers.py`).
+- Manage settings for `CompanyCAGE`, markup rates, SMTP reply-to values, and `EmailTemplate` defaults consumed by RFQ mailouts (`sales/views/settings.py`, `sales/models/email_templates.py`).
+- Integrate with SAM.gov for entity lookup (`sales/services/sam_entity.py`) and DLA awards sync (`sales/services/sam_awards_sync.py`), including staff-facing sync buttons.
 
-### Key Models
-
-| Model | Table | Purpose |
-|---|---|---|
-| `ImportBatch` | `tbl_ImportBatch` | Tracks each daily DIBBS file import |
-| `ImportJob` | `tbl_ImportJob` | Tracks multi-step AJAX import in progress |
-| `Solicitation` | `dibbs_solicitation` | One per solicitation; has `status`, `bucket`, `return_by_date` |
-| `SolicitationLine` | `dibbs_solicitation_line` | NSN/line within a solicitation; has `bq_raw_columns` (JSONField) |
-| `ApprovedSource` | `dibbs_approved_source` | NSN → approved CAGE → part number from AS file |
-| `SupplierMatch` | — | Tier 1/2/3 matches between a line and a supplier |
-| `SupplierRFQ` | — | RFQ sent to a supplier for a line |
-| `SupplierQuote` | — | Quote received from a supplier |
-| `SupplierContactLog` | — | Activity log per solicitation/supplier |
-| `CompanyCAGE` | — | Our company CAGE settings (markup %, compliance codes, SMTP) |
-| `GovernmentBid` | — | Bid built from a quote for BQ export |
-| `DibbsAward` | `dibbs_award` | DLA award notices fetched from SAM.gov |
-| `EmailTemplate` | `dibbs_email_template` | RFQ email subject/body templates with `{variable}` substitution; one can be `is_default` |
-| `Supplier` (ad-hoc created) | `contracts_supplier` | Auto-created from SAM.gov lookup or stub; `[SAM]` prefix in notes = from SAM; `[STUB]` = manual fallback |
-
-`Supplier` model lives in the `suppliers` app (`suppliers/models.py`, table `contracts_supplier`), field `cage_code`.
-
-### Solicitation Status Flow
-`New → Matching → RFQ_PENDING → RFQ_SENT → QUOTING → BID_READY → BID_SUBMITTED → WON / LOST / NO_BID`
-
-### Triage Buckets
-`UNSET → SDVOSB / HUBZONE / GROWTH / SKIP` — set automatically on import by `assign_triage_bucket()`, overridable manually in bulk from the list view.
-
-### Set-Aside Codes
-`R=SDVOSB, H=HUBZone, Y=Small Business, L=WOSB, A=8(a), E=EDWOSB, N=Unrestricted`
-
----
-
-## Services
-
-### `sales/services/importer.py`
-Public entry point: `run_import(in_file, bq_file, as_file, imported_by)`.
-Also exposes sub-functions for the AJAX import steps:
-- `parse_dibbs_files()` — parses IN/BQ/AS files
-- `create_import_batch()` — creates `ImportBatch`, clears old AS rows for same date
-- `upsert_solicitations()` — bulk diff + create/update solicitations
-- `upsert_lines_and_sources()` — bulk diff + create/update lines and AS rows
-
-After matching, calls `sync_dla_awards()` (wrapped in try/except — import never fails due to awards sync).
-
-### `sales/services/matching.py`
-`run_matching_for_batch(batch_id)` — batch-queries all tiers upfront (~4 DB queries total regardless of import size):
-- **Tier 1**: exact NSN match on `dibbs_supplier_nsn`
-- **Tier 2**: approved CAGE from `ApprovedSource` → `Supplier.cage_code` lookup
-- **Tier 3**: FSC match on `SupplierFSC`
-
-Deduplicates by supplier (lowest tier wins). Skips item_type_indicator `'2'` for Tiers 1 & 2. Returns `{lines_processed, matches_found, by_tier: {1, 2, 3}}`.
-
-`backfill_nsn_from_contracts(dry_run=False)` — backfills `SupplierNSN` from `contracts.Clin` history with recency weights (≤2y=1.0, ≤5y=0.6, ≤10y=0.3, else 0.1).
-
-### `sales/services/suppliers.py`
-`create_supplier_from_sam(sam_data, email='')` — find-or-create `Supplier` from `lookup_cage()` result; never overwrites existing. Notes prefixed `[SAM]`. Returns `(supplier, created)`.
-`get_or_create_stub_supplier(cage_code, name, email, phone)` — fallback when SAM is down; notes prefixed `[STUB]`. Returns `(supplier, created)`.
-
-### `sales/services/email.py`
-`send_rfq_email()` and `send_followup_email()`. Resolves supplier email: contact FK → `primary_email` → `business_email`. Uses default `CompanyCAGE` for From/Reply-To.
-
-### `sales/services/bq_export.py`
-`generate_bq_file(bid_ids)` — overlays `GovernmentBid` fields onto `SolicitationLine.bq_raw_columns` (121-column BQ template). Raises `BQExportError` with `.errors` list on validation failure.
-
-### `sales/services/sam_awards_sync.py`
-`sync_dla_awards()` — fetches DLA award notices from SAM.gov Opportunities API v2. Paginates with `postedFrom=today−180d, postedTo=today−90d`. Returns `{created, updated, matched, won, errors}` or `{skipped, reason}` if no API key or 403. Matches awards to our `Solicitation` records and detects wins via `SAM_OUR_CAGE`.
-
-### `sales/services/sam_entity.py`
-`lookup_cage(cage_code)` — calls SAM.gov Entity Management API v3. Returns cleaned dict: `{found, cage_code, legal_name, uei, registration_status, registration_expiry, address, business_types, naics_codes, psc_codes, set_aside_flags, exclusion_status, sam_url}`. Returns `{found: False}` if no entity. Raises `ImproperlyConfigured` if `SAM_API_KEY` missing; raises `RequestException` with clear message on API errors. Set-aside flags parsed from `sbaBusinessTypeList`.
-
----
-
-## Views
-
-### `sales/views/imports.py`
-- `import_upload` — validates form, saves files to temp dir, creates `ImportJob`, redirects to progress page
-- `import_job_progress` — renders progress page
-- `import_step_parse/solicitations/lines/match/awards` — 5 AJAX step endpoints (each returns JSON `{success, ...counts}`)
-- `import_batch_delete` — deletes batch + `New` solicitations only (protects advanced statuses)
-- `import_history` — paginated `ImportBatch` list with delete action
-- `sync_awards_view` — staff-only POST; manually triggers `sync_dla_awards()`, returns JSON
-
-### `sales/views/solicitations.py`
-- `solicitation_list` — paginated, filterable (bucket, set_aside, status, q); bulk bucket reassignment via POST
-- `solicitation_detail` — tabs: Overview, Matches, RFQs, Quotes, Bid; annotates `approved_sources` with `.matched_supplier` (one extra query via `Supplier.objects.filter(cage_code__in=...)`)
-- `no_bid` — POST-only; sets status to `NO_BID`
-- `global_search` — typeahead JSON (`fmt=json`) or full results page
-
-### `sales/views/rfq.py`
-`rfq_pending, rfq_sent, rfq_send_single, rfq_send_batch, rfq_mailto, rfq_mark_sent, rfq_center, rfq_center_detail, rfq_enter_quote, rfq_send_followup, rfq_mark_no_response, rfq_mark_declined, quote_select_for_bid, rfq_cage_preview, rfq_send_to_approved_source, rfq_send_to_adhoc`
-
-RFQ Center (`/sales/rfq/center/`) is a 3-panel layout. `rfq_center_detail` returns an HTML fragment for `fetch()`. `rfq_enter_quote` returns JSON when called via AJAX.
-
-**Manual RFQ email (mailto) flow:** `rfq_mailto(match_id)` — GET, returns JSON `{ mailto_url, to_email, subject, body }` or `{ missing_email: true }`; uses default `EmailTemplate` and supplier email (contact → primary_email → business_email). `rfq_mark_sent(match_id)` — POST; creates/updates `SupplierRFQ` (SENT), logs `SupplierContactLog` (EMAIL_OUT), advances solicitation to `RFQ_SENT` if needed; returns JSON for UI update. No SMTP; user opens email client and marks sent explicitly.
-
-**Ad-hoc RFQ dispatch:** `rfq_cage_preview` — GET `?cage=XXXXX`, returns SAM.gov entity info + `already_in_db` flag; no DB writes. `rfq_send_to_approved_source` — POST; auto-creates `Supplier` from SAM (or stub fallback) for an `ApprovedSource` CAGE, creates `SupplierMatch` (tier 2, APPROVED_SOURCE), returns `mailto_url`. `rfq_send_to_adhoc` — POST; same flow for arbitrary CAGE input, creates `SupplierMatch` (tier 4, MANUAL).
-
-### `sales/views/bids.py`
-`bids_ready, bid_builder, bid_select_quote, bids_export_queue, bids_export_download, bids_history`
-
-Export errors stored in `request.session['export_errors']` and shown on redirect. Download filename: `BQ_export_YYYY-MM-DD.txt`.
-
-### `sales/views/suppliers.py`
-`supplier_list, supplier_detail, supplier_add_nsn, supplier_add_fsc, supplier_remove_nsn, supplier_remove_fsc, backfill_nsn`
-
-`backfill_nsn` is staff-only. NSN add: normalized to 13 digits, `source='manual'`, `match_score=100`.
-
-### `sales/views/settings.py`
-`settings_index, settings_cages, settings_cage_add, settings_cage_edit, email_template_list, email_template_edit, email_template_delete, email_template_set_default, email_template_preview`
-
-Manages `CompanyCAGE` records and **Email Templates**. CAGE dropdowns use labeled choice helpers for SB codes, Affirmative Action, Previous Contracts, and ADR codes. Email templates: list (Name, Default, Updated, Actions), create/edit form with live preview (sample data + `_SafeDict` substitution), set default, delete (blocked for default); preview endpoint returns JSON `{ subject, body }` for debounced fetch.
-
-### `sales/views/entity_lookup.py`
-`entity_lookup(request, cage_code)` — `GET /sales/entity/cage/<cage_code>/`. Calls `lookup_cage()`, renders `entity_lookup.html`. Catches all exception types and passes an `error` string to the template — never raises a 500.
-
----
-
-## Templates
-
-| Template | Purpose |
+## 4. Key Files and What They Do
+| File / Directory | Responsibility |
 |---|---|
-| `sales/base.html` | Nav: Dashboard, Solicitations, RFQ Center (overdue badge), Bid Center, Suppliers, Import, Settings, Email Templates; topbar typeahead search |
-| `sales/solicitations/list.html` | Bucket tab strip, filter bar, bulk reassignment toolbar + checkboxes |
-| `sales/solicitations/detail.html` | Pipeline track; Overview tab (metadata + approved sources); Matches tab (approved sources with **Send RFQ** ACTION column + ad-hoc panel; matched suppliers with **Open RFQ Email** / **Mark Sent** mailto buttons); RFQs/Quotes/Bid tabs; activity feed |
-| `sales/import/upload.html` | 3-file upload form only (processing moved to progress page) |
-| `sales/import/progress.html` | 5-step AJAX progress: Parse → Solicitations → Lines → Match → Sync Awards; summary stat cards; staff "Sync Awards" button |
-| `sales/import/history.html` | Paginated import batch list with delete |
-| `sales/rfq/center.html` | 3-panel RFQ center |
-| `sales/rfq/pending.html` | RFQ pending queue grouped by solicitation; each match has **Open RFQ Email** / **Mark Sent** (same mailto flow as detail Matches tab) |
-| `sales/rfq/sent.html` | Sent RFQs grouped by urgency |
-| `sales/rfq/quote_entry.html` | Quote entry with live suggested bid (JS) |
-| `sales/bids/ready.html` | Lines with quotes ready to bid |
-| `sales/bids/builder.html` | Bid builder (sections 01–06, live margin pill) |
-| `sales/bids/export_queue.html` | BQ export queue |
-| `sales/bids/history.html` | Submitted bid history; WON/LOST actions |
-| `sales/suppliers/list.html` | Supplier list with search |
-| `sales/suppliers/detail.html` | Tabs: Profile, Capabilities (NSN/FSC), Quote History |
-| `sales/settings/cages.html` | CompanyCAGE list |
-| `sales/settings/cage_form.html` | Add/edit CompanyCAGE |
-| `sales/settings/email_templates.html` | Email template list (Name, Default, Updated, Set Default / Edit / Delete) |
-| `sales/settings/email_template_form.html` | Create/edit template; two-column layout with live preview (fetch to `/sales/settings/email/preview/`) |
-| `sales/rfq/partials/mailto_buttons.html` | Reusable partial: Open RFQ Email, Mark Sent, or ✓ Sent badge; used in detail Matches tab and RFQ pending |
-| `sales/entity_lookup.html` | Read-only SAM.gov entity info card; 3 states: found / not-found / error |
+| `models/` package | Defines domain tables: `ImportBatch`, `ImportJob`, the `Solicitation` stack, supplier capability models (`SupplierNSN`, `SupplierFSC`, `ApprovedSource`), RFQ/quote/bid records, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, and match/contact-log data. Many tables reuse `suppliers.Supplier`. |
+| `services/parser.py` | Parses fixed-width IN records, 121-column BQ rows, and AS CSVs into helper dataclasses without writing to the database; also assigns initial triage buckets. |
+| `services/importer.py` | Coordinates parsing, upserts, and matching for a batch, chunking bulk updates to avoid SQL Server limits, clearing stale approved sources, and optionally calling awards sync. Also contains the legacy `run_import()` entry point used by the import wizard. |
+| `services/matching.py` | Executes tiered matching (NSN, approved source, FSC), deduplicates by supplier, bulk-creates `SupplierMatch`, and exposes `backfill_nsn_from_contracts()` that reads `contracts.models.Clin`. |
+| `services/email.py` | Builds RFQ/follow-up subjects/bodies using the default `CompanyCAGE` and `EmailTemplate`, resolves supplier emails, calls Django `send_mail`, and logs contact history/status updates. |
+| `services/bq_export.py` | Validates `GovernmentBid`s, overlays company/bid data onto `SolicitationLine.bq_raw_columns`, and emits the downloadable 121-column BQ file (raises `BQExportError` with `.errors`). |
+| `services/dibbs_fetch.py` | Scrapes DLA’s RFQDates page with `requests`/`BeautifulSoup`, automates Playwright consent/download flows, and extracts IN/BQ/AS files into a temp directory for import. |
+| `services/sam_awards_sync.py` & `services/sam_entity.py` | Call SAM.gov Opportunities v2 (awards syncing) and Entity Management v3 (CAGE lookup), respecting `SAM_API_KEY`/`SAM_OUR_CAGE` and returning structured set-aside, NAICS, and debug data. |
+| `views/` package | Hosts the dashboard (`dashboard.py`), import wizard (`imports.py`), solicitation list/detail and search (`solicitations.py`), RFQ center/actions (`rfq.py`), bid center (`bids.py`), supplier tooling (`suppliers.py`), settings (`settings.py`), SAM entity lookup (`entity_lookup.py`), and `context_processors.py`. |
+| `templates/sales/` | Contains every screen: dashboard, import upload/progress/history, solicitation list/detail, RFQ pending/center/sent/quote entry/partials, bid builder/export/history, supplier list/detail/backfill, settings (cages/email templates), and entity lookup pages. |
+| `urls.py` | Defines the `sales:` namespace for dashboard, import steps, solicitations, RFQ endpoints, bids, suppliers, settings, awards sync, and entity lookup. |
+| `forms.py` | Declares `ImportUploadForm` (three file fields) used by upload/fetch views; `QuoteEntryForm` lives inside `views/rfq.py` and enforces numeric/text validation for quotes. |
+| `context_processors.py` | Adds `overdue_rfq_count` globally by counting SENT RFQs whose solicitation return date is in the past. |
+| `migrations/` | Tracks schema evolution from 0001 through 0010 (buckets, RFQ extras, bids, import jobs, awards, email templates, manual match method). |
 
----
+## 5. Data Model / Domain Objects
+- **Import models:** `ImportBatch` records each DIBBS run, `ImportJob` tracks the AJAX multi-step upload (temp file paths, status, `step_results`).
+- **Solicitation stack:** `Solicitation` holds numbers, status, buckets, return dates, and links to `SolicitationLine`. `SolicitationLine` has NSN text, quantities, delivery days, and `bq_raw_columns` JSON (copy of the BQ row) for later export. Each line connects to matches, quotes, and bids.
+- **Matching/capability models:** `SupplierMatch` stores the winning tier, `ApprovedSource` keeps AS data, `SupplierNSN`/`SupplierFSC` store internal capability records, and manual entries are flagged with source marks.
+- **RFQs and quotes:** `SupplierRFQ` links a line to `suppliers.Supplier`, records sent/follow-up timestamps/status choices, and references `settings.AUTH_USER_MODEL` for `sent_by`. `SupplierQuote` keeps the supplier’s pricing/lead time/note, while `SupplierContactLog` tracks every touchpoint (method, direction, summary).
+- **Bids and company data:** `GovernmentBid` stores DIBBS submission data (cage codes, pricing, manufacturer, part number info, margin). `CompanyCAGE` holds markup, compliance codes, SMTP reply-to, and default/active flags. `EmailTemplate` stores content with `_SafeDict` rendering; one template is marked `is_default`.
+- **Awards:** `DibbsAward` stores SAM.gov entries, ties to `Solicitation` when possible, flags `we_bid`/`we_won`, and persists the raw SAM payload for diagnostics.
+- **Cross-app references:** Supplier relations point to `suppliers.Supplier` (table `contracts_supplier`), while matching backfill queries `contracts.models.Clin`.
 
-## URLs (`sales/urls.py`, namespace `sales:`)
+## 6. Request / User Flow
+1. **Daily import:** `/sales/import/` renders `ImportUploadForm` (IN, BQ, AS files). Uploaded files land in a temp directory, an `ImportJob` is created, and the user is redirected to `/import/job/<job_id>/`, which issues five AJAX POSTs (`parse`, `solicitations`, `lines`, `match`, `awards`). Each step reuses the parsing/upsert/matching services. `import_fetch_dibbs` can prefetch files via Playwright; `import_batch_delete` cleans up only `Solicitation.status='New'` and related lines/sources. `import_history` lists previous batches.
+2. **Solicitation browsing:** `/sales/solicitations/` offers filters (bucket, set-aside, status, line item type, full-text) plus bulk bucket reassignment. Detail view (`solicitations/<sol_number>/`) shows the pipeline ribbon, matches (with mailto buttons), RFQ/quote/bid tabs, approved sources (annotated with in-system suppliers), contact log, and embedded bid builder context. `/sales/search/` supplies top-bar typeahead and JSON results.
+3. **RFQ orchestration:** `/sales/rfq/` (pending queue) lists unmatched matches; buttons call `rfq_mailto` to build a `mailto:` URL from the default `EmailTemplate`, and `rfq_mark_sent` records SENT status. Batch or single send actions create `SupplierRFQ` records, attempt to email, and report success/failure. `/sales/rfq/center/` renders an AJAX-driven three-panel UI, with `/rfq/center/<id>/detail/` returning fragments. Secondary actions include entering quotes (`rfq_enter_quote`), follow-ups, marking no-response/declined, selecting quotes for bids, and sending RFQs to approved-source/adhoc/existing suppliers plus supplier search.
+4. **Quote → bid → export:** `SupplierQuote` entries feed the Bid Center (`/sales/bids/`). `bid_builder` preloads selected or cheapest quotes, validates unit price/delivery/cages, and saves `GovernmentBid`. Draft bids can be marked ready, shown on `bids/export/`, and exported via `bids/export/download/`, which calls `generate_bq_file`. Exported bids update `bid_status`/`submitted_at`, stamp the BQ filename, and flip the solicitation to `BID_SUBMITTED`. `bids/history/` surfaces submitted bids and allows marking solicitations `WON`, `LOST`, or `NO_BID`.
+5. **Suppliers & capabilities:** `/suppliers/` lists active suppliers with NSN/FSC/quote counts, optionally filtered by name or cage. Detail pages provide tabs for profile/capabilities/quote history. Add/remove NSN and FSC forms validate inputs (13-digit NSNs, four-character FSCs) and save manual records. `backfill_nsn` is a staff-only view that runs `matching.backfill_nsn_from_contracts()`, optionally in dry-run mode.
+6. **Settings & SAM:** `/sales/settings/` redirects to the `CompanyCAGE` list; add/edit forms adjust compliance codes, markup, and SMTP reply-to, ensuring only one default cage. `/sales/settings/email/` lists templates, `email_template_edit` manages creation/update, and `email_template_preview` renders sample data via `_SafeDict`. `/sales/entity/cage/<cage_code>/` calls `sam_entity.lookup_cage`, handles missing API keys/errors gracefully, and renders SAM metadata (staff sees raw JSON).
 
-```
-''                                          → dashboard
-import/                                     → import_upload
-import/history/                             → import_history
-import/batch/<id>/delete/                   → import_batch_delete
-import/job/<job_id>/                        → import_job_progress
-import/job/<job_id>/step/parse/             → import_step_parse
-import/job/<job_id>/step/solicitations/     → import_step_solicitations
-import/job/<job_id>/step/lines/             → import_step_lines
-import/job/<job_id>/step/match/             → import_step_match
-import/job/<job_id>/step/awards/            → import_step_awards
-solicitations/                              → solicitation_list
-solicitations/<sol_number>/                 → solicitation_detail
-solicitations/<sol_number>/nobid/           → no_bid
-search/                                     → global_search
-suppliers/backfill-nsn/                     → backfill_nsn
-rfq/                                        → rfq_pending
-rfq/center/                                 → rfq_center
-rfq/center/<id>/detail/                     → rfq_center_detail
-rfq/sent/                                   → rfq_sent
-rfq/send/                                   → rfq_send_single
-rfq/mailto/<match_id>/                      → rfq_mailto
-rfq/<match_id>/mark-sent/                   → rfq_mark_sent
-rfq/cage-preview/                           → rfq_cage_preview
-rfq/send-to-approved-source/               → rfq_send_to_approved_source
-rfq/send-to-adhoc/                         → rfq_send_to_adhoc
-rfq/<sol_number>/send-batch/                → rfq_send_batch
-rfq/<id>/quote/                             → rfq_enter_quote
-rfq/<id>/followup/                          → rfq_send_followup
-rfq/<id>/no-response/                       → rfq_mark_no_response
-rfq/<id>/declined/                          → rfq_mark_declined
-quotes/<id>/select-for-bid/                 → quote_select_for_bid
-bids/                                       → bids_ready
-bids/<sol_number>/build/                    → bid_builder
-bids/select-quote/                          → bid_select_quote
-bids/export/                                → bids_export_queue
-bids/export/download/                       → bids_export_download
-bids/history/                               → bids_history
-suppliers/                                  → supplier_list
-suppliers/<id>/                             → supplier_detail
-suppliers/<id>/nsn/add/                     → supplier_add_nsn
-suppliers/<id>/fsc/add/                     → supplier_add_fsc
-suppliers/<id>/nsn/remove/                  → supplier_remove_nsn
-suppliers/<id>/fsc/remove/                  → supplier_remove_fsc
-settings/                                   → settings_index
-settings/cages/                             → settings_cages
-settings/cages/add/                         → settings_cage_add
-settings/cages/<id>/edit/                   → settings_cage_edit
-settings/email/                             → email_template_list
-settings/email/new/                         → email_template_new
-settings/email/<pk>/edit/                   → email_template_edit
-settings/email/<pk>/delete/                 → email_template_delete
-settings/email/<pk>/set-default/            → email_template_set_default
-settings/email/preview/                     → email_template_preview
-awards/sync/                                → sync_awards_view
-entity/cage/<cage_code>/                    → entity_lookup
-```
+## 7. Templates and UI Surface Area
+- `sales/base.html` supplies the main navigation (Dashboard, Solicitations, RFQ Center, Bid Center, Suppliers, Import, Settings → Email templates) plus a top-bar search that targets `sales:global_search`. Most screens are server-rendered with minimal JavaScript.
+- Import templates: `sales/import/upload.html`, the multi-step `sales/import/progress.html` with AJAX polling/checklists, and `sales/import/history.html`.
+- Solicitations use `sales/solicitations/list.html` (filters, bucket tracking, bulk reassignment) and `sales/solicitations/detail.html` (pipeline ribbon, matches, RFQ/quote/bid tabs, approved sources, contact log, bid builder context).
+- RFQ screens include `sales/rfq/pending.html`, `sales/rfq/center.html` plus `sales/rfq/partials/center_panel.html` and `sales/rfq/partials/mailto_buttons.html`, `sales/rfq/sent.html`, and `sales/rfq/quote_entry.html`.
+- Bid screens: `sales/bids/ready.html`, `sales/bids/builder.html`, `sales/bids/export_queue.html`, and `sales/bids/history.html`.
+- Supplier screens: `sales/suppliers/list.html`, `sales/suppliers/detail.html`, `sales/suppliers/add_nsn.html`, `sales/suppliers/add_fsc.html`, and `sales/suppliers/backfill_nsn.html`.
+- Settings screens: `sales/settings/cages.html`, `sales/settings/cage_form.html`, `sales/settings/email_templates.html`, `sales/settings/email_template_form.html`, with the preview endpoint providing JSON for live previews.
+- SAM lookup page: `sales/entity_lookup.html` renders found/not-found/error states and displays `debug_raw_json` only to staff users.
 
----
+## 8. Admin / Staff Functionality
+- There are no model registrations in `sales/admin.py`; all staff actions go through the custom views.
+- Staff-only endpoints (`backfill_nsn`, `sync_awards_view`) check `request.user.is_staff` or use `@user_passes_test`.
+- Settings and import history screens assume staff access; the Django admin is unused.
 
-## Settings (`STATZWeb/settings.py`)
+## 9. Forms, Validation, and Input Handling
+- `ImportUploadForm` requires the IN, BQ, and AS files and is shared between upload and fetch flows.
+- `QuoteEntryForm` (defined inside `views/rfq.py`) coerces decimals/integers, enforces non-negative prices and lead times, trims text fields, and exposes an `errors` dict for AJAX callers.
+- `supplier_add_nsn` and `supplier_add_fsc` normalize inputs (strip hyphens, enforce length) and rely on Django messages to communicate validation errors.
+- `bid_builder` sanitizes cage codes, bid types, and money/delivery inputs, enforces positive unit price/delivery, and recalculates margins before saving `GovernmentBid`.
+- Settings forms call helpers to build choice tuples for SB representations, affirmative action, and previous contracts while the email preview uses `_SafeDict` to avoid `KeyError`.
 
-```python
-SAM_API_KEY  = os.environ.get('SAM_API_KEY', '')   # SAM.gov API key — awards sync + entity lookup
-SAM_OUR_CAGE = os.environ.get('SAM_OUR_CAGE', '')  # Our CAGE code — used to detect we_won on awards
-# Context processor registered:
-# 'sales.context_processors.rfq_counts'  →  overdue_rfq_count in all templates
-```
+## 10. Business Logic and Services
+- `sales/services/importer.py` orchestrates parsing, batch creation, line upserts, approved source refreshes, and matching, chunking bulk operations to stay within SQL Server parameter limits. `run_import()` wraps the full pipeline (including awards sync).
+- `sales/services/parser.py` contains `parse_in_file`, `parse_bq_file`, `parse_as_file`, and helpers for NSN formatting, date parsing, and bucket assignment.
+- `sales/services/matching.py` batches tier 1–3 lookups, skips part-number items for direct NSN matches, deduplicates suppliers by lowest tier, bulk-creates `SupplierMatch`, and offers `backfill_nsn_from_contracts()` that weights `contracts.Clin` recency.
+- `sales/services/email.py` renders RFQ/follow-up bodies with approved source info, set-aside data, and `dibbs_pdf_url`, resolves supplier emails (contact → primary → business), sends mail via `send_mail`, and logs `SupplierContactLog` entries.
+- `sales/services/bq_export.py` overlays company/bid fields onto the stored 121-column templates, formats prices/delivery fields, enforces column lengths, and raises `BQExportError` when validation fails.
+- `sales/services/dibbs_fetch.py` performs DIBBS discovery with `requests`/`BeautifulSoup` and drives Playwright automation to download IN/BQ/AS files for import.
+- `sales/services/sam_awards_sync.py` paginates SAM opportunities, upserts `DibbsAward`, matches notices to solicitations, and flags `we_won` when the award cage matches `SAM_OUR_CAGE`.
+- `sales/services/sam_entity.py` hits SAM’s Entity API, maps SBA codes to set-aside flags, collects NAICS/PSC data, and returns structured payloads (including `debug_raw_json` for staff).
+- `sales/services/suppliers.py` helper functions materialize suppliers from SAM results or stub values when cage codes are not yet in the supplier database, with notes tagged `[SAM]` or `[STUB]`.
 
----
+## 11. Integrations and Cross-App Dependencies
+- Relies on `suppliers.Supplier` (`contracts_supplier`) for matches, RFQs, quotes, and supplier search forms; multiple services/views import `Supplier`.
+- `matching.backfill_nsn_from_contracts()` reads `contracts.models.Clin` to seed `SupplierNSN`.
+- `SupplierRFQ.sent_by` and contact logs reference `settings.AUTH_USER_MODEL`.
+- External HTTP dependencies: SAM.gov APIs (opportunities/entity) via `requests` and DIBBS downloads via `requests`, `BeautifulSoup`, and Playwright. Missing `SAM_API_KEY`/`SAM_OUR_CAGE` triggers graceful degradation (awards sync skipped, entity lookup returns an error).
+- Settings references include `DEFAULT_FROM_EMAIL` for RFQ emails and the `sales.context_processors.rfq_counts` entry in `STATZWeb/settings.py`.
 
-## Migrations Applied
+## 12. URL Surface / API Surface
+Major routes (namespace `sales:`) include:
+- `/` → `dashboard`
+- `/import/` plus `import/fetch-dibbs/`, history, delete, and the five AJAX steps (`parse`, `solicitations`, `lines`, `match`, `awards`)
+- `/solicitations/` list/detail, `solicitations/<sol_number>/nobid/`, `/search/`
+- `/rfq/` pending, center, sent, mailto, mark-sent, send-batch, enter-quote, follow-up, no-response/declined, cage preview, approved-source/adhoc/existing send, supplier search
+- `/quotes/<id>/select-for-bid/`
+- `/bids/` ready list, builder, select quote, export queue, export download, history
+- `/suppliers/` list/detail plus NSN/FSC add/remove and `backfill-nsn/`
+- `/settings/` cages, cage add/edit, email template list/edit/new/delete/set-default, preview
+- `/awards/sync/` (staff-only manual sync)
+- `/entity/cage/<cage_code>/`
 
-| Migration | What it adds |
-|---|---|
-| `0003_add_solicitation_bucket` | `bucket`, `bucket_assigned_by` on `Solicitation` |
-| `0004_rfq_extra_fields_and_cage_smtp` | Extra `SupplierRFQ` fields; `smtp_reply_to` on `CompanyCAGE` |
-| `0005_bq_raw_columns_and_bid_fields` | `bq_raw_columns` on `SolicitationLine`; extra `GovernmentBid` fields |
-| `0006_add_hubzone_requested_by` | `hubzone_requested_by` on `Solicitation` |
-| `0007_add_importjob` | `ImportJob` model |
-| `0008_add_dibbs_award` | `DibbsAward` model |
-| `0009_email_template` | `EmailTemplate` model (`dibbs_email_template`); seeds "Standard RFQ" default template |
-| `0010_suppliermatch_manual_method` | Adds `MANUAL` choice to `SupplierMatch.match_method`; used for tier-4 ad-hoc matches |
+AJAX and API responses return JSON (import steps, RFQ center detail, `rfq_mailto`, `rfq_mark_sent`, quote entry when called via fetch).
 
----
+## 13. Permissions / Security Considerations
+- Every view is decorated with `@login_required`; RFQ/import actions rely on `request.user` for logging `sent_by` and `logged_by`.
+- Staff-only checks guard `backfill_nsn`, `sync_awards_view`, and determine whether SAM debug JSON is shown.
+- `import_batch_delete` only removes `Solicitation.status='New'` rows so work in progress is preserved.
+- RFQ flows avoid SMTP by generating `mailto:` URLs; `rfq_mark_sent` records the action once the human confirms sending.
+- IN/BQ/AS uploads contain sensitive procurement data; temporary files live under `/tmp` directories that are removed during the matching step.
 
-## Key Design Decisions & Notes
+## 14. Background Processing / Scheduled Work
+- The import pipeline runs entirely via HTTP: each AJAX step updates the `ImportJob`, persists counts, and orchestrates parsing, bulk upserts, matching, and awards sync. There is no background queue.
+- `run_import()` executes matching plus the SAM awards sync sequentially; logging captures errors but does not fail the entire import when awards sync fails.
+- `fetch_dibbs_archive_files` requires Playwright/Chromium and is invoked when staff call `/import/fetch-dibbs/`.
+- `backfill_nsn_from_contracts` is a manual, staff-triggered view (dry run supported).
+- `sync_awards_view` exposes a manual sync button; the service paginates with a 100-record page size.
 
-- **AJAX import**: 5-step fetch() chain on `progress.html` — no WebSockets, no Celery. Each step is its own POST. `ImportJob._save_step()` must include `batch_id` and `import_date` in `update_fields` or they won't persist between requests.
-- **Matching performance**: All tier queries are batched upfront (~4 queries total). Never query per-line.
-- **BQ export**: Requires `SolicitationLine.bq_raw_columns` to be populated (needs BQ file at import time). Raises `BQExportError` otherwise.
-- **Suggested bid**: `unit_price × (1 + default_markup_pct / 100)`; `default_markup_pct` from default `CompanyCAGE` (default 3.50).
-- **Supplier email resolution**: contact FK → `primary_email` → `business_email`.
-- **SAM.gov entity lookup**: Read-only, no DB writes. Uses same `SAM_API_KEY`. Graceful degradation on all error types — no 500s.
-- **Approved sources — both Overview and Matches tabs**: `solicitation_detail` annotates each `ApprovedSource` with `.matched_supplier` via one `Supplier.objects.filter(cage_code__in=...)` query. Both the Overview tab and the Matches tab render the same logic: in-system CAGEs show a supplier link + "In system" green badge; unknown CAGEs show a "🔍 Lookup on SAM.gov" blue badge linking to `sales:entity_cage_lookup` in a new tab.
-- **Tier 2 NSN normalization**: `ApprovedSource.nsn` stored without hyphens; query with `_normalize_nsn(line.nsn)`.
-- **Archived suppliers**: Excluded from all matching tiers.
-- **Manual RFQ email (mailto)**: No SMTP required. User clicks **Open RFQ Email** → GET `rfq_mailto/<match_id>/` returns `mailto_url` (or `missing_email`); client opens email app. User clicks **Mark Sent** → POST `rfq_mark_sent` creates/updates `SupplierRFQ` (SENT), logs contact, advances solicitation; UI replaces buttons with "✓ Sent" badge. Same pattern on Solicitation Detail Matches tab and RFQ Pending page. `sales/services/email.py` unchanged for future SMTP.
+## 15. Testing Coverage
+`tests.py` is the default Django stub with no test cases. There are no unit/integration tests for parser, importer, matching, RFQ flows, or service helpers; adding targeted tests for `sales/services/bq_export.py`, `sales/services/parser.py`, and RFQ workflows would cover high-risk areas.
 
-- **Ad-hoc RFQ dispatch**: `rfq_send_to_approved_source` and `rfq_send_to_adhoc` auto-create `Supplier` records. SAM hit → `[SAM]` notes; SAM miss → `[STUB]` notes. `_build_mailto_for_supplier()` is the shared helper. Tier-4 MANUAL matches are used for ad-hoc; tier-2 APPROVED_SOURCE for approved-source dispatches. Stub suppliers show INCOMPLETE badge in suppliers list.
-- **SupplierMatch.match_method MANUAL**: Added in migration 0010. Tier 4 ad-hoc matches use this. Existing tiers 1/2/3 use DIRECT_NSN / APPROVED_SOURCE / FSC unchanged.
+## 16. Migrations / Schema Notes
+- `0001_initial`: core solicitation/line models, import tables, RFQ scaffolding.
+- `0002_suppliermatch_match_score_suppliernsn_last_synced_and_more`: adds `SupplierMatch`, `SupplierNSN.match_score`, and last-synced metadata.
+- `0003_add_solicitation_bucket`: introduces `bucket`/`bucket_assigned_by` on `Solicitation`.
+- `0004_rfq_extra_fields_and_cage_smtp`: adds RFQ fields (follow-up timestamps, `email_sent_to`, `declined_reason`) and `CompanyCAGE.smtp_reply_to`.
+- `0005_bq_raw_columns_and_bid_fields`: adds `bq_raw_columns` JSON and expands `GovernmentBid` with manufacturer/part-number fields.
+- `0006_add_hubzone_requested_by`: tracks hubzone requests on `Solicitation`.
+- `0007_add_importjob`: creates `ImportJob` for the AJAX workflow.
+- `0008_add_dibbs_award`: adds the `DibbsAward` table.
+- `0009_email_template`: adds `EmailTemplate` with ordering/default behavior.
+- `0010_suppliermatch_manual_method`: adds the `MANUAL` choice for ad-hoc matches.
+Schema evolution reflects RFQ/bid feature rollouts; no large legacy migrations remain.
 
----
+## 17. Known Gaps / Ambiguities
+- There are no automated tests; `sales/tests.py` still contains the default stub.
+- `sales/admin.py` does not register any models, so staff rely entirely on the custom UI rather than the Django admin.
+- RFQ mailto flows assume suppliers expose `contact`, `primary_email`, or `business_email`; if none exist the UI prompts for email manually but does not fill it automatically.
+- `sales/services/dibbs_fetch.py` requires Playwright + Chromium, but the repo lacks documentation or tooling to install them, so `/import/fetch-dibbs/` fails unless the environment already has Playwright binaries.
+- `SupplierMatch` tier logic skips NSN/approved-source matching for `item_type_indicator == '2'`, so part-number-only lines rely solely on FSC or manual matches; this behavior is drawn from the code but not explicitly explained elsewhere.
 
-## Manual RFQ Email (Mailto) + Email Templates — Summary
+## 18. Safe Modification Guidance for Future Developers / AI Agents
+- If `SolicitationLine.bq_raw_columns` is renamed or its JSON shape changes, update `sales/services/bq_export.py` and ensure the importer still populates it; missing templates trigger `BQExportError`.
+- Additional matching tiers or match method changes must update `sales/services/matching.py` (deduplication, scoring) and downstream UI filters that expect the existing `match_method` choices.
+- Any status transition for RFQs should consider `sales/context_processors.rfq_counts` and the UI badges depending on overdue counts.
+- When touching import steps (`views/imports.py`), keep `_save_step` consistent so `ImportJob.step_results` stores `batch_id`/`import_date`; the progress page reads those fields.
+- Changes to RFQ mailto actions require updating `sales/rfq/partials/mailto_buttons.html` and the JS used by the matches tab and RFQ pending.
+- Updating `CompanyCAGE` defaults or email templates must preserve the “one default cage” invariant (`settings_cage_add/edit` resets others) so RFQ flows always find a markup rate or SMTP reply-to.
 
-- **Goal:** Staff can open a pre-filled RFQ in their email client and explicitly mark it sent, without SMTP.
-- **Flow:** **Open RFQ Email** → JSON API builds `mailto:` URL from default `EmailTemplate` and supplier email (contact → primary_email → business_email). **Mark Sent** → POST creates/updates `SupplierRFQ` (SENT), `SupplierContactLog` (EMAIL_OUT), advances solicitation to `RFQ_SENT` when applicable; idempotent per (line, supplier).
-- **Model:** `EmailTemplate` — name, subject_template, body_template, is_default, created_by; `render_subject(context)` / `render_body(context)` with `_SafeDict` (missing keys → empty string). Table `dibbs_email_template`; migration seeds "Standard RFQ".
-- **Template variables:** `{supplier_name}`, `{sol_number}`, `{nsn}`, `{nomenclature}`, `{qty}`, `{unit_of_issue}`, `{return_date}`, `{your_name}`, `{your_email}`.
-- **UI:** Reusable partial `sales/rfq/partials/mailto_buttons.html` in Matches tab and RFQ Pending; CSRF + JS (openMailto, markSent, showMatchAlert) on both pages. Settings → **Email Templates** in nav; list + create/edit with live preview (debounced fetch to preview endpoint).
-
----
-
-## Future TODOs
-
-### Bid Submission — Manual First, Batch as Luxury
-- Batch quote/bid submission is a future enhancement; the manual single-bid flow must be solid first.
-- **Bid Entry Screen (TBD):** When entering a bid, present a single screen showing everything the user needs to complete that bid. Data requirements for this screen still need to be collected before design can begin.
+## 19. Quick Reference
+- **Primary models:** `ImportBatch`, `Solicitation`/`SolicitationLine`, `SupplierMatch`, `SupplierRFQ`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `SupplierNSN`/`SupplierFSC`, `ApprovedSource`.
+- **Main URLs:** `/sales/import/*`, `/sales/solicitations/*`, `/sales/rfq/*`, `/sales/bids/*`, `/sales/suppliers/*`, `/sales/settings/*`, `/sales/entity/cage/<cage_code>/`.
+- **Key templates:** `sales/import/progress.html`, `sales/solicitations/detail.html`, `sales/rfq/center.html` plus `rfq/partials/mailto_buttons.html`, `sales/bids/builder.html`, `sales/settings/email_templates.html`.
+- **Key dependencies:** Playwright + Chromium (DIBBS fetch), `requests`/`BeautifulSoup` (DIBBS + SAM), `SAM_API_KEY`, `SAM_OUR_CAGE`, Django `DEFAULT_FROM_EMAIL`.
+- **Risky files to review first:** `sales/services/importer.py`, `sales/services/matching.py`, `sales/services/bq_export.py`, `sales/views/imports.py`, `sales/views/rfq.py`.

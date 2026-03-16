@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(python:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(ls -la /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp/users/migrations/*.py)",
+      "Bash(find /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp -name *.py -type f -exec grep -l \"from users\\\\|from users\\\\.models\\\\|UserCompanyMembership\\\\|AppPermission\" {})",
+      "Bash(2)",
+      "Bash(wc -l /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp/contracts/views/*.py)",
+      "Bash(grep -E \"\\\\.\\(html|js|py\\)$\")",
+      "Bash(find /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp -path */suppliers/static* -o -path */static/*supplier*)"
     ]
   }
 }
