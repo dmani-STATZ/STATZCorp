@@ -1,10 +1,10 @@
-{#
+{% comment %}
   Include with:
     {% include "sales/rfq/partials/mailto_buttons.html" with match=match %}
 
   `match` must have: match.id, match.supplier.name,
   and `match.rfq_sent` (bool) + `match.rfq_status_display` (str) if annotated.
-#}
+{% endcomment %}
 <div class="rfq-action-cell" data-match-id="{{ match.id }}">
 
   {% if match.rfq_sent %}
