@@ -187,6 +187,26 @@ def _get_job_or_error(job_id):
 
 def _open_files(job):
     """Open the three temp files for reading. Returns (in_f, bq_f, as_f) or raises."""
+    paths = [
+        ("IN", job.in_file_path),
+        ("BQ", job.bq_file_path),
+        ("AS", job.as_file_path),
+    ]
+    missing = []
+    for label, path in paths:
+        if not path:
+            missing.append(f"{label} (path not set)")
+            continue
+        if not os.path.isfile(path):
+            missing.append(f"{label} ({path})")
+
+    if missing:
+        raise FileNotFoundError(
+            "Import source files are no longer available. "
+            "Temporary import files are removed after matching; start a new import. "
+            f"Missing: {', '.join(missing)}"
+        )
+
     return (
         open(job.in_file_path, "r", encoding="utf-8", errors="replace"),
         open(job.bq_file_path, "r", encoding="utf-8", errors="replace"),
@@ -204,6 +224,23 @@ def _save_step(job, status, extra: dict):
     job.save(update_fields=["status", "step_results", "batch_id", "import_date"])
 
 
+def _step_results_dict(job):
+    """Safely parse step_results JSON into a dict."""
+    try:
+        data = json.loads(job.step_results or "{}")
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _error_job_response(job, default_msg="Import job is in error state. Start a new import."):
+    """Standard error response for jobs already marked as failed."""
+    return JsonResponse(
+        {"success": False, "error": job.error_message or default_msg},
+        status=400,
+    )
+
+
 # ── AJAX Step 1: Parse files + create ImportBatch ────────────────────────────
 
 @login_required
@@ -212,6 +249,23 @@ def import_step_parse(request, job_id):
     job, err = _get_job_or_error(job_id)
     if err:
         return err
+
+    cached = _step_results_dict(job)
+    if all(k in cached for k in ("sol_count", "bq_count", "as_count", "parse_errors")):
+        import_date = cached.get("import_date")
+        if not import_date and job.import_date:
+            import_date = job.import_date.isoformat()
+        return JsonResponse({
+            "success": True,
+            "import_date": import_date,
+            "sol_count": cached.get("sol_count", 0),
+            "bq_count": cached.get("bq_count", 0),
+            "as_count": cached.get("as_count", 0),
+            "parse_errors": cached.get("parse_errors", 0),
+        })
+
+    if job.status == ImportJob.STATUS_ERROR:
+        return _error_job_response(job)
 
     job.status = ImportJob.STATUS_PARSING
     job.save(update_fields=["status"])
@@ -274,6 +328,17 @@ def import_step_solicitations(request, job_id):
     if err:
         return err
 
+    cached = _step_results_dict(job)
+    if all(k in cached for k in ("sols_created", "sols_updated")):
+        return JsonResponse({
+            "success": True,
+            "created": cached.get("sols_created", 0),
+            "updated": cached.get("sols_updated", 0),
+        })
+
+    if job.status == ImportJob.STATUS_ERROR:
+        return _error_job_response(job)
+
     if not job.batch_id:
         return JsonResponse({"success": False, "error": "Parse step not yet complete."}, status=400)
 
@@ -314,6 +379,18 @@ def import_step_lines(request, job_id):
     job, err = _get_job_or_error(job_id)
     if err:
         return err
+
+    cached = _step_results_dict(job)
+    if all(k in cached for k in ("lines_created", "lines_updated", "as_loaded")):
+        return JsonResponse({
+            "success": True,
+            "lines_created": cached.get("lines_created", 0),
+            "lines_updated": cached.get("lines_updated", 0),
+            "as_loaded": cached.get("as_loaded", 0),
+        })
+
+    if job.status == ImportJob.STATUS_ERROR:
+        return _error_job_response(job)
 
     if not job.batch_id:
         return JsonResponse({"success": False, "error": "Parse step not yet complete."}, status=400)
@@ -358,6 +435,19 @@ def import_step_match(request, job_id):
     if err:
         return err
 
+    cached = _step_results_dict(job)
+    if all(k in cached for k in ("matches_found", "tier1", "tier2", "tier3")):
+        return JsonResponse({
+            "success": True,
+            "matches_found": cached.get("matches_found", 0),
+            "tier1": cached.get("tier1", 0),
+            "tier2": cached.get("tier2", 0),
+            "tier3": cached.get("tier3", 0),
+        })
+
+    if job.status == ImportJob.STATUS_ERROR:
+        return _error_job_response(job)
+
     if not job.batch_id:
         return JsonResponse({"success": False, "error": "Parse step not yet complete."}, status=400)
 
@@ -369,6 +459,11 @@ def import_step_match(request, job_id):
         tmp_dir = os.path.dirname(job.in_file_path or "")
         if tmp_dir and os.path.isdir(tmp_dir):
             shutil.rmtree(tmp_dir, ignore_errors=True)
+        if job.in_file_path or job.bq_file_path or job.as_file_path:
+            job.in_file_path = None
+            job.bq_file_path = None
+            job.as_file_path = None
+            job.save(update_fields=["in_file_path", "bq_file_path", "as_file_path"])
 
         _save_step(job, ImportJob.STATUS_MATCHING, {
             "matches_found": match_summary.get("matches_found", 0),
@@ -401,6 +496,23 @@ def import_step_awards(request, job_id):
     job, err = _get_job_or_error(job_id)
     if err:
         return err
+
+    cached = _step_results_dict(job)
+    if any(k in cached for k in ("awards_created", "awards_updated", "awards_matched", "awards_won", "awards_skipped", "awards_reason", "awards_error")):
+        skipped = bool(cached.get("awards_skipped", False) or cached.get("awards_error"))
+        reason = cached.get("awards_reason") or cached.get("awards_error") or ""
+        return JsonResponse({
+            "success": True,
+            "created": cached.get("awards_created", 0),
+            "updated": cached.get("awards_updated", 0),
+            "matched": cached.get("awards_matched", 0),
+            "won": cached.get("awards_won", 0),
+            "skipped": skipped,
+            "reason": reason,
+        })
+
+    if job.status == ImportJob.STATUS_ERROR:
+        return _error_job_response(job)
 
     try:
         from sales.services.sam_awards_sync import sync_dla_awards

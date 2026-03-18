@@ -17,6 +17,7 @@ from sales.models.bids import GovernmentBid
 from sales.models.cages import CompanyCAGE
 from sales.models.awards import DibbsAward
 from sales.models.email_templates import EmailTemplate
+from sales.models.inbox import InboxEmail
 
 __all__ = [
     'ImportBatch',
@@ -34,4 +35,5 @@ __all__ = [
     'CompanyCAGE',
     'DibbsAward',
     'EmailTemplate',
+    'InboxEmail',
 ]

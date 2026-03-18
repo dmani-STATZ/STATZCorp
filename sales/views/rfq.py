@@ -24,7 +24,9 @@ from sales.models import (
     ApprovedSource,
     EmailTemplate,
 )
-from sales.services.email import send_rfq_email, send_followup_email
+from sales.models.inbox import InboxEmail
+from sales.services.email import send_rfq_email, send_followup_email, resolve_supplier_email
+from sales.services.imap_fetch import fetch_inbox_emails, _apply_match
 from sales.services.suppliers import create_supplier_from_sam, get_or_create_stub_supplier
 
 
@@ -168,9 +170,9 @@ def rfq_mailto(request, match_id):
     Returns JSON { mailto_url, to_email, subject, body, missing_email: bool }
 
     Resolves supplier email using priority:
-      1. match.supplier.contact.email  (if contact FK exists and contact has email)
-      2. match.supplier.primary_email
-      3. match.supplier.business_email
+      1. match.supplier.primary_email
+      2. match.supplier.business_email
+      3. match.supplier.contact.email
 
     Renders the default EmailTemplate (or first available) with solicitation variables.
     If no email is found, returns { missing_email: true, mailto_url: null }.
@@ -190,13 +192,7 @@ def rfq_mailto(request, match_id):
     sol = line.solicitation
 
     # Resolve email address
-    to_email = None
-    if getattr(supplier, "contact", None) and supplier.contact and getattr(supplier.contact, "email", None) and supplier.contact.email:
-        to_email = supplier.contact.email
-    elif getattr(supplier, "primary_email", None) and supplier.primary_email:
-        to_email = supplier.primary_email
-    elif getattr(supplier, "business_email", None) and supplier.business_email:
-        to_email = supplier.business_email
+    to_email = resolve_supplier_email(supplier)
 
     if not to_email:
         return JsonResponse({"missing_email": True, "mailto_url": None})
@@ -279,13 +275,7 @@ def rfq_mark_sent(request, match_id):
     sol = line.solicitation
 
     # Resolve email (same priority as rfq_mailto)
-    to_email = None
-    if getattr(supplier, "contact", None) and supplier.contact and getattr(supplier.contact, "email", None) and supplier.contact.email:
-        to_email = supplier.contact.email
-    elif getattr(supplier, "primary_email", None) and supplier.primary_email:
-        to_email = supplier.primary_email
-    elif getattr(supplier, "business_email", None) and supplier.business_email:
-        to_email = supplier.business_email
+    to_email = resolve_supplier_email(supplier)
 
     # Create or update SupplierRFQ
     rfq, created = SupplierRFQ.objects.get_or_create(
@@ -444,11 +434,14 @@ def rfq_center(request):
         ("closed", "⛌ Closed", closed, "#6b7280"),
     ]
 
+    unread_count = InboxEmail.objects.filter(is_read=False).count()
+
     return render(request, "sales/rfq/center.html", {
         "rfq_groups_display": rfq_groups_display,
         "selected_rfq_id": selected_rfq_id or 0,
         "default_markup_pct": default_markup_pct,
         "today": today,
+        "unread_count": unread_count,
     })
 
 
@@ -750,13 +743,7 @@ def _build_mailto_for_supplier(supplier, line, user):
     Shared helper: build a mailto URL using the default EmailTemplate.
     Returns (mailto_url, to_email) or (None, None) if no email found.
     """
-    to_email = None
-    if getattr(supplier, 'contact', None) and supplier.contact and getattr(supplier.contact, 'email', None):
-        to_email = supplier.contact.email
-    elif getattr(supplier, 'primary_email', None):
-        to_email = supplier.primary_email
-    elif getattr(supplier, 'business_email', None):
-        to_email = supplier.business_email
+    to_email = resolve_supplier_email(supplier)
 
     if not to_email:
         return (None, None)
@@ -991,14 +978,7 @@ def rfq_supplier_search(request):
 
     results = []
     for s in qs:
-        email = ''
-        contact = getattr(s, 'contact', None)
-        if contact and getattr(contact, 'email', None):
-            email = contact.email
-        elif getattr(s, 'primary_email', None):
-            email = s.primary_email
-        elif getattr(s, 'business_email', None):
-            email = s.business_email
+        email = resolve_supplier_email(s) or ''
 
         results.append({
             'id':              s.pk,
@@ -1047,11 +1027,7 @@ def rfq_send_to_existing(request):
     )
 
     # Apply email override if supplier has no email on file
-    if email_override and not (
-        (getattr(supplier, 'contact', None) and getattr(supplier.contact, 'email', None))
-        or supplier.primary_email
-        or supplier.business_email
-    ):
+    if email_override and not resolve_supplier_email(supplier):
         supplier.business_email = email_override
         supplier.save(update_fields=['business_email'])
 
@@ -1087,3 +1063,91 @@ def quote_select_for_bid(request, quote_id):
     if not next_url and quote.line and quote.line.solicitation:
         next_url = reverse("sales:solicitation_detail", args=[quote.line.solicitation.solicitation_number])
     return redirect(next_url or reverse("sales:rfq_sent"))
+
+
+# ──────────────────────────────────────────────
+# IMAP Inbox views
+# ──────────────────────────────────────────────
+
+@login_required
+@require_POST
+def rfq_inbox_refresh(request):
+    """POST: pull new emails from IMAP using the current user's delegated token."""
+    result = fetch_inbox_emails(user=request.user)
+    if result["errors"] and not result["fetched"]:
+        return JsonResponse({"success": False, "error": result["errors"][0]})
+    unread_count = InboxEmail.objects.filter(is_read=False).count()
+    return JsonResponse({
+        "success": True,
+        "fetched": result["fetched"],
+        "matched": result["matched"],
+        "unread_count": unread_count,
+    })
+
+
+@login_required
+@require_GET
+def rfq_inbox_list(request):
+    """GET: return the inbox email list HTML fragment."""
+    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
+    imap_configured = bool(cage and cage.imap_host and cage.imap_user and cage.imap_password)
+    emails = InboxEmail.objects.select_related("rfq__supplier", "rfq__line__solicitation").order_by("-received_at")[:100]
+    unread_count = InboxEmail.objects.filter(is_read=False).count()
+    return render(request, "sales/rfq/partials/inbox_list.html", {
+        "emails": emails,
+        "imap_configured": imap_configured,
+        "unread_count": unread_count,
+    })
+
+
+@login_required
+@require_GET
+def rfq_inbox_detail(request, email_id):
+    """GET: return the inbox email detail HTML fragment for the center panel. Marks email as read."""
+    inbox_email = get_object_or_404(InboxEmail.objects.select_related(
+        "rfq__supplier", "rfq__line__solicitation", "rfq__line",
+    ), pk=email_id)
+
+    if not inbox_email.is_read:
+        inbox_email.is_read = True
+        inbox_email.save(update_fields=["is_read"])
+
+    # Build list of SENT RFQs for the manual-assign dropdown (unmatched emails only)
+    assignable_rfqs = []
+    if not inbox_email.is_matched:
+        assignable_rfqs = (
+            SupplierRFQ.objects
+            .filter(status="SENT")
+            .select_related("supplier", "line__solicitation")
+            .order_by("-sent_at")[:200]
+        )
+
+    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
+    default_markup_pct = float(cage.default_markup_pct) if cage else 0
+
+    return render(request, "sales/rfq/partials/inbox_detail.html", {
+        "inbox_email": inbox_email,
+        "assignable_rfqs": assignable_rfqs,
+        "default_markup_pct": default_markup_pct,
+        "rfq_enter_quote_url": reverse("sales:rfq_enter_quote", args=[0]).rstrip("0"),
+    })
+
+
+@login_required
+@require_POST
+def rfq_inbox_assign(request, email_id):
+    """POST: manually link an unmatched inbox email to an RFQ."""
+    inbox_email = get_object_or_404(InboxEmail, pk=email_id)
+    rfq_id = request.POST.get("rfq_id")
+    if not rfq_id:
+        return JsonResponse({"success": False, "error": "rfq_id required"})
+
+    rfq = get_object_or_404(SupplierRFQ.objects.select_related("supplier", "line__solicitation"), pk=rfq_id)
+    _apply_match(inbox_email, rfq)
+    inbox_email.save()
+    return JsonResponse({
+        "success": True,
+        "rfq_id": rfq.pk,
+        "supplier_name": rfq.supplier.name or "",
+        "sol_number": rfq.line.solicitation.solicitation_number,
+    })

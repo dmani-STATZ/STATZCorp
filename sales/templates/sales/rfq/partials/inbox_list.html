@@ -1,0 +1,50 @@
+{% load tz %}
+<style>
+  .inbox-email-row { padding: 0.5rem 0.75rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 0.8125rem; transition: background 0.15s; }
+  .inbox-email-row:hover { background: #f9fafb; }
+  .inbox-email-row.selected { background: #eff6ff; border-left: 3px solid var(--company-primary, #004eb3); }
+  .inbox-email-row.unread .inbox-from { font-weight: 700; }
+  .inbox-email-row.unread .inbox-subject { font-weight: 600; }
+  .inbox-from { color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inbox-subject { color: #4b5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; }
+  .inbox-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem; }
+  .inbox-date { font-size: 0.7rem; color: #9ca3af; }
+  .inbox-tag { font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 4px; }
+  .inbox-tag-matched { background: #dcfce7; color: #15803d; }
+  .inbox-tag-unmatched { background: #fef9c3; color: #854d0e; }
+  .inbox-empty { padding: 2rem 1rem; text-align: center; color: #9ca3af; font-size: 0.875rem; }
+  .inbox-unread-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--company-primary, #004eb3); display: inline-block; margin-right: 0.35rem; vertical-align: middle; flex-shrink: 0; }
+</style>
+
+{% if not imap_configured %}
+  <div class="inbox-empty">
+    <div style="font-size:1.25rem; margin-bottom:0.5rem;">📭</div>
+    <div>IMAP not configured.</div>
+    <div style="margin-top:0.5rem; font-size:0.8rem;">Add IMAP credentials in <a href="{% url 'sales:settings_cages' %}">Settings → CAGEs</a>.</div>
+  </div>
+{% elif not emails %}
+  <div class="inbox-empty">
+    <div style="font-size:1.25rem; margin-bottom:0.5rem;">📬</div>
+    <div>No emails fetched yet.</div>
+    <div style="margin-top:0.5rem; font-size:0.8rem; color:#9ca3af;">Click ↻ Refresh to check your inbox.</div>
+  </div>
+{% else %}
+  {% for em in emails %}
+  <div class="inbox-email-row {% if not em.is_read %}unread{% endif %}"
+       data-email-id="{{ em.id }}">
+    <div style="display:flex; align-items:center;">
+      {% if not em.is_read %}<span class="inbox-unread-dot"></span>{% endif %}
+      <span class="inbox-from" style="flex:1; min-width:0;">{{ em.from_name|default:em.from_email|truncatechars:30 }}</span>
+    </div>
+    <div class="inbox-subject" title="{{ em.subject }}">{{ em.subject|truncatechars:50 }}</div>
+    <div class="inbox-meta">
+      <span class="inbox-date">{{ em.received_at|date:"M j, g:i A" }}</span>
+      {% if em.is_matched %}
+        <span class="inbox-tag inbox-tag-matched">Matched</span>
+      {% else %}
+        <span class="inbox-tag inbox-tag-unmatched">Unmatched</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+{% endif %}

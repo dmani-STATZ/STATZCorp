@@ -358,7 +358,7 @@
         <td><span class="mono">{{ match.supplier.cage_code|default:"—" }}</span></td>
         <td><span class="badge-tier{{ match.match_tier }}">T{{ match.match_tier }} · {{ match.get_match_method_display }}</span></td>
         <td>{% if match.supplier.probation %}<span class="badge-warn">Probation</span>{% elif match.supplier.conditional %}<span class="badge-warn">Conditional</span>{% else %}<span style="color:#2dc653; font-size:12px;">Clear</span>{% endif %}</td>
-        <td><span class="mono" style="font-size:11px; color:#5a7090;">{{ match.supplier.primary_email|default:match.supplier.business_email|default:"—" }}</span></td>
+        <td><span class="mono" style="font-size:11px; color:#5a7090;">{{ match.rfq_to_email|default:"—" }}</span></td>
         <td>
           {% if match.is_excluded %}
           <span style="color:#a0aec0; font-size:12px;">Excluded</span>

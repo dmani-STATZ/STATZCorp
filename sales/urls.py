@@ -37,6 +37,10 @@ from .views import (
     rfq_send_to_adhoc,
     rfq_supplier_search,
     rfq_send_to_existing,
+    rfq_inbox_refresh,
+    rfq_inbox_list,
+    rfq_inbox_detail,
+    rfq_inbox_assign,
     bids_ready,
     bid_builder,
     bid_select_quote,
@@ -102,6 +106,11 @@ urlpatterns = [
     path("rfq/send-to-adhoc/", rfq_send_to_adhoc, name="rfq_send_to_adhoc"),
     path("rfq/supplier-search/", rfq_supplier_search, name="rfq_supplier_search"),
     path("rfq/send-to-existing/", rfq_send_to_existing, name="rfq_send_to_existing"),
+    # RFQ Inbox (IMAP)
+    path("rfq/inbox/refresh/", rfq_inbox_refresh, name="rfq_inbox_refresh"),
+    path("rfq/inbox/", rfq_inbox_list, name="rfq_inbox_list"),
+    path("rfq/inbox/<int:email_id>/", rfq_inbox_detail, name="rfq_inbox_detail"),
+    path("rfq/inbox/<int:email_id>/assign/", rfq_inbox_assign, name="rfq_inbox_assign"),
     # Bid Center
     path("bids/", bids_ready, name="bids_ready"),
     path("bids/ready/", bids_ready, name="bids_ready"),

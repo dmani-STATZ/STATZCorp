@@ -32,13 +32,35 @@
   .badge-red { background: #fef2f2; color: #b91c1c; }
   .badge-orange { background: #fff7ed; color: #ea580c; }
   .badge-gray { background: #f3f4f6; color: #6b7280; }
+  /* Inbox tab styles */
+  .rfq-left-tabs { display: flex; border-bottom: 1px solid #e5e7eb; }
+  .rfq-left-tab { flex: 1; padding: 0.5rem 0.5rem; font-size: 0.8125rem; font-weight: 500; text-align: center; cursor: pointer; border: none; background: none; color: #6b7280; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
+  .rfq-left-tab.active { color: var(--company-primary, #004eb3); border-bottom-color: var(--company-primary, #004eb3); }
+  .rfq-left-tab .inbox-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 8px; margin-left: 0.25rem; vertical-align: middle; }
+  .rfq-left-tab .inbox-badge:empty, .rfq-left-tab .inbox-badge[data-count="0"] { display: none; }
+  .inbox-refresh-bar { padding: 0.5rem 0.75rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #e5e7eb; }
+  .inbox-refresh-bar button { padding: 0.3rem 0.65rem; font-size: 0.75rem; border: 1px solid #d1d5db; border-radius: 5px; background: #f9fafb; cursor: pointer; }
+  .inbox-refresh-bar button:hover { background: #f3f4f6; }
+  .inbox-refresh-bar .refresh-status { font-size: 0.75rem; color: #6b7280; }
 </style>
 
 <div class="rfq-center">
   <div class="rfq-left">
-    <div class="rfq-left-search">
-      <input type="text" id="rfq-queue-search" placeholder="Search supplier, sol#, NSN…" autocomplete="off">
+    <!-- Tab bar -->
+    <div class="rfq-left-tabs">
+      <button class="rfq-left-tab active" id="tab-btn-queue" type="button">Queue</button>
+      <button class="rfq-left-tab" id="tab-btn-inbox" type="button">
+        Inbox <span class="inbox-badge" id="inbox-unread-badge" data-count="{{ unread_count }}">{% if unread_count %}{{ unread_count }}{% endif %}</span>
+      </button>
     </div>
+
+    <!-- Queue panel -->
+    <div id="tab-panel-queue">
+      <div class="rfq-left-search">
+        <input type="text" id="rfq-queue-search" placeholder="Search supplier, sol#, NSN…" autocomplete="off">
+      </div>
+    </div>
+    <div id="tab-panel-queue-list">
     <div class="rfq-queue">
       {% for group_key, group_label, rfq_list, accent in rfq_groups_display %}
       <div class="rfq-group" data-group="{{ group_key }}">
@@ -64,6 +86,16 @@
         </div>
       </div>
       {% endfor %}
+    </div>
+    </div><!-- end tab-panel-queue-list -->
+
+    <!-- Inbox panel -->
+    <div id="tab-panel-inbox" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+      <div class="inbox-refresh-bar">
+        <button id="inbox-refresh-btn" type="button">↻ Refresh</button>
+        <span class="refresh-status" id="inbox-refresh-status"></span>
+      </div>
+      <div id="inbox-email-list" style="flex:1; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -232,6 +264,136 @@
   });
 
   if (selectedRfqId) loadCenterPanel(selectedRfqId);
+
+  // ── Inbox tab logic ──────────────────────────────────
+  var inboxListUrl     = "{% url 'sales:rfq_inbox_list' %}";
+  var inboxRefreshUrl  = "{% url 'sales:rfq_inbox_refresh' %}";
+  var inboxDetailBase  = "{% url 'sales:rfq_inbox_detail' email_id=0 %}".replace(/\/0\/$/, '/');
+  var csrfToken        = '{{ csrf_token }}';
+
+  function setActiveTab(tab) {
+    var queuePanel   = document.getElementById('tab-panel-queue');
+    var queueList    = document.getElementById('tab-panel-queue-list');
+    var inboxPanel   = document.getElementById('tab-panel-inbox');
+    var btnQueue     = document.getElementById('tab-btn-queue');
+    var btnInbox     = document.getElementById('tab-btn-inbox');
+    if (tab === 'inbox') {
+      queuePanel.style.display = 'none';
+      queueList.style.display  = 'none';
+      inboxPanel.style.display = 'flex';
+      btnQueue.classList.remove('active');
+      btnInbox.classList.add('active');
+      loadInboxList();
+    } else {
+      queuePanel.style.display = '';
+      queueList.style.display  = '';
+      inboxPanel.style.display = 'none';
+      btnQueue.classList.add('active');
+      btnInbox.classList.remove('active');
+    }
+  }
+
+  function loadInboxList() {
+    fetch(inboxListUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        document.getElementById('inbox-email-list').innerHTML = html;
+        attachInboxRowListeners();
+      });
+  }
+
+  function attachInboxRowListeners() {
+    document.querySelectorAll('.inbox-email-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var eid = parseInt(row.getAttribute('data-email-id'), 10);
+        loadInboxDetail(eid);
+        document.querySelectorAll('.inbox-email-row').forEach(function(r) { r.classList.remove('selected'); });
+        row.classList.add('selected');
+        row.classList.remove('unread');
+        // Decrement badge
+        var badge = document.getElementById('inbox-unread-badge');
+        if (badge) {
+          var cnt = parseInt(badge.getAttribute('data-count') || '0', 10);
+          if (cnt > 0) { cnt--; badge.setAttribute('data-count', cnt); badge.textContent = cnt > 0 ? cnt : ''; }
+        }
+      });
+    });
+  }
+
+  function loadInboxDetail(emailId) {
+    var placeholder = document.getElementById('rfq-center-placeholder');
+    var detail      = document.getElementById('rfq-center-detail');
+    placeholder.style.display = 'none';
+    fetch(inboxDetailBase + emailId + '/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        detail.innerHTML = html;
+        detail.style.display = 'block';
+        var enterBtn = detail.querySelector('[data-action="enter-quote"]');
+        if (enterBtn) {
+          var rfqId = parseInt(enterBtn.getAttribute('data-rfq-id'), 10);
+          enterBtn.addEventListener('click', function() { openQuotePanel(rfqId); });
+        }
+        attachAssignFormListener(detail);
+      })
+      .catch(function() { placeholder.style.display = 'block'; });
+  }
+
+  function attachAssignFormListener(container) {
+    var form = container.querySelector('#inbox-assign-form');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var emailId = form.getAttribute('data-email-id');
+      var fd = new FormData(form);
+      fetch(inboxDetailBase + emailId + '/assign/', {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) { loadInboxDetail(parseInt(emailId, 10)); loadInboxList(); }
+          else { alert(data.error || 'Assignment failed.'); }
+        });
+    });
+  }
+
+  document.getElementById('tab-btn-queue').addEventListener('click', function() { setActiveTab('queue'); });
+  document.getElementById('tab-btn-inbox').addEventListener('click', function() { setActiveTab('inbox'); });
+
+  document.getElementById('inbox-refresh-btn').addEventListener('click', function() {
+    var btn    = this;
+    var status = document.getElementById('inbox-refresh-status');
+    btn.disabled = true;
+    btn.textContent = '…';
+    status.textContent = 'Fetching…';
+    fetch(inboxRefreshUrl, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '↻ Refresh';
+        if (data.success) {
+          status.textContent = 'Fetched ' + data.fetched + ', matched ' + data.matched;
+          var badge = document.getElementById('inbox-unread-badge');
+          if (badge) {
+            badge.setAttribute('data-count', data.unread_count);
+            badge.textContent = data.unread_count > 0 ? data.unread_count : '';
+          }
+          loadInboxList();
+        } else {
+          status.textContent = 'Error: ' + (data.error || 'unknown');
+        }
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = '↻ Refresh';
+        status.textContent = 'Connection error.';
+      });
+  });
 })();
 </script>
 {% endblock content %}

@@ -25,6 +25,20 @@ class CompanyCAGE(models.Model):
     is_active = models.BooleanField(default=True)
     smtp_reply_to = models.EmailField(null=True, blank=True)
 
+    # IMAP inbox settings
+    # IMAP inbox — delegated OAuth2 only (no basic auth in GCC High Exchange Online)
+    # imap_user is the shared mailbox address (e.g. sales@statzcorp.com),
+    # NOT the employee's address. The signed-in employee's delegated token is
+    # used to authenticate; their exchange rights to the shared mailbox grant access.
+    imap_host = models.CharField(max_length=255, null=True, blank=True)
+    imap_port = models.IntegerField(default=993)
+    imap_user = models.CharField(
+        max_length=255, null=True, blank=True,
+        help_text='Shared mailbox address, e.g. sales@statzcorp.com'
+    )
+    imap_folder = models.CharField(max_length=100, default='INBOX')
+    imap_last_fetched = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         db_table = 'dibbs_company_cage'
         verbose_name = 'Company CAGE'

@@ -187,7 +187,7 @@
                               style="display:inline-block; width:6px; height:6px; border-radius:50%;
                                      background:var(--company-primary,#004eb3); flex-shrink:0;"></span>
                         {% endif %}
-                        <a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
+                        <a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}?tab=matches" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
                             {{ sol.solicitation_number }}
                         </a>
                     </div>

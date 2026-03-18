@@ -2,7 +2,7 @@
 
 ## 1. Purpose of This File
 
-This file defines safe-edit guidance for the `sales` Django app for AI coding agents and future developers. It is not a repeat of `CONTEXT.md` — read `sales/CONTEXT.md` first for domain context, then use this file when making code changes.
+This file defines safe-edit guidance for the `sales` Django app for AI coding agents and future developers. It is not a repeat of `CONTEXT.md` — read `sales/CONTEXT.md` first for domain context and the `DIBBS_System_Spec` for intent and vision, then use this file when making code changes.
 
 ---
 

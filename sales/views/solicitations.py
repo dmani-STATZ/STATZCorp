@@ -22,6 +22,7 @@ from sales.models import (
     CompanyCAGE,
     GovernmentBid,
 )
+from sales.services.email import resolve_supplier_email
 from suppliers.models import Supplier
 
 PIPELINE = [
@@ -234,6 +235,7 @@ def solicitation_detail(request, sol_number):
     # Annotate each match with rfq status for "Send RFQ" vs badge (reuse rfqs list)
     rfq_by_match_key = {(r.line_id, r.supplier_id): r for r in rfqs}
     for m in matches:
+        m.rfq_to_email = resolve_supplier_email(m.supplier) or ""
         m.rfq_sent = (m.line_id, m.supplier_id) in rfq_by_match_key
         if m.rfq_sent:
             m.rfq_obj = rfq_by_match_key.get((m.line_id, m.supplier_id))

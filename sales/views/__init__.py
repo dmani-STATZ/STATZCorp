@@ -49,6 +49,10 @@ from sales.views.rfq import (
     rfq_send_to_adhoc,
     rfq_supplier_search,
     rfq_send_to_existing,
+    rfq_inbox_refresh,
+    rfq_inbox_list,
+    rfq_inbox_detail,
+    rfq_inbox_assign,
 )
 from sales.views.bids import (
     bids_ready,
@@ -113,6 +117,10 @@ __all__ = [
     "rfq_send_to_adhoc",
     "rfq_supplier_search",
     "rfq_send_to_existing",
+    "rfq_inbox_refresh",
+    "rfq_inbox_list",
+    "rfq_inbox_detail",
+    "rfq_inbox_assign",
     "bids_ready",
     "bid_builder",
     "bid_select_quote",

@@ -2,8 +2,9 @@
 RFQ email generation and dispatch. Section 10.2, 10.7.
 """
 import logging
+from email.utils import make_msgid
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage
 from django.utils import timezone
 
 from sales.models import SupplierRFQ, SupplierContactLog, ApprovedSource, CompanyCAGE
@@ -11,20 +12,32 @@ from sales.models import SupplierRFQ, SupplierContactLog, ApprovedSource, Compan
 logger = logging.getLogger(__name__)
 
 
-def _supplier_email(supplier):
+def resolve_supplier_email(supplier):
     """
-    Resolve supplier email: contact.email → primary_email → business_email.
-    Supplier has FK `contact` (primary contact); Contact has email.
+    Resolve supplier email for RFQ workflows.
+    Priority: primary_email -> business_email -> contact.email.
     """
+    if getattr(supplier, "primary_email", None):
+        email = supplier.primary_email.strip()
+        if email:
+            return email
+
+    if getattr(supplier, "business_email", None):
+        email = supplier.business_email.strip()
+        if email:
+            return email
+
     if getattr(supplier, "contact_id", None) and supplier.contact:
         email = getattr(supplier.contact, "email", None)
         if email and email.strip():
             return email.strip()
-    if getattr(supplier, "primary_email", None) and supplier.primary_email:
-        return supplier.primary_email.strip()
-    if getattr(supplier, "business_email", None) and supplier.business_email:
-        return supplier.business_email.strip()
+
     return None
+
+
+def _supplier_email(supplier):
+    """Backward-compatible wrapper for existing service calls."""
+    return resolve_supplier_email(supplier)
 
 
 def _default_cage():
@@ -116,14 +129,16 @@ def send_rfq_email(rfq, sent_by):
 
     body = _rfq_body(rfq, reply_to_email, our_company_name, our_cage, sender_full_name)
 
+    msg_id = make_msgid(domain=(from_email.split("@")[-1] if "@" in from_email else "localhost"))
     try:
-        send_mail(
+        msg = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=from_email,
-            recipient_list=[email],
-            fail_silently=False,
+            to=[email],
         )
+        msg.extra_headers = {"Message-ID": msg_id}
+        msg.send(fail_silently=False)
     except Exception as e:
         logger.exception("Failed to send RFQ email for rfq_id=%s: %s", rfq.pk, e)
         return False
@@ -133,7 +148,8 @@ def send_rfq_email(rfq, sent_by):
     rfq.sent_at = now
     rfq.email_sent_to = email
     rfq.sent_by = sent_by
-    rfq.save(update_fields=["status", "sent_at", "email_sent_to", "sent_by"])
+    rfq.email_message_id = msg_id
+    rfq.save(update_fields=["status", "sent_at", "email_sent_to", "sent_by", "email_message_id"])
 
     SupplierContactLog.objects.create(
         rfq=rfq,
@@ -206,13 +222,13 @@ def send_followup_email(rfq, sent_by):
     body = _followup_body(rfq, sender_full_name)
 
     try:
-        send_mail(
+        msg = EmailMessage(
             subject=subject,
-            message=body,
+            body=body,
             from_email=from_email,
-            recipient_list=[email],
-            fail_silently=False,
+            to=[email],
         )
+        msg.send(fail_silently=False)
     except Exception as e:
         logger.exception("Failed to send follow-up for rfq_id=%s: %s", rfq.pk, e)
         return False
@@ -232,3 +248,4 @@ def send_followup_email(rfq, sent_by):
         logged_by=sent_by,
     )
     return True
+

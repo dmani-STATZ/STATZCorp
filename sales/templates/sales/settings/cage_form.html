@@ -101,6 +101,59 @@
 
         </div>
 
+        <!-- IMAP Inbox Settings -->
+        <div style="grid-column:1/-1; margin-top:0.5rem; padding-top:1rem; border-top:1px solid #f3f4f6;">
+            <h3 style="font-size:0.875rem; font-weight:600; color:#374151; margin:0 0 0.75rem;">
+                📬 IMAP Inbox (optional)
+            </h3>
+            <p style="font-size:0.8rem; color:#6b7280; margin:0 0 1rem;">
+                Configure to enable the inbox tab in the RFQ Center. Supplier replies are fetched when you click ↻ Refresh.
+            </p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem 2rem;">
+                <div>
+                    <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">IMAP Host</label>
+                    <input type="text" name="imap_host" maxlength="255"
+                           value="{{ cage.imap_host|default:'' }}"
+                           placeholder="outlook.office365.com"
+                           style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">IMAP Port</label>
+                    <input type="number" name="imap_port" min="1" max="65535"
+                           value="{{ cage.imap_port|default:'993' }}"
+                           style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">Mailbox / Username</label>
+                    <input type="text" name="imap_user" maxlength="255"
+                           value="{{ cage.imap_user|default:'' }}"
+                           placeholder="bids@yourcompany.com"
+                           style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">Folder</label>
+                    <input type="text" name="imap_folder" maxlength="100"
+                           value="{{ cage.imap_folder|default:'INBOX' }}"
+                           style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                </div>
+
+                <!-- Auth note -->
+                <div style="grid-column:1/-1; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:0.75rem 1rem; font-size:0.8rem; color:#166534;">
+                    <strong>✓ Delegated OAuth 2.0 — no passwords stored.</strong>
+                    When a signed-in employee clicks ↻ Refresh, their Microsoft token is used to open the shared mailbox.
+                    Exchange grants access based on that employee's mailbox delegation rights.
+                    Credentials come from <code>MICROSOFT_AUTH_*</code> in <code>.env</code>.
+                </div>
+
+                {% if cage.imap_last_fetched %}
+                <div style="display:flex; align-items:flex-end;">
+                    <p style="font-size:0.75rem; color:#6b7280; margin:0;">Last fetched: {{ cage.imap_last_fetched|date:"N j, Y g:i A" }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+
         <div style="display:flex; gap:2rem; margin-bottom:1.5rem; padding-top:0.5rem; border-top:1px solid #f3f4f6;">
             <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.875rem;">
                 <input type="checkbox" name="is_default" {% if cage.is_default %}checked{% endif %}
