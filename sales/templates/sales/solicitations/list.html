@@ -11,8 +11,9 @@
     </span>
 </div>
 
-{# ── Filter tab strip (Matches / Set-Asides / Unrestricted) ───────────────── #}
-<div class="tab-strip" style="display:flex; gap:0; border-bottom:2px solid #eef2f8; margin-bottom:20px;">
+{# ── Filter tab strip (Matches / Set-Asides / Unrestricted | No-Bid) ─────── #}
+<div class="tab-strip" style="display:flex; align-items:center; gap:0; border-bottom:2px solid #eef2f8; margin-bottom:20px;">
+    <div style="display:flex; gap:0;">
     <a href="?tab=matches{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
        class="bucket-tab {% if active_tab == 'matches' %}active{% endif %}"
        style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'matches' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
@@ -30,6 +31,14 @@
        style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'unrestricted' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
         Unrestricted
         <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.unrestricted|default:0 }}</span>
+    </a>
+    </div>
+    <span style="flex:1;"></span>
+    <a href="?tab=nobid{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
+       class="bucket-tab {% if active_tab == 'nobid' %}active{% endif %}"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'nobid' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+        No-Bid
+        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ nobid_count|default:0 }}</span>
     </a>
 </div>
 
@@ -200,7 +209,7 @@
                               style="display:inline-block; width:6px; height:6px; border-radius:50%;
                                      background:var(--company-primary,#004eb3); flex-shrink:0;"></span>
                         {% endif %}
-                        <a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}?tab=matches" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
+                        <a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}?list_qs={{ filter_snapshot|urlencode }}" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:monospace; font-size:0.8125rem;">
                             {{ sol.solicitation_number }}
                         </a>
                     </div>

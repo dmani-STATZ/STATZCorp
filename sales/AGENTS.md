@@ -33,7 +33,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 ### Before changing views
 - Read the full view module being changed (`sales/views/*.py`).
 - Check `sales/urls.py` for the URL name being used — several names are duplicated (e.g., `bids/` and `bids/ready/` both point to `bids_ready`; `rfq/` and `rfq/pending/` both point to `rfq_pending`).
-- Check templates for context variable names — the detail view passes `solicitation`, `lines`, `matches`, `rfqs`, `quotes`, and other keys that templates depend on.
+- Check templates for context variable names — the detail view passes `solicitation`, `lines`, `matches`, `rfqs`, `quotes`, `prev_sol`, `next_sol`, `list_qs`, `queued_rfq_count`, and other keys that templates depend on.
 - Check `sales/context_processors.py` — adds `overdue_rfq_count` to every request.
 
 ### Before changing services
@@ -78,7 +78,10 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/models/bids.py` + new migration + `sales/services/bq_export.py` (if it maps to a BQ column) + `sales/templates/sales/bids/builder.html` + `sales/views/bids.py` (bid_builder POST handling)
 
 ### Adding a new solicitation status
-→ `sales/models/solicitations.py` (STATUS_CHOICES) + every view that checks that status string + `sales/templates/sales/solicitations/list.html` (filter dropdown) + `sales/templates/sales/solicitations/detail.html` (pipeline ribbon) + `sales/context_processors.py` if it affects overdue count logic
+→ `sales/models/solicitations.py` (STATUS_CHOICES) + every view that checks that status string + `sales/templates/sales/solicitations/list.html` (filter dropdown) + `sales/templates/sales/solicitations/detail.html` (pipeline ribbon **and** status banner block for non–New/Matching statuses) + `sales/context_processors.py` if it affects overdue count logic
+
+### Changing solicitation list tabs, filters, sort, or NO_BID visibility
+→ `sales/views/solicitations.py` — keep `_list_qs_before_tab`, `_apply_list_tab_filter`, `_apply_list_sort`, and `_build_list_queryset` aligned with `solicitation_list()` so detail **Prev/Next** (`?list_qs=`) matches the list. Update `sales/templates/sales/solicitations/list.html` (tabs, `filter_snapshot` on row links) as needed.
 
 ### Adding a new match tier or method
 → `sales/services/matching.py` + `sales/models/matching.py` (MATCH_METHOD_CHOICES) + new migration + `sales/templates/sales/solicitations/detail.html` (matches tab) + `sales/templates/sales/rfq/partials/mailto_buttons.html`
@@ -147,6 +150,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **`rfq/partials/mailto_buttons.html`** is included from both `solicitations/detail.html` (matches tab) and `rfq/pending.html`. Changes affect both screens.
 - **Import progress page** (`import/progress.html`) reads `step_results` JSON keys by name. The keys `batch_id`, `import_date`, `solicitations_created`, `solicitations_updated`, `lines_created`, `lines_updated`, `matches_created` must be written by the corresponding view step functions.
 - **`global_search` view** returns JSON when `?fmt=json` is present, plain HTML otherwise. The top-bar search in `sales/base.html` calls it with `fmt=json`. Do not remove the format check.
+- **Solicitation list ↔ detail navigation:** The list encodes active filters (except `page`) into `?list_qs=` on each row’s detail link. `solicitation_detail` parses `list_qs` and uses `_build_list_queryset()` to compute `prev_sol` / `next_sol`. Any drift between list view filtering and `_build_list_queryset` breaks prev/next; `queued_rfq_count` for banners uses `SupplierRFQ` filtered by `line__solicitation` and `status='QUEUED'` (not a `Solicitation` reverse relation).
 - **Context processor dependency:** `overdue_rfq_count` is available in every template because `sales.context_processors.rfq_counts` is registered in settings. Do not remove `rfq_counts` without updating `STATZWeb/settings.py`.
 
 ---
@@ -198,6 +202,7 @@ After any change, manually verify these flows:
 | CompanyCAGE default | Edit settings, set a new default, confirm only one cage has `is_default=True` |
 | Email template | Set a template as default, trigger an RFQ, confirm template content appears in mailto body |
 | Status context badge | Verify `overdue_rfq_count` badge appears correctly in nav after sending an RFQ with an expired return date |
+| Solicitation list / detail nav | Open list with filters and sort; open a row; confirm Back/Prev/Next and status banners; confirm No-Bid tab only shows `NO_BID` and other tabs exclude it |
 
 **High-risk files to test after any change:** `sales/services/bq_export.py`, `sales/services/matching.py`, `sales/services/importer.py`, `sales/views/rfq.py`, `sales/views/bids.py`.
 
@@ -224,6 +229,8 @@ After any change, manually verify these flows:
 9. **`import_batch_delete` only removes `status='New'` solicitations.** This is intentional but could confuse an agent expecting full batch cleanup. Solicitations that have been triaged, matched, or bid will remain even after the batch is deleted.
 
 10. **`bq_raw_columns` null causes `BQExportError`.** If a `SolicitationLine.bq_raw_columns` is `None` or empty (e.g., from a hand-created line or a migration gap), export will raise `BQExportError` with no easy recovery path.
+
+11. **`_build_list_queryset` vs `solicitation_list` drift.** If list filters or ordering change in one place but not the other, users see wrong Prev/Next order or missing neighbors. Treat `_list_qs_before_tab`, `_apply_list_tab_filter`, and `_apply_list_sort` as part of the same contract as the list template’s `filter_snapshot`.
 
 ---
 
@@ -254,6 +261,7 @@ After any change, manually verify these flows:
 - `sales/services/importer.py` — governs import pipeline
 - `sales/views/rfq.py` — largest and most complex view module
 - `sales/views/bids.py` — bid builder + export orchestration
+- `sales/views/solicitations.py` — list/detail; shared queryset helpers for list + `list_qs` prev/next
 - `sales/urls.py` — URL names used throughout templates
 
 ### Main coupled areas
