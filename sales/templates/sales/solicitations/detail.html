@@ -368,6 +368,9 @@
             {% else %}
               {{ src.approved_cage }}
             {% endif %}
+            {% if src.no_quote_key in no_quote_cages %}
+            <span class="badge bg-danger ms-1" title="This CAGE is on the No Quote list">⛔ No Quote</span>
+            {% endif %}
           </td>
           <td class="mono">{{ src.part_number|default:"—" }}</td>
           <td>
@@ -426,6 +429,9 @@
           {% else %}
             {{ src.approved_cage }}
           {% endif %}
+          {% if src.no_quote_key in no_quote_cages %}
+          <span class="badge bg-danger ms-1" title="This CAGE is on the No Quote list">⛔ No Quote</span>
+          {% endif %}
         </td>
         <td class="mono">{{ src.part_number|default:"—" }}</td>
         <td>
@@ -447,20 +453,31 @@
         </td>
         <td id="as-cell-{{ src.approved_cage }}" style="min-width:180px;">
           {% if src.matched_supplier %}
-          <button type="button" class="btn-queue-rfq btn-sm btn btn-outline-primary"
-                  data-sol="{{ solicitation.solicitation_number }}"
-                  data-supplier="{{ src.matched_supplier.id }}"
-                  {% if src.matched_supplier.id in queued_supplier_ids %}disabled{% endif %}>
-            {% if src.matched_supplier.id in queued_supplier_ids %}
-              ✓ Queued
+            {% if src.no_quote_key in no_quote_cages %}
+            <button type="button" class="btn-queue-rfq-anyway btn-sm btn btn-outline-danger"
+                    data-sol="{{ solicitation.solicitation_number }}"
+                    data-supplier="{{ src.matched_supplier.id }}"
+                    data-cage="{{ src.no_quote_key }}"
+                    {% if src.matched_supplier.id in queued_supplier_ids %}disabled{% endif %}>
+              {% if src.matched_supplier.id in queued_supplier_ids %}✓ Queued{% else %}⛔ Send Anyway{% endif %}
+            </button>
             {% else %}
-              + Add to Queue
+            <button type="button" class="btn-queue-rfq btn-sm btn btn-outline-primary"
+                    data-sol="{{ solicitation.solicitation_number }}"
+                    data-supplier="{{ src.matched_supplier.id }}"
+                    {% if src.matched_supplier.id in queued_supplier_ids %}disabled{% endif %}>
+              {% if src.matched_supplier.id in queued_supplier_ids %}
+                ✓ Queued
+              {% else %}
+                + Add to Queue
+              {% endif %}
+            </button>
             {% endif %}
-          </button>
           {% else %}
           <button type="button" class="btn-add-and-queue btn-sm btn btn-outline-secondary"
                   data-cage="{{ src.approved_cage }}"
-                  data-sol="{{ solicitation.solicitation_number }}">
+                  data-sol="{{ solicitation.solicitation_number }}"
+                  {% if src.no_quote_key in no_quote_cages %}data-no-quote="1"{% endif %}>
             + Add &amp; Queue
           </button>
           {% endif %}
@@ -496,17 +513,31 @@
     <tbody>
       {% for match in matches %}
       <tr>
-        <td>{% if not match.rfq_sent and not match.is_excluded %}<input type="checkbox" name="supplier_ids" value="{{ match.supplier.id }}">{% else %}<input type="checkbox" disabled>{% endif %}</td>
+        <td>{% if not match.rfq_sent and not match.is_excluded and match.supplier_cage_key not in no_quote_cages %}<input type="checkbox" name="supplier_ids" value="{{ match.supplier.id }}">{% else %}<input type="checkbox" disabled>{% endif %}</td>
         <td>
           <a href="{% url 'suppliers:supplier_detail' match.supplier.id %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ match.supplier.name }}</a>
         </td>
-        <td><span class="mono">{{ match.supplier.cage_code|default:"—" }}</span></td>
+        <td>
+          <span class="mono">{{ match.supplier.cage_code|default:"—" }}</span>
+          {% if match.supplier_cage_key in no_quote_cages %}
+          <span class="badge bg-danger ms-1" title="This CAGE is on the No Quote list">⛔ No Quote</span>
+          {% endif %}
+        </td>
         <td><span class="badge-tier{{ match.match_tier }}">T{{ match.match_tier }} · {{ match.get_match_method_display }}</span></td>
         <td>{% if match.supplier.probation %}<span class="badge-warn">Probation</span>{% elif match.supplier.conditional %}<span class="badge-warn">Conditional</span>{% else %}<span style="color:#2dc653; font-size:12px;">Clear</span>{% endif %}</td>
         <td><span class="mono" style="font-size:11px; color:#5a7090;">{{ match.rfq_to_email|default:"—" }}</span></td>
         <td>
           {% if match.is_excluded %}
           <span style="color:#a0aec0; font-size:12px;">Excluded</span>
+          {% elif match.supplier_cage_key in no_quote_cages %}
+          <button type="button" class="btn-queue-rfq-anyway btn-sm btn btn-outline-danger"
+                  data-sol="{{ solicitation.solicitation_number }}"
+                  data-supplier="{{ match.supplier.id }}"
+                  data-cage="{{ match.supplier_cage_key }}"
+                  data-queued="{% if match.supplier.id in queued_supplier_ids %}true{% else %}false{% endif %}"
+                  {% if match.supplier.id in queued_supplier_ids %}disabled{% endif %}>
+            {% if match.supplier.id in queued_supplier_ids %}✓ Queued{% else %}⛔ Send Anyway{% endif %}
+          </button>
           {% else %}
           <button type="button" class="btn-queue-rfq btn-sm btn btn-outline-primary"
                   data-sol="{{ solicitation.solicitation_number }}"
@@ -944,6 +975,43 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" crossorigin="anonymous">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 
+{# No Quote override: server-side rfq_queue_add / supplier_create_and_queue require force_no_quote=1 when CAGE is flagged. #}
+<div class="modal fade" id="noQuoteQueueModal" tabindex="-1" aria-labelledby="noQuoteQueueModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="noQuoteQueueModalLabel">No Quote CAGE</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="noQuoteQueueModalBody"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="noQuoteQueueConfirmBtn">Yes, Send Anyway</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="noQuoteAdhocModal" tabindex="-1" aria-labelledby="noQuoteAdhocModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="noQuoteAdhocModalLabel">No Quote CAGE</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="noQuoteAdhocModalBody"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="noQuoteAdhocConfirmBtn">Yes, continue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="samSupplierModal" tabindex="-1" aria-labelledby="samSupplierModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -969,6 +1037,7 @@
         <form id="sam-supplier-form" class="d-none">
           <input type="hidden" id="sam-cage-hidden" name="cage_code">
           <input type="hidden" id="sam-sol-hidden" name="sol_number">
+          <input type="hidden" name="force_no_quote" id="sam-force-no-quote" value="">
 
           <div class="row g-3">
             <div class="col-12">
@@ -1043,45 +1112,107 @@
 (function () {
   var ENTITY_LOOKUP_URL_TMPL = "{% url 'sales:entity_cage_lookup' cage_code='00000' %}";
 
+  function queueRfqButtonLabel(b) {
+    if (b.dataset.cage) return '⛔ Send Anyway';
+    return '+ Add to Queue';
+  }
+
+  function doQueueRfq(b, forceNoQuote) {
+    if (b.dataset.queued === 'true' || b.disabled) return;
+    b.disabled = true;
+    b.textContent = 'Adding...';
+    var body = 'supplier_id=' + encodeURIComponent(b.dataset.supplier) +
+      '&sol_number=' + encodeURIComponent(b.dataset.sol);
+    if (forceNoQuote) body += '&force_no_quote=1';
+    fetch("{% url 'sales:rfq_queue_add' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': window.CSRF_TOKEN || '{{ csrf_token }}'
+      },
+      body: body
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'queued' || data.status === 'already_queued') {
+          b.textContent = '✓ Queued';
+          b.dataset.queued = 'true';
+          b.disabled = true;
+          b.classList.remove('btn-outline-primary', 'btn-outline-danger');
+          b.classList.add('btn-success');
+        } else {
+          b.textContent = queueRfqButtonLabel(b);
+          b.disabled = false;
+        }
+      })
+      .catch(function () {
+        b.textContent = queueRfqButtonLabel(b);
+        b.disabled = false;
+      });
+  }
+
+  var pendingNoQuoteQueueBtn = null;
+
   document.querySelectorAll('.btn-queue-rfq').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      if (this.dataset.queued === 'true' || this.disabled) return;
-      var b = this;
-      b.disabled = true;
-      b.textContent = 'Adding...';
-      fetch("{% url 'sales:rfq_queue_add' %}", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-CSRFToken': window.CSRF_TOKEN || '{{ csrf_token }}'
-        },
-        body: 'supplier_id=' + encodeURIComponent(b.dataset.supplier) +
-          '&sol_number=' + encodeURIComponent(b.dataset.sol)
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (data.status === 'queued' || data.status === 'already_queued') {
-            b.textContent = '✓ Queued';
-            b.dataset.queued = 'true';
-            b.disabled = true;
-            b.classList.remove('btn-outline-primary');
-            b.classList.add('btn-success');
-          } else {
-            b.textContent = '+ Add to Queue';
-            b.disabled = false;
-          }
-        })
-        .catch(function () {
-          b.textContent = '+ Add to Queue';
-          b.disabled = false;
-        });
+      doQueueRfq(this, false);
     });
+  });
+
+  document.querySelectorAll('.btn-queue-rfq-anyway').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (this.dataset.queued === 'true' || this.disabled) return;
+      pendingNoQuoteQueueBtn = this;
+      var c = this.dataset.cage || '';
+      document.getElementById('noQuoteQueueModalBody').textContent =
+        'CAGE ' + c + ' is on the No Quote list. Are you sure you want to send an RFQ to this supplier anyway?';
+      var el = document.getElementById('noQuoteQueueModal');
+      new bootstrap.Modal(el).show();
+    });
+  });
+
+  document.getElementById('noQuoteQueueConfirmBtn').addEventListener('click', function () {
+    var b = pendingNoQuoteQueueBtn;
+    var modalEl = document.getElementById('noQuoteQueueModal');
+    var inst = bootstrap.Modal.getInstance(modalEl);
+    if (inst) inst.hide();
+    pendingNoQuoteQueueBtn = null;
+    if (b) doQueueRfq(b, true);
+  });
+
+  document.getElementById('noQuoteAdhocConfirmBtn').addEventListener('click', function () {
+    var modalEl = document.getElementById('noQuoteAdhocModal');
+    var inst = bootstrap.Modal.getInstance(modalEl);
+    if (inst) inst.hide();
+    document.getElementById('sam-force-no-quote').value = '1';
+    var c = modalEl.dataset.pendingCage;
+    var s = modalEl.dataset.pendingSol;
+    if (c && s) {
+      openSamAddQueueModal(c, s);
+    }
+    delete modalEl.dataset.pendingCage;
+    delete modalEl.dataset.pendingSol;
   });
 
   document.querySelectorAll('.btn-add-and-queue').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var cage = this.dataset.cage;
       var sol = this.dataset.sol;
+      if (this.getAttribute('data-no-quote') === '1') {
+        var adhocEl = document.getElementById('noQuoteAdhocModal');
+        adhocEl.dataset.pendingCage = cage;
+        adhocEl.dataset.pendingSol = sol;
+        document.getElementById('noQuoteAdhocModalBody').textContent =
+          'CAGE ' + cage + ' is on the No Quote list. Are you sure you want to add this supplier and queue an RFQ anyway?';
+        new bootstrap.Modal(adhocEl).show();
+        return;
+      }
+      document.getElementById('sam-force-no-quote').value = '';
+      openSamAddQueueModal(cage, sol);
+    });
+  });
+
+  function openSamAddQueueModal(cage, sol) {
 
       document.getElementById('sam-modal-loading').classList.remove('d-none');
       document.getElementById('sam-modal-error').classList.add('d-none');
@@ -1136,8 +1267,7 @@
           document.getElementById('sam-supplier-form').classList.remove('d-none');
           saveBtn.disabled = false;
         });
-    });
-  });
+  }
 
   document.getElementById('sam-save-queue-btn').addEventListener('click', function () {
     var form = document.getElementById('sam-supplier-form');
@@ -1162,6 +1292,7 @@
       .then(function (data) {
         if (data.success) {
           bootstrap.Modal.getInstance(document.getElementById('samSupplierModal')).hide();
+          document.getElementById('sam-force-no-quote').value = '';
           var cageVal = document.getElementById('sam-cage-hidden').value;
           document.querySelectorAll('.btn-add-and-queue').forEach(function (addBtn) {
             if (addBtn.getAttribute('data-cage') === cageVal) {
@@ -1172,7 +1303,11 @@
             }
           });
         } else {
-          alert('Error: ' + (data.error || 'Could not save supplier.'));
+          if (data.error === 'no_quote') {
+            alert(data.message || 'This CAGE is on the No Quote list.');
+          } else {
+            alert('Error: ' + (data.error || 'Could not save supplier.'));
+          }
           btn.disabled = false;
           btn.textContent = origText;
         }

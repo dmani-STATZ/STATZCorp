@@ -2808,6 +2808,38 @@ A clean, reassuring upload screen. The three files go in together. Filename vali
 
 ---
 
+## 9.10 No Quote CAGE List
+
+### Purpose
+Sales team members can flag CAGE codes that have declined to work with the company. Flagged CAGEs are surfaced with a red "⛔ No Quote" badge on the solicitation detail page (both **Matches** tab and **Approved Sources** tables, including Overview approved sources) so the team can see risk without hiding matches.
+
+### Data Model — `NoQuoteCAGE` (table: `dibbs_no_quote_cage`)
+| Field | Type | Notes |
+|---|---|---|
+| `cage_code` | CharField(5) | Five-character CAGE; indexed |
+| `reason` | TextField | Optional notes |
+| `date_added` | DateField | Auto-set on creation |
+| `added_by` | FK → User | SET_NULL on user deletion |
+| `is_active` | BooleanField | True = currently flagged |
+| `deactivated_at` | DateField | Set when restored; null if still active |
+
+A partial unique constraint prevents duplicate **active** records for the same CAGE; multiple inactive rows preserve history.
+
+### Adding a CAGE to the No Quote List
+- **From supplier profile** (`/sales/suppliers/<id>/`): "Flag as No Quote" button → modal with optional reason → POST to `sales:supplier_no_quote_add` (uses `suppliers.Supplier.cage_code`, normalized).
+- **From SAM entity lookup** (`/sales/entity/cage/<cage_code>/`): Same button and modal flow → POST to `sales:entity_no_quote_add`.
+
+### Restoring a CAGE (removing from list)
+From the Settings No Quote list page (`/sales/settings/no-quote/`, staff-only): **Restore** sets `is_active=False` and records `deactivated_at`. History is preserved in an expandable section.
+
+### UI Behavior
+- Matched suppliers with a No Quote CAGE show a red **"⛔ No Quote"** badge in the Matches tab. **+ Add to Queue** becomes **"⛔ Send Anyway"** and opens a confirmation modal; the confirmed action POSTs `force_no_quote=1` to `rfq_queue_add`.
+- **Send All RFQs** / **Send Selected RFQs** on RFQ Pending (`rfq_send_batch`) **skip** No Quote CAGEs. **Send All** / multi-select send on the RFQ Queue page (`rfq_queue_send`) also skips them.
+- Approved source rows (matched or not) show the badge when the AS CAGE is flagged; **Add & Queue** for not-in-system sources uses a confirmation modal and `supplier_create_and_queue` with `force_no_quote=1` when confirmed.
+- `get_no_quote_cage_set()` in `sales/services/no_quote.py` loads active CAGEs once per solicitation detail / pending page render.
+
+---
+
 ## 10. Email Workflow — Supplier Communication
 
 ### 10.1 The Core Problem

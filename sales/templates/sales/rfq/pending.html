@@ -102,7 +102,11 @@
           </td>
           <td><span class="badge-tier{{ match.match_tier }}">T{{ match.match_tier }}</span></td>
           <td><a href="{% url 'suppliers:supplier_detail' match.supplier.id %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ match.supplier.name|default:"—" }}</a></td>
-          <td class="mono">{{ match.supplier.cage_code|default:"—" }}</td>
+          <td class="mono">{{ match.supplier.cage_code|default:"—" }}
+            {% if match.supplier_cage_key in no_quote_cages %}
+            <span style="display:inline-block;font-size:0.65rem;font-weight:700;background:#dc2626;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;" title="On No Quote list">⛔ NQ</span>
+            {% endif %}
+          </td>
           <td>{{ match.match_score|floatformat:1 }}</td>
           <td>
             {% include "sales/rfq/partials/mailto_buttons.html" with match=match %}

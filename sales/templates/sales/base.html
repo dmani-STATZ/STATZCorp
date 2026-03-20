@@ -96,6 +96,15 @@
                   {% endif %}">
             Settings
         </a>
+        <a href="{% url 'sales:no_quote_list' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'no_quote_list' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            No Quote CAGEs
+        </a>
         <a href="{% url 'sales:email_template_list' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
                   {% if 'email_template' in request.resolver_match.url_name %}

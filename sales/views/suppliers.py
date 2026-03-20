@@ -16,7 +16,9 @@ from sales.models import (
     SupplierNSN,
     SupplierFSC,
     SupplierQuote,
+    NoQuoteCAGE,
 )
+from sales.services.no_quote import normalize_cage_code
 from sales.services.matching import backfill_nsn_from_contracts
 
 
@@ -66,6 +68,11 @@ def supplier_detail(request, supplier_id):
         .order_by("-quote_date")[:50]
     )
     active_tab = request.GET.get("tab", "profile")
+    cage_norm = normalize_cage_code(supplier.cage_code)
+    is_no_quote = (
+        bool(cage_norm)
+        and NoQuoteCAGE.objects.filter(cage_code=cage_norm, is_active=True).exists()
+    )
 
     return render(request, "sales/suppliers/detail.html", {
         "supplier": supplier,
@@ -73,6 +80,7 @@ def supplier_detail(request, supplier_id):
         "fsc_capabilities": fsc_capabilities,
         "quote_history": quote_history,
         "active_tab": active_tab,
+        "is_no_quote": is_no_quote,
     })
 
 
@@ -162,6 +170,33 @@ def supplier_remove_fsc(request, supplier_id):
         SupplierFSC.objects.filter(supplier=supplier, pk=fsc_id).delete()
         messages.success(request, "FSC capability removed.")
     return redirect(reverse("sales:supplier_detail", args=[supplier.pk]) + "?tab=capabilities")
+
+
+@login_required
+@require_POST
+def supplier_no_quote_add(request, supplier_id):
+    """
+    POST: optional reason. Adds supplier's CAGE to NoQuoteCAGE if not already active.
+    """
+    supplier = get_object_or_404(Supplier, pk=supplier_id)
+    cage_norm = normalize_cage_code(supplier.cage_code)
+    if not cage_norm:
+        messages.warning(request, "This supplier has no CAGE code on file.")
+        return redirect(reverse("sales:supplier_detail", args=[supplier.pk]))
+
+    reason = (request.POST.get("reason") or "").strip()
+    if NoQuoteCAGE.objects.filter(cage_code=cage_norm, is_active=True).exists():
+        messages.warning(request, f"CAGE {cage_norm} is already on the No Quote list.")
+        return redirect(reverse("sales:supplier_detail", args=[supplier.pk]))
+
+    NoQuoteCAGE.objects.create(
+        cage_code=cage_norm,
+        reason=reason,
+        added_by=request.user,
+        is_active=True,
+    )
+    messages.success(request, f"CAGE {cage_norm} added to the No Quote list.")
+    return redirect(reverse("sales:supplier_detail", args=[supplier.pk]))
 
 
 @login_required

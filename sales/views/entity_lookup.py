@@ -5,11 +5,16 @@ import json
 import logging
 
 import requests
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ImproperlyConfigured
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
+from sales.models import NoQuoteCAGE
+from sales.services.no_quote import normalize_cage_code
 from sales.services.sam_entity import lookup_cage
 
 logger = logging.getLogger(__name__)
@@ -107,11 +112,16 @@ def entity_lookup(request, cage_code):
     GET ?fmt=json returns structured JSON for the SAM “Add & Queue” modal (HTTP 200 always).
     """
     cage_code = (cage_code or "").strip().upper()
+    cage_norm = normalize_cage_code(cage_code)
+    is_no_quote = (
+        bool(cage_norm)
+        and NoQuoteCAGE.objects.filter(cage_code=cage_norm, is_active=True).exists()
+    )
 
     if request.GET.get("fmt") == "json":
         return _entity_lookup_json(cage_code)
 
-    context = {"cage_code": cage_code}
+    context = {"cage_code": cage_code, "is_no_quote": is_no_quote}
 
     try:
         data = lookup_cage(cage_code)
@@ -135,3 +145,27 @@ def entity_lookup(request, cage_code):
         )
 
     return render(request, "sales/entity_lookup.html", context)
+
+
+@login_required
+@require_POST
+def entity_no_quote_add(request, cage_code):
+    """POST: optional reason. Adds URL CAGE to NoQuoteCAGE if not already active."""
+    cage_norm = normalize_cage_code(cage_code)
+    if not cage_norm:
+        messages.warning(request, "Invalid CAGE code.")
+        return redirect(reverse("sales:entity_cage_lookup", kwargs={"cage_code": cage_code}))
+
+    reason = (request.POST.get("reason") or "").strip()
+    if NoQuoteCAGE.objects.filter(cage_code=cage_norm, is_active=True).exists():
+        messages.warning(request, f"CAGE {cage_norm} is already on the No Quote list.")
+        return redirect(reverse("sales:entity_cage_lookup", kwargs={"cage_code": cage_norm}))
+
+    NoQuoteCAGE.objects.create(
+        cage_code=cage_norm,
+        reason=reason,
+        added_by=request.user,
+        is_active=True,
+    )
+    messages.success(request, f"CAGE {cage_norm} added to the No Quote list.")
+    return redirect(reverse("sales:entity_cage_lookup", kwargs={"cage_code": cage_norm}))

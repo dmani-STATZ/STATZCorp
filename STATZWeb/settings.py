@@ -293,7 +293,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
 CRISPY_TEMPLATE_PACK = "tailwind"
 
-# Email settings removed - using Windows authentication instead
+# ──────────────────────────────────────────────
+# EMAIL — Microsoft 365 SMTP (GCC High tenant)
+# ──────────────────────────────────────────────
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.office365.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT") or "587")
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER", "noreply@example.com")
 
 # Authentication settings
 LOGIN_REDIRECT_URL = "index"

@@ -3,14 +3,20 @@ Settings views — CompanyCAGE and EmailTemplate management.
 URL: /sales/settings/
 """
 
+from datetime import date
+
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 
-from sales.models import CompanyCAGE, EmailTemplate, RFQGreeting, RFQSalutation
+from sales.models import CompanyCAGE, EmailTemplate, RFQGreeting, RFQSalutation, NoQuoteCAGE
 from sales.models.email_templates import _SafeDict
+
+
+def _staff_required(user):
+    return user.is_authenticated and user.is_staff
 
 
 @login_required
@@ -347,3 +353,40 @@ def settings_salutation_toggle(request, pk):
     salutation.save(update_fields=["is_active"])
     messages.success(request, "Salutation marked " + ("active" if salutation.is_active else "inactive") + ".")
     return redirect("sales:settings_salutations")
+
+
+# ---------- No Quote CAGE list (staff) ----------
+
+
+@login_required
+@user_passes_test(_staff_required)
+def no_quote_list(request):
+    """GET: active + inactive NoQuoteCAGE rows for admin review."""
+    active_records = list(NoQuoteCAGE.objects.filter(is_active=True))
+    inactive_records = list(NoQuoteCAGE.objects.filter(is_active=False))
+    return render(
+        request,
+        "sales/settings/no_quote_list.html",
+        {
+            "active_records": active_records,
+            "inactive_records": inactive_records,
+            "active_nav": "settings",
+        },
+    )
+
+
+@login_required
+@user_passes_test(_staff_required)
+@require_POST
+def no_quote_deactivate(request, pk):
+    """Soft-delete a NoQuoteCAGE row."""
+    record = get_object_or_404(NoQuoteCAGE, pk=pk)
+    if not record.is_active:
+        messages.warning(request, "This record is already inactive.")
+        return redirect("sales:no_quote_list")
+
+    record.is_active = False
+    record.deactivated_at = date.today()
+    record.save(update_fields=["is_active", "deactivated_at"])
+    messages.success(request, f"CAGE {record.cage_code} removed from No Quote list.")
+    return redirect("sales:no_quote_list")

@@ -2,7 +2,9 @@
 {% load static %}
 {% block content %}
 <style>
-  .rfq-center { display: grid; grid-template-columns: 240px 1fr 380px; gap: 0; min-height: calc(100vh - 12rem); }
+  /* overflow-x: hidden clips the quote panel when translateX(100%) parks it at the grid's right edge;
+     otherwise a strip stays visible inside the padded content area (past 100% of the panel width). */
+  .rfq-center { display: grid; grid-template-columns: 240px 1fr 380px; gap: 0; min-height: calc(100vh - 12rem); overflow-x: hidden; }
   .rfq-left { width: 240px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow: hidden; }
   .rfq-left-search { padding: 0.75rem; border-bottom: 1px solid #e5e7eb; }
   .rfq-left-search input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; }

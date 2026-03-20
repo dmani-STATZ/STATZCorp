@@ -147,10 +147,10 @@ def send_rfq_email(rfq, sent_by):
         return False
 
     cage = _default_cage()
-    from_email = getattr(cage, "smtp_reply_to", None) if cage else None
-    if not from_email:
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
-    reply_to_email = from_email
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
+    reply_to_email = (
+        (cage.smtp_reply_to or "").strip() or from_email
+    ) if cage else from_email
     our_company_name = getattr(cage, "company_name", "Our Company") if cage else "Our Company"
     our_cage = getattr(cage, "cage_code", "—") if cage else "—"
     sender_full_name = (getattr(sent_by, "get_full_name", None) and sent_by.get_full_name()) or getattr(sent_by, "username", "") or "Sales"
@@ -170,6 +170,7 @@ def send_rfq_email(rfq, sent_by):
             body=body,
             from_email=from_email,
             to=[email],
+            reply_to=[reply_to_email],
         )
         msg.extra_headers = {"Message-ID": msg_id}
         msg.send(fail_silently=False)
@@ -243,9 +244,10 @@ def send_followup_email(rfq, sent_by):
         return False
 
     cage = _default_cage()
-    from_email = getattr(cage, "smtp_reply_to", None) if cage else None
-    if not from_email:
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
+    reply_to_email = (
+        (cage.smtp_reply_to or "").strip() or from_email
+    ) if cage else from_email
     sender_full_name = (getattr(sent_by, "get_full_name", None) and sent_by.get_full_name()) or getattr(sent_by, "username", "") or "Sales"
 
     line = rfq.line
@@ -261,6 +263,7 @@ def send_followup_email(rfq, sent_by):
             body=body,
             from_email=from_email,
             to=[email],
+            reply_to=[reply_to_email],
         )
         msg.send(fail_silently=False)
     except Exception as e:
@@ -297,11 +300,10 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by):
     import random
 
     cage = _default_cage()
+    default_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
     reply_to = (
-        getattr(cage, "smtp_reply_to", None) if cage else None
-        or getattr(settings, "DEFAULT_FROM_EMAIL", None)
-        or "noreply@localhost"
-    )
+        (cage.smtp_reply_to or "").strip() or default_from
+    ) if cage else default_from
 
     blocks = []
     for rfq in rfqs:

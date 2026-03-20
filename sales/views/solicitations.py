@@ -23,6 +23,7 @@ from sales.models import (
     GovernmentBid,
 )
 from sales.services.email import resolve_supplier_email
+from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
 from suppliers.models import Supplier
 
 PIPELINE = [
@@ -388,6 +389,7 @@ def solicitation_detail(request, sol_number):
             src.matched_supplier = supplier_by_cage.get(
                 (src.approved_cage or "").strip().upper()
             )
+            src.no_quote_key = normalize_cage_code(src.approved_cage)
 
     solicitation.set_aside_display = SET_ASIDE_LABELS.get(
         solicitation.small_business_set_aside or "", ""
@@ -407,6 +409,7 @@ def solicitation_detail(request, sol_number):
     for m in matches:
         m.rfq_to_email = resolve_supplier_email(m.supplier) or ""
         m.rfq_sent = (m.line_id, m.supplier_id) in rfq_by_match_key
+        m.supplier_cage_key = normalize_cage_code(m.supplier.cage_code)
         if m.rfq_sent:
             m.rfq_obj = rfq_by_match_key.get((m.line_id, m.supplier_id))
             m.rfq_status_display = m.rfq_obj.get_status_display() if m.rfq_obj else "Sent"
@@ -469,6 +472,9 @@ def solicitation_detail(request, sol_number):
         }
     bid_show_pn = bool(line and (line.item_description_indicator or "") in "PBN")
 
+    # No Quote CAGE set — loaded once per request; templates compare normalized CAGE substrings.
+    no_quote_cages = get_no_quote_cage_set()
+
     return render(
         request,
         "sales/solicitations/detail.html",
@@ -499,6 +505,7 @@ def solicitation_detail(request, sol_number):
             "next_sol": next_sol,
             "list_qs": list_qs_raw,
             "queued_rfq_count": queued_rfq_count,
+            "no_quote_cages": no_quote_cages,
         },
     )
 

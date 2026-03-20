@@ -29,6 +29,7 @@ from sales.views.suppliers import (
     supplier_add_fsc,
     supplier_remove_nsn,
     supplier_remove_fsc,
+    supplier_no_quote_add,
 )
 from sales.views.rfq import (
     rfq_pending,
@@ -85,8 +86,10 @@ from sales.views.settings import (
     settings_salutation_add,
     settings_salutation_delete,
     settings_salutation_toggle,
+    no_quote_list,
+    no_quote_deactivate,
 )
-from sales.views.entity_lookup import entity_lookup
+from sales.views.entity_lookup import entity_lookup, entity_no_quote_add
 
 __all__ = [
     "dashboard",
@@ -112,6 +115,7 @@ __all__ = [
     "supplier_add_fsc",
     "supplier_remove_nsn",
     "supplier_remove_fsc",
+    "supplier_no_quote_add",
     "rfq_pending",
     "rfq_sent",
     "rfq_send_single",
@@ -162,5 +166,8 @@ __all__ = [
     "settings_salutation_add",
     "settings_salutation_delete",
     "settings_salutation_toggle",
+    "no_quote_list",
+    "no_quote_deactivate",
     "entity_lookup",
+    "entity_no_quote_add",
 ]

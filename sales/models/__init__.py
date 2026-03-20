@@ -19,6 +19,7 @@ from sales.models.cages import CompanyCAGE
 from sales.models.awards import DibbsAward
 from sales.models.email_templates import EmailTemplate
 from sales.models.inbox import InboxEmail
+from sales.models.no_quote import NoQuoteCAGE
 
 __all__ = [
     'ImportBatch',
@@ -39,4 +40,5 @@ __all__ = [
     'DibbsAward',
     'EmailTemplate',
     'InboxEmail',
+    'NoQuoteCAGE',
 ]

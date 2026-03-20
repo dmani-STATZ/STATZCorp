@@ -58,6 +58,7 @@ from .views import (
     supplier_add_fsc,
     supplier_remove_nsn,
     supplier_remove_fsc,
+    supplier_no_quote_add,
     settings_index,
     settings_cages,
     settings_cage_add,
@@ -75,8 +76,11 @@ from .views import (
     settings_salutation_add,
     settings_salutation_delete,
     settings_salutation_toggle,
+    no_quote_list,
+    no_quote_deactivate,
     sync_awards_view,
     entity_lookup,
+    entity_no_quote_add,
 )
 
 app_name = "sales"
@@ -140,6 +144,7 @@ urlpatterns = [
     path("bids/history/", bids_history, name="bids_history"),
     # Suppliers (DIBBS capability management)
     path("suppliers/", supplier_list, name="supplier_list"),
+    path("suppliers/<int:supplier_id>/no-quote/add/", supplier_no_quote_add, name="supplier_no_quote_add"),
     path("suppliers/<int:supplier_id>/", supplier_detail, name="supplier_detail"),
     path("suppliers/<int:supplier_id>/nsn/add/", supplier_add_nsn, name="supplier_add_nsn"),
     path("suppliers/<int:supplier_id>/fsc/add/", supplier_add_fsc, name="supplier_add_fsc"),
@@ -164,8 +169,11 @@ urlpatterns = [
     path("settings/salutations/add/", settings_salutation_add, name="settings_salutation_add"),
     path("settings/salutations/<int:pk>/delete/", settings_salutation_delete, name="settings_salutation_delete"),
     path("settings/salutations/<int:pk>/toggle/", settings_salutation_toggle, name="settings_salutation_toggle"),
+    path("settings/no-quote/", no_quote_list, name="no_quote_list"),
+    path("settings/no-quote/<int:pk>/deactivate/", no_quote_deactivate, name="no_quote_deactivate"),
     # SAM.gov awards sync
     path("awards/sync/", sync_awards_view, name="sync_awards"),
-    # SAM.gov entity lookup (read-only, no DB writes)
+    # SAM.gov entity lookup + No Quote add (POST)
+    path("entity/cage/<str:cage_code>/no-quote/add/", entity_no_quote_add, name="entity_no_quote_add"),
     path("entity/cage/<str:cage_code>/", entity_lookup, name="entity_cage_lookup"),
 ]

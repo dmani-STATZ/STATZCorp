@@ -39,6 +39,7 @@ from sales.services.email import (
     build_grouped_rfq_email,
 )
 from sales.services.imap_fetch import fetch_inbox_emails, _apply_match
+from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
 from sales.services.suppliers import create_supplier_from_sam, get_or_create_stub_supplier
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ def rfq_pending(request):
     for m in pending_matches:
         m.rfq_sent = False
         m.rfq_status_display = ""
+        m.supplier_cage_key = normalize_cage_code(m.supplier.cage_code)
         sol = m.line.solicitation
         key = (sol.id, m.line.id)
         if key not in groups:
@@ -85,6 +87,7 @@ def rfq_pending(request):
     return render(request, "sales/rfq/pending.html", {
         "pending_groups": pending_groups,
         "total_pending": total_pending,
+        "no_quote_cages": get_no_quote_cage_set(),
     })
 
 
@@ -98,6 +101,12 @@ def rfq_send_batch(request, sol_number):
     solicitation = get_object_or_404(Solicitation, solicitation_number=sol_number)
     send_all = request.POST.get("send_all") == "1" or "send_all" in request.POST.getlist("send_all")
     supplier_ids = request.POST.getlist("supplier_ids[]") or request.POST.getlist("supplier_ids")
+    # Bulk send (Send All / Send Selected) skips CAGEs on the No Quote list — override is only for per-row queue/send on solicitation detail.
+    no_quote_cages = get_no_quote_cage_set()
+
+    def _not_no_quote_match(m):
+        cc = normalize_cage_code(m.supplier.cage_code)
+        return not cc or cc not in no_quote_cages
 
     if send_all:
         matches = (
@@ -108,7 +117,10 @@ def rfq_send_batch(request, sol_number):
         existing = set(
             SupplierRFQ.objects.filter(line__solicitation=solicitation).values_list("supplier_id", "line_id")
         )
-        matches = [m for m in matches if (m.supplier_id, m.line_id) not in existing]
+        matches = [
+            m for m in matches
+            if (m.supplier_id, m.line_id) not in existing and _not_no_quote_match(m)
+        ]
     else:
         if not supplier_ids:
             messages.warning(request, "No suppliers selected.")
@@ -126,7 +138,10 @@ def rfq_send_batch(request, sol_number):
                 supplier_id__in=sid_set,
             ).values_list("supplier_id", "line_id")
         )
-        matches = [m for m in matches if (m.supplier_id, m.line_id) not in existing]
+        matches = [
+            m for m in matches
+            if (m.supplier_id, m.line_id) not in existing and _not_no_quote_match(m)
+        ]
 
     sent = 0
     failed = 0
@@ -1111,6 +1126,10 @@ def rfq_queue_add(request):
         return JsonResponse({"status": "error", "error": "solicitation has no lines"}, status=400)
 
     supplier = get_object_or_404(Supplier, pk=sid)
+    cage_norm = normalize_cage_code(supplier.cage_code)
+    force_nq = request.POST.get("force_no_quote") == "1"
+    if cage_norm and cage_norm in get_no_quote_cage_set() and not force_nq:
+        return JsonResponse({"status": "no_quote", "cage": cage_norm})
 
     if SupplierRFQ.objects.filter(line=line, supplier=supplier, status="QUEUED").exists():
         return JsonResponse({"status": "already_queued"})
@@ -1156,6 +1175,17 @@ def supplier_create_and_queue(request):
             {
                 "success": False,
                 "error": "CAGE code, company name, and solicitation number are required.",
+            }
+        )
+
+    cage_norm = normalize_cage_code(cage_code)
+    force_nq = request.POST.get("force_no_quote") == "1"
+    if cage_norm and cage_norm in get_no_quote_cage_set() and not force_nq:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "no_quote",
+                "message": f"CAGE {cage_norm} is on the No Quote list.",
             }
         )
 
@@ -1378,19 +1408,34 @@ def rfq_queue_send(request):
     except (ValueError, TypeError):
         supplier_ids = []
 
+    no_quote_cages = get_no_quote_cage_set()
+
     if send_all:
-        supplier_ids = list(
+        # Send All skips suppliers whose CAGE is on the No Quote list (same rule as rfq_send_batch).
+        sid_list = list(
             SupplierRFQ.objects.filter(status="QUEUED")
             .values_list("supplier_id", flat=True)
             .distinct()
         )
+        cage_by_sid = dict(
+            Supplier.objects.filter(pk__in=sid_list).values_list("id", "cage_code")
+        )
+        supplier_ids = [
+            sid for sid in sid_list
+            if normalize_cage_code(cage_by_sid.get(sid)) not in no_quote_cages
+        ]
     elif not supplier_ids:
         return JsonResponse({"sent_to": [], "failed": []})
+    else:
+        cage_by_sid = dict(
+            Supplier.objects.filter(pk__in=supplier_ids).values_list("id", "cage_code")
+        )
+        supplier_ids = [
+            sid for sid in supplier_ids
+            if normalize_cage_code(cage_by_sid.get(sid)) not in no_quote_cages
+        ]
 
-    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
-    from_email = getattr(cage, "smtp_reply_to", None) if cage else None
-    if not from_email:
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
 
     sent_to = []
     failed = []
@@ -1417,12 +1462,13 @@ def rfq_queue_send(request):
             continue
 
         try:
+            reply_to_addr = payload.get("reply_to") or from_email
             msg = EmailMessage(
                 subject=payload["subject"],
                 body=payload["body"],
                 from_email=from_email,
                 to=[send_email],
-                reply_to=[payload["reply_to"]] if payload.get("reply_to") else None,
+                reply_to=[reply_to_addr],
             )
             for att in payload.get("attachments") or []:
                 msg.attach(att["filename"], att["content"], att.get("mimetype", "application/pdf"))
@@ -1481,7 +1527,12 @@ def rfq_inbox_refresh(request):
 def rfq_inbox_list(request):
     """GET: return the inbox email list HTML fragment."""
     cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
-    imap_configured = bool(cage and cage.imap_host and cage.imap_user and cage.imap_password)
+    imap_configured = bool(
+        cage
+        and getattr(cage, "imap_host", None)
+        and getattr(cage, "imap_user", None)
+        and getattr(cage, "imap_password", None)
+    )
     emails = InboxEmail.objects.select_related("rfq__supplier", "rfq__line__solicitation").order_by("-received_at")[:100]
     unread_count = InboxEmail.objects.filter(is_read=False).count()
     return render(request, "sales/rfq/partials/inbox_list.html", {

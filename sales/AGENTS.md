@@ -10,7 +10,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and SAM.gov award tracking.
 
-**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`.
+**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `NoQuoteCAGE`.
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
@@ -24,7 +24,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ### Before changing models
 - Read the relevant `sales/models/*.py` file.
-- Check `sales/migrations/` (currently 0001–0010) for the highest migration and existing constraints.
+- Check `sales/migrations/` for the highest migration and existing constraints (includes `NoQuoteCAGE` / `0018_no_quote_cage` or later).
 - Search templates under `sales/templates/sales/` for field references — many field names appear in templates directly.
 - Check `sales/services/bq_export.py` for `COMPANY_FILLED_COLUMNS` — it maps 1-based BQ column indices to exact model field names on `GovernmentBid` and `CompanyCAGE`.
 - Check `sales/services/importer.py` for chunking constants (`SOLICITATION_CHUNK=200`, `LINE_CHUNK=230`, `AS_CHUNK=400`) and any field references in upsert logic.
@@ -43,7 +43,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - `sales/services/importer.py` — step results stored in `ImportJob.step_results` as JSON must include `batch_id` and `import_date`; the progress template reads those keys by name.
 
 ### Before changing templates
-- `sales/templates/sales/rfq/partials/mailto_buttons.html` — referenced from both the solicitation detail matches tab and the RFQ pending view. Changes affect two screens.
+- `sales/templates/sales/rfq/partials/mailto_buttons.html` — referenced from the RFQ pending view (solicitation detail Matches tab uses queue buttons + No Quote modals, not this partial).
 - `sales/templates/sales/import/progress.html` — reads `step_results` JSON keys by name; must stay in sync with `_save_step` in `sales/views/imports.py`.
 - `sales/templates/sales/bids/builder.html` — contains inline form field names tied to `GovernmentBid` fields; mismatch causes silent wrong saves.
 - Check `sales/base.html` nav links before renaming any URL name.
@@ -98,6 +98,9 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 ### Changing `SupplierNSN` or `SupplierFSC` fields
 → `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html`
 
+### Flagging or restoring a No Quote CAGE
+→ `sales/models/no_quote.py` + migration + `sales/services/no_quote.py` + `sales/views/suppliers.py` + `sales/views/entity_lookup.py` + `sales/views/settings.py` + `sales/views/solicitations.py` + `sales/views/rfq.py` (batch send, queue add/send, `supplier_create_and_queue`) + `sales/templates/sales/suppliers/detail.html` + `sales/entity_lookup.html` + `sales/templates/sales/solicitations/detail.html` + `sales/templates/sales/rfq/pending.html` + `sales/base.html` / `sales/settings/cages.html` nav
+
 ---
 
 ## 6. Cross-App Dependency Warnings
@@ -121,7 +124,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 ## 7. Security / Permissions Rules
 
 - **Every view must retain `@login_required`**. This app handles sensitive procurement data (solicitation numbers, supplier pricing, bid data). Do not remove or weaken auth decorators.
-- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `sync_awards_view` checks `request.user.is_staff`. Do not remove these checks or widen access.
+- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `sync_awards_view` checks `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
 - **SAM debug JSON** in `sales/templates/sales/entity_lookup.html` is conditionally shown only to staff (`{% if request.user.is_staff %}`). Do not remove this guard.
 - **Import batch delete** (`import_batch_delete`) only deletes solicitations with `status='New'`. This guard prevents accidental deletion of in-progress work. Do not relax this filter.
 - **File uploads** (IN/BQ/AS files) are saved to temp directories and removed during the match step. Do not change temp file handling without verifying cleanup still occurs.
@@ -137,8 +140,10 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **Before renaming `Solicitation.status` choices**, search all views and templates for hardcoded status strings (`'New'`, `'RFQ_SENT'`, `'BID_SUBMITTED'`, etc.). These appear as raw string comparisons in views and template conditionals.
 - **`CompanyCAGE.is_default` invariant:** exactly one active default cage must exist at all times. The `settings_cage_add` and `settings_cage_edit` views enforce this by resetting all other cages to `is_default=False` when a new default is set. Any direct ORM manipulation must maintain this invariant.
 - **`EmailTemplate.is_default` invariant:** same one-default constraint enforced in `email_template_set_default`. `sales/services/email.py` calls `EmailTemplate.objects.filter(is_default=True).first()` and fails gracefully if none found, but RFQ emails will have no template content.
+- **SMTP credentials** are stored in environment variables (`EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`), not on `CompanyCAGE`. Do not add SMTP credential fields to the model. The `smtp_reply_to` field on `CompanyCAGE` holds only the Reply-To address, not auth credentials.
+- **`from_email` on outbound mail must equal `EMAIL_HOST_USER`** exactly (via `DEFAULT_FROM_EMAIL`, which is set from that env var). Microsoft 365 rejects sends where the authenticated account and the From address differ.
 - **Cross-app FKs:** `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, and `GovernmentBid` all have FKs to `suppliers.Supplier`. Changing `on_delete` behavior requires understanding impact on those cascades.
-- **Migrations:** Current highest is `0010`. Always run `makemigrations sales` after any model change and review the generated file before applying.
+- **Migrations:** Run `makemigrations sales` after any model change and review the generated file before applying (schema includes `NoQuoteCAGE` from `0018_no_quote_cage` or later).
 
 ---
 
@@ -147,7 +152,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **URL names must not be renamed casually.** Templates reference them with `{% url 'sales:<name>' %}`. Before renaming, `grep -r "sales:<name>" sales/templates/` and check `sales/base.html` nav links.
 - **Duplicate URL patterns exist by design:** `bids/` and `bids/ready/` both route to `bids_ready`; `rfq/` and `rfq/pending/` both route to `rfq_pending`. Do not clean these up without checking if both are in use from nav links or other templates.
 - **`rfq/partials/center_panel.html`** is returned as an HTML fragment by `rfq_center_detail`. It must remain a partial (no `{% extends %}`) and its context keys must match what the view passes.
-- **`rfq/partials/mailto_buttons.html`** is included from both `solicitations/detail.html` (matches tab) and `rfq/pending.html`. Changes affect both screens.
+- **`rfq/partials/mailto_buttons.html`** is included from `rfq/pending.html` (solicitation detail Matches tab uses queue UI, not this partial).
 - **Import progress page** (`import/progress.html`) reads `step_results` JSON keys by name. The keys `batch_id`, `import_date`, `solicitations_created`, `solicitations_updated`, `lines_created`, `lines_updated`, `matches_created` must be written by the corresponding view step functions.
 - **`global_search` view** returns JSON when `?fmt=json` is present, plain HTML otherwise. The top-bar search in `sales/base.html` calls it with `fmt=json`. Do not remove the format check.
 - **Solicitation list ↔ detail navigation:** The list encodes active filters (except `page`) into `?list_qs=` on each row’s detail link. `solicitation_detail` parses `list_qs` and uses `_build_list_queryset()` to compute `prev_sol` / `next_sol`. Any drift between list view filtering and `_build_list_queryset` breaks prev/next; `queued_rfq_count` for banners uses `SupplierRFQ` filtered by `line__solicitation` and `status='QUEUED'` (not a `Solicitation` reverse relation).
@@ -218,7 +223,7 @@ After any change, manually verify these flows:
 
 4. **`QuoteEntryForm` not in `forms.py`.** It is defined inline in `sales/views/rfq.py`. Searching `forms.py` for quote validation will find nothing.
 
-5. **`rfq/partials/mailto_buttons.html` is included in two places.** Changes to this partial affect the solicitation detail matches tab AND the RFQ pending screen. Testing only one will miss regressions on the other.
+5. **`rfq/partials/mailto_buttons.html` is used on RFQ pending.** The solicitation detail Matches tab does not include it; queue + No Quote UI lives inline in `solicitations/detail.html`.
 
 6. **`step_results` JSON keys are implicit contracts.** The import progress template reads specific keys from `ImportJob.step_results` by name. If a step function stops writing a key (e.g., renames `solicitations_created` to `created_count`), the progress page will silently show blank or "undefined" without any Python error.
 
@@ -231,6 +236,8 @@ After any change, manually verify these flows:
 10. **`bq_raw_columns` null causes `BQExportError`.** If a `SolicitationLine.bq_raw_columns` is `None` or empty (e.g., from a hand-created line or a migration gap), export will raise `BQExportError` with no easy recovery path.
 
 11. **`_build_list_queryset` vs `solicitation_list` drift.** If list filters or ordering change in one place but not the other, users see wrong Prev/Next order or missing neighbors. Treat `_list_qs_before_tab`, `_apply_list_tab_filter`, and `_apply_list_sort` as part of the same contract as the list template’s `filter_snapshot`.
+
+12. **`get_no_quote_cage_set()` is fetched once per page load.** The set is built at render time for solicitation detail and RFQ pending, not per row. If a CAGE is flagged in another tab, an already-open detail page will not show the badge until refresh — expected.
 
 ---
 
