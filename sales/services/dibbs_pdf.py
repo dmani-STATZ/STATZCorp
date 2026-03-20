@@ -10,6 +10,14 @@ Example:
     sol_number = "SPE7M126T6381"
     last_char  = "1"
     url        = "https://dibbs2.bsm.dla.mil/Downloads/RFQ/1/SPE7M126T6381.PDF"
+
+Note on ERR_ABORTED:
+    DIBBS serves PDFs with Content-Disposition: attachment, which causes Chromium
+    to abort the page navigation and trigger a download event instead. page.goto()
+    will raise ERR_ABORTED in this case. The correct pattern is to use
+    page.expect_download() to capture the download object, then read bytes from
+    the temp file path that Playwright writes. The ERR_ABORTED from goto() is
+    swallowed — the expect_download context manager is what matters.
 """
 
 import logging
@@ -32,7 +40,9 @@ def _pdf_url(sol_number: str) -> str:
 def _establish_dibbs2_session(page) -> None:
     """Open dibbs2 warning page and click OK once to set consent cookie."""
     logger.info("Establishing dibbs2 session via %s", DIBBS2_WARNING_URL)
-    page.goto(DIBBS2_WARNING_URL, wait_until="domcontentloaded", timeout=REQUEST_TIMEOUT_MS)
+    page.goto(
+        DIBBS2_WARNING_URL, wait_until="domcontentloaded", timeout=REQUEST_TIMEOUT_MS
+    )
     btn = page.locator("input[type='submit']").first
     if btn.count() == 0:
         raise RuntimeError(
@@ -45,6 +55,42 @@ def _establish_dibbs2_session(page) -> None:
     except Exception:
         pass
     logger.info("dibbs2 session established")
+
+
+def _read_pdf_download(page, url: str, sol_number: str) -> Optional[bytes]:
+    """
+    Navigate to a DIBBS PDF URL and capture the resulting file download.
+
+    DIBBS serves PDFs as Content-Disposition: attachment, which causes Chromium
+    to abort the navigation and fire a download event. page.goto() raises
+    ERR_ABORTED in this case — that exception is intentionally swallowed.
+    The expect_download() context manager captures the download regardless.
+
+    Returns raw PDF bytes, or None if the download produced an empty file.
+    """
+    with page.expect_download(timeout=REQUEST_TIMEOUT_MS) as download_info:
+        try:
+            page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
+        except Exception:
+            # ERR_ABORTED is expected when the response is a file download.
+            # The download event is still fired and captured by expect_download.
+            pass
+
+    download = download_info.value
+    path = download.path()  # Blocks until download completes; returns pathlib.Path
+    if path is None:
+        logger.warning(
+            "Download path is None for %s — download may have failed", sol_number
+        )
+        return None
+
+    body = path.read_bytes()
+    if not body:
+        logger.warning("Empty PDF download for %s", sol_number)
+        return None
+
+    logger.info("Fetched PDF for %s (%d bytes)", sol_number, len(body))
+    return body
 
 
 def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
@@ -67,6 +113,7 @@ def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
                 args=["--no-sandbox", "--disable-dev-shm-usage"],
             )
             context = browser.new_context(accept_downloads=True)
+
             session_page = context.new_page()
             try:
                 _establish_dibbs2_session(session_page)
@@ -78,32 +125,19 @@ def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
 
             page = context.new_page()
             try:
-                resp = page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
-                try:
-                    btn = page.locator("input[type='submit']").first
-                    if btn.count() > 0:
-                        logger.info("Consent interstitial for PDF %s — clicking OK", sol_number)
-                        btn.click()
-                        page.wait_for_load_state("domcontentloaded", timeout=10_000)
-                        resp = page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
-                except Exception:
-                    pass
-
-                if resp and resp.ok:
-                    body = resp.body()
-                    if body and len(body) > 0:
-                        logger.info("Fetched PDF for %s (%d bytes)", sol_number, len(body))
-                        return body
-                logger.warning("No PDF body for %s (status=%s)", sol_number, getattr(resp, "status", None))
+                return _read_pdf_download(page, url, sol_number)
+            except Exception as e:
+                logger.exception("fetch_pdf_for_sol(%s) failed: %s", sol_number, e)
                 return None
             finally:
                 try:
                     page.close()
                 except Exception:
                     pass
+
             browser.close()
     except Exception as e:
-        logger.exception("fetch_pdf_for_sol(%s) failed: %s", sol_number, e)
+        logger.exception("fetch_pdf_for_sol(%s) outer failure: %s", sol_number, e)
         return None
 
 
@@ -131,6 +165,7 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
                 args=["--no-sandbox", "--disable-dev-shm-usage"],
             )
             context = browser.new_context(accept_downloads=True)
+
             session_page = context.new_page()
             try:
                 _establish_dibbs2_session(session_page)
@@ -144,28 +179,12 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
                 url = _pdf_url(sol_number)
                 page = context.new_page()
                 try:
-                    resp = page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
-                    try:
-                        btn = page.locator("input[type='submit']").first
-                        if btn.count() > 0:
-                            logger.info("Consent interstitial for PDF %s — clicking OK", sol_number)
-                            btn.click()
-                            page.wait_for_load_state("domcontentloaded", timeout=10_000)
-                            resp = page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
-                    except Exception:
-                        pass
-
-                    if resp and resp.ok:
-                        body = resp.body()
-                        if body and len(body) > 0:
-                            result[sol_number] = body
-                            logger.info("Fetched PDF for %s (%d bytes)", sol_number, len(body))
-                        else:
-                            logger.warning("Empty PDF body for %s", sol_number)
-                    else:
-                        logger.warning("Failed to fetch PDF for %s (status=%s)", sol_number, getattr(resp, "status", None))
+                    body = _read_pdf_download(page, url, sol_number)
+                    result[sol_number] = body
                 except Exception as e:
-                    logger.exception("fetch_pdfs_for_sols: %s failed: %s", sol_number, e)
+                    logger.exception(
+                        "fetch_pdfs_for_sols: %s failed: %s", sol_number, e
+                    )
                 finally:
                     try:
                         page.close()
@@ -174,6 +193,6 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
 
             browser.close()
     except Exception as e:
-        logger.exception("fetch_pdfs_for_sols failed: %s", e)
+        logger.exception("fetch_pdfs_for_sols outer failure: %s", e)
 
     return result
