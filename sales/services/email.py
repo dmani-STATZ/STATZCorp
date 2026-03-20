@@ -7,9 +7,43 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 from django.utils import timezone
 
-from sales.models import SupplierRFQ, SupplierContactLog, ApprovedSource, CompanyCAGE
+from sales.models import (
+    SupplierRFQ,
+    SupplierContactLog,
+    ApprovedSource,
+    CompanyCAGE,
+    EmailTemplate,
+    RFQGreeting,
+    RFQSalutation,
+)
+from sales.models.email_templates import _SafeDict
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_supplier_email_for_send(supplier):
+    """
+    Resolve supplier email for RFQ send (grouped queue).
+    Priority: rfq_email -> business_email -> primary_email -> first active contact email.
+    """
+    if getattr(supplier, "rfq_email", None):
+        email = (supplier.rfq_email or "").strip()
+        if email:
+            return email
+    if getattr(supplier, "business_email", None):
+        email = (supplier.business_email or "").strip()
+        if email:
+            return email
+    if getattr(supplier, "primary_email", None):
+        email = (supplier.primary_email or "").strip()
+        if email:
+            return email
+    contacts = getattr(supplier, "contacts", None)
+    if contacts is not None:
+        first = contacts.filter(email__isnull=False).exclude(email="").first()
+        if first and (first.email or "").strip():
+            return first.email.strip()
+    return None
 
 
 def resolve_supplier_email(supplier):
@@ -248,4 +282,125 @@ def send_followup_email(rfq, sent_by):
         logged_by=sent_by,
     )
     return True
+
+
+def build_grouped_rfq_email(supplier, rfqs, sent_by):
+    """
+    Build a grouped RFQ email for one supplier covering multiple solicitations.
+    Returns: {
+        'subject': str,
+        'body': str,
+        'reply_to': str,
+        'attachments': [{'filename': str, 'content': bytes, 'mimetype': str}]
+    }
+    """
+    import random
+
+    cage = _default_cage()
+    reply_to = (
+        getattr(cage, "smtp_reply_to", None) if cage else None
+        or getattr(settings, "DEFAULT_FROM_EMAIL", None)
+        or "noreply@localhost"
+    )
+
+    blocks = []
+    for rfq in rfqs:
+        line = rfq.line
+        sol = line.solicitation
+        nsn = (line.nsn or "").strip()
+        nomenclature = (line.nomenclature or "").strip()
+        qty = line.quantity or 0
+        unit = (line.unit_of_issue or "").strip()
+        return_date = (
+            sol.return_by_date.strftime("%b %d, %Y") if sol.return_by_date else "—"
+        )
+        blocks.append(
+            f"Sol #: {sol.solicitation_number}\n"
+            f"NSN: {nsn}    NOMENCLATURE: {nomenclature}\n"
+            f"QTY: {qty} {unit}\n"
+            f"Return By: {return_date}"
+        )
+    sol_blocks = "\n---\n".join(blocks)
+
+    contact_name = supplier.name or "Vendor"
+    contacts = getattr(supplier, "contacts", None)
+    if contacts is not None:
+        first_contact = contacts.first()
+        if first_contact and (first_contact.name or "").strip():
+            contact_name = first_contact.name.strip()
+
+    your_name = (getattr(sent_by, "get_full_name", None) and sent_by.get_full_name()) or getattr(sent_by, "username", "") or "Sales"
+    your_email = getattr(sent_by, "email", "") or ""
+
+    base_ctx = _SafeDict({
+        "supplier_name": (supplier.name or "").strip(),
+        "contact_name": contact_name,
+        "your_name": your_name,
+        "your_email": your_email,
+        "sol_blocks": sol_blocks,
+    })
+
+    active_greetings = list(RFQGreeting.objects.filter(is_active=True))
+    active_salutations = list(RFQSalutation.objects.filter(is_active=True))
+    greeting_text = (
+        random.choice(active_greetings).text if active_greetings else ""
+    )
+    salutation_text = (
+        random.choice(active_salutations).text if active_salutations else ""
+    )
+    try:
+        greeting = greeting_text.format_map(base_ctx) if greeting_text else ""
+    except Exception:
+        greeting = greeting_text
+    try:
+        salutation = salutation_text.format_map(base_ctx) if salutation_text else ""
+    except Exception:
+        salutation = salutation_text
+
+    context = _SafeDict({
+        "supplier_name": base_ctx["supplier_name"],
+        "contact_name": base_ctx["contact_name"],
+        "your_name": your_name,
+        "your_email": your_email,
+        "sol_blocks": sol_blocks,
+        "greeting": greeting,
+        "salutation": salutation,
+    })
+
+    template = (
+        EmailTemplate.objects.filter(is_default=True).first()
+        or EmailTemplate.objects.first()
+    )
+    if template:
+        body = template.render_body(dict(context))
+    else:
+        body = (
+            f"{context['supplier_name']},\n\n"
+            f"{greeting}\n\n{sol_blocks}\n\n{salutation}"
+        )
+
+    if len(rfqs) == 1:
+        line = rfqs[0].line
+        sol = line.solicitation
+        nomenclature = (line.nomenclature or "").strip() or "RFQ"
+        subject = f"RFQ — {sol.solicitation_number} — {nomenclature} — STATZ Corporation"
+    else:
+        subject = f"RFQ — {len(rfqs)} Solicitations — STATZ Corporation"
+
+    attachments = []
+    for rfq in rfqs:
+        sol = rfq.line.solicitation
+        if getattr(sol, "pdf_blob", None) and sol.pdf_blob:
+            attachments.append({
+                "filename": f"{sol.solicitation_number}.PDF",
+                "content": bytes(sol.pdf_blob),
+                "mimetype": "application/pdf",
+            })
+
+    return {
+        "subject": subject,
+        "body": body,
+        "reply_to": reply_to,
+        "attachments": attachments,
+    }
 

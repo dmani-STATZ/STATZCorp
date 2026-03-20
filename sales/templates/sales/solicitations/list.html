@@ -11,27 +11,25 @@
     </span>
 </div>
 
-{# ── Bucket tab strip ────────────────────────────────────────────────────── #}
-<div style="display:flex; gap:0; border-bottom:2px solid #eef2f8; margin-bottom:20px;">
-    <a href="{% url 'sales:solicitation_list' %}"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if not bucket_filter %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
-        All Active
+{# ── Filter tab strip (Matches / Set-Asides / Unrestricted) ───────────────── #}
+<div class="tab-strip" style="display:flex; gap:0; border-bottom:2px solid #eef2f8; margin-bottom:20px;">
+    <a href="?tab=matches{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
+       class="bucket-tab {% if active_tab == 'matches' %}active{% endif %}"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'matches' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+        Matches
+        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.matches|default:0 }}</span>
     </a>
-    <a href="?bucket=SDVOSB"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'SDVOSB' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
-        SDVOSB <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.SDVOSB|default:0 }}</span>
+    <a href="?tab=set_asides{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
+       class="bucket-tab {% if active_tab == 'set_asides' %}active{% endif %}"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'set_asides' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+        Set-Asides
+        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.set_asides|default:0 }}</span>
     </a>
-    <a href="?bucket=HUBZONE"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'HUBZONE' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
-        HUBZone <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.HUBZONE|default:0 }}</span>
-    </a>
-    <a href="?bucket=GROWTH"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'GROWTH' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
-        Growth <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.GROWTH|default:0 }}</span>
-    </a>
-    <a href="?bucket=SKIP"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:#374151; {% if bucket_filter == 'SKIP' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3);{% endif %}">
-        Skip <span style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ bucket_counts.SKIP|default:0 }}</span>
+    <a href="?tab=unrestricted{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
+       class="bucket-tab {% if active_tab == 'unrestricted' %}active{% endif %}"
+       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'unrestricted' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+        Unrestricted
+        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.unrestricted|default:0 }}</span>
     </a>
 </div>
 
@@ -41,7 +39,7 @@
              background:var(--surface-secondary, #f9fafb);
              border:1px solid var(--border-color, #e5e7eb);
              border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
-    {% if bucket_filter %}<input type="hidden" name="bucket" value="{{ bucket_filter }}">{% endif %}
+    <input type="hidden" name="tab" value="{{ active_tab }}">
     <div style="display:flex; flex-direction:column; gap:0.25rem;">
         <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Set-Aside</label>
         <select name="set_aside"
@@ -155,15 +153,30 @@
                     <input type="checkbox" id="select-all" title="Select all on this page"
                            style="cursor:pointer; width:14px; height:14px;">
                 </th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Sol #</th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">NSN</th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Nomenclature</th>
-                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Qty</th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Set-Aside</th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Bucket</th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Return By</th>
-                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Status</th>
-                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">Matches</th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.solicitation_number }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; cursor:pointer;">Sol #{% if sort_param == 'solicitation_number' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-solicitation_number' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.nsn }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; cursor:pointer;">NSN{% if sort_param == 'nsn' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-nsn' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.nomenclature }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; cursor:pointer;">Nomenclature{% if sort_param == 'nomenclature' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-nomenclature' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.quantity }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; justify-content:center; cursor:pointer;">Qty{% if sort_param == 'quantity' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-quantity' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.set_aside }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; cursor:pointer;">Set-Aside{% if sort_param == 'set_aside' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-set_aside' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.return_by_date }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; cursor:pointer;">Return By{% if sort_param == 'return_by_date' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-return_by_date' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.status }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; cursor:pointer;">Status{% if sort_param == 'status' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-status' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:var(--text-muted,#6b7280); text-transform:uppercase; letter-spacing:0.04em;">
+                    <a href="?sort={{ sort_links.match_count }}{% if filter_querystring_no_sort %}&{{ filter_querystring_no_sort }}{% endif %}" style="color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:2px; justify-content:center; cursor:pointer;">Matches{% if sort_param == 'match_count' %}<span aria-hidden="true">↑</span>{% elif sort_param == '-match_count' %}<span aria-hidden="true">↓</span>{% endif %}</a>
+                </th>
             </tr>
         </thead>
         <tbody>
@@ -224,10 +237,6 @@
                     {% endif %}
                 </td>
 
-                <td style="padding:0.625rem 1rem;">
-                    <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#eef2f8; color:#374151;">{{ sol.get_bucket_display|default:sol.bucket }}</span>
-                </td>
-
                 <td style="padding:0.625rem 1rem; white-space:nowrap; font-size:0.8125rem;
                            {% if sol.is_overdue %}color:#dc2626;{% endif %}">
                     {{ sol.return_by_date|date:"M j, Y"|default:"—" }}
@@ -247,10 +256,10 @@
                 </td>
 
                 <td style="padding:0.625rem 1rem; text-align:center;">
-                    {% if sol.total_match_count > 0 %}
+                    {% if sol.match_count > 0 %}
                     <span style="display:inline-block; padding:0.125rem 0.625rem; border-radius:10px; font-size:0.75rem; font-weight:600;
                                  background:rgba(0,78,179,0.1); color:var(--company-primary,#004eb3);">
-                        {{ sol.total_match_count }}
+                        {{ sol.match_count }}
                     </span>
                     {% else %}
                     <span style="color:var(--text-muted,#d1d5db); font-size:0.875rem;">—</span>
@@ -260,7 +269,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="10" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
+                <td colspan="9" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
                     No solicitations found.
                     {% if current_filters.set_aside or current_filters.status or current_filters.q %}
                     <br><a href="{% url 'sales:solicitation_list' %}" style="color:var(--company-primary,#004eb3); text-decoration:none; font-size:0.875rem;">Clear filters</a>

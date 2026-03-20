@@ -7,6 +7,11 @@
         <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0.25rem 0 0;">
             CAGE codes used when building and exporting BQ bids.
         </p>
+        <p style="font-size:0.8125rem; margin:0.5rem 0 0;">
+            <a href="{% url 'sales:settings_greetings' %}" style="color:var(--company-primary,#004eb3); text-decoration:none;">RFQ Greetings</a>
+            &middot;
+            <a href="{% url 'sales:settings_salutations' %}" style="color:var(--company-primary,#004eb3); text-decoration:none;">RFQ Salutations</a>
+        </p>
     </div>
     <a href="{% url 'sales:settings_cage_add' %}"
        style="padding:0.5rem 1.125rem; background:var(--company-primary,#004eb3); color:#fff;

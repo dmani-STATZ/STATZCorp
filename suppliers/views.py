@@ -9,9 +9,13 @@ from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.generic import TemplateView, DetailView, View, ListView
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.shortcuts import get_object_or_404
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 from urllib.parse import urlparse
 
 from contracts.models import Contract, Clin, Address
@@ -536,6 +540,10 @@ class SupplierDetailView(DetailView):
             'conditional': supplier.conditional,
             'archived': supplier.archived,
         }
+        context['has_rfq_email_options'] = bool(
+            (supplier.business_email or supplier.primary_email)
+            or any(c.email for c in context['contacts'])
+        )
 
         clin_contract_ids = Clin.objects.filter(
             supplier=supplier,
@@ -800,6 +808,24 @@ def supplier_search_api(request):
         for s in qs
     ]
     return JsonResponse({'results': results})
+
+
+@login_required
+@require_POST
+def supplier_set_rfq_email(request, supplier_id):
+    supplier = get_object_or_404(Supplier, pk=supplier_id)
+    email = request.POST.get("rfq_email", "").strip()
+    if email:
+        supplier.rfq_email = email
+        supplier.save(update_fields=["rfq_email"])
+        messages.success(request, f"RFQ email updated to {email}")
+    else:
+        supplier.rfq_email = None
+        supplier.save(update_fields=["rfq_email"])
+        messages.warning(request, "RFQ email cleared.")
+    return redirect(
+        request.POST.get("next") or reverse("suppliers:supplier_detail", args=[supplier_id])
+    )
 
 
 class SuppliersInfoByType(LoginRequiredMixin, ListView):

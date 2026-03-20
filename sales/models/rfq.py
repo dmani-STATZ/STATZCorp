@@ -9,6 +9,7 @@ from django.db import models
 class SupplierRFQ(models.Model):
     """RFQ sent to a supplier for a solicitation line."""
     STATUS_CHOICES = [
+        ('QUEUED', 'Queued'),
         ('PENDING', 'Pending'),
         ('SENT', 'Sent'),
         ('RESPONDED', 'Responded'),

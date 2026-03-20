@@ -9,7 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 
-from sales.models import CompanyCAGE, EmailTemplate
+from sales.models import CompanyCAGE, EmailTemplate, RFQGreeting, RFQSalutation
 from sales.models.email_templates import _SafeDict
 
 
@@ -253,3 +253,97 @@ def email_template_preview(request):
         return JsonResponse({"error": str(e)}, status=400)
 
     return JsonResponse({"subject": subject_rendered, "body": body_rendered})
+
+
+# ---------- RFQ Greetings ----------
+
+
+@login_required
+def settings_greetings(request):
+    """List all RFQGreeting records."""
+    greetings = RFQGreeting.objects.all()
+    return render(
+        request,
+        "sales/settings/greetings.html",
+        {"greetings": greetings, "active_nav": "settings"},
+    )
+
+
+@login_required
+def settings_greeting_add(request):
+    """GET: redirect to list. POST: create RFQGreeting, redirect to list."""
+    if request.method == "POST":
+        text = request.POST.get("text", "").strip()
+        if text:
+            RFQGreeting.objects.create(text=text)
+            messages.success(request, "Greeting added.")
+            return redirect("sales:settings_greetings")
+    return redirect("sales:settings_greetings")
+
+
+@login_required
+@require_POST
+def settings_greeting_delete(request, pk):
+    """POST only. Delete RFQGreeting."""
+    greeting = get_object_or_404(RFQGreeting, pk=pk)
+    greeting.delete()
+    messages.success(request, "Greeting deleted.")
+    return redirect("sales:settings_greetings")
+
+
+@login_required
+@require_POST
+def settings_greeting_toggle(request, pk):
+    """POST only. Toggle is_active on RFQGreeting."""
+    greeting = get_object_or_404(RFQGreeting, pk=pk)
+    greeting.is_active = not greeting.is_active
+    greeting.save(update_fields=["is_active"])
+    messages.success(request, "Greeting marked " + ("active" if greeting.is_active else "inactive") + ".")
+    return redirect("sales:settings_greetings")
+
+
+# ---------- RFQ Salutations ----------
+
+
+@login_required
+def settings_salutations(request):
+    """List all RFQSalutation records."""
+    salutations = RFQSalutation.objects.all()
+    return render(
+        request,
+        "sales/settings/salutations.html",
+        {"salutations": salutations, "active_nav": "settings"},
+    )
+
+
+@login_required
+def settings_salutation_add(request):
+    """GET: redirect to list. POST: create RFQSalutation, redirect to list."""
+    if request.method == "POST":
+        text = request.POST.get("text", "").strip()
+        if text:
+            RFQSalutation.objects.create(text=text)
+            messages.success(request, "Salutation added.")
+            return redirect("sales:settings_salutations")
+    return redirect("sales:settings_salutations")
+
+
+@login_required
+@require_POST
+def settings_salutation_delete(request, pk):
+    """POST only. Delete RFQSalutation."""
+    salutation = get_object_or_404(RFQSalutation, pk=pk)
+    salutation.delete()
+    messages.success(request, "Salutation deleted.")
+    return redirect("sales:settings_salutations")
+
+
+@login_required
+@require_POST
+def settings_salutation_toggle(request, pk):
+    """POST only. Toggle is_active on RFQSalutation."""
+    salutation = get_object_or_404(RFQSalutation, pk=pk)
+    salutation.is_active = not salutation.is_active
+    salutation.save(update_fields=["is_active"])
+    messages.success(request, "Salutation marked " + ("active" if salutation.is_active else "inactive") + ".")
+    return redirect("sales:settings_salutations")

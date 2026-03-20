@@ -1,0 +1,167 @@
+{% extends "sales/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
+  .btn-outline-secondary { background: transparent; color: #6b7280; border: 1px solid #d1d5db; }
+  .btn-outline-secondary:hover { background: #f3f4f6; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .queue-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .queue-table th { padding: 0.625rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  .queue-table td { padding: 0.625rem 1rem; border-bottom: 1px solid #eef2f8; }
+  .queue-card { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
+  .queue-card-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  .queue-card-title { font-weight: 600; font-size: 1rem; }
+  .return-past { color: #dc2626; }
+  .return-soon { color: #f59e0b; }
+  .mono { font-family: ui-monospace, monospace; }
+</style>
+
+<div style="margin-bottom: 1rem;">
+  <a href="{% url 'sales:rfq_center' %}" style="font-size: 0.875rem; color: var(--company-primary, #004eb3); text-decoration: none;">← Back to RFQ Center</a>
+</div>
+
+<h1 style="font-size: 1.375rem; font-weight: 600; margin: 0 0 1.25rem;">RFQ Queue</h1>
+
+<div style="display:flex; gap:8px; margin-bottom:20px; align-items:center;">
+  <button id="fetch-pdfs-btn" class="btn btn-outline-secondary">📎 Fetch PDFs for Selected</button>
+  <button id="send-selected-btn" class="btn btn-primary">Send Selected</button>
+  <button id="send-all-btn" class="btn btn-danger">Send All</button>
+  <span id="queue-feedback" style="margin-left:12px;"></span>
+</div>
+
+{% if not grouped_queue %}
+<div style="text-align:center; padding:60px; color:#999;">
+  No RFQs queued.<br>
+  Add solicitations to the queue from the <a href="{% url 'sales:solicitation_list' %}">Matches tab</a>.
+</div>
+{% else %}
+{% for group in grouped_queue %}
+<div class="queue-card">
+  <div class="queue-card-header">
+    <input type="checkbox" class="supplier-checkbox" value="{{ group.supplier.id }}">
+    <span class="queue-card-title">
+      {% if not group.send_email %}<span title="No RFQ email set">⚠</span> {% endif %}{{ group.supplier.name|default:"—" }} (CAGE: {{ group.supplier.cage_code|default:"—" }})
+    </span>
+    <span style="font-size: 0.8125rem; color: #6b7280;">
+      {% if group.send_email %}RFQ Email: {{ group.send_email }}{% else %}⚠ No RFQ email set{% endif %}
+    </span>
+  </div>
+  <table class="queue-table">
+    <thead>
+      <tr>
+        <th>Sol #</th>
+        <th>Nomenclature</th>
+        <th>QTY</th>
+        <th>Return By</th>
+        <th>PDF</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rfq in group.rfqs %}
+      {% with sol=rfq.line.solicitation %}
+      <tr>
+        <td class="mono">{{ sol.solicitation_number }}</td>
+        <td style="max-width:220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ rfq.line.nomenclature|default:'' }}">{{ rfq.line.nomenclature|default:"—"|truncatewords:6 }}</td>
+        <td>{{ rfq.line.quantity|default:"—" }} {{ rfq.line.unit_of_issue|default:"" }}</td>
+        <td>
+          {% if sol.return_by_date %}
+            {% if sol.return_by_date < today %}
+              <span class="return-past">{{ sol.return_by_date|date:"M j, Y" }}</span>
+            {% elif sol.days_remaining != None and sol.days_remaining <= 3 %}
+              <span class="return-soon">{{ sol.return_by_date|date:"M j, Y" }}</span>
+            {% else %}
+              {{ sol.return_by_date|date:"M j, Y" }}
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>{% if sol.pdf_blob %}📎{% else %}⚠{% endif %}</td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endif %}
+
+<script>
+(function() {
+  var csrfToken = '{{ csrf_token }}';
+
+  function getCheckedSupplierIds() {
+    return Array.from(document.querySelectorAll('.supplier-checkbox:checked'))
+                .map(function(cb) { return cb.value; });
+  }
+
+  function setFeedback(msg) {
+    var el = document.getElementById('queue-feedback');
+    if (el) el.textContent = msg;
+  }
+
+  function postAction(url, params) {
+    var parts = [];
+    Object.keys(params).forEach(function(k) {
+      var v = params[k];
+      if (Array.isArray(v)) {
+        v.forEach(function(i) { parts.push(k + '[]=' + encodeURIComponent(i)); });
+      } else {
+        parts.push(k + '=' + encodeURIComponent(v));
+      }
+    });
+    var body = parts.join('&');
+    return fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken},
+      body: body
+    }).then(function(r) { return r.json(); });
+  }
+
+  function handleSendResult(data) {
+    var msg = 'Sent to: ' + (data.sent_to && data.sent_to.length ? data.sent_to.join(', ') : 'none');
+    if (data.failed && data.failed.length) {
+      msg += ' | Failed: ' + data.failed.map(function(f) { return f.supplier + ' (' + f.reason + ')'; }).join(', ');
+    }
+    setFeedback(msg);
+    setTimeout(function() { location.reload(); }, 2500);
+  }
+
+  var fetchPdfsBtn = document.getElementById('fetch-pdfs-btn');
+  if (fetchPdfsBtn) {
+    fetchPdfsBtn.addEventListener('click', function() {
+      var ids = getCheckedSupplierIds();
+      if (!ids.length) { alert('Select at least one supplier.'); return; }
+      setFeedback('Fetching PDFs...');
+      postAction("{% url 'sales:rfq_queue_fetch_pdfs' %}", {supplier_ids: ids})
+        .then(function(data) {
+          setFeedback('Fetched: ' + data.fetched + ', Failed: ' + data.failed);
+          setTimeout(function() { location.reload(); }, 1500);
+        });
+    });
+  }
+
+  var sendSelectedBtn = document.getElementById('send-selected-btn');
+  if (sendSelectedBtn) {
+    sendSelectedBtn.addEventListener('click', function() {
+      var ids = getCheckedSupplierIds();
+      if (!ids.length) { alert('Select at least one supplier.'); return; }
+      if (!confirm('Send RFQs to ' + ids.length + ' supplier(s)?')) return;
+      setFeedback('Sending...');
+      postAction("{% url 'sales:rfq_queue_send' %}", {supplier_ids: ids})
+        .then(function(data) { handleSendResult(data); });
+    });
+  }
+
+  var sendAllBtn = document.getElementById('send-all-btn');
+  if (sendAllBtn) {
+    sendAllBtn.addEventListener('click', function() {
+      if (!confirm('Send RFQs to all queued suppliers?')) return;
+      setFeedback('Sending...');
+      postAction("{% url 'sales:rfq_queue_send' %}", {send_all: 1})
+        .then(function(data) { handleSendResult(data); });
+    });
+  }
+})();
+</script>
+{% endblock content %}

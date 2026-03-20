@@ -48,7 +48,7 @@
   <div class="rfq-left">
     <!-- Tab bar -->
     <div class="rfq-left-tabs">
-      <button class="rfq-left-tab active" id="tab-btn-queue" type="button">Queue</button>
+      <a href="{% url 'sales:rfq_queue_view' %}" class="rfq-left-tab active" id="tab-btn-queue">Queue <span class="inbox-badge" id="queue-badge" data-count="{{ queued_count|default:0 }}">{% if queued_count %}{{ queued_count }}{% endif %}</span></a>
       <button class="rfq-left-tab" id="tab-btn-inbox" type="button">
         Inbox <span class="inbox-badge" id="inbox-unread-badge" data-count="{{ unread_count }}">{% if unread_count %}{{ unread_count }}{% endif %}</span>
       </button>

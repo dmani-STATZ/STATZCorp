@@ -53,6 +53,11 @@ from sales.views.rfq import (
     rfq_inbox_list,
     rfq_inbox_detail,
     rfq_inbox_assign,
+    rfq_queue_view,
+    rfq_queue_add,
+    supplier_create_and_queue,
+    rfq_queue_fetch_pdfs,
+    rfq_queue_send,
 )
 from sales.views.bids import (
     bids_ready,
@@ -72,6 +77,14 @@ from sales.views.settings import (
     email_template_delete,
     email_template_set_default,
     email_template_preview,
+    settings_greetings,
+    settings_greeting_add,
+    settings_greeting_delete,
+    settings_greeting_toggle,
+    settings_salutations,
+    settings_salutation_add,
+    settings_salutation_delete,
+    settings_salutation_toggle,
 )
 from sales.views.entity_lookup import entity_lookup
 
@@ -121,6 +134,11 @@ __all__ = [
     "rfq_inbox_list",
     "rfq_inbox_detail",
     "rfq_inbox_assign",
+    "rfq_queue_view",
+    "rfq_queue_add",
+    "supplier_create_and_queue",
+    "rfq_queue_fetch_pdfs",
+    "rfq_queue_send",
     "bids_ready",
     "bid_builder",
     "bid_select_quote",
@@ -136,5 +154,13 @@ __all__ = [
     "email_template_delete",
     "email_template_set_default",
     "email_template_preview",
+    "settings_greetings",
+    "settings_greeting_add",
+    "settings_greeting_delete",
+    "settings_greeting_toggle",
+    "settings_salutations",
+    "settings_salutation_add",
+    "settings_salutation_delete",
+    "settings_salutation_toggle",
     "entity_lookup",
 ]

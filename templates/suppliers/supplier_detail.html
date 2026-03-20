@@ -183,6 +183,55 @@
         </div>
       </dl>
     </div>
+    <div class="card card-padded shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">RFQ Email</h2>
+      <p class="text-sm text-gray-800 mb-2">
+        {% if supplier.rfq_email %}
+          <a href="mailto:{{ supplier.rfq_email }}" class="text-blue-600 hover:text-blue-800">{{ supplier.rfq_email }}</a>
+        {% else %}
+          <span class="text-amber-700 font-medium">Not set</span>
+        {% endif %}
+      </p>
+      <button type="button" id="rfq-email-picker-toggle" class="text-sm text-blue-600 hover:text-blue-800">Set RFQ Email</button>
+      <div id="rfq-email-picker" class="hidden mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+        <p class="text-sm font-medium text-gray-900">Select RFQ email for {{ supplier.name|default:"this supplier" }}:</p>
+        <form method="post" action="{% url 'suppliers:supplier_set_rfq_email' supplier_id=supplier.pk %}" id="rfq-email-form">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <input type="hidden" name="rfq_email" id="rfq-email-value" value="">
+          <div class="space-y-2 text-sm">
+            {% if supplier.business_email %}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" class="rfq-email-radio" value="{{ supplier.business_email }}"> {{ supplier.business_email }} — Business Email
+            </label>
+            {% endif %}
+            {% if supplier.primary_email %}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" class="rfq-email-radio" value="{{ supplier.primary_email }}"> {{ supplier.primary_email }} — Primary Email
+            </label>
+            {% endif %}
+            {% for contact in contacts %}
+              {% if contact.email %}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" class="rfq-email-radio" value="{{ contact.email }}"> {{ contact.salutation }} {{ contact.name }} — {{ contact.email }}
+            </label>
+              {% endif %}
+            {% endfor %}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" class="rfq-email-radio" value="" id="rfq-email-other-radio"> Other (enter manually):
+            </label>
+            <input type="text" id="rfq-email-other-input" placeholder="email@example.com" class="ml-6 w-full max-w-md rounded border border-gray-300 px-2 py-1 text-sm" style="display:none;">
+            {% if not has_rfq_email_options %}
+            <p class="text-amber-700 text-sm mt-2">No email addresses found — add contacts or edit supplier to add emails.</p>
+            {% endif %}
+          </div>
+          <div class="mt-3 flex gap-2">
+            <button type="submit" class="px-3 py-1 rounded bg-blue-600 text-white text-sm font-medium">Save</button>
+            <button type="button" id="rfq-email-picker-cancel" class="px-3 py-1 rounded border border-gray-300 text-gray-700 text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Addresses / Contacts -->
@@ -511,6 +560,55 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+<script>
+    (function() {
+        var pickerToggle = document.getElementById('rfq-email-picker-toggle');
+        var picker = document.getElementById('rfq-email-picker');
+        var pickerCancel = document.getElementById('rfq-email-picker-cancel');
+        var form = document.getElementById('rfq-email-form');
+        var hiddenVal = document.getElementById('rfq-email-value');
+        var otherRadio = document.getElementById('rfq-email-other-radio');
+        var otherInput = document.getElementById('rfq-email-other-input');
+        if (pickerToggle && picker) {
+            pickerToggle.addEventListener('click', function() {
+                picker.classList.toggle('hidden');
+            });
+        }
+        if (pickerCancel && picker) {
+            pickerCancel.addEventListener('click', function() {
+                picker.classList.add('hidden');
+            });
+        }
+        function setRfqEmailVal(val) {
+            if (hiddenVal) hiddenVal.value = val || '';
+        }
+        if (otherRadio && otherInput) {
+            otherRadio.addEventListener('change', function() {
+                otherInput.style.display = this.checked ? 'block' : 'none';
+                if (this.checked) setRfqEmailVal(otherInput.value.trim());
+                else setRfqEmailVal('');
+            });
+            otherInput.addEventListener('input', function() {
+                if (otherRadio && otherRadio.checked) setRfqEmailVal(this.value.trim());
+            });
+        }
+        document.querySelectorAll('.rfq-email-radio').forEach(function(radio) {
+            radio.addEventListener('change', function() {
+                if (this.value) {
+                    setRfqEmailVal(this.value);
+                    if (otherInput) otherInput.style.display = 'none';
+                }
+            });
+        });
+        if (form) {
+            form.addEventListener('submit', function() {
+                if (otherRadio && otherRadio.checked && otherInput) {
+                    setRfqEmailVal(otherInput.value.trim());
+                }
+            });
+        }
+    })();
+</script>
 <script>
     window.supplierContentTypeId = {{ supplier_content_type_id }};
     window.supplierId = {{ supplier.id }};

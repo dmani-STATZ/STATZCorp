@@ -43,6 +43,11 @@ class Supplier(AuditModel):
     website_url = models.URLField(null=True, blank=True)
     primary_phone = models.CharField(max_length=50, null=True, blank=True)
     primary_email = models.EmailField(null=True, blank=True)
+    rfq_email = models.EmailField(
+        null=True,
+        blank=True,
+        help_text="Preferred email address for RFQ dispatch. Set via the supplier profile.",
+    )
     logo_url = models.URLField(null=True, blank=True)
     last_enriched_at = models.DateTimeField(null=True, blank=True)
     contact = models.ForeignKey('Contact', on_delete=models.CASCADE, null=True, blank=True, related_name='primary_for_supplier')

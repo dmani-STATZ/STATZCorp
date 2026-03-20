@@ -29,7 +29,10 @@
 
 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.8125rem; color:#475569;">
     <strong>Available variables:</strong>
-    {supplier_name}, {sol_number}, {nsn}, {nomenclature}, {qty}, {unit_of_issue}, {return_date}, {your_name}, {your_email}
+    {supplier_name}, {sol_number}, {nsn}, {nomenclature}, {qty}, {unit_of_issue}, {return_date}, {your_name}, {your_email},
+    {sol_blocks} (formatted list of all solicitation items in this RFQ batch),
+    {greeting} (randomly selected opening — manage in Settings → RFQ Greetings),
+    {salutation} (randomly selected closing — manage in Settings → RFQ Salutations)
 </div>
 
 {% if not templates %}

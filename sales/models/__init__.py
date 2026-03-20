@@ -12,6 +12,7 @@ from sales.models.approved_sources import ApprovedSource
 from sales.models.suppliers import SupplierNSN, SupplierFSC
 from sales.models.matching import SupplierMatch
 from sales.models.rfq import SupplierRFQ, SupplierContactLog
+from sales.models.rfq_phrases import RFQGreeting, RFQSalutation
 from sales.models.quotes import SupplierQuote
 from sales.models.bids import GovernmentBid
 from sales.models.cages import CompanyCAGE
@@ -30,6 +31,8 @@ __all__ = [
     'SupplierMatch',
     'SupplierRFQ',
     'SupplierContactLog',
+    'RFQGreeting',
+    'RFQSalutation',
     'SupplierQuote',
     'GovernmentBid',
     'CompanyCAGE',

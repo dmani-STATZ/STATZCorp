@@ -1,0 +1,76 @@
+{% extends "sales/base.html" %}
+{% block content %}
+
+<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem;">
+    <div>
+        <h1 style="font-size:1.375rem; font-weight:600; margin:0;">RFQ Salutations</h1>
+        <p style="font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0.25rem 0 0;">
+            These phrases are randomly selected as the closing line of outbound RFQ emails. Use <code>{your_name}</code> or <code>{your_email}</code> as variables.
+        </p>
+    </div>
+</div>
+
+{% if messages %}
+    {% for msg in messages %}
+    <div style="padding:0.75rem 1rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                color:#166534; font-size:0.875rem; margin-bottom:1rem;">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+{% if not salutations %}
+<div style="padding:2rem; text-align:center; background:#f8fafc; border:1px solid #e2e8f0;
+            border-radius:8px; color:#64748b; font-size:0.875rem; margin-bottom:1.5rem;">
+    No salutations yet — add one below.
+</div>
+{% else %}
+<div style="border:1px solid var(--border-color,#e5e7eb); border-radius:8px; overflow:hidden; margin-bottom:1.5rem;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+        <thead>
+            <tr style="background:var(--surface-secondary,#f9fafb); border-bottom:1px solid #e5e7eb;">
+                <th style="padding:0.625rem 1rem; text-align:left; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Text</th>
+                <th style="padding:0.625rem 1rem; text-align:center; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Active</th>
+                <th style="padding:0.625rem 1rem; text-align:right; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in salutations %}
+            <tr style="border-bottom:1px solid #e5e7eb;">
+                <td style="padding:0.625rem 1rem;">{{ s.text }}</td>
+                <td style="padding:0.625rem 1rem; text-align:center;">
+                    {% if s.is_active %}
+                    <span style="color:#16a34a;">✓</span>
+                    {% else %}
+                    <span style="color:#dc2626;">✗</span>
+                    {% endif %}
+                </td>
+                <td style="padding:0.625rem 1rem; text-align:right;">
+                    <form method="post" action="{% url 'sales:settings_salutation_toggle' s.pk %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); background:none; border:none; cursor:pointer; padding:0;">{% if s.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                    </form>
+                    <form method="post" action="{% url 'sales:settings_salutation_delete' s.pk %}" style="display:inline;" onsubmit="return confirm('Delete this salutation?');">
+                        {% csrf_token %}
+                        <button type="submit" style="font-size:0.8125rem; color:#dc2626; background:none; border:none; cursor:pointer; padding:0; margin-left:0.5rem;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div style="border:1px solid #e5e7eb; border-radius:8px; padding:1rem; background:#f9fafb;">
+    <p style="font-size:0.875rem; font-weight:600; margin:0 0 0.5rem;">Add Salutation</p>
+    <form method="post" action="{% url 'sales:settings_salutation_add' %}">
+        {% csrf_token %}
+        <textarea name="text" rows="2" style="width:100%; max-width:32rem; padding:0.5rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;" placeholder="e.g. Thank you, {your_name}"></textarea>
+        <button type="submit" style="margin-top:0.5rem; padding:0.5rem 1.125rem; background:var(--company-primary,#004eb3); color:#fff; border:none; border-radius:6px; font-size:0.875rem; font-weight:500; cursor:pointer;">Save</button>
+    </form>
+</div>
+
+<p style="margin-top:1.5rem;">
+    <a href="{% url 'sales:settings_cages' %}" style="font-size:0.875rem; color:var(--company-primary,#004eb3); text-decoration:none;">← Back to Settings</a>
+</p>
+
+{% endblock content %}

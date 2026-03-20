@@ -115,6 +115,8 @@ class Solicitation(models.Model):
         default='',
         help_text="Name or note from HUBZone partner who requested this solicitation be worked.",
     )
+    pdf_blob = models.BinaryField(null=True, blank=True)
+    pdf_fetched_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_solicitation'

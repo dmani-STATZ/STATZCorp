@@ -5,7 +5,7 @@ import urllib.parse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Prefetch, Q, OuterRef, Subquery
 from django.http import JsonResponse
 from django.urls import reverse
 from django.contrib import messages
@@ -67,6 +67,17 @@ SET_ASIDE_CHOICES = [
 
 SET_ASIDE_LABELS = {v: label for v, label in SET_ASIDE_CHOICES if v}
 
+# Values that mean "unrestricted" for tab filtering (Solicitation.small_business_set_aside).
+UNRESTRICTED_CODES = ['N', '']
+VALID_TABS = frozenset({'matches', 'set_asides', 'unrestricted'})
+
+# Sort: valid GET values are field name (asc) or -field (desc). Third click clears (default order).
+DEFAULT_ORDER = ('return_by_date', 'solicitation_number')
+SORTABLE_FIELDS = frozenset({
+    'solicitation_number', 'nsn', 'nomenclature', 'quantity',
+    'set_aside', 'return_by_date', 'status', 'match_count',
+})
+
 
 @login_required
 def solicitation_list(request):
@@ -108,7 +119,6 @@ def solicitation_list(request):
                 queryset=SolicitationLine.objects.order_by('line_number', 'id'),
             )
         )
-        .annotate(total_match_count=Count('lines__supplier_matches', distinct=True))
         .order_by('return_by_date', 'solicitation_number')
     )
 
@@ -129,6 +139,68 @@ def solicitation_list(request):
             Q(lines__nomenclature__icontains=q)
         ).distinct()
 
+    # Annotate match count once for tab filtering and table display
+    qs = qs.annotate(match_count=Count('lines__supplier_matches', distinct=True))
+
+    # Tab: matches (default), set_asides, unrestricted
+    raw_tab = request.GET.get('tab', 'matches')
+    active_tab = raw_tab if raw_tab in VALID_TABS else 'matches'
+
+    # Tab counts from base queryset (after other filters, before tab filter)
+    base_annotated = qs
+    _unrestricted_q = Q(small_business_set_aside__in=UNRESTRICTED_CODES) | Q(small_business_set_aside__isnull=True)
+    tab_counts = {
+        'matches': base_annotated.filter(match_count__gt=0).count(),
+        'set_asides': base_annotated.exclude(_unrestricted_q).count(),
+        'unrestricted': base_annotated.filter(_unrestricted_q).count(),
+    }
+
+    # Apply tab filter
+    if active_tab == 'matches':
+        qs = qs.filter(match_count__gt=0)
+    elif active_tab == 'set_asides':
+        qs = qs.exclude(_unrestricted_q)
+    elif active_tab == 'unrestricted':
+        qs = qs.filter(_unrestricted_q)
+
+    # Column sort: ?sort=field (asc), ?sort=-field (desc), no sort = default order
+    sort_param = (request.GET.get('sort') or '').strip()
+    if sort_param.startswith('-'):
+        sort_field = sort_param[1:]
+        sort_desc = True
+    else:
+        sort_field = sort_param
+        sort_desc = False
+    if sort_field not in SORTABLE_FIELDS:
+        sort_param = ''
+        sort_field = None
+        sort_desc = False
+
+    if sort_field:
+        # First-line fields need a subquery annotation
+        if sort_field in ('nsn', 'nomenclature', 'quantity'):
+            first_line = (
+                SolicitationLine.objects.filter(solicitation_id=OuterRef('pk'))
+                .order_by('line_number', 'id')
+            )
+            if sort_field == 'nsn':
+                qs = qs.annotate(first_nsn=Subquery(first_line.values('nsn')[:1]))
+                order_field = 'first_nsn'
+            elif sort_field == 'nomenclature':
+                qs = qs.annotate(first_nomenclature=Subquery(first_line.values('nomenclature')[:1]))
+                order_field = 'first_nomenclature'
+            else:
+                qs = qs.annotate(first_quantity=Subquery(first_line.values('quantity')[:1]))
+                order_field = 'first_quantity'
+        elif sort_field == 'set_aside':
+            order_field = 'small_business_set_aside'
+        else:
+            order_field = sort_field
+        order_by = ('-' + order_field,) if sort_desc else (order_field,)
+        qs = qs.order_by(*order_by)
+    else:
+        qs = qs.order_by(*DEFAULT_ORDER)
+
     today = datetime.date.today()
 
     paginator = Paginator(qs, 50)
@@ -143,6 +215,29 @@ def solicitation_list(request):
         sol.is_overdue = bool(sol.return_by_date and sol.return_by_date < today)
 
     filter_params = {k: v for k, v in request.GET.items() if k != "page"}
+    filter_params_no_tab = {k: v for k, v in request.GET.items() if k not in ("page", "tab")}
+    filter_params_no_sort = {k: v for k, v in request.GET.items() if k not in ("page", "sort")}
+
+    # Next sort value per column for 3-state toggle: default -> asc -> desc -> default
+    def next_sort(current, asc_val):
+        if current == asc_val:
+            return f"-{asc_val}"
+        if current == f"-{asc_val}":
+            return ""
+        return asc_val
+
+    sort_param_val = sort_param or ""
+    sort_links = {
+        "solicitation_number": next_sort(sort_param_val, "solicitation_number"),
+        "nsn": next_sort(sort_param_val, "nsn"),
+        "nomenclature": next_sort(sort_param_val, "nomenclature"),
+        "quantity": next_sort(sort_param_val, "quantity"),
+        "set_aside": next_sort(sort_param_val, "set_aside"),
+        "return_by_date": next_sort(sort_param_val, "return_by_date"),
+        "status": next_sort(sort_param_val, "status"),
+        "match_count": next_sort(sort_param_val, "match_count"),
+    }
+
     return render(request, "sales/solicitations/list.html", {
         "page_obj": page_obj,
         "set_aside_choices": SET_ASIDE_CHOICES,
@@ -152,15 +247,14 @@ def solicitation_list(request):
             "set_aside": set_aside,
             "status": status,
             "item_type": item_type,
-            "bucket": bucket,
         },
-        "bucket_filter": bucket,
-        "bucket_counts": dict(
-            Solicitation.objects.values_list("bucket")
-            .annotate(n=Count("id"))
-            .values_list("bucket", "n")
-        ),
+        "active_tab": active_tab,
+        "tab_counts": tab_counts,
+        "sort_param": sort_param_val,
+        "sort_links": sort_links,
         "filter_querystring": urllib.parse.urlencode(filter_params),
+        "filter_querystring_no_tab": urllib.parse.urlencode(filter_params_no_tab),
+        "filter_querystring_no_sort": urllib.parse.urlencode(filter_params_no_sort),
     })
 
 
@@ -231,6 +325,14 @@ def solicitation_detail(request, sol_number):
         solicitation.small_business_set_aside or "", ""
     )
     pdf_url = solicitation.dibbs_pdf_url or "#"
+
+    # Queued RFQ supplier IDs for this solicitation (Add to Queue button state)
+    queued_supplier_ids = set(
+        SupplierRFQ.objects.filter(
+            line__solicitation=solicitation,
+            status="QUEUED",
+        ).values_list("supplier_id", flat=True)
+    )
 
     # Annotate each match with rfq status for "Send RFQ" vs badge (reuse rfqs list)
     rfq_by_match_key = {(r.line_id, r.supplier_id): r for r in rfqs}
@@ -324,6 +426,7 @@ def solicitation_detail(request, sol_number):
             "bid_iv": bid_iv,
             "bid_show_pn": bid_show_pn,
             "default_markup_pct": default_markup_pct,
+            "queued_supplier_ids": queued_supplier_ids,
         },
     )
 
