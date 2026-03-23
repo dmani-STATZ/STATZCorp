@@ -543,13 +543,13 @@
   <table>
     <thead>
       <tr>
-        <th style="width:2rem;"></th>
-        <th>Supplier</th>
-        <th>CAGE</th>
-        <th>Match Method</th>
-        <th>Status</th>
-        <th>Contact Email</th>
-        <th>Action</th>
+        <th style="width: 3%;"><!-- select --></th>
+        <th style="width: 22%;">SUPPLIER</th>
+        <th style="width: 10%;">CAGE</th>
+        <th style="width: 20%;">MATCH METHOD</th>
+        <th style="width: 12%;">STATUS</th>
+        <th style="width: 20%;">CONTACT EMAIL</th>
+        <th style="width: 13%;">ACTION</th>
       </tr>
     </thead>
     <tbody>
@@ -599,6 +599,74 @@
   </table>
 </div>
 {% endif %}
+
+{# Manually Added Suppliers — search in-system suppliers and queue RFQ (MANUAL match) #}
+<div class="data-table-wrap" style="margin-top:1.5rem;">
+  <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+    <div class="table-title">Manually Added</div>
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary"
+            data-bs-toggle="modal"
+            data-bs-target="#manualSupplierModal">
+      + Add Supplier
+    </button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 3%;"></th>
+        <th style="width: 22%;">SUPPLIER</th>
+        <th style="width: 10%;">CAGE</th>
+        <th style="width: 20%;">MATCH METHOD</th>
+        <th style="width: 12%;">STATUS</th>
+        <th style="width: 20%;">CONTACT EMAIL</th>
+        <th style="width: 13%;">ACTION</th>
+      </tr>
+    </thead>
+    <tbody id="manually-added-tbody">
+      {% for rfq in manual_rfqs %}
+      <tr>
+        <td></td>
+        <td><a href="{% url 'suppliers:supplier_detail' rfq.supplier.pk %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ rfq.supplier.name|default:"—" }}</a></td>
+        <td><code class="mono">{{ rfq.supplier.cage_code|default:"—" }}</code></td>
+        <td><span class="badge bg-secondary">Manual</span></td>
+        <td>
+          {% if rfq.status == 'QUEUED' %}
+            <span class="text-muted">Queued</span>
+          {% elif rfq.status == 'SENT' %}
+            <span class="text-success">Sent</span>
+          {% else %}
+            {{ rfq.get_status_display }}
+          {% endif %}
+        </td>
+        <td>
+          {% if rfq.supplier.rfq_email %}
+            <span class="small">{{ rfq.supplier.rfq_email }}</span>
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if rfq.supplier.pk not in queued_supplier_ids %}
+            <button type="button" class="btn-queue-rfq btn-sm btn btn-outline-primary"
+                    data-sol="{{ solicitation.solicitation_number }}"
+                    data-supplier="{{ rfq.supplier.pk }}"
+                    data-queued="false">
+              + Add to Queue
+            </button>
+          {% else %}
+            <span class="text-muted small">Queued</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr id="manually-added-empty-row">
+        <td colspan="7" class="text-muted small">No suppliers manually added yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endif %}
 
 {# RFQs Tab #}
@@ -1149,6 +1217,34 @@
   </div>
 </div>
 
+{# Manual supplier search — queue RFQ for any in-system supplier (Matches tab) #}
+<div class="modal fade" id="manualSupplierModal" tabindex="-1" aria-labelledby="manualSupplierModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="manualSupplierModalLabel">Add Supplier Manually</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <input type="text"
+                 id="manualSupplierSearch"
+                 class="form-control"
+                 placeholder="Search by name or CAGE code..."
+                 autocomplete="off">
+        </div>
+        <div id="manualSupplierResults" class="list-group" style="max-height: 300px; overflow-y: auto;">
+          <span class="text-muted small px-2">Type at least 2 characters to search.</span>
+        </div>
+        <div id="manualSupplierError" class="text-danger small mt-2 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>window.CSRF_TOKEN = '{{ csrf_token }}';</script>
 <script>
 (function () {
@@ -1196,10 +1292,19 @@
   var pendingNoQuoteQueueBtn = null;
 
   document.querySelectorAll('.btn-queue-rfq').forEach(function (btn) {
+    if (btn.closest('#manually-added-tbody')) return;
     btn.addEventListener('click', function () {
       doQueueRfq(this, false);
     });
   });
+
+  var manualAddedTbody = document.getElementById('manually-added-tbody');
+  if (manualAddedTbody) {
+    manualAddedTbody.addEventListener('click', function (e) {
+      var b = e.target.closest('.btn-queue-rfq');
+      if (b && manualAddedTbody.contains(b)) doQueueRfq(b, false);
+    });
+  }
 
   document.querySelectorAll('.btn-queue-rfq-anyway').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1360,6 +1465,166 @@
         btn.textContent = origText;
       });
   });
+})();
+
+(function () {
+  var searchInput = document.getElementById('manualSupplierSearch');
+  var resultsContainer = document.getElementById('manualSupplierResults');
+  var errorDiv = document.getElementById('manualSupplierError');
+  var solNumber = '{{ solicitation.solicitation_number|escapejs }}';
+  var searchUrl = '{% url "sales:rfq_manual_supplier_search" %}';
+  var addUrl = '{% url "sales:rfq_queue_add_manual" %}';
+  var csrfToken = '{{ csrf_token }}';
+  var supplierDetailTpl = '{% url "suppliers:supplier_detail" 999999 %}';
+  var debounceTimer = null;
+
+  function appendManualSupplierRow(data) {
+    var tbody = document.getElementById('manually-added-tbody');
+    if (!tbody) return;
+    var emptyRow = document.getElementById('manually-added-empty-row');
+    if (emptyRow) emptyRow.remove();
+
+    var tr = document.createElement('tr');
+    tr.appendChild(document.createElement('td'));
+
+    var nameTd = document.createElement('td');
+    var a = document.createElement('a');
+    a.href = supplierDetailTpl.replace('999999', String(data.supplier_id));
+    a.style.fontWeight = '600';
+    a.style.color = '#1a2940';
+    a.style.textDecoration = 'none';
+    a.textContent = data.supplier_name || '';
+    nameTd.appendChild(a);
+
+    var cageTd = document.createElement('td');
+    var code = document.createElement('code');
+    code.className = 'mono';
+    code.textContent = data.cage || '';
+    cageTd.appendChild(code);
+
+    var methodTd = document.createElement('td');
+    var badge = document.createElement('span');
+    badge.className = 'badge bg-secondary';
+    badge.textContent = 'Manual';
+    methodTd.appendChild(badge);
+
+    var statusTd = document.createElement('td');
+    var st = document.createElement('span');
+    st.className = 'text-muted';
+    st.textContent = 'Queued';
+    statusTd.appendChild(st);
+
+    var emailTd = document.createElement('td');
+    var em = document.createElement('span');
+    em.className = 'text-muted';
+    em.textContent = '—';
+    emailTd.appendChild(em);
+
+    var actionTd = document.createElement('td');
+    var qSpan = document.createElement('span');
+    qSpan.className = 'text-muted small';
+    qSpan.textContent = 'Queued';
+    actionTd.appendChild(qSpan);
+
+    tr.appendChild(nameTd);
+    tr.appendChild(cageTd);
+    tr.appendChild(methodTd);
+    tr.appendChild(statusTd);
+    tr.appendChild(emailTd);
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      clearTimeout(debounceTimer);
+      var q = this.value.trim();
+      if (q.length < 2) {
+        resultsContainer.innerHTML = '<span class="text-muted small px-2">Type at least 2 characters to search.</span>';
+        return;
+      }
+      debounceTimer = setTimeout(function () {
+        fetch(searchUrl + '?q=' + encodeURIComponent(q))
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data.results || data.results.length === 0) {
+              resultsContainer.innerHTML = '<span class="text-muted small px-2">No suppliers found.</span>';
+              return;
+            }
+            resultsContainer.innerHTML = data.results.map(function (s) {
+              var name = (s.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+              var cage = (s.cage || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+              return (
+                '<button type="button" class="list-group-item list-group-item-action manual-supplier-pick" ' +
+                'data-supplier-id="' + String(s.id) + '">' +
+                '<strong>' + name + '</strong> <span class="text-muted small">' + cage + '</span></button>'
+              );
+            }).join('');
+
+            resultsContainer.querySelectorAll('.manual-supplier-pick').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var supplierId = this.getAttribute('data-supplier-id');
+                errorDiv.classList.add('d-none');
+                errorDiv.textContent = '';
+
+                fetch(addUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken,
+                  },
+                  body: 'sol_number=' + encodeURIComponent(solNumber) + '&supplier_id=' + encodeURIComponent(supplierId),
+                })
+                  .then(function (r) {
+                    return r.json().then(function (data) {
+                      return { status: r.status, data: data };
+                    });
+                  })
+                  .then(function (_ref) {
+                    var status = _ref.status;
+                    var data = _ref.data;
+                    if (status === 409) {
+                      errorDiv.textContent = data.error || 'Request failed.';
+                      errorDiv.classList.remove('d-none');
+                      return;
+                    }
+                    if (status !== 200 || !data.success) {
+                      errorDiv.textContent = (data && data.error) ? data.error : 'Could not add supplier.';
+                      errorDiv.classList.remove('d-none');
+                      return;
+                    }
+                    var modalEl = document.getElementById('manualSupplierModal');
+                    var modalInst = bootstrap.Modal.getInstance(modalEl);
+                    if (modalInst) modalInst.hide();
+
+                    appendManualSupplierRow(data);
+
+                    searchInput.value = '';
+                    resultsContainer.innerHTML = '<span class="text-muted small px-2">Type at least 2 characters to search.</span>';
+                  })
+                  .catch(function () {
+                    errorDiv.textContent = 'Network error — please try again.';
+                    errorDiv.classList.remove('d-none');
+                  });
+              });
+            });
+          })
+          .catch(function () {
+            resultsContainer.innerHTML = '<span class="text-danger small px-2">Search failed.</span>';
+          });
+      }, 300);
+    });
+
+    var modalEl = document.getElementById('manualSupplierModal');
+    if (modalEl) {
+      modalEl.addEventListener('hidden.bs.modal', function () {
+        searchInput.value = '';
+        resultsContainer.innerHTML = '<span class="text-muted small px-2">Type at least 2 characters to search.</span>';
+        errorDiv.classList.add('d-none');
+        errorDiv.textContent = '';
+      });
+    }
+  }
 })();
 </script>
 {% endblock content %}

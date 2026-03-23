@@ -305,6 +305,20 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER", "noreply@example.com")
 
+# ── Microsoft Graph Mail ──────────────────────────────────────────────────
+# Used for programmatic RFQ email dispatch via Graph API.
+# Distinct from MICROSOFT_AUTH_* which handles user login OAuth flow.
+# !! GCC HIGH TENANT — all endpoints use .us not .com !!
+# Authority: login.microsoftonline.us | Graph: graph.microsoft.us | Scope: graph.microsoft.us/.default
+GRAPH_MAIL_TENANT_ID = os.environ.get("GRAPH_MAIL_TENANT_ID", "")
+GRAPH_MAIL_CLIENT_ID = os.environ.get("GRAPH_MAIL_CLIENT_ID", "")
+GRAPH_MAIL_CLIENT_SECRET = os.environ.get("GRAPH_MAIL_CLIENT_SECRET", "")
+GRAPH_MAIL_SENDER = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+
+# Set to True to send via Graph API.
+# Set to False to fall back to mailto: links (manual send from user's email client).
+GRAPH_MAIL_ENABLED = os.environ.get("GRAPH_MAIL_ENABLED", "False") == "True"
+
 # Authentication settings
 LOGIN_REDIRECT_URL = "index"
 LOGOUT_REDIRECT_URL = "landing"

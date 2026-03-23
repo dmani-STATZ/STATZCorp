@@ -1,0 +1,1 @@
+Update the @CONTEXT.md file and the @AGENT.md files for the project that you current Chat session is working on.  The the Chat Session touched mulitple apps review the chat seesion and determin if any ligitimate updates were made to that application that would require the CONTEXT.md file or the AGENT.md file to be updated.

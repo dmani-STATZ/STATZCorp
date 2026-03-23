@@ -2,6 +2,7 @@
 RFQ email generation and dispatch. Section 10.2, 10.7.
 """
 import logging
+import urllib.parse
 from email.utils import make_msgid
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -289,15 +290,46 @@ def send_followup_email(rfq, sent_by):
 
 def build_grouped_rfq_email(supplier, rfqs, sent_by):
     """
-    Build a grouped RFQ email for one supplier covering multiple solicitations.
-    Returns: {
-        'subject': str,
-        'body': str,
-        'reply_to': str,
-        'attachments': [{'filename': str, 'content': bytes, 'mimetype': str}]
-    }
+    Build and dispatch (or stage) a grouped RFQ email for one supplier.
+
+    When ``GRAPH_MAIL_ENABLED`` is True, sends via Microsoft Graph API and on
+    success updates ``SupplierRFQ`` rows to SENT, logs contact entries, and
+    advances solicitations to RFQ_SENT where applicable.
+
+    When False, returns a mailto: URL for manual send; the caller must confirm
+    via ``rfq_queue_mark_sent`` before statuses are updated.
+
+    Returns:
+        {
+            'success': bool,
+            'mode': 'graph' | 'mailto',
+            'mailto_url': str | None,
+            'to_address': str,
+            'error': str | None,
+            'rfq_ids': list[int],
+            'supplier_name': str,
+            'supplier_cage': str,
+        }
     """
     import random
+
+    rfq_ids = [r.pk for r in rfqs]
+    supplier_name = (supplier.name or supplier.cage_code or f"Supplier {supplier.pk}").strip()
+    supplier_cage = (supplier.cage_code or "").strip()
+
+    to_address = resolve_supplier_email_for_send(supplier)
+    if not to_address:
+        mode = "graph" if settings.GRAPH_MAIL_ENABLED else "mailto"
+        return {
+            "success": False,
+            "mode": mode,
+            "mailto_url": None,
+            "to_address": "",
+            "error": "No email address for supplier.",
+            "rfq_ids": rfq_ids,
+            "supplier_name": supplier_name,
+            "supplier_cage": supplier_cage,
+        }
 
     cage = _default_cage()
     default_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
@@ -399,10 +431,83 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by):
                 "mimetype": "application/pdf",
             })
 
+    if settings.GRAPH_MAIL_ENABLED:
+        from sales.services.graph_mail import send_mail_via_graph
+
+        cage_reply = (cage.smtp_reply_to or "").strip() if cage else ""
+        pdf_attachments = [
+            {
+                "name": att["filename"],
+                "content_type": att.get("mimetype", "application/pdf"),
+                "data": att["content"],
+            }
+            for att in attachments
+        ] or None
+
+        ok = send_mail_via_graph(
+            to_address,
+            subject,
+            body,
+            reply_to=cage_reply or None,
+            attachments=pdf_attachments,
+        )
+        if not ok:
+            return {
+                "success": False,
+                "mode": "graph",
+                "mailto_url": None,
+                "to_address": to_address,
+                "error": "Graph API send failed — check server logs.",
+                "rfq_ids": rfq_ids,
+                "supplier_name": supplier_name,
+                "supplier_cage": supplier_cage,
+            }
+
+        now = timezone.now()
+        for rfq in rfqs:
+            rfq.status = "SENT"
+            rfq.sent_at = now
+            rfq.email_sent_to = to_address
+            rfq.sent_by = sent_by
+            rfq.save(update_fields=["status", "sent_at", "email_sent_to", "sent_by"])
+            sol = rfq.line.solicitation
+            SupplierContactLog.objects.create(
+                rfq=rfq,
+                supplier=supplier,
+                solicitation=sol,
+                method="EMAIL_OUT",
+                direction="OUT",
+                summary=f"RFQ sent to {to_address}",
+                logged_by=sent_by,
+            )
+            if sol.status in ("New", "Matching", "RFQ_PENDING"):
+                sol.status = "RFQ_SENT"
+                sol.save(update_fields=["status"])
+
+        return {
+            "success": True,
+            "mode": "graph",
+            "mailto_url": None,
+            "to_address": to_address,
+            "error": None,
+            "rfq_ids": rfq_ids,
+            "supplier_name": supplier_name,
+            "supplier_cage": supplier_cage,
+        }
+
+    mailto_url = (
+        f"mailto:{urllib.parse.quote(to_address)}"
+        f"?subject={urllib.parse.quote(subject)}"
+        f"&body={urllib.parse.quote(body)}"
+    )
     return {
-        "subject": subject,
-        "body": body,
-        "reply_to": reply_to,
-        "attachments": attachments,
+        "success": True,
+        "mode": "mailto",
+        "mailto_url": mailto_url,
+        "to_address": to_address,
+        "error": None,
+        "rfq_ids": rfq_ids,
+        "supplier_name": supplier_name,
+        "supplier_cage": supplier_cage,
     }
 

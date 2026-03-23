@@ -205,7 +205,7 @@ The system follows a standard Django MVC architecture backed by SQL Server, depl
 | Backend | Django 4.x (Python) | Business logic, file parsing, matching engine, email dispatch |
 | Database | Microsoft SQL Server | Persistent storage for all solicitations, suppliers, bids |
 | File I/O | Python (csv, fixed-width) | Parse IN/BQ/AS files; export completed BQ upload files |
-| Email | Django Email + SMTP | Automated supplier RFQ dispatch |
+| Email | Microsoft Graph API (`msal`) + `mailto:` fallback | Outbound RFQ dispatch from `quotes@statzcorp.com` (production) / `rfq@statzcorp.com` (dev/test); controlled by `GRAPH_MAIL_SENDER` env var; falls back to manual mailto when `GRAPH_MAIL_ENABLED=False` |
 | Task Queue | Celery + Redis (optional) | Async daily file import and email sending |
 
 ### 2.2 Core Data Flow
@@ -945,6 +945,10 @@ The current implementation uses **manual approval**. The flow is:
 4. Staff clicks **Send RFQs** for a solicitation (or selects individual suppliers)
 5. System generates RFQ emails and sets `dibbs_supplier_rfq.status = SENT`
 6. A `auto_dispatch_enabled` boolean on `CompanyCAGE` (or a Django setting) gates the automated pathway for future use
+
+**Email transport:** The system uses Microsoft Graph API (`GRAPH_MAIL_ENABLED=True`) for automated outbound RFQ dispatch from `quotes@statzcorp.com`. When Graph is unavailable or disabled, the queue send flow generates `mailto:` URLs that open in the user's local email client (Outlook). The user sends manually and clicks **Mark All Sent** to confirm. Both paths log `SupplierContactLog` entries and advance `SupplierRFQ` status to `SENT`. The Graph app registration is **STATZ Web App Mail** in the `statzcorpgcch` tenant with **Mail.Send** application permission.
+
+**Sender mailbox decision (standing):** `quotes@statzcorp.com` is the designated production RFQ sender. This address was used by the legacy Sales Patriot platform; suppliers have existing email relationships with it and it carries established sending reputation in the M365 tenant. Switching the production sender requires sales team sign-off. `rfq@statzcorp.com` is the designated dev/test sender — it is a mature mailbox with sending history (critical: newly provisioned accounts are flagged as spam almost immediately at cold RFQ volumes). Environment separation is enforced via `GRAPH_MAIL_SENDER`: `quotes@statzcorp.com` in Azure App Service production config, `rfq@statzcorp.com` in local `.env`.
 
 ---
 
@@ -2050,6 +2054,10 @@ The master list. Users filter down to what they need, then click through to the 
 ## 9.7 Solicitation Detail — `/sales/solicitations/<sol#>/`
 
 The command center for a single deal. The pipeline track at the top tells you exactly where this solicitation is. Five tabs break the work into logical stages so nothing gets missed.
+
+**Matches tab**
+
+- **Manually Added section** — A third section below Matched Suppliers. Uses a Bootstrap modal with debounced search (by name or CAGE) against all in-system suppliers. Selecting a result creates a `SupplierMatch(match_method='MANUAL', match_tier=3)` and stages a `SupplierRFQ(status='QUEUED')`. Duplicate and No Quote checks are enforced server-side with 409 responses displayed inline in the modal.
 
 ```html
 {% extends "sales/base.html" %}

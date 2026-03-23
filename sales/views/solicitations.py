@@ -344,6 +344,7 @@ def solicitation_detail(request, sol_number):
     pipeline_steps = _build_pipeline_steps(solicitation.status)
     matches = (
         SupplierMatch.objects.filter(line__solicitation=solicitation)
+        .exclude(match_method="MANUAL")
         .select_related("supplier")
         .order_by("match_tier", "-match_score")
     )
@@ -403,6 +404,19 @@ def solicitation_detail(request, sol_number):
             line__solicitation=solicitation,
             status="QUEUED",
         ).values_list("supplier_id", flat=True)
+    )
+
+    manual_match_supplier_ids = SupplierMatch.objects.filter(
+        line__solicitation=solicitation,
+        match_method="MANUAL",
+    ).values_list("supplier_id", flat=True)
+    manual_rfqs = (
+        SupplierRFQ.objects.filter(
+            line__solicitation=solicitation,
+            supplier_id__in=manual_match_supplier_ids,
+        )
+        .select_related("supplier")
+        .order_by("supplier__name")
     )
 
     # Annotate each match with rfq status for "Send RFQ" vs badge (reuse rfqs list)
@@ -518,6 +532,7 @@ def solicitation_detail(request, sol_number):
             "queued_rfq_count": queued_rfq_count,
             "no_quote_cages": no_quote_cages,
             "last_award": last_award,
+            "manual_rfqs": manual_rfqs,
         },
     )
 

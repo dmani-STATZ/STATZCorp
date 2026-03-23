@@ -16,6 +16,10 @@
   .return-past { color: #dc2626; }
   .return-soon { color: #f59e0b; }
   .mono { font-family: ui-monospace, monospace; }
+  .btn-outline-primary { background: transparent; color: var(--company-primary, #004eb3); border: 1px solid var(--company-primary, #004eb3); }
+  .btn-outline-primary:hover { background: rgba(0, 78, 179, 0.08); }
+  .mailto-banner { background: #fef9c3; border: 1px solid #facc15; border-radius: 8px; padding: 0.875rem 1rem; margin-bottom: 1.25rem; color: #713f12; font-size: 0.875rem; }
+  .mailto-row { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; background: #fff; }
 </style>
 
 <div style="margin-bottom: 1rem;">
@@ -24,12 +28,43 @@
 
 <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0 0 1.25rem;">RFQ Queue</h1>
 
+{% if show_mailto_confirm and mailto_results %}
+<div class="mailto-banner">
+  SMTP is not configured for automated send (Graph is disabled). Click <strong>Open in Email</strong> for each supplier below, send the email from Outlook, then click <strong>Mark All Sent</strong> to confirm.
+</div>
+{% for result in mailto_results %}
+<div class="mailto-row">
+  <div style="font-weight: 600; margin-bottom: 0.5rem;">
+    {{ result.supplier_name|default:"—" }} <span style="font-weight: 400; color: #6b7280;">(CAGE: {{ result.supplier_cage|default:"—" }})</span>
+  </div>
+  <a href="{{ result.mailto_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary">Open in Email</a>
+  <div style="font-size: 0.8125rem; color: #6b7280; margin-top: 0.5rem;">To: {{ result.to_address }}</div>
+</div>
+{% endfor %}
+<form method="post" action="{% url 'sales:rfq_queue_mark_sent' %}" style="margin-bottom: 1.5rem;">
+  {% csrf_token %}
+  {% for result in mailto_results %}
+    {% for rid in result.rfq_ids %}
+      <input type="hidden" name="rfq_ids" value="{{ rid }}">
+      <input type="hidden" name="email_sent_to" value="{{ result.to_address }}">
+    {% endfor %}
+  {% endfor %}
+  <button type="submit" class="btn btn-primary">Mark All Sent</button>
+</form>
+{% endif %}
+
 <div style="display:flex; gap:8px; margin-bottom:20px; align-items:center;">
   <button id="fetch-pdfs-btn" class="btn btn-outline-secondary">📎 Fetch PDFs for Selected</button>
   <button id="send-selected-btn" class="btn btn-primary">Send Selected</button>
   <button id="send-all-btn" class="btn btn-danger">Send All</button>
   <span id="queue-feedback" style="margin-left:12px;"></span>
 </div>
+
+<form id="queue-send-form" method="post" action="{% url 'sales:rfq_queue_send' %}" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="send_all" id="queue-send-all-flag" value="">
+  <div id="queue-send-id-container"></div>
+</form>
 
 {% if not grouped_queue %}
 <div style="text-align:center; padding:60px; color:#999;">
@@ -118,13 +153,30 @@
     }).then(function(r) { return r.json(); });
   }
 
-  function handleSendResult(data) {
-    var msg = 'Sent to: ' + (data.sent_to && data.sent_to.length ? data.sent_to.join(', ') : 'none');
-    if (data.failed && data.failed.length) {
-      msg += ' | Failed: ' + data.failed.map(function(f) { return f.supplier + ' (' + f.reason + ')'; }).join(', ');
+  function submitQueueSend(sendAll) {
+    var form = document.getElementById('queue-send-form');
+    var container = document.getElementById('queue-send-id-container');
+    var flag = document.getElementById('queue-send-all-flag');
+    if (!form || !container || !flag) return;
+    container.innerHTML = '';
+    flag.value = sendAll ? '1' : '';
+    if (!sendAll) {
+      var ids = getCheckedSupplierIds();
+      if (!ids.length) { alert('Select at least one supplier.'); return; }
+      ids.forEach(function(id) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'supplier_ids';
+        inp.value = id;
+        container.appendChild(inp);
+      });
     }
-    setFeedback(msg);
-    setTimeout(function() { location.reload(); }, 2500);
+    var msg = sendAll
+      ? 'Send RFQs to all queued suppliers?'
+      : ('Send RFQs to ' + getCheckedSupplierIds().length + ' supplier(s)?');
+    if (!confirm(msg)) return;
+    setFeedback('Working…');
+    form.submit();
   }
 
   var fetchPdfsBtn = document.getElementById('fetch-pdfs-btn');
@@ -144,22 +196,14 @@
   var sendSelectedBtn = document.getElementById('send-selected-btn');
   if (sendSelectedBtn) {
     sendSelectedBtn.addEventListener('click', function() {
-      var ids = getCheckedSupplierIds();
-      if (!ids.length) { alert('Select at least one supplier.'); return; }
-      if (!confirm('Send RFQs to ' + ids.length + ' supplier(s)?')) return;
-      setFeedback('Sending...');
-      postAction("{% url 'sales:rfq_queue_send' %}", {supplier_ids: ids})
-        .then(function(data) { handleSendResult(data); });
+      submitQueueSend(false);
     });
   }
 
   var sendAllBtn = document.getElementById('send-all-btn');
   if (sendAllBtn) {
     sendAllBtn.addEventListener('click', function() {
-      if (!confirm('Send RFQs to all queued suppliers?')) return;
-      setFeedback('Sending...');
-      postAction("{% url 'sales:rfq_queue_send' %}", {send_all: 1})
-        .then(function(data) { handleSendResult(data); });
+      submitQueueSend(true);
     });
   }
 })();

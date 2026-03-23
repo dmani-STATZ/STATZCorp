@@ -8,8 +8,8 @@ whitenoise==6.6.0
 mssql-django==1.5
 pyodbc==5.2.0
 
-# Authentication
-msal==1.32.0
+# Authentication / Microsoft Graph (RFQ queue mail)
+msal>=1.28.0
 
 # Forms and UI
 django-crispy-forms==2.3
