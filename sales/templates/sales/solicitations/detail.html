@@ -354,6 +354,48 @@
       <span class="mono" style="font-size:0.875rem;">{{ line.item_type_indicator|default:"—" }}</span>
     </div>
   </div>
+
+  {% if last_award %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">📊 Last Award (by NSN)</div>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-auto">
+          <span class="text-muted small">Awardee CAGE</span><br>
+          <strong>{{ last_award.awardee_cage|default:"—" }}</strong>
+        </div>
+        <div class="col-auto">
+          <span class="text-muted small">Award Date</span><br>
+          <strong>{{ last_award.award_date|date:"M d, Y"|default:"—" }}</strong>
+        </div>
+        <div class="col-auto">
+          <span class="text-muted small">Contract Price</span><br>
+          <strong>
+            {% if last_award.total_contract_price is not None %}
+              ${{ last_award.total_contract_price|floatformat:2 }}
+            {% elif last_award.award_amount is not None %}
+              ${{ last_award.award_amount|floatformat:2 }}
+            {% else %}
+              —
+            {% endif %}
+          </strong>
+        </div>
+        <div class="col-auto">
+          <span class="text-muted small">Source</span><br>
+          <span class="badge {% if last_award.source == 'DIBBS_FILE' %}bg-primary{% else %}bg-secondary{% endif %}">
+            {{ last_award.get_source_display }}
+          </span>
+        </div>
+        {% if last_award.we_won %}
+        <div class="col-auto align-self-end">
+          <span class="badge bg-success">✓ We Won This</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="form-label" style="margin-bottom:0.5rem;">Approved sources</div>
   {% if approved_sources %}
   <div class="data-table-wrap">

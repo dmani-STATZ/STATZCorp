@@ -16,7 +16,7 @@ from sales.models.rfq_phrases import RFQGreeting, RFQSalutation
 from sales.models.quotes import SupplierQuote
 from sales.models.bids import GovernmentBid
 from sales.models.cages import CompanyCAGE
-from sales.models.awards import DibbsAward
+from sales.models.awards import AwardImportBatch, DibbsAward
 from sales.models.email_templates import EmailTemplate
 from sales.models.inbox import InboxEmail
 from sales.models.no_quote import NoQuoteCAGE
@@ -37,6 +37,7 @@ __all__ = [
     'SupplierQuote',
     'GovernmentBid',
     'CompanyCAGE',
+    'AwardImportBatch',
     'DibbsAward',
     'EmailTemplate',
     'InboxEmail',

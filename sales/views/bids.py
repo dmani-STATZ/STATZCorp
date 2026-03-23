@@ -19,6 +19,7 @@ from sales.models import (
     GovernmentBid,
     CompanyCAGE,
     ApprovedSource,
+    DibbsAward,
 )
 from sales.services.bq_export import generate_bq_file, BQExportError, validate_bid_for_export
 
@@ -224,6 +225,23 @@ def bid_builder(request, sol_number):
         initial_pn_cage = first_as.approved_cage if first_as else ""
         initial_pn = first_as.part_number[:40] if first_as and first_as.part_number else ""
 
+    # Last award lookup by NSN (strip hyphens — DibbsAward.nsn is typically unhyphenated)
+    last_award = None
+    award_history = []
+    if nsn_normalized:
+        award_qs = (
+            DibbsAward.objects.filter(nsn__iexact=nsn_normalized)
+            .exclude(total_contract_price=None)
+            .order_by("-award_date", "-id")
+        )
+        last_award = award_qs.first()
+        award_history = list(award_qs[:5])
+    last_award_price_raw = (
+        str(last_award.total_contract_price)
+        if last_award and last_award.total_contract_price is not None
+        else ""
+    )
+
     return render(request, "sales/bids/builder.html", {
         "solicitation": solicitation,
         "line": line,
@@ -253,6 +271,9 @@ def bid_builder(request, sol_number):
         "initial_pn_cage": initial_pn_cage,
         "initial_pn": initial_pn,
         "show_part_number_section": (line.item_description_indicator or "") in "PBN",
+        "last_award": last_award,
+        "award_history": award_history,
+        "last_award_price_raw": last_award_price_raw,
     })
 
 

@@ -1,0 +1,76 @@
+{% extends "sales/base.html" %}
+
+{% block content %}
+
+<style>
+  .sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 1rem; }
+  .sum-card {
+    border-radius: 8px; padding: 14px 16px;
+    border: 1px solid #bfdbfe; background: #eff6ff;
+  }
+  .sum-card .label { font-size: 11px; font-weight: 600; letter-spacing: .07em;
+                     text-transform: uppercase; color: #1e40af; margin-bottom: 4px; }
+  .sum-card .value { font-family: 'Barlow Condensed', sans-serif;
+                     font-size: 26px; font-weight: 800; color: #1e3a8a; line-height: 1.1; word-break: break-all; }
+  .sum-card .value-sm { font-size: 1rem; font-weight: 700; font-family: inherit; }
+</style>
+
+<div style="max-width: 720px;">
+  <h1 style="font-size:1.375rem; font-weight:600; margin:0 0 1rem 0;">{{ page_title }}</h1>
+
+  <div class="alert alert-success" role="alert">
+    Import complete — {{ result.row_count }} rows processed.
+  </div>
+
+  <div class="sum-grid">
+    <div class="sum-card">
+      <div class="label">Award Date</div>
+      <div class="value value-sm">{{ result.award_date }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">Filename</div>
+      <div class="value value-sm" style="font-family:monospace;font-size:0.85rem;">{{ result.filename }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">Total Rows</div>
+      <div class="value">{{ result.row_count }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">New Records</div>
+      <div class="value">{{ result.created_count }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">Updated</div>
+      <div class="value">{{ result.updated_count }}</div>
+    </div>
+    {% for cage, count in result.we_won_by_cage.items %}
+    <div class="sum-card">
+      <div class="label">We Won — {{ cage }}</div>
+      <div class="value">{{ count }}</div>
+    </div>
+    {% empty %}
+    <div class="sum-card">
+      <div class="label">We Won</div>
+      <div class="value value-sm">No active Company CAGEs configured.</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if result.warnings %}
+  <div class="alert alert-warning mt-3" role="alert">
+    <strong>Warnings</strong>
+    <ul class="mb-0 mt-2 small">
+      {% for w in result.warnings %}
+      <li>{{ w }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="mt-4 d-flex flex-wrap gap-2">
+    <a href="{% url 'sales:awards_import_upload' %}" class="btn btn-primary">Import Another File</a>
+    <a href="{% url 'sales:awards_list' %}" class="btn btn-outline-secondary">View All Awards</a>
+  </div>
+</div>
+
+{% endblock content %}

@@ -78,6 +78,15 @@
                   {% endif %}">
             Import
         </a>
+        <a href="{% url 'sales:awards_list' %}"
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
+                  {% if request.resolver_match.url_name == 'awards_list' or request.resolver_match.url_name == 'awards_import_upload' or request.resolver_match.url_name == 'awards_import_result' %}
+                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
+                  {% else %}
+                      color: var(--text-muted, #6b7280);
+                  {% endif %}">
+            🏆 Awards
+        </a>
         <a href="{% url 'sales:bids_history' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
                   {% if request.resolver_match.url_name == 'bids_history' %}

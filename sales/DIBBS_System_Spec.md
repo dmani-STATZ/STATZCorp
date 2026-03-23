@@ -2321,6 +2321,27 @@ The command center for a single deal. The pipeline track at the top tells you ex
 
 The most complex screen in the app. Broken into collapsible sections so it doesn't overwhelm. The price comparison card at the top anchors the user — they always know where their margin stands.
 
+#### Price Anchor Card — Last Award Reference
+
+The Price Anchor card shows three columns:
+
+| Supplier Cost | Last Award Price | Your Bid Price |
+|---|---|---|
+| From selected quote | Most recent DibbsAward for this NSN | Editable, live margin |
+
+**Last Award block** shows: contract price, awardee CAGE, award date.
+If no award data exists for the NSN, the block renders as "—" (placeholder, no data).
+
+**Orange warning badge** ("⚠ Bid Above Last Award") appears on page load when
+`suggested_bid_price > last_award.total_contract_price`. Passive — does not block saving.
+
+**See History link** opens a modal with up to 5 most recent `DibbsAward` records for the
+NSN, ordered by `award_date` descending. Modal footer links to the full Awards list filtered
+by that NSN.
+
+**NSN matching:** `line.nsn` hyphens are stripped before querying `DibbsAward.nsn` to
+handle format differences between DIBBS solicitation files and AW files.
+
 ```html
 {% extends "sales/base.html" %}
 {% block title %}Build Bid — {{ solicitation.solicitation_number }}{% endblock %}
@@ -3511,6 +3532,47 @@ Requested explicitly by the sales team. Add to Phase 3 polish items.
 ### 12.7 Timeline
 
 **Hard deadline: End of March 2026.** Sales Patriot platform access ends. The app needs to be functional enough to handle daily imports and RFQ dispatch by that date. Phase 1 completion is the minimum viable cutover target.
+
+---
+
+## 13. Awards File Import
+
+### 13.1 Overview
+DIBBS publishes daily award data on its portal. An external file server at `files.themanihome.com`
+scrapes and hosts these files on a calendar-based UI. Staff download the AW file for the desired
+date and upload it to STATZ via `/sales/awards/import/`. This is a separate workflow from the
+daily IN/BQ/AS import and from the SAM.gov awards sync.
+
+### 13.2 AW File Format
+Filename format: `aw[YYMMDD].txt` (e.g. `aw260319.txt`). File is CSV with `#`-prefixed comment
+header lines, followed by a `Row_Num,...` column header row, then data rows. Columns:
+Row_Num, Award_Basic_Number, Delivery_Order_Number, Delivery_Order_Counter, Last_Mod_Posting_Date,
+Awardee_CAGE_Code, Total_Contract_Price (format: `$1 234.56`), Award_Date, Posted_Date,
+NSN_Part_Number, Nomenclature, Purchase_Request, Solicitation. All dates: MM-DD-YYYY.
+
+### 13.3 Data Model
+`DibbsAward` is shared between SAM.gov and DIBBS file sources. The `source` field distinguishes
+them: `'SAM'` (default, all pre-existing rows) vs `'DIBBS_FILE'`. DIBBS file rows carry additional
+fields (award_basic_number, awardee_cage, total_contract_price, nsn, etc.) that SAM rows may not
+populate. `AwardImportBatch` tracks each file upload.
+
+Deduplication for DIBBS_FILE rows: `(award_basic_number, delivery_order_number, nsn)`.
+
+### 13.4 Solicitation Matching
+During import, `dibbs_solicitation_number` from the AW file is looked up against
+`Solicitation.solicitation_number`. If a match is found, the FK is set. Many AW rows reference
+solicitations not in the system (different date, already archived, etc.) — these are stored with
+`solicitation=None` and `dibbs_solicitation_number` preserved as a raw string.
+
+### 13.5 We Won Detection
+`we_won` is set to `True` when `awardee_cage` matches `settings.SAM_OUR_CAGE` (case-insensitive).
+The same setting is used by the SAM.gov sync. If `SAM_OUR_CAGE` is not configured, `we_won` is
+always `False` for DIBBS file imports.
+
+### 13.6 Solicitation Detail — Last Award Block
+The solicitation detail Overview tab shows a "Last Award" card when a `DibbsAward` record exists
+for the line's NSN (ordered by `award_date` descending). This gives the sales team instant context
+on who last won and at what price — critical for bid pricing decisions.
 
 ---
 

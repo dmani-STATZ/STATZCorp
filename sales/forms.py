@@ -9,3 +9,10 @@ class ImportUploadForm(forms.Form):
     in_file = forms.FileField(label='IN File')
     bq_file = forms.FileField(label='BQ File')
     as_file = forms.FileField(label='AS File')
+
+
+class AwardUploadForm(forms.Form):
+    aw_file = forms.FileField(
+        label="AW File",
+        help_text="Upload the AW file from the Office File Portal. Filename must be aw[YYMMDD].txt",
+    )

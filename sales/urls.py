@@ -82,6 +82,7 @@ from .views import (
     entity_lookup,
     entity_no_quote_add,
 )
+from .views import awards
 
 app_name = "sales"
 
@@ -171,6 +172,10 @@ urlpatterns = [
     path("settings/salutations/<int:pk>/toggle/", settings_salutation_toggle, name="settings_salutation_toggle"),
     path("settings/no-quote/", no_quote_list, name="no_quote_list"),
     path("settings/no-quote/<int:pk>/deactivate/", no_quote_deactivate, name="no_quote_deactivate"),
+    # Awards list + AW file import (DIBBS_FILE rows in DibbsAward)
+    path("awards/", awards.awards_list, name="awards_list"),
+    path("awards/import/", awards.awards_import_upload, name="awards_import_upload"),
+    path("awards/import/result/", awards.awards_import_result, name="awards_import_result"),
     # SAM.gov awards sync
     path("awards/sync/", sync_awards_view, name="sync_awards"),
     # SAM.gov entity lookup + No Quote add (POST)

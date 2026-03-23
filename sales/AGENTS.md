@@ -10,7 +10,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and SAM.gov award tracking.
 
-**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `NoQuoteCAGE`.
+**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`.
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
@@ -32,6 +32,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ### Before changing views
 - Read the full view module being changed (`sales/views/*.py`).
+- `sales/views/awards.py` — upload enforces `request.user.is_staff`; do not remove that check. The result view pops `aw_import_result` from the session — do not change the session key name.
 - Check `sales/urls.py` for the URL name being used — several names are duplicated (e.g., `bids/` and `bids/ready/` both point to `bids_ready`; `rfq/` and `rfq/pending/` both point to `rfq_pending`).
 - Check templates for context variable names — the detail view passes `solicitation`, `lines`, `matches`, `rfqs`, `quotes`, `prev_sol`, `next_sol`, `list_qs`, `queued_rfq_count`, and other keys that templates depend on.
 - Check `sales/context_processors.py` — adds `overdue_rfq_count` to every request.
@@ -124,7 +125,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 ## 7. Security / Permissions Rules
 
 - **Every view must retain `@login_required`**. This app handles sensitive procurement data (solicitation numbers, supplier pricing, bid data). Do not remove or weaken auth decorators.
-- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `sync_awards_view` checks `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
+- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `sync_awards_view` and `awards_import_upload` check `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
 - **SAM debug JSON** in `sales/templates/sales/entity_lookup.html` is conditionally shown only to staff (`{% if request.user.is_staff %}`). Do not remove this guard.
 - **Import batch delete** (`import_batch_delete`) only deletes solicitations with `status='New'`. This guard prevents accidental deletion of in-progress work. Do not relax this filter.
 - **File uploads** (IN/BQ/AS files) are saved to temp directories and removed during the match step. Do not change temp file handling without verifying cleanup still occurs.

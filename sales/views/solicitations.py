@@ -21,6 +21,7 @@ from sales.models import (
     SupplierContactLog,
     CompanyCAGE,
     GovernmentBid,
+    DibbsAward,
 )
 from sales.services.email import resolve_supplier_email
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
@@ -475,6 +476,16 @@ def solicitation_detail(request, sol_number):
     # No Quote CAGE set — loaded once per request; templates compare normalized CAGE substrings.
     no_quote_cages = get_no_quote_cage_set()
 
+    nsn_raw = getattr(line, "nsn", None) if line else None
+    last_award = None
+    if nsn_raw:
+        last_award = (
+            DibbsAward.objects.filter(nsn__iexact=nsn_raw)
+            .exclude(total_contract_price=None)
+            .order_by("-award_date", "-id")
+            .first()
+        )
+
     return render(
         request,
         "sales/solicitations/detail.html",
@@ -506,6 +517,7 @@ def solicitation_detail(request, sol_number):
             "list_qs": list_qs_raw,
             "queued_rfq_count": queued_rfq_count,
             "no_quote_cages": no_quote_cages,
+            "last_award": last_award,
         },
     )
 

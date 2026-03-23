@@ -1,0 +1,163 @@
+{% extends "sales/base.html" %}
+
+{% block content %}
+
+<style>
+  .drop-zone {
+    border: 2px dashed #c8d6e8;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--company-primary, #004eb3);
+    background: #eef4ff;
+  }
+  .drop-zone-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+  .drop-zone-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: #1a2940; margin-bottom: 4px; }
+  .drop-zone-sub { font-size: 13px; color: #7a90b0; margin-bottom: 14px; }
+  .btn-primary-lg {
+    font-size: 15px; padding: 12px 32px;
+    background: var(--company-primary, #004eb3);
+    color: #fff; border: none; border-radius: 7px;
+    font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn-primary-lg:hover { opacity: .88; }
+  .btn-ghost-sm {
+    font-size: 13px; padding: 9px 18px;
+    background: transparent; color: #4b6080;
+    border: 1px solid #cbd5e1; border-radius: 7px;
+    font-weight: 500; cursor: pointer;
+  }
+  .btn-ghost-sm:hover { background: #f1f5f9; }
+  .aw-crumb { font-size: 0.8125rem; color: #6b7280; margin-bottom: 0.5rem; }
+  .aw-crumb a { color: var(--company-primary, #004eb3); text-decoration: none; }
+  .data-table-wrap table tbody tr:hover { background: #f8fafc; }
+</style>
+
+<div style="max-width: 720px;">
+  <div class="aw-crumb">
+    <a href="{% url 'sales:awards_list' %}">Awards</a> → Import
+  </div>
+  <h1 style="font-size:1.375rem; font-weight:600; margin:0 0 0.25rem 0;">{{ page_title }}</h1>
+  <p class="text-muted small mb-3">Staff only — upload daily AW files for import into DibbsAward (<code>source=DIBBS_FILE</code>).</p>
+
+  {% if error %}
+  <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+  {% endif %}
+  {% if form.aw_file.errors %}
+  <div class="alert alert-danger" role="alert">{{ form.aw_file.errors }}</div>
+  {% endif %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5 fw-semibold mb-2">Upload AW File</h2>
+      <p class="text-muted small mb-3">
+        Download the AW file from the Office File Portal (<code>files.themanihome.com</code>), then drag it here.
+        Filename must match format: <span class="font-monospace">aw[YYMMDD].txt</span> (e.g. <span class="font-monospace">aw260319.txt</span>).
+      </p>
+
+      <form method="post" enctype="multipart/form-data" id="aw-upload-form">
+        {% csrf_token %}
+        <div style="display:none;">{{ form.aw_file }}</div>
+
+        <div class="drop-zone" id="aw-drop-zone"
+             ondragover="event.preventDefault(); this.classList.add('dragover');"
+             ondragleave="this.classList.remove('dragover');"
+             ondrop="awHandleDrop(event)"
+             onclick="document.getElementById('aw-file-input').click()">
+          <span class="drop-zone-icon">📁</span>
+          <div class="drop-zone-title">Drop AW file here or click to browse</div>
+          <div class="drop-zone-sub">One <span class="font-monospace">.txt</span> file only</div>
+          <button type="button" class="btn-ghost-sm"
+                  onclick="event.stopPropagation(); document.getElementById('aw-file-input').click();">
+            Browse
+          </button>
+        </div>
+        <p id="aw-file-label" class="small text-muted mt-2 mb-0" style="display:none;"></p>
+
+        <div class="mt-3">
+          <button type="submit" class="btn-primary-lg">Import Awards File</button>
+          <a href="{% url 'sales:awards_list' %}" class="btn btn-outline-secondary ms-2">View all awards</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h2 class="h5 fw-semibold mb-3">Recent Imports</h2>
+      {% if recent_batches %}
+      <div class="data-table-wrap">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Filename</th>
+              <th class="text-end">Rows</th>
+              <th class="text-end">New</th>
+              <th class="text-end">Updated</th>
+              <th class="text-end">We Won</th>
+              <th>Imported By</th>
+              <th>Imported At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in recent_batches %}
+            <tr>
+              <td>{{ b.award_date|date:"M j, Y" }}</td>
+              <td class="font-monospace small">{{ b.filename }}</td>
+              <td class="text-end">{{ b.row_count }}</td>
+              <td class="text-end">{{ b.created_count }}</td>
+              <td class="text-end">{{ b.updated_count }}</td>
+              <td class="text-end">{{ b.we_won_count }}</td>
+              <td>{% if b.imported_by %}{{ b.imported_by.get_username }}{% else %}—{% endif %}</td>
+              <td class="small text-muted">{{ b.imported_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted mb-0">No award files have been imported yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var input = document.querySelector('#aw-upload-form input[name="aw_file"]');
+  if (!input) return;
+  input.id = 'aw-file-input';
+  input.accept = '.txt,.TXT';
+  input.style.display = 'none';
+  input.addEventListener('change', function() {
+    var lbl = document.getElementById('aw-file-label');
+    if (input.files && input.files[0]) {
+      lbl.style.display = 'block';
+      lbl.textContent = 'Selected: ' + input.files[0].name;
+    }
+  });
+  window.awHandleDrop = function(e) {
+    e.preventDefault();
+    document.getElementById('aw-drop-zone').classList.remove('dragover');
+    var f = e.dataTransfer.files[0];
+    if (!f) return;
+    var dt = new DataTransfer();
+    dt.items.add(f);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+})();
+</script>
+
+{% endblock content %}
