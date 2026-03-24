@@ -10,7 +10,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and SAM.gov award tracking.
 
-**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`.
+**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`.
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
@@ -42,6 +42,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - `sales/services/matching.py` — the three tiers are interdependent; changing tier boundaries or deduplication logic affects bid quality downstream.
 - `sales/services/email.py` — `_default_cage()` must always find exactly one `CompanyCAGE(is_default=True, is_active=True)`. If that invariant breaks, every RFQ email fails.
 - `sales/services/importer.py` — step results stored in `ImportJob.step_results` as JSON must include `batch_id` and `import_date`; the progress template reads those keys by name.
+- `sales/services/graph_inbox.py` — uses the same MSAL client credentials pattern as `graph_mail.py`. GCC High endpoints only. `INBOX_FETCH_LIMIT=50` is hardcoded — change with care as large fetches will slow inbox load. Body is fetched lazily per message open, not in bulk.
 
 ### Before changing templates
 - `sales/templates/sales/rfq/partials/mailto_buttons.html` — referenced from the RFQ pending view (solicitation detail Matches tab uses queue buttons + No Quote modals, not this partial).
@@ -88,7 +89,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/services/matching.py` + `sales/models/matching.py` (MATCH_METHOD_CHOICES) + new migration + `sales/templates/sales/solicitations/detail.html` (matches tab) + `sales/templates/sales/rfq/partials/mailto_buttons.html`
 
 ### Changing `CompanyCAGE` fields
-→ `sales/models/cages.py` + new migration + `sales/services/bq_export.py` (check `COMPANY_FILLED_COLUMNS`) + `sales/services/email.py` (`_default_cage()` and `_rfq_body()`) + `sales/views/settings.py` (cage add/edit form handling) + `sales/templates/sales/settings/cage_form.html`
+→ `sales/models/cages.py` + new migration + `sales/services/bq_export.py` (check `COMPANY_FILLED_COLUMNS`) + `sales/services/email.py` (`_default_cage()` and `_rfq_body()`) + `sales/views/settings.py` (cage add/edit form handling) + `sales/templates/sales/settings/cage_form.html` (RFQ inbox reads the shared mailbox via Graph env vars — not CAGE fields)
 
 ### Changing `EmailTemplate` fields
 → `sales/models/email_templates.py` + new migration + `sales/services/email.py` (template rendering) + `sales/views/settings.py` + `sales/templates/sales/settings/email_template_form.html` + `sales/templates/sales/settings/email_templates.html`
@@ -245,6 +246,8 @@ After any change, manually verify these flows:
 13. **`GRAPH_MAIL_ENABLED=True` without admin consent causes silent failures.** If the Azure App Registration does not have tenant-wide admin consent granted for `Mail.Send`, Graph will return HTTP 403. The queue send will log the error and return `success=False`. No RFQs will be marked SENT. Check server logs if sends appear to succeed in the UI but emails are not received. Additionally, graph_mail.py uses GCC High endpoints (login.microsoftonline.us, graph.microsoft.us). Do not change these to .com equivalents — this tenant is Azure Government, not commercial Azure.
 
 14. **Wrong `GRAPH_MAIL_SENDER` in production will break supplier relationships.** If `GRAPH_MAIL_SENDER` is set to anything other than `quotes@statzcorp.com` in production, RFQs will arrive from an unrecognized address. Suppliers who have been receiving RFQs from `quotes@statzcorp.com` via Sales Patriot for years may ignore or spam-flag emails from an unknown sender. The production env var in Azure App Service must always be `quotes@statzcorp.com`. The dev `.env` uses `rfq@statzcorp.com` to protect the production mailbox from test traffic.
+
+15. **`graph_inbox.py` requires `Mail.Read` not just `Mail.Send`.** The Azure App Registration must have `Mail.Read` or `Mail.ReadWrite` application permission with tenant-wide admin consent, separate from `Mail.Send`. If the token is acquired but inbox fetch returns 403, this permission is missing. GCC High tenants require consent in the Government portal, not the commercial portal.
 
 ---
 

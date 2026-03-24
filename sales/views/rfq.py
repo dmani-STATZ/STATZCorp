@@ -1,6 +1,7 @@
 """
 RFQ dispatch and quote entry views. Section 10.5, 10.8.
 """
+import json
 import logging
 import urllib.parse
 from datetime import timedelta
@@ -30,7 +31,7 @@ from sales.models import (
     ApprovedSource,
     EmailTemplate,
 )
-from sales.models.inbox import InboxEmail
+from sales.models.inbox import InboxMessage, InboxMessageRFQLink
 from sales.services.email import (
     send_rfq_email,
     send_followup_email,
@@ -38,7 +39,11 @@ from sales.services.email import (
     resolve_supplier_email_for_send,
     build_grouped_rfq_email,
 )
-from sales.services.imap_fetch import fetch_inbox_emails, _apply_match
+from sales.services.graph_inbox import (
+    fetch_inbox_messages,
+    fetch_message_body,
+    mark_message_read,
+)
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
 from sales.services.suppliers import create_supplier_from_sam, get_or_create_stub_supplier
 
@@ -463,7 +468,6 @@ def rfq_center(request):
         ("closed", "⛌ Closed", closed, "#6b7280"),
     ]
 
-    unread_count = InboxEmail.objects.filter(is_read=False).count()
     queued_count = SupplierRFQ.objects.filter(status="QUEUED").count()
 
     return render(request, "sales/rfq/center.html", {
@@ -471,7 +475,6 @@ def rfq_center(request):
         "selected_rfq_id": selected_rfq_id or 0,
         "default_markup_pct": default_markup_pct,
         "today": today,
-        "unread_count": unread_count,
         "queued_count": queued_count,
     })
 
@@ -1670,93 +1673,221 @@ def rfq_queue_mark_sent(request):
 
 
 # ──────────────────────────────────────────────
-# IMAP Inbox views
+# Graph Inbox (Microsoft Graph — GRAPH_MAIL_SENDER mailbox)
 # ──────────────────────────────────────────────
 
+
+@login_required
+def rfq_inbox(request):
+    """
+    Renders the Inbox tab of the RFQ Center (full page).
+
+    Fetches the 50 most recent messages from the GRAPH_MAIL_SENDER mailbox via Graph.
+    Merges live Graph results with locally stored InboxMessage rows for link badges.
+    """
+    messages_raw, error = fetch_inbox_messages()
+
+    graph_ids = [m.graph_id for m in messages_raw]
+    stored = (
+        InboxMessage.objects.prefetch_related(
+            'rfq_links__rfq__line__solicitation',
+        )
+        .filter(graph_message_id__in=graph_ids)
+        if graph_ids
+        else InboxMessage.objects.none()
+    )
+    stored_map = {s.graph_message_id: s for s in stored}
+
+    for msg in messages_raw:
+        db_record = stored_map.get(msg.graph_id)
+        if db_record:
+            msg.is_linked = True
+            msg.linked_rfq_ids = list(
+                db_record.rfq_links.values_list('rfq_id', flat=True)
+            )
+            sols = list(
+                db_record.rfq_links.select_related(
+                    'rfq__supplier', 'rfq__line__solicitation',
+                )
+            )
+            sol_nums = []
+            msg.linked_rfqs_display = []
+            for link in sols:
+                rfq = link.rfq
+                sol = rfq.line.solicitation if rfq.line_id else None
+                sn = sol.solicitation_number if sol else ''
+                if sn:
+                    sol_nums.append(sn)
+                msg.linked_rfqs_display.append({
+                    'rfq_id': rfq.pk,
+                    'sol_number': sn,
+                    'supplier_name': (rfq.supplier.name if rfq.supplier_id else '')
+                    or (rfq.supplier.cage_code if rfq.supplier_id else '')
+                    or '—',
+                })
+            msg.linked_sol_numbers = sorted(set(sol_nums))
+            msg.linked_rfqs_json = json.dumps(msg.linked_rfqs_display)
+        else:
+            msg.linked_rfqs_json = '[]'
+
+    context = {
+        'inbox_messages': messages_raw,
+        'inbox_error': error,
+        'active_tab': 'inbox',
+    }
+    return render(request, 'sales/rfq/inbox.html', context)
+
+
+@login_required
+def rfq_inbox_message_body(request, graph_message_id):
+    """
+    AJAX: full HTML body for one Graph message (sandboxed iframe srcdoc on client).
+    """
+    body_html, error = fetch_message_body(graph_message_id)
+    return JsonResponse({'html': body_html, 'error': error})
+
+
 @login_required
 @require_POST
-def rfq_inbox_refresh(request):
-    """POST: pull new emails from IMAP using the current user's delegated token."""
-    result = fetch_inbox_emails(user=request.user)
-    if result["errors"] and not result["fetched"]:
-        return JsonResponse({"success": False, "error": result["errors"][0]})
-    unread_count = InboxEmail.objects.filter(is_read=False).count()
-    return JsonResponse({
-        "success": True,
-        "fetched": result["fetched"],
-        "matched": result["matched"],
-        "unread_count": unread_count,
-    })
+def rfq_inbox_link(request, graph_message_id):
+    """
+    POST: link one inbox message to one or more SupplierRFQ rows (persist InboxMessage + links).
+    """
+    from django.utils.dateparse import parse_datetime
+    from django.utils import timezone as tz
 
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            payload = json.loads(request.body)
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    else:
+        payload = request.POST
 
-@login_required
-@require_GET
-def rfq_inbox_list(request):
-    """GET: return the inbox email list HTML fragment."""
-    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
-    imap_configured = bool(
-        cage
-        and getattr(cage, "imap_host", None)
-        and getattr(cage, "imap_user", None)
-        and getattr(cage, "imap_password", None)
-    )
-    emails = InboxEmail.objects.select_related("rfq__supplier", "rfq__line__solicitation").order_by("-received_at")[:100]
-    unread_count = InboxEmail.objects.filter(is_read=False).count()
-    return render(request, "sales/rfq/partials/inbox_list.html", {
-        "emails": emails,
-        "imap_configured": imap_configured,
-        "unread_count": unread_count,
-    })
-
-
-@login_required
-@require_GET
-def rfq_inbox_detail(request, email_id):
-    """GET: return the inbox email detail HTML fragment for the center panel. Marks email as read."""
-    inbox_email = get_object_or_404(InboxEmail.objects.select_related(
-        "rfq__supplier", "rfq__line__solicitation", "rfq__line",
-    ), pk=email_id)
-
-    if not inbox_email.is_read:
-        inbox_email.is_read = True
-        inbox_email.save(update_fields=["is_read"])
-
-    # Build list of SENT RFQs for the manual-assign dropdown (unmatched emails only)
-    assignable_rfqs = []
-    if not inbox_email.is_matched:
-        assignable_rfqs = (
-            SupplierRFQ.objects
-            .filter(status="SENT")
-            .select_related("supplier", "line__solicitation")
-            .order_by("-sent_at")[:200]
+    rfq_ids_raw = payload.get('rfq_ids', '')
+    try:
+        rfq_id_list = [int(x.strip()) for x in rfq_ids_raw.split(',') if x.strip()]
+    except ValueError:
+        return JsonResponse(
+            {'success': False, 'error': 'rfq_ids must be comma-separated integers'},
+            status=400,
         )
 
-    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
-    default_markup_pct = float(cage.default_markup_pct) if cage else 0
+    if not rfq_id_list:
+        return JsonResponse({'success': False, 'error': 'No RFQ IDs provided'}, status=400)
 
-    return render(request, "sales/rfq/partials/inbox_detail.html", {
-        "inbox_email": inbox_email,
-        "assignable_rfqs": assignable_rfqs,
-        "default_markup_pct": default_markup_pct,
-        "rfq_enter_quote_url": reverse("sales:rfq_enter_quote", args=[0]).rstrip("0"),
+    sender_email = (payload.get('sender_email') or '').strip()
+    sender_name = (payload.get('sender_name') or '').strip()
+    subject = (payload.get('subject') or '').strip()
+    received_at_str = (payload.get('received_at') or '').strip()
+    notes = (payload.get('notes') or '').strip()
+
+    if not sender_email:
+        return JsonResponse(
+            {'success': False, 'error': 'sender_email is required'},
+            status=400,
+        )
+
+    received_at = parse_datetime(received_at_str) if received_at_str else None
+    if received_at is None:
+        received_at = tz.now()
+    if received_at.tzinfo is None:
+        received_at = tz.make_aware(received_at)
+
+    body_html, _ = fetch_message_body(graph_message_id)
+
+    inbox_msg, _ = InboxMessage.objects.get_or_create(
+        graph_message_id=graph_message_id,
+        defaults={
+            'sender_email': sender_email,
+            'sender_name': sender_name,
+            'subject': subject,
+            'received_at': received_at,
+            'body_html': body_html,
+            'is_read': True,
+        },
+    )
+
+    rfqs = SupplierRFQ.objects.select_related(
+        'supplier', 'line__solicitation',
+    ).filter(pk__in=rfq_id_list)
+    for rfq in rfqs:
+        InboxMessageRFQLink.objects.get_or_create(
+            message=inbox_msg,
+            rfq=rfq,
+            defaults={
+                'linked_by': request.user,
+                'notes': notes,
+            },
+        )
+
+    mark_message_read(graph_message_id)
+
+    # Full list for UI (includes prior links on this message)
+    all_links = inbox_msg.rfq_links.select_related(
+        'rfq__supplier', 'rfq__line__solicitation',
+    )
+    linked_rfqs_meta = []
+    for link in all_links:
+        rfq = link.rfq
+        sol = rfq.line.solicitation if rfq.line_id else None
+        linked_rfqs_meta.append({
+            'rfq_id': rfq.pk,
+            'sol_number': sol.solicitation_number if sol else '',
+            'supplier_name': (rfq.supplier.name if rfq.supplier_id else '')
+            or (rfq.supplier.cage_code if rfq.supplier_id else '')
+            or '—',
+        })
+    sols_ordered = sorted({x['sol_number'] for x in linked_rfqs_meta if x.get('sol_number')})
+    return JsonResponse({
+        'success': True,
+        'linked_sol_numbers': sols_ordered,
+        'linked_rfqs': linked_rfqs_meta,
     })
 
 
 @login_required
-@require_POST
-def rfq_inbox_assign(request, email_id):
-    """POST: manually link an unmatched inbox email to an RFQ."""
-    inbox_email = get_object_or_404(InboxEmail, pk=email_id)
-    rfq_id = request.POST.get("rfq_id")
-    if not rfq_id:
-        return JsonResponse({"success": False, "error": "rfq_id required"})
+def rfq_inbox_rfq_search(request):
+    """
+    AJAX GET: search SENT SupplierRFQs for the link modal.
+    """
+    q = request.GET.get('q', '').strip()
+    email = request.GET.get('email', '').strip()
 
-    rfq = get_object_or_404(SupplierRFQ.objects.select_related("supplier", "line__solicitation"), pk=rfq_id)
-    _apply_match(inbox_email, rfq)
-    inbox_email.save()
-    return JsonResponse({
-        "success": True,
-        "rfq_id": rfq.pk,
-        "supplier_name": rfq.supplier.name or "",
-        "sol_number": rfq.line.solicitation.solicitation_number,
-    })
+    qs = SupplierRFQ.objects.select_related(
+        'line__solicitation', 'supplier',
+    ).filter(status='SENT')
+
+    if email:
+        qs = qs.filter(
+            Q(supplier__rfq_email__iexact=email)
+            | Q(supplier__business_email__iexact=email)
+            | Q(supplier__primary_email__iexact=email)
+        )
+
+    if q:
+        qs = qs.filter(
+            Q(line__solicitation__solicitation_number__icontains=q)
+            | Q(supplier__name__icontains=q)
+        )
+
+    qs = qs.order_by('-sent_at', '-id')[:30]
+
+    results = []
+    for rfq in qs:
+        sol = rfq.line.solicitation if rfq.line_id else None
+        sup = rfq.supplier
+        results.append({
+            'rfq_id': rfq.pk,
+            'sol_number': sol.solicitation_number if sol else '',
+            'supplier_name': sup.name if sup else '',
+            'supplier_email': (
+                (getattr(sup, 'rfq_email', None) or '')
+                or (getattr(sup, 'business_email', None) or '')
+                or (getattr(sup, 'primary_email', None) or '')
+            ),
+            'status': rfq.status,
+            'sent_at': rfq.sent_at.isoformat() if rfq.sent_at else '',
+        })
+
+    return JsonResponse(results, safe=False)

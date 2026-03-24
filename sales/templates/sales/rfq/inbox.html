@@ -1,0 +1,363 @@
+{% extends "sales/base.html" %}
+{% block content %}
+<style>
+  .graph-inbox-wrap { max-width: 1400px; margin: 0 auto; }
+  .graph-inbox-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+  .graph-inbox-tabs a { font-size: 0.875rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none; color: #6b7280; border: 1px solid #e5e7eb; }
+  .graph-inbox-tabs a.active { color: var(--company-primary, #004eb3); border-color: var(--company-primary, #004eb3); background: #eff6ff; }
+  .graph-inbox-card { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; overflow: hidden; }
+  .graph-inbox-row { display: flex; min-height: 560px; }
+  .graph-inbox-list { width: 300px; flex-shrink: 0; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; max-height: 640px; }
+  .graph-inbox-list-inner { flex: 1; overflow-y: auto; }
+  .graph-msg-row { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 0.8125rem; transition: background 0.15s; }
+  .graph-msg-row:hover { background: #f9fafb; }
+  .graph-msg-row.active { background: #eff6ff; border-left: 3px solid var(--company-primary, #004eb3); padding-left: calc(0.75rem - 3px); }
+  .graph-msg-row.unread .graph-msg-subj { font-weight: 700; }
+  .graph-msg-row.unread .graph-msg-from { font-weight: 600; }
+  .graph-msg-subj { font-weight: 600; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .graph-msg-from { font-size: 0.75rem; color: #6b7280; margin-top: 0.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .graph-msg-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.35rem; margin-top: 0.25rem; }
+  .graph-msg-date { font-size: 0.7rem; color: #9ca3af; white-space: nowrap; }
+  .graph-unread-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--company-primary, #004eb3); flex-shrink: 0; margin-top: 0.35rem; }
+  .graph-inbox-detail { flex: 1; padding: 1rem; min-width: 0; display: flex; flex-direction: column; }
+  .graph-detail-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.9375rem; }
+  .graph-detail-header { margin-bottom: 0.75rem; }
+  .graph-detail-header h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.35rem; word-break: break-word; }
+  .graph-detail-meta { font-size: 0.8125rem; color: #6b7280; }
+  .graph-linked-list { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+  .graph-linked-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #f3f4f6; font-size: 0.8125rem; }
+  .graph-search-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #f3f4f6; font-size: 0.8125rem; }
+  .graph-empty { padding: 2rem; text-align: center; color: #9ca3af; font-size: 0.875rem; }
+</style>
+
+<div class="graph-inbox-wrap">
+  <div class="graph-inbox-tabs">
+    <a href="{% url 'sales:rfq_queue_view' %}">Queue</a>
+    <a href="{% url 'sales:rfq_inbox' %}" class="active">Inbox</a>
+  </div>
+
+  <div class="graph-inbox-card">
+    <div class="graph-inbox-row">
+      <div class="graph-inbox-list">
+        <div class="p-2 border-bottom bg-light">
+          {% if inbox_error %}
+          <div class="alert alert-danger py-2 px-2 mb-0 small" role="alert">{{ inbox_error }}</div>
+          {% endif %}
+        </div>
+        <div class="graph-inbox-list-inner" id="graph-inbox-list">
+          {% if not inbox_messages and not inbox_error %}
+          <div class="graph-empty">No messages in inbox.</div>
+          {% elif not inbox_messages and inbox_error %}
+          <div class="graph-empty text-muted">No messages returned.</div>
+          {% else %}
+          {% for msg in inbox_messages %}
+          <div class="graph-msg-row {% if not msg.is_read %}unread{% endif %} inbox-msg-item"
+               role="button"
+               tabindex="0"
+               data-graph-id="{{ msg.graph_id|escape }}"
+               data-sender-email="{{ msg.sender_email|escape }}"
+               data-sender-name="{{ msg.sender_name|escape }}"
+               data-subject="{{ msg.subject|escape }}"
+               data-received-at="{{ msg.received_at.isoformat }}"
+               data-is-linked="{% if msg.is_linked %}1{% else %}0{% endif %}"
+               data-linked-sols="{{ msg.linked_sol_numbers|join:', '|escape }}"
+               data-linked-json='{{ msg.linked_rfqs_json|escapejs }}'>
+            <div style="display:flex; gap:0.35rem; align-items:flex-start;">
+              {% if not msg.is_read %}<span class="graph-unread-dot" aria-hidden="true"></span>{% endif %}
+              <div style="min-width:0; flex:1;">
+                <div class="graph-msg-subj" title="{{ msg.subject|escape }}">{{ msg.subject|truncatechars:60 }}</div>
+                <div class="graph-msg-from">{{ msg.sender_name|default:msg.sender_email|truncatechars:42 }}</div>
+                {% if msg.is_linked and msg.linked_sol_numbers %}
+                <div class="mt-1"><span class="badge bg-success small">Linked: {{ msg.linked_sol_numbers|join:", " }}</span></div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="graph-msg-meta">
+              <span></span>
+              <span class="graph-msg-date">{{ msg.received_at|date:"M j, g:i A" }}</span>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="graph-inbox-detail" id="graph-inbox-detail-panel">
+        <div class="graph-detail-placeholder" id="graph-detail-empty">← Select a message to view</div>
+        <div id="graph-detail-body" style="display:none;">
+          <div class="graph-detail-header">
+            <h2 id="graph-d-subject"></h2>
+            <div class="graph-detail-meta">
+              <div id="graph-d-from"></div>
+              <div id="graph-d-date" class="text-muted small"></div>
+            </div>
+          </div>
+          <p class="small text-danger d-none" id="graph-d-err"></p>
+          <iframe
+            id="email-body-frame"
+            title="Email body"
+            srcdoc=""
+            sandbox="allow-same-origin"
+            style="width:100%; height:500px; border:1px solid #dee2e6; border-radius:4px;"
+          ></iframe>
+          <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-link-rfq" data-bs-toggle="modal" data-bs-target="#linkRfqModal">Link to RFQ</button>
+          </div>
+          <div class="graph-linked-list d-none" id="graph-linked-section">
+            <h3 class="h6">Linked RFQs</h3>
+            <div id="graph-linked-list-inner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Link modal -->
+<div class="modal fade" id="linkRfqModal" tabindex="-1" aria-labelledby="linkRfqModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="linkRfqModalLabel">Link to RFQ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="link-rfq-search-q">Search by SOL number or supplier name</label>
+        <input type="text" class="form-control" id="link-rfq-search-q" autocomplete="off" placeholder="Type to search…">
+        <div class="mt-3 small text-muted" id="link-rfq-search-status"></div>
+        <div class="mt-2" id="link-rfq-results"></div>
+      </div>
+      <div class="modal-footer flex-column align-items-stretch">
+        <label class="form-label" for="link-rfq-notes">Notes (optional)</label>
+        <textarea class="form-control form-control-sm mb-2" id="link-rfq-notes" rows="2"></textarea>
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="link-rfq-submit" disabled>Link Selected</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var csrfToken = '{{ csrf_token }}';
+  var bodyUrlTpl = "{% url 'sales:rfq_inbox_message_body' graph_message_id='__GRAPH_MSG_ID__' %}";
+  var linkUrlTpl = "{% url 'sales:rfq_inbox_link' graph_message_id='__GRAPH_MSG_ID__' %}";
+  var searchUrl = "{% url 'sales:rfq_inbox_rfq_search' %}";
+  var quoteUrlTpl = "{% url 'sales:rfq_enter_quote' rfq_id=987654321 %}";
+
+  function encUrl(tpl, gid) {
+    return tpl.replace('__GRAPH_MSG_ID__', encodeURIComponent(gid));
+  }
+
+  function quoteUrlForRfq(rfqId) {
+    return quoteUrlTpl.replace('987654321', String(rfqId));
+  }
+
+  var selectedGid = null;
+  var selectedMeta = {};
+  var searchTimer = null;
+
+  function findRowByGid(gid) {
+    var rows = document.querySelectorAll('.inbox-msg-item');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute('data-graph-id') === gid) return rows[i];
+    }
+    return null;
+  }
+
+  function getSelectedChecks() {
+    return document.querySelectorAll('#link-rfq-results .link-rfq-check:checked');
+  }
+
+  function updateLinkButtonState() {
+    var btn = document.getElementById('link-rfq-submit');
+    if (!btn) return;
+    btn.disabled = getSelectedChecks().length === 0;
+  }
+
+  function renderLinkedRfqs(items) {
+    var sec = document.getElementById('graph-linked-section');
+    var inner = document.getElementById('graph-linked-list-inner');
+    if (!items || !items.length) {
+      sec.classList.add('d-none');
+      inner.innerHTML = '';
+      return;
+    }
+    sec.classList.remove('d-none');
+    inner.innerHTML = items.map(function(it) {
+      var href = quoteUrlForRfq(it.rfq_id);
+      return '<div class="graph-linked-item"><div><strong class="mono">' + escapeHtml(it.sol_number) + '</strong> — ' +
+        escapeHtml(it.supplier_name || '') + '</div><a class="btn btn-sm btn-outline-primary" href="' + href + '">Start Quote Entry</a></div>';
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function parseLinkedJson(row) {
+    var raw = row.getAttribute('data-linked-json') || '[]';
+    try {
+      var j = JSON.parse(raw);
+      return Array.isArray(j) ? j : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function selectMessage(row) {
+    selectedGid = row.getAttribute('data-graph-id');
+    selectedMeta = {
+      sender_email: row.getAttribute('data-sender-email') || '',
+      sender_name: row.getAttribute('data-sender-name') || '',
+      subject: row.getAttribute('data-subject') || '',
+      received_at: row.getAttribute('data-received-at') || ''
+    };
+    document.querySelectorAll('.inbox-msg-item').forEach(function(r) { r.classList.remove('active'); });
+    row.classList.add('active');
+    row.classList.remove('unread');
+
+    document.getElementById('graph-detail-empty').style.display = 'none';
+    document.getElementById('graph-detail-body').style.display = 'block';
+    document.getElementById('graph-d-subject').textContent = selectedMeta.subject || '(no subject)';
+    var fromEl = document.getElementById('graph-d-from');
+    fromEl.textContent = '';
+    if (selectedMeta.sender_name) {
+      fromEl.appendChild(document.createTextNode(selectedMeta.sender_name + ' '));
+    }
+    fromEl.appendChild(document.createTextNode('<' + selectedMeta.sender_email + '>'));
+    document.getElementById('graph-d-date').textContent = selectedMeta.received_at || '';
+
+    var iframe = document.getElementById('email-body-frame');
+    iframe.srcdoc = '<p style="font-family:sans-serif;padding:1rem;color:#6b7280;">Loading…</p>';
+    var errEl = document.getElementById('graph-d-err');
+    errEl.classList.add('d-none');
+    errEl.textContent = '';
+
+    fetch(encUrl(bodyUrlTpl, selectedGid), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          errEl.textContent = data.error;
+          errEl.classList.remove('d-none');
+          iframe.srcdoc = '';
+          return;
+        }
+        iframe.srcdoc = data.html || '';
+      })
+      .catch(function() {
+        errEl.textContent = 'Could not load message body.';
+        errEl.classList.remove('d-none');
+        iframe.srcdoc = '';
+      });
+
+    if (row.getAttribute('data-is-linked') === '1') {
+      renderLinkedRfqs(parseLinkedJson(row));
+    } else {
+      renderLinkedRfqs([]);
+    }
+  }
+
+  document.querySelectorAll('.inbox-msg-item').forEach(function(row) {
+    row.addEventListener('click', function() { selectMessage(row); });
+    row.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectMessage(row); }
+    });
+  });
+
+  function runSearch() {
+    var q = document.getElementById('link-rfq-search-q').value.trim();
+    var status = document.getElementById('link-rfq-search-status');
+    var box = document.getElementById('link-rfq-results');
+    status.textContent = 'Searching…';
+    box.innerHTML = '';
+    var params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (selectedMeta.sender_email) params.set('email', selectedMeta.sender_email);
+    fetch(searchUrl + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) {
+        status.textContent = rows.length ? rows.length + ' result(s)' : 'No results';
+        box.innerHTML = rows.map(function(row) {
+          return '<label class="graph-search-result w-100 mb-0 d-flex align-items-start gap-2">' +
+            '<input type="checkbox" class="form-check-input link-rfq-check mt-1" data-rfq-id="' + row.rfq_id + '">' +
+            '<div class="flex-grow-1"><strong>' + escapeHtml(row.sol_number) + '</strong> ' +
+            escapeHtml(row.supplier_name) +
+            ' <span class="badge bg-secondary">' + escapeHtml(row.status) + '</span>' +
+            '<div class="small text-muted">' + escapeHtml(row.sent_at || '') + '</div></div></label>';
+        }).join('');
+        box.querySelectorAll('.link-rfq-check').forEach(function(cb) {
+          cb.addEventListener('change', updateLinkButtonState);
+        });
+      })
+      .catch(function() { status.textContent = 'Search failed.'; });
+  }
+
+  document.getElementById('link-rfq-search-q').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 300);
+  });
+
+  var modalEl = document.getElementById('linkRfqModal');
+  modalEl.addEventListener('shown.bs.modal', function() {
+    document.getElementById('link-rfq-search-q').value = '';
+    document.getElementById('link-rfq-results').innerHTML = '';
+    document.getElementById('link-rfq-search-status').textContent = '';
+    document.getElementById('link-rfq-notes').value = '';
+    document.getElementById('link-rfq-submit').disabled = true;
+    runSearch();
+  });
+
+  document.getElementById('link-rfq-submit').addEventListener('click', function() {
+    if (!selectedGid) return;
+    var ids = Array.prototype.map.call(getSelectedChecks(), function(cb) { return cb.getAttribute('data-rfq-id'); }).join(',');
+    if (!ids) return;
+    var fd = new FormData();
+    fd.set('rfq_ids', ids);
+    fd.set('sender_email', selectedMeta.sender_email);
+    fd.set('sender_name', selectedMeta.sender_name);
+    fd.set('subject', selectedMeta.subject);
+    fd.set('received_at', selectedMeta.received_at);
+    fd.set('notes', document.getElementById('link-rfq-notes').value);
+    fetch(encUrl(linkUrlTpl, selectedGid), {
+      method: 'POST',
+      body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.success) { alert(data.error || 'Link failed'); return; }
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        var row = findRowByGid(selectedGid);
+        if (row) {
+          row.setAttribute('data-is-linked', '1');
+          row.setAttribute('data-linked-sols', (data.linked_sol_numbers || []).join(','));
+          if (data.linked_rfqs) {
+            row.setAttribute('data-linked-json', JSON.stringify(data.linked_rfqs));
+          }
+          var badgeWrap = row.querySelector('.mt-1');
+          var sols = (data.linked_sol_numbers || []).join(', ');
+          if (!badgeWrap) {
+            var inner = row.querySelector('.graph-msg-from');
+            if (inner && inner.parentNode) {
+              var d = document.createElement('div');
+              d.className = 'mt-1';
+              inner.parentNode.appendChild(d);
+              badgeWrap = d;
+            }
+          }
+          if (badgeWrap) badgeWrap.innerHTML = '<span class="badge bg-success small">Linked: ' + escapeHtml(sols) + '</span>';
+        }
+        renderLinkedRfqs(data.linked_rfqs || []);
+      })
+      .catch(function() { alert('Link request failed.'); });
+  });
+})();
+</script>
+{% endblock content %}

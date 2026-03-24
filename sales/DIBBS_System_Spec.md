@@ -946,7 +946,7 @@ The current implementation uses **manual approval**. The flow is:
 5. System generates RFQ emails and sets `dibbs_supplier_rfq.status = SENT`
 6. A `auto_dispatch_enabled` boolean on `CompanyCAGE` (or a Django setting) gates the automated pathway for future use
 
-**Email transport:** The system uses Microsoft Graph API (`GRAPH_MAIL_ENABLED=True`) for automated outbound RFQ dispatch from `quotes@statzcorp.com`. When Graph is unavailable or disabled, the queue send flow generates `mailto:` URLs that open in the user's local email client (Outlook). The user sends manually and clicks **Mark All Sent** to confirm. Both paths log `SupplierContactLog` entries and advance `SupplierRFQ` status to `SENT`. The Graph app registration is **STATZ Web App Mail** in the `statzcorpgcch` tenant with **Mail.Send** application permission.
+**Email transport:** The system uses Microsoft Graph API (`GRAPH_MAIL_ENABLED=True`) for automated outbound RFQ dispatch from `quotes@statzcorp.com`. When Graph is unavailable or disabled, the queue send flow generates `mailto:` URLs that open in the user's local email client (Outlook). The user sends manually and clicks **Mark All Sent** to confirm. Both paths log `SupplierContactLog` entries and advance `SupplierRFQ` status to `SENT`. The Graph app registration is **STATZ Web App Mail** in the `statzcorpgcch` tenant with **Mail.Send** application permission for outbound sends and **Mail.Read** (or **Mail.ReadWrite**) for the RFQ Inbox reader (`services/graph_inbox.py`), which lists messages in the `GRAPH_MAIL_SENDER` mailbox (GCC High: `graph.microsoft.us`).
 
 **Sender mailbox decision (standing):** `quotes@statzcorp.com` is the designated production RFQ sender. This address was used by the legacy Sales Patriot platform; suppliers have existing email relationships with it and it carries established sending reputation in the M365 tenant. Switching the production sender requires sales team sign-off. `rfq@statzcorp.com` is the designated dev/test sender — it is a mature mailbox with sending history (critical: newly provisioned accounts are flagged as spam almost immediately at cold RFQ volumes). Environment separation is enforced via `GRAPH_MAIL_SENDER`: `quotes@statzcorp.com` in Azure App Service production config, `rfq@statzcorp.com` in local `.env`.
 
@@ -3035,6 +3035,8 @@ class SupplierContactLog(models.Model):
         ordering = ['-logged_at']
 ```
 
+**RFQ Inbox persistence (Microsoft Graph):** Supplier replies in the shared mailbox are listed live from Graph (50 messages per page load). When a rep links a message to one or more `SupplierRFQ` rows, the app stores `dibbs_inbox_message` (`InboxMessage`: Graph id, sender, subject, received time, HTML body) and `dibbs_inbox_message_rfq_link` (`InboxMessageRFQLink`: bridge to `dibbs_supplier_rfq`, optional note and `linked_by`). Unlinked messages are never written to the database. Email HTML is shown only inside a sandboxed iframe (`sandbox="allow-same-origin"`, no scripts). One email can link to multiple RFQs for grouped supplier replies. **Start Quote Entry** uses the existing `rfq_enter_quote` flow per linked RFQ.
+
 ---
 
 ### 10.7 Email Template Spec
@@ -3135,6 +3137,8 @@ The RFQ Center is redesigned around the sales team's actual daily rhythm. A sale
 - All other fields collapsed under "Additional Details ▼"
 - `Ctrl+Enter` saves
 - Does not navigate away — user stays in the RFQ Center after saving
+
+**Inbox tab — supplier replies (Graph):** The RFQ Center **Inbox** tab links to `/sales/rfq/inbox/`, a two-panel page: recent messages from the `GRAPH_MAIL_SENDER` mailbox (read via Graph on each request; no background sync), message body loaded on demand, and **Link to RFQ** to attach a message to one or more sent RFQs. IMAP and per-CAGE mailbox settings are not used; configuration is environment-only (`GRAPH_MAIL_*`).
 
 ---
 

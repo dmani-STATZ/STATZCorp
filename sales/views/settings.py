@@ -122,11 +122,6 @@ def _cage_from_post(data, instance=None):
     cage.default_child_labor_code = data.get("default_child_labor_code", "N").strip()
     cage.default_markup_pct = data.get("default_markup_pct", "3.50") or "3.50"
     cage.smtp_reply_to = data.get("smtp_reply_to", "").strip() or None
-    cage.imap_host = data.get("imap_host", "").strip() or None
-    imap_port = data.get("imap_port", "").strip()
-    cage.imap_port = int(imap_port) if imap_port.isdigit() else 993
-    cage.imap_user = data.get("imap_user", "").strip() or None
-    cage.imap_folder = data.get("imap_folder", "INBOX").strip() or "INBOX"
     cage.is_default = "is_default" in data
     cage.is_active = "is_active" in data
     return cage
