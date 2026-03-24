@@ -1,5 +1,6 @@
 {% extends "sales/base.html" %}
 {% load static %}
+{% load sales_extras %}
 
 {% block content %}
 
@@ -112,14 +113,27 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 36px; margin: 0 auto 18px;
   }
+
+  /* ── Calendar tooltip ────────────────────────────────────────────── */
+  [title] { cursor: default; }
+
+  /* ── Two-column responsive collapse ─────────────────────────────── */
+  @media (max-width: 900px) {
+    .import-two-col { flex-direction: column !important; }
+    .import-two-col > div:first-child { flex: none !important; width: 100% !important; }
+  }
 </style>
 
-<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.25rem; max-width:680px;">
-  <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Daily Import</h1>
-  <a href="{% url 'sales:import_history' %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">View Import History →</a>
-</div>
+<div class="import-two-col" style="display:flex; gap:32px; align-items:flex-start;">
 
-<div style="max-width:680px;">
+  {# ── LEFT COLUMN — existing upload form ── #}
+  <div style="flex:0 0 520px; min-width:0;">
+
+    {# PAGE TITLE ROW #}
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.25rem;">
+      <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Daily Import</h1>
+      <a href="{% url 'sales:import_history' %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">View Import History →</a>
+    </div>
 
   {# ── Step indicator ──────────────────────────────────────────────────── #}
   <div class="step-bar" id="step-bar">
@@ -160,9 +174,16 @@
       {{ form.in_file }}
       {{ form.bq_file }}
       {{ form.as_file }}
+      <input type="hidden" name="skip_sam" id="hidden-skip-sam" value="">
     </form>
 
     {# Fetch from DIBBS (default: yesterday; optional date for weekend/other days) #}
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+      <span style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+                   color:#16a34a; background:#f0fdf4; border:1px solid #bbf7d0;
+                   border-radius:4px; padding:2px 8px;">⚡ Automatic</span>
+      <span style="font-size:12px; color:#6b7280;">Recommended — fetches files directly from DIBBS</span>
+    </div>
     <form method="post" action="{% url 'sales:import_fetch_dibbs' %}" id="fetch-dibbs-form" style="margin-bottom:18px;">
       {% csrf_token %}
       <div class="alert-info" style="margin-bottom:0;">
@@ -177,11 +198,31 @@
         <input type="date" id="fetch-date" name="fetch_date" value="{{ default_fetch_date|default:'' }}"
                style="font-size:14px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; min-width:140px;"
                title="Default is yesterday. Change to get weekend or other dates.">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#4b6080; cursor:pointer; user-select:none;">
+          <input type="checkbox" name="skip_sam" value="1" style="width:15px; height:15px; cursor:pointer;">
+          Skip SAM.gov Sync
+        </label>
         <button type="submit" class="btn-primary-lg" id="fetch-dibbs-btn">
           Fetch from DIBBS &amp; Import
         </button>
       </div>
     </form>
+
+    {# OR divider — separates automatic fetch from manual upload #}
+    <div style="display:flex; align-items:center; gap:14px; margin:20px 0;">
+      <div style="flex:1; height:1px; background:#e5e7eb;"></div>
+      <span style="font-size:12px; font-weight:700; color:#9ca3af; letter-spacing:.08em;
+                   background:#fff; padding:0 4px;">OR</span>
+      <div style="flex:1; height:1px; background:#e5e7eb;"></div>
+    </div>
+
+    {# Manual upload label #}
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+      <span style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+                   color:#6b7280; background:#f8fafc; border:1px solid #e2e8f0;
+                   border-radius:4px; padding:2px 8px;">Manual Upload</span>
+      <span style="font-size:12px; color:#6b7280;">Download files from DIBBS then upload them here</span>
+    </div>
 
     {# Visible drop zone — feeds the hidden form fields #}
     <div class="drop-zone" id="drop-zone"
@@ -277,8 +318,12 @@
       <div id="confirm-date" class="file-check-row"></div>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
       <button type="button" class="btn-ghost-sm" onclick="goToStep1()">← Start Over</button>
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#4b6080; cursor:pointer; user-select:none;">
+        <input type="checkbox" id="skip-sam-checkbox" style="width:15px; height:15px; cursor:pointer;">
+        Skip SAM.gov Sync
+      </label>
       <button type="button" class="btn-primary-lg" id="confirm-btn" onclick="submitImport()">
         ✓ Confirm Import
       </button>
@@ -286,8 +331,99 @@
 
   </div>{# /step2 #}
 
+  </div>{# /left column #}
 
-</div>{# /max-width wrapper #}
+  {# ── RIGHT COLUMN — calendar (GET only; omitted when context has no cal_weeks) ── #}
+  {% if cal_weeks %}
+  <div style="flex:1; min-width:260px;">
+    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:18px 16px;">
+
+      {# Calendar header #}
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:800;
+                    color:#0a1628; letter-spacing:.02em;">
+          {{ month_name }} {{ cal_year }}
+        </div>
+        <div style="display:flex; gap:10px; font-size:11px;">
+          <span style="display:flex; align-items:center; gap:4px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:#3b82f6; display:inline-block;"></span>
+            SOL Import
+          </span>
+          <span style="display:flex; align-items:center; gap:4px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:#a855f7; display:inline-block;"></span>
+            AW Import
+          </span>
+        </div>
+      </div>
+
+      {# Day-of-week headers #}
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:4px;">
+        {% for dow in "Mo,Tu,We,Th,Fr,Sa,Su"|split:"," %}
+        <div style="text-align:center; font-size:10px; font-weight:700; letter-spacing:.06em;
+                    text-transform:uppercase; color:#9ca3af; padding:2px 0;">{{ dow }}</div>
+        {% endfor %}
+      </div>
+
+      {# Calendar grid #}
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px;">
+        {% for week in cal_weeks %}
+          {% for day in week %}
+            {% if day == 0 %}
+              <div style="height:44px;"></div>
+            {% else %}
+              {% with sol=sol_by_day|dict_key:day aw=aw_by_day|dict_key:day %}
+              <div style="
+                height:44px; border-radius:6px; padding:3px 4px;
+                background:{% if sol and aw %}#ede9fe{% elif sol %}#eff6ff{% elif aw %}#faf5ff{% else %}#f8fafc{% endif %};
+                border:1px solid {% if sol and aw %}#c4b5fd{% elif sol %}#bfdbfe{% elif aw %}#e9d5ff{% else %}#f1f5f9{% endif %};
+                position:relative; cursor:default;
+                {% if day == today_day %}outline:2px solid var(--company-primary,#004eb3); outline-offset:-2px;{% endif %}
+                "
+                {% if sol or aw %}
+                title="{% if sol %}SOL: {{ sol.sol_count }} solicitations · {{ sol.imported_by }} · {{ sol.imported_at|date:'g:i A' }}{% endif %}{% if sol and aw %} | {% endif %}{% if aw %}AW: {{ aw.row_count }} awards · {{ aw.imported_by }} · {{ aw.imported_at|date:'g:i A' }}{% endif %}"
+                {% endif %}
+              >
+                <div style="font-size:11px; font-weight:{% if day == today_day %}700{% else %}500{% endif %};
+                            color:{% if day == today_day %}var(--company-primary,#004eb3){% else %}#374151{% endif %};">
+                  {{ day }}
+                </div>
+                <div style="display:flex; gap:2px; margin-top:2px; flex-wrap:wrap;">
+                  {% if sol %}
+                    <span style="font-size:9px; font-weight:700; color:#1d4ed8;
+                                 background:#dbeafe; border-radius:2px; padding:0 3px;
+                                 line-height:14px;">SOL</span>
+                  {% endif %}
+                  {% if aw %}
+                    <span style="font-size:9px; font-weight:700; color:#7e22ce;
+                                 background:#f3e8ff; border-radius:2px; padding:0 3px;
+                                 line-height:14px;">AW</span>
+                  {% endif %}
+                </div>
+              </div>
+              {% endwith %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+
+      {# Legend / summary below calendar #}
+      <div style="margin-top:14px; padding-top:12px; border-top:1px solid #f1f5f9;
+                  display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="font-size:11px; color:#6b7280;">
+          <span style="font-weight:600; color:#1d4ed8;">{{ sol_by_day|length }}</span>
+          SOL import{{ sol_by_day|length|pluralize }} this month
+        </div>
+        <div style="font-size:11px; color:#6b7280;">
+          <span style="font-weight:600; color:#7e22ce;">{{ aw_by_day|length }}</span>
+          AW import{{ aw_by_day|length|pluralize }} this month
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endif %}
+
+</div>{# /two-column wrapper #}
 
 <script>
   // ── State ──────────────────────────────────────────────────────────────
@@ -434,6 +570,9 @@
     const btn = document.getElementById('confirm-btn');
     btn.disabled = true;
     btn.textContent = '⏳ Importing…';
+    // Copy checkbox state into the hidden form field before submitting
+    const skipChecked = document.getElementById('skip-sam-checkbox')?.checked;
+    document.getElementById('hidden-skip-sam').value = skipChecked ? '1' : '';
     document.getElementById('import-form').submit();
   }
 

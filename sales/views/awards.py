@@ -11,65 +11,78 @@ from sales.services.awards_file_importer import import_aw_file
 from sales.services.awards_file_parser import AwardFileParseError, parse_aw_file
 
 
-def _import_result_for_session(result: dict) -> dict:
-    """JSON-serialize dates for session storage."""
-    out = dict(result)
-    ad = out.get("award_date")
-    if hasattr(ad, "isoformat"):
-        out["award_date"] = ad.isoformat()
-    return out
-
-
 @login_required
 def awards_import_upload(request):
     """
     GET:  Render upload form + import history (last 20 AwardImportBatch records).
-    POST: Accept uploaded AW file, parse and import it, redirect to result page.
+    POST: Accept one or more uploaded AW files, parse and import each, re-render with per-file results.
     """
     if not request.user.is_staff:
         return HttpResponseForbidden("Staff access required.")
 
+    recent_qs = AwardImportBatch.objects.select_related("imported_by").order_by("-imported_at")[:20]
+
     if request.method == "POST":
-        form = AwardUploadForm(request.POST, request.FILES)
-        if not form.is_valid():
-            return render(
-                request,
-                "sales/awards/import_upload.html",
-                {
-                    "form": form,
-                    "page_title": "Awards File Import",
-                    "recent_batches": AwardImportBatch.objects.order_by("-imported_at")[:20],
-                    "error": "Please correct the form errors below.",
-                },
-            )
-        aw_file = form.cleaned_data.get("aw_file")
-        if not aw_file:
-            return render(
-                request,
-                "sales/awards/import_upload.html",
-                {
-                    "form": form,
-                    "page_title": "Awards File Import",
-                    "recent_batches": AwardImportBatch.objects.order_by("-imported_at")[:20],
-                    "error": "No file uploaded.",
-                },
-            )
-        try:
-            parse_result = parse_aw_file(aw_file.read(), aw_file.name)
-        except AwardFileParseError as e:
+        uploaded_files = request.FILES.getlist("aw_file")
+
+        if not uploaded_files:
             return render(
                 request,
                 "sales/awards/import_upload.html",
                 {
                     "form": AwardUploadForm(),
                     "page_title": "Awards File Import",
-                    "recent_batches": AwardImportBatch.objects.order_by("-imported_at")[:20],
-                    "error": str(e),
+                    "recent_batches": recent_qs,
+                    "error": "Please select at least one AW file to upload.",
                 },
             )
-        summary = import_aw_file(parse_result, request.user)
-        request.session["aw_import_result"] = _import_result_for_session(summary)
-        return redirect("sales:awards_import_result")
+
+        results = []
+        for upload in uploaded_files:
+            filename = upload.name
+            file_result = {
+                "filename": filename,
+                "success": False,
+                "error": None,
+                "row_count": 0,
+                "created_count": 0,
+                "updated_count": 0,
+                "skipped_count": 0,
+                "we_won_count": 0,
+                "warnings": [],
+            }
+            try:
+                file_bytes = upload.read()
+                parse_result = parse_aw_file(file_bytes, filename)
+                summary = import_aw_file(parse_result, request.user)
+                file_result["success"] = True
+                file_result["row_count"] = summary["row_count"]
+                file_result["created_count"] = summary["created_count"]
+                file_result["updated_count"] = summary["updated_count"]
+                file_result["skipped_count"] = summary["skipped_count"]
+                file_result["we_won_count"] = summary["we_won_count"]
+                file_result["warnings"] = summary["warnings"]
+            except AwardFileParseError as e:
+                file_result["error"] = str(e)
+            except Exception as e:
+                file_result["error"] = f"Unexpected error: {e}"
+
+            results.append(file_result)
+
+        recent_batches = AwardImportBatch.objects.select_related("imported_by").order_by(
+            "-imported_at"
+        )[:20]
+
+        return render(
+            request,
+            "sales/awards/import_upload.html",
+            {
+                "form": AwardUploadForm(),
+                "page_title": "Awards File Import",
+                "recent_batches": recent_batches,
+                "results": results,
+            },
+        )
 
     return render(
         request,
@@ -77,7 +90,7 @@ def awards_import_upload(request):
         {
             "form": AwardUploadForm(),
             "page_title": "Awards File Import",
-            "recent_batches": AwardImportBatch.objects.order_by("-imported_at")[:20],
+            "recent_batches": recent_qs,
         },
     )
 

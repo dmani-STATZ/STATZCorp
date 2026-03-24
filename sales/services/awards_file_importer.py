@@ -60,6 +60,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
             'row_count': int,
             'created_count': int,
             'updated_count': int,
+            'skipped_count': int,
             'we_won_count': int,
             'we_won_by_cage': dict,
             'batch_id': int,
@@ -96,6 +97,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
 
     to_create: list[DibbsAward] = []
     to_update: list[DibbsAward] = []
+    skipped_count: int = 0  # rows skipped because incoming file is older
 
     update_fields = [
         "award_basic_number",
@@ -115,6 +117,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         "solicitation",
         "we_won",
         "source",
+        "aw_file_date",
     ]
 
     with transaction.atomic():
@@ -145,6 +148,14 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
 
             if nid in existing_by_nid:
                 obj = existing_by_nid[nid]
+
+                # Skip update if the incoming file is strictly older than what already wrote this row.
+                # Equal dates = allow (same file re-imported). Newer dates = allow.
+                incoming_file_date = parse_result.award_date
+                if obj.aw_file_date is not None and incoming_file_date < obj.aw_file_date:
+                    skipped_count += 1
+                    continue
+
                 obj.source = DibbsAward.SOURCE_DIBBS_FILE
                 obj.award_basic_number = row.award_basic_number
                 obj.delivery_order_number = row.delivery_order_number or ""
@@ -162,6 +173,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                 obj.solicitation = matched_solicitation
                 obj.we_won = we_won
                 obj.nsn = row.nsn
+                obj.aw_file_date = incoming_file_date
                 to_update.append(obj)
             else:
                 to_create.append(
@@ -187,6 +199,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                         we_bid=False,
                         awardee_name="",
                         sam_data={},
+                        aw_file_date=parse_result.award_date,
                     )
                 )
 
@@ -223,6 +236,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         "row_count": row_count_source,
         "created_count": created_count,
         "updated_count": updated_count,
+        "skipped_count": skipped_count,
         "we_won_count": sum(we_won_by_cage.values()),
         "we_won_by_cage": we_won_by_cage,
         "batch_id": batch.pk,

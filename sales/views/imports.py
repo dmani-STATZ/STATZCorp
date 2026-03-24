@@ -12,6 +12,7 @@ Steps:
   3. /import/job/<id>/step/lines/          → upsert SolicitationLine + ApprovedSource rows
   4. /import/job/<id>/step/match/          → run supplier matching engine
 """
+import calendar as cal_module
 import json
 import logging
 import os
@@ -26,10 +27,11 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from sales.forms import ImportUploadForm
-from sales.models import ImportBatch, ImportJob
+from sales.models import AwardImportBatch, ImportBatch, ImportJob
 from sales.services.dibbs_fetch import DibbsFetchError, fetch_dibbs_archive_files
 from sales.services.importer import (
     _import_date_from_filename,
@@ -54,11 +56,96 @@ def import_upload(request):
     """
     if request.method != "POST":
         default_fetch_date = (date.today() - timedelta(days=1)).isoformat()
-        return render(request, "sales/import/upload.html", {
-            "form": ImportUploadForm(),
-            "page_title": "Daily Import",
-            "default_fetch_date": default_fetch_date,
-        })
+
+        # Calendar: show the month containing yesterday
+        yesterday = date.today() - timedelta(days=1)
+        cal_year = yesterday.year
+        cal_month = yesterday.month
+
+        # Pull all ImportBatch dates for this month
+        sol_batches = (
+            ImportBatch.objects.filter(
+                import_date__year=cal_year, import_date__month=cal_month
+            )
+            .values(
+                "import_date",
+                "imported_by",
+                "imported_at",
+                "solicitation_count",
+            )
+            .order_by("import_date")
+        )
+
+        # Pull all AwardImportBatch dates for this month
+        aw_batches = (
+            AwardImportBatch.objects.filter(
+                award_date__year=cal_year, award_date__month=cal_month
+            )
+            .select_related("imported_by")
+            .values(
+                "award_date",
+                "imported_by__first_name",
+                "imported_by__last_name",
+                "imported_by__username",
+                "imported_at",
+                "row_count",
+            )
+            .order_by("award_date")
+        )
+
+        # Build lookup dicts keyed by day integer
+        sol_by_day = {}
+        for b in sol_batches:
+            d = b["import_date"].day
+            sol_by_day[d] = {
+                "imported_by": b["imported_by"] or "—",
+                "imported_at": b["imported_at"],
+                "sol_count": b["solicitation_count"] or 0,
+            }
+
+        aw_by_day = {}
+        for b in aw_batches:
+            d = b["award_date"].day
+            full_name = (
+                " ".join(
+                    filter(
+                        None,
+                        [
+                            b.get("imported_by__first_name", ""),
+                            b.get("imported_by__last_name", ""),
+                        ],
+                    )
+                ).strip()
+                or b.get("imported_by__username")
+                or "—"
+            )
+            aw_by_day[d] = {
+                "imported_by": full_name,
+                "imported_at": b["imported_at"],
+                "row_count": b["row_count"] or 0,
+            }
+
+        # Build calendar weeks — list of weeks, each week is list of day ints (0 = padding)
+        cal_weeks = cal_module.monthcalendar(cal_year, cal_month)
+        month_name = cal_module.month_name[cal_month]
+
+        return render(
+            request,
+            "sales/import/upload.html",
+            {
+                "form": ImportUploadForm(),
+                "page_title": "Daily Import",
+                "default_fetch_date": default_fetch_date,
+                "cal_year": cal_year,
+                "cal_month": cal_month,
+                "month_name": month_name,
+                "cal_weeks": cal_weeks,
+                "sol_by_day": sol_by_day,
+                "aw_by_day": aw_by_day,
+                "today_day": date.today().day,
+                "yesterday_day": yesterday.day,
+            },
+        )
 
     form = ImportUploadForm(request.POST, request.FILES)
     if not form.is_valid():
@@ -108,7 +195,11 @@ def import_upload(request):
         imported_by  = imported_by,
     )
 
-    return redirect("sales:import_job_progress", job_id=job.job_id)
+    skip_sam = bool(request.POST.get("skip_sam"))
+    redirect_url = reverse("sales:import_job_progress", kwargs={"job_id": job.job_id})
+    if skip_sam:
+        redirect_url += "?skip_sam=1"
+    return redirect(redirect_url)
 
 
 def _default_fetch_date():
@@ -159,7 +250,11 @@ def import_fetch_dibbs(request):
         imported_by=imported_by,
     )
     messages.success(request, "Files fetched from DIBBS. Processing import…")
-    return redirect("sales:import_job_progress", job_id=job.job_id)
+    skip_sam = bool(request.POST.get("skip_sam"))
+    redirect_url = reverse("sales:import_job_progress", kwargs={"job_id": job.job_id})
+    if skip_sam:
+        redirect_url += "?skip_sam=1"
+    return redirect(redirect_url)
 
 
 # ── Progress page ─────────────────────────────────────────────────────────────

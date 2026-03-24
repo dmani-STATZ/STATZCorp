@@ -265,6 +265,7 @@
   const CSRF  = '{{ csrf_token }}';
   const JOB   = '{{ job.job_id }}';
   const BASE  = '/sales/import/job/' + JOB + '/step/';
+  const SKIP_SAM = new URLSearchParams(window.location.search).get('skip_sam') === '1';
 
   const steps = [
     {
@@ -297,7 +298,7 @@
       onOk: (d) => d.skipped
         ? '⚠ Skipped — ' + (d.reason || 'no API key')
         : (d.created || 0).toLocaleString() + ' created · ' + (d.updated || 0).toLocaleString() + ' updated · ' + (d.matched || 0).toLocaleString() + ' matched',
-      detail: 'Fetching DLA award notices from SAM.gov…',
+      detail: SKIP_SAM ? 'Skipped — SAM sync disabled for this import.' : 'Fetching DLA award notices from SAM.gov…',
     },
   ];
 
@@ -345,6 +346,14 @@
     const step = steps[idx];
     setRunning(step.key);
     setProgress(Math.round((idx / steps.length) * 100));
+
+    // Skip SAM sync if user requested it
+    if (step.key === 'awards' && SKIP_SAM) {
+      const skipData = { success: true, skipped: true, reason: 'Skipped by user' };
+      results[step.key] = skipData;
+      setDone(step.key, '⏭ Skipped — SAM sync disabled for this import');
+      return runStep(idx + 1);
+    }
 
     return fetch(step.url, {
       method:  'POST',

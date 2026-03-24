@@ -61,8 +61,8 @@
     <div class="card-body">
       <h2 class="h5 fw-semibold mb-2">Upload AW File</h2>
       <p class="text-muted small mb-3">
-        Download the AW file from the Office File Portal (<code>files.themanihome.com</code>), then drag it here.
-        Filename must match format: <span class="font-monospace">aw[YYMMDD].txt</span> (e.g. <span class="font-monospace">aw260319.txt</span>).
+        Download AW files from the Office File Portal (<code>files.themanihome.com</code>), then drag them here.
+        One or more <span class="font-monospace">.txt</span> files. Each must match format: <span class="font-monospace">aw[YYMMDD].txt</span> (e.g. <span class="font-monospace">aw260319.txt</span>).
       </p>
 
       <form method="post" enctype="multipart/form-data" id="aw-upload-form">
@@ -76,7 +76,7 @@
              onclick="document.getElementById('aw-file-input').click()">
           <span class="drop-zone-icon">📁</span>
           <div class="drop-zone-title">Drop AW file here or click to browse</div>
-          <div class="drop-zone-sub">One <span class="font-monospace">.txt</span> file only</div>
+          <div class="drop-zone-sub">One or more <span class="font-monospace">.txt</span> files</div>
           <button type="button" class="btn-ghost-sm"
                   onclick="event.stopPropagation(); document.getElementById('aw-file-input').click();">
             Browse
@@ -91,6 +91,54 @@
       </form>
     </div>
   </div>
+
+  {% if results %}
+  <div class="mt-4">
+    <h5>Import Results</h5>
+    <table class="table table-sm table-bordered">
+      <thead class="table-dark">
+        <tr>
+          <th>File</th>
+          <th>Status</th>
+          <th>Rows</th>
+          <th>New</th>
+          <th>Updated</th>
+          <th>Skipped</th>
+          <th>We Won</th>
+          <th>Warnings</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr class="{% if r.success %}table-success{% else %}table-danger{% endif %}">
+          <td><code>{{ r.filename }}</code></td>
+          <td>
+            {% if r.success %}
+              <span class="text-success fw-bold">✓ Imported</span>
+            {% else %}
+              <span class="text-danger fw-bold">✗ Failed</span>
+            {% endif %}
+          </td>
+          <td>{{ r.row_count }}</td>
+          <td>{{ r.created_count }}</td>
+          <td>{{ r.updated_count }}</td>
+          <td>{{ r.skipped_count }}</td>
+          <td>{{ r.we_won_count }}</td>
+          <td>
+            {% if not r.success %}
+              <span class="text-danger">{{ r.error }}</span>
+            {% elif r.warnings %}
+              <span class="text-warning">{{ r.warnings|length }} warning(s)</span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <div class="card">
     <div class="card-body">
@@ -139,21 +187,27 @@
   if (!input) return;
   input.id = 'aw-file-input';
   input.accept = '.txt,.TXT';
+  input.multiple = true;
   input.style.display = 'none';
   input.addEventListener('change', function() {
     var lbl = document.getElementById('aw-file-label');
-    if (input.files && input.files[0]) {
+    if (input.files && input.files.length) {
       lbl.style.display = 'block';
-      lbl.textContent = 'Selected: ' + input.files[0].name;
+      var names = Array.prototype.map.call(input.files, function(f) { return f.name; });
+      lbl.textContent = input.files.length === 1
+        ? ('Selected: ' + names[0])
+        : ('Selected: ' + input.files.length + ' files — ' + names.join(', '));
     }
   });
   window.awHandleDrop = function(e) {
     e.preventDefault();
     document.getElementById('aw-drop-zone').classList.remove('dragover');
-    var f = e.dataTransfer.files[0];
-    if (!f) return;
+    var files = e.dataTransfer.files;
+    if (!files || !files.length) return;
     var dt = new DataTransfer();
-    dt.items.add(f);
+    for (var i = 0; i < files.length; i++) {
+      dt.items.add(files[i]);
+    }
     input.files = dt.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   };

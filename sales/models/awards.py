@@ -66,6 +66,12 @@ class DibbsAward(models.Model):
     last_mod_posting_date = models.DateField(null=True, blank=True)
     total_contract_price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     posted_date = models.DateField(null=True, blank=True)
+    aw_file_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date of the AW file that last wrote this record (from filename, e.g. aw260321.txt → 2026-03-21).",
+    )
     nsn = models.CharField(max_length=46, null=True, blank=True, db_index=True)
     nomenclature = models.CharField(max_length=100, null=True, blank=True)
     purchase_request = models.CharField(max_length=20, null=True, blank=True)
