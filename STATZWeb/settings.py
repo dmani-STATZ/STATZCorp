@@ -334,7 +334,9 @@ GRAPH_MAIL_SENDER = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
 
 # Set to True to send via Graph API.
 # Set to False to fall back to mailto: links (manual send from user's email client).
-GRAPH_MAIL_ENABLED = os.environ.get("GRAPH_MAIL_ENABLED", "False") == "True"
+GRAPH_MAIL_ENABLED = (
+    os.environ.get("GRAPH_MAIL_ENABLED", "False").strip().lower() == "true"
+)
 
 # Authentication settings
 LOGIN_REDIRECT_URL = "index"
