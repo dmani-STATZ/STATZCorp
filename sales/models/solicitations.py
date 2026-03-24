@@ -60,6 +60,7 @@ class Solicitation(models.Model):
     """One row per solicitation (from IN/BQ)."""
     STATUS_CHOICES = [
         ('New', 'New'),
+        ('Active', 'Active'),
         ('Matching', 'Matching'),
         ('RFQ_PENDING', 'RFQ Pending'),
         ('RFQ_SENT', 'RFQ Sent'),
@@ -69,6 +70,7 @@ class Solicitation(models.Model):
         ('WON', 'Won'),
         ('LOST', 'Lost'),
         ('NO_BID', 'No Bid'),
+        ('Archived', 'Archived'),
     ]
     BUCKET_CHOICES = [
         ('UNSET', 'Not Yet Triaged'),

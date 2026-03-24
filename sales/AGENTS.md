@@ -42,6 +42,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - `sales/services/matching.py` — the three tiers are interdependent; changing tier boundaries or deduplication logic affects bid quality downstream.
 - `sales/services/email.py` — `_default_cage()` must always find exactly one `CompanyCAGE(is_default=True, is_active=True)`. If that invariant breaks, every RFQ email fails.
 - `sales/services/importer.py` — step results stored in `ImportJob.step_results` as JSON must include `batch_id` and `import_date`; the progress template reads those keys by name.
+- `_run_lifecycle_sweep()` in `services/importer.py` runs at the start of every import inside `transaction.atomic()` (parse step in `imports.py`, and the legacy `run_import()` entry point). It transitions `New → Active` for prior-batch records and `→ Archived` for expired terminal records using **per-pass `QuerySet.update()`** (not chunked `bulk_update`) to avoid SQLite write-lock storms. It must remain the first database write in the parse-step `try` block (before `create_import_batch`) and the first operation inside `run_import()`'s lifecycle `atomic` block. Do not move it after batch creation or call it conditionally.
 - `sales/services/graph_inbox.py` — uses the same MSAL client credentials pattern as `graph_mail.py`. GCC High endpoints only. `INBOX_FETCH_LIMIT=50` is hardcoded — change with care as large fetches will slow inbox load. Body is fetched lazily per message open, not in bulk.
 
 ### Before changing templates
@@ -108,6 +109,11 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/base.html` — add the new sub-nav link to the correct `{% if section == '...' %}` block
 → `sales/urls.py` — add the URL pattern as usual
 → Update the active detection `or` chain in the sub-nav block to include the new url_name
+
+### Changing inbox claim expiry duration
+→ `sales/models/inbox.py` — `claim_for()` method timedelta value
+→ `CONTEXT.md` — update the 20-minute reference
+→ `AGENTS.md` — update this entry
 
 ---
 
@@ -258,6 +264,8 @@ After any change, manually verify these flows:
 15. **`graph_inbox.py` requires `Mail.Read` not just `Mail.Send`.** The Azure App Registration must have `Mail.Read` or `Mail.ReadWrite` application permission with tenant-wide admin consent, separate from `Mail.Send`. If the token is acquired but inbox fetch returns 403, this permission is missing. GCC High tenants require consent in the Government portal, not the commercial portal.
 
 16. **Sub-nav active state uses `or`-chained `url_name` checks, not `in` operator.** Django template `in` does substring matching on strings. Always use `{% if request.resolver_match.url_name == 'x' or request.resolver_match.url_name == 'y' %}` for multi-value active detection in the sub-nav bar.
+
+17. **Inbox claim stubs are created on first message open.** When a rep clicks an unlinked message that has no `InboxMessage` DB record yet, a stub record is created with blank `body_html` to enable claim tracking. The full body is only stored at link time (`rfq_inbox_link` view). Do not assume `InboxMessage.body_html` is populated just because the record exists — check `rfq_links` to determine if the message has been fully processed.
 
 ---
 

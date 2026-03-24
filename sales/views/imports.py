@@ -23,6 +23,7 @@ from datetime import date, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -32,6 +33,7 @@ from sales.models import ImportBatch, ImportJob
 from sales.services.dibbs_fetch import DibbsFetchError, fetch_dibbs_archive_files
 from sales.services.importer import (
     _import_date_from_filename,
+    _run_lifecycle_sweep,
     create_import_batch,
     parse_dibbs_files,
     upsert_lines_and_sources,
@@ -262,6 +264,8 @@ def import_step_parse(request, job_id):
             "bq_count": cached.get("bq_count", 0),
             "as_count": cached.get("as_count", 0),
             "parse_errors": cached.get("parse_errors", 0),
+            "new_to_active": cached.get("new_to_active", 0),
+            "expired_to_archived": cached.get("expired_to_archived", 0),
         })
 
     if job.status == ImportJob.STATUS_ERROR:
@@ -271,36 +275,41 @@ def import_step_parse(request, job_id):
     job.save(update_fields=["status"])
 
     try:
-        in_f, bq_f, as_f = _open_files(job)
-        try:
-            parsed = parse_dibbs_files(in_f, bq_f, as_f)
-        finally:
-            in_f.close(); bq_f.close(); as_f.close()
+        with transaction.atomic():
+            lifecycle_counts = _run_lifecycle_sweep()
 
-        summary     = parsed["summary"]
-        import_date = _import_date_from_filename(job.in_file_name)
-        from datetime import date
-        if not import_date:
-            import_date = date.today()
+            in_f, bq_f, as_f = _open_files(job)
+            try:
+                parsed = parse_dibbs_files(in_f, bq_f, as_f)
+            finally:
+                in_f.close(); bq_f.close(); as_f.close()
 
-        batch = create_import_batch(
-            parsed,
-            job.in_file_name or "",
-            job.bq_file_name or "",
-            job.as_file_name or "",
-            import_date,
-            job.imported_by or "",
-        )
+            summary     = parsed["summary"]
+            import_date = _import_date_from_filename(job.in_file_name)
+            from datetime import date
+            if not import_date:
+                import_date = date.today()
 
-        job.import_date = import_date
-        job.batch_id    = batch.id
-        _save_step(job, ImportJob.STATUS_PARSING, {
-            "import_date": import_date.isoformat(),
-            "sol_count":   summary["solicitation_count"],
-            "bq_count":    summary["batch_quote_count"],
-            "as_count":    summary["approved_source_count"],
-            "parse_errors": summary["parse_error_count"],
-        })
+            batch = create_import_batch(
+                parsed,
+                job.in_file_name or "",
+                job.bq_file_name or "",
+                job.as_file_name or "",
+                import_date,
+                job.imported_by or "",
+            )
+
+            job.import_date = import_date
+            job.batch_id    = batch.id
+            _save_step(job, ImportJob.STATUS_PARSING, {
+                "import_date": import_date.isoformat(),
+                "sol_count":   summary["solicitation_count"],
+                "bq_count":    summary["batch_quote_count"],
+                "as_count":    summary["approved_source_count"],
+                "parse_errors": summary["parse_error_count"],
+                "new_to_active": lifecycle_counts["new_to_active"],
+                "expired_to_archived": lifecycle_counts["expired_to_archived"],
+            })
 
         return JsonResponse({
             "success":      True,
@@ -309,6 +318,8 @@ def import_step_parse(request, job_id):
             "bq_count":     summary["batch_quote_count"],
             "as_count":     summary["approved_source_count"],
             "parse_errors": summary["parse_error_count"],
+            "new_to_active": lifecycle_counts["new_to_active"],
+            "expired_to_archived": lifecycle_counts["expired_to_archived"],
         })
 
     except Exception as exc:

@@ -18,6 +18,7 @@ from sales.views.imports import (
 from sales.views.solicitations import (
     solicitation_list,
     solicitation_detail,
+    solicitation_archive,
     no_bid,
     global_search,
 )
@@ -109,6 +110,7 @@ __all__ = [
     "sync_awards_view",
     "solicitation_list",
     "solicitation_detail",
+    "solicitation_archive",
     "no_bid",
     "global_search",
     "backfill_nsn",

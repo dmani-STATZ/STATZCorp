@@ -17,6 +17,7 @@ from .views import (
     import_step_awards,
     solicitation_list,
     solicitation_detail,
+    solicitation_archive,
     no_bid,
     global_search,
     backfill_nsn,
@@ -103,6 +104,7 @@ urlpatterns = [
     path("import/job/<str:job_id>/step/match/", import_step_match, name="import_step_match"),
     path("import/job/<str:job_id>/step/awards/", import_step_awards, name="import_step_awards"),
     path("solicitations/", solicitation_list, name="solicitation_list"),
+    path("solicitations/archive/", solicitation_archive, name="solicitation_archive"),
     path("solicitations/<str:sol_number>/", solicitation_detail, name="solicitation_detail"),
     path("solicitations/<str:sol_number>/nobid/", no_bid, name="no_bid"),
     path("dashboard/", dashboard, name="dashboard"),
@@ -131,6 +133,7 @@ urlpatterns = [
     # RFQ Inbox (Microsoft Graph)
     path("rfq/inbox/body/<path:graph_message_id>/", rfq_inbox_message_body, name="rfq_inbox_message_body"),
     path("rfq/inbox/link/<path:graph_message_id>/", rfq_inbox_link, name="rfq_inbox_link"),
+    path("rfq/inbox/override-claim/<str:graph_message_id>/", views_rfq.rfq_inbox_override_claim, name="rfq_inbox_override_claim"),
     path("rfq/inbox/rfq-search/", rfq_inbox_rfq_search, name="rfq_inbox_rfq_search"),
     path("rfq/inbox/refresh/", views_rfq.rfq_inbox_refresh, name="rfq_inbox_refresh"),
     path("rfq/inbox/", rfq_inbox, name="rfq_inbox"),

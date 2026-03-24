@@ -66,6 +66,7 @@
                         text-transform: uppercase; color: #15803d; margin-bottom: 4px; }
   .sum-card-sm .value { font-family: 'Barlow Condensed', sans-serif;
                         font-size: 26px; font-weight: 800; color: #14532d; line-height: 1; }
+  .sum-card-sm .sub   { font-size: 11px; color: #15803d; margin-top: 2px; }
 
   .done-header {
     text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.25rem;
@@ -166,6 +167,20 @@
         <div class="label">Appr. Sources</div>
         <div class="value" id="sum-as">—</div>
       </div>
+    </div>
+
+    <div class="sum-grid-sol" style="margin-top:0.5rem;">
+      <div class="sum-card-sm" style="border-color:#cbd5e1; background:#f8fafc;">
+        <div class="label" style="color:#475569;">New → Active</div>
+        <div class="value" style="color:#334155;" id="sum-lifecycle-active">—</div>
+        <div class="sub" style="color:#64748b;">Carried over from prior imports</div>
+      </div>
+      <div class="sum-card-sm" style="border-color:#cbd5e1; background:#f8fafc;">
+        <div class="label" style="color:#475569;">Expired → Archived</div>
+        <div class="value" style="color:#334155;" id="sum-lifecycle-archived">—</div>
+        <div class="sub" style="color:#64748b;">Past due date, moved to archive</div>
+      </div>
+      <div class="sum-card-sm" style="visibility:hidden; pointer-events:none;" aria-hidden="true"></div>
     </div>
 
     <div class="sum-grid-sol" style="margin-top:0.5rem;">
@@ -362,6 +377,11 @@
     document.getElementById('sum-sol-created').textContent = (sr.created || 0).toLocaleString();
     document.getElementById('sum-sol-updated').textContent = (sr.updated || 0).toLocaleString();
     document.getElementById('sum-as').textContent          = (lr.as_loaded || 0).toLocaleString();
+
+    document.getElementById('sum-lifecycle-active').textContent =
+      (pr.new_to_active || 0).toLocaleString();
+    document.getElementById('sum-lifecycle-archived').textContent =
+      (pr.expired_to_archived || 0).toLocaleString();
     document.getElementById('sum-matches').textContent     = (mr.matches_found || 0).toLocaleString();
     document.getElementById('sum-t1').textContent          = (mr.tier1 || 0).toLocaleString();
     document.getElementById('sum-t2').textContent          = (mr.tier2 || 0).toLocaleString();

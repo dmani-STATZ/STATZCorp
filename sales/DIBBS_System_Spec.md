@@ -271,7 +271,26 @@ All tables use SQL Server. Django ORM models map directly to these tables. Ident
 | BuyerCode | VARCHAR(5) | IN col 9 | DLA buyer identifier |
 | ImportDate | DATE | System | Date the file was imported |
 | ImportBatchID | INT FK | — | Links to tbl_ImportBatch |
-| Status | VARCHAR(20) | App | New / Reviewing / RFQ Sent / Bid Submitted / No Bid / Won / Lost |
+| Status | VARCHAR(20) | App | See solicitation status table below (includes `New`, `Active`, pipeline states, `Archived`). |
+
+**Solicitation `status` values (app field `Solicitation.status`):**
+
+| Status | Meaning |
+|--------|---------|
+| `New` | Imported in today's batch — transitioned to Active on next import |
+| `Active` | Prior import, untouched, within due date |
+| `Matching` | Matching engine processing |
+| `RFQ_PENDING` | Matched, awaiting RFQ dispatch |
+| `RFQ_SENT` | RFQ emails sent to suppliers |
+| `QUOTING` | At least one supplier quote received |
+| `BID_READY` | Bid assembled and ready for export |
+| `BID_SUBMITTED` | BQ file exported and submitted to DIBBS |
+| `WON` | Award received |
+| `LOST` | Award went elsewhere |
+| `NO_BID` | Sales team elected not to bid |
+| `Archived` | Past due date, terminal/untouched — hidden from default views |
+
+**Lifecycle sweep (import):** At the start of each daily import (before a new `ImportBatch` is created), `_run_lifecycle_sweep()` in `sales/services/importer.py` runs inside a DB transaction: (1) `New` solicitations whose `ImportBatch.import_date` is before today become `Active`; (2) solicitations past `return_by_date` that are not in active pipeline statuses (`RFQ_PENDING` … `BID_SUBMITTED`) and are in `NO_BID`, `New`, `Active`, or `SKIP` bucket become `Archived`. Counts are stored on the import parse step and shown on the import progress summary.
 
 #### `tbl_SolicitationLine` — one row per NSN/line within a solicitation
 

@@ -197,7 +197,7 @@ def send_rfq_email(rfq, sent_by):
         logged_by=sent_by,
     )
 
-    if sol.status in ("New", "Matching", "RFQ_PENDING"):
+    if sol.status in ("New", "Active", "Matching", "RFQ_PENDING"):
         sol.status = "RFQ_SENT"
         sol.save(update_fields=["status"])
 
@@ -480,7 +480,7 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by):
                 summary=f"RFQ sent to {to_address}",
                 logged_by=sent_by,
             )
-            if sol.status in ("New", "Matching", "RFQ_PENDING"):
+            if sol.status in ("New", "Active", "Matching", "RFQ_PENDING"):
                 sol.status = "RFQ_SENT"
                 sol.save(update_fields=["status"])
 

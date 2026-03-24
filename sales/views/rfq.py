@@ -342,7 +342,7 @@ def rfq_mark_sent(request, match_id):
     )
 
     # Advance solicitation status if it's still at New or Matching or RFQ_PENDING
-    status_order = ["New", "Matching", "RFQ_PENDING", "RFQ_SENT", "QUOTING", "BID_READY", "BID_SUBMITTED"]
+    status_order = ["New", "Active", "Matching", "RFQ_PENDING", "RFQ_SENT", "QUOTING", "BID_READY", "BID_SUBMITTED"]
     current_idx = status_order.index(sol.status) if sol.status in status_order else 0
     rfq_sent_idx = status_order.index("RFQ_SENT")
     if current_idx < rfq_sent_idx:
@@ -689,7 +689,7 @@ def rfq_enter_quote(request, rfq_id):
                 logged_by=request.user,
             )
 
-            if sol.status in ("New", "Matching", "RFQ_PENDING", "RFQ_SENT"):
+            if sol.status in ("New", "Active", "Matching", "RFQ_PENDING", "RFQ_SENT"):
                 sol.status = "QUOTING"
                 sol.save(update_fields=["status"])
 
@@ -1198,7 +1198,7 @@ def rfq_queue_add_manual(request):
             sent_by=request.user,
         )
 
-        if solicitation.status in ("New", "Matching"):
+        if solicitation.status in ("New", "Active", "Matching"):
             solicitation.status = "RFQ_PENDING"
             solicitation.save(update_fields=["status"])
 
@@ -1253,7 +1253,7 @@ def rfq_queue_add(request):
         sent_by=request.user,
     )
 
-    if solicitation.status in ("New", "Matching"):
+    if solicitation.status in ("New", "Active", "Matching"):
         solicitation.status = "RFQ_PENDING"
         solicitation.save(update_fields=["status"])
 
@@ -1375,7 +1375,7 @@ def supplier_create_and_queue(request):
                 sent_by=request.user,
             )
 
-            if solicitation.status in ("New", "Matching"):
+            if solicitation.status in ("New", "Active", "Matching"):
                 solicitation.status = "RFQ_PENDING"
                 solicitation.save(update_fields=["status"])
 
@@ -1665,7 +1665,7 @@ def rfq_queue_mark_sent(request):
                 logged_by=request.user,
             )
 
-            if sol.status in ("New", "Matching", "RFQ_PENDING"):
+            if sol.status in ("New", "Active", "Matching", "RFQ_PENDING"):
                 sol.status = "RFQ_SENT"
                 sol.save(update_fields=["status"])
             confirmed += 1
@@ -1765,10 +1765,110 @@ def rfq_inbox_refresh(request):
 @login_required
 def rfq_inbox_message_body(request, graph_message_id):
     """
-    AJAX: full HTML body for one Graph message (sandboxed iframe srcdoc on client).
+    AJAX endpoint. Fetches full HTML body for one Graph message AND handles
+    claim logic in a single round trip.
+
+    Claim behavior:
+    - If message is already linked (has rfq_links): no claim logic, return body freely.
+    - If message has an active claim by another user (non-expired): do not overwrite
+      the claim. Return body plus claim warning data so JS can show the warning.
+    - If message has no claim, or claim is expired, or claim belongs to request.user:
+      write/refresh the claim for request.user, return body with claim_status='owned'.
+
+    Response JSON:
+    {
+        "html": "<...>",
+        "error": null,
+        "claim_status": "owned" | "claimed_by_other" | "linked" | "new",
+        "claimed_by_name": "Sarah Smith",   // only when claim_status == "claimed_by_other"
+        "claimed_at_display": "10:42 AM",   // only when claim_status == "claimed_by_other"
+        "graph_message_id": "..."           // echoed back for JS convenience
+    }
     """
     body_html, error = fetch_message_body(graph_message_id)
-    return JsonResponse({'html': body_html, 'error': error})
+
+    response_data = {
+        'html': body_html,
+        'error': error,
+        'graph_message_id': graph_message_id,
+        'claim_status': 'new',
+        'claimed_by_name': '',
+        'claimed_at_display': '',
+    }
+
+    try:
+        inbox_msg = InboxMessage.objects.prefetch_related('rfq_links').get(
+            graph_message_id=graph_message_id
+        )
+    except InboxMessage.DoesNotExist:
+        inbox_msg = None
+
+    if inbox_msg and inbox_msg.rfq_links.exists():
+        response_data['claim_status'] = 'linked'
+        return JsonResponse(response_data)
+
+    if inbox_msg and inbox_msg.is_claimed_by_other(request.user):
+        response_data['claim_status'] = 'claimed_by_other'
+        claimer = inbox_msg.claimed_by
+        response_data['claimed_by_name'] = (
+            (claimer.get_full_name() or claimer.username) if claimer else 'Another user'
+        )
+        if inbox_msg.claimed_at:
+            local_time = timezone.localtime(inbox_msg.claimed_at)
+            # Windows-safe hour format (no %-I support)
+            response_data['claimed_at_display'] = local_time.strftime('%I:%M %p').lstrip('0')
+        return JsonResponse(response_data)
+
+    if not inbox_msg:
+        sender_email = request.GET.get('sender_email', '')
+        sender_name = request.GET.get('sender_name', '')
+        subject = request.GET.get('subject', '')
+        received_at_str = request.GET.get('received_at', '')
+
+        from django.utils.dateparse import parse_datetime
+        received_at = parse_datetime(received_at_str) if received_at_str else None
+        if received_at is None:
+            received_at = timezone.now()
+        if received_at.tzinfo is None:
+            received_at = timezone.make_aware(received_at)
+
+        now = timezone.now()
+        inbox_msg = InboxMessage.objects.create(
+            graph_message_id=graph_message_id,
+            sender_email=sender_email,
+            sender_name=sender_name,
+            subject=subject,
+            received_at=received_at,
+            body_html='',
+            is_read=False,
+            claimed_by=request.user,
+            claimed_at=now,
+            claim_expires_at=now + timedelta(minutes=20),
+        )
+    else:
+        inbox_msg.claim_for(request.user)
+
+    response_data['claim_status'] = 'owned'
+    return JsonResponse(response_data)
+
+
+@login_required
+@require_POST
+def rfq_inbox_override_claim(request, graph_message_id):
+    """
+    POST endpoint. Overrides an existing claim on a message, transferring it
+    to request.user. Used only when a rep explicitly chooses to override another
+    user's active claim via the confirmation step in the UI.
+
+    Returns JSON { success: true, claim_status: 'owned' }
+    """
+    try:
+        inbox_msg = InboxMessage.objects.get(graph_message_id=graph_message_id)
+    except InboxMessage.DoesNotExist:
+        return JsonResponse({'success': True, 'claim_status': 'owned'})
+
+    inbox_msg.claim_for(request.user)
+    return JsonResponse({'success': True, 'claim_status': 'owned'})
 
 
 @login_required

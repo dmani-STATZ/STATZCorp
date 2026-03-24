@@ -2,9 +2,12 @@
 Solicitation list and detail views.
 """
 import urllib.parse
+from datetime import date
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
 from django.db.models import Count, Prefetch, Q, OuterRef, Subquery
 from django.http import JsonResponse
 from django.urls import reverse
@@ -29,6 +32,7 @@ from suppliers.models import Supplier
 
 PIPELINE = [
     ("New", "📥", "New"),
+    ("Active", "📌", "Active"),
     ("Matching", "🎯", "Matching"),
     ("RFQ_PENDING", "📋", "RFQ Pending"),
     ("RFQ_SENT", "📨", "RFQ Sent"),
@@ -98,6 +102,7 @@ def _list_qs_before_tab(params):
 
     qs = (
         Solicitation.objects
+        .exclude(status="Archived")
         .prefetch_related(
             Prefetch(
                 'lines',
@@ -212,7 +217,6 @@ def solicitation_list(request):
                 messages.success(request, f"{len(sol_ids)} solicitation(s) moved to {label}.")
         return redirect(request.get_full_path())
 
-    from django.core.paginator import Paginator
     import datetime
 
     q = request.GET.get('q', '').strip()
@@ -593,4 +597,82 @@ def global_search(request):
         request,
         "sales/search_results.html",
         {"query": q, "solicitations": sol_qs},
+    )
+
+
+@login_required
+def solicitation_archive(request):
+    """
+    Read-only mining view for Archived solicitations.
+    Paginated at 50 per page, sorted by return_by_date descending.
+    """
+    qs = (
+        Solicitation.objects.filter(status="Archived")
+        .select_related("import_batch")
+        .prefetch_related(
+            Prefetch(
+                "lines",
+                queryset=SolicitationLine.objects.order_by("line_number", "id"),
+            )
+        )
+        .order_by("-return_by_date")
+    )
+
+    set_aside = request.GET.get("set_aside", "").strip()
+    item_type = request.GET.get("item_type", "").strip()
+    q = request.GET.get("q", "").strip()
+    date_from = request.GET.get("date_from", "").strip()
+    date_to = request.GET.get("date_to", "").strip()
+
+    if set_aside:
+        qs = qs.filter(small_business_set_aside=set_aside)
+    if item_type:
+        qs = qs.filter(lines__item_type_indicator=item_type).distinct()
+    if q:
+        qs = qs.filter(
+            Q(solicitation_number__icontains=q)
+            | Q(lines__nomenclature__icontains=q)
+            | Q(lines__nsn__icontains=q)
+        ).distinct()
+    if date_from:
+        try:
+            qs = qs.filter(return_by_date__gte=date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            qs = qs.filter(return_by_date__lte=date.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    paginator = Paginator(qs, 50)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    for sol in page_obj:
+        sol_lines = list(sol.lines.all())
+        sol.first_line = sol_lines[0] if sol_lines else None
+        sol.set_aside_display = SET_ASIDE_LABELS.get(sol.small_business_set_aside or "", "")
+
+    filter_params = {k: v for k, v in request.GET.items() if k != "page"}
+    filter_querystring = urllib.parse.urlencode(filter_params)
+
+    total_archived = Solicitation.objects.filter(status="Archived").count()
+
+    return render(
+        request,
+        "sales/solicitations/archive.html",
+        {
+            "page_obj": page_obj,
+            "total_archived": total_archived,
+            "filter_querystring": filter_querystring,
+            "set_aside_choices": SET_ASIDE_CHOICES,
+            "current_filters": {
+                "set_aside": set_aside,
+                "item_type": item_type,
+                "q": q,
+                "date_from": date_from,
+                "date_to": date_to,
+            },
+        },
     )

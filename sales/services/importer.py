@@ -9,7 +9,7 @@ Public API (used by both the legacy run_import and the new AJAX step views):
   create_import_batch(...)                         → ImportBatch
   upsert_solicitations(parsed, batch, import_date) → {created, updated}
   upsert_lines_and_sources(parsed, batch)          → {lines_created, ...}
-  run_import(...)                                  → full summary dict (unchanged)
+  run_import(...)                                  → full summary dict (+ lifecycle counts)
 """
 import io
 import logging
@@ -17,6 +17,7 @@ import re
 from datetime import date
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from sales.models import (
@@ -31,6 +32,11 @@ from sales.services.parser import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Statuses that indicate active pipeline work — never archive these
+PIPELINE_STATUSES = frozenset([
+    "RFQ_PENDING", "RFQ_SENT", "QUOTING", "BID_READY", "BID_SUBMITTED",
+])
 
 # SQL Server has a 2100 parameter limit per statement.
 SOLICITATION_CHUNK = 200   # 200 × 9 fields = 1800 params — safe
@@ -326,6 +332,56 @@ def upsert_lines_and_sources(parsed: dict, batch: ImportBatch) -> dict:
     }
 
 
+def _run_lifecycle_sweep() -> dict:
+    """
+    Pre-import lifecycle sweep. Runs before new solicitation rows are written.
+
+    Pass 1 — New → Active:
+        Solicitations with status='New' whose import batch date is before today
+        are transitioned to 'Active'. Preserves 'New' as meaning "seen in today's import".
+
+    Pass 2 — Expired → Archived:
+        Past return_by_date, not in PIPELINE_STATUSES, and (status in NO_BID/New/Active
+        or bucket is SKIP) → 'Archived'.
+
+    Returns:
+        dict with keys new_to_active, expired_to_archived (transition counts).
+    """
+    today = timezone.now().date()
+
+    # --- Pass 1: New → Active ---
+    new_qs = Solicitation.objects.filter(
+        status="New",
+        import_batch__import_date__lt=today,
+    )
+    new_to_active_count = new_qs.count()
+    if new_to_active_count:
+        # One UPDATE per pass — avoids SQLite lock contention from many bulk_update rounds.
+        new_qs.update(status="Active")
+
+    # --- Pass 2: Expired → Archived ---
+    expired_qs = Solicitation.objects.filter(
+        return_by_date__lt=today,
+    ).exclude(
+        status__in=PIPELINE_STATUSES,
+    ).filter(
+        Q(status__in=["NO_BID", "New", "Active"]) | Q(bucket="SKIP")
+    )
+    expired_to_archived_count = expired_qs.count()
+    if expired_to_archived_count:
+        expired_qs.update(status="Archived")
+
+    logger.info(
+        "Lifecycle sweep: %s New→Active, %s Expired→Archived",
+        new_to_active_count,
+        expired_to_archived_count,
+    )
+    return {
+        "new_to_active": new_to_active_count,
+        "expired_to_archived": expired_to_archived_count,
+    }
+
+
 # ── Legacy entry-point (unchanged external behaviour) ────────────────────────
 
 def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
@@ -338,6 +394,9 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
     as_name  = getattr(as_file,  "name", "") or ""
 
     import_date = _import_date_from_filename(in_name) or date.today()
+
+    with transaction.atomic():
+        lifecycle_counts = _run_lifecycle_sweep()
 
     parsed = parse_dibbs_files(in_file, bq_file, as_file)
     summary = parsed["summary"]
@@ -373,6 +432,8 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
         "parse_error_count":         summary["parse_error_count"],
         "solicitations_with_errors": summary["solicitations_with_errors"],
         "match_summary":             match_summary,
+        "new_to_active":             lifecycle_counts["new_to_active"],
+        "expired_to_archived":       lifecycle_counts["expired_to_archived"],
     }
     logger.info(
         f"Import complete: batch={batch.id} sol_created={sol_r['created']} "

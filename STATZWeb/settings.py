@@ -198,9 +198,26 @@ else:
         DATABASES = {
             "default": {
                 "ENGINE": "django.db.backends.sqlite3",
-                "NAME": BASE_DIR / "db.sqlite3",
+                "NAME": "C:\\Users\\dionm\\AppData\\Local\\STATZCorp\\db.sqlite3",
+                "OPTIONS": {
+                    "timeout": 60,
+                },
             },
         }
+
+
+# SQLite (dev): WAL + busy_timeout so imports and concurrent page loads hit fewer "database is locked" errors.
+if DATABASES.get("default", {}).get("ENGINE") == "django.db.backends.sqlite3":
+    from django.db.backends.signals import connection_created
+
+    def _sqlite_pragmas(sender, connection, **kwargs):
+        if connection.vendor != "sqlite":
+            return
+        with connection.cursor() as cursor:
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA busy_timeout=60000;")
+
+    connection_created.connect(_sqlite_pragmas)
 
 
 # Password validation
@@ -559,8 +576,10 @@ else:
     SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 # SAM.gov API integration
-SAM_API_KEY = os.environ.get('SAM_API_KEY', '')   # Required for awards sync
-SAM_OUR_CAGE = os.environ.get('SAM_OUR_CAGE', '')  # e.g. '1ABC2' — used to detect we_won
+SAM_API_KEY = os.environ.get("SAM_API_KEY", "")  # Required for awards sync
+SAM_OUR_CAGE = os.environ.get(
+    "SAM_OUR_CAGE", ""
+)  # e.g. '1ABC2' — used to detect we_won
 
 # Print environment summary
 # print(f"   Settings loaded - Environment: {'PRODUCTION' if IS_PRODUCTION else 'DEVELOPMENT'}")
