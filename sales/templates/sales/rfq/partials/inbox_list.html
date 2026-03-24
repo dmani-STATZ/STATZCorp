@@ -1,0 +1,34 @@
+{% if not inbox_messages and not inbox_error %}
+<div class="graph-empty">No messages in inbox.</div>
+{% elif not inbox_messages and inbox_error %}
+<div class="graph-empty text-muted">No messages returned.</div>
+{% else %}
+{% for msg in inbox_messages %}
+<div class="graph-msg-row {% if not msg.is_read %}unread{% endif %} inbox-msg-item"
+     role="button"
+     tabindex="0"
+     data-graph-id="{{ msg.graph_id|escape }}"
+     data-sender-email="{{ msg.sender_email|escape }}"
+     data-sender-name="{{ msg.sender_name|escape }}"
+     data-subject="{{ msg.subject|escape }}"
+     data-received-at="{{ msg.received_at.isoformat }}"
+     data-is-linked="{% if msg.is_linked %}1{% else %}0{% endif %}"
+     data-linked-sols="{{ msg.linked_sol_numbers|join:', '|escape }}"
+     data-linked-json='{{ msg.linked_rfqs_json|escapejs }}'>
+  <div style="display:flex; gap:0.35rem; align-items:flex-start;">
+    {% if not msg.is_read %}<span class="graph-unread-dot" aria-hidden="true"></span>{% endif %}
+    <div style="min-width:0; flex:1;">
+      <div class="graph-msg-subj" title="{{ msg.subject|escape }}">{{ msg.subject|truncatechars:60 }}</div>
+      <div class="graph-msg-from">{{ msg.sender_name|default:msg.sender_email|truncatechars:42 }}</div>
+      {% if msg.is_linked and msg.linked_sol_numbers %}
+      <div class="mt-1"><span class="badge bg-success small">Linked: {{ msg.linked_sol_numbers|join:", " }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="graph-msg-meta">
+    <span></span>
+    <span class="graph-msg-date">{{ msg.received_at|date:"M j, g:i A" }}</span>
+  </div>
+</div>
+{% endfor %}
+{% endif %}

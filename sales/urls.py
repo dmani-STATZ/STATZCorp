@@ -2,6 +2,7 @@
 Sales (DIBBS Bidding) app URL configuration.
 """
 from django.urls import path
+from .views import rfq as views_rfq
 from .views import (
     dashboard,
     import_upload,
@@ -131,6 +132,7 @@ urlpatterns = [
     path("rfq/inbox/body/<path:graph_message_id>/", rfq_inbox_message_body, name="rfq_inbox_message_body"),
     path("rfq/inbox/link/<path:graph_message_id>/", rfq_inbox_link, name="rfq_inbox_link"),
     path("rfq/inbox/rfq-search/", rfq_inbox_rfq_search, name="rfq_inbox_rfq_search"),
+    path("rfq/inbox/refresh/", views_rfq.rfq_inbox_refresh, name="rfq_inbox_refresh"),
     path("rfq/inbox/", rfq_inbox, name="rfq_inbox"),
     # RFQ Queue (grouped add / fetch PDFs / send)
     path("rfq/queue/", rfq_queue_view, name="rfq_queue_view"),

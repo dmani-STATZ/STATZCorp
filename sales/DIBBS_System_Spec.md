@@ -961,7 +961,7 @@ The current implementation uses **manual approval**. The flow is:
 
 ### 9.1 Page Tree
 
-The Sales App is organized into five top-level zones. Every workflow a user needs to complete lives within one of these zones. Navigation is always visible in the left sidebar.
+The Sales App uses an 8-item primary navigation bar (Dashboard, Solicitations, RFQ Center, Bid Center, Suppliers, Import, Awards, Settings). RFQ Center, Bid Center, and Settings also render a server-side secondary sub-nav (via the `section` view context variable) directly beneath the primary bar.
 
 ```
 SALES APP
@@ -1005,19 +1005,19 @@ SALES APP
 │    ├── Add NSN Capability               /sales/suppliers/<id>/nsn/add/
 │    └── Add FSC Capability               /sales/suppliers/<id>/fsc/add/
 │
-├── 📨  RFQ Center                         /sales/rfq/
-│    ├── Pending Review                    /sales/rfq/pending/             (default view)
-│    │         All matches awaiting RFQ send decision
-│    │         Grouped by solicitation
-│    │         One-click send per solicitation or bulk send
+├── 📨  RFQ Center                         /sales/rfq/queue/
+│    ├── Queue (sub-nav)                   /sales/rfq/queue/               (default view)
+│    │         All queued RFQs grouped by supplier
+│    ├── Manage (sub-nav)                  /sales/rfq/center/
+│    │         3-panel RFQ management workflow
+│    ├── Inbox (sub-nav)                   /sales/rfq/inbox/
+│    │         Supplier mailbox replies linked to RFQs
+│    ├── Pending Review                    /sales/rfq/pending/
 │    ├── Sent RFQs                         /sales/rfq/sent/
-│    │         All dispatched RFQs with response status
-│    │         Overdue flags (return date approaching, no response)
 │    └── Enter Supplier Quote              /sales/rfq/<rfq_id>/quote/
-│              Form to record pricing received from supplier
 │
 ├── 💰  Bid Center                         /sales/bids/
-│    ├── Ready to Bid                      /sales/bids/ready/              (default view)
+│    ├── Active (sub-nav)                  /sales/bids/                    (default view)
 │    │         Lines with at least one supplier quote, no bid yet
 │    │         Shows best supplier price + suggested bid at 3.5%
 │    ├── Bid Builder                       /sales/bids/<sol#>/build/
@@ -1025,14 +1025,21 @@ SALES APP
 │    │         CAGE selector, price override, all 121 BQ fields
 │    ├── Export Queue                      /sales/bids/export/
 │    │         Bids marked ready — select and export BQ file
-│    └── Bid History                       /sales/bids/history/
+│    └── Bid History (sub-nav)             /sales/bids/history/
 │              All submitted bids with outcome tracking
 │
 └── ⚙️  Settings                           /sales/settings/
-     ├── Company CAGEs                     /sales/settings/cages/
+     ├── CAGEs (sub-nav)                   /sales/settings/cages/
      │         Manage registered CAGE codes and their defaults
-     └── Email Templates                   /sales/settings/email/
-               RFQ email subject and body templates
+     ├── No Quote CAGEs (sub-nav)          /sales/settings/no-quote/
+     ├── Email Templates (sub-nav)         /sales/settings/email/
+     ├── Greetings (sub-nav)               /sales/settings/greetings/
+     └── Salutations (sub-nav)             /sales/settings/salutations/
+
+Notes:
+- Secondary sub-nav is rendered server-side from template conditionals based on `section` (`'rfq'`, `'bids'`, `'settings'`).
+- No JavaScript controls sub-nav visibility.
+- Bid History, No Quote CAGEs, and Email Templates are sub-nav destinations, not primary-nav items.
 ```
 
 ### 9.2 Navigation & Status Flow

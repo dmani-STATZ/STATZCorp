@@ -103,6 +103,12 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 ### Flagging or restoring a No Quote CAGE
 → `sales/models/no_quote.py` + migration + `sales/services/no_quote.py` + `sales/views/suppliers.py` + `sales/views/entity_lookup.py` + `sales/views/settings.py` + `sales/views/solicitations.py` + `sales/views/rfq.py` (batch send, queue add/send, `supplier_create_and_queue`) + `sales/templates/sales/suppliers/detail.html` + `sales/entity_lookup.html` + `sales/templates/sales/solicitations/detail.html` + `sales/templates/sales/rfq/pending.html` + `sales/base.html` / `sales/settings/cages.html` nav
 
+### Adding a new page to an existing section (RFQ Center, Bid Center, or Settings)
+→ `sales/views/<module>.py` — add `'section': '<value>'` to the new view's context
+→ `sales/base.html` — add the new sub-nav link to the correct `{% if section == '...' %}` block
+→ `sales/urls.py` — add the URL pattern as usual
+→ Update the active detection `or` chain in the sub-nav block to include the new url_name
+
 ---
 
 ## 6. Cross-App Dependency Warnings
@@ -157,6 +163,8 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **Duplicate URL patterns exist by design:** `bids/` and `bids/ready/` both route to `bids_ready`; `rfq/` and `rfq/pending/` both route to `rfq_pending`. Do not clean these up without checking if both are in use from nav links or other templates.
 - **`rfq/partials/center_panel.html`** is returned as an HTML fragment by `rfq_center_detail`. It must remain a partial (no `{% extends %}`) and its context keys must match what the view passes.
 - **`rfq/partials/mailto_buttons.html`** is included from `rfq/pending.html` (solicitation detail Matches tab uses queue UI, not this partial).
+- **Section-driven sub-nav contract:** `sales/base.html` renders RFQ/Bid/Settings secondary navigation from `section` context. Full-page renders in `sales/views/rfq.py`, `sales/views/bids.py`, and `sales/views/settings.py` must include `"section"` (`"rfq"`, `"bids"`, `"settings"` respectively) or the correct primary/sub-nav highlight will break.
+- **Do not reintroduce per-template RFQ Queue/Inbox tab strips** in `sales/templates/sales/rfq/center.html` or `sales/templates/sales/rfq/inbox.html`; those routes are navigated via the shared sub-nav in `sales/base.html`.
 - **Import progress page** (`import/progress.html`) reads `step_results` JSON keys by name. The keys `batch_id`, `import_date`, `solicitations_created`, `solicitations_updated`, `lines_created`, `lines_updated`, `matches_created` must be written by the corresponding view step functions.
 - **`global_search` view** returns JSON when `?fmt=json` is present, plain HTML otherwise. The top-bar search in `sales/base.html` calls it with `fmt=json`. Do not remove the format check.
 - **Solicitation list ↔ detail navigation:** The list encodes active filters (except `page`) into `?list_qs=` on each row’s detail link. `solicitation_detail` parses `list_qs` and uses `_build_list_queryset()` to compute `prev_sol` / `next_sol`. Any drift between list view filtering and `_build_list_queryset` breaks prev/next; `queued_rfq_count` for banners uses `SupplierRFQ` filtered by `line__solicitation` and `status='QUEUED'` (not a `Solicitation` reverse relation).
@@ -248,6 +256,8 @@ After any change, manually verify these flows:
 14. **Wrong `GRAPH_MAIL_SENDER` in production will break supplier relationships.** If `GRAPH_MAIL_SENDER` is set to anything other than `quotes@statzcorp.com` in production, RFQs will arrive from an unrecognized address. Suppliers who have been receiving RFQs from `quotes@statzcorp.com` via Sales Patriot for years may ignore or spam-flag emails from an unknown sender. The production env var in Azure App Service must always be `quotes@statzcorp.com`. The dev `.env` uses `rfq@statzcorp.com` to protect the production mailbox from test traffic.
 
 15. **`graph_inbox.py` requires `Mail.Read` not just `Mail.Send`.** The Azure App Registration must have `Mail.Read` or `Mail.ReadWrite` application permission with tenant-wide admin consent, separate from `Mail.Send`. If the token is acquired but inbox fetch returns 403, this permission is missing. GCC High tenants require consent in the Government portal, not the commercial portal.
+
+16. **Sub-nav active state uses `or`-chained `url_name` checks, not `in` operator.** Django template `in` does substring matching on strings. Always use `{% if request.resolver_match.url_name == 'x' or request.resolver_match.url_name == 'y' %}` for multi-value active detection in the sub-nav bar.
 
 ---
 

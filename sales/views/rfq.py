@@ -93,6 +93,7 @@ def rfq_pending(request):
         "pending_groups": pending_groups,
         "total_pending": total_pending,
         "no_quote_cages": get_no_quote_cage_set(),
+        "section": "rfq",
     })
 
 
@@ -405,6 +406,7 @@ def rfq_sent(request):
         "awaiting": awaiting,
         "responded": responded,
         "closed": closed,
+        "section": "rfq",
     })
 
 
@@ -476,6 +478,7 @@ def rfq_center(request):
         "default_markup_pct": default_markup_pct,
         "today": today,
         "queued_count": queued_count,
+        "section": "rfq",
     })
 
 
@@ -709,6 +712,7 @@ def rfq_enter_quote(request, rfq_id):
         "solicitation": sol,
         "default_markup_pct": default_markup_pct,
         "form": form,
+        "section": "rfq",
     })
 
 
@@ -1453,6 +1457,7 @@ def rfq_queue_view(request):
     ctx = _rfq_queue_template_context()
     ctx.setdefault("show_mailto_confirm", False)
     ctx.setdefault("mailto_results", [])
+    ctx["section"] = "rfq"
     return render(request, "sales/rfq/queue.html", ctx)
 
 
@@ -1597,6 +1602,7 @@ def rfq_queue_send(request):
         ctx = _rfq_queue_template_context()
         ctx["mailto_results"] = mailto_results
         ctx["show_mailto_confirm"] = True
+        ctx["section"] = "rfq"
         return render(request, "sales/rfq/queue.html", ctx)
 
     if graph_successes:
@@ -1677,14 +1683,8 @@ def rfq_queue_mark_sent(request):
 # ──────────────────────────────────────────────
 
 
-@login_required
-def rfq_inbox(request):
-    """
-    Renders the Inbox tab of the RFQ Center (full page).
-
-    Fetches the 50 most recent messages from the GRAPH_MAIL_SENDER mailbox via Graph.
-    Merges live Graph results with locally stored InboxMessage rows for link badges.
-    """
+def _build_rfq_inbox_message_context():
+    """Build inbox list context from Graph + local RFQ link metadata."""
     messages_raw, error = fetch_inbox_messages()
 
     graph_ids = [m.graph_id for m in messages_raw]
@@ -1730,12 +1730,36 @@ def rfq_inbox(request):
         else:
             msg.linked_rfqs_json = '[]'
 
-    context = {
+    return {
         'inbox_messages': messages_raw,
         'inbox_error': error,
-        'active_tab': 'inbox',
     }
+
+
+@login_required
+def rfq_inbox(request):
+    """
+    Renders the Inbox tab of the RFQ Center (full page).
+
+    Fetches the 50 most recent messages from the GRAPH_MAIL_SENDER mailbox via Graph.
+    Merges live Graph results with locally stored InboxMessage rows for link badges.
+    """
+    context = _build_rfq_inbox_message_context()
+    context.update({
+        'active_tab': 'inbox',
+        'section': 'rfq',
+    })
     return render(request, 'sales/rfq/inbox.html', context)
+
+
+@login_required
+@require_GET
+def rfq_inbox_refresh(request):
+    """
+    AJAX endpoint: returns only the inbox list HTML fragment.
+    """
+    context = _build_rfq_inbox_message_context()
+    return render(request, 'sales/rfq/partials/inbox_list.html', context)
 
 
 @login_required

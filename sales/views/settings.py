@@ -29,7 +29,7 @@ def settings_index(request):
 def settings_cages(request):
     """List all CompanyCAGE records."""
     cages = CompanyCAGE.objects.order_by("-is_default", "cage_code")
-    return render(request, "sales/settings/cages.html", {"cages": cages})
+    return render(request, "sales/settings/cages.html", {"cages": cages, "section": "settings"})
 
 
 @login_required
@@ -48,6 +48,7 @@ def settings_cage_add(request):
         "sb_representations_choices": _get_sb_representations_choices(),
         "affirmative_choices": _get_affirmative_choices(),
         "prev_contracts_choices": _get_prev_contracts_choices(),
+        "section": "settings",
     }
     return render(request, "sales/settings/cage_form.html", context)
 
@@ -69,6 +70,7 @@ def settings_cage_edit(request, cage_id):
         "sb_representations_choices": _get_sb_representations_choices(),
         "affirmative_choices": _get_affirmative_choices(),
         "prev_contracts_choices": _get_prev_contracts_choices(),
+        "section": "settings",
     }
     return render(request, "sales/settings/cage_form.html", context)
 
@@ -137,7 +139,7 @@ def email_template_list(request):
     return render(
         request,
         "sales/settings/email_templates.html",
-        {"templates": templates, "active_nav": "settings"},
+        {"templates": templates, "active_nav": "settings", "section": "settings"},
     )
 
 
@@ -185,13 +187,14 @@ def email_template_edit(request, pk=None):
                 "template": template,
                 "errors": errors,
                 "active_nav": "settings",
+                "section": "settings",
             },
         )
 
     return render(
         request,
         "sales/settings/email_template_form.html",
-        {"template": template, "active_nav": "settings"},
+        {"template": template, "active_nav": "settings", "section": "settings"},
     )
 
 
@@ -209,6 +212,7 @@ def email_template_delete(request, pk):
                 "templates": templates,
                 "error": "Cannot delete the default template. Set another template as default first.",
                 "active_nav": "settings",
+                "section": "settings",
             },
         )
     template.delete()
@@ -266,7 +270,7 @@ def settings_greetings(request):
     return render(
         request,
         "sales/settings/greetings.html",
-        {"greetings": greetings, "active_nav": "settings"},
+        {"greetings": greetings, "active_nav": "settings", "section": "settings"},
     )
 
 
@@ -313,7 +317,7 @@ def settings_salutations(request):
     return render(
         request,
         "sales/settings/salutations.html",
-        {"salutations": salutations, "active_nav": "settings"},
+        {"salutations": salutations, "active_nav": "settings", "section": "settings"},
     )
 
 
@@ -366,6 +370,7 @@ def no_quote_list(request):
             "active_records": active_records,
             "inactive_records": inactive_records,
             "active_nav": "settings",
+            "section": "settings",
         },
     )
 

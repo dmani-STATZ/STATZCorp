@@ -73,6 +73,7 @@ def bids_ready(request):
         "bid_lines": bid_lines,
         "total_count": len(bid_lines),
         "default_markup_pct": default_markup_pct,
+        "section": "bids",
     })
 
 
@@ -274,6 +275,7 @@ def bid_builder(request, sol_number):
         "last_award": last_award,
         "award_history": award_history,
         "last_award_price_raw": last_award_price_raw,
+        "section": "bids",
     })
 
 
@@ -314,6 +316,7 @@ def bids_export_queue(request):
         "export_bids": export_bids,
         "total_count": total_count,
         "export_errors": export_errors,
+        "section": "bids",
     })
 
 
@@ -375,4 +378,5 @@ def bids_history(request):
     return render(request, 'sales/bids/history.html', {
         'page_obj': page_obj,
         'total_count': paginator.count,
+        'section': 'bids',
     })

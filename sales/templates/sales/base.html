@@ -15,6 +15,48 @@
         </form>
     </div>
 
+    <style>
+      .subnav-bar {
+        --subnav-bg: #f3f4f6;
+        background-color: var(--subnav-bg);
+        width: 100%;
+        height: 36px;
+        display: flex;
+        align-items: stretch;
+        margin-top: -1.75rem;
+        margin-bottom: 1.75rem;
+        border-bottom: 1px solid #d1d5db;
+      }
+      .subnav-inner {
+        display: flex;
+        align-items: stretch;
+        padding: 0 1rem;
+        gap: 0;
+      }
+      .subnav-link {
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        color: #4b5563;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-family: inherit;
+        border-bottom: 3px solid transparent;
+        transition: opacity 0.15s ease, border-color 0.15s ease;
+        white-space: nowrap;
+      }
+      .subnav-link:hover {
+        color: #111827;
+        opacity: 1;
+        text-decoration: none;
+      }
+      .subnav-link.active {
+        color: #111827;
+        border-bottom-color: var(--company-primary, #004eb3);
+        font-weight: 600;
+      }
+    </style>
+
     {# ── Sales sub-navigation ───────────────────────────────────────────── #}
     <nav style="display:flex; gap:0.25rem; border-bottom:2px solid var(--border-color, #e5e7eb); margin-bottom:1.75rem; padding-top:1.25rem;">
         <a href="{% url 'sales:dashboard' %}"
@@ -35,9 +77,9 @@
                   {% endif %}">
             Solicitations
         </a>
-        <a href="{% url 'sales:rfq_center' %}"
+        <a href="{% url 'sales:rfq_queue_view' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if request.resolver_match.url_name == 'rfq_pending' or request.resolver_match.url_name == 'rfq_sent' or request.resolver_match.url_name == 'rfq_center' or request.resolver_match.url_name == 'rfq_center_detail' or request.resolver_match.url_name == 'rfq_queue_view' or request.resolver_match.url_name == 'rfq_inbox' %}
+                  {% if section == 'rfq' %}
                       border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
                   {% else %}
                       color: var(--text-muted, #6b7280);
@@ -53,7 +95,7 @@
         </a>
         <a href="{% url 'sales:bids_ready' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if request.resolver_match.url_name == 'bids_ready' or request.resolver_match.url_name == 'bid_builder' or request.resolver_match.url_name == 'bids_export_queue' %}
+                  {% if section == 'bids' %}
                       border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
                   {% else %}
                       color: var(--text-muted, #6b7280);
@@ -87,41 +129,14 @@
                   {% endif %}">
             🏆 Awards
         </a>
-        <a href="{% url 'sales:bids_history' %}"
-           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if request.resolver_match.url_name == 'bids_history' %}
-                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
-                  {% else %}
-                      color: var(--text-muted, #6b7280);
-                  {% endif %}">
-            Bid History
-        </a>
         <a href="{% url 'sales:settings_cages' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if 'settings' in request.resolver_match.url_name and 'email_template' not in request.resolver_match.url_name %}
+                  {% if section == 'settings' %}
                       border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
                   {% else %}
                       color: var(--text-muted, #6b7280);
                   {% endif %}">
             Settings
-        </a>
-        <a href="{% url 'sales:no_quote_list' %}"
-           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if request.resolver_match.url_name == 'no_quote_list' %}
-                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
-                  {% else %}
-                      color: var(--text-muted, #6b7280);
-                  {% endif %}">
-            No Quote CAGEs
-        </a>
-        <a href="{% url 'sales:email_template_list' %}"
-           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
-                  {% if 'email_template' in request.resolver_match.url_name %}
-                      border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
-                  {% else %}
-                      color: var(--text-muted, #6b7280);
-                  {% endif %}">
-            Email Templates
         </a>
 <!--        {% if request.user.is_superuser %}
         <a href="{% url 'sales:backfill_nsn' %}"
@@ -135,6 +150,51 @@
         </a>
         {% endif %} -->
     </nav>
+
+    {% if section %}
+    <nav class="subnav-bar">
+      <div class="subnav-inner">
+        {% if section == 'rfq' %}
+          <a href="{% url 'sales:rfq_queue_view' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_queue_view' %}active{% endif %}">
+            Queue
+          </a>
+          <a href="{% url 'sales:rfq_center' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_center' or request.resolver_match.url_name == 'rfq_center_detail' %}active{% endif %}">
+            Manage
+          </a>
+          <a href="{% url 'sales:rfq_inbox' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_inbox' or request.resolver_match.url_name == 'rfq_inbox_message_body' or request.resolver_match.url_name == 'rfq_inbox_link' or request.resolver_match.url_name == 'rfq_inbox_rfq_search' %}active{% endif %}">
+            Inbox
+          </a>
+        {% endif %}
+
+        {% if section == 'bids' %}
+          <a href="{% url 'sales:bids_ready' %}" class="subnav-link {% if request.resolver_match.url_name == 'bids_ready' or request.resolver_match.url_name == 'bid_builder' or request.resolver_match.url_name == 'bids_export_queue' or request.resolver_match.url_name == 'bids_export_download' or request.resolver_match.url_name == 'bid_select_quote' %}active{% endif %}">
+            Active
+          </a>
+          <a href="{% url 'sales:bids_history' %}" class="subnav-link {% if request.resolver_match.url_name == 'bids_history' %}active{% endif %}">
+            Bid History
+          </a>
+        {% endif %}
+
+        {% if section == 'settings' %}
+          <a href="{% url 'sales:settings_cages' %}" class="subnav-link {% if request.resolver_match.url_name == 'settings_cages' or request.resolver_match.url_name == 'settings_cage_add' or request.resolver_match.url_name == 'settings_cage_edit' or request.resolver_match.url_name == 'settings_index' %}active{% endif %}">
+            CAGEs
+          </a>
+          <a href="{% url 'sales:no_quote_list' %}" class="subnav-link {% if request.resolver_match.url_name == 'no_quote_list' or request.resolver_match.url_name == 'no_quote_deactivate' %}active{% endif %}">
+            No Quote CAGEs
+          </a>
+          <a href="{% url 'sales:email_template_list' %}" class="subnav-link {% if request.resolver_match.url_name == 'email_template_list' or request.resolver_match.url_name == 'email_template_new' or request.resolver_match.url_name == 'email_template_edit' or request.resolver_match.url_name == 'email_template_delete' or request.resolver_match.url_name == 'email_template_set_default' or request.resolver_match.url_name == 'email_template_preview' %}active{% endif %}">
+            Email Templates
+          </a>
+          <a href="{% url 'sales:settings_greetings' %}" class="subnav-link {% if request.resolver_match.url_name == 'settings_greetings' or request.resolver_match.url_name == 'settings_greeting_add' or request.resolver_match.url_name == 'settings_greeting_delete' or request.resolver_match.url_name == 'settings_greeting_toggle' %}active{% endif %}">
+            Greetings
+          </a>
+          <a href="{% url 'sales:settings_salutations' %}" class="subnav-link {% if request.resolver_match.url_name == 'settings_salutations' or request.resolver_match.url_name == 'settings_salutation_add' or request.resolver_match.url_name == 'settings_salutation_delete' or request.resolver_match.url_name == 'settings_salutation_toggle' %}active{% endif %}">
+            Salutations
+          </a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
 
     {% block content %}{% endblock content %}
 

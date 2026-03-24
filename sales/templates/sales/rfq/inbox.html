@@ -2,9 +2,6 @@
 {% block content %}
 <style>
   .graph-inbox-wrap { max-width: 1400px; margin: 0 auto; }
-  .graph-inbox-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
-  .graph-inbox-tabs a { font-size: 0.875rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none; color: #6b7280; border: 1px solid #e5e7eb; }
-  .graph-inbox-tabs a.active { color: var(--company-primary, #004eb3); border-color: var(--company-primary, #004eb3); background: #eff6ff; }
   .graph-inbox-card { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; overflow: hidden; }
   .graph-inbox-row { display: flex; min-height: 560px; }
   .graph-inbox-list { width: 300px; flex-shrink: 0; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; max-height: 640px; }
@@ -31,54 +28,20 @@
 </style>
 
 <div class="graph-inbox-wrap">
-  <div class="graph-inbox-tabs">
-    <a href="{% url 'sales:rfq_queue_view' %}">Queue</a>
-    <a href="{% url 'sales:rfq_inbox' %}" class="active">Inbox</a>
-  </div>
-
   <div class="graph-inbox-card">
     <div class="graph-inbox-row">
       <div class="graph-inbox-list">
-        <div class="p-2 border-bottom bg-light">
+        <div class="p-2 border-bottom bg-light d-flex justify-content-between align-items-center gap-2">
           {% if inbox_error %}
-          <div class="alert alert-danger py-2 px-2 mb-0 small" role="alert">{{ inbox_error }}</div>
+          <div class="alert alert-danger py-2 px-2 mb-0 small flex-grow-1" role="alert">{{ inbox_error }}</div>
           {% endif %}
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="btn-inbox-refresh">
+            <span class="btn-refresh-text">Refresh</span>
+            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+          </button>
         </div>
         <div class="graph-inbox-list-inner" id="graph-inbox-list">
-          {% if not inbox_messages and not inbox_error %}
-          <div class="graph-empty">No messages in inbox.</div>
-          {% elif not inbox_messages and inbox_error %}
-          <div class="graph-empty text-muted">No messages returned.</div>
-          {% else %}
-          {% for msg in inbox_messages %}
-          <div class="graph-msg-row {% if not msg.is_read %}unread{% endif %} inbox-msg-item"
-               role="button"
-               tabindex="0"
-               data-graph-id="{{ msg.graph_id|escape }}"
-               data-sender-email="{{ msg.sender_email|escape }}"
-               data-sender-name="{{ msg.sender_name|escape }}"
-               data-subject="{{ msg.subject|escape }}"
-               data-received-at="{{ msg.received_at.isoformat }}"
-               data-is-linked="{% if msg.is_linked %}1{% else %}0{% endif %}"
-               data-linked-sols="{{ msg.linked_sol_numbers|join:', '|escape }}"
-               data-linked-json='{{ msg.linked_rfqs_json|escapejs }}'>
-            <div style="display:flex; gap:0.35rem; align-items:flex-start;">
-              {% if not msg.is_read %}<span class="graph-unread-dot" aria-hidden="true"></span>{% endif %}
-              <div style="min-width:0; flex:1;">
-                <div class="graph-msg-subj" title="{{ msg.subject|escape }}">{{ msg.subject|truncatechars:60 }}</div>
-                <div class="graph-msg-from">{{ msg.sender_name|default:msg.sender_email|truncatechars:42 }}</div>
-                {% if msg.is_linked and msg.linked_sol_numbers %}
-                <div class="mt-1"><span class="badge bg-success small">Linked: {{ msg.linked_sol_numbers|join:", " }}</span></div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="graph-msg-meta">
-              <span></span>
-              <span class="graph-msg-date">{{ msg.received_at|date:"M j, g:i A" }}</span>
-            </div>
-          </div>
-          {% endfor %}
-          {% endif %}
+          {% include "sales/rfq/partials/inbox_list.html" %}
         </div>
       </div>
 
@@ -146,6 +109,7 @@
   var linkUrlTpl = "{% url 'sales:rfq_inbox_link' graph_message_id='__GRAPH_MSG_ID__' %}";
   var searchUrl = "{% url 'sales:rfq_inbox_rfq_search' %}";
   var quoteUrlTpl = "{% url 'sales:rfq_enter_quote' rfq_id=987654321 %}";
+  var refreshUrl = "{% url 'sales:rfq_inbox_refresh' %}";
 
   function encUrl(tpl, gid) {
     return tpl.replace('__GRAPH_MSG_ID__', encodeURIComponent(gid));
@@ -263,12 +227,14 @@
     }
   }
 
-  document.querySelectorAll('.inbox-msg-item').forEach(function(row) {
-    row.addEventListener('click', function() { selectMessage(row); });
-    row.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectMessage(row); }
+  function bindInboxRows() {
+    document.querySelectorAll('.inbox-msg-item').forEach(function(row) {
+      row.addEventListener('click', function() { selectMessage(row); });
+      row.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectMessage(row); }
+      });
     });
-  });
+  }
 
   function runSearch() {
     var q = document.getElementById('link-rfq-search-q').value.trim();
@@ -358,6 +324,43 @@
       })
       .catch(function() { alert('Link request failed.'); });
   });
+
+  var refreshBtn = document.getElementById('btn-inbox-refresh');
+  function setRefreshLoading(isLoading) {
+    if (!refreshBtn) return;
+    refreshBtn.disabled = isLoading;
+    var textEl = refreshBtn.querySelector('.btn-refresh-text');
+    var spinEl = refreshBtn.querySelector('.spinner-border');
+    if (textEl) textEl.textContent = isLoading ? 'Refreshing...' : 'Refresh';
+    if (spinEl) spinEl.classList.toggle('d-none', !isLoading);
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function() {
+      setRefreshLoading(true);
+      fetch(refreshUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(resp) { return resp.text(); })
+        .then(function(html) {
+          var list = document.getElementById('graph-inbox-list');
+          if (list) {
+            list.innerHTML = html;
+            bindInboxRows();
+            if (selectedGid) {
+              var selectedRow = findRowByGid(selectedGid);
+              if (selectedRow) selectedRow.classList.add('active');
+            }
+          }
+        })
+        .catch(function() {
+          alert('Inbox refresh failed.');
+        })
+        .finally(function() {
+          setRefreshLoading(false);
+        });
+    });
+  }
+
+  bindInboxRows();
 })();
 </script>
 {% endblock content %}
