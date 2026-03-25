@@ -200,7 +200,7 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         created_count = 0
         created_notice_ids: list[str] = []
         if to_create:
-            DibbsAward.objects.bulk_create(to_create, batch_size=500)
+            DibbsAward.objects.bulk_create(to_create, batch_size=50)
             created_notice_ids = [o.notice_id for o in to_create]
             created_count = len(to_create)
 
