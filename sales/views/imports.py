@@ -2,7 +2,7 @@
 Daily DIBBS import views — multi-step AJAX flow.
 
 Upload stores files to a temp directory and creates an ImportJob record,
-then redirects to the progress page.  The progress page fires 4 sequential
+then redirects to the progress page.  The progress page fires four sequential
 AJAX POST requests (one per step), each returning JSON.  The browser updates
 the visual checklist in real time; no page reload or spinner needed.
 
@@ -195,10 +195,7 @@ def import_upload(request):
         imported_by  = imported_by,
     )
 
-    skip_sam = bool(request.POST.get("skip_sam"))
     redirect_url = reverse("sales:import_job_progress", kwargs={"job_id": job.job_id})
-    if skip_sam:
-        redirect_url += "?skip_sam=1"
     return redirect(redirect_url)
 
 
@@ -250,10 +247,7 @@ def import_fetch_dibbs(request):
         imported_by=imported_by,
     )
     messages.success(request, "Files fetched from DIBBS. Processing import…")
-    skip_sam = bool(request.POST.get("skip_sam"))
     redirect_url = reverse("sales:import_job_progress", kwargs={"job_id": job.job_id})
-    if skip_sam:
-        redirect_url += "?skip_sam=1"
     return redirect(redirect_url)
 
 
@@ -591,72 +585,6 @@ def import_step_match(request, job_id):
         job.status = ImportJob.STATUS_ERROR
         job.error_message = str(exc)
         job.save(update_fields=["status", "error_message"])
-        return JsonResponse({"success": False, "error": str(exc)}, status=500)
-
-
-# ── AJAX Step 5: SAM Awards Sync ─────────────────────────────────────────────
-
-@login_required
-@require_POST
-def import_step_awards(request, job_id):
-    job, err = _get_job_or_error(job_id)
-    if err:
-        return err
-
-    cached = _step_results_dict(job)
-    if any(k in cached for k in ("awards_created", "awards_updated", "awards_matched", "awards_won", "awards_skipped", "awards_reason", "awards_error")):
-        skipped = bool(cached.get("awards_skipped", False) or cached.get("awards_error"))
-        reason = cached.get("awards_reason") or cached.get("awards_error") or ""
-        return JsonResponse({
-            "success": True,
-            "created": cached.get("awards_created", 0),
-            "updated": cached.get("awards_updated", 0),
-            "matched": cached.get("awards_matched", 0),
-            "won": cached.get("awards_won", 0),
-            "skipped": skipped,
-            "reason": reason,
-        })
-
-    if job.status == ImportJob.STATUS_ERROR:
-        return _error_job_response(job)
-
-    try:
-        from sales.services.sam_awards_sync import sync_dla_awards
-        result = sync_dla_awards()
-        logger.info(f"ImportJob {job_id} awards step: {result}")
-
-        _save_step(job, ImportJob.STATUS_COMPLETE, {
-            "awards_created": result.get("created", 0),
-            "awards_updated": result.get("updated", 0),
-            "awards_matched": result.get("matched", 0),
-            "awards_won":     result.get("won", 0),
-            "awards_skipped": result.get("skipped", False),
-            "awards_reason":  result.get("reason", ""),
-        })
-
-        return JsonResponse({"success": True, **result})
-
-    except Exception as exc:
-        logger.error(f"ImportJob {job_id} awards step failed: {exc}", exc_info=True)
-        # Mark complete anyway — awards sync is non-blocking
-        _save_step(job, ImportJob.STATUS_COMPLETE, {"awards_error": str(exc)})
-        return JsonResponse({"success": True, "skipped": True, "reason": str(exc)})
-
-
-# ── Manual awards sync ────────────────────────────────────────────────────────
-
-@login_required
-@require_POST
-def sync_awards_view(request):
-    """Manually trigger a SAM.gov awards sync. Staff only."""
-    if not request.user.is_staff:
-        return JsonResponse({"success": False, "error": "Staff access required."}, status=403)
-    try:
-        from sales.services.sam_awards_sync import sync_dla_awards
-        result = sync_dla_awards()
-        return JsonResponse({"success": True, **result})
-    except Exception as exc:
-        logger.error(f"Manual SAM awards sync failed: {exc}", exc_info=True)
         return JsonResponse({"success": False, "error": str(exc)}, status=500)
 
 

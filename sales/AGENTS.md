@@ -8,7 +8,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ## 2. App Scope
 
-**Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and SAM.gov award tracking.
+**Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and DIBBS AW file award import (`DibbsAward`).
 
 **Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`.
 
@@ -71,7 +71,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Admin:** `sales/admin.py` registers nothing. All staff actions go through custom views. Do not assume Django admin works for any sales model.
 
-**Background processing:** None. Everything runs synchronously via HTTP. The five AJAX import steps are sequential HTTP POSTs, not background tasks.
+**Background processing:** None. Everything runs synchronously via HTTP. The four AJAX import steps are sequential HTTP POSTs, not background tasks.
 
 ---
 
@@ -124,7 +124,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **`contracts.models.Clin`** — read in `sales/services/matching.py::backfill_nsn_from_contracts()`. If `Clin` fields change (especially nsn, supplier FK), this function breaks silently.
 - **`auth.User`** — referenced as FK in `SupplierRFQ.sent_by`, `SupplierContactLog.logged_by`, `SupplierQuote.entered_by`, `EmailTemplate.created_by`. If `AUTH_USER_MODEL` changes or user fields are restructured, update these models.
 - **`settings.DEFAULT_FROM_EMAIL`** — used in `sales/services/email.py` for outbound email sender.
-- **`settings.SAM_API_KEY`** and **`settings.SAM_OUR_CAGE`** — required by `sam_entity.py` and `sam_awards_sync.py`; missing values cause graceful degradation (awards sync skipped, entity lookup errors shown to user).
+- **`settings.SAM_API_KEY`** — required by `sam_entity.py` for CAGE lookup; missing values cause graceful degradation (entity lookup errors shown to user).
 
 ### Other apps that depend on this app:
 - **`STATZWeb/settings.py`** — registers `sales.context_processors.rfq_counts` in `CONTEXT_PROCESSORS`. If this processor is renamed or its module path changes, the setting must be updated or a 500 error occurs on every page load.
@@ -138,7 +138,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 ## 7. Security / Permissions Rules
 
 - **Every view must retain `@login_required`**. This app handles sensitive procurement data (solicitation numbers, supplier pricing, bid data). Do not remove or weaken auth decorators.
-- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `sync_awards_view` and `awards_import_upload` check `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
+- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `awards_import_upload` checks `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
 - **SAM debug JSON** in `sales/templates/sales/entity_lookup.html` is conditionally shown only to staff (`{% if request.user.is_staff %}`). Do not remove this guard.
 - **Import batch delete** (`import_batch_delete`) only deletes solicitations with `status='New'`. This guard prevents accidental deletion of in-progress work. Do not relax this filter.
 - **File uploads** (IN/BQ/AS files) are saved to temp directories and removed during the match step. Do not change temp file handling without verifying cleanup still occurs.
@@ -171,7 +171,8 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **`rfq/partials/mailto_buttons.html`** is included from `rfq/pending.html` (solicitation detail Matches tab uses queue UI, not this partial).
 - **Section-driven sub-nav contract:** `sales/base.html` renders RFQ/Bid/Settings secondary navigation from `section` context. Full-page renders in `sales/views/rfq.py`, `sales/views/bids.py`, and `sales/views/settings.py` must include `"section"` (`"rfq"`, `"bids"`, `"settings"` respectively) or the correct primary/sub-nav highlight will break.
 - **Do not reintroduce per-template RFQ Queue/Inbox tab strips** in `sales/templates/sales/rfq/center.html` or `sales/templates/sales/rfq/inbox.html`; those routes are navigated via the shared sub-nav in `sales/base.html`.
-- **Import progress page** (`import/progress.html`) reads `step_results` JSON keys by name. The keys `batch_id`, `import_date`, `solicitations_created`, `solicitations_updated`, `lines_created`, `lines_updated`, `matches_created` must be written by the corresponding view step functions.
+- **`sales/templates/sales/import/upload.html`** — Combines POST `import_fetch_dibbs` (date + submit) and a client-driven manual path that fills hidden `ImportUploadForm` fields and submits `import_upload`. Do not reintroduce SAM awards skip checkboxes or `skip_sam` POST data; awards are loaded only via `/sales/awards/import/`.
+- **Import progress page** (`import/progress.html`) drives four steps and reads each step’s JSON response in the browser. `_save_step` in `imports.py` merges into `ImportJob.step_results`; keep keys aligned with the views: parse (`import_date`, `sol_count`, `bq_count`, `as_count`, `parse_errors`, `new_to_active`, `expired_to_archived`), solicitations (`sols_created`, `sols_updated`), lines (`lines_created`, `lines_updated`, `as_loaded`), match (`matches_found`, `tier1`, `tier2`, `tier3`). `ImportJob.batch_id` and `ImportJob.import_date` are set on the job row during the parse step.
 - **`global_search` view** returns JSON when `?fmt=json` is present, plain HTML otherwise. The top-bar search in `sales/base.html` calls it with `fmt=json`. Do not remove the format check.
 - **Solicitation list ↔ detail navigation:** The list encodes active filters (except `page`) into `?list_qs=` on each row’s detail link. `solicitation_detail` parses `list_qs` and uses `_build_list_queryset()` to compute `prev_sol` / `next_sol`. Any drift between list view filtering and `_build_list_queryset` breaks prev/next; `queued_rfq_count` for banners uses `SupplierRFQ` filtered by `line__solicitation` and `status='QUEUED'` (not a `Solicitation` reverse relation).
 - **Context processor dependency:** `overdue_rfq_count` is available in every template because `sales.context_processors.rfq_counts` is registered in settings. Do not remove `rfq_counts` without updating `STATZWeb/settings.py`.
@@ -193,16 +194,15 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **No signals.** No Celery tasks. No scheduled jobs. No async processing.
 
-**The import pipeline is fully synchronous via five sequential AJAX HTTP POSTs:**
+**The import pipeline is fully synchronous via four sequential AJAX HTTP POSTs:**
 1. `import_step_parse` → parse files
 2. `import_step_solicitations` → upsert Solicitation rows
 3. `import_step_lines` → upsert SolicitationLine + ApprovedSource rows
 4. `import_step_match` → run matching engine
-5. `import_step_awards` → sync SAM.gov awards
 
-Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress page polls these. If a step fails, `ImportJob.status` is set to `'error'` and the message is stored in `ImportJob.error_message`.
+Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress page drives these in order. If a step fails, `ImportJob.status` is set to `'error'` and the message is stored in `ImportJob.error_message`.
 
-**Awards sync** (`sync_awards_view` and step 5) calls SAM.gov and is expected to sometimes fail. Failures are logged but do not abort the import.
+**Awards data** is loaded only via staff AW file upload (`awards_import_upload` / `awards_file_importer`), not the daily import pipeline.
 
 **DIBBS fetch** (`import_fetch_dibbs`) requires Playwright + Chromium. If not installed, it will raise `DibbsFetchError`. This is a known gap with no fallback.
 
@@ -243,7 +243,7 @@ After any change, manually verify these flows:
 
 5. **`rfq/partials/mailto_buttons.html` is used on RFQ pending.** The solicitation detail Matches tab does not include it; queue + No Quote UI lives inline in `solicitations/detail.html`.
 
-6. **`step_results` JSON keys are implicit contracts.** The import progress template reads specific keys from `ImportJob.step_results` by name. If a step function stops writing a key (e.g., renames `solicitations_created` to `created_count`), the progress page will silently show blank or "undefined" without any Python error.
+6. **`step_results` JSON keys are implicit contracts.** The import progress page consumes each step’s JSON response in the browser; `_save_step` also merges keys into `ImportJob.step_results`. Renaming or dropping keys (e.g., `sols_created` / `matches_found`) without updating both the view and `progress.html` will silently show blanks or break idempotent step retries.
 
 7. **`item_type_indicator == '2'` skips NSN matching.** In `matching.py`, lines with `item_type_indicator='2'` skip tiers 1 and 2 and go straight to FSC (tier 3) or manual match. This behavior is implicit in the code; adding a tier without accounting for this indicator will apply it to wrong line types.
 
@@ -313,7 +313,7 @@ After any change, manually verify these flows:
 
 ### Main security-sensitive areas
 - All views — must retain `@login_required`
-- `backfill_nsn`, `sync_awards_view` — must retain staff-only guards
+- `backfill_nsn` — must retain staff-only guard
 - SAM debug JSON — must remain staff-only in `entity_lookup.html`
 - `import_batch_delete` — must retain `status='New'` filter
 

@@ -30,7 +30,6 @@
         <select class="form-select form-select-sm" id="f-src" name="source">
           <option value="" {% if not filter_source %}selected{% endif %}>All Sources</option>
           <option value="DIBBS_FILE" {% if filter_source == 'DIBBS_FILE' %}selected{% endif %}>DIBBS File</option>
-          <option value="SAM" {% if filter_source == 'SAM' %}selected{% endif %}>SAM.gov</option>
         </select>
       </div>
       <div class="col-auto">
@@ -81,8 +80,6 @@
         <td class="num small">
           {% if award.total_contract_price is not None %}
             ${{ award.total_contract_price|floatformat:2 }}
-          {% elif award.award_amount is not None %}
-            ${{ award.award_amount|floatformat:2 }}
           {% else %}
             —
           {% endif %}
@@ -97,11 +94,7 @@
           {% endif %}
         </td>
         <td>
-          {% if award.source == 'DIBBS_FILE' %}
-            <span class="badge bg-primary">DIBBS</span>
-          {% else %}
-            <span class="badge bg-secondary">SAM</span>
-          {% endif %}
+          <span class="badge bg-primary">DIBBS</span>
         </td>
         <td>{% if award.we_won %}<span class="text-success fw-bold">✓</span>{% endif %}</td>
       </tr>

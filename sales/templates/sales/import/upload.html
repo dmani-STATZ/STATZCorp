@@ -174,7 +174,6 @@
       {{ form.in_file }}
       {{ form.bq_file }}
       {{ form.as_file }}
-      <input type="hidden" name="skip_sam" id="hidden-skip-sam" value="">
     </form>
 
     {# Fetch from DIBBS (default: yesterday; optional date for weekend/other days) #}
@@ -198,10 +197,6 @@
         <input type="date" id="fetch-date" name="fetch_date" value="{{ default_fetch_date|default:'' }}"
                style="font-size:14px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; min-width:140px;"
                title="Default is yesterday. Change to get weekend or other dates.">
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#4b6080; cursor:pointer; user-select:none;">
-          <input type="checkbox" name="skip_sam" value="1" style="width:15px; height:15px; cursor:pointer;">
-          Skip SAM.gov Sync
-        </label>
         <button type="submit" class="btn-primary-lg" id="fetch-dibbs-btn">
           Fetch from DIBBS &amp; Import
         </button>
@@ -320,10 +315,6 @@
 
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
       <button type="button" class="btn-ghost-sm" onclick="goToStep1()">← Start Over</button>
-      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#4b6080; cursor:pointer; user-select:none;">
-        <input type="checkbox" id="skip-sam-checkbox" style="width:15px; height:15px; cursor:pointer;">
-        Skip SAM.gov Sync
-      </label>
       <button type="button" class="btn-primary-lg" id="confirm-btn" onclick="submitImport()">
         ✓ Confirm Import
       </button>
@@ -570,9 +561,6 @@
     const btn = document.getElementById('confirm-btn');
     btn.disabled = true;
     btn.textContent = '⏳ Importing…';
-    // Copy checkbox state into the hidden form field before submitting
-    const skipChecked = document.getElementById('skip-sam-checkbox')?.checked;
-    document.getElementById('hidden-skip-sam').value = skipChecked ? '1' : '';
     document.getElementById('import-form').submit();
   }
 

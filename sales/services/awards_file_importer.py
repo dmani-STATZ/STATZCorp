@@ -108,7 +108,6 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         "total_contract_price",
         "award_date",
         "posted_date",
-        "award_amount",
         "nsn",
         "nomenclature",
         "purchase_request",
@@ -165,7 +164,6 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                 obj.total_contract_price = _safe_decimal(row.total_contract_price)
                 obj.award_date = eff_award_date
                 obj.posted_date = row.posted_date
-                obj.award_amount = _safe_decimal(row.total_contract_price)
                 obj.nomenclature = row.nomenclature
                 obj.purchase_request = row.purchase_request
                 obj.dibbs_solicitation_number = row.dibbs_solicitation_number
@@ -188,7 +186,6 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                         total_contract_price=_safe_decimal(row.total_contract_price),
                         award_date=eff_award_date,
                         posted_date=row.posted_date,
-                        award_amount=_safe_decimal(row.total_contract_price),
                         nsn=row.nsn,
                         nomenclature=row.nomenclature,
                         purchase_request=row.purchase_request,
@@ -196,9 +193,6 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                         solicitation=matched_solicitation,
                         sol_number=sol_guess,
                         we_won=we_won,
-                        we_bid=False,
-                        awardee_name="",
-                        sam_data={},
                         aw_file_date=parse_result.award_date,
                     )
                 )

@@ -12,8 +12,6 @@ from sales.views.imports import (
     import_step_solicitations,
     import_step_lines,
     import_step_match,
-    import_step_awards,
-    sync_awards_view,
 )
 from sales.views.solicitations import (
     solicitation_list,
@@ -106,8 +104,6 @@ __all__ = [
     "import_step_solicitations",
     "import_step_lines",
     "import_step_match",
-    "import_step_awards",
-    "sync_awards_view",
     "solicitation_list",
     "solicitation_detail",
     "solicitation_archive",

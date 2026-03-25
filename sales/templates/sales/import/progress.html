@@ -133,15 +133,6 @@
       </div>
       <div class="step-result" id="result-match"></div>
     </div>
-
-    <div class="step-row" id="row-awards">
-      <div class="step-icon" id="icon-awards">5</div>
-      <div style="flex:1;">
-        <div class="step-label">Sync SAM Awards</div>
-        <div class="step-detail" id="detail-awards">Waiting…</div>
-      </div>
-      <div class="step-result" id="result-awards"></div>
-    </div>
   </div>
 
   {# Summary — hidden until complete #}
@@ -183,21 +174,6 @@
       <div class="sum-card-sm" style="visibility:hidden; pointer-events:none;" aria-hidden="true"></div>
     </div>
 
-    <div class="sum-grid-sol" style="margin-top:0.5rem;">
-      <div class="sum-card-sm" style="border-color:#e9d5ff; background:#faf5ff;">
-        <div class="label" style="color:#7e22ce;">Awards Synced</div>
-        <div class="value" style="color:#581c87;" id="sum-awards-synced">—</div>
-      </div>
-      <div class="sum-card-sm" style="border-color:#e9d5ff; background:#faf5ff;">
-        <div class="label" style="color:#7e22ce;">Sol Matched</div>
-        <div class="value" style="color:#581c87;" id="sum-awards-matched">—</div>
-      </div>
-      <div class="sum-card-sm" style="border-color:#e9d5ff; background:#faf5ff;">
-        <div class="label" style="color:#7e22ce;">We Won</div>
-        <div class="value" style="color:#581c87;" id="sum-awards-won">—</div>
-      </div>
-    </div>
-
     <div class="sum-grid">
       <div class="sum-card">
         <div class="label">Matches</div>
@@ -233,15 +209,6 @@
                 text-decoration:none; font-size:0.875rem; color:#6b7280;">
         New Import
       </a>
-      {% if user.is_staff %}
-      <button id="btn-sync-awards" onclick="syncAwards()"
-              style="padding:0.5625rem 1.25rem; border:1px solid #a3bffa; border-radius:7px;
-                     background:#eff6ff; color:#1d4ed8; font-size:0.875rem; font-weight:600;
-                     cursor:pointer;">
-        Sync Awards
-      </button>
-      <span id="sync-awards-result" style="font-size:0.8125rem; color:#374151;"></span>
-      {% endif %}
     </div>
   </div>
 
@@ -265,7 +232,6 @@
   const CSRF  = '{{ csrf_token }}';
   const JOB   = '{{ job.job_id }}';
   const BASE  = '/sales/import/job/' + JOB + '/step/';
-  const SKIP_SAM = new URLSearchParams(window.location.search).get('skip_sam') === '1';
 
   const steps = [
     {
@@ -291,14 +257,6 @@
       url:  BASE + 'match/',
       onOk: (d) => d.matches_found.toLocaleString() + ' supplier matches',
       detail: 'Running supplier matching engine…',
-    },
-    {
-      key:  'awards',
-      url:  BASE + 'awards/',
-      onOk: (d) => d.skipped
-        ? '⚠ Skipped — ' + (d.reason || 'no API key')
-        : (d.created || 0).toLocaleString() + ' created · ' + (d.updated || 0).toLocaleString() + ' updated · ' + (d.matched || 0).toLocaleString() + ' matched',
-      detail: SKIP_SAM ? 'Skipped — SAM sync disabled for this import.' : 'Fetching DLA award notices from SAM.gov…',
     },
   ];
 
@@ -347,14 +305,6 @@
     setRunning(step.key);
     setProgress(Math.round((idx / steps.length) * 100));
 
-    // Skip SAM sync if user requested it
-    if (step.key === 'awards' && SKIP_SAM) {
-      const skipData = { success: true, skipped: true, reason: 'Skipped by user' };
-      results[step.key] = skipData;
-      setDone(step.key, '⏭ Skipped — SAM sync disabled for this import');
-      return runStep(idx + 1);
-    }
-
     return fetch(step.url, {
       method:  'POST',
       headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
@@ -377,7 +327,6 @@
     const sr = results.sols   || {};
     const lr = results.lines  || {};
     const mr = results.match  || {};
-    const ar = results.awards || {};
 
     document.getElementById('sum-date-line').textContent =
       'Import date: ' + (pr.import_date || '—') +
@@ -396,54 +345,12 @@
     document.getElementById('sum-t2').textContent          = (mr.tier2 || 0).toLocaleString();
     document.getElementById('sum-t3').textContent          = (mr.tier3 || 0).toLocaleString();
 
-    const awardsSynced = ar.skipped ? '—' : ((ar.created || 0) + (ar.updated || 0)).toLocaleString();
-    document.getElementById('sum-awards-synced').textContent  = awardsSynced;
-    document.getElementById('sum-awards-matched').textContent = ar.skipped ? '—' : (ar.matched || 0).toLocaleString();
-    document.getElementById('sum-awards-won').textContent     = ar.skipped ? '—' : (ar.won || 0).toLocaleString();
-
     document.getElementById('summary-panel').style.display = 'block';
   }
 
   // Kick off step 1 immediately on page load
   runStep(0);
 })();
-
-function syncAwards() {
-  const btn = document.getElementById('btn-sync-awards');
-  const out = document.getElementById('sync-awards-result');
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = 'Syncing…';
-  out.textContent = '';
-  fetch('{% url "sales:sync_awards" %}', {
-    method: 'POST',
-    headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
-  })
-    .then(r => r.json())
-    .then(d => {
-      if (d.skipped) {
-        out.textContent = 'Skipped: ' + d.reason;
-      } else if (d.success) {
-        out.textContent =
-          'Done — created: ' + (d.created || 0) +
-          ', updated: ' + (d.updated || 0) +
-          ', matched: ' + (d.matched || 0) +
-          ', won: ' + (d.won || 0) +
-          (d.errors ? ', errors: ' + d.errors : '');
-      } else {
-        out.style.color = '#b91c1c';
-        out.textContent = 'Error: ' + (d.error || 'Unknown');
-      }
-    })
-    .catch(err => {
-      out.style.color = '#b91c1c';
-      out.textContent = 'Request failed: ' + err;
-    })
-    .finally(() => {
-      btn.disabled = false;
-      btn.textContent = 'Sync Awards';
-    });
-}
 </script>
 
 {% endblock content %}

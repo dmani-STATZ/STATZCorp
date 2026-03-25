@@ -3579,7 +3579,7 @@ Requested explicitly by the sales team. Add to Phase 3 polish items.
 DIBBS publishes daily award data on its portal. An external file server at `files.themanihome.com`
 scrapes and hosts these files on a calendar-based UI. Staff download the AW file for the desired
 date and upload it to STATZ via `/sales/awards/import/`. This is a separate workflow from the
-daily IN/BQ/AS import and from the SAM.gov awards sync.
+daily IN/BQ/AS import; SAM.gov awards sync was removed (AW file is the sole source for `DibbsAward`).
 
 ### 13.2 AW File Format
 Filename format: `aw[YYMMDD].txt` (e.g. `aw260319.txt`). File is CSV with `#`-prefixed comment
@@ -3589,10 +3589,10 @@ Awardee_CAGE_Code, Total_Contract_Price (format: `$1 234.56`), Award_Date, Poste
 NSN_Part_Number, Nomenclature, Purchase_Request, Solicitation. All dates: MM-DD-YYYY.
 
 ### 13.3 Data Model
-`DibbsAward` is shared between SAM.gov and DIBBS file sources. The `source` field distinguishes
-them: `'SAM'` (default, all pre-existing rows) vs `'DIBBS_FILE'`. DIBBS file rows carry additional
-fields (award_basic_number, awardee_cage, total_contract_price, nsn, etc.) that SAM rows may not
-populate. `AwardImportBatch` tracks each file upload.
+`DibbsAward` is populated from DIBBS AW file import (`source='DIBBS_FILE'`). The model may still
+carry `SOURCE_SAM` / `SOURCE_DIBBS_FILE` choice values for legacy database rows. Operational
+writes use file-driven fields (`award_basic_number`, `awardee_cage`, `total_contract_price`, `nsn`,
+etc.). `AwardImportBatch` tracks each file upload.
 
 Deduplication for DIBBS_FILE rows: `(award_basic_number, delivery_order_number, nsn)`.
 
@@ -3603,9 +3603,8 @@ solicitations not in the system (different date, already archived, etc.) — the
 `solicitation=None` and `dibbs_solicitation_number` preserved as a raw string.
 
 ### 13.5 We Won Detection
-`we_won` is set to `True` when `awardee_cage` matches `settings.SAM_OUR_CAGE` (case-insensitive).
-The same setting is used by the SAM.gov sync. If `SAM_OUR_CAGE` is not configured, `we_won` is
-always `False` for DIBBS file imports.
+`we_won` is set to `True` when `awardee_cage` matches any active `CompanyCAGE.cage_code`
+(case-insensitive). If no active company CAGEs exist, `we_won` stays `False` for imported rows.
 
 ### 13.6 Solicitation Detail — Last Award Block
 The solicitation detail Overview tab shows a "Last Award" card when a `DibbsAward` record exists

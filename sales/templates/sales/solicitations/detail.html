@@ -373,8 +373,6 @@
           <strong>
             {% if last_award.total_contract_price is not None %}
               ${{ last_award.total_contract_price|floatformat:2 }}
-            {% elif last_award.award_amount is not None %}
-              ${{ last_award.award_amount|floatformat:2 }}
             {% else %}
               —
             {% endif %}

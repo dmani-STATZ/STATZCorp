@@ -387,7 +387,7 @@ def _run_lifecycle_sweep() -> dict:
 def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
     """
     Full single-shot import (used by the legacy synchronous upload view).
-    Calls the sub-functions in sequence; matching runs outside the transaction.
+    Calls the sub-functions in sequence; matching runs after upserts.
     """
     in_name  = getattr(in_file,  "name", "") or ""
     bq_name  = getattr(bq_file,  "name", "") or ""
@@ -411,13 +411,6 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
     except Exception as exc:
         logger.error(f"Matching engine failed for batch {batch.id}: {exc}", exc_info=True)
         match_summary = {"lines_processed": 0, "matches_found": 0, "by_tier": {1: 0, 2: 0, 3: 0}, "error": str(exc)}
-
-    try:
-        from sales.services.sam_awards_sync import sync_dla_awards
-        awards_summary = sync_dla_awards()
-        logger.info(f"SAM awards sync: {awards_summary}")
-    except Exception as exc:
-        logger.error(f"SAM awards sync failed (non-fatal): {exc}", exc_info=True)
 
     result = {
         "success":                   True,

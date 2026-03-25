@@ -14,7 +14,6 @@ from .views import (
     import_step_solicitations,
     import_step_lines,
     import_step_match,
-    import_step_awards,
     solicitation_list,
     solicitation_detail,
     solicitation_archive,
@@ -83,7 +82,6 @@ from .views import (
     settings_salutation_toggle,
     no_quote_list,
     no_quote_deactivate,
-    sync_awards_view,
     entity_lookup,
     entity_no_quote_add,
 )
@@ -102,7 +100,6 @@ urlpatterns = [
     path("import/job/<str:job_id>/step/solicitations/", import_step_solicitations, name="import_step_solicitations"),
     path("import/job/<str:job_id>/step/lines/", import_step_lines, name="import_step_lines"),
     path("import/job/<str:job_id>/step/match/", import_step_match, name="import_step_match"),
-    path("import/job/<str:job_id>/step/awards/", import_step_awards, name="import_step_awards"),
     path("solicitations/", solicitation_list, name="solicitation_list"),
     path("solicitations/archive/", solicitation_archive, name="solicitation_archive"),
     path("solicitations/<str:sol_number>/", solicitation_detail, name="solicitation_detail"),
@@ -187,8 +184,6 @@ urlpatterns = [
     path("awards/", awards.awards_list, name="awards_list"),
     path("awards/import/", awards.awards_import_upload, name="awards_import_upload"),
     path("awards/import/result/", awards.awards_import_result, name="awards_import_result"),
-    # SAM.gov awards sync
-    path("awards/sync/", sync_awards_view, name="sync_awards"),
     # SAM.gov entity lookup + No Quote add (POST)
     path("entity/cage/<str:cage_code>/no-quote/add/", entity_no_quote_add, name="entity_no_quote_add"),
     path("entity/cage/<str:cage_code>/", entity_lookup, name="entity_cage_lookup"),
