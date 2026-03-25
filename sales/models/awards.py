@@ -48,7 +48,6 @@ class DibbsAward(models.Model):
     award_date = models.DateField()
     awardee_cage = models.CharField(max_length=10, blank=True, db_index=True)
     we_won = models.BooleanField(default=False)
-    synced_at = models.DateTimeField(auto_now_add=True)
 
     source = models.CharField(
         max_length=10,

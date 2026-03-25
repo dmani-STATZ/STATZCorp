@@ -159,6 +159,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **`GRAPH_MAIL_SENDER` is environment-specific and must not be hardcoded.** Production value is `quotes@statzcorp.com` (inherited from Sales Patriot — do not change without sales team sign-off). Dev/test value is `rfq@statzcorp.com`. Never substitute a newly created M365 account — new accounts lack sending reputation and will be flagged as spam by supplier mail servers when sending cold RFQ volumes.
 - **`from_email` on outbound mail must equal `EMAIL_HOST_USER`** exactly (via `DEFAULT_FROM_EMAIL`, which is set from that env var). Microsoft 365 rejects sends where the authenticated account and the From address differ.
 - **Cross-app FKs:** `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, and `GovernmentBid` all have FKs to `suppliers.Supplier`. Changing `on_delete` behavior requires understanding impact on those cascades.
+- **`DibbsAward` AW import:** `sales/services/awards_file_importer.py` persists rows with `bulk_create` / `bulk_update`, not per-instance `save()`. Do not add `auto_now_add` / `auto_now` fields to `DibbsAward` unless every write path sets them explicitly — otherwise SQL Server can receive NULL for NOT NULL datetime columns. Import timing is modeled by `aw_file_date` and `AwardImportBatch.imported_at` (the old `synced_at` field was removed as redundant).
 - **Migrations:** Run `makemigrations sales` after any model change and review the generated file before applying (schema includes `NoQuoteCAGE` from `0018_no_quote_cage` or later).
 
 ---
@@ -266,6 +267,8 @@ After any change, manually verify these flows:
 16. **Sub-nav active state uses `or`-chained `url_name` checks, not `in` operator.** Django template `in` does substring matching on strings. Always use `{% if request.resolver_match.url_name == 'x' or request.resolver_match.url_name == 'y' %}` for multi-value active detection in the sub-nav bar.
 
 17. **Inbox claim stubs are created on first message open.** When a rep clicks an unlinked message that has no `InboxMessage` DB record yet, a stub record is created with blank `body_html` to enable claim tracking. The full body is only stored at link time (`rfq_inbox_link` view). Do not assume `InboxMessage.body_html` is populated just because the record exists — check `rfq_links` to determine if the message has been fully processed.
+
+18. **`DibbsAward` + `bulk_create` and `auto_now_add`.** Django does not invoke `save()` (or `auto_now_add`) on `bulk_create`. A NOT NULL datetime column on SQL Server plus NULL inserts produces errors (e.g. 8115). AW import timing must continue to use `aw_file_date` and `AwardImportBatch.imported_at`, not a hidden sync timestamp on the award row.
 
 ---
 
