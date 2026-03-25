@@ -1,9 +1,12 @@
 import hashlib
+import logging
 
 from django.db import transaction
 
 from sales.models import AwardImportBatch, DibbsAward, Solicitation
 from sales.services.awards_file_parser import AwardFileParseResult
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_decimal(value):
@@ -200,13 +203,62 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         created_count = 0
         created_notice_ids: list[str] = []
         if to_create:
-            DibbsAward.objects.bulk_create(to_create, batch_size=500)
+            try:
+                DibbsAward.objects.bulk_create(to_create, batch_size=500)
+            except Exception as exc:
+                if to_create:
+                    sample = to_create[0]
+                    logger.error(
+                        "bulk_create failed. Sample record fields: "
+                        "notice_id=%r, sol_number=%r, award_date=%r, "
+                        "total_contract_price=%r, awardee_cage=%r, "
+                        "delivery_order_counter=%r, nsn=%r, "
+                        "aw_file_date=%r, source=%r",
+                        sample.notice_id,
+                        sample.sol_number,
+                        sample.award_date,
+                        sample.total_contract_price,
+                        sample.awardee_cage,
+                        sample.delivery_order_counter,
+                        sample.nsn,
+                        sample.aw_file_date,
+                        sample.source,
+                    )
+                raise RuntimeError(
+                    f"bulk_create failed on DibbsAward. "
+                    f"First record notice_id={getattr(to_create[0], 'notice_id', '?')!r}, "
+                    f"total_contract_price={getattr(to_create[0], 'total_contract_price', '?')!r}, "
+                    f"delivery_order_counter={getattr(to_create[0], 'delivery_order_counter', '?')!r}, "
+                    f"aw_file_date={getattr(to_create[0], 'aw_file_date', '?')!r}. "
+                    f"Original error: {exc}"
+                ) from exc
             created_notice_ids = [o.notice_id for o in to_create]
             created_count = len(to_create)
 
         updated_count = 0
         if to_update:
-            DibbsAward.objects.bulk_update(to_update, update_fields, batch_size=500)
+            try:
+                DibbsAward.objects.bulk_update(to_update, update_fields, batch_size=500)
+            except Exception as exc:
+                if to_update:
+                    sample = to_update[0]
+                    logger.error(
+                        "bulk_update failed. Sample record fields: "
+                        "notice_id=%r, total_contract_price=%r, "
+                        "delivery_order_counter=%r, aw_file_date=%r",
+                        sample.notice_id,
+                        sample.total_contract_price,
+                        sample.delivery_order_counter,
+                        sample.aw_file_date,
+                    )
+                raise RuntimeError(
+                    f"bulk_update failed on DibbsAward. "
+                    f"First record notice_id={getattr(to_update[0], 'notice_id', '?')!r}, "
+                    f"total_contract_price={getattr(to_update[0], 'total_contract_price', '?')!r}, "
+                    f"delivery_order_counter={getattr(to_update[0], 'delivery_order_counter', '?')!r}, "
+                    f"aw_file_date={getattr(to_update[0], 'aw_file_date', '?')!r}. "
+                    f"Original error: {exc}"
+                ) from exc
             updated_count = len(to_update)
 
         batch = AwardImportBatch.objects.create(
