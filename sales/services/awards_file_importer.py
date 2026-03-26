@@ -6,6 +6,14 @@ from sales.models import AwardImportBatch, DibbsAward, Solicitation
 from sales.services.awards_file_parser import AwardFileParseResult
 
 
+def _chunked(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+
+AW_CHUNK = 100  # 100 × 20 fields = 2000 params — under SQL Server 2100 limit
+
+
 def _safe_decimal(value):
     """
     Explicitly coerce Decimal-or-None values before passing to bulk_create.
@@ -200,13 +208,15 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         created_count = 0
         created_notice_ids: list[str] = []
         if to_create:
-            DibbsAward.objects.bulk_create(to_create, batch_size=50)
+            for chunk in _chunked(to_create, AW_CHUNK):
+                DibbsAward.objects.bulk_create(chunk)
             created_notice_ids = [o.notice_id for o in to_create]
             created_count = len(to_create)
 
         updated_count = 0
         if to_update:
-            DibbsAward.objects.bulk_update(to_update, update_fields, batch_size=500)
+            for chunk in _chunked(to_update, AW_CHUNK):
+                DibbsAward.objects.bulk_update(chunk, update_fields)
             updated_count = len(to_update)
 
         batch = AwardImportBatch.objects.create(
