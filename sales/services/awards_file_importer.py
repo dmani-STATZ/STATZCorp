@@ -11,7 +11,7 @@ def _chunked(lst, n):
         yield lst[i:i + n]
 
 
-AW_CHUNK = 100  # 100 × 20 fields = 2000 params — under SQL Server 2100 limit
+AW_CHUNK = 100  # 100 rows x 20 fields = 2000 params — under SQL Server 2100 limit
 
 
 def _safe_decimal(value):
@@ -208,8 +208,22 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         created_count = 0
         created_notice_ids: list[str] = []
         if to_create:
+            from django.db import connection as _conn
+
+            _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
+            _cols = ", ".join(f.column for f in _fields)
+            _placeholders = ", ".join(["%s" for _ in _fields])
+            _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
             for chunk in _chunked(to_create, AW_CHUNK):
-                DibbsAward.objects.bulk_create(chunk)
+                _rows = [
+                    tuple(
+                        f.get_db_prep_save(f.value_from_object(obj), connection=_conn)
+                        for f in _fields
+                    )
+                    for obj in chunk
+                ]
+                with _conn.cursor() as cursor:
+                    cursor.executemany(_sql, _rows)
             created_notice_ids = [o.notice_id for o in to_create]
             created_count = len(to_create)
 
