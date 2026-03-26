@@ -100,18 +100,24 @@ def parse_aw_file(file_bytes: bytes, filename: str) -> AwardFileParseResult:
     data_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
 
     if not data_lines:
-        raise AwardFileParseError("No data rows found in file after removing comment lines.")
+        raise AwardFileParseError(
+            "No data rows found in file after removing comment lines."
+        )
 
     if data_lines[0].strip().startswith("Row_Num"):
         data_lines = data_lines[1:]
 
     if not data_lines:
-        raise AwardFileParseError("File contains only a header row — no award data found.")
+        raise AwardFileParseError(
+            "File contains only a header row — no award data found."
+        )
 
     rows: list[AwardRow] = []
     warnings: list[str] = []
 
-    reader = csv.reader(io.StringIO("\n".join(data_lines)))
+    reader = csv.reader(
+        io.StringIO("\n".join(data_lines)), quoting=csv.QUOTE_NONE, escapechar="\\"
+    )
     for line_num, cols in enumerate(reader, start=1):
         while len(cols) < 13:
             cols.append("")
@@ -124,7 +130,9 @@ def parse_aw_file(file_bytes: bytes, filename: str) -> AwardFileParseResult:
         price_raw = cols[6].strip()
         price = _clean_price(price_raw)
         if price_raw and price is None:
-            warnings.append(f"Row {line_num}: could not parse price '{price_raw}' — stored as null.")
+            warnings.append(
+                f"Row {line_num}: could not parse price '{price_raw}' — stored as null."
+            )
 
         rows.append(
             AwardRow(
@@ -137,7 +145,7 @@ def parse_aw_file(file_bytes: bytes, filename: str) -> AwardFileParseResult:
                 award_date=_parse_date(cols[7].strip()),
                 posted_date=_parse_date(cols[8].strip()),
                 nsn=cols[9].strip() or None,
-                nomenclature=cols[10].strip() or None,
+                nomenclature=cols[10].strip().strip('"') or None,
                 purchase_request=cols[11].strip() or None,
                 dibbs_solicitation_number=cols[12].strip() or None,
             )
