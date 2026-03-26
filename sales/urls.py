@@ -3,6 +3,7 @@ Sales (DIBBS Bidding) app URL configuration.
 """
 from django.urls import path
 from .views import rfq as views_rfq
+from .views.awards_wins import awards_wins
 from .views import (
     dashboard,
     import_upload,
@@ -182,6 +183,7 @@ urlpatterns = [
     path("settings/no-quote/<int:pk>/deactivate/", no_quote_deactivate, name="no_quote_deactivate"),
     # Awards list + AW file import (DIBBS_FILE rows in DibbsAward)
     path("awards/", awards.awards_list, name="awards_list"),
+    path("awards/wins/", awards_wins, name="awards_wins"),
     path("awards/import/", awards.awards_import_upload, name="awards_import_upload"),
     path("awards/import/result/", awards.awards_import_result, name="awards_import_result"),
     # SAM.gov entity lookup + No Quote add (POST)

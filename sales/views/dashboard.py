@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.shortcuts import render
 
-from sales.models import Solicitation, ImportBatch
+from sales.models import Solicitation, ImportBatch, DibbsAward, WeWonAward
 
 
 @login_required
@@ -48,6 +48,17 @@ def dashboard(request):
     for sol in recent_solicitations:
         sol.first_line = sol.lines.order_by("line_number", "id").first()
 
+    from django.db.models import Count as _Count
+    month_start = today.replace(day=1)
+    wins_this_month = (
+        DibbsAward.objects
+        .filter(id__in=WeWonAward.objects.values("id"))
+        .filter(award_date__gte=month_start)
+        .values("award_basic_number", "delivery_order_number")
+        .distinct()
+        .aggregate(total=_Count("*"))
+    )["total"] or 0
+
     return render(
         request,
         "sales/dashboard.html",
@@ -59,5 +70,6 @@ def dashboard(request):
             "urgent_count": urgent_count,
             "recent_solicitations": recent_solicitations,
             "total_active": total_active,
+            "wins_this_month": wins_this_month,
         },
     )

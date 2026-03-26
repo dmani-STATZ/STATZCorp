@@ -3611,5 +3611,32 @@ The solicitation detail Overview tab shows a "Last Award" card when a `DibbsAwar
 for the line's NSN (ordered by `award_date` descending). This gives the sales team instant context
 on who last won and at what price — critical for bid pricing decisions.
 
+### 13.7 Wins Report (Dynamic Company CAGE Join)
+Wins are determined dynamically from active company CAGE configuration, not from the static
+`DibbsAward.we_won` field. A SQL Server view identifies winning award row IDs by joining
+`dibbs_award.awardee_cage` to active `dibbs_company_cage.cage_code` values case-insensitively.
+
+**Important:** This view is created manually in SSMS by a developer/DBA. It is not managed
+by Django migrations.
+
+```sql
+CREATE VIEW [dbo].[dibbs_we_won_awards] AS
+SELECT da.[id]
+FROM [dbo].[dibbs_award] da
+INNER JOIN [dbo].[dibbs_company_cage] cc
+    ON UPPER(da.[awardee_cage]) = UPPER(cc.[cage_code])
+WHERE cc.[is_active] = 1
+```
+
+The Django app exposes this view via unmanaged model `WeWonAward`:
+- `managed = False`
+- `db_table = 'dibbs_we_won_awards'`
+- Typical usage: `DibbsAward.objects.filter(id__in=WeWonAward.objects.values('id'))`
+
+UI surface:
+- Dashboard card: **Wins This Month** on `/sales/` (links to wins report).
+- Wins report page: `/sales/awards/wins/` (URL name `sales:awards_wins`), grouped by
+  `(award_basic_number, delivery_order_number)` and paginated by group.
+
 ---
 

@@ -81,3 +81,20 @@ class DibbsAward(models.Model):
 
     class Meta:
         db_table = "dibbs_award"
+
+
+class WeWonAward(models.Model):
+    """
+    Read-only unmanaged model backed by the SQL Server view
+    dibbs_we_won_awards. Joins dibbs_award.awardee_cage to
+    dibbs_company_cage.cage_code (active CAGEs only).
+    Use: DibbsAward.objects.filter(id__in=WeWonAward.objects.values('id'))
+
+    IMPORTANT: The view [dbo].[dibbs_we_won_awards] must exist in the
+    database. It is NOT created by Django migrations — create it manually
+    in SSMS. See DIBBS_System_Spec.md Section 13 for the CREATE VIEW DDL.
+    """
+
+    class Meta:
+        managed = False
+        db_table = "dibbs_we_won_awards"
