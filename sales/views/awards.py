@@ -50,8 +50,10 @@ def awards_import_upload(request):
                 "error": None,
                 "row_count": 0,
                 "created_count": 0,
-                "updated_count": 0,
-                "skipped_count": 0,
+                "faux_created_count": 0,
+                "updated_faux_count": 0,
+                "mod_created_count": 0,
+                "mod_skipped_count": 0,
                 "we_won_count": 0,
                 "warnings": [],
             }
@@ -62,8 +64,10 @@ def awards_import_upload(request):
                 file_result["success"] = True
                 file_result["row_count"] = summary["row_count"]
                 file_result["created_count"] = summary["created_count"]
-                file_result["updated_count"] = summary["updated_count"]
-                file_result["skipped_count"] = summary["skipped_count"]
+                file_result["faux_created_count"] = summary["faux_created_count"]
+                file_result["updated_faux_count"] = summary["updated_faux_count"]
+                file_result["mod_created_count"] = summary["mod_created_count"]
+                file_result["mod_skipped_count"] = summary["mod_skipped_count"]
                 file_result["we_won_count"] = summary["we_won_count"]
                 file_result["warnings"] = summary["warnings"]
             except AwardFileParseError as e:

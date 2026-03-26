@@ -36,12 +36,24 @@
       <div class="value">{{ result.row_count }}</div>
     </div>
     <div class="sum-card">
-      <div class="label">New Records</div>
+      <div class="label">Awards Created</div>
       <div class="value">{{ result.created_count }}</div>
     </div>
     <div class="sum-card">
-      <div class="label">Updated</div>
-      <div class="value">{{ result.updated_count }}</div>
+      <div class="label">Faux Created</div>
+      <div class="value">{{ result.faux_created_count }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">Faux Updated</div>
+      <div class="value">{{ result.updated_faux_count }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">MODs Created</div>
+      <div class="value">{{ result.mod_created_count }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">MODs Skipped</div>
+      <div class="value">{{ result.mod_skipped_count }}</div>
     </div>
     {% for cage, count in result.we_won_by_cage.items %}
     <div class="sum-card">

@@ -53,31 +53,10 @@ def _dedupe_rows(rows):
 
 
 def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
-    """
-    Upsert DibbsAward records from a parsed AW file result.
+    from datetime import date as _date
+    from django.db import connection as _conn
+    from sales.models import CompanyCAGE, DibbsAwardMod
 
-    Deduplication key for DIBBS_FILE source rows:
-        (award_basic_number, delivery_order_number, nsn)
-
-    If delivery_order_number is None/empty, treat it as '' for dedup purposes.
-
-    Returns a summary dict:
-        {
-            'award_date': date,
-            'filename': str,
-            'row_count': int,
-            'created_count': int,
-            'updated_count': int,
-            'skipped_count': int,
-            'we_won_count': int,
-            'we_won_by_cage': dict,
-            'batch_id': int,
-            'warnings': list[str],
-        }
-    """
-    from sales.models import CompanyCAGE
-
-    # Build per-CAGE win counter — keys are the original-case cage_code from CompanyCAGE
     cage_code_map = {
         v.upper(): v
         for v in CompanyCAGE.objects.filter(is_active=True).values_list(
@@ -98,123 +77,110 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
         )
     }
 
-    notice_ids = [
-        _dibbs_file_notice_id(r.award_basic_number, r.delivery_order_number, r.nsn)
-        for r in rows
-    ]
+    award_rows = [r for r in rows if not r.last_mod_posting_date]
+    mod_rows = [r for r in rows if r.last_mod_posting_date]
 
-    to_create: list[DibbsAward] = []
-    to_update: list[DibbsAward] = []
-    skipped_count: int = 0  # rows skipped because incoming file is older
+    created_count = 0
+    faux_created_count = 0
+    updated_faux_count = 0
+    mod_created_count = 0
+    mod_skipped_count = 0
+    warnings = list(parse_result.warnings)
+    faux_to_create = []
 
-    update_fields = [
-        "award_basic_number",
-        "delivery_order_number",
-        "delivery_order_counter",
-        "last_mod_posting_date",
-        "awardee_cage",
-        "total_contract_price",
-        "award_date",
-        "posted_date",
-        "nsn",
-        "nomenclature",
-        "purchase_request",
-        "dibbs_solicitation_number",
-        "sol_number",
-        "solicitation",
-        "we_won",
-        "source",
-        "aw_file_date",
-    ]
+    def _extract_fy_date(award_basic_number: str):
+        try:
+            fy_2digit = award_basic_number[6:8]
+            fiscal_year = 2000 + int(fy_2digit)
+            return _date(fiscal_year, 9, 30)
+        except (ValueError, IndexError, TypeError):
+            return parse_result.award_date
+
+    def _we_won(awardee_cage):
+        return bool(awardee_cage and awardee_cage.upper() in our_cages_upper)
+
+    def _track_win(awardee_cage):
+        if awardee_cage and awardee_cage.upper() in our_cages_upper:
+            original = cage_code_map[awardee_cage.upper()]
+            we_won_by_cage[original] += 1
 
     with transaction.atomic():
-        existing_by_nid = {
-            obj.notice_id: obj
-            for obj in DibbsAward.objects.filter(notice_id__in=notice_ids)
+        existing_keys = {
+            (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
+            for obj in DibbsAward.objects.filter(
+                award_basic_number__in=[r.award_basic_number for r in award_rows]
+            ).only(
+                "id",
+                "award_basic_number",
+                "delivery_order_number",
+                "nsn",
+                "is_faux",
+                "notice_id",
+            )
         }
 
-        for row in rows:
+        to_create_awards = []
+        to_update_faux = []
+
+        for row in award_rows:
+            key = (row.award_basic_number, row.delivery_order_number or "", row.nsn or "")
             nid = _dibbs_file_notice_id(
                 row.award_basic_number, row.delivery_order_number, row.nsn
             )
-            we_won = bool(
-                row.awardee_cage and row.awardee_cage.upper() in our_cages_upper
-            )
-            if we_won:
-                original_cage = cage_code_map[row.awardee_cage.upper()]
-                we_won_by_cage[original_cage] += 1
+            we_won = _we_won(row.awardee_cage)
+            sol_guess = (row.dibbs_solicitation_number or row.award_basic_number or "")[:50]
+            matched_sol = sol_lookup.get(row.dibbs_solicitation_number or "")
 
-            matched_solicitation = None
-            if row.dibbs_solicitation_number:
-                matched_solicitation = sol_lookup.get(row.dibbs_solicitation_number)
-
-            sol_guess = (row.dibbs_solicitation_number or row.award_basic_number or "")[
-                :50
-            ]
-            eff_award_date = row.award_date or parse_result.award_date
-
-            if nid in existing_by_nid:
-                obj = existing_by_nid[nid]
-
-                # Skip update if the incoming file is strictly older than what already wrote this row.
-                # Equal dates = allow (same file re-imported). Newer dates = allow.
-                incoming_file_date = parse_result.award_date
-                if obj.aw_file_date is not None and incoming_file_date < obj.aw_file_date:
-                    skipped_count += 1
-                    continue
-
-                obj.source = DibbsAward.SOURCE_DIBBS_FILE
-                obj.award_basic_number = row.award_basic_number
-                obj.delivery_order_number = row.delivery_order_number or ""
-                obj.delivery_order_counter = row.delivery_order_counter
-                obj.last_mod_posting_date = row.last_mod_posting_date
-                obj.awardee_cage = (row.awardee_cage or "")[:10]
-                obj.total_contract_price = _safe_decimal(row.total_contract_price)
-                obj.award_date = eff_award_date
-                obj.posted_date = row.posted_date
-                obj.nomenclature = row.nomenclature
-                obj.purchase_request = row.purchase_request
-                obj.dibbs_solicitation_number = row.dibbs_solicitation_number
-                obj.sol_number = sol_guess
-                obj.solicitation = matched_solicitation
-                obj.we_won = we_won
-                obj.nsn = row.nsn
-                obj.aw_file_date = incoming_file_date
-                to_update.append(obj)
-            else:
-                to_create.append(
+            if key not in existing_keys:
+                to_create_awards.append(
                     DibbsAward(
                         source=DibbsAward.SOURCE_DIBBS_FILE,
                         notice_id=nid,
                         award_basic_number=row.award_basic_number,
                         delivery_order_number=row.delivery_order_number or "",
                         delivery_order_counter=row.delivery_order_counter,
-                        last_mod_posting_date=row.last_mod_posting_date,
+                        last_mod_posting_date=None,
                         awardee_cage=(row.awardee_cage or "")[:10],
                         total_contract_price=_safe_decimal(row.total_contract_price),
-                        award_date=eff_award_date,
+                        award_date=row.award_date or parse_result.award_date,
                         posted_date=row.posted_date,
                         nsn=row.nsn,
                         nomenclature=row.nomenclature,
                         purchase_request=row.purchase_request,
                         dibbs_solicitation_number=row.dibbs_solicitation_number,
-                        solicitation=matched_solicitation,
                         sol_number=sol_guess,
+                        solicitation=matched_sol,
                         we_won=we_won,
+                        is_faux=False,
                         aw_file_date=parse_result.award_date,
                     )
                 )
+                if we_won:
+                    _track_win(row.awardee_cage)
+            else:
+                existing = existing_keys[key]
+                if existing.is_faux:
+                    existing.is_faux = False
+                    existing.award_date = row.award_date or parse_result.award_date
+                    existing.total_contract_price = _safe_decimal(row.total_contract_price)
+                    existing.awardee_cage = (row.awardee_cage or "")[:10]
+                    existing.nomenclature = row.nomenclature
+                    existing.purchase_request = row.purchase_request
+                    existing.dibbs_solicitation_number = row.dibbs_solicitation_number
+                    existing.sol_number = sol_guess
+                    existing.solicitation = matched_sol
+                    existing.we_won = we_won
+                    existing.aw_file_date = parse_result.award_date
+                    to_update_faux.append(existing)
+                    if we_won:
+                        _track_win(row.awardee_cage)
 
-        created_count = 0
-        created_notice_ids: list[str] = []
-        if to_create:
-            from django.db import connection as _conn
-
+        if to_create_awards:
             _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
             _cols = ", ".join(f.column for f in _fields)
             _placeholders = ", ".join(["%s" for _ in _fields])
             _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
-            for chunk in _chunked(to_create, AW_CHUNK):
+            for chunk in _chunked(to_create_awards, AW_CHUNK):
                 _rows = [
                     tuple(
                         f.get_db_prep_save(f.value_from_object(obj), connection=_conn)
@@ -224,39 +190,173 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                 ]
                 with _conn.cursor() as cursor:
                     cursor.executemany(_sql, _rows)
-            created_notice_ids = [o.notice_id for o in to_create]
-            created_count = len(to_create)
+            created_count = len(to_create_awards)
 
-        updated_count = 0
-        if to_update:
-            for chunk in _chunked(to_update, AW_CHUNK):
-                DibbsAward.objects.bulk_update(chunk, update_fields)
-            updated_count = len(to_update)
+        if to_update_faux:
+            faux_update_fields = [
+                "is_faux",
+                "award_date",
+                "total_contract_price",
+                "awardee_cage",
+                "nomenclature",
+                "purchase_request",
+                "dibbs_solicitation_number",
+                "sol_number",
+                "solicitation",
+                "we_won",
+                "aw_file_date",
+            ]
+            for chunk in _chunked(to_update_faux, AW_CHUNK):
+                DibbsAward.objects.bulk_update(chunk, faux_update_fields)
+            updated_faux_count = len(to_update_faux)
+
+        if mod_rows:
+            existing_mod_awards = {
+                (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
+                for obj in DibbsAward.objects.filter(
+                    award_basic_number__in=[r.award_basic_number for r in mod_rows]
+                ).only("id", "award_basic_number", "delivery_order_number", "nsn")
+            }
+
+            existing_mod_dedup = set(
+                DibbsAwardMod.objects.filter(
+                    award_id__in=[o.id for o in existing_mod_awards.values()]
+                ).values_list("award_id", "mod_date", "nsn", "mod_contract_price")
+            )
+
+            faux_key_to_obj = {}
+
+            for row in mod_rows:
+                key = (row.award_basic_number, row.delivery_order_number or "", row.nsn or "")
+                if key not in existing_mod_awards and key not in faux_key_to_obj:
+                    nid = _dibbs_file_notice_id(
+                        row.award_basic_number, row.delivery_order_number, row.nsn
+                    )
+                    faux = DibbsAward(
+                        source=DibbsAward.SOURCE_DIBBS_FILE,
+                        notice_id=nid,
+                        award_basic_number=row.award_basic_number,
+                        delivery_order_number=row.delivery_order_number or "",
+                        delivery_order_counter=row.delivery_order_counter,
+                        last_mod_posting_date=None,
+                        awardee_cage=(row.awardee_cage or "")[:10],
+                        total_contract_price=None,
+                        award_date=_extract_fy_date(row.award_basic_number),
+                        posted_date=None,
+                        nsn=row.nsn,
+                        nomenclature=row.nomenclature,
+                        purchase_request=None,
+                        dibbs_solicitation_number=row.dibbs_solicitation_number,
+                        sol_number=(row.dibbs_solicitation_number or row.award_basic_number or "")[:50],
+                        solicitation=sol_lookup.get(row.dibbs_solicitation_number or ""),
+                        we_won=_we_won(row.awardee_cage),
+                        is_faux=True,
+                        aw_file_date=parse_result.award_date,
+                    )
+                    faux_to_create.append(faux)
+                    faux_key_to_obj[key] = faux
+                    if faux.we_won:
+                        _track_win(row.awardee_cage)
+
+            if faux_to_create:
+                _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
+                _cols = ", ".join(f.column for f in _fields)
+                _placeholders = ", ".join(["%s" for _ in _fields])
+                _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
+                for chunk in _chunked(faux_to_create, AW_CHUNK):
+                    _rows = [
+                        tuple(
+                            f.get_db_prep_save(f.value_from_object(obj), connection=_conn)
+                            for f in _fields
+                        )
+                        for obj in chunk
+                    ]
+                    with _conn.cursor() as cursor:
+                        cursor.executemany(_sql, _rows)
+
+                reloaded = {
+                    (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
+                    for obj in DibbsAward.objects.filter(
+                        notice_id__in=[o.notice_id for o in faux_to_create]
+                    ).only("id", "award_basic_number", "delivery_order_number", "nsn")
+                }
+                existing_mod_awards.update(reloaded)
+                faux_created_count = len(faux_to_create)
+
+            mods_to_create = []
+            for row in mod_rows:
+                key = (row.award_basic_number, row.delivery_order_number or "", row.nsn or "")
+                award_obj = existing_mod_awards.get(key)
+                if not award_obj:
+                    warnings.append(
+                        "MOD row skipped - could not find or create award for "
+                        f"{row.award_basic_number} / {row.delivery_order_number} / {row.nsn}"
+                    )
+                    continue
+
+                price = _safe_decimal(row.total_contract_price)
+                dedup_key = (award_obj.id, row.last_mod_posting_date, row.nsn, price)
+                if dedup_key in existing_mod_dedup:
+                    mod_skipped_count += 1
+                    continue
+
+                existing_mod_dedup.add(dedup_key)
+                mods_to_create.append(
+                    DibbsAwardMod(
+                        award=award_obj,
+                        award_basic_number=row.award_basic_number,
+                        delivery_order_number=row.delivery_order_number or "",
+                        delivery_order_counter=row.delivery_order_counter,
+                        nsn=row.nsn,
+                        nomenclature=row.nomenclature,
+                        awardee_cage=(row.awardee_cage or "")[:10],
+                        mod_date=row.last_mod_posting_date,
+                        mod_contract_price=price,
+                        posted_date=row.posted_date,
+                        purchase_request=row.purchase_request,
+                        dibbs_solicitation_number=row.dibbs_solicitation_number,
+                        sol_number=(row.dibbs_solicitation_number or row.award_basic_number or "")[:50],
+                        aw_file_date=parse_result.award_date,
+                    )
+                )
+
+            if mods_to_create:
+                for chunk in _chunked(mods_to_create, AW_CHUNK):
+                    DibbsAwardMod.objects.bulk_create(chunk)
+                mod_created_count = len(mods_to_create)
 
         batch = AwardImportBatch.objects.create(
             award_date=parse_result.award_date,
             filename=parse_result.filename,
             imported_by=imported_by,
             row_count=row_count_source,
-            created_count=created_count,
-            updated_count=updated_count,
+            awards_created=created_count,
+            faux_created=faux_created_count,
+            faux_upgraded=updated_faux_count,
+            mods_created=mod_created_count,
+            mods_skipped=mod_skipped_count,
             we_won_count=sum(we_won_by_cage.values()),
         )
 
-        if created_notice_ids:
-            DibbsAward.objects.filter(notice_id__in=created_notice_ids).update(
-                aw_import_batch=batch
-            )
-
+        if to_create_awards:
+            DibbsAward.objects.filter(
+                notice_id__in=[o.notice_id for o in to_create_awards]
+            ).update(aw_import_batch=batch)
+        if faux_to_create:
+            DibbsAward.objects.filter(
+                notice_id__in=[o.notice_id for o in faux_to_create]
+            ).update(aw_import_batch=batch)
     return {
         "award_date": parse_result.award_date,
         "filename": parse_result.filename,
         "row_count": row_count_source,
         "created_count": created_count,
-        "updated_count": updated_count,
-        "skipped_count": skipped_count,
+        "faux_created_count": faux_created_count,
+        "updated_faux_count": updated_faux_count,
+        "mod_created_count": mod_created_count,
+        "mod_skipped_count": mod_skipped_count,
         "we_won_count": sum(we_won_by_cage.values()),
         "we_won_by_cage": we_won_by_cage,
         "batch_id": batch.pk,
-        "warnings": parse_result.warnings,
+        "warnings": warnings,
     }

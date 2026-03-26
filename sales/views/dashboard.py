@@ -48,16 +48,16 @@ def dashboard(request):
     for sol in recent_solicitations:
         sol.first_line = sol.lines.order_by("line_number", "id").first()
 
-    from django.db.models import Count as _Count
     month_start = today.replace(day=1)
     wins_this_month = (
         DibbsAward.objects
         .filter(id__in=WeWonAward.objects.values("id"))
         .filter(award_date__gte=month_start)
+        .filter(is_faux=False)
         .values("award_basic_number", "delivery_order_number")
         .distinct()
-        .aggregate(total=_Count("*"))
-    )["total"] or 0
+        .count()
+    )
 
     return render(
         request,

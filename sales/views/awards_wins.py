@@ -5,9 +5,10 @@ per page. Wins determined dynamically via WeWonAward view.
 """
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db.models import Exists, OuterRef
 from django.shortcuts import render
 
-from sales.models import DibbsAward, WeWonAward
+from sales.models import DibbsAward, DibbsAwardMod, WeWonAward
 
 
 @login_required
@@ -28,12 +29,14 @@ def awards_wins(request):
     rows = (
         DibbsAward.objects
         .filter(id__in=won_ids)
+        .filter(is_faux=False)
         .order_by(
             "-award_date",
             "award_basic_number",
             "delivery_order_number",
             "nsn",
         )
+        .annotate(has_mods=Exists(DibbsAwardMod.objects.filter(award=OuterRef("pk"))))
         .values(
             "id",
             "award_basic_number",
@@ -43,6 +46,7 @@ def awards_wins(request):
             "nomenclature",
             "total_contract_price",
             "sol_number",
+            "has_mods",
         )
     )
 
@@ -62,9 +66,12 @@ def awards_wins(request):
                     "award_date": row["award_date"],
                     "total_contract_price": row["total_contract_price"],
                     "sol_number": row["sol_number"],
+                    "has_mods": row["has_mods"],
                     "lines": [],
                 }
             )
+        elif row["has_mods"]:
+            groups[seen[key]]["has_mods"] = True
         groups[seen[key]]["lines"].append(
             {
                 "nsn": row["nsn"],

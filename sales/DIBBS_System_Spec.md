@@ -3589,18 +3589,33 @@ Awardee_CAGE_Code, Total_Contract_Price (format: `$1 234.56`), Award_Date, Poste
 NSN_Part_Number, Nomenclature, Purchase_Request, Solicitation. All dates: MM-DD-YYYY.
 
 ### 13.3 Data Model
-`DibbsAward` is populated from DIBBS AW file import (`source='DIBBS_FILE'`). The model may still
-carry `SOURCE_SAM` / `SOURCE_DIBBS_FILE` choice values for legacy database rows. Operational
-writes use file-driven fields (`award_basic_number`, `awardee_cage`, `total_contract_price`, `nsn`,
-etc.). `AwardImportBatch` tracks each file upload.
+`DibbsAward` is populated from AW originals (`last_mod_posting_date IS NULL`) and includes
+`is_faux` to mark synthesized placeholders. `DibbsAwardMod` stores AW modification rows
+(`last_mod_posting_date IS NOT NULL`) in table `dibbs_award_mod` linked to `DibbsAward`.
+`AwardImportBatch` tracks each upload with counters for:
+`awards_created`, `faux_created`, `faux_upgraded`, `mods_created`, `mods_skipped`.
 
-Deduplication for DIBBS_FILE rows: `(award_basic_number, delivery_order_number, nsn)`.
+Original-award dedup key in `DibbsAward` import path:
+`(award_basic_number, delivery_order_number, nsn)`.
+
+MOD dedup key in `DibbsAwardMod`:
+`(award_id, mod_date, nsn, mod_contract_price)`.
 
 ### 13.4 Solicitation Matching
 During import, `dibbs_solicitation_number` from the AW file is looked up against
 `Solicitation.solicitation_number`. If a match is found, the FK is set. Many AW rows reference
 solicitations not in the system (different date, already archived, etc.) — these are stored with
 `solicitation=None` and `dibbs_solicitation_number` preserved as a raw string.
+
+Routing logic:
+- If `last_mod_posting_date IS NULL`, process row as original award (`DibbsAward` path).
+- If `last_mod_posting_date IS NOT NULL`, process row as MOD (`DibbsAwardMod` path).
+
+Faux synthesis (MOD-first scenario):
+- If MOD row has no matching award key, create a faux `DibbsAward` first (`is_faux=True`).
+- Faux `award_date` is fiscal year end (Sep 30) derived from `award_basic_number[6:8]`
+  (`"24"` -> `2024-09-30`), with fallback to parsed AW file date if extraction fails.
+- Then insert `DibbsAwardMod` linked to that faux award.
 
 ### 13.5 We Won Detection
 `we_won` is set to `True` when `awardee_cage` matches any active `CompanyCAGE.cage_code`

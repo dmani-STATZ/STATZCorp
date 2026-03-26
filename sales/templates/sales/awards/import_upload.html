@@ -101,9 +101,11 @@
           <th>File</th>
           <th>Status</th>
           <th>Rows</th>
-          <th>New</th>
-          <th>Updated</th>
-          <th>Skipped</th>
+          <th>Awards</th>
+          <th>Faux Created</th>
+          <th>Faux Updated</th>
+          <th>MODs</th>
+          <th>MODs Skipped</th>
           <th>We Won</th>
           <th>Warnings</th>
         </tr>
@@ -121,8 +123,10 @@
           </td>
           <td>{{ r.row_count }}</td>
           <td>{{ r.created_count }}</td>
-          <td>{{ r.updated_count }}</td>
-          <td>{{ r.skipped_count }}</td>
+          <td>{{ r.faux_created_count }}</td>
+          <td>{{ r.updated_faux_count }}</td>
+          <td>{{ r.mod_created_count }}</td>
+          <td>{{ r.mod_skipped_count }}</td>
           <td>{{ r.we_won_count }}</td>
           <td>
             {% if not r.success %}
@@ -151,8 +155,11 @@
               <th>Date</th>
               <th>Filename</th>
               <th class="text-end">Rows</th>
-              <th class="text-end">New</th>
-              <th class="text-end">Updated</th>
+              <th class="text-end">Awards</th>
+              <th class="text-end">Faux Created</th>
+              <th class="text-end">Faux Upgraded</th>
+              <th class="text-end">MODs Created</th>
+              <th class="text-end">MODs Skipped</th>
               <th class="text-end">We Won</th>
               <th>Imported By</th>
               <th>Imported At</th>
@@ -164,8 +171,11 @@
               <td>{{ b.award_date|date:"M j, Y" }}</td>
               <td class="font-monospace small">{{ b.filename }}</td>
               <td class="text-end">{{ b.row_count }}</td>
-              <td class="text-end">{{ b.created_count }}</td>
-              <td class="text-end">{{ b.updated_count }}</td>
+              <td class="text-end">{{ b.awards_created }}</td>
+              <td class="text-end">{{ b.faux_created }}</td>
+              <td class="text-end">{{ b.faux_upgraded }}</td>
+              <td class="text-end">{{ b.mods_created }}</td>
+              <td class="text-end">{{ b.mods_skipped }}</td>
               <td class="text-end">{{ b.we_won_count }}</td>
               <td>{% if b.imported_by %}{{ b.imported_by.get_username }}{% else %}—{% endif %}</td>
               <td class="small text-muted">{{ b.imported_at|date:"Y-m-d H:i" }}</td>
