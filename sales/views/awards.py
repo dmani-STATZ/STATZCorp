@@ -20,10 +20,14 @@ def awards_import_upload(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Staff access required.")
 
-    recent_qs = AwardImportBatch.objects.select_related("imported_by").order_by("-imported_at")[:20]
+    recent_qs = AwardImportBatch.objects.select_related("imported_by").order_by(
+        "-imported_at"
+    )[:20]
 
     if request.method == "POST":
-        uploaded_files = request.FILES.getlist("aw_file")
+        uploaded_files = sorted(
+            request.FILES.getlist("aw_file"), key=lambda f: f.name.lower()
+        )
 
         if not uploaded_files:
             return render(
@@ -69,9 +73,9 @@ def awards_import_upload(request):
 
             results.append(file_result)
 
-        recent_batches = AwardImportBatch.objects.select_related("imported_by").order_by(
-            "-imported_at"
-        )[:20]
+        recent_batches = AwardImportBatch.objects.select_related(
+            "imported_by"
+        ).order_by("-imported_at")[:20]
 
         return render(
             request,
@@ -119,7 +123,9 @@ def awards_list(request):
         date_to   — award_date <= this date (YYYY-MM-DD)
         we_won    — '1' to show only we_won=True rows
     """
-    qs = DibbsAward.objects.select_related("solicitation").order_by("-award_date", "-id")
+    qs = DibbsAward.objects.select_related("solicitation").order_by(
+        "-award_date", "-id"
+    )
 
     cage = request.GET.get("cage", "").strip()
     if cage:
