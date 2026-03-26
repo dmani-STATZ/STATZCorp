@@ -321,8 +321,29 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                 )
 
             if mods_to_create:
+                from django.db import connection as _conn2
+                _mfields = [
+                    f for f in DibbsAwardMod._meta.concrete_fields
+                    if not f.primary_key
+                ]
+                _mcols = ', '.join(f.column for f in _mfields)
+                _mplaceholders = ', '.join(['%s' for _ in _mfields])
+                _msql = (
+                    f'INSERT INTO dibbs_award_mod ({_mcols}) '
+                    f'VALUES ({_mplaceholders})'
+                )
                 for chunk in _chunked(mods_to_create, AW_CHUNK):
-                    DibbsAwardMod.objects.bulk_create(chunk)
+                    _mrows = [
+                        tuple(
+                            f.get_db_prep_save(
+                                f.value_from_object(obj), connection=_conn2
+                            )
+                            for f in _mfields
+                        )
+                        for obj in chunk
+                    ]
+                    with _conn2.cursor() as cursor:
+                        cursor.executemany(_msql, _mrows)
                 mod_created_count = len(mods_to_create)
 
         batch = AwardImportBatch.objects.create(
