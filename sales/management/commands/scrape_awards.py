@@ -14,6 +14,8 @@ from sales.services.dibbs_awards_scraper import (
     scrape_awards_for_date,
 )
 
+_CHROMIUM_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+
 
 class Command(BaseCommand):
     help = (
@@ -48,20 +50,24 @@ class Command(BaseCommand):
             )
             sys.exit(1)
 
+        if raw:
+            self._handle_single_date(sync_playwright, raw)
+        else:
+            self._handle_reconciliation(sync_playwright)
+
+    def _run_playwright(self, sync_playwright, fn):
+        """
+        Open a Playwright session, accept DoD warning, call fn(page), then close the browser.
+        No Django ORM calls inside this path (required for mssql on Azure with Playwright's loop).
+        """
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-            )
+            browser = pw.chromium.launch(headless=True, args=_CHROMIUM_ARGS)
             try:
                 context = browser.new_context(user_agent=USER_AGENT)
                 page = context.new_page()
                 try:
                     accept_dod_warning(page)
-                    if raw:
-                        self._handle_single_date(page, raw)
-                    else:
-                        self._handle_reconciliation(page)
+                    return fn(page)
                 finally:
                     try:
                         page.close()
@@ -77,7 +83,23 @@ class Command(BaseCommand):
                 except Exception:
                     pass
 
-    def _handle_single_date(self, page, raw: str) -> None:
+    def _fetch_available_dates_only(self, sync_playwright):
+        """Phase 1 (reconciliation): browser only — list of dates from DIBBS."""
+
+        def _inner(page):
+            return get_available_dates(page)
+
+        return self._run_playwright(sync_playwright, _inner)
+
+    def _scrape_awards_for_date_only(self, sync_playwright, target_date: date):
+        """Browser only — returns scrape_awards_for_date result dict."""
+
+        def _inner(page):
+            return scrape_awards_for_date(page, target_date)
+
+        return self._run_playwright(sync_playwright, _inner)
+
+    def _handle_single_date(self, sync_playwright, raw: str) -> None:
         try:
             target_date = date.fromisoformat(raw)
         except ValueError:
@@ -95,12 +117,14 @@ class Command(BaseCommand):
             )
             return
 
-        status = self._scrape_and_import_date(page, target_date)
+        batch = self._start_scrape_batch(target_date)
+        result = self._scrape_awards_for_date_only(sync_playwright, target_date)
+        status = self._finalize_scrape_batch(batch, target_date, result)
         if status == "FAILED":
             sys.exit(1)
 
-    def _handle_reconciliation(self, page) -> None:
-        available_dates = get_available_dates(page)
+    def _handle_reconciliation(self, sync_playwright) -> None:
+        available_dates = self._fetch_available_dates_only(sync_playwright)
         if not available_dates:
             self.stdout.write(
                 self.style.WARNING("No award dates found on DIBBS dates page; nothing to do.")
@@ -120,7 +144,9 @@ class Command(BaseCommand):
         n_failed = 0
 
         for target_date in to_scrape:
-            status = self._scrape_and_import_date(page, target_date)
+            batch = self._start_scrape_batch(target_date)
+            result = self._scrape_awards_for_date_only(sync_playwright, target_date)
+            status = self._finalize_scrape_batch(batch, target_date, result)
             if status == "SUCCESS":
                 n_success += 1
             elif status == "PARTIAL":
@@ -134,11 +160,8 @@ class Command(BaseCommand):
         if n_failed:
             sys.exit(1)
 
-    def _scrape_and_import_date(self, page, target_date: date) -> str:
-        """
-        Create/update batch, scrape, import. Prints one summary line on success/partial.
-        Returns 'SUCCESS', 'PARTIAL', or 'FAILED'.
-        """
+    def _start_scrape_batch(self, target_date: date) -> AwardImportBatch:
+        """ORM only — create/update batch before opening Playwright for this date."""
         filename = f"scrape-{target_date.isoformat()}.txt"[:50]
         batch, _ = AwardImportBatch.objects.update_or_create(
             scrape_date=target_date,
@@ -150,9 +173,15 @@ class Command(BaseCommand):
                 "filename": filename,
             },
         )
+        return batch
 
-        result = scrape_awards_for_date(page, target_date)
-
+    def _finalize_scrape_batch(
+        self, batch: AwardImportBatch, target_date: date, result: dict
+    ) -> str:
+        """
+        ORM only — persist scrape outcome after the Playwright session has closed.
+        Returns 'SUCCESS', 'PARTIAL', or 'FAILED'.
+        """
         if result["error"]:
             batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
             batch.expected_rows = result.get("expected_rows") or 0

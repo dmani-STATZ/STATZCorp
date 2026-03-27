@@ -3663,10 +3663,10 @@ on who last won and at what price — critical for bid pricing decisions.
 **Schedule:** Nightly (configure time in Azure portal)
 
 **Reconciliation flow (default, no `--date`):**
-1. Launch headless Chromium once per run; accept the DoD warning page a single time.
-2. Open the DIBBS award **dates** page (`AwdDates.aspx?category=post`), parse all available calendar dates (today is excluded — same-day awards are not published yet).
-3. Compare against `AwardImportBatch` where `source=AUTO_SCRAPE` and `scrape_status=SUCCESS`; build the list of dates still needing a scrape, **oldest first**.
-4. If nothing remains, exit successfully. Otherwise, for each date in order, navigate to the daily awards grid and run the **per-date flow** below using the **same** browser session.
+1. Launch headless Chromium; accept the DoD warning page; open the DIBBS award **dates** page (`AwdDates.aspx?category=post`), parse all available calendar dates (today is excluded — same-day awards are not published yet). **Close the browser completely.**
+2. **After Playwright exits:** query `AwardImportBatch` (ORM only) to compare against `source=AUTO_SCRAPE` and `scrape_status=SUCCESS`; build the list of dates still needing a scrape, **oldest first**. (ORM must not run inside `sync_playwright()` when using the mssql backend on Azure App Service — Playwright’s event loop conflicts with the driver’s DB connection.)
+3. If nothing remains, exit successfully.
+4. For each date in order: create/update `AwardImportBatch` (ORM), then launch a **new** Playwright session, accept DoD warning, run the **per-date scrape** steps below (browser only), close the browser, then bulk-upsert and update the batch (ORM). Continue on individual failures.
 5. After all dates, print a summary (counts of SUCCESS / PARTIAL / FAILED). Exit with a non-zero status if any date failed.
 
 **Per-date scrape target:** `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx?Category=post&TypeSrch=cq&Value=MM-DD-YYYY`
@@ -3676,7 +3676,7 @@ on who last won and at what price — critical for bid pricing decisions.
 2. Read expected record count from page header (`ctl00_cph1_lblRecCount`)
 3. Paginate through all pages using ASP.NET `__doPostBack` grid control
 4. Normalise records to match AW file format
-5. Bulk-upsert via `awards_file_importer.import_aw_records()`
+5. **After the Playwright session closes:** bulk-upsert via `awards_file_importer.import_aw_records()`
 6. Mark `AwardImportBatch` as SUCCESS, PARTIAL, or FAILED
 
 **Success condition:** `actual_rows == expected_rows` AND no exception thrown.  
