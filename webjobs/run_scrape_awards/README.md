@@ -3,6 +3,7 @@
 ## What This Does
 Runs the Django management command `scrape_awards` which scrapes today's
 DIBBS award records directly into the DibbsAward table.
+Scraper defaults to running the day prior to the current day.
 
 ## Azure Deployment Instructions
 1. Zip ONLY the `run.sh` file (not the folder, just the file):

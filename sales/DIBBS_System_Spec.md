@@ -3657,28 +3657,33 @@ on who last won and at what price — critical for bid pricing decisions.
 
 ### 13.7 Automated Scraper
 
-**Entry point:** `python manage.py scrape_awards [--date YYYY-MM-DD]`  
+**Entry point:** `python manage.py scrape_awards` (reconciliation, default) · `python manage.py scrape_awards --date YYYY-MM-DD` (single date) · optional `--all` (same reconciliation as default; mutually exclusive with `--date`)  
 **Service:** `sales/services/dibbs_awards_scraper.py`  
 **Scheduler:** Azure WebJob — `webjobs/run_scrape_awards/run.sh`  
 **Schedule:** Nightly (configure time in Azure portal)
 
-**Scrape target:** `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx?Category=post&TypeSrch=cq&Value=MM-DD-YYYY`
+**Reconciliation flow (default, no `--date`):**
+1. Launch headless Chromium once per run; accept the DoD warning page a single time.
+2. Open the DIBBS award **dates** page (`AwdDates.aspx?category=post`), parse all available calendar dates (today is excluded — same-day awards are not published yet).
+3. Compare against `AwardImportBatch` where `source=AUTO_SCRAPE` and `scrape_status=SUCCESS`; build the list of dates still needing a scrape, **oldest first**.
+4. If nothing remains, exit successfully. Otherwise, for each date in order, navigate to the daily awards grid and run the **per-date flow** below using the **same** browser session.
+5. After all dates, print a summary (counts of SUCCESS / PARTIAL / FAILED). Exit with a non-zero status if any date failed.
 
-**Flow:**
-1. Launch headless Chromium via Playwright
-2. Accept DoD warning page
-3. Navigate to awards page for target date
-4. Read expected record count from page header (`ctl00_cph1_lblRecCount`)
-5. Paginate through all pages using ASP.NET `__doPostBack` grid control
-6. Normalise records to match AW file format
-7. Bulk-upsert via `awards_file_importer.import_aw_records()`
-8. Mark `AwardImportBatch` as SUCCESS, PARTIAL, or FAILED
+**Per-date scrape target:** `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx?Category=post&TypeSrch=cq&Value=MM-DD-YYYY`
+
+**Per-date flow (each date in reconciliation, or the one date when `--date` is used):**
+1. Navigate to awards page for that date
+2. Read expected record count from page header (`ctl00_cph1_lblRecCount`)
+3. Paginate through all pages using ASP.NET `__doPostBack` grid control
+4. Normalise records to match AW file format
+5. Bulk-upsert via `awards_file_importer.import_aw_records()`
+6. Mark `AwardImportBatch` as SUCCESS, PARTIAL, or FAILED
 
 **Success condition:** `actual_rows == expected_rows` AND no exception thrown.  
 **PARTIAL:** Scraper completed pagination but row count mismatch. Data is still written.  
 **FAILED:** Exception thrown during scrape. `AwardImportBatch` is marked FAILED. Manual upload fallback should be used.
 
-**Idempotent:** Running the command twice for the same date is safe. Existing SUCCESS batches are skipped. `DibbsAward` rows are upserted (not duplicated) using the existing dedup key.
+**Idempotent:** Reconciliation skips dates already marked SUCCESS for `AUTO_SCRAPE`. A manual `--date` run skips if that date already has a successful auto batch. `DibbsAward` rows are upserted (not duplicated) using the existing dedup key.
 
 ### 13.8 Wins Report (Dynamic Company CAGE Join)
 Wins are determined dynamically from active company CAGE configuration, not from the static

@@ -6,32 +6,83 @@ from django.utils import timezone
 
 from sales.models import AwardImportBatch
 from sales.services.awards_file_importer import import_aw_records
-from sales.services.dibbs_awards_scraper import scrape_awards_for_date
+from sales.services.dibbs_awards_scraper import (
+    USER_AGENT,
+    accept_dod_warning,
+    get_available_dates,
+    get_dates_needing_scrape,
+    scrape_awards_for_date,
+)
 
 
 class Command(BaseCommand):
     help = (
-        "Scrape DIBBS award records for a given date and write directly to DibbsAward table."
+        "Reconcile DIBBS award dates: scrape missing or failed AUTO_SCRAPE dates (default), "
+        "or scrape a single date with --date."
     )
 
     def add_arguments(self, parser):
-        parser.add_argument(
+        mx = parser.add_mutually_exclusive_group(required=False)
+        mx.add_argument(
             "--date",
             type=str,
             metavar="YYYY-MM-DD",
-            help="Date to scrape. Defaults to today if not provided.",
+            help="Scrape only this date (manual run). Does not run reconciliation.",
+        )
+        mx.add_argument(
+            "--all",
+            action="store_true",
+            help="Explicitly run full reconciliation (same as default when --date is omitted).",
         )
 
     def handle(self, *args, **options):
         raw = options.get("date")
-        if raw:
+
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            self.stderr.write(
+                self.style.ERROR(
+                    "Playwright is not installed. Use: pip install playwright && playwright install chromium"
+                )
+            )
+            sys.exit(1)
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+            )
             try:
-                target_date = date.fromisoformat(raw)
-            except ValueError:
-                self.stderr.write(self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)"))
-                sys.exit(1)
-        else:
-            target_date = date.today()
+                context = browser.new_context(user_agent=USER_AGENT)
+                page = context.new_page()
+                try:
+                    accept_dod_warning(page)
+                    if raw:
+                        self._handle_single_date(page, raw)
+                    else:
+                        self._handle_reconciliation(page)
+                finally:
+                    try:
+                        page.close()
+                    except Exception:
+                        pass
+                    try:
+                        context.close()
+                    except Exception:
+                        pass
+            finally:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+
+    def _handle_single_date(self, page, raw: str) -> None:
+        try:
+            target_date = date.fromisoformat(raw)
+        except ValueError:
+            self.stderr.write(self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)"))
+            sys.exit(1)
 
         existing = AwardImportBatch.objects.filter(
             scrape_date=target_date,
@@ -44,6 +95,50 @@ class Command(BaseCommand):
             )
             return
 
+        status = self._scrape_and_import_date(page, target_date)
+        if status == "FAILED":
+            sys.exit(1)
+
+    def _handle_reconciliation(self, page) -> None:
+        available_dates = get_available_dates(page)
+        if not available_dates:
+            self.stdout.write(
+                self.style.WARNING("No award dates found on DIBBS dates page; nothing to do.")
+            )
+            return
+
+        to_scrape = get_dates_needing_scrape(available_dates)
+        if not to_scrape:
+            self.stdout.write("All available dates already scraped successfully.")
+            return
+
+        listed = ", ".join(d.isoformat() for d in to_scrape)
+        self.stdout.write(f"Found {len(to_scrape)} date(s) to scrape: {listed}")
+
+        n_success = 0
+        n_partial = 0
+        n_failed = 0
+
+        for target_date in to_scrape:
+            status = self._scrape_and_import_date(page, target_date)
+            if status == "SUCCESS":
+                n_success += 1
+            elif status == "PARTIAL":
+                n_partial += 1
+            else:
+                n_failed += 1
+
+        self.stdout.write(
+            f"Reconciliation complete: {n_success} SUCCESS, {n_partial} PARTIAL, {n_failed} FAILED"
+        )
+        if n_failed:
+            sys.exit(1)
+
+    def _scrape_and_import_date(self, page, target_date: date) -> str:
+        """
+        Create/update batch, scrape, import. Prints one summary line on success/partial.
+        Returns 'SUCCESS', 'PARTIAL', or 'FAILED'.
+        """
         filename = f"scrape-{target_date.isoformat()}.txt"[:50]
         batch, _ = AwardImportBatch.objects.update_or_create(
             scrape_date=target_date,
@@ -56,21 +151,28 @@ class Command(BaseCommand):
             },
         )
 
-        result = scrape_awards_for_date(target_date)
+        result = scrape_awards_for_date(page, target_date)
 
         if result["error"]:
             batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
             batch.expected_rows = result.get("expected_rows") or 0
             batch.last_attempted_at = timezone.now()
             batch.save(update_fields=["scrape_status", "expected_rows", "last_attempted_at"])
-            self.stderr.write(self.style.ERROR(result["error"]))
-            sys.exit(1)
+            self.stderr.write(self.style.ERROR(f"{target_date}: {result['error']}"))
+            return "FAILED"
 
-        import_summary = import_aw_records(
-            result["records"],
-            batch,
-            target_date,
-        )
+        try:
+            import_summary = import_aw_records(
+                result["records"],
+                batch,
+                target_date,
+            )
+        except Exception as exc:
+            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+            batch.last_attempted_at = timezone.now()
+            batch.save(update_fields=["scrape_status", "last_attempted_at"])
+            self.stderr.write(self.style.ERROR(f"{target_date}: Import failed: {exc}"))
+            return "FAILED"
 
         batch.refresh_from_db()
         batch.expected_rows = result["expected_rows"]
@@ -94,3 +196,4 @@ class Command(BaseCommand):
             f"Scraped: {result['actual_rows']} | Created: {import_summary['created_count']} | "
             f"Updated: {import_summary['updated_faux_count']} | Status: {status_label}"
         )
+        return status_label

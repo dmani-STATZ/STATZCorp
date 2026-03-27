@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.dibbs.bsm.dla.mil"
 WARNING_URL = f"{BASE_URL}/dodwarning.aspx?goto=/"
 AWARDS_REC_URL = f"{BASE_URL}/Awards/AwdRecs.aspx"
+AWARDS_DATE_URL = f"{BASE_URL}/Awards/AwdDates.aspx?category=post"
+
+HREF_VALUE_DATE = re.compile(r"Value=(\d{2}-\d{2}-\d{4})", re.I)
 
 NAV_TIMEOUT = 60_000
 TABLE_TIMEOUT = 30_000
@@ -81,6 +84,61 @@ def build_awards_url(award_date: date) -> str:
         f"{AWARDS_REC_URL}?Category=post&TypeSrch=cq&Value="
         f"{award_date.strftime('%m-%d-%Y')}"
     )
+
+
+def get_available_dates(page) -> list[date]:
+    """
+    Scrapes the DIBBS awards dates page and returns all available
+    award dates as a sorted list, oldest to newest.
+    URL: https://www.dibbs.bsm.dla.mil/Awards/AwdDates.aspx?category=post
+    Parses all <a> href attributes for Value=MM-DD-YYYY pattern.
+    Returns empty list if none found.
+    Today's date is excluded — DIBBS does not publish same-day awards until the following day.
+    """
+    from datetime import datetime
+
+    page.goto(AWARDS_DATE_URL, wait_until="domcontentloaded", timeout=NAV_TIMEOUT)
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=15_000)
+    except Exception:
+        pass
+    html = page.content()
+    soup = BeautifulSoup(html, "html.parser")
+    found: set[date] = set()
+    for a in soup.find_all("a", href=True):
+        href = a.get("href") or ""
+        m = HREF_VALUE_DATE.search(href)
+        if not m:
+            continue
+        try:
+            d = datetime.strptime(m.group(1), "%m-%d-%Y").date()
+        except ValueError:
+            continue
+        found.add(d)
+    today = date.today()
+    found.discard(today)
+    return sorted(found)
+
+
+def get_dates_needing_scrape(available_dates: list[date]) -> list[date]:
+    """
+    Given a list of dates available on DIBBS, returns the subset
+    that need to be scraped — i.e., not already marked SUCCESS in
+    AwardImportBatch with source='AUTO_SCRAPE'.
+    Returns dates sorted oldest to newest.
+    """
+    from sales.models import AwardImportBatch
+
+    successful_dates = set(
+        AwardImportBatch.objects.filter(
+            source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+            scrape_status=AwardImportBatch.SCRAPE_SUCCESS,
+        )
+        .exclude(scrape_date__isnull=True)
+        .values_list("scrape_date", flat=True)
+    )
+
+    return [d for d in available_dates if d not in successful_dates]
 
 
 def get_expected_record_count(html: str) -> int:
@@ -230,9 +288,10 @@ def click_next_ellipsis(page) -> bool:
     return False
 
 
-def scrape_awards_for_date(award_date: date) -> dict[str, Any]:
+def scrape_awards_for_date(page, award_date: date) -> dict[str, Any]:
     """
-    Scrape all award records for the given date from DIBBS.
+    Scrape all award records for the given date from DIBBS using an existing Playwright page.
+    Caller must have accepted the DoD warning and may reuse the same session across dates.
     Returns a result dict with success, expected_rows, actual_rows, records, error.
     Never raises — errors are returned in result['error'].
     """
@@ -244,14 +303,6 @@ def scrape_awards_for_date(award_date: date) -> dict[str, Any]:
         "error": None,
     }
 
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        result["error"] = (
-            "Playwright is not installed. Use: pip install playwright && playwright install chromium"
-        )
-        return result
-
     collected: dict[str, dict[str, str]] = {}
 
     def _merge_page(html: str) -> None:
@@ -262,67 +313,43 @@ def scrape_awards_for_date(award_date: date) -> dict[str, Any]:
                 collected[str(key)] = norm
 
     try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+        page.goto(
+            build_awards_url(award_date),
+            wait_until="domcontentloaded",
+            timeout=NAV_TIMEOUT,
+        )
+        try:
+            page.wait_for_selector(
+                "table tr:nth-child(3)",
+                timeout=TABLE_TIMEOUT,
             )
-            try:
-                context = browser.new_context(user_agent=USER_AGENT)
-                page = context.new_page()
-                try:
-                    accept_dod_warning(page)
-                    page.goto(
-                        build_awards_url(award_date),
-                        wait_until="domcontentloaded",
-                        timeout=NAV_TIMEOUT,
+        except Exception as e:
+            result["error"] = f"Awards table did not load: {e}"
+            return result
+
+        html = page.content()
+        expected_rows = get_expected_record_count(html)
+        result["expected_rows"] = expected_rows
+        last_page = math.ceil(expected_rows / 50) if expected_rows else 1
+
+        _merge_page(html)
+
+        for p in range(2, last_page + 1):
+            state = get_pagination_state(page.content())
+            if p not in state["visible_pages"] and state["has_next_ellipsis"]:
+                if not click_next_ellipsis(page):
+                    logger.warning(
+                        "Page %s not visible and ellipsis click failed; trying __doPostBack",
+                        p,
                     )
-                    try:
-                        page.wait_for_selector(
-                            "table tr:nth-child(3)",
-                            timeout=TABLE_TIMEOUT,
-                        )
-                    except Exception as e:
-                        result["error"] = f"Awards table did not load: {e}"
-                        return result
+            _dopostback(page, str(p))
+            _merge_page(page.content())
 
-                    html = page.content()
-                    expected_rows = get_expected_record_count(html)
-                    result["expected_rows"] = expected_rows
-                    last_page = math.ceil(expected_rows / 50) if expected_rows else 1
-
-                    _merge_page(html)
-
-                    for p in range(2, last_page + 1):
-                        state = get_pagination_state(page.content())
-                        if p not in state["visible_pages"] and state["has_next_ellipsis"]:
-                            if not click_next_ellipsis(page):
-                                logger.warning(
-                                    "Page %s not visible and ellipsis click failed; trying __doPostBack",
-                                    p,
-                                )
-                        _dopostback(page, str(p))
-                        _merge_page(page.content())
-
-                    records = list(collected.values())
-                    result["actual_rows"] = len(records)
-                    result["records"] = records
-                    result["error"] = None
-                    result["success"] = len(records) == expected_rows
-                finally:
-                    try:
-                        page.close()
-                    except Exception:
-                        pass
-                    try:
-                        context.close()
-                    except Exception:
-                        pass
-            finally:
-                try:
-                    browser.close()
-                except Exception:
-                    pass
+        records = list(collected.values())
+        result["actual_rows"] = len(records)
+        result["records"] = records
+        result["error"] = None
+        result["success"] = len(records) == expected_rows
     except Exception as e:
         logger.exception("scrape_awards_for_date failed")
         result["error"] = str(e)
