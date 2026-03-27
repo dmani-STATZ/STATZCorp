@@ -313,6 +313,7 @@ def scrape_awards_for_date(
     award_date: date,
     batch_id: int,
     on_page_complete: Callable[[list[dict[str, str]], int, int], None],
+    activity_log: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """
     Scrape all award records for one date. Opens and closes Playwright inside this function.
@@ -322,9 +323,15 @@ def scrape_awards_for_date(
     After each page is parsed, ``on_page_complete(records, page_num, total_pages)`` is called
     with plain Python data — safe for Django ORM. It is invoked before ``time.sleep(PAGE_DELAY)``.
 
+    ``activity_log`` is optional; when set, short progress strings are emitted (e.g. for WebJob logs).
+
     Returns keys: success, expected_rows, actual_rows, pages_scraped, error.
     """
     _ = batch_id
+
+    def _emit(msg: str) -> None:
+        if activity_log:
+            activity_log(msg)
     result: dict[str, Any] = {
         "success": False,
         "expected_rows": 0,
@@ -343,6 +350,7 @@ def scrape_awards_for_date(
     pages_scraped = 0
 
     with sync_playwright() as pw:
+        _emit(f"Browser: launching Chromium for {award_date.isoformat()}.")
         browser = pw.chromium.launch(headless=True, args=_CHROMIUM_ARGS)
         try:
             context = browser.new_context(user_agent=USER_AGENT)
@@ -350,11 +358,14 @@ def scrape_awards_for_date(
             try:
                 try:
                     accept_dod_warning(page)
+                    _emit("Browser: DoD warning accepted.")
+                    _emit(f"Browser: navigating to awards grid for {award_date.isoformat()}.")
                     page.goto(
                         build_awards_url(award_date),
                         wait_until="domcontentloaded",
                         timeout=NAV_TIMEOUT,
                     )
+                    _emit("Browser: waiting for awards table selector.")
                     try:
                         page.wait_for_selector(
                             "table tr:nth-child(3)",
@@ -364,13 +375,19 @@ def scrape_awards_for_date(
                         result["error"] = f"Awards table did not load: {e}"
                         return result
 
+                    _emit("Browser: awards table loaded.")
                     html = page.content()
                     expected_rows = get_expected_record_count(html)
                     result["expected_rows"] = expected_rows
                     last_page = max(1, math.ceil(expected_rows / 50) if expected_rows else 1)
+                    _emit(
+                        f"Browser: DIBBS reports {expected_rows} row(s), "
+                        f"{last_page} page(s) to fetch."
+                    )
 
                     for p in range(1, last_page + 1):
                         if p > 1:
+                            _emit(f"Browser: navigating to page {p} of {last_page}.")
                             state = get_pagination_state(page.content())
                             if p not in state["visible_pages"] and state["has_next_ellipsis"]:
                                 if not click_next_ellipsis(page):

@@ -20,6 +20,12 @@ class Command(BaseCommand):
         "expiry notification. Use --date for a single date without reconciliation, or --dry-run."
     )
 
+    def _activity(self, message: str) -> None:
+        """UTC timestamp + prefix for WebJob / log stream visibility."""
+        ts = timezone.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.stdout.write(f"[{ts}] [scrape_awards] {message}")
+        sys.stdout.flush()
+
     def add_arguments(self, parser):
         parser.add_argument(
             "--date",
@@ -34,12 +40,36 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        self._activity("Command started.")
+        n = self._fail_stuck_in_progress_batches()
+        self._activity(
+            f"Stuck IN_PROGRESS cleanup: marked {n} batch(es) as FAILED."
+            if n
+            else "Stuck IN_PROGRESS cleanup: none found."
+        )
+
         if options.get("date"):
+            self._activity("--date mode: single-date scrape (reconciliation skipped).")
             target_date = self._parse_date(options["date"])
             self._scrape_single_date(target_date)
+            self._activity("Command finished.")
             return
 
         self._run_full_reconciliation(dry_run=options.get("dry_run", False))
+        self._activity("Command finished.")
+
+    def _fail_stuck_in_progress_batches(self) -> int:
+        """
+        Any AUTO_SCRAPE batch still IN_PROGRESS when this command starts was almost
+        certainly interrupted (crash, timeout, deploy). Mark FAILED so the queue can retry.
+        """
+        return AwardImportBatch.objects.filter(
+            source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+            scrape_status=AwardImportBatch.SCRAPE_IN_PROGRESS,
+        ).update(
+            scrape_status=AwardImportBatch.SCRAPE_FAILED,
+            last_attempted_at=timezone.now(),
+        )
 
     def _parse_date(self, raw: str) -> date:
         try:
@@ -72,6 +102,7 @@ class Command(BaseCommand):
             get_available_dates_from_dibbs,
         )
 
+        self._activity("Phase 1: inventory — opening browser for AwdDates.aspx.")
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=_CHROMIUM_ARGS)
             context = browser.new_context(user_agent=USER_AGENT)
@@ -85,6 +116,9 @@ class Command(BaseCommand):
                 )
                 dates = get_available_dates_from_dibbs(page)
                 self.stdout.write(f"DIBBS has {len(dates)} available award dates.")
+                self._activity(
+                    f"Phase 1: inventory — browser closed; {len(dates)} date(s) from DIBBS."
+                )
                 return dates
             finally:
                 try:
@@ -111,6 +145,8 @@ class Command(BaseCommand):
 
         new_dates = [d for d in available_dates if d not in existing_dates]
 
+        self._activity("Phase 2: syncing DIBBS dates to DB (MISSING batches).")
+
         if new_dates:
             now = timezone.now()
             AwardImportBatch.objects.bulk_create(
@@ -127,8 +163,10 @@ class Command(BaseCommand):
                 ]
             )
             self.stdout.write(f"Registered {len(new_dates)} new dates as MISSING.")
+            self._activity(f"Phase 2: registered {len(new_dates)} new MISSING batch(es).")
         else:
             self.stdout.write("No new dates to register.")
+            self._activity("Phase 2: no new dates to register.")
 
     def _build_work_queue(self) -> list[AwardImportBatch]:
         """
@@ -149,13 +187,16 @@ class Command(BaseCommand):
         )
 
     def _run_full_reconciliation(self, dry_run: bool = False) -> None:
+        self._activity("Full reconciliation: starting.")
         available_dates = self._fetch_available_dates()
         self._sync_dates_to_db(available_dates)
 
         queue = self._build_work_queue()
         self.stdout.write(f"Work queue: {len(queue)} date(s) to scrape.")
+        self._activity(f"Phase 3: work queue has {len(queue)} date(s) (non-SUCCESS).")
 
         if dry_run:
+            self._activity("Dry-run: listing queue only; no scraping.")
             for batch in queue:
                 self.stdout.write(
                     f"  Would scrape: {batch.scrape_date} (status: {batch.scrape_status})"
@@ -170,6 +211,7 @@ class Command(BaseCommand):
         self._check_and_notify_expiring_dates()
 
         if any_failed:
+            self._activity("Full reconciliation ended with one or more FAILED scrapes.")
             sys.exit(1)
 
     def _scrape_single_date_from_batch(self, batch: AwardImportBatch) -> bool:
@@ -179,6 +221,9 @@ class Command(BaseCommand):
         and final status updates after the browser closes.
         Returns False if scrape_status is FAILED.
         """
+        self._activity(
+            f"Phase 3: starting scrape for date {batch.scrape_date} (batch_id={batch.pk})."
+        )
         self.stdout.write(f"Scraping {batch.scrape_date}...")
 
         batch.scrape_status = AwardImportBatch.SCRAPE_IN_PROGRESS
@@ -225,11 +270,13 @@ class Command(BaseCommand):
                 f"  Page {page_num}/{total_pages} — {len(records)} rows — "
                 f"running total: {total_rows_written[0]}"
             )
+            sys.stdout.flush()
 
         result = scrape_awards_for_date(
             award_date=batch.scrape_date,
             batch_id=batch.pk,
             on_page_complete=on_page_complete,
+            activity_log=self._activity,
         )
 
         batch.refresh_from_db()
@@ -237,13 +284,26 @@ class Command(BaseCommand):
         if result["error"]:
             batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
             self.stderr.write(f"  FAILED: {result['error']}")
+            sys.stderr.flush()
+            self._activity(
+                f"Scrape finished with error for {batch.scrape_date}: {result['error']}"
+            )
         elif result["success"]:
             batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
             self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
+            sys.stdout.flush()
+            self._activity(
+                f"Scrape SUCCESS for {batch.scrape_date}: {result['actual_rows']} row(s)."
+            )
         else:
             batch.scrape_status = AwardImportBatch.SCRAPE_PARTIAL
             self.stdout.write(
                 f"  PARTIAL: {result['actual_rows']} of {result['expected_rows']} expected"
+            )
+            sys.stdout.flush()
+            self._activity(
+                f"Scrape PARTIAL for {batch.scrape_date}: "
+                f"{result['actual_rows']} of {result['expected_rows']} expected."
             )
 
         batch.expected_rows = result["expected_rows"]
@@ -261,6 +321,7 @@ class Command(BaseCommand):
         return batch.scrape_status != AwardImportBatch.SCRAPE_FAILED
 
     def _scrape_single_date(self, target_date: date) -> None:
+        self._activity(f"Single-date scrape requested for {target_date.isoformat()}.")
         batch = (
             AwardImportBatch.objects.filter(
                 scrape_date=target_date,
@@ -283,6 +344,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"{target_date} already SUCCESS. Use a different approach to re-scrape."
             )
+            self._activity(f"Skip: {target_date} already SUCCESS.")
             return
 
         if not self._scrape_single_date_from_batch(batch):
@@ -292,6 +354,7 @@ class Command(BaseCommand):
         """
         Non-SUCCESS dates at least 38 days old (DIBBS ~45-day retention) — email + UI banner data.
         """
+        self._activity("Phase 4: retention / expiry notification check.")
         today = timezone.now().date()
         danger_threshold = today - timedelta(days=38)
 
@@ -306,10 +369,14 @@ class Command(BaseCommand):
 
         if not expiring:
             self.stdout.write("Notification check: no expiring incomplete dates.")
+            self._activity("Phase 4: no dates in retention danger zone.")
             return
 
         self.stdout.write(
             f"WARNING: {len(expiring)} date(s) approaching DIBBS retention deadline:"
+        )
+        self._activity(
+            f"Phase 4: {len(expiring)} date(s) in danger zone (incomplete + >=38 days old)."
         )
         for b in expiring:
             days_old = (today - b.scrape_date).days
@@ -322,6 +389,7 @@ class Command(BaseCommand):
     def _send_expiry_notification(self, expiring_batches: list[AwardImportBatch]) -> None:
         if not getattr(settings, "GRAPH_MAIL_ENABLED", False):
             self.stdout.write("Graph mail not enabled — skipping email notification.")
+            self._activity("Expiry email skipped (GRAPH_MAIL_ENABLED is false).")
             return
 
         recipient = os.environ.get("AWARDS_ALERT_EMAIL")
@@ -329,6 +397,8 @@ class Command(BaseCommand):
             self.stderr.write(
                 "AWARDS_ALERT_EMAIL env var not set — cannot send expiry notification."
             )
+            sys.stderr.flush()
+            self._activity("Expiry email skipped (AWARDS_ALERT_EMAIL not set).")
             return
 
         today = timezone.now().date()
@@ -368,5 +438,8 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
         )
         if ok:
             self.stdout.write(f"Expiry alert sent to {recipient}.")
+            self._activity(f"Phase 4: expiry alert email sent to {recipient}.")
         else:
             self.stderr.write("Failed to send expiry notification (Graph returned failure).")
+            sys.stderr.flush()
+            self._activity("Phase 4: expiry alert email failed (Graph returned failure).")

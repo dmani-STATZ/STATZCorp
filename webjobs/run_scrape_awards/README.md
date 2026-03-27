@@ -21,3 +21,8 @@ Scraper defaults to running the day prior to the current day.
 SSH into App Service and run:
   python manage.py scrape_awards
   python manage.py scrape_awards --date 2026-03-25
+
+## Logs (Azure WebJob)
+The WebJob captures **stdout and stderr** from this script. The management command prints timestamped `[scrape_awards]` lines for each phase (inventory, DB sync, scrape queue, per-date browser steps, notifications). `run.sh` sets `PYTHONUNBUFFERED=1` and uses `python -u` so lines appear in the portal **Log stream** as they are written instead of only when the buffer fills.
+
+In Azure Portal: **App Service → WebJobs → (your job) → Logs** (or **Log stream** while the job runs).
