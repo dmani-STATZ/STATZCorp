@@ -1,45 +1,59 @@
+import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from sales.models import AwardImportBatch
 from sales.services.awards_file_importer import import_aw_records
-from sales.services.dibbs_awards_scraper import (
-    USER_AGENT,
-    accept_dod_warning,
-    get_available_dates,
-    get_dates_needing_scrape,
-    scrape_awards_for_date,
-)
+from sales.services.dibbs_awards_scraper import scrape_awards_for_date
+from sales.services.graph_mail import send_mail_via_graph
 
 _CHROMIUM_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
 
 
 class Command(BaseCommand):
     help = (
-        "Reconcile DIBBS award dates: scrape missing or failed AUTO_SCRAPE dates (default), "
-        "or scrape a single date with --date."
+        "DIBBS awards reconciliation: inventory dates, sync MISSING batches, scrape queue, "
+        "expiry notification. Use --date for a single date without reconciliation, or --dry-run."
     )
 
     def add_arguments(self, parser):
-        mx = parser.add_mutually_exclusive_group(required=False)
-        mx.add_argument(
+        parser.add_argument(
             "--date",
             type=str,
             metavar="YYYY-MM-DD",
-            help="Scrape only this date (manual run). Does not run reconciliation.",
+            help="Force scrape a specific date, skipping reconciliation.",
         )
-        mx.add_argument(
-            "--all",
+        parser.add_argument(
+            "--dry-run",
             action="store_true",
-            help="Explicitly run full reconciliation (same as default when --date is omitted).",
+            help="Run reconciliation and show what would be scraped, without scraping.",
         )
 
     def handle(self, *args, **options):
-        raw = options.get("date")
+        if options.get("date"):
+            target_date = self._parse_date(options["date"])
+            self._scrape_single_date(target_date)
+            return
 
+        self._run_full_reconciliation(dry_run=options.get("dry_run", False))
+
+    def _parse_date(self, raw: str) -> date:
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            self.stderr.write(self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)"))
+            sys.exit(1)
+
+    def _fetch_available_dates(self) -> list[date]:
+        """
+        Opens one browser session, accepts DoD warning, hits AwdDates.aspx,
+        returns all available dates sorted oldest-first. Closes browser.
+        No ORM calls inside this method.
+        """
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
@@ -50,179 +64,309 @@ class Command(BaseCommand):
             )
             sys.exit(1)
 
-        if raw:
-            self._handle_single_date(sync_playwright, raw)
-        else:
-            self._handle_reconciliation(sync_playwright)
+        from sales.services.dibbs_awards_scraper import (
+            AWARDS_DATE_URL,
+            NAV_TIMEOUT,
+            USER_AGENT,
+            accept_dod_warning,
+            get_available_dates_from_dibbs,
+        )
 
-    def _run_playwright(self, sync_playwright, fn):
-        """
-        Open a Playwright session, accept DoD warning, call fn(page), then close the browser.
-        No Django ORM calls inside this path (required for mssql on Azure with Playwright's loop).
-        """
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=_CHROMIUM_ARGS)
+            context = browser.new_context(user_agent=USER_AGENT)
+            page = context.new_page()
             try:
-                context = browser.new_context(user_agent=USER_AGENT)
-                page = context.new_page()
-                try:
-                    accept_dod_warning(page)
-                    return fn(page)
-                finally:
-                    try:
-                        page.close()
-                    except Exception:
-                        pass
-                    try:
-                        context.close()
-                    except Exception:
-                        pass
+                accept_dod_warning(page)
+                page.goto(
+                    AWARDS_DATE_URL,
+                    wait_until="domcontentloaded",
+                    timeout=NAV_TIMEOUT,
+                )
+                dates = get_available_dates_from_dibbs(page)
+                self.stdout.write(f"DIBBS has {len(dates)} available award dates.")
+                return dates
             finally:
+                try:
+                    context.close()
+                except Exception:
+                    pass
                 try:
                     browser.close()
                 except Exception:
                     pass
 
-    def _fetch_available_dates_only(self, sync_playwright):
-        """Phase 1 (reconciliation): browser only — list of dates from DIBBS."""
-
-        def _inner(page):
-            return get_available_dates(page)
-
-        return self._run_playwright(sync_playwright, _inner)
-
-    def _scrape_awards_for_date_only(self, sync_playwright, target_date: date):
-        """Browser only — returns scrape_awards_for_date result dict."""
-
-        def _inner(page):
-            return scrape_awards_for_date(page, target_date)
-
-        return self._run_playwright(sync_playwright, _inner)
-
-    def _handle_single_date(self, sync_playwright, raw: str) -> None:
-        try:
-            target_date = date.fromisoformat(raw)
-        except ValueError:
-            self.stderr.write(self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)"))
-            sys.exit(1)
-
-        existing = AwardImportBatch.objects.filter(
-            scrape_date=target_date,
-            source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
-            scrape_status=AwardImportBatch.SCRAPE_SUCCESS,
-        ).first()
-        if existing:
-            self.stdout.write(
-                self.style.WARNING(f"Already successfully scraped {target_date}. Skipping.")
-            )
-            return
-
-        batch = self._start_scrape_batch(target_date)
-        result = self._scrape_awards_for_date_only(sync_playwright, target_date)
-        status = self._finalize_scrape_batch(batch, target_date, result)
-        if status == "FAILED":
-            sys.exit(1)
-
-    def _handle_reconciliation(self, sync_playwright) -> None:
-        available_dates = self._fetch_available_dates_only(sync_playwright)
-        if not available_dates:
-            self.stdout.write(
-                self.style.WARNING("No award dates found on DIBBS dates page; nothing to do.")
-            )
-            return
-
-        to_scrape = get_dates_needing_scrape(available_dates)
-        if not to_scrape:
-            self.stdout.write("All available dates already scraped successfully.")
-            return
-
-        listed = ", ".join(d.isoformat() for d in to_scrape)
-        self.stdout.write(f"Found {len(to_scrape)} date(s) to scrape: {listed}")
-
-        n_success = 0
-        n_partial = 0
-        n_failed = 0
-
-        for target_date in to_scrape:
-            batch = self._start_scrape_batch(target_date)
-            result = self._scrape_awards_for_date_only(sync_playwright, target_date)
-            status = self._finalize_scrape_batch(batch, target_date, result)
-            if status == "SUCCESS":
-                n_success += 1
-            elif status == "PARTIAL":
-                n_partial += 1
-            else:
-                n_failed += 1
-
-        self.stdout.write(
-            f"Reconciliation complete: {n_success} SUCCESS, {n_partial} PARTIAL, {n_failed} FAILED"
-        )
-        if n_failed:
-            sys.exit(1)
-
-    def _start_scrape_batch(self, target_date: date) -> AwardImportBatch:
-        """ORM only — create/update batch before opening Playwright for this date."""
-        filename = f"scrape-{target_date.isoformat()}.txt"[:50]
-        batch, _ = AwardImportBatch.objects.update_or_create(
-            scrape_date=target_date,
-            source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
-            defaults={
-                "scrape_status": AwardImportBatch.SCRAPE_IN_PROGRESS,
-                "last_attempted_at": timezone.now(),
-                "award_date": target_date,
-                "filename": filename,
-            },
-        )
-        return batch
-
-    def _finalize_scrape_batch(
-        self, batch: AwardImportBatch, target_date: date, result: dict
-    ) -> str:
+    def _sync_dates_to_db(self, available_dates: list[date]) -> None:
         """
-        ORM only — persist scrape outcome after the Playwright session has closed.
-        Returns 'SUCCESS', 'PARTIAL', or 'FAILED'.
+        For each date DIBBS has available, ensure an AwardImportBatch record exists.
+        If missing, create with scrape_status=MISSING, source=AUTO_SCRAPE.
+        Never downgrades an existing status.
         """
-        if result["error"]:
-            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
-            batch.expected_rows = result.get("expected_rows") or 0
-            batch.last_attempted_at = timezone.now()
-            batch.save(update_fields=["scrape_status", "expected_rows", "last_attempted_at"])
-            self.stderr.write(self.style.ERROR(f"{target_date}: {result['error']}"))
-            return "FAILED"
+        existing_dates = set(
+            AwardImportBatch.objects.filter(
+                source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+                scrape_date__in=available_dates,
+            ).values_list("scrape_date", flat=True)
+        )
 
-        try:
-            import_summary = import_aw_records(
-                result["records"],
-                batch,
-                target_date,
+        new_dates = [d for d in available_dates if d not in existing_dates]
+
+        if new_dates:
+            now = timezone.now()
+            AwardImportBatch.objects.bulk_create(
+                [
+                    AwardImportBatch(
+                        scrape_date=d,
+                        source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+                        scrape_status=AwardImportBatch.SCRAPE_MISSING,
+                        award_date=d,
+                        filename=f"scrape-{d.isoformat()}.txt"[:50],
+                        imported_at=now,
+                    )
+                    for d in new_dates
+                ]
             )
-        except Exception as exc:
-            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
-            batch.last_attempted_at = timezone.now()
-            batch.save(update_fields=["scrape_status", "last_attempted_at"])
-            self.stderr.write(self.style.ERROR(f"{target_date}: Import failed: {exc}"))
-            return "FAILED"
+            self.stdout.write(f"Registered {len(new_dates)} new dates as MISSING.")
+        else:
+            self.stdout.write("No new dates to register.")
+
+    def _build_work_queue(self) -> list[AwardImportBatch]:
+        """
+        Returns all AUTO_SCRAPE batches that are not SUCCESS, ordered oldest scrape_date first.
+        Excludes IN_PROGRESS records that were last attempted in the last 30 minutes
+        (safety guard against re-queuing an actively running parallel scrape).
+        """
+        cutoff = timezone.now() - timedelta(minutes=30)
+
+        return list(
+            AwardImportBatch.objects.filter(source=AwardImportBatch.SOURCE_AUTO_SCRAPE)
+            .exclude(scrape_status=AwardImportBatch.SCRAPE_SUCCESS)
+            .exclude(
+                scrape_status=AwardImportBatch.SCRAPE_IN_PROGRESS,
+                last_attempted_at__gte=cutoff,
+            )
+            .order_by("scrape_date")
+        )
+
+    def _run_full_reconciliation(self, dry_run: bool = False) -> None:
+        available_dates = self._fetch_available_dates()
+        self._sync_dates_to_db(available_dates)
+
+        queue = self._build_work_queue()
+        self.stdout.write(f"Work queue: {len(queue)} date(s) to scrape.")
+
+        if dry_run:
+            for batch in queue:
+                self.stdout.write(
+                    f"  Would scrape: {batch.scrape_date} (status: {batch.scrape_status})"
+                )
+            return
+
+        any_failed = False
+        for batch in queue:
+            if not self._scrape_single_date_from_batch(batch):
+                any_failed = True
+
+        self._check_and_notify_expiring_dates()
+
+        if any_failed:
+            sys.exit(1)
+
+    def _scrape_single_date_from_batch(self, batch: AwardImportBatch) -> bool:
+        """
+        Scrapes one date. Opens browser, scrapes, closes browser.
+        All ORM writes happen via on_page_complete (outside Playwright evaluation)
+        and final status updates after the browser closes.
+        Returns False if scrape_status is FAILED.
+        """
+        self.stdout.write(f"Scraping {batch.scrape_date}...")
+
+        batch.scrape_status = AwardImportBatch.SCRAPE_IN_PROGRESS
+        batch.last_attempted_at = timezone.now()
+        batch.pages_scraped = 0
+        batch.row_count = 0
+        batch.awards_created = 0
+        batch.faux_created = 0
+        batch.faux_upgraded = 0
+        batch.mods_created = 0
+        batch.mods_skipped = 0
+        batch.we_won_count = 0
+        batch.save(
+            update_fields=[
+                "scrape_status",
+                "last_attempted_at",
+                "pages_scraped",
+                "row_count",
+                "awards_created",
+                "faux_created",
+                "faux_upgraded",
+                "mods_created",
+                "mods_skipped",
+                "we_won_count",
+            ]
+        )
+
+        total_rows_written = [0]
+
+        def on_page_complete(records: list, page_num: int, total_pages: int) -> None:
+            if records:
+                import_aw_records(
+                    records,
+                    batch,
+                    batch.scrape_date,
+                )
+                total_rows_written[0] += len(records)
+
+            batch.pages_scraped = page_num
+            batch.row_count = total_rows_written[0]
+            batch.save(update_fields=["pages_scraped", "row_count"])
+
+            self.stdout.write(
+                f"  Page {page_num}/{total_pages} — {len(records)} rows — "
+                f"running total: {total_rows_written[0]}"
+            )
+
+        result = scrape_awards_for_date(
+            award_date=batch.scrape_date,
+            batch_id=batch.pk,
+            on_page_complete=on_page_complete,
+        )
 
         batch.refresh_from_db()
+
+        if result["error"]:
+            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+            self.stderr.write(f"  FAILED: {result['error']}")
+        elif result["success"]:
+            batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
+            self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
+        else:
+            batch.scrape_status = AwardImportBatch.SCRAPE_PARTIAL
+            self.stdout.write(
+                f"  PARTIAL: {result['actual_rows']} of {result['expected_rows']} expected"
+            )
+
         batch.expected_rows = result["expected_rows"]
-        batch.scrape_status = (
-            AwardImportBatch.SCRAPE_SUCCESS
-            if result["success"]
-            else AwardImportBatch.SCRAPE_PARTIAL
-        )
+        batch.pages_scraped = result["pages_scraped"]
         batch.last_attempted_at = timezone.now()
         batch.save(
             update_fields=[
-                "expected_rows",
                 "scrape_status",
+                "expected_rows",
+                "pages_scraped",
                 "last_attempted_at",
             ]
         )
 
-        status_label = "SUCCESS" if result["success"] else "PARTIAL"
-        self.stdout.write(
-            f"Scrape complete: {target_date} | Expected: {result['expected_rows']} | "
-            f"Scraped: {result['actual_rows']} | Created: {import_summary['created_count']} | "
-            f"Updated: {import_summary['updated_faux_count']} | Status: {status_label}"
+        return batch.scrape_status != AwardImportBatch.SCRAPE_FAILED
+
+    def _scrape_single_date(self, target_date: date) -> None:
+        batch = (
+            AwardImportBatch.objects.filter(
+                scrape_date=target_date,
+                source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+            )
+            .order_by("id")
+            .first()
         )
-        return status_label
+        if batch is None:
+            batch = AwardImportBatch(
+                scrape_date=target_date,
+                source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+                scrape_status=AwardImportBatch.SCRAPE_MISSING,
+                award_date=target_date,
+                filename=f"scrape-{target_date.isoformat()}.txt"[:50],
+            )
+            batch.save()
+
+        if batch.scrape_status == AwardImportBatch.SCRAPE_SUCCESS:
+            self.stdout.write(
+                f"{target_date} already SUCCESS. Use a different approach to re-scrape."
+            )
+            return
+
+        if not self._scrape_single_date_from_batch(batch):
+            sys.exit(1)
+
+    def _check_and_notify_expiring_dates(self) -> None:
+        """
+        Non-SUCCESS dates at least 38 days old (DIBBS ~45-day retention) — email + UI banner data.
+        """
+        today = timezone.now().date()
+        danger_threshold = today - timedelta(days=38)
+
+        expiring = list(
+            AwardImportBatch.objects.filter(
+                source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+                scrape_date__lte=danger_threshold,
+            )
+            .exclude(scrape_status=AwardImportBatch.SCRAPE_SUCCESS)
+            .order_by("scrape_date")
+        )
+
+        if not expiring:
+            self.stdout.write("Notification check: no expiring incomplete dates.")
+            return
+
+        self.stdout.write(
+            f"WARNING: {len(expiring)} date(s) approaching DIBBS retention deadline:"
+        )
+        for b in expiring:
+            days_old = (today - b.scrape_date).days
+            self.stdout.write(
+                f"  {b.scrape_date} — {days_old} days old — status: {b.scrape_status}"
+            )
+
+        self._send_expiry_notification(expiring)
+
+    def _send_expiry_notification(self, expiring_batches: list[AwardImportBatch]) -> None:
+        if not getattr(settings, "GRAPH_MAIL_ENABLED", False):
+            self.stdout.write("Graph mail not enabled — skipping email notification.")
+            return
+
+        recipient = os.environ.get("AWARDS_ALERT_EMAIL")
+        if not recipient:
+            self.stderr.write(
+                "AWARDS_ALERT_EMAIL env var not set — cannot send expiry notification."
+            )
+            return
+
+        today = timezone.now().date()
+
+        rows = []
+        for batch in expiring_batches:
+            days_old = (today - batch.scrape_date).days
+            days_remaining = max(0, 45 - days_old)
+            rows.append(
+                f"  • {batch.scrape_date}  |  Status: {batch.scrape_status}  |  "
+                f"Age: {days_old} days  |  Est. days remaining on DIBBS: {days_remaining}"
+            )
+
+        body = f"""STATZ Awards Scraper — Expiry Alert
+
+The following DIBBS award dates have NOT been successfully scraped and are
+approaching the ~45-day DIBBS data retention window. Once these dates age off
+DIBBS, the data cannot be recovered.
+
+Dates at risk:
+{chr(10).join(rows)}
+
+Action required: Investigate why these dates are not reaching SUCCESS status.
+Check the Azure WebJob logs and the Awards Import History page in STATZ for details.
+
+Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
+"""
+
+        subject = f"STATZ ALERT: {len(expiring_batches)} award date(s) expiring on DIBBS"
+
+        sender = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+        ok = send_mail_via_graph(
+            to_address=recipient,
+            subject=subject,
+            body=body,
+            reply_to=sender,
+        )
+        if ok:
+            self.stdout.write(f"Expiry alert sent to {recipient}.")
+        else:
+            self.stderr.write("Failed to send expiry notification (Graph returned failure).")

@@ -17,12 +17,14 @@ class AwardImportBatch(models.Model):
     SCRAPE_SUCCESS = "SUCCESS"
     SCRAPE_PARTIAL = "PARTIAL"
     SCRAPE_FAILED = "FAILED"
+    SCRAPE_MISSING = "MISSING"
     SCRAPE_STATUS_CHOICES = [
         (SCRAPE_PENDING, "Pending"),
         (SCRAPE_IN_PROGRESS, "In Progress"),
         (SCRAPE_SUCCESS, "Success"),
         (SCRAPE_PARTIAL, "Partial"),
         (SCRAPE_FAILED, "Failed"),
+        (SCRAPE_MISSING, "Missing"),
     ]
 
     award_date = models.DateField()
@@ -57,6 +59,7 @@ class AwardImportBatch(models.Model):
         blank=True,
     )
     last_attempted_at = models.DateTimeField(null=True, blank=True)
+    pages_scraped = models.IntegerField(null=True, blank=True, default=0)
 
     class Meta:
         db_table = "dibbs_award_import_batch"

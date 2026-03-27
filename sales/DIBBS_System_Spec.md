@@ -3657,35 +3657,40 @@ on who last won and at what price — critical for bid pricing decisions.
 
 ### 13.7 Automated Scraper
 
-**Entry point:** `python manage.py scrape_awards` (reconciliation, default) · `python manage.py scrape_awards --date YYYY-MM-DD` (single date) · optional `--all` (same reconciliation as default; mutually exclusive with `--date`)  
+**Entry point:** `python manage.py scrape_awards` (full reconciliation) · `python manage.py scrape_awards --date YYYY-MM-DD` (single date, skips reconciliation) · `python manage.py scrape_awards --dry-run` (inventory + queue only)  
 **Service:** `sales/services/dibbs_awards_scraper.py`  
 **Scheduler:** Azure WebJob — `webjobs/run_scrape_awards/run.sh`  
 **Schedule:** Nightly (configure time in Azure portal)
 
-**Reconciliation flow (default, no `--date`):**
-1. Launch headless Chromium; accept the DoD warning page; open the DIBBS award **dates** page (`AwdDates.aspx?category=post`), parse all available calendar dates (today is excluded — same-day awards are not published yet). **Close the browser completely.**
-2. **After Playwright exits:** query `AwardImportBatch` (ORM only) to compare against `source=AUTO_SCRAPE` and `scrape_status=SUCCESS`; build the list of dates still needing a scrape, **oldest first**. (ORM must not run inside `sync_playwright()` when using the mssql backend on Azure App Service — Playwright’s event loop conflicts with the driver’s DB connection.)
-3. If nothing remains, exit successfully.
-4. For each date in order: create/update `AwardImportBatch` (ORM), then launch a **new** Playwright session, accept DoD warning, run the **per-date scrape** steps below (browser only), close the browser, then bulk-upsert and update the batch (ORM). Continue on individual failures.
-5. After all dates, print a summary (counts of SUCCESS / PARTIAL / FAILED). Exit with a non-zero status if any date failed.
+**Architecture — four phases.** Django ORM must never run inside `with sync_playwright()` when using the mssql backend on Azure App Service (Playwright’s event loop conflicts with the driver’s DB connection). All database access is outside browser sessions, except passing plain Python data into/out of Playwright.
+
+**Phase 1 — Inventory (browser, no ORM)**  
+Launch headless Chromium, accept the DoD warning, navigate to `AwdDates.aspx?category=post`, parse all available award dates from link `href`s (`Value=MM-DD-YYYY`), close the browser. Returns the date list sorted oldest-first.
+
+**Phase 2 — Sync dates to DB (pure ORM)**  
+For each date returned by Phase 1 that does not yet have an `AwardImportBatch` with `source=AUTO_SCRAPE`, insert a row with `scrape_status=MISSING` (never downgrade existing rows).
+
+**Phase 3 — Scrape loop (one browser session per date)**  
+Build a queue of all `AUTO_SCRAPE` batches where `scrape_status` is not `SUCCESS`, ordered by `scrape_date` ascending. Skip `IN_PROGRESS` rows whose `last_attempted_at` is within the last 30 minutes (parallel-run guard). For each queued batch: mark `IN_PROGRESS` (ORM), then call `scrape_awards_for_date()`, which opens Playwright, paginates `AwdRecs.aspx` for that date, and after **each page** invokes `on_page_complete(records, page_num, total_pages)` — that callback runs outside the browser’s async context and calls `import_aw_records()` so rows are persisted incrementally (not held in memory for the whole date). After the browser closes, set final `scrape_status` (SUCCESS / PARTIAL / FAILED), `expected_rows`, `pages_scraped`, `last_attempted_at`.
+
+**Phase 4 — Notification check (pure ORM + optional Graph mail)**  
+See §13.8.
 
 **Per-date scrape target:** `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx?Category=post&TypeSrch=cq&Value=MM-DD-YYYY`
 
-**Per-date flow (each date in reconciliation, or the one date when `--date` is used):**
-1. Navigate to awards page for that date
-2. Read expected record count from page header (`ctl00_cph1_lblRecCount`)
-3. Paginate through all pages using ASP.NET `__doPostBack` grid control
-4. Normalise records to match AW file format
-5. **After the Playwright session closes:** bulk-upsert via `awards_file_importer.import_aw_records()`
-6. Mark `AwardImportBatch` as SUCCESS, PARTIAL, or FAILED
-
 **Success condition:** `actual_rows == expected_rows` AND no exception thrown.  
-**PARTIAL:** Scraper completed pagination but row count mismatch. Data is still written.  
-**FAILED:** Exception thrown during scrape. `AwardImportBatch` is marked FAILED. Manual upload fallback should be used.
+**PARTIAL:** Scraper finished pagination but row count mismatch; data from completed pages remains.  
+**FAILED:** Exception during scrape; `AwardImportBatch` is marked FAILED. Manual upload fallback should be used.
 
-**Idempotent:** Reconciliation skips dates already marked SUCCESS for `AUTO_SCRAPE`. A manual `--date` run skips if that date already has a successful auto batch. `DibbsAward` rows are upserted (not duplicated) using the existing dedup key.
+**Idempotency:** Queue excludes `SUCCESS`. `DibbsAward` rows are upserted using the existing dedup key; per-page imports accumulate batch counters in `_process_records` when reusing the same `AwardImportBatch`.
 
-### 13.8 Wins Report (Dynamic Company CAGE Join)
+### 13.8 Danger zone — retention alerts
+
+DIBBS retains roughly **45 days** of award history. Any `AUTO_SCRAPE` `AwardImportBatch` with `scrape_status` other than `SUCCESS` and with `scrape_date` at least **38 days** before today is treated as at risk of falling off DIBBS before it is scraped.
+
+**Behavior:** After each full reconciliation run (not `--date`), the management command evaluates this condition. If any rows match, it sends **one** consolidated email via Microsoft Graph (`send_mail_via_graph`) to the address in environment variable **`AWARDS_ALERT_EMAIL`** (also set `GRAPH_MAIL_ENABLED` and the same Graph credentials as RFQ mail). The awards import history page (`/sales/awards/import/`) shows an **alert banner** listing the same at-risk batches.
+
+### 13.9 Wins Report (Dynamic Company CAGE Join)
 Wins are determined dynamically from active company CAGE configuration, not from the static
 `DibbsAward.we_won` field. A SQL Server view identifies winning award row IDs by joining
 `dibbs_award.awardee_cage` to active `dibbs_company_cage.cage_code` values case-insensitively.

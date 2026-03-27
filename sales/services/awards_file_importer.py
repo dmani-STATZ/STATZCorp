@@ -432,15 +432,17 @@ def _process_records(
 
         if existing_batch is not None:
             batch = existing_batch
+            batch.refresh_from_db()
             batch.award_date = parse_result.award_date
             batch.filename = (parse_result.filename or "")[:50]
             batch.row_count = row_count_source
-            batch.awards_created = created_count
-            batch.faux_created = faux_created_count
-            batch.faux_upgraded = updated_faux_count
-            batch.mods_created = mod_created_count
-            batch.mods_skipped = mod_skipped_count
-            batch.we_won_count = sum(we_won_by_cage.values())
+            # Cumulative when the same batch is fed multiple times (e.g. per-page scraper).
+            batch.awards_created = batch.awards_created + created_count
+            batch.faux_created = batch.faux_created + faux_created_count
+            batch.faux_upgraded = batch.faux_upgraded + updated_faux_count
+            batch.mods_created = batch.mods_created + mod_created_count
+            batch.mods_skipped = batch.mods_skipped + mod_skipped_count
+            batch.we_won_count = batch.we_won_count + sum(we_won_by_cage.values())
             if imported_by is not None:
                 batch.imported_by = imported_by
             batch.save()

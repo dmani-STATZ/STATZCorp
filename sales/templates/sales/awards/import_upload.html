@@ -2,6 +2,41 @@
 
 {% block content %}
 
+{% if has_expiring_incomplete %}
+<div class="alert alert-danger d-flex align-items-start gap-3 mb-4" role="alert">
+    <div>
+        <strong>Award data expiry warning</strong><br>
+        The following dates have incomplete scrape status and are approaching the
+        DIBBS ~45-day data retention window. Once these dates age off DIBBS,
+        the award data cannot be recovered.
+        <ul class="mt-2 mb-0">
+            {% for batch in expiring_incomplete %}
+            <li>
+                <strong>{{ batch.scrape_date }}</strong> —
+                Status:
+                {% if batch.scrape_status == 'SUCCESS' %}
+                    <span class="badge bg-success">Success</span>
+                {% elif batch.scrape_status == 'PARTIAL' %}
+                    <span class="badge bg-warning text-dark">Partial</span>
+                {% elif batch.scrape_status == 'FAILED' %}
+                    <span class="badge bg-danger">Failed</span>
+                {% elif batch.scrape_status == 'IN_PROGRESS' %}
+                    <span class="badge bg-primary">In progress</span>
+                {% elif batch.scrape_status == 'MISSING' %}
+                    <span class="badge bg-secondary">Missing</span>
+                {% elif batch.scrape_status == 'PENDING' %}
+                    <span class="badge bg-secondary">Pending</span>
+                {% else %}
+                    <span class="badge bg-secondary">{{ batch.scrape_status }}</span>
+                {% endif %}
+                — {{ batch.scrape_date|timesince }} old
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
 <style>
   .drop-zone {
     border: 2px dashed #c8d6e8;
@@ -217,6 +252,8 @@
                     <span class="scrape-status-progress">In progress <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:0.65rem;height:0.65rem;vertical-align:middle;"></span></span>
                   {% elif b.scrape_status == 'PENDING' %}
                     <span class="scrape-status-pending">Pending</span>
+                  {% elif b.scrape_status == 'MISSING' %}
+                    <span class="scrape-status-pending">Missing</span>
                   {% else %}
                     {{ b.get_scrape_status_display }}
                   {% endif %}

@@ -8,7 +8,10 @@ Handles both development and production environments.
 
 from pathlib import Path
 import os
+import warnings
 from django.core.exceptions import ImproperlyConfigured
+
+warnings.filterwarnings("ignore", message="urllib3.*doesn't match a supported version")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

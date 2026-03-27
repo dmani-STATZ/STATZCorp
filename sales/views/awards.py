@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from sales.forms import AwardUploadForm
 from sales.models import AwardImportBatch, DibbsAward
@@ -19,6 +20,18 @@ def awards_import_upload(request):
     """
     if not request.user.is_staff:
         return HttpResponseForbidden("Staff access required.")
+
+    today = timezone.now().date()
+    danger_threshold = today - timedelta(days=38)
+    expiring_incomplete = (
+        AwardImportBatch.objects.filter(
+            source=AwardImportBatch.SOURCE_AUTO_SCRAPE,
+            scrape_date__lte=danger_threshold,
+        )
+        .exclude(scrape_status=AwardImportBatch.SCRAPE_SUCCESS)
+        .order_by("scrape_date")
+    )
+    has_expiring_incomplete = expiring_incomplete.exists()
 
     recent_qs = AwardImportBatch.objects.select_related("imported_by").order_by(
         "-imported_at"
@@ -37,6 +50,8 @@ def awards_import_upload(request):
                     "form": AwardUploadForm(),
                     "page_title": "Awards File Import",
                     "recent_batches": recent_qs,
+                    "expiring_incomplete": expiring_incomplete,
+                    "has_expiring_incomplete": has_expiring_incomplete,
                     "error": "Please select at least one AW file to upload.",
                 },
             )
@@ -88,6 +103,8 @@ def awards_import_upload(request):
                 "form": AwardUploadForm(),
                 "page_title": "Awards File Import",
                 "recent_batches": recent_batches,
+                "expiring_incomplete": expiring_incomplete,
+                "has_expiring_incomplete": has_expiring_incomplete,
                 "results": results,
             },
         )
@@ -99,6 +116,8 @@ def awards_import_upload(request):
             "form": AwardUploadForm(),
             "page_title": "Awards File Import",
             "recent_batches": recent_qs,
+            "expiring_incomplete": expiring_incomplete,
+            "has_expiring_incomplete": has_expiring_incomplete,
         },
     )
 

@@ -150,12 +150,57 @@ AJAX and API responses return JSON (import steps, RFQ center detail, `rfq_mailto
 - IN/BQ/AS uploads contain sensitive procurement data; temporary files live under `/tmp` directories that are removed during the matching step.
 
 ## 14. Background Processing / Scheduled Work
-- The solicitation import pipeline runs entirely via HTTP: each AJAX step updates the `ImportJob`, persists counts, and orchestrates parsing, bulk upserts, and matching. Background processing is limited to the `scrape_awards` management command (`sales/management/commands/scrape_awards.py`), triggered on a nightly schedule by an Azure WebJob (`webjobs/run_scrape_awards/run.sh`). All other operations remain synchronous via HTTP.
-- **Default behavior (no arguments):** reconciliation loop — a **short** Playwright session loads DIBBS’s available award dates (`AwdDates.aspx`); after the browser **fully closes**, the command queries the DB for gaps (`get_dates_needing_scrape`), then opens a **new** Playwright session per date to scrape `AwdRecs.aspx` (**oldest to newest**). Django ORM work runs only **outside** `sync_playwright()` contexts (required for the mssql backend on Azure App Service with Playwright’s event loop). Today’s date is never scraped: DIBBS does not publish same-day awards until the following day. Use `--date YYYY-MM-DD` for a manual single-date scrape only (no reconciliation). Optional `--all` explicitly selects the same full reconciliation as the default when `--date` is omitted.
-- For each target date, the command scrapes `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx`, paginates the awards grid, normalises rows to AW-file shape, and bulk-upserts into `DibbsAward` via `sales/services/awards_file_importer.py` (`import_aw_records`). The grid renders contract numbers in anchor tags that include extra UI text, so parser logic must extract `Award_Basic_Number` / `Delivery_Order_Number` from the first PDF-link anchor (`href` containing `/Downloads/Awards/`) instead of raw cell text. `AwardImportBatch` records both manual file uploads (`source=FILE_UPLOAD`) and automated runs (`source=AUTO_SCRAPE`) with `scrape_status`, `expected_rows`, `scrape_date`, and `last_attempted_at`.
-- The manual AW file upload at `/sales/awards/import/` remains available as a fallback if the scraper fails.
-- `fetch_dibbs_archive_files` requires Playwright/Chromium and is invoked when staff call `/import/fetch-dibbs/` (IN/BQ/AS discovery and download — separate from awards scraping).
-- `backfill_nsn_from_contracts` is a manual, staff-triggered view (dry run supported).
+
+One background worker exists: the DIBBS awards scraper management command.
+
+**Entry point:** `python manage.py scrape_awards [--date YYYY-MM-DD] [--dry-run]`
+**Scheduler:** Azure WebJob (`webjobs/run_scrape_awards/run.sh`) — nightly schedule
+**Service:** `sales/services/dibbs_awards_scraper.py`
+
+### Scraper Architecture
+
+The scraper runs in four clean phases. All Django ORM calls are strictly separated
+from Playwright browser sessions — NO ORM inside any `with sync_playwright()` block.
+
+**Phase 1 — Inventory (browser, no ORM)**
+  Opens browser → hits AwdDates.aspx → gets full available date list → closes browser.
+
+**Phase 2 — Sync dates to DB (pure ORM)**
+  For each date on DIBBS not yet in AwardImportBatch → INSERT with scrape_status='MISSING'.
+
+**Phase 3 — Scrape loop (one browser session per date)**
+  Queries non-SUCCESS dates oldest-first. For each date:
+    - Opens browser → scrapes all pages → for each page: calls on_page_complete callback
+      (which saves records to DB) → waits 2 seconds → closes browser.
+    - Updates AwardImportBatch with final status after browser closes.
+
+**Phase 4 — Notification check (pure ORM + Graph mail)**
+  Finds non-SUCCESS dates where scrape_date <= today - 38 days.
+  Sends email via Graph to AWARDS_ALERT_EMAIL env var + shows warning banner on UI.
+
+### Scrape Status Values
+- MISSING — date exists on DIBBS, not yet attempted
+- IN_PROGRESS — currently being scraped (or crashed mid-scrape)
+- SUCCESS — actual_rows == expected_rows, complete
+- PARTIAL — completed but row count mismatch, eligible for retry
+- FAILED — exception thrown, eligible for retry
+
+### Danger Zone Logic
+DIBBS keeps ~45 days of award data. Any non-SUCCESS date where
+`today - scrape_date >= 38 days` is in the danger zone and triggers
+email notification + UI warning banner.
+
+### Required Environment Variables
+- GRAPH_MAIL_ENABLED, GRAPH_MAIL_TENANT_ID, GRAPH_MAIL_CLIENT_ID,
+  GRAPH_MAIL_CLIENT_SECRET, GRAPH_MAIL_SENDER — same as RFQ mail system
+- **AWARDS_ALERT_EMAIL** — set in Azure App Service Configuration to the email address that should receive award scraper alert emails (required for expiry notifications; typically the system administrator).
+
+### Per-Page Save Pattern
+Records are saved to DB after each page (50 rows), not accumulated in memory.
+AwardImportBatch.pages_scraped and row_count are updated after each page.
+This means a crashed scrape retains all data from completed pages.
+
+The solicitation import pipeline runs entirely via HTTP (AJAX steps on `ImportJob`). `fetch_dibbs_archive_files` requires Playwright/Chromium for `/import/fetch-dibbs/` (IN/BQ/AS — separate from awards). `backfill_nsn_from_contracts` is a manual staff view (dry run supported).
 ## 15. Testing Coverage
 `tests.py` is the default Django stub with no test cases. There are no unit/integration tests for parser, importer, matching, RFQ flows, or service helpers; adding targeted tests for `sales/services/bq_export.py`, `sales/services/parser.py`, and RFQ workflows would cover high-risk areas.
 
