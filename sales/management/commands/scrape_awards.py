@@ -26,6 +26,55 @@ class Command(BaseCommand):
         self.stdout.write(f"[{ts}] [scrape_awards] {message}")
         sys.stdout.flush()
 
+    def _send_job_failure_email(self, subject_detail: str, body: str) -> None:
+        """
+        One alert per failed run to AWARDS_ALERT_EMAIL (same Graph path as expiry mail).
+        Skips quietly if Graph disabled or recipient unset.
+        """
+        if not getattr(settings, "GRAPH_MAIL_ENABLED", False):
+            self._activity("Job failure email skipped (GRAPH_MAIL_ENABLED is false).")
+            return
+
+        recipient = os.environ.get("AWARDS_ALERT_EMAIL")
+        if not recipient:
+            self.stderr.write(
+                "AWARDS_ALERT_EMAIL not set — cannot send job failure notification."
+            )
+            sys.stderr.flush()
+            self._activity("Job failure email skipped (AWARDS_ALERT_EMAIL not set).")
+            return
+
+        full_body = f"""STATZ Awards Scraper — Run Failed
+
+{body}
+
+Check Azure WebJob logs for full output.
+
+Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
+"""
+
+        sender = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+        subject = f"STATZ ALERT: scrape_awards — {subject_detail}"
+        ok = send_mail_via_graph(
+            to_address=recipient,
+            subject=subject,
+            body=full_body,
+            reply_to=sender,
+        )
+        if ok:
+            self.stdout.write(f"Job failure alert sent to {recipient}.")
+            self._activity(f"Job failure email sent to {recipient}.")
+        else:
+            self.stderr.write("Job failure email not accepted by Graph.")
+            sys.stderr.flush()
+            self._activity("Job failure email failed (Graph returned failure).")
+
+    def _exit_with_failure(self, subject_detail: str, body: str) -> None:
+        """Log, send failure email (if configured), exit non-zero."""
+        self._activity(f"Exiting with failure: {subject_detail}")
+        self._send_job_failure_email(subject_detail, body)
+        sys.exit(1)
+
     def add_arguments(self, parser):
         parser.add_argument(
             "--date",
@@ -76,7 +125,11 @@ class Command(BaseCommand):
             return date.fromisoformat(raw)
         except ValueError:
             self.stderr.write(self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)"))
-            sys.exit(1)
+            sys.stderr.flush()
+            self._exit_with_failure(
+                "invalid --date argument",
+                f"The value {raw!r} is not a valid calendar date in YYYY-MM-DD format.",
+            )
 
     def _fetch_available_dates(self) -> list[date]:
         """
@@ -92,7 +145,12 @@ class Command(BaseCommand):
                     "Playwright is not installed. Use: pip install playwright && playwright install chromium"
                 )
             )
-            sys.exit(1)
+            sys.stderr.flush()
+            self._exit_with_failure(
+                "Playwright not installed",
+                "The scrape_awards command requires Playwright and Chromium on this machine.\n"
+                "Install with: pip install playwright && playwright install chromium",
+            )
 
         from sales.services.dibbs_awards_scraper import (
             AWARDS_DATE_URL,
@@ -203,23 +261,36 @@ class Command(BaseCommand):
                 )
             return
 
-        any_failed = False
+        failed_dates: list[tuple[date, str]] = []
         for batch in queue:
-            if not self._scrape_single_date_from_batch(batch):
-                any_failed = True
+            ok, fail_reason = self._scrape_single_date_from_batch(batch)
+            if not ok:
+                failed_dates.append(
+                    (batch.scrape_date, fail_reason or "Scrape marked FAILED (see logs).")
+                )
 
         self._check_and_notify_expiring_dates()
 
-        if any_failed:
-            self._activity("Full reconciliation ended with one or more FAILED scrapes.")
-            sys.exit(1)
+        if failed_dates:
+            self._activity(
+                f"Full reconciliation ended with {len(failed_dates)} FAILED scrape(s)."
+            )
+            lines = "\n".join(
+                f"  • {d.isoformat()} — {reason}" for d, reason in failed_dates
+            )
+            self._exit_with_failure(
+                "one or more scrape dates FAILED",
+                f"The following award date(s) failed to scrape:\n{lines}",
+            )
 
-    def _scrape_single_date_from_batch(self, batch: AwardImportBatch) -> bool:
+    def _scrape_single_date_from_batch(
+        self, batch: AwardImportBatch
+    ) -> tuple[bool, str | None]:
         """
         Scrapes one date. Opens browser, scrapes, closes browser.
         All ORM writes happen via on_page_complete (outside Playwright evaluation)
         and final status updates after the browser closes.
-        Returns False if scrape_status is FAILED.
+        Returns (False, error_message) if scrape_status is FAILED; (True, None) otherwise.
         """
         self._activity(
             f"Phase 3: starting scrape for date {batch.scrape_date} (batch_id={batch.pk})."
@@ -318,7 +389,9 @@ class Command(BaseCommand):
             ]
         )
 
-        return batch.scrape_status != AwardImportBatch.SCRAPE_FAILED
+        if batch.scrape_status == AwardImportBatch.SCRAPE_FAILED:
+            return False, result.get("error") or "Scrape ended with status FAILED."
+        return True, None
 
     def _scrape_single_date(self, target_date: date) -> None:
         self._activity(f"Single-date scrape requested for {target_date.isoformat()}.")
@@ -347,8 +420,12 @@ class Command(BaseCommand):
             self._activity(f"Skip: {target_date} already SUCCESS.")
             return
 
-        if not self._scrape_single_date_from_batch(batch):
-            sys.exit(1)
+        ok, fail_reason = self._scrape_single_date_from_batch(batch)
+        if not ok:
+            self._exit_with_failure(
+                f"--date scrape FAILED for {target_date.isoformat()}",
+                f"Date: {target_date.isoformat()}\nReason: {fail_reason}",
+            )
 
     def _check_and_notify_expiring_dates(self) -> None:
         """

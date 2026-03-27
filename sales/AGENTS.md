@@ -215,6 +215,8 @@ Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress 
 
 **Awards danger zone:** Non-SUCCESS `AwardImportBatch` records where `today - scrape_date >= 38 days` trigger email (Graph, `AWARDS_ALERT_EMAIL`) + UI warning on the awards import page. DIBBS keeps ~45 days of award data.
 
+**Awards job failure email:** If `GRAPH_MAIL_ENABLED` and `AWARDS_ALERT_EMAIL` are set, any `scrape_awards` run that exits with failure (invalid `--date`, Playwright missing, or at least one scrape date ending `FAILED`) sends one consolidated alert to `AWARDS_ALERT_EMAIL` before `sys.exit(1)`.
+
 **Awards data** is loaded by that scraper (reconciliation or `--date`), with staff AW file upload (`awards_import_upload` / `import_aw_file`) as a fallback. `AwardImportBatch` distinguishes paths via `source` (`FILE_UPLOAD` vs `AUTO_SCRAPE`) and, for scrapes, tracks `scrape_date`, `expected_rows`, `scrape_status`, `last_attempted_at`, and `pages_scraped`.
 
 **Awards grid parsing note:** DIBBS renders contract numbers in anchor tags and appends UI text in table cells. In `sales/services/dibbs_awards_scraper.py`, parse `Award_Basic_Number` and `Delivery_Order_Number` from the first anchor whose `href` contains `/Downloads/Awards/` (not raw `td.get_text()`), and do not drop rows when delivery order cells are blank.

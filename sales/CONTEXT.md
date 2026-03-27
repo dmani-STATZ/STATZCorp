@@ -193,7 +193,7 @@ email notification + UI warning banner.
 ### Required Environment Variables
 - GRAPH_MAIL_ENABLED, GRAPH_MAIL_TENANT_ID, GRAPH_MAIL_CLIENT_ID,
   GRAPH_MAIL_CLIENT_SECRET, GRAPH_MAIL_SENDER — same as RFQ mail system
-- **AWARDS_ALERT_EMAIL** — set in Azure App Service Configuration to the email address that should receive award scraper alert emails (required for expiry notifications; typically the system administrator).
+- **AWARDS_ALERT_EMAIL** — set in Azure App Service Configuration to the email address that should receive award scraper alert emails (expiry / retention warnings **and** a **job failure** alert whenever `scrape_awards` exits non-zero: invalid `--date`, missing Playwright, or one or more dates ending in `FAILED`; same Graph settings as RFQ mail).
 
 ### Per-Page Save Pattern
 Records are saved to DB after each page (50 rows), not accumulated in memory.
