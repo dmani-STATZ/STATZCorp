@@ -71,7 +71,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Admin:** `sales/admin.py` registers nothing. All staff actions go through custom views. Do not assume Django admin works for any sales model.
 
-**Background processing:** The `scrape_awards` management command (Azure WebJob) is the only off-HTTP worker. The solicitation import pipeline and all staff UI flows otherwise run synchronously via HTTP; the four AJAX import steps are sequential HTTP POSTs, not an internal task queue.
+**Background processing:** Azure WebJobs run `scrape_awards`, `fetch_pending_pdfs`, and `auto_import_dibbs`. The interactive solicitation import pipeline and other staff UI flows run synchronously via HTTP; the four AJAX import steps are sequential HTTP POSTs, not an internal task queue.
 
 ---
 
@@ -207,7 +207,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress page drives these in order. If a step fails, `ImportJob.status` is set to `'error'` and the message is stored in `ImportJob.error_message`.
 
-**The only scheduled/background worker in this app** is the Django management command `scrape_awards`, intended to run nightly via an Azure WebJob. **Default:** inventory dates on DIBBS (`AwdDates.aspx`), sync new dates as `AwardImportBatch` rows with `scrape_status=MISSING`, build a work queue of non-SUCCESS `AUTO_SCRAPE` batches (oldest first), scrape one date per Playwright session with **per-page** `import_aw_records()` callbacks, then run the expiry notification check. **`--date YYYY-MM-DD`** skips reconciliation and scrapes one date. **`--dry-run`** prints the queue without scraping. It writes into `DibbsAward` via `sales/services/dibbs_awards_scraper.py` and `awards_file_importer.import_aw_records()`.
+**Scheduled/background workers in this app:** (1) `scrape_awards` — nightly Azure WebJob. **Default:** inventory dates on DIBBS (`AwdDates.aspx`), sync new dates as `AwardImportBatch` rows with `scrape_status=MISSING`, build a work queue of non-SUCCESS `AUTO_SCRAPE` batches (oldest first), scrape one date per Playwright session with **per-page** `import_aw_records()` callbacks, then run the expiry notification check. **`--date YYYY-MM-DD`** skips reconciliation and scrapes one date. **`--dry-run`** prints the queue without scraping. It writes into `DibbsAward` via `sales/services/dibbs_awards_scraper.py` and `awards_file_importer.import_aw_records()`. (2) `auto_import_dibbs` management command auto-imports DIBBS daily files for dates that have no `ImportBatch` yet. Uses `fetch_dibbs_archive_files()` for Playwright fetch and `run_import()` for the full pipeline. Strictly follows ORM/Playwright boundary rule. Does not touch the AJAX stepper or `ImportJob`. Stale import banner appears on import page when latest `ImportBatch` is >1 day old. Failure alert goes to `AWARDS_ALERT_EMAIL`.
 
 **Scraper ORM rule:** Django ORM calls CANNOT be made inside a `with sync_playwright()` block when running on Azure App Service with mssql backend. The mssql driver's `sql_server_version` cached property opens a `temporary_connection()` which raises `SynchronousOnlyOperation` inside Playwright's event loop. All DB reads must happen before the browser opens. All DB writes must happen via callbacks called outside browser evaluation context, or after the `with sync_playwright()` block closes.
 

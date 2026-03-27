@@ -3342,6 +3342,8 @@ def dibbs_pdf_url(self):
 
 > **Background fetch pipeline:** `pdf_fetch_status` (`PENDING` / `FETCHING` / `DONE` / `FAILED`) and `pdf_fetch_attempts` on `Solicitation` drive automated PDF fetching. When a sol is added to the RFQ queue and has no blob, status is set to `PENDING`. The `fetch_pending_pdfs` management command (Azure WebJob, every five minutes, office hours) picks up all `PENDING` sols and retries `FAILED` sols with fewer than five attempts, fetches in one shared Playwright session, and saves blobs plus procurement history. Max five retry attempts per sol.
 
+> **`auto_import_dibbs` WebJob** — Runs at 2:00 AM CT daily. Reconciles DIBBS RFQDates.aspx against `ImportBatch` (dates without a batch row are queued; `ImportBatch` has no error/status column). Imports via `fetch_dibbs_archive_files()` + `run_import()` pipeline. Alerts `AWARDS_ALERT_EMAIL` on failure. Manual import remains available as fallback. Stale import banner shown on import page if latest batch is >1 day old.
+
 > ⚠ **Note:** The original spec URL (`https://www.dibbs.bsm.dla.mil/Docs/RFQ/{filename}`) was incorrect. The live URL format uses `dibbs2.bsm.dla.mil/Downloads/RFQ/{last_char_of_sol_number}/{filename}` — subdirectory is derived from the last character of the solicitation number. Already corrected in production.
 
 **In the RFQ email template**, include the link in the body:

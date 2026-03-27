@@ -1,7 +1,7 @@
 # Sales Context
 
 ## 1. Purpose
-The `sales` app owns the DIBBS bidding workflow: it ingests the daily IN/BQ/AS export from DIBBS, triages solicitations, surfaces supplier matches, issues RFQs via `mailto:` flows, captures quotes, builds GovernmentBids, exports the BQ submission file, and tracks awards from DIBBS AW file import (`DibbsAward`). It also exposes supplier capability tooling (NSN/FSC lists, backfill from contracts) plus settings for Company CAGE metadata and email templates. Everything is driven by Django views/templates with no background workers; long-running work happens synchronously via the AJAX/stepper import UI.
+The `sales` app owns the DIBBS bidding workflow: it ingests the daily IN/BQ/AS export from DIBBS, triages solicitations, surfaces supplier matches, issues RFQs via `mailto:` flows, captures quotes, builds GovernmentBids, exports the BQ submission file, and tracks awards from DIBBS AW file import (`DibbsAward`). It also exposes supplier capability tooling (NSN/FSC lists, backfill from contracts) plus settings for Company CAGE metadata and email templates. Primary UI flows are Django views/templates; scheduled Azure WebJobs run awards scraping, solicitation PDF fetch, and automated daily DIBBS import. Interactive import still uses the AJAX/stepper UI.
 
 ## 2. App Identity
 - **Django app name:** `sales`
@@ -151,7 +151,9 @@ AJAX and API responses return JSON (import steps, RFQ center detail, `rfq_mailto
 
 ## 14. Background Processing / Scheduled Work
 
-Background workers: DIBBS awards scraper and DIBBS solicitation PDF fetcher.
+Background workers: DIBBS awards scraper, DIBBS solicitation PDF fetcher, and automated daily IN/BQ/AS import.
+
+**`auto_import_dibbs`** — Daily management command (Azure WebJob, 2:00 AM CT, `0 0 7 * * *`). Phase 1: scrapes RFQDates.aspx for available dates. Phase 2: reconciles against `ImportBatch` — queues any DIBBS date that has both IN and BQ links but no `ImportBatch` row yet (`ImportBatch` has no error/status fields; a row means that date was imported). Phase 3: fetches files via `fetch_dibbs_archive_files()` (Playwright) then calls `run_import()` (ORM) for each date, oldest first. Phase 4: sends consolidated failure alert to `AWARDS_ALERT_EMAIL` via Graph mail if any dates failed. ORM/Playwright boundary rule applies. Manual import flow unchanged.
 
 **`fetch_pending_pdfs`** — Queries `Solicitation` for `pdf_fetch_status` in `PENDING` or `FAILED` (retry) with `pdf_fetch_attempts < 5`. Opens one shared Playwright browser session via `fetch_pdfs_for_sols()`, fetches all matching PDFs, saves blobs, runs procurement history parse/save. Marks `DONE` on success, `FAILED` on failure (increments `pdf_fetch_attempts`). After five failures a sol is permanently skipped. Designed to run every five minutes as an Azure WebJob during office hours. All ORM calls happen outside the Playwright session boundary (Azure mssql requirement).
 
@@ -202,7 +204,7 @@ Records are saved to DB after each page (50 rows), not accumulated in memory.
 AwardImportBatch.pages_scraped and row_count are updated after each page.
 This means a crashed scrape retains all data from completed pages.
 
-The solicitation import pipeline runs entirely via HTTP (AJAX steps on `ImportJob`). `fetch_dibbs_archive_files` requires Playwright/Chromium for `/import/fetch-dibbs/` (IN/BQ/AS — separate from awards). `backfill_nsn_from_contracts` is a manual staff view (dry run supported).
+The interactive solicitation import pipeline runs via HTTP (AJAX steps on `ImportJob`). The `auto_import_dibbs` command runs the same `fetch_dibbs_archive_files` + `run_import()` pipeline without `ImportJob`. `fetch_dibbs_archive_files` requires Playwright/Chromium for `/import/fetch-dibbs/` and for the WebJob (IN/BQ/AS — separate from awards). `backfill_nsn_from_contracts` is a manual staff view (dry run supported).
 ## 15. Testing Coverage
 `tests.py` is the default Django stub with no test cases. There are no unit/integration tests for parser, importer, matching, RFQ flows, or service helpers; adding targeted tests for `sales/services/bq_export.py`, `sales/services/parser.py`, and RFQ workflows would cover high-risk areas.
 

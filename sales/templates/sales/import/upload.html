@@ -135,6 +135,18 @@
       <a href="{% url 'sales:import_history' %}" style="font-size:0.8125rem; color:var(--company-primary,#004eb3); text-decoration:none;">View Import History →</a>
     </div>
 
+    {% if stale_import %}
+    <div class="alert alert-warn" role="alert">
+      <span>⚠</span>
+      <div>
+        Last import was {{ latest_import_date|date:"D M d" }} —
+        automated import may have failed.
+        <a href="{% url 'sales:import_upload' %}">Import manually</a> or check the
+        WebJob logs in Azure portal.
+      </div>
+    </div>
+    {% endif %}
+
   {# ── Step indicator ──────────────────────────────────────────────────── #}
   <div class="step-bar" id="step-bar">
     <div class="step-item">

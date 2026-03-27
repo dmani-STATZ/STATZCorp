@@ -28,6 +28,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from sales.forms import ImportUploadForm
@@ -129,6 +130,12 @@ def import_upload(request):
         cal_weeks = cal_module.monthcalendar(cal_year, cal_month)
         month_name = cal_module.month_name[cal_month]
 
+        latest_batch = ImportBatch.objects.order_by("-import_date").first()
+        stale_import = False
+        if latest_batch:
+            days_old = (timezone.now().date() - latest_batch.import_date).days
+            stale_import = days_old > 1
+
         return render(
             request,
             "sales/import/upload.html",
@@ -144,6 +151,8 @@ def import_upload(request):
                 "aw_by_day": aw_by_day,
                 "today_day": date.today().day,
                 "yesterday_day": yesterday.day,
+                "stale_import": stale_import,
+                "latest_import_date": latest_batch.import_date if latest_batch else None,
             },
         )
 
