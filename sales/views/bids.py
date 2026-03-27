@@ -20,6 +20,7 @@ from sales.models import (
     CompanyCAGE,
     ApprovedSource,
     DibbsAward,
+    NsnProcurementHistory,
 )
 from sales.services.bq_export import generate_bq_file, BQExportError, validate_bid_for_export
 
@@ -243,6 +244,12 @@ def bid_builder(request, sol_number):
         else ""
     )
 
+    procurement_history = (
+        NsnProcurementHistory.objects.filter(nsn=nsn_normalized).order_by("-award_date")[:25]
+        if nsn_normalized
+        else []
+    )
+
     return render(request, "sales/bids/builder.html", {
         "solicitation": solicitation,
         "line": line,
@@ -275,6 +282,8 @@ def bid_builder(request, sol_number):
         "last_award": last_award,
         "award_history": award_history,
         "last_award_price_raw": last_award_price_raw,
+        "procurement_history": procurement_history,
+        "procurement_history_nsn": nsn_normalized,
         "section": "bids",
     })
 

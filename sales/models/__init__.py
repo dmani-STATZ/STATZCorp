@@ -5,6 +5,7 @@ Re-export all sales models so imports work as normal:
 from sales.models.solicitations import (
     ImportBatch,
     ImportJob,
+    NsnProcurementHistory,
     Solicitation,
     SolicitationLine,
 )
@@ -26,6 +27,7 @@ __all__ = [
     'ImportJob',
     'Solicitation',
     'SolicitationLine',
+    'NsnProcurementHistory',
     'ApprovedSource',
     'SupplierNSN',
     'SupplierFSC',

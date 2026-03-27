@@ -1469,7 +1469,11 @@ def rfq_queue_fetch_pdfs(request):
     Fetch PDFs for QUEUED rfqs of those suppliers where pdf_blob is missing.
     Return JSON { fetched: N, failed: M }.
     """
-    from sales.services.dibbs_pdf import fetch_pdfs_for_sols
+    from sales.services.dibbs_pdf import (
+        fetch_pdfs_for_sols,
+        parse_procurement_history,
+        save_procurement_history,
+    )
 
     raw_ids = request.POST.getlist("supplier_ids[]") or request.POST.getlist("supplier_ids")
     try:
@@ -1503,6 +1507,11 @@ def rfq_queue_fetch_pdfs(request):
             Solicitation.objects.filter(solicitation_number=sol_number).update(
                 pdf_blob=body, pdf_fetched_at=now
             )
+            try:
+                history_rows = parse_procurement_history(body, sol_number)
+                save_procurement_history(history_rows)
+            except Exception:
+                pass
             fetched += 1
         else:
             failed += 1

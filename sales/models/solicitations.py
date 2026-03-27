@@ -171,3 +171,51 @@ class SolicitationLine(models.Model):
         db_table = 'dibbs_solicitation_line'
         verbose_name = 'Solicitation line'
         verbose_name_plural = 'Solicitation lines'
+
+
+class NsnProcurementHistory(models.Model):
+    """
+    Historical DLA purchase records for a given NSN, extracted from DIBBS
+    solicitation ZIP blobs at PDF fetch time.
+
+    Keyed on NSN + contract_number. The solicitation is provenance only —
+    this data belongs to the NSN, not any single solicitation.
+    """
+    nsn = models.CharField(
+        max_length=13,
+        db_index=True,
+        help_text="Normalized 13-digit NSN, no hyphens. e.g. 5935011299512",
+    )
+    fsc = models.CharField(
+        max_length=4,
+        db_index=True,
+        help_text="First 4 chars of NSN — FSC code",
+    )
+    cage_code = models.CharField(max_length=5)
+    contract_number = models.CharField(max_length=25)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_cost = models.DecimalField(max_digits=14, decimal_places=5)
+    award_date = models.DateField()
+    surplus_material = models.BooleanField(default=False)
+    # Provenance — which solicitation surface did we first/last see this row on
+    first_seen_sol = models.CharField(
+        max_length=13,
+        blank=True,
+        help_text="Solicitation number where this row was first extracted",
+    )
+    last_seen_sol = models.CharField(
+        max_length=13,
+        blank=True,
+        help_text="Solicitation number where this row was most recently seen",
+    )
+    extracted_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "dibbs_nsn_procurement_history"
+        unique_together = [("nsn", "contract_number")]
+        ordering = ["-award_date"]
+        verbose_name = "NSN Procurement History"
+        verbose_name_plural = "NSN Procurement History"
+
+    def __str__(self):
+        return f"{self.nsn} — {self.contract_number} @ ${self.unit_cost}"

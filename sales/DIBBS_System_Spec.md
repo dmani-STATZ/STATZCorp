@@ -555,6 +555,38 @@ class GovernmentBid(models.Model):
 
 ---
 
+### 3.5 NSN Procurement History Table
+
+#### `dibbs_nsn_procurement_history`
+
+Stores historical DLA purchase records per NSN, extracted from DIBBS solicitation ZIP blobs at PDF fetch time. Keyed on `(nsn, contract_number)`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | INT IDENTITY PK | Surrogate key |
+| nsn | VARCHAR(13) | Normalized, no hyphens. FSC+NIIN. Indexed. |
+| fsc | CHAR(4) | First 4 chars of NSN. Indexed. |
+| cage_code | VARCHAR(5) | Awardee CAGE |
+| contract_number | VARCHAR(25) | DLA contract number — unique with nsn |
+| quantity | DECIMAL(12,3) | Quantity awarded |
+| unit_cost | DECIMAL(14,5) | Unit price at award |
+| award_date | DATE | Date of award |
+| surplus_material | BIT | Whether surplus material was used |
+| first_seen_sol | VARCHAR(13) | Solicitation number where first extracted |
+| last_seen_sol | VARCHAR(13) | Solicitation number where most recently seen |
+| extracted_at | DATETIME | Last upsert timestamp |
+
+**Design decisions:**
+
+- No FK to `Solicitation`. The data belongs to the NSN; the solicitation is provenance only, stored as a plain varchar.
+- Upsert key is `(nsn, contract_number)`. Price/quantity are never overwritten on update — historical fact only. `last_seen_sol` and `extracted_at` update.
+- NSN stored normalized (no hyphens). Join to `SolicitationLine.nsn` always uses `_normalize_nsn()` on both sides.
+- Extraction runs after a successful download in `fetch_pdf_for_sol()` (same module), and after the RFQ queue persists `pdf_blob` in `rfq_queue_fetch_pdfs`. Wrapped in bare `except Exception` so parse failures never break the PDF fetch.
+- The DIBBS "PDF" is actually a ZIP archive with per-page `.txt` files. Text is pre-extracted — no PDF parsing library required.
+- History is absent for some solicitation types (pharmaceutical, medical). Empty result is normal and handled silently.
+
+---
+
 ## 4. Supplier Matching Engine
 
 When a daily import completes, the matching engine runs automatically and attempts to link each solicitation line to one or more capable suppliers. Three matching tiers are applied in priority order.

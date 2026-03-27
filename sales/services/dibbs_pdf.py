@@ -20,8 +20,17 @@ Note on ERR_ABORTED:
     swallowed — the expect_download context manager is what matters.
 """
 
+import io
+import json
 import logging
-from typing import Optional
+import re
+import zipfile
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from typing import Dict, List, Optional
+
+from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +134,14 @@ def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
 
             page = context.new_page()
             try:
-                return _read_pdf_download(page, url, sol_number)
+                body = _read_pdf_download(page, url, sol_number)
+                if body:
+                    try:
+                        history_rows = parse_procurement_history(body, sol_number)
+                        save_procurement_history(history_rows)
+                    except Exception:
+                        pass
+                return body
             except Exception as e:
                 logger.exception("fetch_pdf_for_sol(%s) failed: %s", sol_number, e)
                 return None
@@ -196,3 +212,163 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
         logger.exception("fetch_pdfs_for_sols outer failure: %s", e)
 
     return result
+
+
+def parse_procurement_history(zip_bytes: bytes, sol_number: str) -> List[Dict]:
+    """
+    Extract procurement history rows from a DIBBS solicitation ZIP blob.
+
+    Returns a list of dicts, each with keys:
+        nsn, fsc, cage_code, contract_number, quantity,
+        unit_cost, award_date, surplus_material, sol_number
+
+    Returns empty list if no history found (normal for some sol types).
+    Raises no exceptions — logs warnings on malformed rows and continues.
+    """
+    if not zip_bytes:
+        return []
+
+    HEADER_RE = re.compile(
+        r"Procurement History for NSN/FSC:(\d{9})/(\d{4})",
+        re.IGNORECASE,
+    )
+    ROW_RE = re.compile(
+        r"^([A-Z0-9]{5})\s+(\S+)\s+([\d.]+)\s+([\d.]+)\s+(\d{8})\s+([YN])\s*$"
+    )
+    COLUMN_HEADER_RE = re.compile(
+        r"CAGE\s+Contract Number\s+Quantity", re.IGNORECASE
+    )
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile:
+        return []
+
+    try:
+        manifest = json.loads(zf.read("manifest.json"))
+        page_files = [
+            p["text"]["path"]
+            for p in sorted(manifest["pages"], key=lambda x: x["page_number"])
+        ]
+    except Exception:
+        page_files = sorted(
+            [n for n in zf.namelist() if n.endswith(".txt")],
+            key=lambda x: int(x.replace(".txt", "")),
+        )
+
+    rows: Dict[str, Dict] = {}
+    current_nsn = None
+    current_fsc = None
+    in_history = False
+
+    for page_file in page_files:
+        try:
+            text = zf.read(page_file).decode("utf-8", errors="replace")
+        except Exception:
+            continue
+
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            header_match = HEADER_RE.search(line)
+            if header_match:
+                niin = header_match.group(1)
+                fsc = header_match.group(2)
+                current_nsn = fsc + niin
+                current_fsc = fsc
+                in_history = True
+                continue
+
+            if not in_history:
+                continue
+
+            if COLUMN_HEADER_RE.search(line):
+                continue
+
+            if line == ".":
+                continue
+
+            row_match = ROW_RE.match(line)
+            if row_match:
+                contract_num = row_match.group(2)
+                if contract_num in rows:
+                    continue
+                try:
+                    qty = Decimal(row_match.group(3))
+                    cost = Decimal(row_match.group(4))
+                    awd_str = row_match.group(5)
+                    awd_date = date(
+                        int(awd_str[:4]),
+                        int(awd_str[4:6]),
+                        int(awd_str[6:8]),
+                    )
+                except (InvalidOperation, ValueError):
+                    logger.warning(
+                        "Skipping malformed procurement history row for %s: %r",
+                        sol_number,
+                        line,
+                    )
+                    continue
+
+                rows[contract_num] = {
+                    "nsn": current_nsn,
+                    "fsc": current_fsc,
+                    "cage_code": row_match.group(1),
+                    "contract_number": contract_num,
+                    "quantity": qty,
+                    "unit_cost": cost,
+                    "award_date": awd_date,
+                    "surplus_material": row_match.group(6) == "Y",
+                    "sol_number": sol_number,
+                }
+            else:
+                if rows:
+                    in_history = False
+                    current_nsn = None
+                    current_fsc = None
+
+    return list(rows.values())
+
+
+def save_procurement_history(rows: List[Dict]) -> int:
+    """
+    Upsert procurement history rows into dibbs_nsn_procurement_history.
+
+    - New rows: insert with first_seen_sol = last_seen_sol = sol_number
+    - Existing rows (matched on nsn + contract_number):
+        update last_seen_sol and extracted_at only.
+        Price/quantity data is historical fact — never overwritten.
+
+    Returns count of rows inserted or updated.
+    """
+    if not rows:
+        return 0
+
+    from sales.models import NsnProcurementHistory
+
+    now = timezone.now()
+    count = 0
+
+    with transaction.atomic():
+        for row in rows:
+            row = dict(row)
+            sol = row.pop("sol_number")
+            obj, created = NsnProcurementHistory.objects.get_or_create(
+                nsn=row["nsn"],
+                contract_number=row["contract_number"],
+                defaults={
+                    **row,
+                    "first_seen_sol": sol,
+                    "last_seen_sol": sol,
+                    "extracted_at": now,
+                },
+            )
+            if not created:
+                obj.last_seen_sol = sol
+                obj.extracted_at = now
+                obj.save(update_fields=["last_seen_sol", "extracted_at"])
+            count += 1
+
+    return count
