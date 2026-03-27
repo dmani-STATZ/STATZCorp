@@ -21,10 +21,9 @@ Note on ERR_ABORTED:
 """
 
 import io
-import json
+from pypdf import PdfReader
 import logging
 import re
-import zipfile
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional
@@ -138,9 +137,16 @@ def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
                 if body:
                     try:
                         history_rows = parse_procurement_history(body, sol_number)
-                        save_procurement_history(history_rows)
-                    except Exception:
-                        pass
+                        saved = save_procurement_history(history_rows)
+                        logger.info(
+                            "fetch_pdf_for_sol(%s): parsed %d rows, saved %d",
+                            sol_number, len(history_rows), saved,
+                        )
+                    except Exception as e:
+                        logger.exception(
+                            "fetch_pdf_for_sol(%s): procurement history parse/save failed: %s",
+                            sol_number, e,
+                        )
                 return body
             except Exception as e:
                 logger.exception("fetch_pdf_for_sol(%s) failed: %s", sol_number, e)
@@ -214,9 +220,9 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
     return result
 
 
-def parse_procurement_history(zip_bytes: bytes, sol_number: str) -> List[Dict]:
+def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
     """
-    Extract procurement history rows from a DIBBS solicitation ZIP blob.
+    Extract procurement history rows from a DIBBS solicitation PDF blob.
 
     Returns a list of dicts, each with keys:
         nsn, fsc, cage_code, contract_number, quantity,
@@ -225,7 +231,7 @@ def parse_procurement_history(zip_bytes: bytes, sol_number: str) -> List[Dict]:
     Returns empty list if no history found (normal for some sol types).
     Raises no exceptions — logs warnings on malformed rows and continues.
     """
-    if not zip_bytes:
+    if not pdf_bytes:
         return []
 
     HEADER_RE = re.compile(
@@ -240,31 +246,24 @@ def parse_procurement_history(zip_bytes: bytes, sol_number: str) -> List[Dict]:
     )
 
     try:
-        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
-    except zipfile.BadZipFile:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+    except Exception as e:
+        logger.warning("parse_procurement_history(%s): failed to open PDF: %s", sol_number, e)
         return []
-
-    try:
-        manifest = json.loads(zf.read("manifest.json"))
-        page_files = [
-            p["text"]["path"]
-            for p in sorted(manifest["pages"], key=lambda x: x["page_number"])
-        ]
-    except Exception:
-        page_files = sorted(
-            [n for n in zf.namelist() if n.endswith(".txt")],
-            key=lambda x: int(x.replace(".txt", "")),
-        )
 
     rows: Dict[str, Dict] = {}
     current_nsn = None
     current_fsc = None
     in_history = False
 
-    for page_file in page_files:
+    for page in reader.pages:
         try:
-            text = zf.read(page_file).decode("utf-8", errors="replace")
-        except Exception:
+            text = page.extract_text() or ""
+        except Exception as e:
+            logger.warning(
+                "parse_procurement_history(%s): failed to extract text from page: %s",
+                sol_number, e,
+            )
             continue
 
         for line in text.splitlines():

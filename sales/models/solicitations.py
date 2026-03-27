@@ -120,6 +120,22 @@ class Solicitation(models.Model):
     pdf_blob = models.BinaryField(null=True, blank=True)
     pdf_fetched_at = models.DateTimeField(null=True, blank=True)
 
+    PDF_FETCH_STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("FETCHING", "Fetching"),
+        ("DONE", "Done"),
+        ("FAILED", "Failed"),
+    ]
+    pdf_fetch_status = models.CharField(
+        max_length=10,
+        choices=PDF_FETCH_STATUS_CHOICES,
+        null=True,
+        blank=True,
+        default=None,
+        db_index=True,
+    )
+    pdf_fetch_attempts = models.PositiveSmallIntegerField(default=0)
+
     class Meta:
         db_table = 'dibbs_solicitation'
         verbose_name = 'Solicitation'

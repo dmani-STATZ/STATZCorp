@@ -96,6 +96,7 @@ Run repo-wide search before any of these changes:
 - Keep restrictive field allowlists on enrichment/update endpoints (`suppliers` apply enrichment, similar write APIs).
 - Treat uploads/downloads as sensitive:
 - PDF/file handlers in `tools`, `training`, `processing`, `contracts` should keep size/type/permission checks.
+- `parse_procurement_history()` in `sales/services/dibbs_pdf.py` uses `pypdf.PdfReader` to extract text from raw PDF bytes. DIBBS serves `.PDF` files directly — not ZIPs. The old ZIP-based approach was incorrect and has been replaced. The `pypdf` package is a declared dependency in `requirements.txt`.
 - Exports should remain authenticated and scoped.
 
 ## 9. Reporting / Export / Background Processing Rules
@@ -110,6 +111,7 @@ Run repo-wide search before any of these changes:
 - `tools` (PDF/ZIP outputs),
 - `users` (portal CSV export).
 - There is no Celery task layer in this repo. Assume heavy processing is request-time and verify latency/error handling.
+- `fetch_pending_pdfs` management command fetches DIBBS solicitation PDFs for all `PENDING` (and `FAILED` with fewer than five attempts) sols in a single shared Playwright session. Triggered by RFQ queue add (sets `PENDING` when `pdf_blob` is null). Intended to run every five minutes as a scheduled Azure WebJob. Max five attempts per sol. ORM boundary rule applies: all DB reads before Playwright opens, all DB writes after it closes.
 - Signal-based automation exists in `transactions` and `users`; changing save paths or middleware can silently remove side effects.
 
 ## 10. Testing and Verification Expectations

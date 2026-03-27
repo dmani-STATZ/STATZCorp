@@ -50,6 +50,13 @@ from sales.services.suppliers import create_supplier_from_sam, get_or_create_stu
 logger = logging.getLogger(__name__)
 
 
+def _mark_solicitation_pdf_fetch_pending_if_needed(solicitation: Solicitation) -> None:
+    """When a sol is queued for RFQ, flag background PDF fetch if no blob yet."""
+    if not solicitation.pdf_blob:
+        solicitation.pdf_fetch_status = "PENDING"
+        solicitation.save(update_fields=["pdf_fetch_status"])
+
+
 # ---------- Pending queue: matches with no RFQ sent ----------
 
 @login_required
@@ -1202,6 +1209,8 @@ def rfq_queue_add_manual(request):
             solicitation.status = "RFQ_PENDING"
             solicitation.save(update_fields=["status"])
 
+        _mark_solicitation_pdf_fetch_pending_if_needed(solicitation)
+
     return JsonResponse(
         {
             "success": True,
@@ -1256,6 +1265,8 @@ def rfq_queue_add(request):
     if solicitation.status in ("New", "Active", "Matching"):
         solicitation.status = "RFQ_PENDING"
         solicitation.save(update_fields=["status"])
+
+    _mark_solicitation_pdf_fetch_pending_if_needed(solicitation)
 
     return JsonResponse({"status": "queued", "rfq_id": rfq.pk})
 
@@ -1378,6 +1389,8 @@ def supplier_create_and_queue(request):
             if solicitation.status in ("New", "Active", "Matching"):
                 solicitation.status = "RFQ_PENDING"
                 solicitation.save(update_fields=["status"])
+
+            _mark_solicitation_pdf_fetch_pending_if_needed(solicitation)
 
             summary = (
                 "Supplier created from SAM data and added to RFQ queue"
