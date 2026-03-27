@@ -37,6 +37,13 @@
   .aw-crumb { font-size: 0.8125rem; color: #6b7280; margin-bottom: 0.5rem; }
   .aw-crumb a { color: var(--company-primary, #004eb3); text-decoration: none; }
   .data-table-wrap table tbody tr:hover { background: #f8fafc; }
+  .badge-src-upload { background: #6c757d; color: #fff; font-size: 0.7rem; }
+  .badge-src-scrape { background: #0d6efd; color: #fff; font-size: 0.7rem; }
+  .scrape-status-success { color: #198754; font-weight: 600; }
+  .scrape-status-partial { color: #d97706; font-weight: 600; }
+  .scrape-status-failed { color: #dc3545; font-weight: 600; }
+  .scrape-status-progress { color: #0d6efd; font-weight: 600; }
+  .scrape-status-pending { color: #6c757d; font-weight: 600; }
 </style>
 
 <div style="max-width: 720px;">
@@ -44,7 +51,7 @@
     <a href="{% url 'sales:awards_list' %}">Awards</a> → Import
   </div>
   <h1 style="font-size:1.375rem; font-weight:600; margin:0 0 0.25rem 0;">{{ page_title }}</h1>
-  <p class="text-muted small mb-3">Staff only — upload daily AW files for import into DibbsAward (<code>source=DIBBS_FILE</code>).</p>
+  <p class="text-muted small mb-3">Staff only — upload daily AW files for import into DibbsAward (<code>source=DIBBS_FILE</code>). Awards are also loaded nightly by the automated DIBBS scraper; use this page if the scraper failed or you need a manual re-import.</p>
 
   {% if error %}
   <div class="alert alert-danger" role="alert">{{ error }}</div>
@@ -61,7 +68,7 @@
     <div class="card-body">
       <h2 class="h5 fw-semibold mb-2">Upload AW File</h2>
       <p class="text-muted small mb-3">
-        Download AW files from the Office File Portal (<code>files.themanihome.com</code>), then drag them here.
+        If you need a file-based import, download the AW file from DIBBS (or your usual source), then drag it here.
         One or more <span class="font-monospace">.txt</span> files. Each must match format: <span class="font-monospace">aw[YYMMDD].txt</span> (e.g. <span class="font-monospace">aw260319.txt</span>).
       </p>
 
@@ -153,6 +160,10 @@
           <thead>
             <tr>
               <th>Date</th>
+              <th>Source</th>
+              <th>Scrape date</th>
+              <th>Expected</th>
+              <th>Scrape status</th>
               <th>Filename</th>
               <th class="text-end">Rows</th>
               <th class="text-end">Awards</th>
@@ -169,6 +180,50 @@
             {% for b in recent_batches %}
             <tr>
               <td>{{ b.award_date|date:"M j, Y" }}</td>
+              <td>
+                {% if b.source == 'AUTO_SCRAPE' %}
+                  <span class="badge badge-src-scrape rounded-pill">Scrape</span>
+                {% else %}
+                  <span class="badge badge-src-upload rounded-pill">Upload</span>
+                {% endif %}
+              </td>
+              <td class="small">
+                {% if b.source == 'AUTO_SCRAPE' and b.scrape_date %}
+                  {{ b.scrape_date|date:"M j, Y" }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-end small">
+                {% if b.source == 'AUTO_SCRAPE' %}
+                  {% if b.expected_rows is not None %}
+                    {{ b.expected_rows }}
+                  {% else %}
+                    —
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="small">
+                {% if b.source == 'AUTO_SCRAPE' and b.scrape_status %}
+                  {% if b.scrape_status == 'SUCCESS' %}
+                    <span class="scrape-status-success">Success</span>
+                  {% elif b.scrape_status == 'PARTIAL' %}
+                    <span class="scrape-status-partial">Partial</span>
+                  {% elif b.scrape_status == 'FAILED' %}
+                    <span class="scrape-status-failed">Failed</span>
+                  {% elif b.scrape_status == 'IN_PROGRESS' %}
+                    <span class="scrape-status-progress">In progress <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:0.65rem;height:0.65rem;vertical-align:middle;"></span></span>
+                  {% elif b.scrape_status == 'PENDING' %}
+                    <span class="scrape-status-pending">Pending</span>
+                  {% else %}
+                    {{ b.get_scrape_status_display }}
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td class="font-monospace small">{{ b.filename }}</td>
               <td class="text-end">{{ b.row_count }}</td>
               <td class="text-end">{{ b.awards_created }}</td>

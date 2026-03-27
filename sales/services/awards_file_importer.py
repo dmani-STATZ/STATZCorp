@@ -1,9 +1,11 @@
 import hashlib
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 
 from sales.models import AwardImportBatch, DibbsAward, Solicitation
-from sales.services.awards_file_parser import AwardFileParseResult
+from sales.services.awards_file_parser import AwardFileParseResult, AwardRow
 
 
 def _chunked(lst, n):
@@ -52,7 +54,87 @@ def _dedupe_rows(rows):
     return list(by_key.values())
 
 
+def _clean_price_str(raw: str) -> Decimal | None:
+    if not raw or not raw.strip():
+        return None
+    cleaned = raw.replace("$", "").replace(" ", "").strip()
+    try:
+        return Decimal(cleaned)
+    except (InvalidOperation, Exception):
+        return None
+
+
+def _parse_mmddyyyy(raw: str):
+    if not raw or not raw.strip():
+        return None
+    try:
+        return datetime.strptime(raw.strip(), "%m-%d-%Y").date()
+    except ValueError:
+        return None
+
+
+def _award_row_from_scrape_dict(d: dict, warnings: list[str]) -> AwardRow | None:
+    award_basic_number = (d.get("Award_Basic_Number") or "").strip()
+    if not award_basic_number:
+        return None
+
+    price_raw = (d.get("Total_Contract_Price") or "").strip()
+    price = _clean_price_str(price_raw)
+    if price_raw and price is None:
+        warnings.append(
+            f"Award {award_basic_number}: could not parse price '{price_raw}' — stored as null."
+        )
+
+    return AwardRow(
+        award_basic_number=award_basic_number,
+        delivery_order_number=(d.get("Delivery_Order_Number") or "").strip() or None,
+        delivery_order_counter=(d.get("Delivery_Order_Counter") or "").strip() or None,
+        last_mod_posting_date=_parse_mmddyyyy((d.get("Last_Mod_Posting_Date") or "").strip()),
+        awardee_cage=(d.get("Awardee_CAGE_Code") or "").strip() or None,
+        total_contract_price=price,
+        award_date=_parse_mmddyyyy((d.get("Award_Date") or "").strip()),
+        posted_date=_parse_mmddyyyy((d.get("Posted_Date") or "").strip()),
+        nsn=(d.get("NSN_Part_Number") or "").strip() or None,
+        nomenclature=(d.get("Nomenclature") or "").strip().strip('"') or None,
+        purchase_request=(d.get("Purchase_Request") or "").strip() or None,
+        dibbs_solicitation_number=(d.get("Solicitation") or "").strip() or None,
+    )
+
+
+def import_aw_records(
+    records: list[dict], batch: AwardImportBatch, aw_file_date: date
+) -> dict:
+    warnings: list[str] = []
+    rows: list[AwardRow] = []
+    for d in records:
+        row = _award_row_from_scrape_dict(d, warnings)
+        if row is not None:
+            rows.append(row)
+    pr = AwardFileParseResult(
+        award_date=aw_file_date,
+        filename=batch.filename,
+        rows=rows,
+        warnings=warnings,
+    )
+    return _process_records(
+        pr,
+        imported_by=None,
+        existing_batch=batch,
+        source_row_count=len(records),
+    )
+
+
 def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
+    return _process_records(parse_result, imported_by, existing_batch=None)
+
+
+def _process_records(
+    parse_result: AwardFileParseResult,
+    imported_by,
+    existing_batch: AwardImportBatch | None = None,
+    *,
+    source_row_count: int | None = None,
+) -> dict:
     from datetime import date as _date
     from django.db import connection as _conn
     from sales.models import CompanyCAGE, DibbsAwardMod
@@ -68,7 +150,9 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
     we_won_by_cage = {original: 0 for original in cage_code_map.values()}
 
     rows = _dedupe_rows(parse_result.rows)
-    row_count_source = len(parse_result.rows)
+    row_count_source = (
+        source_row_count if source_row_count is not None else len(parse_result.rows)
+    )
 
     sol_lookup = {
         s.solicitation_number: s
@@ -346,18 +430,33 @@ def import_aw_file(parse_result: AwardFileParseResult, imported_by) -> dict:
                         cursor.executemany(_msql, _mrows)
                 mod_created_count = len(mods_to_create)
 
-        batch = AwardImportBatch.objects.create(
-            award_date=parse_result.award_date,
-            filename=parse_result.filename,
-            imported_by=imported_by,
-            row_count=row_count_source,
-            awards_created=created_count,
-            faux_created=faux_created_count,
-            faux_upgraded=updated_faux_count,
-            mods_created=mod_created_count,
-            mods_skipped=mod_skipped_count,
-            we_won_count=sum(we_won_by_cage.values()),
-        )
+        if existing_batch is not None:
+            batch = existing_batch
+            batch.award_date = parse_result.award_date
+            batch.filename = (parse_result.filename or "")[:50]
+            batch.row_count = row_count_source
+            batch.awards_created = created_count
+            batch.faux_created = faux_created_count
+            batch.faux_upgraded = updated_faux_count
+            batch.mods_created = mod_created_count
+            batch.mods_skipped = mod_skipped_count
+            batch.we_won_count = sum(we_won_by_cage.values())
+            if imported_by is not None:
+                batch.imported_by = imported_by
+            batch.save()
+        else:
+            batch = AwardImportBatch.objects.create(
+                award_date=parse_result.award_date,
+                filename=(parse_result.filename or "")[:50],
+                imported_by=imported_by,
+                row_count=row_count_source,
+                awards_created=created_count,
+                faux_created=faux_created_count,
+                faux_upgraded=updated_faux_count,
+                mods_created=mod_created_count,
+                mods_skipped=mod_skipped_count,
+                we_won_count=sum(we_won_by_cage.values()),
+            )
 
         if to_create_awards:
             DibbsAward.objects.filter(

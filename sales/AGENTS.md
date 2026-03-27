@@ -71,7 +71,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Admin:** `sales/admin.py` registers nothing. All staff actions go through custom views. Do not assume Django admin works for any sales model.
 
-**Background processing:** None. Everything runs synchronously via HTTP. The four AJAX import steps are sequential HTTP POSTs, not background tasks.
+**Background processing:** The `scrape_awards` management command (Azure WebJob) is the only off-HTTP worker. The solicitation import pipeline and all staff UI flows otherwise run synchronously via HTTP; the four AJAX import steps are sequential HTTP POSTs, not an internal task queue.
 
 ---
 
@@ -197,9 +197,9 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ## 11. Background Tasks / Signals / Automation Rules
 
-**No signals.** No Celery tasks. No scheduled jobs. No async processing.
+**No signals.** No Celery tasks. No in-app async task queue.
 
-**The import pipeline is fully synchronous via four sequential AJAX HTTP POSTs:**
+**The solicitation import pipeline is fully synchronous via four sequential AJAX HTTP POSTs:**
 1. `import_step_parse` → parse files
 2. `import_step_solicitations` → upsert Solicitation rows
 3. `import_step_lines` → upsert SolicitationLine + ApprovedSource rows
@@ -207,9 +207,13 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress page drives these in order. If a step fails, `ImportJob.status` is set to `'error'` and the message is stored in `ImportJob.error_message`.
 
-**Awards data** is loaded only via staff AW file upload (`awards_import_upload` / `awards_file_importer`), not the daily import pipeline.
+**The only scheduled/background worker in this app** is the Django management command `scrape_awards`, intended to run nightly via an Azure WebJob. It scrapes DIBBS award pages into `DibbsAward` using `sales/services/dibbs_awards_scraper.py` and `awards_file_importer.import_aw_records()`.
 
-**DIBBS fetch** (`import_fetch_dibbs`) requires Playwright + Chromium. If not installed, it will raise `DibbsFetchError`. This is a known gap with no fallback.
+**Awards data** is loaded by that scraper by default, with staff AW file upload (`awards_import_upload` / `import_aw_file`) as a fallback. `AwardImportBatch` distinguishes paths via `source` (`FILE_UPLOAD` vs `AUTO_SCRAPE`) and, for scrapes, tracks `scrape_date`, `expected_rows`, `scrape_status`, and `last_attempted_at`.
+
+**`awards_file_importer.py`** exposes two entry points: `import_aw_file()` (file upload, unchanged) and `import_aw_records()` (scraper). Both delegate to shared `_process_records()` for bulk upsert, deduplication, `we_won` detection, and solicitation matching.
+
+**DIBBS fetch** (`import_fetch_dibbs`) requires Playwright + Chromium. If not installed, it will raise `DibbsFetchError`. The awards scraper has the same Playwright dependency.
 
 ---
 

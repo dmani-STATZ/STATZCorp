@@ -3576,10 +3576,7 @@ Requested explicitly by the sales team. Add to Phase 3 polish items.
 ## 13. Awards File Import
 
 ### 13.1 Overview
-DIBBS publishes daily award data on its portal. An external file server at `files.themanihome.com`
-scrapes and hosts these files on a calendar-based UI. Staff download the AW file for the desired
-date and upload it to STATZ via `/sales/awards/import/`. This is a separate workflow from the
-daily IN/BQ/AS import; SAM.gov awards sync was removed (AW file is the sole source for `DibbsAward`).
+DIBBS publishes daily award data on its portal. STATZ scrapes this data automatically each night via a Django management command (`scrape_awards`) triggered by an Azure WebJob. Award records are written directly to `DibbsAward` with no intermediate file. The manual AW file upload at `/sales/awards/import/` is retained as a fallback if the automated scraper fails. `AwardImportBatch` tracks both paths, distinguished by the `source` field (`FILE_UPLOAD` vs `AUTO_SCRAPE`). This is a separate workflow from the daily IN/BQ/AS import; SAM.gov awards sync was removed (DIBBS is the sole source for `DibbsAward` file-style rows).
 
 ### 13.2 AW File Format
 Filename format: `aw[YYMMDD].txt` (e.g. `aw260319.txt`). File is CSV with `#`-prefixed comment
@@ -3592,8 +3589,8 @@ NSN_Part_Number, Nomenclature, Purchase_Request, Solicitation. All dates: MM-DD-
 `DibbsAward` is populated from AW originals (`last_mod_posting_date IS NULL`) and includes
 `is_faux` to mark synthesized placeholders. `DibbsAwardMod` stores AW modification rows
 (`last_mod_posting_date IS NOT NULL`) in table `dibbs_award_mod` linked to `DibbsAward`.
-`AwardImportBatch` tracks each upload with counters for:
-`awards_created`, `faux_created`, `faux_upgraded`, `mods_created`, `mods_skipped`.
+`AwardImportBatch` tracks each upload or scrape with counters for:
+`awards_created`, `faux_created`, `faux_upgraded`, `mods_created`, `mods_skipped`, plus for automated scrapes: `source`, `scrape_date`, `expected_rows`, `scrape_status`, `last_attempted_at`.
 
 Original-award dedup key in `DibbsAward` import path:
 `(award_basic_number, delivery_order_number, nsn)`.
@@ -3626,7 +3623,32 @@ The solicitation detail Overview tab shows a "Last Award" card when a `DibbsAwar
 for the line's NSN (ordered by `award_date` descending). This gives the sales team instant context
 on who last won and at what price — critical for bid pricing decisions.
 
-### 13.7 Wins Report (Dynamic Company CAGE Join)
+### 13.7 Automated Scraper
+
+**Entry point:** `python manage.py scrape_awards [--date YYYY-MM-DD]`  
+**Service:** `sales/services/dibbs_awards_scraper.py`  
+**Scheduler:** Azure WebJob — `webjobs/run_scrape_awards/run.sh`  
+**Schedule:** Nightly (configure time in Azure portal)
+
+**Scrape target:** `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx?Category=post&TypeSrch=cq&Value=MM-DD-YYYY`
+
+**Flow:**
+1. Launch headless Chromium via Playwright
+2. Accept DoD warning page
+3. Navigate to awards page for target date
+4. Read expected record count from page header (`ctl00_cph1_lblRecCount`)
+5. Paginate through all pages using ASP.NET `__doPostBack` grid control
+6. Normalise records to match AW file format
+7. Bulk-upsert via `awards_file_importer.import_aw_records()`
+8. Mark `AwardImportBatch` as SUCCESS, PARTIAL, or FAILED
+
+**Success condition:** `actual_rows == expected_rows` AND no exception thrown.  
+**PARTIAL:** Scraper completed pagination but row count mismatch. Data is still written.  
+**FAILED:** Exception thrown during scrape. `AwardImportBatch` is marked FAILED. Manual upload fallback should be used.
+
+**Idempotent:** Running the command twice for the same date is safe. Existing SUCCESS batches are skipped. `DibbsAward` rows are upserted (not duplicated) using the existing dedup key.
+
+### 13.8 Wins Report (Dynamic Company CAGE Join)
 Wins are determined dynamically from active company CAGE configuration, not from the static
 `DibbsAward.we_won` field. A SQL Server view identifies winning award row IDs by joining
 `dibbs_award.awardee_cage` to active `dibbs_company_cage.cage_code` values case-insensitively.

@@ -3,7 +3,27 @@ from django.db import models
 
 
 class AwardImportBatch(models.Model):
-    """Tracks each AW file upload. One record per imported file."""
+    """Tracks each AW file upload or automated scrape run."""
+
+    SOURCE_FILE_UPLOAD = "FILE_UPLOAD"
+    SOURCE_AUTO_SCRAPE = "AUTO_SCRAPE"
+    SOURCE_CHOICES = [
+        (SOURCE_FILE_UPLOAD, "Manual File Upload"),
+        (SOURCE_AUTO_SCRAPE, "Automated Scraper"),
+    ]
+
+    SCRAPE_PENDING = "PENDING"
+    SCRAPE_IN_PROGRESS = "IN_PROGRESS"
+    SCRAPE_SUCCESS = "SUCCESS"
+    SCRAPE_PARTIAL = "PARTIAL"
+    SCRAPE_FAILED = "FAILED"
+    SCRAPE_STATUS_CHOICES = [
+        (SCRAPE_PENDING, "Pending"),
+        (SCRAPE_IN_PROGRESS, "In Progress"),
+        (SCRAPE_SUCCESS, "Success"),
+        (SCRAPE_PARTIAL, "Partial"),
+        (SCRAPE_FAILED, "Failed"),
+    ]
 
     award_date = models.DateField()
     filename = models.CharField(max_length=50)
@@ -22,6 +42,21 @@ class AwardImportBatch(models.Model):
     mods_created = models.IntegerField(default=0)
     mods_skipped = models.IntegerField(default=0)
     we_won_count = models.IntegerField(default=0)
+
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_FILE_UPLOAD,
+    )
+    scrape_date = models.DateField(null=True, blank=True)
+    expected_rows = models.IntegerField(null=True, blank=True)
+    scrape_status = models.CharField(
+        max_length=20,
+        choices=SCRAPE_STATUS_CHOICES,
+        null=True,
+        blank=True,
+    )
+    last_attempted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "dibbs_award_import_batch"
@@ -163,7 +198,7 @@ class WeWonAward(models.Model):
 
     IMPORTANT: The view [dbo].[dibbs_we_won_awards] must exist in the
     database. It is NOT created by Django migrations — create it manually
-    in SSMS. See DIBBS_System_Spec.md Section 13 for the CREATE VIEW DDL.
+    in SSMS. See DIBBS_System_Spec.md Section 13.8 for the CREATE VIEW DDL.
     """
 
     class Meta:

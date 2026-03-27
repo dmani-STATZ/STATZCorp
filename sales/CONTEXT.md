@@ -150,9 +150,10 @@ AJAX and API responses return JSON (import steps, RFQ center detail, `rfq_mailto
 - IN/BQ/AS uploads contain sensitive procurement data; temporary files live under `/tmp` directories that are removed during the matching step.
 
 ## 14. Background Processing / Scheduled Work
-- The import pipeline runs entirely via HTTP: each AJAX step updates the `ImportJob`, persists counts, and orchestrates parsing, bulk upserts, and matching. There is no background queue.
-- `run_import()` executes matching after upserts; awards are maintained only via the separate AW file import flow.
-- `fetch_dibbs_archive_files` requires Playwright/Chromium and is invoked when staff call `/import/fetch-dibbs/`.
+- The solicitation import pipeline runs entirely via HTTP: each AJAX step updates the `ImportJob`, persists counts, and orchestrates parsing, bulk upserts, and matching. Background processing is limited to the `scrape_awards` management command (`sales/management/commands/scrape_awards.py`), triggered on a nightly schedule by an Azure WebJob (`webjobs/run_scrape_awards/run.sh`). All other operations remain synchronous via HTTP.
+- That command uses Playwright to scrape `https://www.dibbs.bsm.dla.mil/Awards/AwdRecs.aspx`, accepts the DoD warning page, paginates the awards grid, normalises rows to AW-file shape, and bulk-upserts into `DibbsAward` via `sales/services/awards_file_importer.py` (`import_aw_records`). `AwardImportBatch` records both manual file uploads (`source=FILE_UPLOAD`) and automated runs (`source=AUTO_SCRAPE`) with `scrape_status`, `expected_rows`, `scrape_date`, and `last_attempted_at`.
+- The manual AW file upload at `/sales/awards/import/` remains available as a fallback if the scraper fails.
+- `fetch_dibbs_archive_files` requires Playwright/Chromium and is invoked when staff call `/import/fetch-dibbs/` (IN/BQ/AS discovery and download — separate from awards scraping).
 - `backfill_nsn_from_contracts` is a manual, staff-triggered view (dry run supported).
 ## 15. Testing Coverage
 `tests.py` is the default Django stub with no test cases. There are no unit/integration tests for parser, importer, matching, RFQ flows, or service helpers; adding targeted tests for `sales/services/bq_export.py`, `sales/services/parser.py`, and RFQ workflows would cover high-risk areas.
