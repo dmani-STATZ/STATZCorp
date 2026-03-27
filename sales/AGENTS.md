@@ -211,6 +211,8 @@ Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress 
 
 **Awards data** is loaded by that scraper (reconciliation or `--date`), with staff AW file upload (`awards_import_upload` / `import_aw_file`) as a fallback. `AwardImportBatch` distinguishes paths via `source` (`FILE_UPLOAD` vs `AUTO_SCRAPE`) and, for scrapes, tracks `scrape_date`, `expected_rows`, `scrape_status`, and `last_attempted_at`.
 
+**Awards grid parsing note:** DIBBS renders contract numbers in anchor tags and appends UI text in table cells. In `sales/services/dibbs_awards_scraper.py`, parse `Award_Basic_Number` and `Delivery_Order_Number` from the first anchor whose `href` contains `/Downloads/Awards/` (not raw `td.get_text()`), and do not drop rows when delivery order cells are blank.
+
 **`awards_file_importer.py`** exposes two entry points: `import_aw_file()` (file upload, unchanged) and `import_aw_records()` (scraper). Both delegate to shared `_process_records()` for bulk upsert, deduplication, `we_won` detection, and solicitation matching.
 
 **DIBBS fetch** (`import_fetch_dibbs`) requires Playwright + Chromium. If not installed, it will raise `DibbsFetchError`. The awards scraper has the same Playwright dependency.

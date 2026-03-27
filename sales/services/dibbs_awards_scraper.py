@@ -158,6 +158,15 @@ def _cell_text(td) -> str:
     return " ".join(td.get_text(separator=" ", strip=True).split())
 
 
+def _award_link_text(td) -> str:
+    if td is None:
+        return ""
+    link = td.find("a", href=lambda h: h and "/Downloads/Awards/" in h)
+    if not link:
+        return ""
+    return " ".join(link.get_text(separator=" ", strip=True).split())
+
+
 def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
     """Parse the awards grid HTML into row dicts matching COLUMNS."""
     _ = award_date
@@ -179,17 +188,16 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         first = _cell_text(cells[0])
         if not first or not first.isdigit():
             continue
-        if len(cells) < len(COLUMNS):
-            logger.warning(
-                "Skipping awards row with %s cells (expected %s): first cell=%r",
-                len(cells),
-                len(COLUMNS),
-                first[:20],
-            )
-            continue
         row: dict[str, str] = {}
         for i, col in enumerate(COLUMNS):
-            row[col] = _cell_text(cells[i]) if i < len(cells) else ""
+            cell = cells[i] if i < len(cells) else None
+            if i == 1:  # Award_Basic_Number
+                value = _award_link_text(cell)
+                row[col] = value if value else _cell_text(cell)
+            elif i == 2:  # Delivery_Order_Number
+                row[col] = _award_link_text(cell)
+            else:
+                row[col] = _cell_text(cell)
         rows_out.append(row)
     return rows_out
 
