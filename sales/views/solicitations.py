@@ -25,6 +25,7 @@ from sales.models import (
     CompanyCAGE,
     GovernmentBid,
     DibbsAward,
+    WeWonAward,
 )
 from sales.services.email import resolve_supplier_email
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
@@ -496,6 +497,7 @@ def solicitation_detail(request, sol_number):
 
     nsn_raw = getattr(line, "nsn", None) if line else None
     last_award = None
+    last_award_we_won = False
     if nsn_raw:
         last_award = (
             DibbsAward.objects.filter(nsn__iexact=nsn_raw)
@@ -503,6 +505,8 @@ def solicitation_detail(request, sol_number):
             .order_by("-award_date", "-id")
             .first()
         )
+        if last_award:
+            last_award_we_won = WeWonAward.objects.filter(pk=last_award.pk).exists()
 
     return render(
         request,
@@ -536,6 +540,7 @@ def solicitation_detail(request, sol_number):
             "queued_rfq_count": queued_rfq_count,
             "no_quote_cages": no_quote_cages,
             "last_award": last_award,
+            "last_award_we_won": last_award_we_won,
             "manual_rfqs": manual_rfqs,
         },
     )

@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from sales.models import AwardImportBatch, CompanyCAGE, Solicitation
+from sales.models import AwardImportBatch
 from sales.services.awards_file_importer import import_aw_records
 from sales.services.dibbs_awards_scraper import scrape_awards_for_date
 from sales.services.graph_mail import send_mail_via_graph
@@ -288,8 +288,9 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
     ) -> tuple[bool, str | None]:
         """
         Scrapes one date. Opens browser, scrapes, closes browser.
-        All ORM writes happen via on_page_complete (outside Playwright evaluation)
-        and final status updates after the browser closes.
+        While Playwright is active, ``on_page_complete`` only accumulates rows in memory
+        (no ORM). After ``scrape_awards_for_date()`` returns, ``import_aw_records()``
+        runs once and final batch status is saved.
         Returns (False, error_message) if scrape_status is FAILED; (True, None) otherwise.
         """
         self._activity(
@@ -322,40 +323,14 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             ]
         )
 
-        # Pre-fetch ORM data before browser opens — sync ORM inside Playwright's
-        # session can raise SynchronousOnlyOperation (e.g. mssql temporary_connection).
-        cage_code_set = set(
-            CompanyCAGE.objects.filter(is_active=True).values_list(
-                "cage_code", flat=True
-            )
-        )
-        sol_lookup = {
-            s.solicitation_number: s
-            for s in Solicitation.objects.exclude(status="NO_BID").only(
-                "id", "solicitation_number"
-            )
-        }
-
-        total_rows_written = [0]
+        all_records: list[dict] = []
 
         def on_page_complete(records: list, page_num: int, total_pages: int) -> None:
             if records:
-                import_aw_records(
-                    records,
-                    batch,
-                    batch.scrape_date,
-                    cage_code_set=cage_code_set,
-                    sol_lookup=sol_lookup,
-                )
-                total_rows_written[0] += len(records)
-
-            batch.pages_scraped = page_num
-            batch.row_count = total_rows_written[0]
-            batch.save(update_fields=["pages_scraped", "row_count"])
-
+                all_records.extend(records)
             self.stdout.write(
                 f"  Page {page_num}/{total_pages} — {len(records)} rows — "
-                f"running total: {total_rows_written[0]}"
+                f"running total: {len(all_records)}"
             )
             sys.stdout.flush()
 
@@ -366,8 +341,6 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             activity_log=self._activity,
         )
 
-        batch.refresh_from_db()
-
         if result["error"]:
             batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
             self.stderr.write(f"  FAILED: {result['error']}")
@@ -375,23 +348,37 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             self._activity(
                 f"Scrape finished with error for {batch.scrape_date}: {result['error']}"
             )
-        elif result["success"]:
-            batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
-            self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
-            sys.stdout.flush()
-            self._activity(
-                f"Scrape SUCCESS for {batch.scrape_date}: {result['actual_rows']} row(s)."
-            )
         else:
-            batch.scrape_status = AwardImportBatch.SCRAPE_PARTIAL
-            self.stdout.write(
-                f"  PARTIAL: {result['actual_rows']} of {result['expected_rows']} expected"
-            )
-            sys.stdout.flush()
-            self._activity(
-                f"Scrape PARTIAL for {batch.scrape_date}: "
-                f"{result['actual_rows']} of {result['expected_rows']} expected."
-            )
+            if all_records:
+                self.stdout.write(
+                    f"  Browser closed. Saving {len(all_records)} records to DB..."
+                )
+                sys.stdout.flush()
+                self._activity(
+                    f"Persisting {len(all_records)} scraped row(s) for "
+                    f"{batch.scrape_date} (batch_id={batch.pk})."
+                )
+                import_aw_records(all_records, batch, batch.scrape_date)
+
+            if result["success"]:
+                batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
+                self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
+                sys.stdout.flush()
+                self._activity(
+                    f"Scrape SUCCESS for {batch.scrape_date}: "
+                    f"{result['actual_rows']} row(s)."
+                )
+            else:
+                batch.scrape_status = AwardImportBatch.SCRAPE_PARTIAL
+                self.stdout.write(
+                    f"  PARTIAL: {result['actual_rows']} of "
+                    f"{result['expected_rows']} expected"
+                )
+                sys.stdout.flush()
+                self._activity(
+                    f"Scrape PARTIAL for {batch.scrape_date}: "
+                    f"{result['actual_rows']} of {result['expected_rows']} expected."
+                )
 
         batch.expected_rows = result["expected_rows"]
         batch.pages_scraped = result["pages_scraped"]

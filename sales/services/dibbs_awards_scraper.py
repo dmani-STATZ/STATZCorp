@@ -321,7 +321,9 @@ def scrape_awards_for_date(
     ``batch_id`` is reserved for callers (no ORM access here on mssql + Playwright).
 
     After each page is parsed, ``on_page_complete(records, page_num, total_pages)`` is called
-    with plain Python data — safe for Django ORM. It is invoked before ``time.sleep(PAGE_DELAY)``.
+    with plain Python data. The callback must not use the Django ORM or open DB connections
+    (including inside ``transaction.atomic()``) while Playwright is active. It should only
+    accumulate rows and update in-memory progress. It is invoked before ``time.sleep(PAGE_DELAY)``.
 
     ``activity_log`` is optional; when set, short progress strings are emitted (e.g. for WebJob logs).
 

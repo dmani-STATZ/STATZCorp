@@ -96,7 +96,7 @@
         <td>
           <span class="badge bg-primary">DIBBS</span>
         </td>
-        <td>{% if award.we_won %}<span class="text-success fw-bold">✓</span>{% endif %}</td>
+        <td>{% if award.id in we_won_id_set %}<span class="text-success fw-bold">✓</span>{% endif %}</td>
       </tr>
       {% empty %}
       <tr><td colspan="8" class="text-muted">No awards match the current filters.</td></tr>

@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from sales.forms import AwardUploadForm
-from sales.models import AwardImportBatch, DibbsAward
+from sales.models import AwardImportBatch, DibbsAward, WeWonAward
 from sales.services.awards_file_importer import import_aw_file
 from sales.services.awards_file_parser import AwardFileParseError, parse_aw_file
 
@@ -144,7 +144,7 @@ def awards_list(request):
         source   — filter by source ('SAM' or 'DIBBS_FILE'). Default: show all.
         date_from — award_date >= this date (YYYY-MM-DD)
         date_to   — award_date <= this date (YYYY-MM-DD)
-        we_won    — '1' to show only we_won=True rows
+        we_won    — '1' to show only rows present in ``WeWonAward`` (active CAGE match)
     """
     qs = DibbsAward.objects.select_related("solicitation").order_by(
         "-award_date", "-id"
@@ -177,11 +177,20 @@ def awards_list(request):
             pass
 
     if request.GET.get("we_won") == "1":
-        qs = qs.filter(we_won=True)
+        qs = qs.filter(id__in=WeWonAward.objects.values("id"))
 
     total_count = qs.count()
     paginator = Paginator(qs, 100)
     page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    page_award_ids = [a.id for a in page_obj.object_list]
+    we_won_id_set = set()
+    if page_award_ids:
+        we_won_id_set = set(
+            WeWonAward.objects.filter(id__in=page_award_ids).values_list(
+                "id", flat=True
+            )
+        )
 
     return render(
         request,
@@ -196,5 +205,6 @@ def awards_list(request):
             "filter_date_to": date_to,
             "filter_we_won": request.GET.get("we_won", ""),
             "total_count": total_count,
+            "we_won_id_set": we_won_id_set,
         },
     )

@@ -1,5 +1,4 @@
 import hashlib
-from collections.abc import Collection
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -103,12 +102,7 @@ def _award_row_from_scrape_dict(d: dict, warnings: list[str]) -> AwardRow | None
 
 
 def import_aw_records(
-    records: list[dict],
-    batch: AwardImportBatch,
-    aw_file_date: date,
-    *,
-    cage_code_set: Collection[str] | None = None,
-    sol_lookup: dict[str, Solicitation] | None = None,
+    records: list[dict], batch: AwardImportBatch, aw_file_date: date
 ) -> dict:
     warnings: list[str] = []
     rows: list[AwardRow] = []
@@ -127,8 +121,6 @@ def import_aw_records(
         imported_by=None,
         existing_batch=batch,
         source_row_count=len(records),
-        cage_code_set=cage_code_set,
-        sol_lookup=sol_lookup,
     )
 
 
@@ -142,35 +134,22 @@ def _process_records(
     existing_batch: AwardImportBatch | None = None,
     *,
     source_row_count: int | None = None,
-    cage_code_set: Collection[str] | None = None,
-    sol_lookup: dict[str, Solicitation] | None = None,
 ) -> dict:
     from datetime import date as _date
     from django.db import connection as _conn
-    from sales.models import CompanyCAGE, DibbsAwardMod
-
-    if cage_code_set is None:
-        cage_codes_iter = CompanyCAGE.objects.filter(is_active=True).values_list(
-            "cage_code", flat=True
-        )
-    else:
-        cage_codes_iter = cage_code_set
-    cage_code_map = {str(v).upper(): v for v in cage_codes_iter if v}
-    our_cages_upper = set(cage_code_map.keys())
-    we_won_by_cage = {original: 0 for original in cage_code_map.values()}
+    from sales.models import DibbsAwardMod
 
     rows = _dedupe_rows(parse_result.rows)
     row_count_source = (
         source_row_count if source_row_count is not None else len(parse_result.rows)
     )
 
-    if sol_lookup is None:
-        sol_lookup = {
-            s.solicitation_number: s
-            for s in Solicitation.objects.exclude(status="NO_BID").only(
-                "id", "solicitation_number"
-            )
-        }
+    sol_lookup = {
+        s.solicitation_number: s
+        for s in Solicitation.objects.exclude(status="NO_BID").only(
+            "id", "solicitation_number"
+        )
+    }
 
     award_rows = [r for r in rows if not r.last_mod_posting_date]
     mod_rows = [r for r in rows if r.last_mod_posting_date]
@@ -190,14 +169,6 @@ def _process_records(
             return _date(fiscal_year, 9, 30)
         except (ValueError, IndexError, TypeError):
             return parse_result.award_date
-
-    def _we_won(awardee_cage):
-        return bool(awardee_cage and awardee_cage.upper() in our_cages_upper)
-
-    def _track_win(awardee_cage):
-        if awardee_cage and awardee_cage.upper() in our_cages_upper:
-            original = cage_code_map[awardee_cage.upper()]
-            we_won_by_cage[original] += 1
 
     with transaction.atomic():
         existing_keys = {
@@ -222,7 +193,6 @@ def _process_records(
             nid = _dibbs_file_notice_id(
                 row.award_basic_number, row.delivery_order_number, row.nsn
             )
-            we_won = _we_won(row.awardee_cage)
             sol_guess = (row.dibbs_solicitation_number or row.award_basic_number or "")[:50]
             matched_sol = sol_lookup.get(row.dibbs_solicitation_number or "")
 
@@ -245,13 +215,10 @@ def _process_records(
                         dibbs_solicitation_number=row.dibbs_solicitation_number,
                         sol_number=sol_guess,
                         solicitation=matched_sol,
-                        we_won=we_won,
                         is_faux=False,
                         aw_file_date=parse_result.award_date,
                     )
                 )
-                if we_won:
-                    _track_win(row.awardee_cage)
             else:
                 existing = existing_keys[key]
                 if existing.is_faux:
@@ -264,11 +231,8 @@ def _process_records(
                     existing.dibbs_solicitation_number = row.dibbs_solicitation_number
                     existing.sol_number = sol_guess
                     existing.solicitation = matched_sol
-                    existing.we_won = we_won
                     existing.aw_file_date = parse_result.award_date
                     to_update_faux.append(existing)
-                    if we_won:
-                        _track_win(row.awardee_cage)
 
         if to_create_awards:
             _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
@@ -298,7 +262,6 @@ def _process_records(
                 "dibbs_solicitation_number",
                 "sol_number",
                 "solicitation",
-                "we_won",
                 "aw_file_date",
             ]
             for chunk in _chunked(to_update_faux, AW_CHUNK):
@@ -344,14 +307,11 @@ def _process_records(
                         dibbs_solicitation_number=row.dibbs_solicitation_number,
                         sol_number=(row.dibbs_solicitation_number or row.award_basic_number or "")[:50],
                         solicitation=sol_lookup.get(row.dibbs_solicitation_number or ""),
-                        we_won=_we_won(row.awardee_cage),
                         is_faux=True,
                         aw_file_date=parse_result.award_date,
                     )
                     faux_to_create.append(faux)
                     faux_key_to_obj[key] = faux
-                    if faux.we_won:
-                        _track_win(row.awardee_cage)
 
             if faux_to_create:
                 _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
@@ -453,7 +413,6 @@ def _process_records(
             batch.faux_upgraded = batch.faux_upgraded + updated_faux_count
             batch.mods_created = batch.mods_created + mod_created_count
             batch.mods_skipped = batch.mods_skipped + mod_skipped_count
-            batch.we_won_count = batch.we_won_count + sum(we_won_by_cage.values())
             if imported_by is not None:
                 batch.imported_by = imported_by
             batch.save()
@@ -468,7 +427,7 @@ def _process_records(
                 faux_upgraded=updated_faux_count,
                 mods_created=mod_created_count,
                 mods_skipped=mod_skipped_count,
-                we_won_count=sum(we_won_by_cage.values()),
+                we_won_count=0,
             )
 
         if to_create_awards:
@@ -488,8 +447,8 @@ def _process_records(
         "updated_faux_count": updated_faux_count,
         "mod_created_count": mod_created_count,
         "mod_skipped_count": mod_skipped_count,
-        "we_won_count": sum(we_won_by_cage.values()),
-        "we_won_by_cage": we_won_by_cage,
+        "we_won_count": 0,
+        "we_won_by_cage": {},
         "batch_id": batch.pk,
         "warnings": warnings,
     }
