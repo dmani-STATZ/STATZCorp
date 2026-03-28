@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Collection
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -102,7 +103,12 @@ def _award_row_from_scrape_dict(d: dict, warnings: list[str]) -> AwardRow | None
 
 
 def import_aw_records(
-    records: list[dict], batch: AwardImportBatch, aw_file_date: date
+    records: list[dict],
+    batch: AwardImportBatch,
+    aw_file_date: date,
+    *,
+    cage_code_set: Collection[str] | None = None,
+    sol_lookup: dict[str, Solicitation] | None = None,
 ) -> dict:
     warnings: list[str] = []
     rows: list[AwardRow] = []
@@ -121,6 +127,8 @@ def import_aw_records(
         imported_by=None,
         existing_batch=batch,
         source_row_count=len(records),
+        cage_code_set=cage_code_set,
+        sol_lookup=sol_lookup,
     )
 
 
@@ -134,18 +142,20 @@ def _process_records(
     existing_batch: AwardImportBatch | None = None,
     *,
     source_row_count: int | None = None,
+    cage_code_set: Collection[str] | None = None,
+    sol_lookup: dict[str, Solicitation] | None = None,
 ) -> dict:
     from datetime import date as _date
     from django.db import connection as _conn
     from sales.models import CompanyCAGE, DibbsAwardMod
 
-    cage_code_map = {
-        v.upper(): v
-        for v in CompanyCAGE.objects.filter(is_active=True).values_list(
+    if cage_code_set is None:
+        cage_codes_iter = CompanyCAGE.objects.filter(is_active=True).values_list(
             "cage_code", flat=True
         )
-        if v
-    }
+    else:
+        cage_codes_iter = cage_code_set
+    cage_code_map = {str(v).upper(): v for v in cage_codes_iter if v}
     our_cages_upper = set(cage_code_map.keys())
     we_won_by_cage = {original: 0 for original in cage_code_map.values()}
 
@@ -154,12 +164,13 @@ def _process_records(
         source_row_count if source_row_count is not None else len(parse_result.rows)
     )
 
-    sol_lookup = {
-        s.solicitation_number: s
-        for s in Solicitation.objects.exclude(status="NO_BID").only(
-            "id", "solicitation_number"
-        )
-    }
+    if sol_lookup is None:
+        sol_lookup = {
+            s.solicitation_number: s
+            for s in Solicitation.objects.exclude(status="NO_BID").only(
+                "id", "solicitation_number"
+            )
+        }
 
     award_rows = [r for r in rows if not r.last_mod_posting_date]
     mod_rows = [r for r in rows if r.last_mod_posting_date]

@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from sales.models import AwardImportBatch
+from sales.models import AwardImportBatch, CompanyCAGE, Solicitation
 from sales.services.awards_file_importer import import_aw_records
 from sales.services.dibbs_awards_scraper import scrape_awards_for_date
 from sales.services.graph_mail import send_mail_via_graph
@@ -322,6 +322,20 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             ]
         )
 
+        # Pre-fetch ORM data before browser opens — sync ORM inside Playwright's
+        # session can raise SynchronousOnlyOperation (e.g. mssql temporary_connection).
+        cage_code_set = set(
+            CompanyCAGE.objects.filter(is_active=True).values_list(
+                "cage_code", flat=True
+            )
+        )
+        sol_lookup = {
+            s.solicitation_number: s
+            for s in Solicitation.objects.exclude(status="NO_BID").only(
+                "id", "solicitation_number"
+            )
+        }
+
         total_rows_written = [0]
 
         def on_page_complete(records: list, page_num: int, total_pages: int) -> None:
@@ -330,6 +344,8 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                     records,
                     batch,
                     batch.scrape_date,
+                    cage_code_set=cage_code_set,
+                    sol_lookup=sol_lookup,
                 )
                 total_rows_written[0] += len(records)
 
