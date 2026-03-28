@@ -112,6 +112,8 @@ Run repo-wide search before any of these changes:
 - `users` (portal CSV export).
 - There is no Celery task layer in this repo. Assume heavy processing is request-time and verify latency/error handling.
 - `fetch_pending_pdfs` management command fetches DIBBS solicitation PDFs for all `PENDING` (and `FAILED` with fewer than five attempts) sols in a single shared Playwright session. Triggered by RFQ queue add (sets `PENDING` when `pdf_blob` is null). Intended to run every five minutes as a scheduled Azure WebJob. Max five attempts per sol. ORM boundary rule applies: all DB reads before Playwright opens, all DB writes after it closes.
+- CA zip pipeline runs as Phase 4 of `auto_import_dibbs`. `fetch_ca_zip()` in `sales/services/dibbs_fetch.py` downloads the CA zip via Playwright. `parse_ca_zip()` in `sales/services/ca_parser.py` processes it with pure ORM — lookup by `pdf_file_name`, skip if `pdf_data_pulled` set, parse via `parse_procurement_history()`, save via `save_procurement_history()`. ORM/Playwright boundary strictly maintained. `fetch_pending_pdfs` excludes sols where `pdf_data_pulled` is not null.
+- The scraper may re-attempt a date that was partially imported. `_process_records()` in `sales/services/awards_file_importer.py` must filter out `notice_id` values that already exist before calling `executemany` to prevent `IntegrityError` on duplicate key (and filter `dibbs_award_mod` inserts against existing rows for the same unique constraint).
 - Signal-based automation exists in `transactions` and `users`; changing save paths or middleware can silently remove side effects.
 
 ## 10. Testing and Verification Expectations

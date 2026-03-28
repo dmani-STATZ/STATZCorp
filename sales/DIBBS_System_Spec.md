@@ -3346,6 +3346,8 @@ def dibbs_pdf_url(self):
 
 > ⚠ **Note:** The original spec URL (`https://www.dibbs.bsm.dla.mil/Docs/RFQ/{filename}`) was incorrect. The live URL format uses `dibbs2.bsm.dla.mil/Downloads/RFQ/{last_char_of_sol_number}/{filename}` — subdirectory is derived from the last character of the solicitation number. Already corrected in production.
 
+**CA Zip Pipeline:** Nightly bulk procurement history extraction. `ca{yymmdd}.zip` on RFQDates.aspx contains SF-18 PDFs for all sols in that day's IN file, named by `pdf_file_name`. Downloaded by `fetch_ca_zip()` (Playwright), parsed by `parse_ca_zip()` (ORM). Lookup key is `Solicitation.pdf_file_name` (uppercase match). Sets `pdf_data_pulled` timestamp on processed sols. `fetch_pending_pdfs` skips these. Parse-and-discard — no blobs stored.
+
 **In the RFQ email template**, include the link in the body:
 ```
 Solicitation PDF: https://dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/{pdf_filename}

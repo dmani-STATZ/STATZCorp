@@ -6,7 +6,7 @@
 # - ImportBatch: stores import_date (DateField); no error_message or status field — reconciliation
 #   treats any existing ImportBatch row for a calendar date as "already imported."
 # - _scrape_rfq_hrefs() returns: dict[str, dict[str, str]] keyed by YYMMDD tag (e.g. "260327")
-#   with optional "in" and "bq" URL keys per tag.
+#   with optional "in", "bq", and "ca" URL keys per tag.
 import logging
 import os
 import shutil
@@ -70,9 +70,10 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Dates to import: {[str(d) for d, _, _ in work_list]}")
 
-        # Phase 3: Fetch and import (Playwright inside fetch; ORM only after it returns)
+        # Phase 3: Fetch IN/BQ/AS and import; Phase 4 (per date): CA zip via fetch_ca_zip
+        # then parse_ca_zip (ORM only). Playwright does not overlap ORM.
         failures = []
-        for import_date, tag, _hrefs in work_list:
+        for import_date, tag, hrefs in work_list:
             self.stdout.write(f"  Processing {import_date} (tag {tag})...")
             tmp_dir = None
             try:
@@ -94,6 +95,48 @@ class Command(BaseCommand):
                         f"  {import_date}: imported successfully — {sol_count} solicitations"
                     )
                 )
+
+                ca_url = hrefs.get("ca")
+                if not ca_url:
+                    self.stdout.write(
+                        f"  {import_date}: no CA zip href found, skipping."
+                    )
+                else:
+                    self.stdout.write(
+                        f"  {import_date}: fetching CA zip from {ca_url}..."
+                    )
+                    try:
+                        from sales.services.ca_parser import parse_ca_zip
+                        from sales.services.dibbs_fetch import fetch_ca_zip
+
+                        ca_bytes = fetch_ca_zip(ca_url)
+
+                        if ca_bytes:
+                            self.stdout.write(
+                                f"  {import_date}: CA zip fetched ({len(ca_bytes)} bytes), parsing..."
+                            )
+                            ca_result = parse_ca_zip(ca_bytes, import_date)
+                            self.stdout.write(
+                                f"  {import_date}: CA zip complete — "
+                                f"{ca_result['parsed']} parsed, "
+                                f"{ca_result['history_rows_saved']} history rows, "
+                                f"{ca_result['skipped_already_pulled']} skipped, "
+                                f"{ca_result['no_match']} no match, "
+                                f"{ca_result['errors']} errors"
+                            )
+                        else:
+                            self.stdout.write(
+                                f"  {import_date}: CA zip fetch returned no data."
+                            )
+                            failures.append(
+                                (import_date, "CA zip fetch returned no data")
+                            )
+
+                    except Exception as e:
+                        self.stdout.write(
+                            f"  {import_date}: CA zip processing failed: {e}"
+                        )
+                        failures.append((import_date, f"CA zip error: {e}"))
             except DibbsFetchError as e:
                 logger.error("auto_import_dibbs fetch failed for %s: %s", import_date, e)
                 self.stdout.write(
@@ -110,7 +153,7 @@ class Command(BaseCommand):
                 if tmp_dir:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        # Phase 4: Alert
+        # Failure alert (after Phase 4 CA zip per date)
         if failures:
             self._send_alert(failures)
 

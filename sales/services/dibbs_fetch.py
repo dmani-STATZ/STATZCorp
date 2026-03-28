@@ -75,7 +75,7 @@ def _make_www_session() -> requests.Session:
 
 
 def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
-    """Return {"260312": {"in": "https://...", "bq": "https://..."}, ...}."""
+    """Return {"260312": {"in": "...", "bq": "...", "ca": "..."}, ...}; ca optional per tag."""
     resp = session.get(RFQ_DATES_URL, timeout=DEFAULT_TIMEOUT)
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -91,6 +91,10 @@ def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
             fname = href_l.rsplit("/", 1)[-1].split("?")[0]
             tag = fname[2:8]
             result.setdefault(tag, {})["bq"] = href
+        elif "/downloads/rfq/archive/ca" in href_l and href_l.endswith(".zip"):
+            fname = href_l.rsplit("/", 1)[-1].split("?")[0]
+            tag = fname[2:8]
+            result.setdefault(tag, {})["ca"] = href
     return result
 
 
@@ -283,3 +287,91 @@ def fetch_dibbs_archive_files(
         "bq_file_name": bq_name or f"bq{tag}.txt",
         "as_file_name": as_name or f"as{tag}.txt",
     }
+
+
+def fetch_ca_zip(ca_url: str) -> Optional[bytes]:
+    """
+    Download the DIBBS CA zip for a given date.
+
+    Returns raw zip bytes, or None on failure.
+    Opens and closes its own Playwright browser session.
+    Uses the same DoD consent bypass as fetch_dibbs_archive_files().
+    """
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        logger.exception("Playwright not installed")
+        return None
+
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
+            try:
+                context = browser.new_context(accept_downloads=True)
+                session_page = context.new_page()
+                try:
+                    _establish_dibbs2_session(session_page)
+                finally:
+                    try:
+                        session_page.close()
+                    except Exception:
+                        pass
+
+                page = None
+                try:
+                    page = context.new_page()
+                    with page.expect_download(timeout=120_000) as dl_info:
+                        try:
+                            page.goto(
+                                ca_url, wait_until="commit", timeout=120_000
+                            )
+                        except PlaywrightError as exc:
+                            msg = str(exc)
+                            if (
+                                "Download is starting" in msg
+                                or "ERR_ABORTED" in msg
+                            ):
+                                logger.info(
+                                    "CA zip triggered browser download "
+                                    "(navigation aborted)"
+                                )
+                            else:
+                                raise
+                        except Exception:
+                            pass
+                    download = dl_info.value
+                    path = download.path()
+                    if path is None:
+                        logger.warning(
+                            "CA zip download path is None for %s", ca_url
+                        )
+                        return None
+                    body = path.read_bytes()
+                    if not body:
+                        logger.warning("Empty CA zip download for %s", ca_url)
+                        return None
+                    logger.info(
+                        "Fetched CA zip (%d bytes) from %s", len(body), ca_url
+                    )
+                    return body
+                except Exception as e:
+                    logger.exception("fetch_ca_zip(%s) failed: %s", ca_url, e)
+                    return None
+                finally:
+                    if page is not None:
+                        try:
+                            page.close()
+                        except Exception:
+                            pass
+            finally:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.exception("fetch_ca_zip outer failure: %s", e)
+        return None

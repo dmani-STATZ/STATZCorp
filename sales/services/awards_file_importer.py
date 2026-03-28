@@ -236,6 +236,7 @@ def _process_records(
 
         if to_create_awards:
             _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
+            notice_id_index = next(i for i, f in enumerate(_fields) if f.name == "notice_id")
             _cols = ", ".join(f.column for f in _fields)
             _placeholders = ", ".join(["%s" for _ in _fields])
             _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
@@ -247,9 +248,19 @@ def _process_records(
                     )
                     for obj in chunk
                 ]
-                with _conn.cursor() as cursor:
-                    cursor.executemany(_sql, _rows)
-            created_count = len(to_create_awards)
+                if _rows:
+                    existing_notice_ids = set(
+                        DibbsAward.objects.filter(
+                            notice_id__in=[r[notice_id_index] for r in _rows]
+                        ).values_list("notice_id", flat=True)
+                    )
+                    _rows = [
+                        r for r in _rows if r[notice_id_index] not in existing_notice_ids
+                    ]
+                if _rows:
+                    with _conn.cursor() as cursor:
+                        cursor.executemany(_sql, _rows)
+                    created_count += len(_rows)
 
         if to_update_faux:
             faux_update_fields = [
@@ -315,6 +326,7 @@ def _process_records(
 
             if faux_to_create:
                 _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
+                notice_id_index = next(i for i, f in enumerate(_fields) if f.name == "notice_id")
                 _cols = ", ".join(f.column for f in _fields)
                 _placeholders = ", ".join(["%s" for _ in _fields])
                 _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
@@ -326,8 +338,19 @@ def _process_records(
                         )
                         for obj in chunk
                     ]
-                    with _conn.cursor() as cursor:
-                        cursor.executemany(_sql, _rows)
+                    if _rows:
+                        existing_notice_ids = set(
+                            DibbsAward.objects.filter(
+                                notice_id__in=[r[notice_id_index] for r in _rows]
+                            ).values_list("notice_id", flat=True)
+                        )
+                        _rows = [
+                            r for r in _rows if r[notice_id_index] not in existing_notice_ids
+                        ]
+                    if _rows:
+                        with _conn.cursor() as cursor:
+                            cursor.executemany(_sql, _rows)
+                        faux_created_count += len(_rows)
 
                 reloaded = {
                     (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
@@ -336,7 +359,6 @@ def _process_records(
                     ).only("id", "award_basic_number", "delivery_order_number", "nsn")
                 }
                 existing_mod_awards.update(reloaded)
-                faux_created_count = len(faux_to_create)
 
             mods_to_create = []
             for row in mod_rows:
@@ -387,6 +409,12 @@ def _process_records(
                     f'INSERT INTO dibbs_award_mod ({_mcols}) '
                     f'VALUES ({_mplaceholders})'
                 )
+                award_fk_index = next(i for i, f in enumerate(_mfields) if f.name == "award")
+                mod_date_index = next(i for i, f in enumerate(_mfields) if f.name == "mod_date")
+                nsn_index = next(i for i, f in enumerate(_mfields) if f.name == "nsn")
+                price_index = next(
+                    i for i, f in enumerate(_mfields) if f.name == "mod_contract_price"
+                )
                 for chunk in _chunked(mods_to_create, AW_CHUNK):
                     _mrows = [
                         tuple(
@@ -397,9 +425,30 @@ def _process_records(
                         )
                         for obj in chunk
                     ]
-                    with _conn2.cursor() as cursor:
-                        cursor.executemany(_msql, _mrows)
-                mod_created_count = len(mods_to_create)
+                    if _mrows:
+                        _award_ids = {r[award_fk_index] for r in _mrows}
+                        existing_mod_tuples = set(
+                            DibbsAwardMod.objects.filter(
+                                award_id__in=_award_ids
+                            ).values_list(
+                                "award_id", "mod_date", "nsn", "mod_contract_price"
+                            )
+                        )
+                        _mrows = [
+                            r
+                            for r in _mrows
+                            if (
+                                r[award_fk_index],
+                                r[mod_date_index],
+                                r[nsn_index],
+                                r[price_index],
+                            )
+                            not in existing_mod_tuples
+                        ]
+                    if _mrows:
+                        with _conn2.cursor() as cursor:
+                            cursor.executemany(_msql, _mrows)
+                        mod_created_count += len(_mrows)
 
         if existing_batch is not None:
             batch = existing_batch

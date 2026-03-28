@@ -135,6 +135,15 @@ class Solicitation(models.Model):
         db_index=True,
     )
     pdf_fetch_attempts = models.PositiveSmallIntegerField(default=0)
+    pdf_data_pulled = models.DateTimeField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Set when procurement history data has been extracted from this sol's PDF, "
+            "either via CA zip or individual fetch."
+        ),
+    )
 
     class Meta:
         db_table = 'dibbs_solicitation'

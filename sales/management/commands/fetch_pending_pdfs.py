@@ -23,6 +23,7 @@ class Command(BaseCommand):
             Solicitation.objects.filter(
                 Q(pdf_fetch_status="PENDING") | Q(pdf_fetch_status="FAILED"),
                 pdf_fetch_attempts__lt=MAX_ATTEMPTS,
+                pdf_data_pulled__isnull=True,
             ).values("solicitation_number", "pdf_fetch_attempts")
         )
 
@@ -31,9 +32,15 @@ class Command(BaseCommand):
             pdf_fetch_attempts__gte=MAX_ATTEMPTS,
         ).count()
 
+        ca_covered = Solicitation.objects.filter(
+            pdf_fetch_status="PENDING",
+            pdf_data_pulled__isnull=False,
+        ).count()
+
         if not pending_sols:
             self.stdout.write(
-                f"No pending PDFs to fetch. ({skipped} permanently failed.)"
+                f"No pending PDFs to fetch. ({skipped} permanently failed; "
+                f"{ca_covered} skipped — CA zip already pulled.)"
             )
             return
 
@@ -91,5 +98,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             f"fetch_pending_pdfs complete: {done} done, {failed} failed, "
-            f"{skipped} skipped (max attempts reached)"
+            f"{skipped} skipped (max attempts reached), "
+            f"{ca_covered} skipped (CA zip already pulled)"
         )
