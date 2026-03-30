@@ -15,6 +15,7 @@
    - 2.1 High-Level Architecture
    - 2.2 Core Data Flow
    - 2.3 DIBBS File Summary
+   - 2.4 Infrastructure — Azure App Service
 3. [Database Schema](#3-database-schema)
    - 3.1 Solicitation Tables
    - 3.2 Approved Source Table
@@ -249,6 +250,24 @@ The end-to-end pipeline moves through six stages:
 NSN, Approved Source CAGE, Part Number, Approved Source Company Name
 "6640014392807","08071","XX63 1K1 15","MILLIPORE CORPORATION"
 ```
+
+### 2.4 Infrastructure — Azure App Service
+
+For high-performance deployments on **Azure App Service (Linux, Oryx build)**:
+
+#### GCC High (Azure Government)
+
+Production targets **Azure Government (GCC High)**. Identity and Microsoft Graph for mail/inbox use **US sovereign endpoints** (e.g. `login.microsoftonline.us`, `graph.microsoft.us`) — not commercial `.com` tenants. App Service, Key Vault, and CI/CD must be provisioned in the correct cloud; configuration and secrets are **not** interchangeable with commercial Azure.
+
+#### Build vs runtime (Oryx)
+
+- **`SCM_DO_BUILD_DURING_DEPLOYMENT=true`** must be set in the Azure Portal (**Configuration** → Application settings) so **Oryx runs the deployment build** (dependency restore, optional `collectstatic`, virtualenv layout under `/tmp` or the published `antenv`). If this is off or mis-set, the app can start without a complete Python environment and enter **crash loops** until the setting is corrected.
+- **`collectstatic`** is produced during the **Oryx build** phase when static files are collected as part of deployment. Running `manage.py collectstatic` again in the **runtime** `startup.sh` is redundant, repeats heavy I/O, and can push container startup past health-check timeouts (~10+ minute boots). **Disable or omit collectstatic in the runtime startup script**; rely on the build output under `wwwroot`.
+- **Runtime `startup.sh` must stay environment-aware:** the Oryx virtual environment path can change or be recreated across platform events. **Do not invoke bare `python`** for `manage.py`, Playwright, or Gunicorn wiring that depends on the app’s interpreter. The repo script resolves **`$PYTHON_EXE`** dynamically (discover `antenv` under `/tmp`, with a documented fallback), then uses `$PYTHON_EXE` for all Python entrypoints. Hard-coding `/tmp/antenv/bin/python` as the only path without discovery risks failures when the platform layout differs.
+
+#### Playwright / Chromium at runtime
+
+- **Playwright / Chromium** may still be needed at runtime for DIBBS fetch and PDF flows. Install or cache browser binaries during build when possible; if a runtime install remains, **gate** it on a filesystem check so restarts skip re-download when `.local-browsers` already exists (see repo `startup.sh`).
 
 ---
 

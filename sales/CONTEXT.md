@@ -255,6 +255,7 @@ The interactive solicitation import pipeline runs via HTTP (AJAX steps on `Impor
 Schema evolution reflects RFQ/bid feature rollouts; no large legacy migrations remain.
 
 ## 17. Known Gaps / Ambiguities
+- **March 2026 — App Service / platform hardening:** After a platform-level incident where the Oryx virtual environment under `/tmp` could be lost on recycle, operations standardized on **dynamic `PYTHON_EXE` discovery** in repo `startup.sh`, **no runtime `collectstatic`** (Oryx build owns static files), and **gated Playwright Chromium install** (skip when `.local-browsers` already exists). **`SCM_DO_BUILD_DURING_DEPLOYMENT=true`** in Azure is required for Oryx to build the environment correctly. The **ORM / Playwright boundary** (no Django ORM inside `sync_playwright()` when using the mssql backend) remains enforced in scrapers, PDF fetch, and import automation. **`startup.sh`** prunes `/home/site/repository/sales/temp/*` when that directory exists to cap import/fetch temp growth on the data volume. See **§20** for startup-time behavior and targets.
 - There are no automated tests; `sales/tests.py` still contains the default stub.
 - `sales/admin.py` does not register any models, so staff rely entirely on the custom UI rather than the Django admin.
 - RFQ mailto flows assume suppliers expose `contact`, `primary_email`, or `business_email`; if none exist the UI prompts for email manually but does not fill it automatically.
@@ -277,3 +278,15 @@ Schema evolution reflects RFQ/bid feature rollouts; no large legacy migrations r
 - **Key templates:** `sales/import/progress.html`, `sales/solicitations/list.html`, `sales/solicitations/detail.html`, `sales/rfq/center.html`, `sales/rfq/inbox.html`, plus `rfq/partials/mailto_buttons.html`, `sales/bids/builder.html`, `sales/settings/email_templates.html`, `sales/settings/greetings.html`, `sales/settings/salutations.html`.
 - **Key dependencies:** Playwright + Chromium (DIBBS fetch), `requests`/`BeautifulSoup` (DIBBS + SAM entity lookup), `SAM_API_KEY`, Django `DEFAULT_FROM_EMAIL`.
 - **Risky files to review first:** `sales/services/importer.py`, `sales/services/matching.py`, `sales/services/bq_export.py`, `sales/views/imports.py`, `sales/views/rfq.py`.
+
+## 20. Azure App Service startup — March 2026
+
+Boot time on App Service was improved after infrastructure recovery from a platform-level failure (lost `/tmp/antenv` and long restart windows). Redundant runtime work was removed and startup was made path-resilient:
+
+- **`PYTHON_EXE`:** `startup.sh` **discovers** the Oryx-provided interpreter under `/tmp/.../antenv/bin/python` via `find`, with a fallback path, then uses **`$PYTHON_EXE`** for migrations, `set_build_info`, and Playwright — not bare `python`, so recycle-safe behavior is preserved when the venv path shifts.
+- **`collectstatic`** was removed from runtime `startup.sh` (commented with rationale): Oryx already collects static assets during deployment; repeating it at container start was redundant and contributed to long startups / timeouts (~10+ minutes in the worst case).
+- **Playwright Chromium** install in `startup.sh` is **gated** (move toward install-only-when-needed): if Playwright’s `.local-browsers` directory already exists under the deployed `antenv` layout, the script logs that binaries were found and skips install; otherwise it runs `install-deps` / `install chromium` as before.
+- **ORM / Playwright boundary** at the application layer is unchanged: database reads/writes stay **outside** `sync_playwright()` for mssql on App Service (documented in `AGENTS.md` and service code). Platform startup only affects **whether** Chromium is present, not that rule.
+- **Disk hygiene:** when `/home/site/repository/sales/temp` exists (Azure deploy layout), startup **removes contents** of `sales/temp/*` so unbounded import/fetch leftovers cannot fill the site volume (current usage has been healthy at ~511MB, but the guard prevents future storage-related incidents).
+
+After deploy, Azure Log Stream should show `Playwright binaries found. Skipping install.` on warm paths; target healthy availability is **under ~2 minutes** once the build artifact and migrations are warm (verify per environment). Portal setting **`SCM_DO_BUILD_DURING_DEPLOYMENT=true`** is required so Oryx performs the deployment build; see `sales/DIBBS_System_Spec.md` §2.4 for GCC High and build-time notes.

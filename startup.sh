@@ -11,24 +11,36 @@ fi
 
 echo "[startup] Using Python: $PYTHON_EXE"
 
+# Cap import/fetch temp growth on the deployed site volume (Azure layout).
+if [ -d "/home/site/repository/sales/temp" ]; then
+  echo "[startup] Pruning /home/site/repository/sales/temp/*"
+  rm -rf /home/site/repository/sales/temp/* 2>/dev/null || true
+fi
+
 # Optional: activate a venv if provided by the platform
 # [ -f venv/bin/activate ] && source venv/bin/activate || true
 
-echo "[startup] Collectstatic (skip with DISABLE_COLLECTSTATIC=1)"
-if [ "${DISABLE_COLLECTSTATIC:-0}" != "1" ]; then
-  $PYTHON_EXE manage.py collectstatic --noinput || true
-fi
+# collectstatic: handled by Oryx during deployment — do not run here (redundant and risks startup timeout).
+# To force a one-off runtime collectstatic, run manually or re-enable below with care.
+# echo "[startup] Collectstatic (skip with DISABLE_COLLECTSTATIC=1)"
+# if [ "${DISABLE_COLLECTSTATIC:-0}" != "1" ]; then
+#   $PYTHON_EXE manage.py collectstatic --noinput || true
+# fi
 
 echo "[startup] Running migrations (with --fake-initial safety)"
 # First try a normal migrate but allow fake-initial to mark initial migration as applied
 $PYTHON_EXE manage.py migrate --noinput --fake-initial || true
 
 # Playwright: required for DIBBS fetch (headless browser). Skip if DISABLE_PLAYWRIGHT=1.
-# On Azure App Service Linux, install-deps may need to run in the build step (e.g. in a custom Dockerfile).
+# Gate install on existing browsers — full install on every cold start delays container readiness.
 if [ "${DISABLE_PLAYWRIGHT:-0}" != "1" ]; then
-  echo "[startup] Installing Playwright Chromium (for DIBBS fetch)"
-  $PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
-  $PYTHON_EXE -m playwright install chromium || true
+  if [ ! -d "/home/site/wwwroot/antenv/lib/python3.10/site-packages/playwright/driver/package/.local-browsers" ]; then
+    echo "[startup] Playwright binaries missing. Installing..."
+    $PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
+    $PYTHON_EXE -m playwright install chromium || true
+  else
+    echo "[startup] Playwright binaries found. Skipping install."
+  fi
 fi
 
 # Optional emergency toggle: reset only the reports app migrations at runtime (non-destructive/fake)

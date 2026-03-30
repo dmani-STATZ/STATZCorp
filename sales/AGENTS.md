@@ -22,6 +22,13 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ## 3. Read This Before Editing
 
+- **Azure App Service environments are ephemeral.** Always **discover the Python path dynamically** in shell scripts (e.g. resolve `PYTHON_EXE` from the Oryx `antenv` layout) rather than calling raw `python` or assuming a fixed `/tmp/antenv` path. Fixed paths after platform recycle or image updates can cause **container crash loops**.
+
+### Performance — Azure / container startup
+
+- **Oryx handles `collectstatic` during deployment build.** Redundant `collectstatic` invocations in **`startup.sh`** must be avoided so cold starts stay **under ~2 minutes** (repeat static collection previously contributed to **~10-minute** startups and health-check timeouts).
+- **Never run full binary installations (like Playwright) in `startup.sh` without first checking for existing files.** Unconditional `playwright install` on every container start significantly delays availability; gate on the presence of cached driver/browser paths (or install during the build image/Oryx phase instead).
+
 ### Before changing models
 - Read the relevant `sales/models/*.py` file.
 - Check `sales/migrations/` for the highest migration and existing constraints (includes `NoQuoteCAGE` / `0018_no_quote_cage` or later).
