@@ -1,17 +1,16 @@
 """
 Fetch DIBBS daily files from DLA.
 
-Strategy (aligned with downloader_v21):
-
 Phase 1 — Discovery (requests against www.dibbs.bsm.dla.mil)
-  Accept the DoD warning and scrape RFQDates.aspx for current IN and BQ zip hrefs
-  for the target date. Optional: if urls are passed in, skip discovery.
+  Accept the DoD warning and scrape RFQDates.aspx for IN (.txt) and BQ (.zip) hrefs
+  per date. Optional: if urls are passed in, skip discovery.
 
 Phase 2 — Download (Playwright against dibbs2.bsm.dla.mil)
   1. Visit dodwarning.aspx?goto=/
   2. Click OK once to establish the dibbs2 session (consent cookie set in browser)
   3. In that same context, navigate to the IN file URL and capture download
-  4. Navigate to the BQ zip URL, capture download, extract bq + as .txt
+  4. Navigate to the BQ zip URL, capture download, extract bq + as .txt from the zip
+     (AS approved-source text is inside the BQ zip, not a separate CA archive).
 
 Returns local paths for the import pipeline. Caller is responsible for cleanup
 of tmp_dir after import (existing cleanup in import_step_match).
@@ -38,7 +37,8 @@ RFQ_DATES_URL = f"{DIBBS_MAIN}/RFQ/RFQDates.aspx?category=recent"
 DIBBS2_WARNING_URL = f"{DIBBS2_MAIN}/dodwarning.aspx?goto=/"
 
 DEFAULT_TIMEOUT = 30
-REQUEST_TIMEOUT_MS = 30_000
+# Playwright navigation / download waits (GCC High latency)
+REQUEST_TIMEOUT_MS = 60_000
 
 
 class DibbsFetchError(Exception):
@@ -75,7 +75,7 @@ def _make_www_session() -> requests.Session:
 
 
 def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
-    """Return {"260312": {"in": "...", "bq": "...", "ca": "..."}, ...}; ca optional per tag."""
+    """Return {"260312": {"in": "...", "bq": "..."}, ...} — IN txt + BQ zip only."""
     resp = session.get(RFQ_DATES_URL, timeout=DEFAULT_TIMEOUT)
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -91,10 +91,6 @@ def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
             fname = href_l.rsplit("/", 1)[-1].split("?")[0]
             tag = fname[2:8]
             result.setdefault(tag, {})["bq"] = href
-        elif "/downloads/rfq/archive/ca" in href_l and href_l.endswith(".zip"):
-            fname = href_l.rsplit("/", 1)[-1].split("?")[0]
-            tag = fname[2:8]
-            result.setdefault(tag, {})["ca"] = href
     return result
 
 
@@ -253,9 +249,10 @@ def fetch_dibbs_archive_files(
 
         browser.close()
 
-    # Extract zip → bq + as
+    # Extract bq{tag}.zip → BQ + AS .txt (AS is packaged inside the BQ zip)
     bq_name = as_name = None
     bq_path = as_path = None
+    members: list[str] = []
     with zipfile.ZipFile(zip_path, "r") as zf:
         members = zf.namelist()
         for member in members:
@@ -265,7 +262,7 @@ def fetch_dibbs_archive_files(
                 as_name = Path(member).name
                 as_path = tmp / as_name
                 as_path.write_bytes(data)
-                logger.info("Extracted %s", as_name)
+                logger.info("Extracted AS from BQ zip: %s", as_name)
             elif name_l.startswith("bq") and name_l.endswith(".txt"):
                 bq_name = Path(member).name
                 bq_path = tmp / bq_name
@@ -275,7 +272,7 @@ def fetch_dibbs_archive_files(
 
     if not bq_path or not as_path:
         raise DibbsFetchError(
-            f"Zip did not contain expected BQ and AS .txt files. Found: {members}"
+            f"BQ zip did not contain expected BQ and AS .txt files. Members: {members}"
         )
 
     return {
@@ -287,91 +284,3 @@ def fetch_dibbs_archive_files(
         "bq_file_name": bq_name or f"bq{tag}.txt",
         "as_file_name": as_name or f"as{tag}.txt",
     }
-
-
-def fetch_ca_zip(ca_url: str) -> Optional[bytes]:
-    """
-    Download the DIBBS CA zip for a given date.
-
-    Returns raw zip bytes, or None on failure.
-    Opens and closes its own Playwright browser session.
-    Uses the same DoD consent bypass as fetch_dibbs_archive_files().
-    """
-    try:
-        from playwright.sync_api import Error as PlaywrightError
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        logger.exception("Playwright not installed")
-        return None
-
-    try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
-            )
-            try:
-                context = browser.new_context(accept_downloads=True)
-                session_page = context.new_page()
-                try:
-                    _establish_dibbs2_session(session_page)
-                finally:
-                    try:
-                        session_page.close()
-                    except Exception:
-                        pass
-
-                page = None
-                try:
-                    page = context.new_page()
-                    with page.expect_download(timeout=120_000) as dl_info:
-                        try:
-                            page.goto(
-                                ca_url, wait_until="commit", timeout=120_000
-                            )
-                        except PlaywrightError as exc:
-                            msg = str(exc)
-                            if (
-                                "Download is starting" in msg
-                                or "ERR_ABORTED" in msg
-                            ):
-                                logger.info(
-                                    "CA zip triggered browser download "
-                                    "(navigation aborted)"
-                                )
-                            else:
-                                raise
-                        except Exception:
-                            pass
-                    download = dl_info.value
-                    path = download.path()
-                    if path is None:
-                        logger.warning(
-                            "CA zip download path is None for %s", ca_url
-                        )
-                        return None
-                    body = path.read_bytes()
-                    if not body:
-                        logger.warning("Empty CA zip download for %s", ca_url)
-                        return None
-                    logger.info(
-                        "Fetched CA zip (%d bytes) from %s", len(body), ca_url
-                    )
-                    return body
-                except Exception as e:
-                    logger.exception("fetch_ca_zip(%s) failed: %s", ca_url, e)
-                    return None
-                finally:
-                    if page is not None:
-                        try:
-                            page.close()
-                        except Exception:
-                            pass
-            finally:
-                try:
-                    browser.close()
-                except Exception:
-                    pass
-    except Exception as e:
-        logger.exception("fetch_ca_zip outer failure: %s", e)
-        return None

@@ -800,9 +800,8 @@ def solicitation_reparse(request, sol_number):
     pack_saved = save_sol_packaging(key, pack)
 
     now = timezone.now()
-    if hist_saved > 0 or pack_saved:
-        sol.pdf_data_pulled = now
-        sol.save(update_fields=["pdf_data_pulled"])
+    sol.pdf_data_pulled = now
+    sol.save(update_fields=["pdf_data_pulled"])
 
     return JsonResponse(
         {

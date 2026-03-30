@@ -1,12 +1,12 @@
 # Confirmed interfaces (read from source before writing):
 # - run_import() signature: run_import(in_file, bq_file, as_file, imported_by: str) -> dict
-#   Import date is taken inside run_import from _import_date_from_filename(in_file.name), not a parameter.
 # - fetch_dibbs_archive_files() returns: dict with tmp_dir, in_path, bq_path, as_path,
 #   in_file_name, bq_file_name, as_file_name (str paths / names).
-# - ImportBatch: stores import_date (DateField); no error_message or status field — reconciliation
-#   treats any existing ImportBatch row for a calendar date as "already imported."
-# - _scrape_rfq_hrefs() returns: dict[str, dict[str, str]] keyed by YYMMDD tag (e.g. "260327")
-#   with optional "in", "bq", and "ca" URL keys per tag (only "in"/"bq" required for import).
+# - ImportBatch: stores import_date (DateField); reconciliation treats any existing row
+#   for a calendar date as "already imported."
+# - Three-phase nightly flow: Loop A (metadata + run_import per missing date),
+#   Loop B (set-aside PDF blob harvest, Playwright batches of 10),
+#   Loop C (parse pdf_blob → procurement history + packaging; ORM only, after all B sessions).
 import logging
 import os
 import shutil
@@ -18,9 +18,14 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+HARVEST_BATCH_SIZE = 10
+
 
 class Command(BaseCommand):
-    help = "Reconcile and auto-import missing DIBBS daily files (IN/BQ/AS)."
+    help = (
+        "Three-phase DIBBS auto-import: IN/BQ/AS daily import, set-aside PDF harvest, "
+        "local PDF parse backlog."
+    )
 
     def handle(self, *args, **options):
         from sales.services.dibbs_fetch import (
@@ -30,12 +35,12 @@ class Command(BaseCommand):
             fetch_dibbs_archive_files,
         )
         from sales.models import ImportBatch, Solicitation
-        from sales.services.dibbs_pdf import fetch_pdfs_for_sols, persist_pdf_procurement_extract
+        from sales.services.dibbs_pdf import fetch_pdfs_for_sols, parse_pdf_data_backlog
         from sales.services.importer import run_import
 
         self.stdout.write(f"[{timezone.now().isoformat()}] auto_import_dibbs starting...")
 
-        # Phase 1: Discovery (requests only)
+        # Discovery (requests only — no Playwright)
         try:
             session = _make_www_session()
             available = _scrape_rfq_hrefs(session)
@@ -47,7 +52,6 @@ class Command(BaseCommand):
 
         self.stdout.write(f"DIBBS has {len(available)} available date tags.")
 
-        # Phase 2: Reconciliation (pure ORM, no Playwright)
         imported_dates = set(
             ImportBatch.objects.values_list("import_date", flat=True).distinct()
         )
@@ -65,17 +69,18 @@ class Command(BaseCommand):
 
         work_list.sort(key=lambda x: x[0])
 
-        if not work_list:
-            self.stdout.write("auto_import_dibbs: all dates current, nothing to import.")
-            return
-
-        self.stdout.write(f"Dates to import: {[str(d) for d, _, _ in work_list]}")
-
-        # Phase 3: Fetch IN/BQ/AS and import. Phase 4 (per date): set-aside sols only —
-        # one Playwright session (fetch_pdfs_for_sols), then ORM parse/save (boundary rule).
         failures = []
+
+        # Loop A — metadata & core import (IN/BQ/AS → run_import)
+        if work_list:
+            self.stdout.write(
+                f"Loop A: dates to import — {[str(d) for d, _, _ in work_list]}"
+            )
+        else:
+            self.stdout.write("Loop A: all DIBBS dates already have an ImportBatch.")
+
         for import_date, tag, _hrefs in work_list:
-            self.stdout.write(f"  Processing {import_date} (tag {tag})...")
+            self.stdout.write(f"  Loop A — {import_date} (tag {tag})...")
             tmp_dir = None
             try:
                 result = fetch_dibbs_archive_files(target_date=import_date)
@@ -93,40 +98,9 @@ class Command(BaseCommand):
                 sol_count = summary.get("solicitation_count", 0)
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"  {import_date}: imported successfully — {sol_count} solicitations"
+                        f"  {import_date}: imported — {sol_count} solicitations"
                     )
                 )
-
-                sol_keys = list(
-                    Solicitation.objects.filter(
-                        import_date=import_date,
-                        pdf_data_pulled__isnull=True,
-                    )
-                    .exclude(small_business_set_aside="N")
-                    .values_list("solicitation_number", flat=True)
-                )
-                sol_keys = [s.strip().upper() for s in sol_keys if s]
-
-                if not sol_keys:
-                    self.stdout.write(
-                        f"  {import_date}: no set-aside sols need PDF procurement extract, skipping."
-                    )
-                else:
-                    self.stdout.write(
-                        f"  {import_date}: fetching {len(sol_keys)} set-aside PDF(s) "
-                        f"(single Playwright session)..."
-                    )
-                    pdf_map = fetch_pdfs_for_sols(sol_keys)
-                    got = sum(1 for b in pdf_map.values() if b)
-                    for key in sol_keys:
-                        body = pdf_map.get(key)
-                        if body:
-                            persist_pdf_procurement_extract(key, body)
-                    self.stdout.write(
-                        f"  {import_date}: PDF phase complete — "
-                        f"{got} fetched, {len(sol_keys) - got} missing/failed "
-                        f"(procurement extract applied for successful downloads)."
-                    )
             except DibbsFetchError as e:
                 logger.error("auto_import_dibbs fetch failed for %s: %s", import_date, e)
                 self.stdout.write(
@@ -143,14 +117,89 @@ class Command(BaseCommand):
                 if tmp_dir:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        # Failure alert (import/fetch failures only — PDF misses for set-asides are logged above)
+        # Loop B — harvest PDF blobs for set-aside sols (fresh browser every 10 PDFs)
+        self.stdout.write(
+            "Loop B: harvesting set-aside PDF blobs (Playwright batches of 10)..."
+        )
+        harvested = self._harvest_set_aside_pdf_blobs()
+        self.stdout.write(
+            self.style.SUCCESS(f"Loop B: finished harvest cycle ({harvested} batch(es))")
+        )
+
+        # Loop C — local parse only; all Playwright from Loop B is closed
+        self.stdout.write("Loop C: parsing stored PDFs (procurement history + packaging)...")
+        n_parsed = parse_pdf_data_backlog(lambda m: self.stdout.write(m))
+        self.stdout.write(
+            self.style.SUCCESS(f"Loop C: processed {n_parsed} solicitation(s).")
+        )
+
         if failures:
             self._send_alert(failures)
 
         ok = len(work_list) - len(failures)
         self.stdout.write(
-            f"auto_import_dibbs complete: {ok} succeeded, {len(failures)} failed."
+            f"auto_import_dibbs complete: Loop A {ok}/{len(work_list)} date(s) imported, "
+            f"{len(failures)} failed."
         )
+
+    def _harvest_set_aside_pdf_blobs(self) -> int:
+        """
+        Set-aside sols with no pdf_blob: fetch in batches of HARVEST_BATCH_SIZE,
+        one Playwright session per batch. ORM updates only after each session returns.
+        """
+        from sales.models import Solicitation
+        from sales.services.dibbs_pdf import fetch_pdfs_for_sols
+
+        batches = 0
+        while True:
+            batch = list(
+                Solicitation.objects.filter(
+                    pdf_blob__isnull=True,
+                    pdf_fetch_attempts__lt=5,
+                    pdf_data_pulled__isnull=True,
+                )
+                .exclude(small_business_set_aside="N")
+                .order_by("solicitation_number")
+                .values_list("solicitation_number", "pdf_fetch_attempts")[
+                    :HARVEST_BATCH_SIZE
+                ]
+            )
+            if not batch:
+                break
+
+            batches += 1
+            sol_numbers = [
+                (s[0] or "").strip().upper() for s in batch if (s[0] or "").strip()
+            ]
+            attempts_map = {
+                (s[0] or "").strip().upper(): s[1] for s in batch if (s[0] or "").strip()
+            }
+            if not sol_numbers:
+                break
+
+            pdf_map = fetch_pdfs_for_sols(sol_numbers)
+
+            now = timezone.now()
+            for key in sol_numbers:
+                body = pdf_map.get(key)
+                if body:
+                    Solicitation.objects.filter(solicitation_number=key).update(
+                        pdf_blob=body,
+                        pdf_fetched_at=now,
+                        pdf_fetch_status="DONE",
+                    )
+                else:
+                    prev = attempts_map.get(key, 0)
+                    new_att = prev + 1
+                    upd = {
+                        "pdf_fetch_status": "FAILED",
+                        "pdf_fetch_attempts": new_att,
+                    }
+                    if new_att >= 5:
+                        upd["pdf_data_pulled"] = now
+                    Solicitation.objects.filter(solicitation_number=key).update(**upd)
+
+        return batches
 
     def _send_alert(self, failures):
         """Send consolidated failure alert via Graph mail if configured."""

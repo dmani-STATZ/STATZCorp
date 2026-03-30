@@ -28,14 +28,19 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
-from django.db import transaction
+from django.db import connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 DIBBS2_MAIN = "https://dibbs2.bsm.dla.mil"
 DIBBS2_WARNING_URL = f"{DIBBS2_MAIN}/dodwarning.aspx?goto=/"
-REQUEST_TIMEOUT_MS = 30_000
+# Match dibbs_fetch — GCC High / slow DIBBS responses
+REQUEST_TIMEOUT_MS = 60_000
+
+# Chunk size for procurement-history bulk SQL (SQL Server parameter limits)
+AW_CHUNK = 100
 
 
 def _pdf_url(sol_number: str) -> str:
@@ -576,10 +581,9 @@ def save_procurement_history(rows: List[Dict]) -> int:
     """
     Upsert procurement history rows into dibbs_nsn_procurement_history.
 
-    - New rows: insert with first_seen_sol = last_seen_sol = sol_number
-    - Existing rows (matched on nsn + contract_number):
-        update last_seen_sol and extracted_at only.
-        Price/quantity data is historical fact — never overwritten.
+    - New rows: INSERT via raw executemany (%s) — avoids django-mssql-backend
+      OUTPUT INSERTED.id on bulk paths.
+    - Existing rows (nsn + contract_number): UPDATE last_seen_sol and extracted_at only.
 
     Returns count of rows inserted or updated.
     """
@@ -589,27 +593,78 @@ def save_procurement_history(rows: List[Dict]) -> int:
     from sales.models import NsnProcurementHistory
 
     now = timezone.now()
-    count = 0
 
-    with transaction.atomic():
-        for row in rows:
-            row = dict(row)
-            sol = row.pop("sol_number")
-            obj, created = NsnProcurementHistory.objects.get_or_create(
-                nsn=row["nsn"],
-                contract_number=row["contract_number"],
-                defaults={
-                    **row,
-                    "first_seen_sol": sol,
-                    "last_seen_sol": sol,
-                    "extracted_at": now,
-                },
+    # Dedupe by (nsn, contract_number); last row wins
+    by_key: Dict[tuple, Dict] = {}
+    for raw in rows:
+        r = dict(raw)
+        sol = (r.pop("sol_number", None) or "").strip().upper()
+        key = (r["nsn"], r["contract_number"])
+        by_key[key] = {**r, "_sol": sol}
+
+    keys = list(by_key.keys())
+    existing: set[tuple] = set()
+    for i in range(0, len(keys), AW_CHUNK):
+        chunk = keys[i : i + AW_CHUNK]
+        q = Q()
+        for nsn, cn in chunk:
+            q |= Q(nsn=nsn, contract_number=cn)
+        for tup in NsnProcurementHistory.objects.filter(q).values_list(
+            "nsn", "contract_number"
+        ):
+            existing.add(tup)
+
+    insert_params: List[tuple] = []
+    update_params: List[tuple] = []
+
+    for (nsn, cn), data in by_key.items():
+        sol = data["_sol"]
+        row = {k: v for k, v in data.items() if k != "_sol"}
+        if (nsn, cn) in existing:
+            update_params.append((sol, now, nsn, cn))
+        else:
+            sm = 1 if row.get("surplus_material") else 0
+            insert_params.append(
+                (
+                    row["nsn"],
+                    row["fsc"],
+                    row["cage_code"],
+                    row["contract_number"],
+                    row["quantity"],
+                    row["unit_cost"],
+                    row["award_date"],
+                    sm,
+                    sol,
+                    sol,
+                    now,
+                )
             )
-            if not created:
-                obj.last_seen_sol = sol
-                obj.extracted_at = now
-                obj.save(update_fields=["last_seen_sol", "extracted_at"])
-            count += 1
+
+    insert_sql = """
+        INSERT INTO dibbs_nsn_procurement_history (
+            nsn, fsc, cage_code, contract_number, quantity, unit_cost,
+            award_date, surplus_material, first_seen_sol, last_seen_sol, extracted_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    update_sql = """
+        UPDATE dibbs_nsn_procurement_history
+        SET last_seen_sol = %s, extracted_at = %s
+        WHERE nsn = %s AND contract_number = %s
+    """
+
+    count = 0
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            for i in range(0, len(insert_params), AW_CHUNK):
+                batch = insert_params[i : i + AW_CHUNK]
+                if batch:
+                    cursor.executemany(insert_sql, batch)
+                    count += len(batch)
+            for i in range(0, len(update_params), AW_CHUNK):
+                batch = update_params[i : i + AW_CHUNK]
+                if batch:
+                    cursor.executemany(update_sql, batch)
+                    count += len(batch)
 
     return count
 
@@ -619,6 +674,9 @@ def persist_pdf_procurement_extract(sol_number: str, pdf_bytes: Optional[bytes])
     Parse procurement history and Section D from PDF bytes, save to DB, set
     Solicitation.pdf_data_pulled. Call only after any Playwright session has fully
     exited (Azure mssql + sync_playwright ORM boundary).
+
+    Always sets pdf_data_pulled when pdf_bytes is non-empty, even if parsers find
+    no rows or raise (record is marked processed).
     """
     if not pdf_bytes:
         return
@@ -627,31 +685,63 @@ def persist_pdf_procurement_extract(sol_number: str, pdf_bytes: Optional[bytes])
     now = timezone.now()
 
     try:
-        history_rows = parse_procurement_history(pdf_bytes, key)
-        saved = save_procurement_history(history_rows)
-        logger.info(
-            "persist_pdf_procurement_extract(%s): parsed %d rows, saved %d",
-            key,
-            len(history_rows),
-            saved,
-        )
-    except Exception as e:
-        logger.exception(
-            "persist_pdf_procurement_extract(%s): procurement history failed: %s",
-            key,
-            e,
-        )
-        return
+        try:
+            history_rows = parse_procurement_history(pdf_bytes, key)
+            saved = save_procurement_history(history_rows)
+            logger.info(
+                "persist_pdf_procurement_extract(%s): parsed %d rows, saved %d",
+                key,
+                len(history_rows),
+                saved,
+            )
+        except Exception as e:
+            logger.exception(
+                "persist_pdf_procurement_extract(%s): procurement history failed: %s",
+                key,
+                e,
+            )
 
-    try:
-        pack = parse_packaging_from_pdf(pdf_bytes, key)
-        if save_sol_packaging(key, pack):
-            logger.info("persist_pdf_procurement_extract(%s): saved SolPackaging", key)
-    except Exception as e:
-        logger.exception(
-            "persist_pdf_procurement_extract(%s): packaging failed: %s", key, e
+        try:
+            pack = parse_packaging_from_pdf(pdf_bytes, key)
+            if save_sol_packaging(key, pack):
+                logger.info(
+                    "persist_pdf_procurement_extract(%s): saved SolPackaging", key
+                )
+        except Exception as e:
+            logger.exception(
+                "persist_pdf_procurement_extract(%s): packaging failed: %s", key, e
+            )
+    finally:
+        from sales.models import Solicitation
+
+        Solicitation.objects.filter(solicitation_number=key).update(
+            pdf_data_pulled=now
         )
 
+
+def parse_pdf_data_backlog(log=None) -> int:
+    """
+    Phase 3 / factory: process solicitations with a stored PDF but no extract
+    timestamp. No Playwright — safe to run only after all harvest sessions are closed.
+    """
     from sales.models import Solicitation
 
-    Solicitation.objects.filter(solicitation_number=key).update(pdf_data_pulled=now)
+    qs = (
+        Solicitation.objects.filter(
+            pdf_blob__isnull=False,
+            pdf_data_pulled__isnull=True,
+        )
+        .order_by("solicitation_number")
+        .values_list("solicitation_number", "pdf_blob")
+    )
+
+    n = 0
+    for sol_number, blob in qs.iterator(chunk_size=50):
+        if not blob:
+            continue
+        key = (sol_number or "").strip().upper()
+        persist_pdf_procurement_extract(key, bytes(blob))
+        n += 1
+        if log:
+            log(f"  parse backlog: {key}")
+    return n

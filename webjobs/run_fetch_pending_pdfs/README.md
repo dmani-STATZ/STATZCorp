@@ -1,43 +1,41 @@
 # run_fetch_pending_pdfs WebJob
 
-Fetches pending DIBBS solicitation PDFs for all solicitations where
-`pdf_fetch_status = PENDING` and `pdf_fetch_attempts < 5`.
+**Status:** **Deprecated** as the default high-frequency scheduled job. Nightly
+`auto_import_dibbs` now runs **Loop B** (set-aside PDF harvest, batches of 10
+with a fresh Playwright session per batch) and **Loop C** (`parse_pdf_data_backlog`)
+for procurement history and packaging.
 
-Opens a single shared Playwright browser session, fetches all pending PDFs,
-saves blobs to `Solicitation.pdf_blob`, and runs procurement history parsing
-into `dibbs_nsn_procurement_history`.
+This WebJob / command remains useful for **manual** runs or a **light** schedule
+when you need to fetch PDFs for **RFQ-queue** solicitations (`PENDING` /
+`FAILED`, `pdf_fetch_attempts < 5`, `pdf_data_pulled` null) that are not covered
+by the nightly set-aside harvest.
 
+## Behavior
 
-## Schedule
+- Fetches up to **10** pending sols per Playwright session (browser fully closed
+  between batches).
+- Saves `pdf_blob`, `pdf_fetched_at`, `pdf_fetch_status` on success; increments
+  attempts and sets `FAILED` on failure; sets `pdf_data_pulled` on the **fifth**
+  failure (no blob) to stop infinite retries.
+- After **all** fetch batches complete, runs **`parse_pdf_data_backlog()`** so
+  parsing happens with **no** ORM inside `sync_playwright()`.
 
-Triggered WebJob — runs every 5 minutes during office hours.
-CRON schedule configured in Azure portal: `0 */5 10-20 * * *`
-(Every 5 minutes, 7am–7pm UTC — adjust to match CT office hours if needed)
+## Schedule (if still deployed)
 
+If you keep this WebJob, use a low-frequency CRON or on-demand trigger only —
+not every five minutes.
 
 ## Azure Setup
 
 1. Deploy the app so this folder is present at:
-&#x20;  `/home/site/wwwroot/webjobs/run_fetch_pending_pdfs/`
+   `/home/site/wwwroot/webjobs/run_fetch_pending_pdfs/`
 2. In Azure Portal → App Service → WebJobs → Add:
-&#x20;  - Name: `run_fetch_pending_pdfs`
-&#x20;  - File upload: zip of this folder containing `run.sh`
-&#x20;  - Type: Triggered
-&#x20;  - Triggers: Scheduled
-&#x20;  - CRON expression: `0 */5 7-19 * * *`
-
-
-
-## Retry behavior
-
-Sols that fail fetch have `pdf_fetch_attempts` incremented.
-After 5 failed attempts the sol is permanently skipped until
-`pdf_fetch_attempts` is manually reset to 0 by staff.
-
-
+   - Name: `run_fetch_pending_pdfs`
+   - File upload: zip of this folder containing `run.sh`
+   - Type: Triggered
+   - Triggers: Scheduled (optional / infrequent)
 
 ## Dependencies
 
-Requires Playwright + Chromium installed on the App Service instance.
-Same Playwright dependency as `scrape_awards` and the manual PDF fetch.
-
+Requires Playwright + Chromium on the App Service instance (same as
+`scrape_awards` and `auto_import_dibbs`).
