@@ -171,10 +171,12 @@ def _process_records(
             return parse_result.award_date
 
     with transaction.atomic():
-        existing_keys = {
-            (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
+        # Build existing_keys in chunks to stay under SQL Server's 2100 parameter limit
+        existing_keys = {}
+        award_basic_numbers = [r.award_basic_number for r in award_rows]
+        for chunk in _chunked(award_basic_numbers, AW_CHUNK):
             for obj in DibbsAward.objects.filter(
-                award_basic_number__in=[r.award_basic_number for r in award_rows]
+                award_basic_number__in=chunk
             ).only(
                 "id",
                 "award_basic_number",
@@ -182,8 +184,9 @@ def _process_records(
                 "nsn",
                 "is_faux",
                 "notice_id",
-            )
-        }
+            ):
+                key = (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or "")
+                existing_keys[key] = obj
 
         to_create_awards = []
         to_update_faux = []
@@ -280,12 +283,14 @@ def _process_records(
             updated_faux_count = len(to_update_faux)
 
         if mod_rows:
-            existing_mod_awards = {
-                (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
+            existing_mod_awards = {}
+            mod_basic_numbers = [r.award_basic_number for r in mod_rows]
+            for chunk in _chunked(mod_basic_numbers, AW_CHUNK):
                 for obj in DibbsAward.objects.filter(
-                    award_basic_number__in=[r.award_basic_number for r in mod_rows]
-                ).only("id", "award_basic_number", "delivery_order_number", "nsn")
-            }
+                    award_basic_number__in=chunk
+                ).only("id", "award_basic_number", "delivery_order_number", "nsn"):
+                    key = (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or "")
+                    existing_mod_awards[key] = obj
 
             existing_mod_dedup = set(
                 DibbsAwardMod.objects.filter(

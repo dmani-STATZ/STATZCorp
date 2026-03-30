@@ -6,7 +6,7 @@
 # - ImportBatch: stores import_date (DateField); no error_message or status field — reconciliation
 #   treats any existing ImportBatch row for a calendar date as "already imported."
 # - _scrape_rfq_hrefs() returns: dict[str, dict[str, str]] keyed by YYMMDD tag (e.g. "260327")
-#   with optional "in", "bq", and "ca" URL keys per tag.
+#   with optional "in", "bq", and "ca" URL keys per tag (only "in"/"bq" required for import).
 import logging
 import os
 import shutil
@@ -29,7 +29,8 @@ class Command(BaseCommand):
             _scrape_rfq_hrefs,
             fetch_dibbs_archive_files,
         )
-        from sales.models import ImportBatch
+        from sales.models import ImportBatch, Solicitation
+        from sales.services.dibbs_pdf import fetch_pdfs_for_sols, persist_pdf_procurement_extract
         from sales.services.importer import run_import
 
         self.stdout.write(f"[{timezone.now().isoformat()}] auto_import_dibbs starting...")
@@ -70,10 +71,10 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Dates to import: {[str(d) for d, _, _ in work_list]}")
 
-        # Phase 3: Fetch IN/BQ/AS and import; Phase 4 (per date): CA zip via fetch_ca_zip
-        # then parse_ca_zip (ORM only). Playwright does not overlap ORM.
+        # Phase 3: Fetch IN/BQ/AS and import. Phase 4 (per date): set-aside sols only —
+        # one Playwright session (fetch_pdfs_for_sols), then ORM parse/save (boundary rule).
         failures = []
-        for import_date, tag, hrefs in work_list:
+        for import_date, tag, _hrefs in work_list:
             self.stdout.write(f"  Processing {import_date} (tag {tag})...")
             tmp_dir = None
             try:
@@ -96,47 +97,36 @@ class Command(BaseCommand):
                     )
                 )
 
-                ca_url = hrefs.get("ca")
-                if not ca_url:
+                sol_keys = list(
+                    Solicitation.objects.filter(
+                        import_date=import_date,
+                        pdf_data_pulled__isnull=True,
+                    )
+                    .exclude(small_business_set_aside="N")
+                    .values_list("solicitation_number", flat=True)
+                )
+                sol_keys = [s.strip().upper() for s in sol_keys if s]
+
+                if not sol_keys:
                     self.stdout.write(
-                        f"  {import_date}: no CA zip href found, skipping."
+                        f"  {import_date}: no set-aside sols need PDF procurement extract, skipping."
                     )
                 else:
                     self.stdout.write(
-                        f"  {import_date}: fetching CA zip from {ca_url}..."
+                        f"  {import_date}: fetching {len(sol_keys)} set-aside PDF(s) "
+                        f"(single Playwright session)..."
                     )
-                    try:
-                        from sales.services.ca_parser import parse_ca_zip
-                        from sales.services.dibbs_fetch import fetch_ca_zip
-
-                        ca_bytes = fetch_ca_zip(ca_url)
-
-                        if ca_bytes:
-                            self.stdout.write(
-                                f"  {import_date}: CA zip fetched ({len(ca_bytes)} bytes), parsing..."
-                            )
-                            ca_result = parse_ca_zip(ca_bytes, import_date)
-                            self.stdout.write(
-                                f"  {import_date}: CA zip complete — "
-                                f"{ca_result['parsed']} parsed, "
-                                f"{ca_result['history_rows_saved']} history rows, "
-                                f"{ca_result['skipped_already_pulled']} skipped, "
-                                f"{ca_result['no_match']} no match, "
-                                f"{ca_result['errors']} errors"
-                            )
-                        else:
-                            self.stdout.write(
-                                f"  {import_date}: CA zip fetch returned no data."
-                            )
-                            failures.append(
-                                (import_date, "CA zip fetch returned no data")
-                            )
-
-                    except Exception as e:
-                        self.stdout.write(
-                            f"  {import_date}: CA zip processing failed: {e}"
-                        )
-                        failures.append((import_date, f"CA zip error: {e}"))
+                    pdf_map = fetch_pdfs_for_sols(sol_keys)
+                    got = sum(1 for b in pdf_map.values() if b)
+                    for key in sol_keys:
+                        body = pdf_map.get(key)
+                        if body:
+                            persist_pdf_procurement_extract(key, body)
+                    self.stdout.write(
+                        f"  {import_date}: PDF phase complete — "
+                        f"{got} fetched, {len(sol_keys) - got} missing/failed "
+                        f"(procurement extract applied for successful downloads)."
+                    )
             except DibbsFetchError as e:
                 logger.error("auto_import_dibbs fetch failed for %s: %s", import_date, e)
                 self.stdout.write(
@@ -153,7 +143,7 @@ class Command(BaseCommand):
                 if tmp_dir:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        # Failure alert (after Phase 4 CA zip per date)
+        # Failure alert (import/fetch failures only — PDF misses for set-asides are logged above)
         if failures:
             self._send_alert(failures)
 

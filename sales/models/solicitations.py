@@ -2,6 +2,7 @@
 Solicitation, SolicitationLine, ImportBatch — Section 3.1.
 Tables: dibbs_solicitation, dibbs_solicitation_line, tbl_ImportBatch.
 """
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -61,6 +62,7 @@ class Solicitation(models.Model):
     STATUS_CHOICES = [
         ('New', 'New'),
         ('Active', 'Active'),
+        ('RESEARCH', 'Research'),
         ('Matching', 'Matching'),
         ('RFQ_PENDING', 'RFQ Pending'),
         ('RFQ_SENT', 'RFQ Sent'),
@@ -144,6 +146,27 @@ class Solicitation(models.Model):
             "either via CA zip or individual fetch."
         ),
     )
+
+    # Sol Review claim fields
+    review_claimed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='sol_review_claims',
+        db_column='review_claimed_by_id'
+    )
+    review_claimed_at = models.DateTimeField(null=True, blank=True)
+    review_claim_expires_at = models.DateTimeField(null=True, blank=True)
+
+    # Research queue fields
+    research_flagged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='research_flagged_sols',
+        db_column='research_flagged_by_id'
+    )
+    research_flagged_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_solicitation'

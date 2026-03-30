@@ -3342,18 +3342,20 @@ def dibbs_pdf_url(self):
 
 > **Background fetch pipeline:** `pdf_fetch_status` (`PENDING` / `FETCHING` / `DONE` / `FAILED`) and `pdf_fetch_attempts` on `Solicitation` drive automated PDF fetching. When a sol is added to the RFQ queue and has no blob, status is set to `PENDING`. The `fetch_pending_pdfs` management command (Azure WebJob, every five minutes, office hours) picks up all `PENDING` sols and retries `FAILED` sols with fewer than five attempts, fetches in one shared Playwright session, and saves blobs plus procurement history. Max five retry attempts per sol.
 
-> **`auto_import_dibbs` WebJob** — Runs at 2:00 AM CT daily. Reconciles DIBBS RFQDates.aspx against `ImportBatch` (dates without a batch row are queued; `ImportBatch` has no error/status column). Imports via `fetch_dibbs_archive_files()` + `run_import()` pipeline. Alerts `AWARDS_ALERT_EMAIL` on failure. Manual import remains available as fallback. Stale import banner shown on import page if latest batch is >1 day old.
+> **`auto_import_dibbs` WebJob** — Runs at 2:00 AM CT daily. Reconciles DIBBS RFQDates.aspx against `ImportBatch` (dates without a batch row are queued; `ImportBatch` has no error/status column). Imports via `fetch_dibbs_archive_files()` + `run_import()`. **Phase 4:** for each imported date, fetches individual solicitation PDFs in one shared Playwright session for **set-aside** rows only (`small_business_set_aside != 'N'`), skipping unrestricted (`N`) sols and rows that already have `pdf_data_pulled`; after the browser closes, runs procurement-history + Section D extraction and sets `pdf_data_pulled` (no `pdf_blob` stored). Alerts `AWARDS_ALERT_EMAIL` on IN/BQ/AS import/fetch failures. Manual import remains available as fallback. Stale import banner shown on import page if latest batch is >1 day old.
 
 > ⚠ **Note:** The original spec URL (`https://www.dibbs.bsm.dla.mil/Docs/RFQ/{filename}`) was incorrect. The live URL format uses `dibbs2.bsm.dla.mil/Downloads/RFQ/{last_char_of_sol_number}/{filename}` — subdirectory is derived from the last character of the solicitation number. Already corrected in production.
 
-**CA Zip Pipeline:** Nightly bulk procurement history extraction. `ca{yymmdd}.zip` on RFQDates.aspx contains SF-18 PDFs for all sols in that day's IN file, named by `pdf_file_name`. Downloaded by `fetch_ca_zip()` (Playwright), parsed by `parse_ca_zip()` (ORM). Lookup key is `Solicitation.pdf_file_name` (uppercase match). Sets `pdf_data_pulled` timestamp on processed sols. `fetch_pending_pdfs` skips these. Parse-and-discard — no blobs stored.
+**Automated procurement extract (nightly import):** The `auto_import_dibbs` WebJob no longer downloads the bulk `ca{yymmdd}.zip` archive. Instead, after each daily IN/BQ/AS import it targets **set-aside** solicitations for that `import_date`, downloads each SF-18 PDF individually via `fetch_pdfs_for_sols()` (one Playwright session per date), then applies `persist_pdf_procurement_extract` after the session ends (ORM boundary). Unrestricted sols (`small_business_set_aside == 'N'`) are skipped. **`parse_ca_zip()` / `fetch_ca_zip()`** remain in the codebase for optional or manual bulk processing if needed; they are not part of the scheduled import path.
+
+**In-app PDF viewer (Review Workbench):** The primary source for opening an RFQ PDF in the browser is the stored `Solicitation.pdf_blob` served by `solicitation_pdf_view` (`/sales/solicitations/<sol_number>/pdf/`, `Content-Disposition: inline`). If `pdf_blob` is empty, that view sets `pdf_fetch_status` to `FETCHING`, runs Playwright `fetch_pdf_for_sol`, persists the bytes, runs procurement-history and Section D packaging extraction, updates `pdf_fetched_at` / `pdf_data_pulled`, then returns the PDF. Outbound RFQ email bodies continue to use the direct DIBBS URL (`dibbs_pdf_url`) so suppliers still receive the government-hosted link.
 
 **In the RFQ email template**, include the link in the body:
 ```
 Solicitation PDF: https://dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/{pdf_filename}
 ```
 
-**In the app UI**, all "View PDF" buttons open this URL in a new tab.
+**In the app UI**, the Review Workbench **View RFQ PDF** control uses the `pdf_blob` route above (with on-demand fetch when missing). Other surfaces may still link to `dibbs_pdf_url` where a direct DIBBS tab is appropriate.
 
 ---
 
@@ -3361,9 +3363,9 @@ Solicitation PDF: https://dibbs2.bsm.dla.mil/Downloads/RFQ/{subdir}/{pdf_filenam
 
 | Question | Decision | Rationale |
 |---|---|---|
-| Where do PDFs live? | On DIBBS servers — store only the filename | Zero storage cost, always authoritative, no sync problems |
+| Where do PDFs live? | On DIBBS servers for supplier-facing links; in-app viewing uses `pdf_blob` when fetched | Email uses authoritative DIBBS URL; workbench can cache bytes for parsing and inline display |
 | How do suppliers get the PDF? | Direct DIBBS link included in RFQ email body | Simple, reliable; supplier gets it from the official government source |
-| How do salespeople view PDFs? | "View on DIBBS" button opens URL in new tab | Same approach — no storage needed anywhere |
+| How do salespeople view PDFs? | Review Workbench serves `pdf_blob` inline (`solicitation_pdf_view`), fetching via Playwright if missing | Enables procurement history + packaging extraction and avoids relying on the browser alone for slow DIBBS downloads |
 | How do salespeople look up a supplier reply? | Global topbar search, `/` shortcut, matches sol#/NSN/name/CAGE/part# | Works from any page without navigation; handles any identifier in the email |
 | Search field normalization | Strip hyphens from NSN input before matching | `8465017225469` and `8465-01-722-5469` both hit the same record |
 

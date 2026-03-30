@@ -1,47 +1,28 @@
 {% extends "sales/base.html" %}
 {% load static %}
 {% block content %}
-<style>
-  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
-  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
-  .btn-outline-secondary { background: transparent; color: #6b7280; border: 1px solid #d1d5db; }
-  .btn-outline-secondary:hover { background: #f3f4f6; }
-  .btn-danger { background: #dc2626; color: #fff; }
-  .queue-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-  .queue-table th { padding: 0.625rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-  .queue-table td { padding: 0.625rem 1rem; border-bottom: 1px solid #eef2f8; }
-  .queue-card { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
-  .queue-card-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-  .queue-card-title { font-weight: 600; font-size: 1rem; }
-  .return-past { color: #dc2626; }
-  .return-soon { color: #f59e0b; }
-  .mono { font-family: ui-monospace, monospace; }
-  .btn-outline-primary { background: transparent; color: var(--company-primary, #004eb3); border: 1px solid var(--company-primary, #004eb3); }
-  .btn-outline-primary:hover { background: rgba(0, 78, 179, 0.08); }
-  .mailto-banner { background: #fef9c3; border: 1px solid #facc15; border-radius: 8px; padding: 0.875rem 1rem; margin-bottom: 1.25rem; color: #713f12; font-size: 0.875rem; }
-  .mailto-row { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; background: #fff; }
-</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" crossorigin="anonymous">
 
-<div style="margin-bottom: 1rem;">
-  <a href="{% url 'sales:rfq_center' %}" style="font-size: 0.875rem; color: var(--company-primary, #004eb3); text-decoration: none;">← Back to RFQ Center</a>
+<div class="mb-3">
+  <a href="{% url 'sales:rfq_center' %}" class="text-decoration-none small">← Back to RFQ Center</a>
 </div>
 
-<h1 style="font-size: 1.375rem; font-weight: 600; margin: 0 0 1.25rem;">RFQ Queue</h1>
+<h1 class="h4 fw-semibold mb-3">RFQ Queue</h1>
 
 {% if show_mailto_confirm and mailto_results %}
-<div class="mailto-banner">
-  SMTP is not configured for automated send (Graph is disabled). Click <strong>Open in Email</strong> for each supplier below, send the email from Outlook, then click <strong>Mark All Sent</strong> to confirm.
+<div class="alert alert-warning mb-4">
+  Open each <strong>Open in Email</strong> link, send from your mail client, then click <strong>Mark All Sent</strong>.
 </div>
 {% for result in mailto_results %}
-<div class="mailto-row">
-  <div style="font-weight: 600; margin-bottom: 0.5rem;">
-    {{ result.supplier_name|default:"—" }} <span style="font-weight: 400; color: #6b7280;">(CAGE: {{ result.supplier_cage|default:"—" }})</span>
+<div class="border rounded p-3 mb-3 bg-white">
+  <div class="fw-semibold mb-2">
+    {{ result.supplier_name|default:"—" }} <span class="text-muted fw-normal">(CAGE: {{ result.supplier_cage|default:"—" }})</span>
   </div>
-  <a href="{{ result.mailto_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary">Open in Email</a>
-  <div style="font-size: 0.8125rem; color: #6b7280; margin-top: 0.5rem;">To: {{ result.to_address }}</div>
+  <a href="{{ result.mailto_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">Open in Email</a>
+  <div class="small text-muted mt-2">To: {{ result.to_address }}</div>
 </div>
 {% endfor %}
-<form method="post" action="{% url 'sales:rfq_queue_mark_sent' %}" style="margin-bottom: 1.5rem;">
+<form method="post" action="{% url 'sales:rfq_queue_mark_sent' %}" class="mb-4">
   {% csrf_token %}
   {% for result in mailto_results %}
     {% for rid in result.rfq_ids %}
@@ -53,159 +34,230 @@
 </form>
 {% endif %}
 
-<div style="display:flex; gap:8px; margin-bottom:20px; align-items:center;">
-  <button id="fetch-pdfs-btn" class="btn btn-outline-secondary">📎 Fetch PDFs for Selected</button>
-  <button id="send-selected-btn" class="btn btn-primary">Send Selected</button>
-  <button id="send-all-btn" class="btn btn-danger">Send All</button>
-  <span id="queue-feedback" style="margin-left:12px;"></span>
-</div>
-
-<form id="queue-send-form" method="post" action="{% url 'sales:rfq_queue_send' %}" style="display:none;">
+<form id="rfq-queue-main-form" method="post" action="{% url 'sales:rfq_queue' %}">
   {% csrf_token %}
-  <input type="hidden" name="send_all" id="queue-send-all-flag" value="">
-  <div id="queue-send-id-container"></div>
-</form>
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="queue-check-all">Check All</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="queue-uncheck-all">Uncheck All</button>
+    <button type="submit" class="btn btn-success btn-sm" id="queue-send-selected">Send Selected RFQs</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="queue-fetch-pdfs">Fetch PDFs for Selected</button>
+    <span class="badge bg-secondary ms-1">{{ total_queued_suppliers|default:0 }} suppliers | {{ total_queued_sols|default:0 }} solicitations queued</span>
+  </div>
 
 {% if not grouped_queue %}
-<div style="text-align:center; padding:60px; color:#999;">
+<div class="text-center text-muted py-5">
   No RFQs queued.<br>
-  Add solicitations to the queue from the <a href="{% url 'sales:solicitation_list' %}">Matches tab</a>.
+  Add suppliers from <a href="{% url 'sales:solicitation_list' %}">Solicitations</a> (Matches tab).
 </div>
 {% else %}
 {% for group in grouped_queue %}
-<div class="queue-card">
-  <div class="queue-card-header">
-    <input type="checkbox" class="supplier-checkbox" value="{{ group.supplier.id }}">
-    <span class="queue-card-title">
-      {% if not group.send_email %}<span title="No RFQ email set">⚠</span> {% endif %}{{ group.supplier.name|default:"—" }} (CAGE: {{ group.supplier.cage_code|default:"—" }})
-    </span>
-    <span style="font-size: 0.8125rem; color: #6b7280;">
-      {% if group.send_email %}RFQ Email: {{ group.send_email }}{% else %}⚠ No RFQ email set{% endif %}
-    </span>
+{% with s=group.supplier %}
+{% with field_key=s.cage_code|default:s.pk|stringformat:"s" %}
+<div class="card mb-3 shadow-sm" data-supplier-id="{{ s.pk }}">
+  <div class="card-header bg-light d-flex flex-wrap align-items-center gap-2 py-2">
+    <input type="checkbox" class="form-check-input supplier-cb" name="selected_cages" value="{{ s.cage_code }}" id="cb-{{ field_key }}"
+      {% if not s.cage_code %}disabled title="Supplier needs a CAGE code to send from the queue"{% endif %}>
+    <label class="form-check-label fw-bold mb-0" for="cb-{{ field_key }}">{{ s.name|default:"—" }}</label>
+    <span class="text-muted small">CAGE: {{ s.cage_code|default:"—" }}</span>
+    {% if group.is_no_quote %}<span class="badge bg-danger">No-Quote</span>{% endif %}
+    <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+      <input type="email" class="form-control form-control-sm queue-email-input" style="min-width:200px;" name="email_{{ field_key }}" value="{{ group.email }}" data-cage="{{ s.cage_code|default:'' }}" data-field-key="{{ field_key }}" placeholder="RFQ email">
+      <span class="email-save-indicator small" style="min-width:1.25rem;" id="email-ind-{{ field_key }}"></span>
+      <button type="button" class="btn btn-outline-primary btn-sm btn-preview-email" data-cage-raw="{{ s.cage_code|default:'' }}" data-name="{{ s.name|default:'Supplier' }}" data-field-key="{{ field_key }}" {% if not s.cage_code %}disabled{% endif %}>Preview Email</button>
+    </div>
   </div>
-  <table class="queue-table">
-    <thead>
-      <tr>
-        <th>Sol #</th>
-        <th>Nomenclature</th>
-        <th>QTY</th>
-        <th>Return By</th>
-        <th>PDF</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for rfq in group.rfqs %}
-      {% with sol=rfq.line.solicitation %}
-      <tr>
-        <td class="mono">{{ sol.solicitation_number }}</td>
-        <td style="max-width:220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ rfq.line.nomenclature|default:'' }}">{{ rfq.line.nomenclature|default:"—"|truncatewords:6 }}</td>
-        <td>{{ rfq.line.quantity|default:"—" }} {{ rfq.line.unit_of_issue|default:"" }}</td>
-        <td>
-          {% if sol.return_by_date %}
-            {% if sol.return_by_date < today %}
-              <span class="return-past">{{ sol.return_by_date|date:"M j, Y" }}</span>
-            {% elif sol.days_remaining != None and sol.days_remaining <= 3 %}
-              <span class="return-soon">{{ sol.return_by_date|date:"M j, Y" }}</span>
-            {% else %}
-              {{ sol.return_by_date|date:"M j, Y" }}
-            {% endif %}
-          {% else %}—{% endif %}
-        </td>
-        <td>{% if sol.pdf_blob %}📎{% else %}⚠{% endif %}</td>
-      </tr>
-      {% endwith %}
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="card-body">
+    <p class="mb-1">
+      <a class="small text-decoration-none" data-bs-toggle="collapse" href="#notes-{{ field_key }}">Supplier Notes ▼</a>
+    </p>
+    <div class="collapse" id="notes-{{ field_key }}">
+      <div class="text-muted small border rounded p-2 mb-3 bg-light">
+        {% if group.notes %}{{ group.notes|linebreaksbr }}{% else %}<em>No notes on file</em>{% endif %}
+      </div>
+    </div>
+    <label class="form-label small text-muted mb-1">Personal note for this email (optional)</label>
+    <textarea class="form-control form-control-sm mb-1 personalization-ta" name="personalization_{{ field_key }}" id="pers-{{ field_key }}" rows="2">{{ group.personalization_text }}</textarea>
+    <p class="small text-muted mb-3">This text will appear at the top of the email, after the greeting.</p>
+    <div class="ps-2 border-start border-2 border-secondary">
+      <table class="table table-sm table-bordered mb-0 bg-white small">
+        <thead class="table-light">
+          <tr>
+            <th>Sol #</th>
+            <th>NSN</th>
+            <th>Nomenclature</th>
+            <th>Qty + UOM</th>
+            <th>Return By</th>
+            <th>PDF</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rfq in group.rfqs %}
+          {% with line=rfq.line sol=rfq.line.solicitation %}
+          <tr>
+            <td class="font-monospace">{{ sol.solicitation_number }}</td>
+            <td class="font-monospace">{{ line.nsn|default:"—" }}</td>
+            <td>{{ line.nomenclature|default:"—"|truncatewords:8 }}</td>
+            <td>{{ line.quantity|default:"—" }} {{ line.unit_of_issue|default:"" }}</td>
+            <td>
+              {% if sol.return_by_date %}
+                {% if sol.days_remaining != None and sol.days_remaining <= 3 %}
+                  <span class="text-danger fw-semibold">{{ sol.return_by_date|date:"M j, Y" }}</span>
+                {% else %}
+                  {{ sol.return_by_date|date:"M j, Y" }}
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>{% if sol.pdf_blob %}✓{% else %}⚠{% endif %}</td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
+{% endwith %}
+{% endwith %}
 {% endfor %}
 {% endif %}
+</form>
 
+<div class="modal fade" id="emailPreviewModal" tabindex="-1" aria-labelledby="emailPreviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="emailPreviewModalLabel">Email Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="email-preview-spinner" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+        </div>
+        <div id="email-preview-body" class="d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 <script>
 (function() {
   var csrfToken = '{{ csrf_token }}';
+  var previewPathPrefix = '/sales/rfq/queue/preview/';
 
-  function getCheckedSupplierIds() {
-    return Array.from(document.querySelectorAll('.supplier-checkbox:checked'))
-                .map(function(cb) { return cb.value; });
-  }
+  document.getElementById('queue-check-all') && document.getElementById('queue-check-all').addEventListener('click', function() {
+    document.querySelectorAll('.supplier-cb:not(:disabled)').forEach(function(c) { c.checked = true; });
+  });
+  document.getElementById('queue-uncheck-all') && document.getElementById('queue-uncheck-all').addEventListener('click', function() {
+    document.querySelectorAll('.supplier-cb').forEach(function(c) { c.checked = false; });
+  });
 
-  function setFeedback(msg) {
-    var el = document.getElementById('queue-feedback');
-    if (el) el.textContent = msg;
-  }
+  document.getElementById('queue-send-selected') && document.getElementById('queue-send-selected').addEventListener('click', function(e) {
+    var n = document.querySelectorAll('.supplier-cb:checked').length;
+    if (!n) {
+      e.preventDefault();
+      alert('Select at least one supplier.');
+      return false;
+    }
+    if (!confirm('Send RFQs to ' + n + ' supplier(s)?')) {
+      e.preventDefault();
+      return false;
+    }
+  });
 
-  function postAction(url, params) {
-    var parts = [];
-    Object.keys(params).forEach(function(k) {
-      var v = params[k];
-      if (Array.isArray(v)) {
-        v.forEach(function(i) { parts.push(k + '[]=' + encodeURIComponent(i)); });
-      } else {
-        parts.push(k + '=' + encodeURIComponent(v));
-      }
+  document.getElementById('queue-fetch-pdfs') && document.getElementById('queue-fetch-pdfs').addEventListener('click', function() {
+    var ids = [];
+    document.querySelectorAll('.supplier-cb:checked').forEach(function(cb) {
+      var card = cb.closest('[data-supplier-id]');
+      if (card) ids.push(card.getAttribute('data-supplier-id'));
     });
-    var body = parts.join('&');
-    return fetch(url, {
+    if (!ids.length) {
+      alert('Select at least one supplier.');
+      return;
+    }
+    var body = 'csrfmiddlewaretoken=' + encodeURIComponent(csrfToken) + '&' +
+      ids.map(function(id) { return 'supplier_ids[]=' + encodeURIComponent(id); }).join('&');
+    fetch("{% url 'sales:rfq_queue_fetch_pdfs' %}", {
       method: 'POST',
       headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken},
       body: body
-    }).then(function(r) { return r.json(); });
-  }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      alert('Fetched: ' + data.fetched + ', Failed: ' + data.failed);
+      setTimeout(function() { location.reload(); }, 800);
+    });
+  });
 
-  function submitQueueSend(sendAll) {
-    var form = document.getElementById('queue-send-form');
-    var container = document.getElementById('queue-send-id-container');
-    var flag = document.getElementById('queue-send-all-flag');
-    if (!form || !container || !flag) return;
-    container.innerHTML = '';
-    flag.value = sendAll ? '1' : '';
-    if (!sendAll) {
-      var ids = getCheckedSupplierIds();
-      if (!ids.length) { alert('Select at least one supplier.'); return; }
-      ids.forEach(function(id) {
-        var inp = document.createElement('input');
-        inp.type = 'hidden';
-        inp.name = 'supplier_ids';
-        inp.value = id;
-        container.appendChild(inp);
+  document.querySelectorAll('.queue-email-input').forEach(function(inp) {
+    inp.addEventListener('blur', function() {
+      var cage = (inp.getAttribute('data-cage') || '').trim();
+      var fk = inp.getAttribute('data-field-key') || '';
+      var ind = document.getElementById('email-ind-' + fk);
+      if (!cage) { if (ind) ind.textContent = ''; return; }
+      if (ind) { ind.textContent = '…'; ind.className = 'email-save-indicator small text-muted'; }
+      var fd = new FormData();
+      fd.append('csrfmiddlewaretoken', csrfToken);
+      fd.append('cage_code', cage);
+      fd.append('email', inp.value || '');
+      fetch("{% url 'sales:rfq_update_supplier_email' %}", {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken},
+        body: fd
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (ind) {
+          ind.textContent = data.success ? '✓' : '✗';
+          ind.className = 'email-save-indicator small ' + (data.success ? 'text-success' : 'text-danger');
+        }
+      }).catch(function() {
+        if (ind) { ind.textContent = '✗'; ind.className = 'email-save-indicator small text-danger'; }
       });
-    }
-    var msg = sendAll
-      ? 'Send RFQs to all queued suppliers?'
-      : ('Send RFQs to ' + getCheckedSupplierIds().length + ' supplier(s)?');
-    if (!confirm(msg)) return;
-    setFeedback('Working…');
-    form.submit();
-  }
+    });
+  });
 
-  var fetchPdfsBtn = document.getElementById('fetch-pdfs-btn');
-  if (fetchPdfsBtn) {
-    fetchPdfsBtn.addEventListener('click', function() {
-      var ids = getCheckedSupplierIds();
-      if (!ids.length) { alert('Select at least one supplier.'); return; }
-      setFeedback('Fetching PDFs...');
-      postAction("{% url 'sales:rfq_queue_fetch_pdfs' %}", {supplier_ids: ids})
+  var previewModalEl = document.getElementById('emailPreviewModal');
+  var previewModal = previewModalEl ? new bootstrap.Modal(previewModalEl) : null;
+  var spin = document.getElementById('email-preview-spinner');
+  var bodyEl = document.getElementById('email-preview-body');
+  var titleEl = document.getElementById('emailPreviewModalLabel');
+
+  previewModalEl && previewModalEl.addEventListener('hidden.bs.modal', function() {
+    if (spin) { spin.classList.remove('d-none'); }
+    if (bodyEl) { bodyEl.classList.add('d-none'); bodyEl.innerHTML = ''; }
+  });
+
+  document.querySelectorAll('.btn-preview-email').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var cage = (btn.getAttribute('data-cage-raw') || '').trim();
+      var name = btn.getAttribute('data-name') || 'Supplier';
+      var fk = btn.getAttribute('data-field-key');
+      var ta = document.getElementById('pers-' + fk);
+      var pers = ta ? ta.value : '';
+      if (!cage) { alert('Supplier needs a CAGE code for preview.'); return; }
+      if (titleEl) titleEl.textContent = 'Email Preview — ' + name;
+      if (spin) spin.classList.remove('d-none');
+      if (bodyEl) { bodyEl.classList.add('d-none'); bodyEl.innerHTML = ''; }
+      previewModal.show();
+      var url = previewPathPrefix + encodeURIComponent(cage) + '/?personalization=' + encodeURIComponent(pers);
+      fetch(url)
+        .then(function(r) { return r.json(); })
         .then(function(data) {
-          setFeedback('Fetched: ' + data.fetched + ', Failed: ' + data.failed);
-          setTimeout(function() { location.reload(); }, 1500);
+          if (spin) spin.classList.add('d-none');
+          if (bodyEl) {
+            bodyEl.classList.remove('d-none');
+            bodyEl.innerHTML = data.preview_html || ('<p class="text-danger">' + (data.error || 'Preview failed.') + '</p>');
+          }
+        })
+        .catch(function() {
+          if (spin) spin.classList.add('d-none');
+          if (bodyEl) {
+            bodyEl.classList.remove('d-none');
+            bodyEl.innerHTML = '<p class="text-danger">Preview failed.</p>';
+          }
         });
     });
-  }
-
-  var sendSelectedBtn = document.getElementById('send-selected-btn');
-  if (sendSelectedBtn) {
-    sendSelectedBtn.addEventListener('click', function() {
-      submitQueueSend(false);
-    });
-  }
-
-  var sendAllBtn = document.getElementById('send-all-btn');
-  if (sendAllBtn) {
-    sendAllBtn.addEventListener('click', function() {
-      submitQueueSend(true);
-    });
-  }
+  });
 })();
 </script>
 {% endblock content %}

@@ -1,6 +1,7 @@
 """
 RFQ dispatch and quote entry views. Section 10.5, 10.8.
 """
+import html
 import json
 import logging
 import urllib.parse
@@ -30,6 +31,7 @@ from sales.models import (
     CompanyCAGE,
     ApprovedSource,
     EmailTemplate,
+    SupplierNSN,
 )
 from sales.models.inbox import InboxMessage, InboxMessageRFQLink
 from sales.services.email import (
@@ -38,7 +40,9 @@ from sales.services.email import (
     resolve_supplier_email,
     resolve_supplier_email_for_send,
     build_grouped_rfq_email,
+    compose_grouped_rfq_email_message,
 )
+from sales.services.matching import normalize_nsn
 from sales.services.graph_inbox import (
     fetch_inbox_messages,
     fetch_message_body,
@@ -61,47 +65,8 @@ def _mark_solicitation_pdf_fetch_pending_if_needed(solicitation: Solicitation) -
 
 @login_required
 def rfq_pending(request):
-    """
-    Shows all SupplierMatch records where no SupplierRFQ has been sent yet,
-    grouped by solicitation. Template: sales/rfq/pending.html
-    """
-    # Matches that have no RFQ for (line, supplier)
-    rfq_exists = SupplierRFQ.objects.filter(
-        line=OuterRef("line_id"),
-        supplier=OuterRef("supplier_id"),
-    )
-    pending_matches = (
-        SupplierMatch.objects.filter(~Exists(rfq_exists))
-        .select_related("supplier", "line", "line__solicitation")
-        .order_by("line__solicitation__return_by_date", "line__solicitation__solicitation_number", "match_tier", "-match_score")
-    )
-
-    # Group by (solicitation, line) — one line per sol for simplicity per spec
-    from collections import OrderedDict
-    groups = OrderedDict()
-    for m in pending_matches:
-        m.rfq_sent = False
-        m.rfq_status_display = ""
-        m.supplier_cage_key = normalize_cage_code(m.supplier.cage_code)
-        sol = m.line.solicitation
-        key = (sol.id, m.line.id)
-        if key not in groups:
-            groups[key] = {
-                "solicitation": sol,
-                "line": m.line,
-                "matches": [],
-            }
-        groups[key]["matches"].append(m)
-
-    pending_groups = list(groups.values())
-    total_pending = len(pending_matches)
-
-    return render(request, "sales/rfq/pending.html", {
-        "pending_groups": pending_groups,
-        "total_pending": total_pending,
-        "no_quote_cages": get_no_quote_cage_set(),
-        "section": "rfq",
-    })
+    """Retired: former pending-matches screen now routes to the supplier-grouped RFQ Queue."""
+    return redirect("sales:rfq_queue")
 
 
 @login_required
@@ -109,7 +74,7 @@ def rfq_pending(request):
 def rfq_send_batch(request, sol_number):
     """
     POST: supplier_ids[] or send_all. Create SupplierRFQ (PENDING), call send_rfq_email for each.
-    Redirect to rfq_pending with message.
+    Redirect to RFQ queue with message.
     """
     solicitation = get_object_or_404(Solicitation, solicitation_number=sol_number)
     send_all = request.POST.get("send_all") == "1" or "send_all" in request.POST.getlist("send_all")
@@ -137,7 +102,7 @@ def rfq_send_batch(request, sol_number):
     else:
         if not supplier_ids:
             messages.warning(request, "No suppliers selected.")
-            return redirect("sales:rfq_pending")
+            return redirect("sales:rfq_queue")
         sid_set = {int(x) for x in supplier_ids if str(x).isdigit()}
         matches = list(
             SupplierMatch.objects.filter(
@@ -176,7 +141,7 @@ def rfq_send_batch(request, sol_number):
     if not sent and not failed and (send_all or supplier_ids):
         messages.warning(request, "No new RFQs sent (all selected already had an RFQ or no matches).")
 
-    return redirect("sales:rfq_pending")
+    return redirect("sales:rfq_queue")
 
 
 @login_required
@@ -186,7 +151,7 @@ def rfq_send_single(request):
     match_id = request.POST.get("match_id")
     if not match_id:
         messages.warning(request, "No match selected.")
-        return redirect("sales:rfq_pending")
+        return redirect("sales:rfq_queue")
 
     match = get_object_or_404(
         SupplierMatch.objects.select_related("supplier", "line", "line__solicitation"),
@@ -201,7 +166,7 @@ def rfq_send_single(request):
         else:
             messages.warning(request, "Could not send RFQ (missing email or error).")
 
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("sales:rfq_pending")
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("sales:rfq_queue")
     return redirect(next_url)
 
 
@@ -370,49 +335,70 @@ def rfq_mark_sent(request, match_id):
 @login_required
 def rfq_sent(request):
     """
-    Sent RFQs grouped by urgency: overdue, urgent, awaiting, responded, closed.
+    Sent RFQs grouped by supplier with response status (RESPONDED / AWAITING / OVERDUE).
     Template: sales/rfq/sent.html
     """
-    from datetime import timedelta
-    from django.utils import timezone
+    from collections import OrderedDict
 
     today = timezone.now().date()
-    urgent_cutoff = today + timedelta(days=2)
+    overdue_cutoff = today + timedelta(days=3)
 
     base = (
-        SupplierRFQ.objects.filter(
-            status__in=["SENT", "RESPONDED", "NO_RESPONSE", "DECLINED"]
-        )
+        SupplierRFQ.objects.filter(status__in=["SENT", "RESPONDED"])
         .select_related("line__solicitation", "supplier")
     )
+    rfq_list = list(base.order_by("supplier__name", "line__solicitation__solicitation_number"))
 
-    overdue = []
-    urgent = []
-    awaiting = []
-    responded = []
-    closed = []
-
-    for rfq in base.order_by("line__solicitation__return_by_date", "sent_at"):
+    groups_od = OrderedDict()
+    for rfq in rfq_list:
+        sid = rfq.supplier_id
+        if sid not in groups_od:
+            groups_od[sid] = {
+                "supplier": rfq.supplier,
+                "rfqs": [],
+                "sols": [],
+                "_sol_ids": set(),
+            }
+        g = groups_od[sid]
+        g["rfqs"].append(rfq)
         sol = rfq.line.solicitation
-        return_by = sol.return_by_date if sol else None
-        if rfq.status == "SENT":
-            if return_by and return_by < today:
-                overdue.append(rfq)
-            elif return_by and return_by <= urgent_cutoff:
-                urgent.append(rfq)
-            else:
-                awaiting.append(rfq)
-        elif rfq.status == "RESPONDED":
-            responded.append(rfq)
+        if sol.pk not in g["_sol_ids"]:
+            g["_sol_ids"].add(sol.pk)
+            g["sols"].append(sol)
+
+    supplier_groups = []
+    for _sid, g in groups_od.items():
+        del g["_sol_ids"]
+        rfqs = g["rfqs"]
+        times = [r.sent_at for r in rfqs if r.sent_at]
+        g["sent_at"] = min(times) if times else None
+
+        rfq_id_list = [r.pk for r in rfqs]
+        has_quote = SupplierQuote.objects.filter(rfq_id__in=rfq_id_list).exists()
+        if has_quote:
+            g["response_status"] = "RESPONDED"
         else:
-            closed.append(rfq)
+            urgent_sol = any(
+                (sl.return_by_date and sl.return_by_date <= overdue_cutoff)
+                for sl in g["sols"]
+                if getattr(sl, "return_by_date", None)
+            )
+            g["response_status"] = "OVERDUE" if urgent_sol else "AWAITING"
+        sent_only = [r for r in rfqs if r.status == "SENT"]
+        g["followup_rfq"] = sent_only[0] if sent_only else (rfqs[0] if rfqs else None)
+        supplier_groups.append(g)
+
+    rank = {"OVERDUE": 0, "AWAITING": 1, "RESPONDED": 2}
+    supplier_groups.sort(
+        key=lambda x: (rank.get(x["response_status"], 9), (x["supplier"].name or "").lower())
+    )
+
+    follow_up_templates = list(EmailTemplate.objects.order_by("name"))
 
     return render(request, "sales/rfq/sent.html", {
-        "overdue": overdue,
-        "urgent": urgent,
-        "awaiting": awaiting,
-        "responded": responded,
-        "closed": closed,
+        "supplier_groups": supplier_groups,
+        "follow_up_templates": follow_up_templates,
+        "today": today,
         "section": "rfq",
     })
 
@@ -579,9 +565,13 @@ def rfq_mark_declined(request, rfq_id):
 @login_required
 @require_POST
 def rfq_send_followup(request, rfq_id):
-    """Call send_followup_email, redirect to rfq_sent with message."""
+    """Call send_followup_email (optional EmailTemplate from POST template_id)."""
     rfq = get_object_or_404(SupplierRFQ, pk=rfq_id)
-    if send_followup_email(rfq, request.user):
+    tpl = None
+    tid = request.POST.get("template_id")
+    if tid and str(tid).isdigit():
+        tpl = EmailTemplate.objects.filter(pk=int(tid)).first()
+    if send_followup_email(rfq, request.user, email_template=tpl):
         messages.success(request, "Follow-up email sent.")
     else:
         messages.warning(request, "Could not send follow-up (only SENT RFQs allowed, or email error).")
@@ -680,6 +670,18 @@ def rfq_enter_quote(request, rfq_id):
                 notes=form.cleaned_data["notes"],
                 entered_by=request.user,
             )
+            nsn_raw = (line.nsn or "").strip()
+            if nsn_raw and rfq.supplier_id:
+                n_norm = normalize_nsn(nsn_raw)
+                if n_norm:
+                    SupplierNSN.objects.get_or_create(
+                        supplier_id=rfq.supplier_id,
+                        nsn=n_norm,
+                        defaults={
+                            "match_score": Decimal("50.00"),
+                            "source": "quote_confirmed",
+                        },
+                    )
             from django.utils import timezone
             now = timezone.now()
             rfq.status = "RESPONDED"
@@ -1253,7 +1255,15 @@ def rfq_queue_add(request):
         return JsonResponse({"status": "no_quote", "cage": cage_norm})
 
     if SupplierRFQ.objects.filter(line=line, supplier=supplier, status="QUEUED").exists():
-        return JsonResponse({"status": "already_queued"})
+        cur_status = (
+            Solicitation.objects.filter(pk=solicitation.pk)
+            .values_list("status", flat=True)
+            .first()
+        ) or ""
+        return JsonResponse({
+            "status": "already_queued",
+            "solicitation_status": cur_status,
+        })
 
     rfq = SupplierRFQ.objects.create(
         line=line,
@@ -1268,7 +1278,11 @@ def rfq_queue_add(request):
 
     _mark_solicitation_pdf_fetch_pending_if_needed(solicitation)
 
-    return JsonResponse({"status": "queued", "rfq_id": rfq.pk})
+    return JsonResponse({
+        "status": "queued",
+        "rfq_id": rfq.pk,
+        "solicitation_status": solicitation.status,
+    })
 
 
 @login_required
@@ -1433,45 +1447,227 @@ def _rfq_queue_template_context():
         .order_by("supplier__name", "line__solicitation__solicitation_number")
     )
     rfq_list = list(qs)
+    nq_set = get_no_quote_cage_set()
 
     groups = OrderedDict()
     for rfq in rfq_list:
         sid = rfq.supplier_id
         if sid not in groups:
-            send_email = _resolve_send_email(rfq.supplier)
+            sup = rfq.supplier
+            send_email = _resolve_send_email(sup) or ""
+            cc_norm = normalize_cage_code(sup.cage_code or "")
             groups[sid] = {
-                "supplier": rfq.supplier,
+                "supplier": sup,
                 "rfqs": [],
-                "has_missing_pdfs": False,
+                "sols": [],
+                "_sol_ids": set(),
+                "email": send_email,
                 "send_email": send_email,
+                "notes": sup.notes or "",
+                "personalization_text": "",
+                "has_missing_pdfs": False,
+                "is_no_quote": bool(cc_norm and cc_norm in nq_set),
             }
-        groups[sid]["rfqs"].append(rfq)
+        g = groups[sid]
+        g["rfqs"].append(rfq)
         sol = rfq.line.solicitation
+        if sol.pk not in g["_sol_ids"]:
+            g["_sol_ids"].add(sol.pk)
+            g["sols"].append(sol)
         if not getattr(sol, "pdf_blob", None) or not sol.pdf_blob:
-            groups[sid]["has_missing_pdfs"] = True
+            g["has_missing_pdfs"] = True
 
-    grouped_queue = list(groups.values())
-    total_queued = len(rfq_list)
+    grouped_queue = []
+    for sid in sorted(groups.keys(), key=lambda k: (groups[k]["supplier"].name or "").lower()):
+        g = groups[sid]
+        del g["_sol_ids"]
+        if g["rfqs"]:
+            g["personalization_text"] = (g["rfqs"][0].personalization_text or "").strip()
+        grouped_queue.append(g)
+
+    total_queued_sols = len({r.line.solicitation_id for r in rfq_list})
     today = timezone.now().date()
     return {
         "grouped_queue": grouped_queue,
-        "total_queued": total_queued,
+        "total_queued": len(rfq_list),
+        "total_queued_suppliers": len(grouped_queue),
+        "total_queued_sols": total_queued_sols,
         "today": today,
     }
 
 
+def _rfq_queue_mass_send(request, supplier_ids_int_list, personalization_by_supplier_id=None):
+    """
+    Run grouped send for each supplier_id. personalization_by_supplier_id maps
+    supplier.pk -> personalization string (optional).
+    Returns (mailto_results, graph_success_count, graph_failure_count, failed_skipped_list).
+    """
+    personalization_by_supplier_id = personalization_by_supplier_id or {}
+    results = []
+    failed = []
+    for sid in supplier_ids_int_list:
+        rfqs = list(
+            SupplierRFQ.objects.filter(status="QUEUED", supplier_id=sid)
+            .select_related("supplier", "line__solicitation")
+            .order_by("line__solicitation__solicitation_number")
+        )
+        if not rfqs:
+            continue
+        supplier = rfqs[0].supplier
+        name = (supplier.name or supplier.cage_code or f"Supplier {sid}").strip()
+        pers = personalization_by_supplier_id.get(sid, "") or ""
+
+        send_email = _resolve_send_email(supplier)
+        if not send_email:
+            failed.append({"supplier": name, "reason": "no email"})
+            continue
+
+        try:
+            result = build_grouped_rfq_email(
+                supplier, rfqs, request.user, personalization_text=pers
+            )
+        except Exception as e:
+            logger.exception("build_grouped_rfq_email failed for supplier_id=%s", sid)
+            failed.append({"supplier": name, "reason": str(e)})
+            continue
+
+        results.append(result)
+
+    mailto_results = [r for r in results if r["mode"] == "mailto" and r["success"]]
+    graph_results = [r for r in results if r["mode"] == "graph"]
+    graph_failures = [r for r in graph_results if not r["success"]]
+    graph_successes = [r for r in graph_results if r["success"]]
+    return mailto_results, len(graph_successes), len(graph_failures), failed
+
+
 @login_required
-@require_GET
-def rfq_queue_view(request):
+def rfq_queue(request):
     """
-    GET: render Queue tab content — all QUEUED RFQs grouped by supplier.
-    Context: grouped_queue, total_queued.
+    Supplier-grouped RFQ Queue. GET: render. POST: mass send for selected CAGEs.
     """
+    if request.method == "POST":
+        selected_cages = request.POST.getlist("selected_cages")
+        if not selected_cages:
+            messages.warning(request, "No suppliers selected.")
+            return redirect("sales:rfq_queue")
+
+        no_quote_cages = get_no_quote_cage_set()
+        supplier_ids = []
+        pers_by_sid = {}
+
+        for cage_raw in selected_cages:
+            cage = (cage_raw or "").strip()
+            if not cage:
+                continue
+            cage_norm = normalize_cage_code(cage)
+            if cage_norm and cage_norm in no_quote_cages:
+                continue
+            supplier = Supplier.objects.filter(cage_code__iexact=cage).first()
+            if not supplier:
+                continue
+            rfqs = list(
+                SupplierRFQ.objects.filter(status="QUEUED", supplier=supplier)
+                .select_related("line__solicitation")
+            )
+            if not rfqs:
+                continue
+
+            email_post = (request.POST.get(f"email_{cage}") or "").strip()
+            if email_post:
+                supplier.rfq_email = email_post
+                supplier.save(update_fields=["rfq_email"])
+
+            pers = (request.POST.get(f"personalization_{cage}") or "").strip()
+            for r in rfqs:
+                r.personalization_text = pers
+                r.save(update_fields=["personalization_text"])
+            pers_by_sid[supplier.pk] = pers
+            supplier_ids.append(supplier.pk)
+
+        if not supplier_ids:
+            messages.warning(request, "No queued RFQs for the selected suppliers.")
+            return redirect("sales:rfq_queue")
+
+        mailto_results, g_ok, g_fail, failed = _rfq_queue_mass_send(
+            request, supplier_ids, pers_by_sid
+        )
+
+        for f in failed:
+            messages.warning(
+                request,
+                f"Skipped {f['supplier']}: {f['reason']}.",
+            )
+
+        if mailto_results:
+            ctx = _rfq_queue_template_context()
+            ctx["mailto_results"] = mailto_results
+            ctx["show_mailto_confirm"] = True
+            ctx["section"] = "rfq"
+            return render(request, "sales/rfq/queue.html", ctx)
+
+        if g_ok:
+            messages.success(
+                request,
+                f"Emailed {g_ok} supplier(s) successfully via Graph.",
+            )
+        if g_fail:
+            messages.error(
+                request,
+                f"{g_fail} supplier email(s) failed to send. Check server logs.",
+            )
+        if not g_ok and not g_fail and not mailto_results and not failed:
+            messages.info(request, "Nothing was sent.")
+        return redirect("sales:rfq_queue")
+
     ctx = _rfq_queue_template_context()
     ctx.setdefault("show_mailto_confirm", False)
     ctx.setdefault("mailto_results", [])
     ctx["section"] = "rfq"
     return render(request, "sales/rfq/queue.html", ctx)
+
+
+@login_required
+@require_POST
+def rfq_update_supplier_email(request):
+    """Update supplier RFQ email from the queue (stored on ``Supplier.rfq_email``)."""
+    cage_code = (request.POST.get("cage_code") or "").strip()
+    email = (request.POST.get("email") or "").strip()
+    if not cage_code:
+        return JsonResponse({"success": False, "error": "CAGE required"}, status=400)
+    try:
+        supplier = Supplier.objects.get(cage_code__iexact=cage_code)
+        supplier.rfq_email = email or None
+        supplier.save(update_fields=["rfq_email"])
+        return JsonResponse({"success": True})
+    except Supplier.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Supplier not found"}, status=404)
+
+
+@login_required
+@require_GET
+def rfq_preview_email(request, cage_code):
+    """JSON preview of grouped RFQ email body for one supplier (QUEUED RFQs)."""
+    cage = (cage_code or "").strip()
+    supplier = Supplier.objects.filter(cage_code__iexact=cage).first()
+    if not supplier:
+        return JsonResponse({"error": "Supplier not found"}, status=404)
+
+    rfqs = list(
+        SupplierRFQ.objects.filter(status="QUEUED", supplier=supplier)
+        .select_related("line", "line__solicitation", "supplier")
+        .prefetch_related("supplier__contacts")
+        .order_by("line__solicitation__solicitation_number")
+    )
+    if not rfqs:
+        return JsonResponse({"error": "No queued RFQs for this supplier"}, status=400)
+
+    pers = (request.GET.get("personalization") or "").strip()
+    _subject, body_plain = compose_grouped_rfq_email_message(
+        supplier, rfqs, request.user, personalization_text=pers
+    )
+    safe = html.escape(body_plain)
+    preview_html = f'<div class="rfq-preview-body" style="white-space:pre-wrap;font-family:system-ui,sans-serif;font-size:0.9rem;">{safe}</div>'
+    return JsonResponse({"preview_html": preview_html})
 
 
 @login_required
@@ -1484,8 +1680,10 @@ def rfq_queue_fetch_pdfs(request):
     """
     from sales.services.dibbs_pdf import (
         fetch_pdfs_for_sols,
+        parse_packaging_from_pdf,
         parse_procurement_history,
         save_procurement_history,
+        save_sol_packaging,
     )
 
     raw_ids = request.POST.getlist("supplier_ids[]") or request.POST.getlist("supplier_ids")
@@ -1523,6 +1721,11 @@ def rfq_queue_fetch_pdfs(request):
             try:
                 history_rows = parse_procurement_history(body, sol_number)
                 save_procurement_history(history_rows)
+            except Exception:
+                pass
+            try:
+                pack = parse_packaging_from_pdf(body, sol_number)
+                save_sol_packaging(sol_number, pack)
             except Exception:
                 pass
             fetched += 1
@@ -1566,7 +1769,7 @@ def rfq_queue_send(request):
     else:
         if not supplier_ids:
             messages.warning(request, "No suppliers selected for send.")
-            return redirect("sales:rfq_queue_view")
+            return redirect("sales:rfq_queue")
         cage_by_sid = dict(
             Supplier.objects.filter(pk__in=supplier_ids).values_list("id", "cage_code")
         )
@@ -1580,7 +1783,7 @@ def rfq_queue_send(request):
             request,
             "No suppliers to send (queue empty, none selected, or all on the No Quote list).",
         )
-        return redirect("sales:rfq_queue_view")
+        return redirect("sales:rfq_queue")
 
     results = []
     failed = []
@@ -1601,7 +1804,7 @@ def rfq_queue_send(request):
             continue
 
         try:
-            result = build_grouped_rfq_email(supplier, rfqs, request.user)
+            result = build_grouped_rfq_email(supplier, rfqs, request.user, personalization_text="")
         except Exception as e:
             logger.exception("build_grouped_rfq_email failed for supplier_id=%s", sid)
             failed.append({"supplier": name, "reason": str(e)})
@@ -1639,7 +1842,7 @@ def rfq_queue_send(request):
             f"{len(graph_failures)} RFQ email(s) failed to send. Check server logs.",
         )
 
-    return redirect("sales:rfq_queue_view")
+    return redirect("sales:rfq_queue")
 
 
 @login_required
@@ -1653,7 +1856,7 @@ def rfq_queue_mark_sent(request):
     emails = request.POST.getlist("email_sent_to")
     if len(rfq_ids) != len(emails) or not rfq_ids:
         messages.error(request, "Invalid confirmation data.")
-        return redirect("sales:rfq_queue_view")
+        return redirect("sales:rfq_queue")
 
     now = timezone.now()
     confirmed = 0
@@ -1697,7 +1900,7 @@ def rfq_queue_mark_sent(request):
     else:
         messages.warning(request, "No queued RFQs were updated (already sent or invalid IDs).")
 
-    return redirect("sales:rfq_queue_view")
+    return redirect("sales:rfq_queue")
 
 
 # ──────────────────────────────────────────────

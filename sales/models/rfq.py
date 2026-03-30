@@ -43,6 +43,13 @@ class SupplierRFQ(models.Model):
     notes = models.TextField(null=True, blank=True)
     declined_reason = models.CharField(max_length=255, null=True, blank=True)
 
+    # RFQ personalization
+    personalization_text = models.TextField(
+        blank=True,
+        default='',
+        help_text='Optional personal note injected into the top of this supplier RFQ email'
+    )
+
     class Meta:
         db_table = 'dibbs_supplier_rfq'
         verbose_name = 'Supplier RFQ'

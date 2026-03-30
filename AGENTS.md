@@ -97,6 +97,7 @@ Run repo-wide search before any of these changes:
 - Treat uploads/downloads as sensitive:
 - PDF/file handlers in `tools`, `training`, `processing`, `contracts` should keep size/type/permission checks.
 - `parse_procurement_history()` in `sales/services/dibbs_pdf.py` uses `pypdf.PdfReader` to extract text from raw PDF bytes. DIBBS serves `.PDF` files directly — not ZIPs. The old ZIP-based approach was incorrect and has been replaced. The `pypdf` package is a declared dependency in `requirements.txt`.
+- **`NsnProcurementHistory`** rows are keyed on `(nsn, contract_number)`. `save_procurement_history()` inserts new rows with `first_seen_sol` / `last_seen_sol`; for existing keys it updates **`last_seen_sol`** and **`extracted_at`** only — it does not overwrite price, quantity, or other historical fields.
 - Exports should remain authenticated and scoped.
 
 ## 9. Reporting / Export / Background Processing Rules
@@ -112,8 +113,8 @@ Run repo-wide search before any of these changes:
 - `users` (portal CSV export).
 - There is no Celery task layer in this repo. Assume heavy processing is request-time and verify latency/error handling.
 - `fetch_pending_pdfs` management command fetches DIBBS solicitation PDFs for all `PENDING` (and `FAILED` with fewer than five attempts) sols in a single shared Playwright session. Triggered by RFQ queue add (sets `PENDING` when `pdf_blob` is null). Intended to run every five minutes as a scheduled Azure WebJob. Max five attempts per sol. ORM boundary rule applies: all DB reads before Playwright opens, all DB writes after it closes.
-- CA zip pipeline runs as Phase 4 of `auto_import_dibbs`. `fetch_ca_zip()` in `sales/services/dibbs_fetch.py` downloads the CA zip via Playwright. `parse_ca_zip()` in `sales/services/ca_parser.py` processes it with pure ORM — lookup by `pdf_file_name`, skip if `pdf_data_pulled` set, parse via `parse_procurement_history()`, save via `save_procurement_history()`. ORM/Playwright boundary strictly maintained. `fetch_pending_pdfs` excludes sols where `pdf_data_pulled` is not null.
-- The scraper may re-attempt a date that was partially imported. `_process_records()` in `sales/services/awards_file_importer.py` must filter out `notice_id` values that already exist before calling `executemany` to prevent `IntegrityError` on duplicate key (and filter `dibbs_award_mod` inserts against existing rows for the same unique constraint).
+- `auto_import_dibbs` Phase 4 (after `run_import`) fetches individual solicitation PDFs for set-aside rows only (`small_business_set_aside != 'N'`) via `fetch_pdfs_for_sols()` in one Playwright session per date, then `persist_pdf_procurement_extract` in `sales/services/dibbs_pdf.py` after the browser closes (procurement history, packaging, `pdf_data_pulled`). The bulk CA zip path (`fetch_ca_zip` / `parse_ca_zip`) is not used by the scheduled WebJob. ORM/Playwright boundary strictly maintained. `fetch_pending_pdfs` excludes sols where `pdf_data_pulled` is not null.
+- The scraper may re-attempt a date that was partially imported. `_process_records()` in `sales/services/awards_file_importer.py` must filter out `notice_id` values that already exist before calling `executemany` to prevent `IntegrityError` on duplicate key (and filter `dibbs_award_mod` inserts against existing rows for the same unique constraint). All `IN` clause queries against large record sets must be chunked using `_chunked(list, AW_CHUNK)` to stay under SQL Server's 2,100 parameter limit. This applies to `existing_keys` and `existing_mod_awards` lookups in `_process_records()`.
 - Signal-based automation exists in `transactions` and `users`; changing save paths or middleware can silently remove side effects.
 
 ## 10. Testing and Verification Expectations

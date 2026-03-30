@@ -40,7 +40,7 @@ class Command(BaseCommand):
         if not pending_sols:
             self.stdout.write(
                 f"No pending PDFs to fetch. ({skipped} permanently failed; "
-                f"{ca_covered} skipped — CA zip already pulled.)"
+                f"{ca_covered} skipped — procurement data already extracted.)"
             )
             return
 
@@ -71,12 +71,21 @@ class Command(BaseCommand):
                 )
                 try:
                     from sales.services.dibbs_pdf import (
+                        parse_packaging_from_pdf,
                         parse_procurement_history,
                         save_procurement_history,
+                        save_sol_packaging,
                     )
 
                     rows = parse_procurement_history(body, sol_number)
                     saved = save_procurement_history(rows)
+                    try:
+                        pack = parse_packaging_from_pdf(body, sol_number)
+                        save_sol_packaging(sol_number, pack)
+                    except Exception as pack_e:
+                        self.stdout.write(
+                            f"  {sol_number}: packaging parse/save failed: {pack_e}"
+                        )
                     self.stdout.write(
                         f"  {sol_number}: DONE — {len(body)} bytes, {saved} procurement history rows saved"
                     )
@@ -99,5 +108,5 @@ class Command(BaseCommand):
         self.stdout.write(
             f"fetch_pending_pdfs complete: {done} done, {failed} failed, "
             f"{skipped} skipped (max attempts reached), "
-            f"{ca_covered} skipped (CA zip already pulled)"
+            f"{ca_covered} skipped (procurement data already extracted)"
         )

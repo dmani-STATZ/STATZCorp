@@ -37,8 +37,10 @@ def parse_ca_zip(zip_bytes: bytes, import_date: date) -> Dict:
     """
     from sales.models import Solicitation
     from sales.services.dibbs_pdf import (
+        parse_packaging_from_pdf,
         parse_procurement_history,
         save_procurement_history,
+        save_sol_packaging,
     )
 
     result = {
@@ -135,6 +137,18 @@ def parse_ca_zip(zip_bytes: bytes, import_date: date) -> Dict:
                 )
                 result["errors"] += 1
                 continue
+
+            try:
+                pack = parse_packaging_from_pdf(
+                    pdf_bytes, sol_row["solicitation_number"]
+                )
+                save_sol_packaging(sol_row["solicitation_number"], pack)
+            except Exception as e:
+                logger.warning(
+                    "parse_ca_zip: packaging save error for %s: %s",
+                    sol_row["solicitation_number"],
+                    e,
+                )
 
             Solicitation.objects.filter(pk=sol_row["pk"]).update(
                 pdf_data_pulled=now

@@ -26,10 +26,7 @@ from sales.models import (
     SolicitationLine,
     ApprovedSource,
 )
-from sales.services.parser import (
-    parse_import_batch,
-    assign_triage_bucket,
-)
+from sales.services.parser import parse_import_batch
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +150,8 @@ def upsert_solicitations(parsed: dict, batch: ImportBatch, import_date: date) ->
     triage_by_sol: dict[str, str] = {}
     for ps in solicitations:
         if ps.solicitation_number not in triage_by_sol:
-            triage_by_sol[ps.solicitation_number] = assign_triage_bucket(ps)
+            # assign_triage_bucket(ps)  # RETIRED — buckets deprecated, see Section 14.3 of spec
+            triage_by_sol[ps.solicitation_number] = "UNSET"
 
     # First ParsedSolicitation per sol_number
     first_ps: dict[str, object] = {}

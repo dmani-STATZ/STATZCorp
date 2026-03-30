@@ -26,7 +26,7 @@ import logging
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from django.db import transaction
 from django.utils import timezone
@@ -101,66 +101,222 @@ def _read_pdf_download(page, url: str, sol_number: str) -> Optional[bytes]:
     return body
 
 
+SECTION_D_START_RES = [
+    re.compile(
+        r"(?:^|\n)\s*Section\s+D\s*[-–—:.]?\s*Packaging\s+and\s+Marking",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(
+        r"(?:^|\n)\s*Section\s+D\s*[-–—:.]?\s*Packaging\s+and\s+Preservation",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(
+        r"(?:^|\n)\s*Packaging\s+and\s+Preservation\b",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+]
+SECTION_D_START_RE = SECTION_D_START_RES[0]
+SECTION_AFTER_D_RE = re.compile(
+    r"(?:^|\n)\s*Section\s+[EF]\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Optional labeled lines inside Section D (SF-18 style varies)
+_PACK_STD_LINE = re.compile(
+    r"^\s*(?:Packaging\s+(?:Standard|Data|Requirements?)|Level\s*[A-Z0-9]?)\s*[:.]?\s*(.+)$",
+    re.IGNORECASE,
+)
+_PRES_LINE = re.compile(
+    r"^\s*(?:Preservation|Pres\.\s*Method)\s*[:.]?\s*(.+)$",
+    re.IGNORECASE,
+)
+_MARK_LINE = re.compile(
+    r"^\s*(?:Marking|Markings?|MIL[-\s]*STD[-\s]*129)\s*[:.]?\s*(.+)$",
+    re.IGNORECASE,
+)
+# MIL-style packaging codes (RP001, PK001, etc.) inside Section D
+_PACK_CODE_RE = re.compile(r"\b([A-Z]{2}\d{3})\b")
+
+
+def _section_d_start_in_text(text: str) -> Optional[re.Match]:
+    """First Section D / packaging heading match in document order."""
+    best: Optional[re.Match] = None
+    for cre in SECTION_D_START_RES:
+        m = cre.search(text)
+        if m and (best is None or m.start() < best.start()):
+            best = m
+    return best
+
+
+def _extract_full_pdf_text(pdf_bytes: bytes, sol_number: str) -> str:
+    if not pdf_bytes:
+        return ""
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+    except Exception as e:
+        logger.warning("_extract_full_pdf_text(%s): %s", sol_number, e)
+        return ""
+    parts: List[str] = []
+    for page in reader.pages:
+        try:
+            parts.append(page.extract_text() or "")
+        except Exception as e:
+            logger.warning(
+                "_extract_full_pdf_text(%s): page extract failed: %s", sol_number, e
+            )
+    return "\n".join(parts)
+
+
+def _packaging_code_blocks(raw: str) -> str:
+    """
+    Split Section D text on codes like RP001 / PK001 and format as labeled blocks.
+    """
+    if not raw or not _PACK_CODE_RE.search(raw):
+        return ""
+    parts: List[str] = []
+    for m in _PACK_CODE_RE.finditer(raw):
+        code = m.group(1)
+        start = m.end()
+        nxt = _PACK_CODE_RE.search(raw, start)
+        end = nxt.start() if nxt else len(raw)
+        body = raw[start:end].strip()
+        body = re.sub(r"\s+", " ", body)
+        if body:
+            parts.append(f"{code} — {body}")
+        else:
+            parts.append(code)
+    return "\n".join(parts).strip()
+
+
+def parse_packaging_data(pdf_bytes: bytes, sol_number: str = "") -> Dict[str, str]:
+    """
+    Locate Section D or "Packaging and Preservation" in extracted PDF text; pull
+    packaging / preservation / marking strings, MIL-style code blocks (RP001…),
+    and raw section text for SolPackaging upsert.
+    """
+    empty: Dict[str, str] = {
+        "packaging_standard": "",
+        "preservation_requirements": "",
+        "marking_requirements": "",
+        "raw_section_d": "",
+    }
+    text = _extract_full_pdf_text(pdf_bytes, sol_number)
+    if not text.strip():
+        return empty
+
+    m = _section_d_start_in_text(text)
+    if not m:
+        m = re.search(r"(?:^|\n)\s*Section\s+D\b", text, re.IGNORECASE | re.MULTILINE)
+        if m:
+            chunk_probe = text[m.start() : m.start() + 2500]
+            if not re.search(
+                r"Packaging|Preservation|Marking|RP\d{3}|PK\d{3}",
+                chunk_probe,
+                re.IGNORECASE,
+            ):
+                m = None
+    if not m:
+        return empty
+
+    start = m.start()
+    chunk = text[start:]
+    end_m = SECTION_AFTER_D_RE.search(chunk, pos=len(m.group(0)))
+    raw = (chunk[: end_m.start()] if end_m else chunk).strip()
+    if not raw:
+        return empty
+
+    raw_cap = 32000
+    if len(raw) > raw_cap:
+        raw = raw[:raw_cap] + "\n…"
+
+    packaging_standard = ""
+    preservation_parts: List[str] = []
+    marking_parts: List[str] = []
+
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        pm = _PACK_STD_LINE.match(s)
+        if pm:
+            packaging_standard = pm.group(1).strip()[:200]
+            continue
+        pr = _PRES_LINE.match(s)
+        if pr:
+            preservation_parts.append(pr.group(1).strip())
+            continue
+        mk = _MARK_LINE.match(s)
+        if mk:
+            marking_parts.append(mk.group(1).strip())
+            continue
+
+    if not packaging_standard:
+        for s in raw.splitlines():
+            t = s.strip()
+            if re.search(r"\bMIL[-\s]?STD\b|\bASTM\b|\bPPP[-\s]?\w+", t, re.I):
+                packaging_standard = t[:200]
+                break
+
+    code_text = _packaging_code_blocks(raw)
+    preservation_joined = "\n".join(preservation_parts).strip()
+    if code_text:
+        if preservation_joined:
+            preservation_joined = f"{preservation_joined}\n\n{code_text}".strip()
+        else:
+            preservation_joined = code_text
+
+    return {
+        "packaging_standard": packaging_standard,
+        "preservation_requirements": preservation_joined,
+        "marking_requirements": "\n".join(marking_parts).strip(),
+        "raw_section_d": raw,
+    }
+
+
+def parse_packaging_from_pdf(pdf_bytes: bytes, sol_number: str) -> Dict[str, str]:
+    """Backward-compatible name; delegates to parse_packaging_data."""
+    return parse_packaging_data(pdf_bytes, sol_number)
+
+
+def save_sol_packaging(sol_number: str, data: Dict[str, Any]) -> bool:
+    """
+    Upsert SolPackaging when Section D was found (raw_section_d non-empty).
+    Returns True if a row was written.
+    """
+    raw = (data.get("raw_section_d") or "").strip()
+    if not raw:
+        return False
+
+    from sales.models import SolPackaging
+
+    sol_key = sol_number.strip().upper()
+    packaging_standard = (data.get("packaging_standard") or "")[:200]
+    preservation = (data.get("preservation_requirements") or "").strip()
+    marking = (data.get("marking_requirements") or "").strip()
+
+    SolPackaging.objects.update_or_create(
+        solicitation_number=sol_key,
+        defaults={
+            "packaging_standard": packaging_standard,
+            "preservation_requirements": preservation,
+            "marking_requirements": marking,
+            "raw_section_d": raw,
+        },
+    )
+    return True
+
+
 def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
     """
     Fetch the PDF for a single solicitation. Returns raw bytes or None on failure.
-    Opens and closes its own Playwright browser session.
-    Uses the same DoD consent bypass as dibbs_fetch.py.
+    Uses one Playwright session via fetch_pdfs_for_sols(), then persists procurement
+    history, packaging, and pdf_data_pulled outside that session.
     """
-    url = _pdf_url(sol_number)
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        logger.exception("Playwright not installed")
-        return None
-
-    try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
-            )
-            context = browser.new_context(accept_downloads=True)
-
-            session_page = context.new_page()
-            try:
-                _establish_dibbs2_session(session_page)
-            finally:
-                try:
-                    session_page.close()
-                except Exception:
-                    pass
-
-            page = context.new_page()
-            try:
-                body = _read_pdf_download(page, url, sol_number)
-                if body:
-                    try:
-                        history_rows = parse_procurement_history(body, sol_number)
-                        saved = save_procurement_history(history_rows)
-                        logger.info(
-                            "fetch_pdf_for_sol(%s): parsed %d rows, saved %d",
-                            sol_number, len(history_rows), saved,
-                        )
-                    except Exception as e:
-                        logger.exception(
-                            "fetch_pdf_for_sol(%s): procurement history parse/save failed: %s",
-                            sol_number, e,
-                        )
-                return body
-            except Exception as e:
-                logger.exception("fetch_pdf_for_sol(%s) failed: %s", sol_number, e)
-                return None
-            finally:
-                try:
-                    page.close()
-                except Exception:
-                    pass
-
-            browser.close()
-    except Exception as e:
-        logger.exception("fetch_pdf_for_sol(%s) outer failure: %s", sol_number, e)
-        return None
+    key = sol_number.strip().upper()
+    results = fetch_pdfs_for_sols([key])
+    body = results.get(key)
+    if body:
+        persist_pdf_procurement_extract(key, body)
+    return body
 
 
 def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
@@ -220,6 +376,79 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
     return result
 
 
+def _parse_procurement_header_line(line: str) -> Optional[Tuple[str, str]]:
+    """
+    Return (nsn_13, fsc_4) if line declares procurement history NSN context.
+    NSN is stored as FSC (4) + NIIN (9), no hyphens.
+    """
+    s = re.sub(r"\s+", " ", line.strip())
+    patterns = [
+        # "Procurement History for NSN/FSC: 123456789/1234" and punctuation variants
+        re.compile(
+            r"Procurement\s+History\s+for\s+NSN\s*/\s*FSC\s*[:\s#]?\s*(\d{9})\s*/\s*(\d{4})",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"Procurement\s+History\s+for\s+NSN\s*/\s*FSC\s*[:\s#]?\s*(\d{4})\s*/\s*(\d{9})",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"Procurement\s+History\s+for\s+NSN\s*[:\s]\s*(\d{13})\b",
+            re.IGNORECASE,
+        ),
+    ]
+    for i, pat in enumerate(patterns):
+        m = pat.search(s)
+        if not m:
+            continue
+        if i == 0:
+            niin, fsc = m.group(1), m.group(2)
+            return fsc + niin, fsc
+        if i == 1:
+            fsc, niin = m.group(1), m.group(2)
+            return fsc + niin, fsc
+        full = m.group(1)
+        return full, full[:4]
+
+    return None
+
+
+def _parse_procurement_header_continuation(line: str) -> Optional[Tuple[str, str]]:
+    s = re.sub(r"\s+", " ", line.strip())
+    m = re.search(
+        r"\b(\d{4})[\s\-/](\d{9})\b|\b(\d{13})\b",
+        s,
+    )
+    if not m:
+        return None
+    if m.group(3):
+        full = m.group(3)
+        return full, full[:4]
+    return m.group(1) + m.group(2), m.group(1)
+
+
+def _match_procurement_row(line: str) -> Optional[re.Match]:
+    """
+    Match CAGE + contract + qty + unit price + yyyymmdd + Y/N with flexible spacing.
+    """
+    norm = re.sub(r"\s+", " ", line.strip())
+    if not norm:
+        return None
+    pat = re.compile(
+        r"^([A-Z0-9]{5})\s+(.+?)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{8})\s+([YN])\s*$",
+        re.IGNORECASE,
+    )
+    m = pat.match(norm)
+    if m:
+        return m
+    # Tighter spaces merged in PDF extraction
+    pat2 = re.compile(
+        r"^([A-Z0-9]{5})\s+(\S+(?:\s+\S+)*)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{8})\s+([YN])\b",
+        re.IGNORECASE,
+    )
+    return pat2.match(norm)
+
+
 def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
     """
     Extract procurement history rows from a DIBBS solicitation PDF blob.
@@ -234,15 +463,9 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
     if not pdf_bytes:
         return []
 
-    HEADER_RE = re.compile(
-        r"Procurement History for NSN/FSC:(\d{9})/(\d{4})",
-        re.IGNORECASE,
-    )
-    ROW_RE = re.compile(
-        r"^([A-Z0-9]{5})\s+(\S+)\s+([\d.]+)\s+([\d.]+)\s+(\d{8})\s+([YN])\s*$"
-    )
     COLUMN_HEADER_RE = re.compile(
-        r"CAGE\s+Contract Number\s+Quantity", re.IGNORECASE
+        r"CAGE\s+.*Contract\s+.*Quantity|Contract\s+Number\s+.*Quantity",
+        re.IGNORECASE,
     )
 
     try:
@@ -252,9 +475,11 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
         return []
 
     rows: Dict[str, Dict] = {}
-    current_nsn = None
-    current_fsc = None
+    current_nsn: Optional[str] = None
+    current_fsc: Optional[str] = None
     in_history = False
+    # Carry across pages — history tables often span page breaks without a repeated header.
+    header_continuation: Optional[str] = None
 
     for page in reader.pages:
         try:
@@ -267,20 +492,34 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
             continue
 
         for line in text.splitlines():
+            raw_line = line
             line = line.strip()
+            if header_continuation is not None:
+                line = f"{header_continuation} {line}".strip()
+                header_continuation = None
+
             if not line:
                 continue
 
-            header_match = HEADER_RE.search(line)
-            if header_match:
-                niin = header_match.group(1)
-                fsc = header_match.group(2)
-                current_nsn = fsc + niin
-                current_fsc = fsc
+            hdr = _parse_procurement_header_line(line)
+            if hdr is None and re.match(
+                r"^Procurement\s+History\b",
+                re.sub(r"\s+", " ", line),
+                re.IGNORECASE,
+            ):
+                cont = _parse_procurement_header_continuation(line)
+                if cont:
+                    current_nsn, current_fsc = cont
+                    in_history = True
+                else:
+                    header_continuation = line
+                continue
+            if hdr:
+                current_nsn, current_fsc = hdr
                 in_history = True
                 continue
 
-            if not in_history:
+            if not in_history or current_nsn is None:
                 continue
 
             if COLUMN_HEADER_RE.search(line):
@@ -289,14 +528,16 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
             if line == ".":
                 continue
 
-            row_match = ROW_RE.match(line)
+            row_match = _match_procurement_row(raw_line)
+            if not row_match:
+                row_match = _match_procurement_row(line)
             if row_match:
-                contract_num = row_match.group(2)
+                contract_num = row_match.group(2).strip()
                 if contract_num in rows:
                     continue
                 try:
-                    qty = Decimal(row_match.group(3))
-                    cost = Decimal(row_match.group(4))
+                    qty = Decimal(row_match.group(3).replace(",", ""))
+                    cost = Decimal(row_match.group(4).replace(",", ""))
                     awd_str = row_match.group(5)
                     awd_date = date(
                         int(awd_str[:4]),
@@ -314,12 +555,12 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
                 rows[contract_num] = {
                     "nsn": current_nsn,
                     "fsc": current_fsc,
-                    "cage_code": row_match.group(1),
+                    "cage_code": row_match.group(1).upper(),
                     "contract_number": contract_num,
                     "quantity": qty,
                     "unit_cost": cost,
                     "award_date": awd_date,
-                    "surplus_material": row_match.group(6) == "Y",
+                    "surplus_material": row_match.group(6).upper() == "Y",
                     "sol_number": sol_number,
                 }
             else:
@@ -371,3 +612,46 @@ def save_procurement_history(rows: List[Dict]) -> int:
             count += 1
 
     return count
+
+
+def persist_pdf_procurement_extract(sol_number: str, pdf_bytes: Optional[bytes]) -> None:
+    """
+    Parse procurement history and Section D from PDF bytes, save to DB, set
+    Solicitation.pdf_data_pulled. Call only after any Playwright session has fully
+    exited (Azure mssql + sync_playwright ORM boundary).
+    """
+    if not pdf_bytes:
+        return
+
+    key = sol_number.strip().upper()
+    now = timezone.now()
+
+    try:
+        history_rows = parse_procurement_history(pdf_bytes, key)
+        saved = save_procurement_history(history_rows)
+        logger.info(
+            "persist_pdf_procurement_extract(%s): parsed %d rows, saved %d",
+            key,
+            len(history_rows),
+            saved,
+        )
+    except Exception as e:
+        logger.exception(
+            "persist_pdf_procurement_extract(%s): procurement history failed: %s",
+            key,
+            e,
+        )
+        return
+
+    try:
+        pack = parse_packaging_from_pdf(pdf_bytes, key)
+        if save_sol_packaging(key, pack):
+            logger.info("persist_pdf_procurement_extract(%s): saved SolPackaging", key)
+    except Exception as e:
+        logger.exception(
+            "persist_pdf_procurement_extract(%s): packaging failed: %s", key, e
+        )
+
+    from sales.models import Solicitation
+
+    Solicitation.objects.filter(solicitation_number=key).update(pdf_data_pulled=now)

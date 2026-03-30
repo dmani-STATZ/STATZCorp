@@ -21,6 +21,7 @@ from sales.models.awards import AwardImportBatch, DibbsAward, DibbsAwardMod, WeW
 from sales.models.email_templates import EmailTemplate
 from sales.models.inbox import InboxMessage, InboxMessageRFQLink
 from sales.models.no_quote import NoQuoteCAGE
+from sales.models.packaging import SolPackaging
 
 __all__ = [
     'ImportBatch',
@@ -47,4 +48,5 @@ __all__ = [
     'InboxMessage',
     'InboxMessageRFQLink',
     'NoQuoteCAGE',
+    'SolPackaging',
 ]

@@ -26,6 +26,11 @@ def _normalize_nsn(nsn: str) -> str:
     return nsn.replace("-", "").strip() if nsn else ""
 
 
+def normalize_nsn(nsn: str) -> str:
+    """Public alias for NSN normalization (used by views and quote-side learning)."""
+    return _normalize_nsn(nsn)
+
+
 def _match_tier1_nsn(line: SolicitationLine) -> list[dict]:
     """
     Query dibbs_supplier_nsn for exact NSN match.

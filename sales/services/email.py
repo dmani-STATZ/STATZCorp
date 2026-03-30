@@ -22,6 +22,115 @@ from sales.models.email_templates import _SafeDict
 logger = logging.getLogger(__name__)
 
 
+def compose_grouped_rfq_email_message(supplier, rfqs, sent_by, personalization_text=""):
+    """
+    Build subject and plain-text body for a grouped RFQ email (one supplier, many lines).
+    Used by build_grouped_rfq_email and by the RFQ queue preview endpoint.
+    """
+    import random
+
+    rfqs = list(rfqs)
+    if not rfqs:
+        return ("", "")
+
+    blocks = []
+    for rfq in rfqs:
+        line = rfq.line
+        sol = line.solicitation
+        nsn = (line.nsn or "").strip()
+        nomenclature = (line.nomenclature or "").strip()
+        qty = line.quantity or 0
+        unit = (line.unit_of_issue or "").strip()
+        return_date = (
+            sol.return_by_date.strftime("%b %d, %Y") if sol.return_by_date else "—"
+        )
+        blocks.append(
+            f"Sol #: {sol.solicitation_number}\n"
+            f"NSN: {nsn}    NOMENCLATURE: {nomenclature}\n"
+            f"QTY: {qty} {unit}\n"
+            f"Return By: {return_date}"
+        )
+    sol_blocks = "\n---\n".join(blocks)
+
+    contact_name = supplier.name or "Vendor"
+    contacts = getattr(supplier, "contacts", None)
+    if contacts is not None:
+        first_contact = contacts.first()
+        if first_contact and (first_contact.name or "").strip():
+            contact_name = first_contact.name.strip()
+
+    your_name = (getattr(sent_by, "get_full_name", None) and sent_by.get_full_name()) or getattr(sent_by, "username", "") or "Sales"
+    your_email = getattr(sent_by, "email", "") or ""
+
+    pers = (personalization_text or "").strip()
+    personalization_block = (pers + "\n\n") if pers else ""
+
+    base_ctx = _SafeDict({
+        "supplier_name": (supplier.name or "").strip(),
+        "contact_name": contact_name,
+        "your_name": your_name,
+        "your_email": your_email,
+        "sol_blocks": sol_blocks,
+        "personalization_block": personalization_block,
+    })
+
+    active_greetings = list(RFQGreeting.objects.filter(is_active=True))
+    active_salutations = list(RFQSalutation.objects.filter(is_active=True))
+    greeting_text = (
+        random.choice(active_greetings).text if active_greetings else ""
+    )
+    salutation_text = (
+        random.choice(active_salutations).text if active_salutations else ""
+    )
+    try:
+        greeting = greeting_text.format_map(base_ctx) if greeting_text else ""
+    except Exception:
+        greeting = greeting_text
+    try:
+        salutation = salutation_text.format_map(base_ctx) if salutation_text else ""
+    except Exception:
+        salutation = salutation_text
+
+    context = _SafeDict({
+        "supplier_name": base_ctx["supplier_name"],
+        "contact_name": base_ctx["contact_name"],
+        "your_name": your_name,
+        "your_email": your_email,
+        "sol_blocks": sol_blocks,
+        "greeting": greeting,
+        "salutation": salutation,
+        "personalization_block": personalization_block,
+    })
+
+    template = (
+        EmailTemplate.objects.filter(is_default=True).first()
+        or EmailTemplate.objects.first()
+    )
+    if template:
+        tpl_body = template.body_template
+        if personalization_block and "{personalization_block}" not in tpl_body:
+            tpl_body = tpl_body.replace("{sol_blocks}", "{personalization_block}{sol_blocks}", 1)
+        try:
+            body = tpl_body.format_map(_SafeDict(dict(context)))
+        except Exception:
+            body = template.body_template.format_map(_SafeDict(dict(context)))
+    else:
+        body = (
+            f"{context['supplier_name']},\n\n"
+            f"{greeting}\n\n{personalization_block}{sol_blocks}\n\n{salutation}"
+        )
+
+    if len(rfqs) == 1:
+        line = rfqs[0].line
+        sol = line.solicitation
+        nomenclature = (line.nomenclature or "").strip() or "RFQ"
+        subject = f"RFQ — {sol.solicitation_number} — {nomenclature} — STATZ Corporation"
+    else:
+        subject = f"RFQ — {len(rfqs)} Solicitations — STATZ Corporation"
+
+    return (subject, body)
+
+
 def resolve_supplier_email_for_send(supplier):
     """
     Resolve supplier email for RFQ send (grouped queue).
@@ -228,12 +337,15 @@ Thank you,
 """
 
 
-def send_followup_email(rfq, sent_by):
+def send_followup_email(rfq, sent_by, email_template=None):
     """
     Send a follow-up email for an existing RFQ.
     Only valid if rfq.status == 'SENT'.
     Increments rfq.follow_up_count, sets rfq.follow_up_sent_at=now,
     creates SupplierContactLog (FOLLOWUP). Returns True/False.
+
+    If ``email_template`` is provided, subject/body are rendered from it;
+    otherwise the default _followup_body text is used.
     """
     if rfq.status != "SENT":
         logger.warning("Follow-up only allowed for SENT rfq_id=%s (status=%s).", rfq.pk, rfq.status)
@@ -255,8 +367,25 @@ def send_followup_email(rfq, sent_by):
     sol = line.solicitation
     nomenclature = (line.nomenclature or "").strip() or "RFQ"
     return_by = sol.return_by_date.strftime("%Y-%m-%d") if sol.return_by_date else ""
-    subject = f"FOLLOW-UP: RFQ {sol.solicitation_number} – {nomenclature} – Due {return_by}"
-    body = _followup_body(rfq, sender_full_name)
+    return_date_display = sol.return_by_date.strftime("%m/%d/%Y") if sol.return_by_date else ""
+
+    if email_template is not None:
+        tpl_ctx = _SafeDict({
+            "supplier_name": (rfq.supplier.name or "").strip(),
+            "sol_number": sol.solicitation_number or "",
+            "nsn": (line.nsn or "").strip(),
+            "nomenclature": nomenclature,
+            "qty": str(line.quantity) if line.quantity is not None else "",
+            "unit_of_issue": (line.unit_of_issue or "").strip(),
+            "return_date": return_date_display,
+            "your_name": sender_full_name,
+            "your_email": getattr(sent_by, "email", "") or "",
+        })
+        subject = email_template.render_subject(dict(tpl_ctx))
+        body = email_template.render_body(dict(tpl_ctx))
+    else:
+        subject = f"FOLLOW-UP: RFQ {sol.solicitation_number} – {nomenclature} – Due {return_by}"
+        body = _followup_body(rfq, sender_full_name)
 
     try:
         msg = EmailMessage(
@@ -288,7 +417,7 @@ def send_followup_email(rfq, sent_by):
     return True
 
 
-def build_grouped_rfq_email(supplier, rfqs, sent_by):
+def build_grouped_rfq_email(supplier, rfqs, sent_by, personalization_text=""):
     """
     Build and dispatch (or stage) a grouped RFQ email for one supplier.
 
@@ -298,6 +427,9 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by):
 
     When False, returns a mailto: URL for manual send; the caller must confirm
     via ``rfq_queue_mark_sent`` before statuses are updated.
+
+    ``personalization_text`` is inserted after the greeting (see
+    ``compose_grouped_rfq_email_message``).
 
     Returns:
         {
@@ -311,8 +443,6 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by):
             'supplier_cage': str,
         }
     """
-    import random
-
     rfq_ids = [r.pk for r in rfqs]
     supplier_name = (supplier.name or supplier.cage_code or f"Supplier {supplier.pk}").strip()
     supplier_cage = (supplier.cage_code or "").strip()
@@ -337,89 +467,9 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by):
         (cage.smtp_reply_to or "").strip() or default_from
     ) if cage else default_from
 
-    blocks = []
-    for rfq in rfqs:
-        line = rfq.line
-        sol = line.solicitation
-        nsn = (line.nsn or "").strip()
-        nomenclature = (line.nomenclature or "").strip()
-        qty = line.quantity or 0
-        unit = (line.unit_of_issue or "").strip()
-        return_date = (
-            sol.return_by_date.strftime("%b %d, %Y") if sol.return_by_date else "—"
-        )
-        blocks.append(
-            f"Sol #: {sol.solicitation_number}\n"
-            f"NSN: {nsn}    NOMENCLATURE: {nomenclature}\n"
-            f"QTY: {qty} {unit}\n"
-            f"Return By: {return_date}"
-        )
-    sol_blocks = "\n---\n".join(blocks)
-
-    contact_name = supplier.name or "Vendor"
-    contacts = getattr(supplier, "contacts", None)
-    if contacts is not None:
-        first_contact = contacts.first()
-        if first_contact and (first_contact.name or "").strip():
-            contact_name = first_contact.name.strip()
-
-    your_name = (getattr(sent_by, "get_full_name", None) and sent_by.get_full_name()) or getattr(sent_by, "username", "") or "Sales"
-    your_email = getattr(sent_by, "email", "") or ""
-
-    base_ctx = _SafeDict({
-        "supplier_name": (supplier.name or "").strip(),
-        "contact_name": contact_name,
-        "your_name": your_name,
-        "your_email": your_email,
-        "sol_blocks": sol_blocks,
-    })
-
-    active_greetings = list(RFQGreeting.objects.filter(is_active=True))
-    active_salutations = list(RFQSalutation.objects.filter(is_active=True))
-    greeting_text = (
-        random.choice(active_greetings).text if active_greetings else ""
+    subject, body = compose_grouped_rfq_email_message(
+        supplier, rfqs, sent_by, personalization_text=personalization_text or ""
     )
-    salutation_text = (
-        random.choice(active_salutations).text if active_salutations else ""
-    )
-    try:
-        greeting = greeting_text.format_map(base_ctx) if greeting_text else ""
-    except Exception:
-        greeting = greeting_text
-    try:
-        salutation = salutation_text.format_map(base_ctx) if salutation_text else ""
-    except Exception:
-        salutation = salutation_text
-
-    context = _SafeDict({
-        "supplier_name": base_ctx["supplier_name"],
-        "contact_name": base_ctx["contact_name"],
-        "your_name": your_name,
-        "your_email": your_email,
-        "sol_blocks": sol_blocks,
-        "greeting": greeting,
-        "salutation": salutation,
-    })
-
-    template = (
-        EmailTemplate.objects.filter(is_default=True).first()
-        or EmailTemplate.objects.first()
-    )
-    if template:
-        body = template.render_body(dict(context))
-    else:
-        body = (
-            f"{context['supplier_name']},\n\n"
-            f"{greeting}\n\n{sol_blocks}\n\n{salutation}"
-        )
-
-    if len(rfqs) == 1:
-        line = rfqs[0].line
-        sol = line.solicitation
-        nomenclature = (line.nomenclature or "").strip() or "RFQ"
-        subject = f"RFQ — {sol.solicitation_number} — {nomenclature} — STATZ Corporation"
-    else:
-        subject = f"RFQ — {len(rfqs)} Solicitations — STATZ Corporation"
 
     attachments = []
     for rfq in rfqs:

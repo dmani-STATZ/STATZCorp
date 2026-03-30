@@ -86,7 +86,7 @@
                   {% endif %}">
             Archive
         </a>
-        <a href="{% url 'sales:rfq_queue_view' %}"
+        <a href="{% url 'sales:rfq_queue' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
                   {% if section == 'rfq' %}
                       border-bottom-color: var(--company-primary, #004eb3); color: var(--company-primary, #004eb3);
@@ -164,8 +164,11 @@
     <nav class="subnav-bar">
       <div class="subnav-inner">
         {% if section == 'rfq' %}
-          <a href="{% url 'sales:rfq_queue_view' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_queue_view' %}active{% endif %}">
+          <a href="{% url 'sales:rfq_queue' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_queue' %}active{% endif %}">
             Queue
+          </a>
+          <a href="{% url 'sales:rfq_sent' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_sent' %}active{% endif %}">
+            Sent
           </a>
           <a href="{% url 'sales:rfq_center' %}" class="subnav-link {% if request.resolver_match.url_name == 'rfq_center' or request.resolver_match.url_name == 'rfq_center_detail' %}active{% endif %}">
             Manage

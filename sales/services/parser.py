@@ -595,6 +595,8 @@ def assign_triage_bucket(sol: ParsedSolicitation) -> str:
     Returns:
         Bucket string: 'SDVOSB' or 'UNSET'
     """
+    # DEPRECATED — triage buckets retired. This function is no longer called.
+    # Retained in codebase for reference only. Do not call.
     if sol.sb_set_aside in SDVOSB_CODES:
         return 'SDVOSB'
     return 'UNSET'

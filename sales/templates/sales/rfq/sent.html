@@ -1,187 +1,104 @@
 {% extends "sales/base.html" %}
 {% load static %}
 {% block content %}
-<style>
-  .form-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.25rem; }
-  .form-label { font-size: 0.7rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
-  .mono { font-family: ui-monospace, monospace; }
-  .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
-  .btn-primary { background: var(--company-primary, #004eb3); color: #fff; }
-  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
-  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
-  .section-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600; font-size: 0.9375rem; }
-  .section-body { border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; overflow: hidden; }
-  .section-body table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-  .section-body th { padding: 0.625rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-  .section-body td { padding: 0.625rem 1rem; border-bottom: 1px solid #eef2f8; }
-  .row-overdue { background: #fef2f2 !important; }
-  .return-urgent { color: #ea580c; font-weight: 600; }
-  .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
-</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" crossorigin="anonymous">
 
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:0.75rem;">
-  <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Sent RFQs</h1>
-  <a href="{% url 'sales:rfq_pending' %}" class="btn btn-ghost btn-sm">RFQ Pending</a>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+  <h1 class="h4 fw-semibold mb-0">Sent RFQs</h1>
+  <div class="d-flex gap-2">
+    <a href="{% url 'sales:rfq_queue' %}" class="btn btn-outline-secondary btn-sm">RFQ Queue</a>
+    <a href="{% url 'sales:rfq_center' %}" class="btn btn-outline-secondary btn-sm">Manage</a>
+  </div>
 </div>
 
-{# Overdue #}
-<div style="margin-bottom:1rem;">
-  <div class="section-header" style="background:#fef2f2; border-color:#fecaca;">
-    🔴 Overdue ({{ overdue|length }})
-  </div>
-  <div class="section-body">
-    {% if overdue %}
-    <table>
-      <thead><tr><th>Supplier</th><th>Sol#</th><th>Nomenclature</th><th>Sent</th><th>Return by</th><th>Days left</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>
-        {% for r in overdue %}
-        <tr class="row-overdue">
-          <td><a href="{% url 'suppliers:supplier_detail' r.supplier.id %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ r.supplier.name|default:"—" }}</a></td>
-          <td class="mono"><a href="{% url 'sales:solicitation_detail' sol_number=r.line.solicitation.solicitation_number %}">{{ r.line.solicitation.solicitation_number }}</a></td>
-          <td>{{ r.line.nomenclature|default:"—"|truncatewords:6 }}</td>
-          <td>{{ r.sent_at|date:"M j, Y"|default:"—" }}</td>
-          <td>{{ r.line.solicitation.return_by_date|date:"M j, Y"|default:"—" }}</td>
-          <td>—</td>
-          <td><span class="badge" style="background:#eef2f8; color:#374151;">{{ r.get_status_display }}</span></td>
-          <td>
-            <a href="{% url 'sales:rfq_enter_quote' rfq_id=r.id %}" class="btn btn-primary btn-sm">Enter Quote</a>
-            <form method="post" action="{% url 'sales:rfq_send_followup' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Follow Up</button></form>
-            <form method="post" action="{% url 'sales:rfq_mark_no_response' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">No Response</button></form>
-            <form method="post" action="{% url 'sales:rfq_mark_declined' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Declined</button></form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{% if not supplier_groups %}
+<p class="text-muted">No sent RFQs in the active pipeline.</p>
+{% else %}
+{% for group in supplier_groups %}
+{% with s=group.supplier %}
+<div class="card mb-3 shadow-sm">
+  <div class="card-header bg-light d-flex flex-wrap align-items-center gap-2 py-2">
+    <span class="fw-bold">{{ s.name|default:"—" }}</span>
+    <span class="text-muted small">CAGE: {{ s.cage_code|default:"—" }}</span>
+    {% if group.sent_at %}
+    <span class="text-muted small">Sent {{ group.sent_at|date:"M j, Y" }}</span>
+    {% endif %}
+    {% if group.response_status == 'RESPONDED' %}
+    <span class="badge bg-success">RESPONDED</span>
+    {% elif group.response_status == 'OVERDUE' %}
+    <span class="badge bg-danger">OVERDUE</span>
     {% else %}
-    <p style="padding:1rem; margin:0; color:#6b7280;">None</p>
+    <span class="badge bg-primary">AWAITING</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="ps-2 border-start border-2 border-secondary mb-3">
+      <table class="table table-sm table-bordered mb-0 bg-white small">
+        <thead class="table-light">
+          <tr>
+            <th>Sol #</th>
+            <th>NSN</th>
+            <th>Nomenclature</th>
+            <th>Qty + UOM</th>
+            <th>Return By</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rfq in group.rfqs %}
+          {% with line=rfq.line sol=rfq.line.solicitation %}
+          <tr>
+            <td class="font-monospace"><a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}">{{ sol.solicitation_number }}</a></td>
+            <td class="font-monospace">{{ line.nsn|default:"—" }}</td>
+            <td>{{ line.nomenclature|default:"—"|truncatewords:8 }}</td>
+            <td>{{ line.quantity|default:"—" }} {{ line.unit_of_issue|default:"" }}</td>
+            <td>
+              {% if sol.return_by_date %}
+                {% if sol.days_remaining != None and sol.days_remaining <= 3 %}
+                  <span class="text-danger fw-semibold">{{ sol.return_by_date|date:"M j, Y" }}</span>
+                {% else %}
+                  {{ sol.return_by_date|date:"M j, Y" }}
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <a href="{% url 'sales:rfq_enter_quote' rfq_id=rfq.id %}" class="btn btn-sm btn-outline-primary">Enter Quote</a>
+            </td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if group.response_status == 'AWAITING' or group.response_status == 'OVERDUE' %}
+    {% with fr=group.followup_rfq %}
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      {% if follow_up_templates and fr %}
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          Send Follow-Up
+        </button>
+        <ul class="dropdown-menu">
+          {% for t in follow_up_templates %}
+          <li>
+            <form method="post" action="{% url 'sales:rfq_send_followup' rfq_id=fr.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="template_id" value="{{ t.pk }}">
+              <button type="submit" class="dropdown-item">{{ t.name }}</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+    {% endwith %}
     {% endif %}
   </div>
 </div>
+{% endwith %}
+{% endfor %}
+{% endif %}
 
-{# Urgent #}
-<div style="margin-bottom:1rem;">
-  <div class="section-header" style="background:#fff7ed; border-color:#fed7aa;">
-    🟠 Urgent ≤2 days ({{ urgent|length }})
-  </div>
-  <div class="section-body">
-    {% if urgent %}
-    <table>
-      <thead><tr><th>Supplier</th><th>Sol#</th><th>Nomenclature</th><th>Sent</th><th>Return by</th><th>Days left</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>
-        {% for r in urgent %}
-        <tr>
-          <td><a href="{% url 'suppliers:supplier_detail' r.supplier.id %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ r.supplier.name|default:"—" }}</a></td>
-          <td class="mono"><a href="{% url 'sales:solicitation_detail' sol_number=r.line.solicitation.solicitation_number %}">{{ r.line.solicitation.solicitation_number }}</a></td>
-          <td>{{ r.line.nomenclature|default:"—"|truncatewords:6 }}</td>
-          <td>{{ r.sent_at|date:"M j, Y"|default:"—" }}</td>
-          <td class="return-urgent">{{ r.line.solicitation.return_by_date|date:"M j, Y"|default:"—" }}</td>
-          <td>{{ r.line.solicitation.days_remaining|default:"—" }}</td>
-          <td><span class="badge" style="background:#eef2f8; color:#374151;">{{ r.get_status_display }}</span></td>
-          <td>
-            <a href="{% url 'sales:rfq_enter_quote' rfq_id=r.id %}" class="btn btn-primary btn-sm">Enter Quote</a>
-            <form method="post" action="{% url 'sales:rfq_send_followup' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Follow Up</button></form>
-            <form method="post" action="{% url 'sales:rfq_mark_no_response' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">No Response</button></form>
-            <form method="post" action="{% url 'sales:rfq_mark_declined' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Declined</button></form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p style="padding:1rem; margin:0; color:#6b7280;">None</p>
-    {% endif %}
-  </div>
-</div>
-
-{# Awaiting #}
-<div style="margin-bottom:1rem;">
-  <div class="section-header" style="background:#fefce8; border-color:#fef08a;">
-    🟡 Awaiting ({{ awaiting|length }})
-  </div>
-  <div class="section-body">
-    {% if awaiting %}
-    <table>
-      <thead><tr><th>Supplier</th><th>Sol#</th><th>Nomenclature</th><th>Sent</th><th>Return by</th><th>Days left</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>
-        {% for r in awaiting %}
-        <tr>
-          <td><a href="{% url 'suppliers:supplier_detail' r.supplier.id %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ r.supplier.name|default:"—" }}</a></td>
-          <td class="mono"><a href="{% url 'sales:solicitation_detail' sol_number=r.line.solicitation.solicitation_number %}">{{ r.line.solicitation.solicitation_number }}</a></td>
-          <td>{{ r.line.nomenclature|default:"—"|truncatewords:6 }}</td>
-          <td>{{ r.sent_at|date:"M j, Y"|default:"—" }}</td>
-          <td>{{ r.line.solicitation.return_by_date|date:"M j, Y"|default:"—" }}</td>
-          <td>{{ r.line.solicitation.days_remaining|default:"—" }}</td>
-          <td><span class="badge" style="background:#eef2f8; color:#374151;">{{ r.get_status_display }}</span></td>
-          <td>
-            <a href="{% url 'sales:rfq_enter_quote' rfq_id=r.id %}" class="btn btn-primary btn-sm">Enter Quote</a>
-            <form method="post" action="{% url 'sales:rfq_send_followup' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Follow Up</button></form>
-            <form method="post" action="{% url 'sales:rfq_mark_no_response' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">No Response</button></form>
-            <form method="post" action="{% url 'sales:rfq_mark_declined' rfq_id=r.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm">Declined</button></form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p style="padding:1rem; margin:0; color:#6b7280;">None</p>
-    {% endif %}
-  </div>
-</div>
-
-{# Responded #}
-<div style="margin-bottom:1rem;">
-  <div class="section-header" style="background:#f0fdf4; border-color:#bbf7d0;">
-    🟢 Responded ({{ responded|length }})
-  </div>
-  <div class="section-body">
-    {% if responded %}
-    <table>
-      <thead><tr><th>Supplier</th><th>Sol#</th><th>Nomenclature</th><th>Sent</th><th>Return by</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>
-        {% for r in responded %}
-        <tr>
-          <td><a href="{% url 'suppliers:supplier_detail' r.supplier.id %}" style="font-weight:600; color:#1a2940; text-decoration:none;">{{ r.supplier.name|default:"—" }}</a></td>
-          <td class="mono"><a href="{% url 'sales:solicitation_detail' sol_number=r.line.solicitation.solicitation_number %}">{{ r.line.solicitation.solicitation_number }}</a></td>
-          <td>{{ r.line.nomenclature|default:"—"|truncatewords:6 }}</td>
-          <td>{{ r.sent_at|date:"M j, Y"|default:"—" }}</td>
-          <td>{{ r.line.solicitation.return_by_date|date:"M j, Y"|default:"—" }}</td>
-          <td><span class="badge" style="background:#dcfce7; color:#166534;">{{ r.get_status_display }}</span></td>
-          <td><a href="{% url 'sales:rfq_enter_quote' rfq_id=r.id %}" class="btn btn-ghost btn-sm">View Quote</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p style="padding:1rem; margin:0; color:#6b7280;">None</p>
-    {% endif %}
-  </div>
-</div>
-
-{# Closed (No Response / Declined) #}
-<div style="margin-bottom:1rem;">
-  <div class="section-header" style="background:#f3f4f6; border-color:#e5e7eb;">
-    Closed ({{ closed|length }})
-  </div>
-  <div class="section-body">
-    {% if closed %}
-    <table>
-      <thead><tr><th>Supplier</th><th>Sol#</th><th>Nomenclature</th><th>Sent</th><th>Status</th></tr></thead>
-      <tbody>
-        {% for r in closed %}
-        <tr style="color:#9ca3af;">
-          <td>{{ r.supplier.name|default:"—" }}</td>
-          <td class="mono">{{ r.line.solicitation.solicitation_number }}</td>
-          <td>{{ r.line.nomenclature|default:"—"|truncatewords:6 }}</td>
-          <td>{{ r.sent_at|date:"M j, Y"|default:"—" }}</td>
-          <td><span class="badge" style="background:#e5e7eb; color:#6b7280;">{{ r.get_status_display }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p style="padding:1rem; margin:0; color:#6b7280;">None</p>
-    {% endif %}
-  </div>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 {% endblock content %}
