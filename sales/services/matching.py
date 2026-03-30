@@ -27,7 +27,12 @@ def _normalize_nsn(nsn: str) -> str:
 
 
 def normalize_nsn(nsn: str) -> str:
-    """Public alias for NSN normalization (used by views and quote-side learning)."""
+    """
+    Public alias for NSN normalization (views, imports, RFQ quote entry).
+
+    `rfq_enter_quote` uses this when `get_or_create`ing `SupplierNSN` after a successful
+    quote save (`match_score=50`, `source='quote_confirmed'`).
+    """
     return _normalize_nsn(nsn)
 
 

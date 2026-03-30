@@ -10,13 +10,14 @@ from decimal import Decimal
 from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods, require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from django.urls import reverse
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
+from django.template.loader import render_to_string
 
 from contracts.models import Address
 from suppliers.models import Supplier
@@ -670,6 +671,14 @@ def rfq_enter_quote(request, rfq_id):
                 notes=form.cleaned_data["notes"],
                 entered_by=request.user,
             )
+            if not SupplierMatch.objects.filter(line=line, supplier=rfq.supplier).exists():
+                SupplierMatch.objects.create(
+                    line=line,
+                    supplier=rfq.supplier,
+                    match_method="MANUAL",
+                    match_tier=3,
+                    match_score=Decimal("0.00"),
+                )
             nsn_raw = (line.nsn or "").strip()
             if nsn_raw and rfq.supplier_id:
                 n_norm = normalize_nsn(nsn_raw)
@@ -1118,88 +1127,123 @@ def quote_select_for_bid(request, quote_id):
 
 
 @login_required
+@require_GET
 def rfq_manual_supplier_search(request):
     """
-    JSON search for the manual supplier add modal on solicitation detail.
-    GET ?q= — min 2 characters. Searches Supplier by name and cage_code.
+    Manual supplier typeahead for solicitation workbench.
+
+    GET ?q= (min 2 chars), optional ?solicitation_number= to exclude suppliers
+    that already have a SupplierRFQ on that solicitation (any line).
+
+    HTMX (HX-Request): HTML fragment for #wb-manual-results.
+    Otherwise: JSON array [{id, name, cage}].
     """
     q = request.GET.get("q", "").strip()
-    if len(q) < 2:
-        return JsonResponse({"results": []})
+    sol_key = (request.GET.get("solicitation_number") or request.GET.get("sol_number") or "").strip()
+    is_htmx = request.headers.get("HX-Request") == "true"
 
-    suppliers = (
-        Supplier.objects.filter(Q(name__icontains=q) | Q(cage_code__icontains=q))
-        .order_by("name")[:20]
-    )
+    if len(q) < 2:
+        if is_htmx:
+            return render(
+                request,
+                "sales/solicitations/partials/manual_supplier_search_results.html",
+                {"results": [], "solicitation_number": sol_key},
+            )
+        return JsonResponse([], safe=False)
+
+    suppliers = Supplier.objects.filter(
+        Q(name__icontains=q) | Q(cage_code__icontains=q)
+    ).order_by("name")
+    if sol_key:
+        existing = SupplierRFQ.objects.filter(
+            line__solicitation__solicitation_number=sol_key,
+        ).values_list("supplier_id", flat=True)
+        suppliers = suppliers.exclude(pk__in=existing)
+    suppliers = suppliers[:20]
+
     results = [
-        {
-            "id": s.pk,
-            "name": s.name or "",
-            "cage": s.cage_code or "",
-        }
+        {"id": s.pk, "name": s.name or "", "cage": s.cage_code or ""}
         for s in suppliers
     ]
-    return JsonResponse({"results": results})
+
+    if is_htmx:
+        return render(
+            request,
+            "sales/solicitations/partials/manual_supplier_search_results.html",
+            {
+                "results": results,
+                "solicitation_number": sol_key,
+            },
+        )
+    return JsonResponse(results, safe=False)
 
 
 @login_required
 @require_POST
 def rfq_queue_add_manual(request):
     """
-    POST: sol_number, supplier_id — stage SupplierRFQ(QUEUED) with SupplierMatch(MANUAL)
-    for the solicitation's first line (same as rfq_queue_add).
+    POST: supplier_id, solicitation_number (or sol_number).
+
+    Creates SupplierRFQ(QUEUED); advances solicitation New/Active/Matching → RFQ_PENDING;
+    flags PDF fetch when blob missing. Does not create SupplierMatch (deferred to quote entry).
+
+    HTMX: out-of-band refresh of #wb-matches-sidebar + #wb-manual-results.
     """
+    from sales.views.solicitations import _workbench_sidebar_context
+
     supplier_id = request.POST.get("supplier_id")
-    sol_number = (request.POST.get("sol_number") or "").strip()
+    sol_number = (
+        request.POST.get("solicitation_number") or request.POST.get("sol_number") or ""
+    ).strip()
+    is_htmx = request.headers.get("HX-Request") == "true"
+
+    def _htmx_msg(msg: str) -> HttpResponse:
+        html = render_to_string(
+            "sales/solicitations/partials/manual_queue_htmx_response.html",
+            {"htmx_error": msg, "sidebar_inner": ""},
+            request=request,
+        )
+        return HttpResponse(html, content_type="text/html")
+
     if not supplier_id or not sol_number:
+        if is_htmx:
+            return _htmx_msg("supplier_id and solicitation_number are required.")
         return JsonResponse(
-            {"error": "supplier_id and sol_number are required."},
+            {"error": "supplier_id and solicitation_number are required."},
             status=400,
         )
 
     try:
         sid = int(supplier_id)
     except (ValueError, TypeError):
+        if is_htmx:
+            return _htmx_msg("Invalid supplier_id.")
         return JsonResponse({"error": "Invalid supplier_id."}, status=400)
 
     solicitation = get_object_or_404(Solicitation, solicitation_number=sol_number)
     line = solicitation.lines.order_by("line_number", "id").first()
     if not line:
+        if is_htmx:
+            return _htmx_msg("Solicitation has no lines.")
         return JsonResponse({"error": "Solicitation has no lines."}, status=400)
 
     supplier = get_object_or_404(Supplier, pk=sid)
 
     cage_norm = normalize_cage_code(supplier.cage_code)
     if cage_norm and cage_norm in get_no_quote_cage_set():
-        return JsonResponse(
-            {"error": "This supplier is on the No Quote list."},
-            status=409,
-        )
+        if is_htmx:
+            return _htmx_msg("No Quote CAGE")
+        return JsonResponse({"error": "No Quote CAGE"}, status=409)
 
-    if SupplierRFQ.objects.filter(line=line, supplier=supplier).exists():
-        return JsonResponse(
-            {
-                "error": "An RFQ already exists for this supplier on this solicitation.",
-            },
-            status=409,
-        )
+    if SupplierRFQ.objects.filter(
+        line__solicitation=solicitation, supplier=supplier
+    ).exists():
+        msg = "An RFQ already exists for this supplier on this solicitation."
+        if is_htmx:
+            return _htmx_msg(msg)
+        return JsonResponse({"error": msg}, status=409)
 
     with transaction.atomic():
-        match, _created = SupplierMatch.objects.get_or_create(
-            line=line,
-            supplier=supplier,
-            defaults={
-                "match_tier": 3,
-                "match_method": "MANUAL",
-                "match_score": Decimal("0.00"),
-            },
-        )
-        if match.match_method != "MANUAL" or match.match_tier != 3:
-            match.match_tier = 3
-            match.match_method = "MANUAL"
-            match.match_score = Decimal("0.00")
-            match.save(update_fields=["match_tier", "match_method", "match_score"])
-
         rfq = SupplierRFQ.objects.create(
             line=line,
             supplier=supplier,
@@ -1212,6 +1256,19 @@ def rfq_queue_add_manual(request):
             solicitation.save(update_fields=["status"])
 
         _mark_solicitation_pdf_fetch_pending_if_needed(solicitation)
+
+    if is_htmx:
+        sidebar_inner = render_to_string(
+            "sales/solicitations/partials/workbench_sidebar_matches.html",
+            _workbench_sidebar_context(solicitation),
+            request=request,
+        )
+        html = render_to_string(
+            "sales/solicitations/partials/manual_queue_htmx_response.html",
+            {"htmx_error": None, "sidebar_inner": sidebar_inner},
+            request=request,
+        )
+        return HttpResponse(html, content_type="text/html")
 
     return JsonResponse(
         {

@@ -1,0 +1,12 @@
+{% if htmx_error %}
+<div id="wb-manual-results" hx-swap-oob="innerHTML">
+  <div class="alert alert-danger py-1 small mb-0">{{ htmx_error }}</div>
+</div>
+{% else %}
+<div id="wb-matches-sidebar" hx-swap-oob="innerHTML">
+{{ sidebar_inner|safe }}
+</div>
+<div id="wb-manual-results" hx-swap-oob="innerHTML">
+  <span class="text-success small">Queued.</span>
+</div>
+{% endif %}

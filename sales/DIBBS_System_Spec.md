@@ -2115,7 +2115,7 @@ The command center for a single deal. The pipeline track at the top tells you ex
 
 **Matches tab**
 
-- **Manually Added section** — A third section below Matched Suppliers. Uses a Bootstrap modal with debounced search (by name or CAGE) against all in-system suppliers. Selecting a result creates a `SupplierMatch(match_method='MANUAL', match_tier=3)` and stages a `SupplierRFQ(status='QUEUED')`. Duplicate and No Quote checks are enforced server-side with 409 responses displayed inline in the modal.
+- **Manual supplier add (workbench sidebar)** — HTMX typeahead on **Add supplier manually**: `hx-get` to `rfq_manual_supplier_search` with debounced `keyup` (300ms), `?q=` plus `solicitation_number` to exclude suppliers who already have a `SupplierRFQ` on this solicitation. JSON API (non-HTMX) returns `[{id, name, cage}]`. Choosing a row `POST`s `rfq_queue_add_manual` (`supplier_id`, `solicitation_number` or `sol_number`): creates `SupplierRFQ(status='QUEUED', sent_by=user)` only — **no** `SupplierMatch` at queue time; `SupplierMatch(match_method='MANUAL', match_tier=3, match_score=0)` is created when a quote is saved in `rfq_enter_quote` if still missing. No Quote CAGE → JSON `409` / HTMX inline error **No Quote CAGE**. Success refreshes `#wb-matches-sidebar` via out-of-band swap. Sidebar rows show a **Manual** badge for manual-queue or MANUAL-match suppliers and an **In Queue** pill when `QUEUED`.
 
 ```html
 {% extends "sales/base.html" %}

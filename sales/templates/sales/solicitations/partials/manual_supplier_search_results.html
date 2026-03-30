@@ -1,0 +1,15 @@
+{# Fragment returned by rfq_manual_supplier_search for HTMX. #}
+{% if not results %}
+<div class="list-group-item text-muted py-2 small">No results.</div>
+{% else %}
+{% for r in results %}
+<button type="button"
+        class="list-group-item list-group-item-action text-start"
+        hx-post="{% url 'sales:rfq_queue_add_manual' %}"
+        hx-vals='{"supplier_id": "{{ r.id }}", "solicitation_number": "{{ solicitation_number|escapejs }}"}'
+        hx-include="#wb-manual-add-card"
+        hx-swap="none">
+  <strong>{{ r.name }}</strong> <span class="text-muted mono small">{{ r.cage }}</span>
+</button>
+{% endfor %}
+{% endif %}

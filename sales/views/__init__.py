@@ -16,6 +16,7 @@ from sales.views.imports import (
 from sales.views.solicitations import (
     solicitation_list,
     solicitation_workbench,
+    solicitation_workbench_sidebar_partial,
     solicitation_detail,
     solicitation_pdf_view,
     solicitation_history_packaging_partial,
@@ -120,6 +121,7 @@ __all__ = [
     "import_step_match",
     "solicitation_list",
     "solicitation_workbench",
+    "solicitation_workbench_sidebar_partial",
     "solicitation_detail",
     "solicitation_pdf_view",
     "solicitation_history_packaging_partial",

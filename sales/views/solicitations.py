@@ -131,10 +131,25 @@ def _infer_queue_kind(sol):
     return QUEUE_KIND_RESEARCH if sol.status == 'RESEARCH' else QUEUE_KIND_ACTIVE
 
 
+def _match_method_source_label(method: str) -> str:
+    if method == "MANUAL":
+        return "Manual"
+    if method == "DIRECT_NSN":
+        return "NSN Match"
+    if method == "APPROVED_SOURCE":
+        return "Approved Source"
+    if method == "FSC":
+        return "FSC"
+    return "Match"
+
+
 def build_consolidated_supplier_list(sol, no_quote_cages):
     """
     Merge SupplierMatch rows and ApprovedSource rows for this solicitation's lines,
     deduped by normalized CAGE. Sorted: non–no-quote first, then by tier, then name.
+
+    Rows may include `is_manual` (manual queue without engine match, or MANUAL match)
+    for workbench badges. RFQ-only suppliers (no SupplierMatch yet) appear as Manual.
     """
     lines = list(sol.lines.all())
     nsn_set = {_normalize_nsn(l.nsn) for l in lines if l.nsn}
@@ -149,19 +164,20 @@ def build_consolidated_supplier_list(sol, no_quote_cages):
         cage = normalize_cage_code(sup.cage_code)
         if not cage:
             continue
+        src = _match_method_source_label(m.match_method)
         if cage not in by_cage:
             by_cage[cage] = {
                 'supplier': sup,
                 'cage_code': cage,
                 'company_name': (sup.name or '').strip(),
-                'sources': ['NSN Match'],
+                'sources': [src],
                 'match_tier': m.match_tier,
                 'is_no_quote': cage in no_quote_cages,
             }
         else:
             e = by_cage[cage]
-            if 'NSN Match' not in e['sources']:
-                e['sources'].append('NSN Match')
+            if src not in e['sources']:
+                e['sources'].append(src)
             e['match_tier'] = min(
                 e['match_tier'] if e['match_tier'] is not None else 99,
                 m.match_tier,
@@ -198,7 +214,50 @@ def build_consolidated_supplier_list(sol, no_quote_cages):
                     if e['supplier'] and not e['company_name']:
                         e['company_name'] = (e['supplier'].name or '').strip()
 
+    match_pairs = set(
+        SupplierMatch.objects.filter(line__solicitation=sol).values_list(
+            "line_id", "supplier_id"
+        )
+    )
+    for rfq in SupplierRFQ.objects.filter(line__solicitation=sol).select_related("supplier"):
+        sup = rfq.supplier
+        cage = normalize_cage_code(sup.cage_code)
+        if not cage:
+            continue
+        if (rfq.line_id, sup.pk) in match_pairs:
+            continue
+        if cage not in by_cage:
+            by_cage[cage] = {
+                "supplier": sup,
+                "cage_code": cage,
+                "company_name": (sup.name or "").strip(),
+                "sources": ["Manual"],
+                "match_tier": None,
+                "is_no_quote": cage in no_quote_cages,
+            }
+        else:
+            e = by_cage[cage]
+            if "Manual" not in e["sources"]:
+                e["sources"].append("Manual")
+
+    manual_supplier_ids = set(
+        SupplierMatch.objects.filter(
+            line__solicitation=sol, match_method="MANUAL"
+        ).values_list("supplier_id", flat=True)
+    )
+    rfq_only_manual_ids = set()
+    for line_id, sup_id in SupplierRFQ.objects.filter(
+        line__solicitation=sol
+    ).values_list("line_id", "supplier_id"):
+        if (line_id, sup_id) not in match_pairs:
+            rfq_only_manual_ids.add(sup_id)
+    show_manual_ids = manual_supplier_ids | rfq_only_manual_ids
+
     rows = list(by_cage.values())
+    for e in rows:
+        sup = e.get("supplier")
+        e["is_manual"] = bool(sup and sup.pk in show_manual_ids)
+
     rows.sort(
         key=lambda e: (
             e['is_no_quote'],
@@ -207,6 +266,26 @@ def build_consolidated_supplier_list(sol, no_quote_cages):
         )
     )
     return rows
+
+
+def _workbench_sidebar_context(solicitation):
+    """Shared context for workbench right rail (matches + manual add card)."""
+    no_quote_cages = get_no_quote_cage_set()
+    supplier_matches = build_consolidated_supplier_list(solicitation, no_quote_cages)
+    queued_cages = set(
+        normalize_cage_code(c)
+        for c in SupplierRFQ.objects.filter(
+            line__solicitation=solicitation,
+            status="QUEUED",
+        ).values_list("supplier__cage_code", flat=True)
+        if normalize_cage_code(c)
+    )
+    return {
+        "solicitation": solicitation,
+        "supplier_matches": supplier_matches,
+        "queued_cages": queued_cages,
+        "no_quote_cages": no_quote_cages,
+    }
 
 
 def _apply_review_queue_optional_filters(qs, data):
@@ -895,24 +974,18 @@ def solicitation_workbench(request, sol_number):
         ).values_list("supplier_id", flat=True)
     )
 
-    no_quote_cages = get_no_quote_cage_set()
     _rpc = _workbench_procurement_packaging_context(solicitation, line)
     procurement_history = _rpc["procurement_history"]
     packaging = _rpc["packaging"]
     has_pdf_blob = _rpc["has_pdf_blob"]
-    supplier_matches = build_consolidated_supplier_list(solicitation, no_quote_cages)
+    sidebar_ctx = _workbench_sidebar_context(solicitation)
+    supplier_matches = sidebar_ctx["supplier_matches"]
+    queued_cages = sidebar_ctx["queued_cages"]
+    no_quote_cages = sidebar_ctx["no_quote_cages"]
     rfqs_queued = SupplierRFQ.objects.filter(
         line__solicitation=solicitation,
         status="QUEUED",
     ).exists()
-    queued_cages = set(
-        normalize_cage_code(c)
-        for c in SupplierRFQ.objects.filter(
-            line__solicitation=solicitation,
-            status="QUEUED",
-        ).values_list("supplier__cage_code", flat=True)
-        if normalize_cage_code(c)
-    )
 
     nsn_raw = getattr(line, "nsn", None) if line else None
     last_award = None
@@ -969,6 +1042,17 @@ def solicitation_workbench(request, sol_number):
             "show_triage_actions": show_triage_actions,
             "show_research_button": show_research_button,
         },
+    )
+
+
+@login_required
+def solicitation_workbench_sidebar_partial(request, sol_number):
+    """HTMX/full GET: matches table + manual supplier card (same context as workbench right rail)."""
+    solicitation = get_object_or_404(Solicitation, solicitation_number=sol_number)
+    return render(
+        request,
+        "sales/solicitations/partials/workbench_sidebar_matches.html",
+        _workbench_sidebar_context(solicitation),
     )
 
 

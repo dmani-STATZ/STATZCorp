@@ -13,6 +13,7 @@ class SupplierMatch(models.Model):
         ("DIRECT_NSN", "Direct NSN"),
         ("APPROVED_SOURCE", "Approved Source"),
         ("FSC", "FSC Category"),
+        ("MANUAL", "Manual / Ad-hoc"),
     ]
     line = models.ForeignKey(
         "SolicitationLine",
