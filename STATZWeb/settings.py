@@ -45,7 +45,7 @@ IS_PRODUCTION = os.environ.get("WEBSITE_SITE_NAME") is not None
 # Azure App Service configuration
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
-    "statzweb.azurewebsites.us,127.0.0.1,localhost,169.254.130.1,169.254.130.2,169.254.130.5,.azurewebsites.us",
+    "statzweb.azurewebsites.us,127.0.0.1,localhost,169.254.130.1,169.254.130.2,169.254.130.5,.azurewebsites.us,",
 ).split(",")
 
 # CORS settings for PWA
