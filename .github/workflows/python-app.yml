@@ -42,4 +42,4 @@ jobs:
           DJANGO_SETTINGS_MODULE: STATZWeb.settings
           SECRET_KEY: ci-placeholder-key-not-for-production
         run: |
-          python manage.py check --deploy 2>/dev/null || python manage.py check
+          python manage.py test

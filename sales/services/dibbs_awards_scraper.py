@@ -3,6 +3,7 @@ Scrape DIBBS daily award records from AwdRecs.aspx (www.dibbs.bsm.dla.mil).
 
 Playwright is required. Does not touch the database — callers persist via awards_file_importer.
 """
+
 from __future__ import annotations
 
 import logging
@@ -186,6 +187,8 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         cells = tr.find_all("td")
         if not cells:
             continue
+        if cells[0].get("colspan"):  # pagination row
+            continue
         first = _cell_text(cells[0])
         if not first or not first.isdigit():
             continue
@@ -193,11 +196,23 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         for i, col in enumerate(COLUMNS):
             cell = cells[i] if i < len(cells) else None
             if i == 1:  # Award_Basic_Number
-                link = cell.find("a", href=lambda h: h and "/Downloads/Awards/" in h) if cell else None
-                value = link.get_text(strip=True) if link else (_cell_text(cell) if cell else "")
+                link = (
+                    cell.find("a", href=lambda h: h and "/Downloads/Awards/" in h)
+                    if cell
+                    else None
+                )
+                value = (
+                    link.get_text(strip=True)
+                    if link
+                    else (_cell_text(cell) if cell else "")
+                )
                 row[col] = value
             elif i == 2:  # Delivery_Order_Number
-                link = cell.find("a", href=lambda h: h and "/Downloads/Awards/" in h) if cell else None
+                link = (
+                    cell.find("a", href=lambda h: h and "/Downloads/Awards/" in h)
+                    if cell
+                    else None
+                )
                 value = link.get_text(strip=True) if link else ""
                 row[col] = value
             else:
@@ -206,7 +221,9 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
     return rows_out
 
 
-def normalize_award_record_for_importer(raw: dict[str, str], award_date: date) -> dict[str, str]:
+def normalize_award_record_for_importer(
+    raw: dict[str, str], award_date: date
+) -> dict[str, str]:
     """Normalize scraped row dict to AW-style fields expected by awards_file_importer."""
     out: dict[str, str] = {}
     for col in COLUMNS:
@@ -248,7 +265,10 @@ def get_pagination_state(html: str) -> dict[str, Any]:
         txt = span.get_text(strip=True)
         if txt.isdigit():
             td = span.find_parent("td")
-            if td is not None and td.find("a", href=re.compile(r"__doPostBack", re.I)) is None:
+            if (
+                td is not None
+                and td.find("a", href=re.compile(r"__doPostBack", re.I)) is None
+            ):
                 try:
                     current_page = int(txt)
                 except ValueError:
@@ -334,6 +354,7 @@ def scrape_awards_for_date(
     def _emit(msg: str) -> None:
         if activity_log:
             activity_log(msg)
+
     result: dict[str, Any] = {
         "success": False,
         "expected_rows": 0,
@@ -361,7 +382,9 @@ def scrape_awards_for_date(
                 try:
                     accept_dod_warning(page)
                     _emit("Browser: DoD warning accepted.")
-                    _emit(f"Browser: navigating to awards grid for {award_date.isoformat()}.")
+                    _emit(
+                        f"Browser: navigating to awards grid for {award_date.isoformat()}."
+                    )
                     page.goto(
                         build_awards_url(award_date),
                         wait_until="domcontentloaded",
@@ -381,7 +404,9 @@ def scrape_awards_for_date(
                     html = page.content()
                     expected_rows = get_expected_record_count(html)
                     result["expected_rows"] = expected_rows
-                    last_page = max(1, math.ceil(expected_rows / 50) if expected_rows else 1)
+                    last_page = max(
+                        1, math.ceil(expected_rows / 50) if expected_rows else 1
+                    )
                     _emit(
                         f"Browser: DIBBS reports {expected_rows} row(s), "
                         f"{last_page} page(s) to fetch."
@@ -391,7 +416,10 @@ def scrape_awards_for_date(
                         if p > 1:
                             _emit(f"Browser: navigating to page {p} of {last_page}.")
                             state = get_pagination_state(page.content())
-                            if p not in state["visible_pages"] and state["has_next_ellipsis"]:
+                            if (
+                                p not in state["visible_pages"]
+                                and state["has_next_ellipsis"]
+                            ):
                                 if not click_next_ellipsis(page):
                                     logger.warning(
                                         "Page %s not visible and ellipsis click failed; "

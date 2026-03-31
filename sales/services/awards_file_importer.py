@@ -10,7 +10,7 @@ from sales.services.awards_file_parser import AwardFileParseResult, AwardRow
 
 def _chunked(lst, n):
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
 
 
 AW_CHUNK = 100  # 100 rows x 20 fields = 2000 params — under SQL Server 2100 limit
@@ -34,21 +34,25 @@ def _safe_decimal(value):
 
 
 def _dibbs_file_notice_id(
-    award_basic_number: str, delivery_order_number: str | None, nsn: str | None
+    award_basic_number: str,
+    delivery_order_number: str | None,
+    nsn: str | None,
+    purchase_request: str | None,
 ) -> str:
-    key = f"{award_basic_number}|{delivery_order_number or ''}|{nsn or ''}"
+    key = f"{award_basic_number}|{delivery_order_number or ''}|{nsn or ''}|{purchase_request or ''}"
     h = hashlib.sha256(key.encode("utf-8")).hexdigest()
     return f"DF{h}"
 
 
 def _dedupe_rows(rows):
-    """Last row wins per (award_basic_number, delivery_order_number, nsn) key."""
-    by_key: dict[tuple[str, str, str], object] = {}
+    """Last row wins per (award_basic_number, delivery_order_number, nsn, purchase_request) key."""
+    by_key: dict[tuple[str, str, str, str], object] = {}
     for row in rows:
         key = (
             row.award_basic_number,
             row.delivery_order_number or "",
             row.nsn or "",
+            row.purchase_request or "",
         )
         by_key[key] = row
     return list(by_key.values())
@@ -89,7 +93,9 @@ def _award_row_from_scrape_dict(d: dict, warnings: list[str]) -> AwardRow | None
         award_basic_number=award_basic_number,
         delivery_order_number=(d.get("Delivery_Order_Number") or "").strip() or None,
         delivery_order_counter=(d.get("Delivery_Order_Counter") or "").strip() or None,
-        last_mod_posting_date=_parse_mmddyyyy((d.get("Last_Mod_Posting_Date") or "").strip()),
+        last_mod_posting_date=_parse_mmddyyyy(
+            (d.get("Last_Mod_Posting_Date") or "").strip()
+        ),
         awardee_cage=(d.get("Awardee_CAGE_Code") or "").strip() or None,
         total_contract_price=price,
         award_date=_parse_mmddyyyy((d.get("Award_Date") or "").strip()),
@@ -175,9 +181,7 @@ def _process_records(
         existing_keys = {}
         award_basic_numbers = [r.award_basic_number for r in award_rows]
         for chunk in _chunked(award_basic_numbers, AW_CHUNK):
-            for obj in DibbsAward.objects.filter(
-                award_basic_number__in=chunk
-            ).only(
+            for obj in DibbsAward.objects.filter(award_basic_number__in=chunk).only(
                 "id",
                 "award_basic_number",
                 "delivery_order_number",
@@ -185,18 +189,33 @@ def _process_records(
                 "is_faux",
                 "notice_id",
             ):
-                key = (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or "")
+                key = (
+                    obj.award_basic_number,
+                    obj.delivery_order_number or "",
+                    obj.nsn or "",
+                    obj.purchase_request or "",
+                )
                 existing_keys[key] = obj
 
         to_create_awards = []
         to_update_faux = []
 
         for row in award_rows:
-            key = (row.award_basic_number, row.delivery_order_number or "", row.nsn or "")
-            nid = _dibbs_file_notice_id(
-                row.award_basic_number, row.delivery_order_number, row.nsn
+            key = (
+                row.award_basic_number,
+                row.delivery_order_number or "",
+                row.nsn or "",
+                row.purchase_request or "",
             )
-            sol_guess = (row.dibbs_solicitation_number or row.award_basic_number or "")[:50]
+            nid = _dibbs_file_notice_id(
+                row.award_basic_number,
+                row.delivery_order_number,
+                row.nsn,
+                row.purchase_request,
+            )
+            sol_guess = (row.dibbs_solicitation_number or row.award_basic_number or "")[
+                :50
+            ]
             matched_sol = sol_lookup.get(row.dibbs_solicitation_number or "")
 
             if key not in existing_keys:
@@ -227,7 +246,9 @@ def _process_records(
                 if existing.is_faux:
                     existing.is_faux = False
                     existing.award_date = row.award_date or parse_result.award_date
-                    existing.total_contract_price = _safe_decimal(row.total_contract_price)
+                    existing.total_contract_price = _safe_decimal(
+                        row.total_contract_price
+                    )
                     existing.awardee_cage = (row.awardee_cage or "")[:10]
                     existing.nomenclature = row.nomenclature
                     existing.purchase_request = row.purchase_request
@@ -239,7 +260,9 @@ def _process_records(
 
         if to_create_awards:
             _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
-            notice_id_index = next(i for i, f in enumerate(_fields) if f.name == "notice_id")
+            notice_id_index = next(
+                i for i, f in enumerate(_fields) if f.name == "notice_id"
+            )
             _cols = ", ".join(f.column for f in _fields)
             _placeholders = ", ".join(["%s" for _ in _fields])
             _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
@@ -258,7 +281,9 @@ def _process_records(
                         ).values_list("notice_id", flat=True)
                     )
                     _rows = [
-                        r for r in _rows if r[notice_id_index] not in existing_notice_ids
+                        r
+                        for r in _rows
+                        if r[notice_id_index] not in existing_notice_ids
                     ]
                 if _rows:
                     with _conn.cursor() as cursor:
@@ -286,25 +311,48 @@ def _process_records(
             existing_mod_awards = {}
             mod_basic_numbers = [r.award_basic_number for r in mod_rows]
             for chunk in _chunked(mod_basic_numbers, AW_CHUNK):
-                for obj in DibbsAward.objects.filter(
-                    award_basic_number__in=chunk
-                ).only("id", "award_basic_number", "delivery_order_number", "nsn"):
-                    key = (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or "")
+                for obj in DibbsAward.objects.filter(award_basic_number__in=chunk).only(
+                    "id",
+                    "award_basic_number",
+                    "delivery_order_number",
+                    "nsn",
+                    "purchase_request",
+                ):
+                    key = (
+                        obj.award_basic_number,
+                        obj.delivery_order_number or "",
+                        obj.nsn or "",
+                        obj.purchase_request or "",
+                    )
                     existing_mod_awards[key] = obj
 
             existing_mod_dedup = set(
                 DibbsAwardMod.objects.filter(
                     award_id__in=[o.id for o in existing_mod_awards.values()]
-                ).values_list("award_id", "mod_date", "nsn", "mod_contract_price")
+                ).values_list(
+                    "award_id",
+                    "mod_date",
+                    "nsn",
+                    "mod_contract_price",
+                    "purchase_request",
+                )
             )
 
             faux_key_to_obj = {}
 
             for row in mod_rows:
-                key = (row.award_basic_number, row.delivery_order_number or "", row.nsn or "")
+                key = (
+                    row.award_basic_number,
+                    row.delivery_order_number or "",
+                    row.nsn or "",
+                    row.purchase_request or "",
+                )
                 if key not in existing_mod_awards and key not in faux_key_to_obj:
                     nid = _dibbs_file_notice_id(
-                        row.award_basic_number, row.delivery_order_number, row.nsn
+                        row.award_basic_number,
+                        row.delivery_order_number,
+                        row.nsn,
+                        row.purchase_request,
                     )
                     faux = DibbsAward(
                         source=DibbsAward.SOURCE_DIBBS_FILE,
@@ -319,10 +367,16 @@ def _process_records(
                         posted_date=None,
                         nsn=row.nsn,
                         nomenclature=row.nomenclature,
-                        purchase_request=None,
+                        purchase_request=row.purchase_request,
                         dibbs_solicitation_number=row.dibbs_solicitation_number,
-                        sol_number=(row.dibbs_solicitation_number or row.award_basic_number or "")[:50],
-                        solicitation=sol_lookup.get(row.dibbs_solicitation_number or ""),
+                        sol_number=(
+                            row.dibbs_solicitation_number
+                            or row.award_basic_number
+                            or ""
+                        )[:50],
+                        solicitation=sol_lookup.get(
+                            row.dibbs_solicitation_number or ""
+                        ),
                         is_faux=True,
                         aw_file_date=parse_result.award_date,
                     )
@@ -330,15 +384,21 @@ def _process_records(
                     faux_key_to_obj[key] = faux
 
             if faux_to_create:
-                _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
-                notice_id_index = next(i for i, f in enumerate(_fields) if f.name == "notice_id")
+                _fields = [
+                    f for f in DibbsAward._meta.concrete_fields if not f.primary_key
+                ]
+                notice_id_index = next(
+                    i for i, f in enumerate(_fields) if f.name == "notice_id"
+                )
                 _cols = ", ".join(f.column for f in _fields)
                 _placeholders = ", ".join(["%s" for _ in _fields])
                 _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
                 for chunk in _chunked(faux_to_create, AW_CHUNK):
                     _rows = [
                         tuple(
-                            f.get_db_prep_save(f.value_from_object(obj), connection=_conn)
+                            f.get_db_prep_save(
+                                f.value_from_object(obj), connection=_conn
+                            )
                             for f in _fields
                         )
                         for obj in chunk
@@ -350,7 +410,9 @@ def _process_records(
                             ).values_list("notice_id", flat=True)
                         )
                         _rows = [
-                            r for r in _rows if r[notice_id_index] not in existing_notice_ids
+                            r
+                            for r in _rows
+                            if r[notice_id_index] not in existing_notice_ids
                         ]
                     if _rows:
                         with _conn.cursor() as cursor:
@@ -358,26 +420,48 @@ def _process_records(
                         faux_created_count += len(_rows)
 
                 reloaded = {
-                    (obj.award_basic_number, obj.delivery_order_number or "", obj.nsn or ""): obj
+                    (
+                        obj.award_basic_number,
+                        obj.delivery_order_number or "",
+                        obj.nsn or "",
+                        obj.purchase_request or "",
+                    ): obj
                     for obj in DibbsAward.objects.filter(
                         notice_id__in=[o.notice_id for o in faux_to_create]
-                    ).only("id", "award_basic_number", "delivery_order_number", "nsn")
+                    ).only(
+                        "id",
+                        "award_basic_number",
+                        "delivery_order_number",
+                        "nsn",
+                        "purchase_request",
+                    )
                 }
                 existing_mod_awards.update(reloaded)
 
             mods_to_create = []
             for row in mod_rows:
-                key = (row.award_basic_number, row.delivery_order_number or "", row.nsn or "")
+                key = (
+                    row.award_basic_number,
+                    row.delivery_order_number or "",
+                    row.nsn or "",
+                    row.purchase_request or "",
+                )
                 award_obj = existing_mod_awards.get(key)
                 if not award_obj:
                     warnings.append(
                         "MOD row skipped - could not find or create award for "
-                        f"{row.award_basic_number} / {row.delivery_order_number} / {row.nsn}"
+                        f"{row.award_basic_number} / {row.delivery_order_number} / {row.nsn} / {row.purchase_request}"
                     )
                     continue
 
                 price = _safe_decimal(row.total_contract_price)
-                dedup_key = (award_obj.id, row.last_mod_posting_date, row.nsn, price)
+                dedup_key = (
+                    award_obj.id,
+                    row.last_mod_posting_date,
+                    row.nsn,
+                    price,
+                    row.purchase_request,
+                )
                 if dedup_key in existing_mod_dedup:
                     mod_skipped_count += 1
                     continue
@@ -397,28 +481,39 @@ def _process_records(
                         posted_date=row.posted_date,
                         purchase_request=row.purchase_request,
                         dibbs_solicitation_number=row.dibbs_solicitation_number,
-                        sol_number=(row.dibbs_solicitation_number or row.award_basic_number or "")[:50],
+                        sol_number=(
+                            row.dibbs_solicitation_number
+                            or row.award_basic_number
+                            or ""
+                        )[:50],
                         aw_file_date=parse_result.award_date,
                     )
                 )
 
             if mods_to_create:
                 from django.db import connection as _conn2
+
                 _mfields = [
-                    f for f in DibbsAwardMod._meta.concrete_fields
-                    if not f.primary_key
+                    f for f in DibbsAwardMod._meta.concrete_fields if not f.primary_key
                 ]
-                _mcols = ', '.join(f.column for f in _mfields)
-                _mplaceholders = ', '.join(['%s' for _ in _mfields])
+                _mcols = ", ".join(f.column for f in _mfields)
+                _mplaceholders = ", ".join(["%s" for _ in _mfields])
                 _msql = (
-                    f'INSERT INTO dibbs_award_mod ({_mcols}) '
-                    f'VALUES ({_mplaceholders})'
+                    f"INSERT INTO dibbs_award_mod ({_mcols}) "
+                    f"VALUES ({_mplaceholders})"
                 )
-                award_fk_index = next(i for i, f in enumerate(_mfields) if f.name == "award")
-                mod_date_index = next(i for i, f in enumerate(_mfields) if f.name == "mod_date")
+                award_fk_index = next(
+                    i for i, f in enumerate(_mfields) if f.name == "award"
+                )
+                mod_date_index = next(
+                    i for i, f in enumerate(_mfields) if f.name == "mod_date"
+                )
                 nsn_index = next(i for i, f in enumerate(_mfields) if f.name == "nsn")
                 price_index = next(
                     i for i, f in enumerate(_mfields) if f.name == "mod_contract_price"
+                )
+                purchase_request_index = next(
+                    i for i, f in enumerate(_mfields) if f.name == "purchase_request"
                 )
                 for chunk in _chunked(mods_to_create, AW_CHUNK):
                     _mrows = [
@@ -436,7 +531,11 @@ def _process_records(
                             DibbsAwardMod.objects.filter(
                                 award_id__in=_award_ids
                             ).values_list(
-                                "award_id", "mod_date", "nsn", "mod_contract_price"
+                                "award_id",
+                                "mod_date",
+                                "nsn",
+                                "mod_contract_price",
+                                "purchase_request",
                             )
                         )
                         _mrows = [
@@ -447,6 +546,7 @@ def _process_records(
                                 r[mod_date_index],
                                 r[nsn_index],
                                 r[price_index],
+                                r[purchase_request_index],
                             )
                             not in existing_mod_tuples
                         ]
