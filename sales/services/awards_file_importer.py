@@ -61,7 +61,7 @@ def _dedupe_rows(rows):
 def _clean_price_str(raw: str) -> Decimal | None:
     if not raw or not raw.strip():
         return None
-    cleaned = raw.replace("$", "").replace(" ", "").strip()
+    cleaned = raw.replace("$", "").replace(",", "").replace(" ", "").strip()
     try:
         return Decimal(cleaned)
     except (InvalidOperation, Exception):

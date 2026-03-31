@@ -124,7 +124,9 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
         try:
             return date.fromisoformat(raw)
         except ValueError:
-            self.stderr.write(self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)"))
+            self.stderr.write(
+                self.style.ERROR(f"Invalid date: {raw!r} (use YYYY-MM-DD)")
+            )
             sys.stderr.flush()
             self._exit_with_failure(
                 "invalid --date argument",
@@ -221,7 +223,9 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                 ]
             )
             self.stdout.write(f"Registered {len(new_dates)} new dates as MISSING.")
-            self._activity(f"Phase 2: registered {len(new_dates)} new MISSING batch(es).")
+            self._activity(
+                f"Phase 2: registered {len(new_dates)} new MISSING batch(es)."
+            )
         else:
             self.stdout.write("No new dates to register.")
             self._activity("Phase 2: no new dates to register.")
@@ -266,7 +270,10 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             ok, fail_reason = self._scrape_single_date_from_batch(batch)
             if not ok:
                 failed_dates.append(
-                    (batch.scrape_date, fail_reason or "Scrape marked FAILED (see logs).")
+                    (
+                        batch.scrape_date,
+                        fail_reason or "Scrape marked FAILED (see logs).",
+                    )
                 )
 
         self._check_and_notify_expiring_dates()
@@ -354,6 +361,15 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                     f"  Browser closed. Saving {len(all_records)} records to DB..."
                 )
                 sys.stdout.flush()
+
+                # DEBUG
+                result2 = import_aw_records(all_records, batch, batch.scrape_date)
+                for w in result2.get("warnings", []):
+                    print(f"  WARN: {w}")
+                print(
+                    f"  created={result2['created_count']} faux={result2['faux_created_count']} mods={result2['mod_created_count']} skipped={result2['mod_skipped_count']}"
+                )
+
                 self._activity(
                     f"Persisting {len(all_records)} scraped row(s) for "
                     f"{batch.scrape_date} (batch_id={batch.pk})."
@@ -466,7 +482,9 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
 
         self._send_expiry_notification(expiring)
 
-    def _send_expiry_notification(self, expiring_batches: list[AwardImportBatch]) -> None:
+    def _send_expiry_notification(
+        self, expiring_batches: list[AwardImportBatch]
+    ) -> None:
         if not getattr(settings, "GRAPH_MAIL_ENABLED", False):
             self.stdout.write("Graph mail not enabled — skipping email notification.")
             self._activity("Expiry email skipped (GRAPH_MAIL_ENABLED is false).")
@@ -507,7 +525,9 @@ Check the Azure WebJob logs and the Awards Import History page in STATZ for deta
 Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
 """
 
-        subject = f"STATZ ALERT: {len(expiring_batches)} award date(s) expiring on DIBBS"
+        subject = (
+            f"STATZ ALERT: {len(expiring_batches)} award date(s) expiring on DIBBS"
+        )
 
         sender = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
         ok = send_mail_via_graph(
@@ -520,6 +540,10 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             self.stdout.write(f"Expiry alert sent to {recipient}.")
             self._activity(f"Phase 4: expiry alert email sent to {recipient}.")
         else:
-            self.stderr.write("Failed to send expiry notification (Graph returned failure).")
+            self.stderr.write(
+                "Failed to send expiry notification (Graph returned failure)."
+            )
             sys.stderr.flush()
-            self._activity("Phase 4: expiry alert email failed (Graph returned failure).")
+            self._activity(
+                "Phase 4: expiry alert email failed (Graph returned failure)."
+            )

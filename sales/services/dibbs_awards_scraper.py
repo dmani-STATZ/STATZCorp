@@ -182,38 +182,55 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
     if table is None:
         return []
 
+    all_trs = table.find_all("tr")
+    if len(all_trs) < 4:
+        return []
+
     rows_out: list[dict[str, str]] = []
-    for tr in table.find_all("tr"):
+    # DEBUG — remove after fix confirmed
+    # for i, tr in enumerate(all_trs):
+    #     cells = tr.find_all("td")
+    #     first_text = _cell_text(cells[0]) if cells else "[no td cells]"
+    #     cls = tr.get("class", [])
+    #     print(f"TR[{i}] class={cls} first_cell={repr(first_text)[:60]}")
+    for tr in all_trs[3:]:
+        if not tr.get("class"):  # skip bare <tr> — inner pagination table row
+            continue
         cells = tr.find_all("td")
         if not cells:
-            continue
-        if cells[0].get("colspan"):  # pagination row
             continue
         first = _cell_text(cells[0])
         if not first or not first.isdigit():
             continue
         row: dict[str, str] = {}
-        for i, col in enumerate(COLUMNS):
+        for i, col in enumerate(
+            COLUMNS
+        ):  # skip first 3 rows (pagination, inner pagination, header)
             cell = cells[i] if i < len(cells) else None
             if i == 1:  # Award_Basic_Number
-                link = (
-                    cell.find("a", href=lambda h: h and "/Downloads/Awards/" in h)
-                    if cell
-                    else None
-                )
-                value = (
-                    link.get_text(strip=True)
-                    if link
-                    else (_cell_text(cell) if cell else "")
-                )
+                if cell:
+                    for a in cell.find_all("a"):
+                        if (
+                            "Award/Basic Package View" in a.get_text()
+                            or "Award Basic Package View" in a.get_text()
+                        ):
+                            a.decompose()
+                    value = _cell_text(cell)
+                else:
+                    value = ""
                 row[col] = value
             elif i == 2:  # Delivery_Order_Number
-                link = (
-                    cell.find("a", href=lambda h: h and "/Downloads/Awards/" in h)
-                    if cell
-                    else None
-                )
-                value = link.get_text(strip=True) if link else ""
+                if cell:
+                    # Remove the "Delivery Order Package View" sub-link text
+                    for a in cell.find_all("a"):
+                        if "Delivery Order Package View" in a.get_text():
+                            a.decompose()
+                    value = _cell_text(cell)
+                else:
+                    value = ""
+                row[col] = value
+            elif i == 5:  # Awardee_CAGE_Code
+                value = _cell_text(cell) if cell else ""
                 row[col] = value
             else:
                 row[col] = _cell_text(cell)
@@ -429,6 +446,14 @@ def scrape_awards_for_date(
                             _dopostback(page, str(p))
                         html = page.content()
                         records = _page_records_normalized(html, award_date)
+
+                        # DEBUG
+                        if p == 1:
+                            for r in records[:5]:
+                                print(
+                                    f"  ROW: {r.get('Row_Num')} | award={r.get('Award_Basic_Number')} | do={r.get('Delivery_Order_Number')} | nsn={r.get('NSN_Part_Number')} | pr={r.get('Purchase_Request')}"
+                                )
+
                         on_page_complete(records, p, last_page)
                         actual_rows += len(records)
                         pages_scraped += 1
