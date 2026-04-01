@@ -130,6 +130,20 @@ class DibbsAward(models.Model):
 
     class Meta:
         db_table = "dibbs_award"
+        indexes = [
+            models.Index(
+                fields=["award_basic_number", "delivery_order_number", "nsn"],
+                name="dibbs_award_dedup",
+            ),
+            models.Index(
+                fields=["award_basic_number"],
+                name="dibbs_award_basic_number",
+            ),
+            models.Index(
+                fields=["delivery_order_number"],
+                name="dibbs_award_delivery_order",
+            ),
+        ]
 
 
 class DibbsAwardMod(models.Model):

@@ -242,6 +242,8 @@ The interactive solicitation import pipeline runs via HTTP (AJAX steps on `Impor
 - `0016_solicitation_pdf_fields`: adds `pdf_blob` and `pdf_fetched_at` to `Solicitation`.
 - `0030_solicitation_pdf_fetch_attempts_and_more`: adds `pdf_fetch_status` and `pdf_fetch_attempts` to `Solicitation`.
 - `0031_solicitation_pdf_data_pulled`: adds `pdf_data_pulled` to `Solicitation` (procurement history extracted via automated PDF paths; `fetch_pending_pdfs` skips when set).
+- `0033_dibbs_award_dedup_and_lookup_indexes`: adds composite index `dibbs_award_dedup` on `(award_basic_number, delivery_order_number, nsn)` and individual indexes on `award_basic_number` and `delivery_order_number` to fix full-table-scan dedup lookups during AW file import.
+- `0034_alter_suppliermatch_match_method`: syncs migration state for `SupplierMatch.match_method` choices (restores `MANUAL` in the graph after `0018_no_quote_cage` dropped it); no column type change on existing databases.
 - `0017_rfqgreeting_rfqsalutation`: creates `RFQGreeting` and `RFQSalutation` (tables `dibbs_rfq_greeting`, `dibbs_rfq_salutation`).
 - `0018_no_quote_cage`: adds `NoQuoteCAGE` (`dibbs_no_quote_cage`) with partial unique constraint on active `cage_code`.
 - `0019_award_import_batch_and_dibbs_award_file_fields`: adds `AwardImportBatch` table (`dibbs_award_import_batch`) and new DIBBS-file fields on `DibbsAward` (`source`, `award_basic_number`, `delivery_order_number`, `delivery_order_counter`, `last_mod_posting_date`, `total_contract_price`, `posted_date`, `nsn`, `nomenclature`, `purchase_request`, `dibbs_solicitation_number`, `aw_import_batch` FK).
