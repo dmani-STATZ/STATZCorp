@@ -82,8 +82,8 @@ def _award_row_from_scrape_dict(d: dict, warnings: list[str]) -> AwardRow | None
     if not award_basic_number:
         return None
 
-    # price_raw = (d.get("Total_Contract_Price") or "").strip()
-    # price = _clean_price_str(price_raw)
+    price_raw = (d.get("Total_Contract_Price") or "").strip()
+    price = _clean_price_str(price_raw)
     # if price_raw and price is None:
     #     warnings.append(
     #         f"Award {award_basic_number}: could not parse price '{price_raw}' — stored as null."
@@ -151,16 +151,16 @@ def _process_records(
     )
 
     referenced_sol_numbers = {
-        r.dibbs_solicitation_number
-        for r in rows
-        if r.dibbs_solicitation_number
+        r.dibbs_solicitation_number for r in rows if r.dibbs_solicitation_number
     }
     sol_lookup = {}
     if referenced_sol_numbers:
         for chunk in _chunked(list(referenced_sol_numbers), AW_CHUNK):
-            for s in Solicitation.objects.filter(
-                solicitation_number__in=chunk
-            ).exclude(status="NO_BID").only("id", "solicitation_number"):
+            for s in (
+                Solicitation.objects.filter(solicitation_number__in=chunk)
+                .exclude(status="NO_BID")
+                .only("id", "solicitation_number")
+            ):
                 sol_lookup[s.solicitation_number] = s
 
     award_rows = [r for r in rows if not r.last_mod_posting_date]
