@@ -82,12 +82,12 @@ def _award_row_from_scrape_dict(d: dict, warnings: list[str]) -> AwardRow | None
     if not award_basic_number:
         return None
 
-    price_raw = (d.get("Total_Contract_Price") or "").strip()
-    price = _clean_price_str(price_raw)
-    if price_raw and price is None:
-        warnings.append(
-            f"Award {award_basic_number}: could not parse price '{price_raw}' — stored as null."
-        )
+    # price_raw = (d.get("Total_Contract_Price") or "").strip()
+    # price = _clean_price_str(price_raw)
+    # if price_raw and price is None:
+    #     warnings.append(
+    #         f"Award {award_basic_number}: could not parse price '{price_raw}' — stored as null."
+    #     )
 
     return AwardRow(
         award_basic_number=award_basic_number,
@@ -150,12 +150,18 @@ def _process_records(
         source_row_count if source_row_count is not None else len(parse_result.rows)
     )
 
-    sol_lookup = {
-        s.solicitation_number: s
-        for s in Solicitation.objects.exclude(status="NO_BID").only(
-            "id", "solicitation_number"
-        )
+    referenced_sol_numbers = {
+        r.dibbs_solicitation_number
+        for r in rows
+        if r.dibbs_solicitation_number
     }
+    sol_lookup = {}
+    if referenced_sol_numbers:
+        for chunk in _chunked(list(referenced_sol_numbers), AW_CHUNK):
+            for s in Solicitation.objects.filter(
+                solicitation_number__in=chunk
+            ).exclude(status="NO_BID").only("id", "solicitation_number"):
+                sol_lookup[s.solicitation_number] = s
 
     award_rows = [r for r in rows if not r.last_mod_posting_date]
     mod_rows = [r for r in rows if r.last_mod_posting_date]
@@ -260,9 +266,6 @@ def _process_records(
 
         if to_create_awards:
             _fields = [f for f in DibbsAward._meta.concrete_fields if not f.primary_key]
-            notice_id_index = next(
-                i for i, f in enumerate(_fields) if f.name == "notice_id"
-            )
             _cols = ", ".join(f.column for f in _fields)
             _placeholders = ", ".join(["%s" for _ in _fields])
             _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
@@ -274,17 +277,6 @@ def _process_records(
                     )
                     for obj in chunk
                 ]
-                if _rows:
-                    existing_notice_ids = set(
-                        DibbsAward.objects.filter(
-                            notice_id__in=[r[notice_id_index] for r in _rows]
-                        ).values_list("notice_id", flat=True)
-                    )
-                    _rows = [
-                        r
-                        for r in _rows
-                        if r[notice_id_index] not in existing_notice_ids
-                    ]
                 if _rows:
                     with _conn.cursor() as cursor:
                         cursor.executemany(_sql, _rows)
@@ -387,9 +379,6 @@ def _process_records(
                 _fields = [
                     f for f in DibbsAward._meta.concrete_fields if not f.primary_key
                 ]
-                notice_id_index = next(
-                    i for i, f in enumerate(_fields) if f.name == "notice_id"
-                )
                 _cols = ", ".join(f.column for f in _fields)
                 _placeholders = ", ".join(["%s" for _ in _fields])
                 _sql = f"INSERT INTO dibbs_award ({_cols}) VALUES ({_placeholders})"
@@ -403,17 +392,6 @@ def _process_records(
                         )
                         for obj in chunk
                     ]
-                    if _rows:
-                        existing_notice_ids = set(
-                            DibbsAward.objects.filter(
-                                notice_id__in=[r[notice_id_index] for r in _rows]
-                            ).values_list("notice_id", flat=True)
-                        )
-                        _rows = [
-                            r
-                            for r in _rows
-                            if r[notice_id_index] not in existing_notice_ids
-                        ]
                     if _rows:
                         with _conn.cursor() as cursor:
                             cursor.executemany(_sql, _rows)
@@ -502,19 +480,6 @@ def _process_records(
                     f"INSERT INTO dibbs_award_mod ({_mcols}) "
                     f"VALUES ({_mplaceholders})"
                 )
-                award_fk_index = next(
-                    i for i, f in enumerate(_mfields) if f.name == "award"
-                )
-                mod_date_index = next(
-                    i for i, f in enumerate(_mfields) if f.name == "mod_date"
-                )
-                nsn_index = next(i for i, f in enumerate(_mfields) if f.name == "nsn")
-                price_index = next(
-                    i for i, f in enumerate(_mfields) if f.name == "mod_contract_price"
-                )
-                purchase_request_index = next(
-                    i for i, f in enumerate(_mfields) if f.name == "purchase_request"
-                )
                 for chunk in _chunked(mods_to_create, AW_CHUNK):
                     _mrows = [
                         tuple(
@@ -525,31 +490,6 @@ def _process_records(
                         )
                         for obj in chunk
                     ]
-                    if _mrows:
-                        _award_ids = {r[award_fk_index] for r in _mrows}
-                        existing_mod_tuples = set(
-                            DibbsAwardMod.objects.filter(
-                                award_id__in=_award_ids
-                            ).values_list(
-                                "award_id",
-                                "mod_date",
-                                "nsn",
-                                "mod_contract_price",
-                                "purchase_request",
-                            )
-                        )
-                        _mrows = [
-                            r
-                            for r in _mrows
-                            if (
-                                r[award_fk_index],
-                                r[mod_date_index],
-                                r[nsn_index],
-                                r[price_index],
-                                r[purchase_request_index],
-                            )
-                            not in existing_mod_tuples
-                        ]
                     if _mrows:
                         with _conn2.cursor() as cursor:
                             cursor.executemany(_msql, _mrows)

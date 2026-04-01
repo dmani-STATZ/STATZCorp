@@ -448,11 +448,11 @@ def scrape_awards_for_date(
                         records = _page_records_normalized(html, award_date)
 
                         # DEBUG
-                        if p == 1:
-                            for r in records[:5]:
-                                print(
-                                    f"  ROW: {r.get('Row_Num')} | award={r.get('Award_Basic_Number')} | do={r.get('Delivery_Order_Number')} | nsn={r.get('NSN_Part_Number')} | pr={r.get('Purchase_Request')}"
-                                )
+                        # if p == 1:
+                        #     for r in records[:5]:
+                        #         print(
+                        #             f"  ROW: {r.get('Row_Num')} | award={r.get('Award_Basic_Number')} | do={r.get('Delivery_Order_Number')} | nsn={r.get('NSN_Part_Number')} | pr={r.get('Purchase_Request')}"
+                        #         )
 
                         on_page_complete(records, p, last_page)
                         actual_rows += len(records)
