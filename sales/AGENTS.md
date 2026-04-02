@@ -233,7 +233,7 @@ Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress 
 
 **Awards data** is loaded by that scraper (reconciliation or `--date`), with staff AW file upload (`awards_import_upload` / `import_aw_file`) as a fallback. `AwardImportBatch` distinguishes paths via `source` (`FILE_UPLOAD` vs `AUTO_SCRAPE`) and, for scrapes, tracks `scrape_date`, `expected_rows`, `scrape_status`, `last_attempted_at`, and `pages_scraped`.
 
-**Awards grid parsing note:** DIBBS renders contract numbers in anchor tags and appends UI text in table cells. In `sales/services/dibbs_awards_scraper.py`, parse `Award_Basic_Number` and `Delivery_Order_Number` from the first anchor whose `href` contains `/Downloads/Awards/` (not raw `td.get_text()`), and do not drop rows when delivery order cells are blank.
+**Awards grid parsing note:** DIBBS appends a small `»` + package-view link in table cells. `parse_awards_table` uses uniform `get_text(separator=" ", strip=True)` per cell; `normalize_award_record_for_importer` strips `»` and trailing link text with `re.sub(r"\s*».*$", "", v)`. Do not reintroduce per-column anchor surgery.
 
 **`awards_file_importer.py`** exposes `import_aw_file()` (file upload) and `import_aw_records()` (scraper, called once per date after the browser closes). Both stage rows and call `usp_process_award_staging`; business logic lives in SQL Server. Win detection for display and reporting uses the `WeWonAward` SQL view (`dibbs_we_won_awards`), not the `DibbsAward.we_won` column at import time.
 

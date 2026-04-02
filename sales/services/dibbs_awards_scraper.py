@@ -187,14 +187,8 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         return []
 
     rows_out: list[dict[str, str]] = []
-    # DEBUG — remove after fix confirmed
-    # for i, tr in enumerate(all_trs):
-    #     cells = tr.find_all("td")
-    #     first_text = _cell_text(cells[0]) if cells else "[no td cells]"
-    #     cls = tr.get("class", [])
-    #     print(f"TR[{i}] class={cls} first_cell={repr(first_text)[:60]}")
     for tr in all_trs[3:]:
-        if not tr.get("class"):  # skip bare <tr> — inner pagination table row
+        if not tr.get("class"):
             continue
         cells = tr.find_all("td")
         if not cells:
@@ -203,37 +197,9 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         if not first or not first.isdigit():
             continue
         row: dict[str, str] = {}
-        for i, col in enumerate(
-            COLUMNS
-        ):  # skip first 3 rows (pagination, inner pagination, header)
+        for i, col in enumerate(COLUMNS):
             cell = cells[i] if i < len(cells) else None
-            if i == 1:  # Award_Basic_Number
-                if cell:
-                    for a in cell.find_all("a"):
-                        if (
-                            "Award/Basic Package View" in a.get_text()
-                            or "Award Basic Package View" in a.get_text()
-                        ):
-                            a.decompose()
-                    value = _cell_text(cell)
-                else:
-                    value = ""
-                row[col] = value
-            elif i == 2:  # Delivery_Order_Number
-                if cell:
-                    # Remove the "Delivery Order Package View" sub-link text
-                    for a in cell.find_all("a"):
-                        if "Delivery Order Package View" in a.get_text():
-                            a.decompose()
-                    value = _cell_text(cell)
-                else:
-                    value = ""
-                row[col] = value
-            elif i == 5:  # Awardee_CAGE_Code
-                value = _cell_text(cell) if cell else ""
-                row[col] = value
-            else:
-                row[col] = _cell_text(cell)
+            row[col] = _cell_text(cell)
         rows_out.append(row)
     return rows_out
 
@@ -247,6 +213,8 @@ def normalize_award_record_for_importer(
         v = raw.get(col, "") or ""
         if isinstance(v, str):
             v = v.strip()
+            # Strip » and everything after it (DIBBS package-view link text bleeds in)
+            v = re.sub(r"\s*».*$", "", v).strip()
         out[col] = v
 
     price = out.get("Total_Contract_Price", "")

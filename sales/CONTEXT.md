@@ -184,6 +184,8 @@ Background workers: DIBBS awards scraper, DIBBS solicitation PDF fetcher, and au
 **Scheduler:** Azure WebJob (`webjobs/run_scrape_awards/run.sh`) — nightly schedule
 **Service:** `sales/services/dibbs_awards_scraper.py`
 
+`parse_awards_table` now uses simple `get_text()` extraction for all columns. The `»` character and DIBBS package-view link text is stripped via `re.sub(r"\s*».*$", "", v)` in `normalize_award_record_for_importer`. Do not add per-column anchor surgery — it is fragile against DIBBS HTML structure changes.
+
 ### Scraper Architecture
 
 The scraper runs in four clean phases. All Django ORM calls are strictly separated

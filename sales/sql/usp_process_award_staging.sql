@@ -24,7 +24,8 @@ BEGIN
 
     IF @batch_id IS NULL
     BEGIN
-        RAISERROR('No staging rows found for stage_id %s', 16, 1, @stage_id);
+        DECLARE @stage_id_str VARCHAR(36) = CONVERT(VARCHAR(36), @stage_id);
+        RAISERROR('No staging rows found for stage_id %s', 16, 1, @stage_id_str);
         RETURN;
     END
 
@@ -112,7 +113,15 @@ BEGIN
                         ISNULL(s.award_basic_number, '')), 50),
         da.solicitation_id = s.solicitation_id,
         da.aw_file_date = TRY_CONVERT(DATE, s.aw_file_date, 110),
-        da.aw_import_batch_id = @batch_id
+        da.aw_import_batch_id = @batch_id,
+        da.we_won = CASE 
+                        WHEN EXISTS (
+                            SELECT 1 FROM dibbs_company_cage cc 
+                            WHERE cc.cage_code = LEFT(ISNULL(s.awardee_cage, ''), 10)
+                            AND cc.is_active = 1
+                        ) THEN 1 
+                        ELSE 0 
+                    END
     FROM dibbs_award da
     INNER JOIN dibbs_award_staging s
         ON s.award_basic_number = da.award_basic_number
@@ -131,7 +140,7 @@ BEGIN
         delivery_order_counter, last_mod_posting_date, awardee_cage,
         total_contract_price, award_date, posted_date, nsn, nomenclature,
         purchase_request, dibbs_solicitation_number, sol_number,
-        solicitation_id, is_faux, aw_file_date, aw_import_batch_id
+        solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won
     )
     SELECT
         s.notice_id,
@@ -154,7 +163,15 @@ BEGIN
         s.solicitation_id,
         0,
         TRY_CONVERT(DATE, s.aw_file_date, 110),
-        @batch_id
+        @batch_id,
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 FROM dibbs_company_cage cc 
+                WHERE cc.cage_code = LEFT(ISNULL(s.awardee_cage, ''), 10)
+                AND cc.is_active = 1
+            ) THEN 1 
+            ELSE 0 
+        END
     FROM dibbs_award_staging s
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'AWARD'
@@ -177,7 +194,7 @@ BEGIN
         delivery_order_counter, last_mod_posting_date, awardee_cage,
         total_contract_price, award_date, posted_date, nsn, nomenclature,
         purchase_request, dibbs_solicitation_number, sol_number,
-        solicitation_id, is_faux, aw_file_date, aw_import_batch_id
+        solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won
     )
     SELECT DISTINCT
         s.notice_id,
@@ -189,8 +206,11 @@ BEGIN
         LEFT(ISNULL(s.awardee_cage, ''), 10),
         NULL,  -- faux has no price
         -- Fiscal year end derived from award_basic_number chars 7-8
-        TRY_CONVERT(DATE,
-            CONCAT('20', SUBSTRING(s.award_basic_number, 7, 2), '-09-30')),
+        COALESCE(
+            TRY_CONVERT(DATE,
+                CONCAT('20', SUBSTRING(s.award_basic_number, 7, 2), '-09-30')),
+            TRY_CONVERT(DATE, s.aw_file_date, 110)  -- fallback to file date
+        ),
         NULL,
         s.nsn,
         s.nomenclature,
@@ -201,7 +221,8 @@ BEGIN
         s.solicitation_id,
         1,  -- is_faux = True
         TRY_CONVERT(DATE, s.aw_file_date, 110),
-        @batch_id
+        @batch_id, 
+        0
     FROM dibbs_award_staging s
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'MOD'
@@ -304,4 +325,3 @@ BEGIN
 
     COMMIT TRANSACTION;
 END;
-GO

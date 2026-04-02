@@ -226,10 +226,10 @@ class WeWonAward(models.Model):
 
 
 class DibbsAwardStaging(models.Model):
-    stage_id = models.UUIDField(
-        default=_uuid.uuid4,
+    stage_id = models.CharField(
+        max_length=36,
         db_index=True,
-        help_text="Isolates concurrent staging runs. One UUID per scrape/upload run.",
+        help_text="Isolates concurrent staging runs. One UUID per scrape/upload run."
     )
     batch = models.ForeignKey(
         "AwardImportBatch",
@@ -266,7 +266,7 @@ class DibbsAwardStaging(models.Model):
 
 
 class DibbsAwardStagingError(models.Model):
-    stage_id = models.UUIDField(db_index=True)
+    stage_id = models.CharField(max_length=36, db_index=True)
     batch = models.ForeignKey(
         "AwardImportBatch",
         on_delete=models.CASCADE,
