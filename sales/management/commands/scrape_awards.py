@@ -362,19 +362,18 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                 )
                 sys.stdout.flush()
 
-                # DEBUG
                 result2 = import_aw_records(all_records, batch, batch.scrape_date)
                 for w in result2.get("warnings", []):
                     print(f"  WARN: {w}")
                 print(
-                    f"  created={result2['created_count']} faux={result2['faux_created_count']} mods={result2['mod_created_count']} skipped={result2['mod_skipped_count']}"
+                    f"  created={result2['created_count']} faux={result2['faux_created_count']} "
+                    f"mods={result2['mod_created_count']} skipped={result2['mod_skipped_count']}"
                 )
 
                 self._activity(
                     f"Persisting {len(all_records)} scraped row(s) for "
                     f"{batch.scrape_date} (batch_id={batch.pk})."
                 )
-                import_aw_records(all_records, batch, batch.scrape_date)
 
             if result["success"]:
                 batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS

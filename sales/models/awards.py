@@ -1,3 +1,5 @@
+import uuid as _uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -221,3 +223,64 @@ class WeWonAward(models.Model):
     class Meta:
         managed = False
         db_table = "dibbs_we_won_awards"
+
+
+class DibbsAwardStaging(models.Model):
+    stage_id = models.UUIDField(
+        default=_uuid.uuid4,
+        db_index=True,
+        help_text="Isolates concurrent staging runs. One UUID per scrape/upload run.",
+    )
+    batch = models.ForeignKey(
+        "AwardImportBatch",
+        on_delete=models.CASCADE,
+        related_name="staging_rows",
+    )
+    staged_at = models.DateTimeField(auto_now_add=True)
+
+    # All raw fields stored as varchar — stored proc cleans and parses
+    notice_id = models.CharField(max_length=66)
+    award_basic_number = models.CharField(max_length=50)
+    delivery_order_number = models.CharField(max_length=50, blank=True, default="")
+    delivery_order_counter = models.CharField(max_length=50, blank=True, null=True)
+    last_mod_posting_date = models.CharField(max_length=20, blank=True, null=True)
+    awardee_cage = models.CharField(max_length=10, blank=True, null=True)
+    total_contract_price = models.CharField(max_length=20, blank=True, null=True)
+    award_date = models.CharField(max_length=20, blank=True, null=True)
+    posted_date = models.CharField(max_length=20, blank=True, null=True)
+    nsn = models.CharField(max_length=50, blank=True, null=True)
+    nomenclature = models.CharField(max_length=100, blank=True, null=True)
+    purchase_request = models.CharField(max_length=50, blank=True, null=True)
+    dibbs_solicitation_number = models.CharField(max_length=50, blank=True, null=True)
+    aw_file_date = models.CharField(max_length=20, blank=True, null=True)
+
+    # Set by stored proc — null on insert
+    row_type = models.CharField(max_length=5, blank=True, null=True)
+    solicitation_id = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "dibbs_award_staging"
+
+    def __str__(self):
+        return f"Staging {self.award_basic_number} [{self.stage_id}]"
+
+
+class DibbsAwardStagingError(models.Model):
+    stage_id = models.UUIDField(db_index=True)
+    batch = models.ForeignKey(
+        "AwardImportBatch",
+        on_delete=models.CASCADE,
+        related_name="staging_errors",
+    )
+    staged_at = models.DateTimeField()
+    raw_award_basic_number = models.CharField(max_length=50, blank=True, null=True)
+    raw_nsn = models.CharField(max_length=50, blank=True, null=True)
+    raw_delivery_order_number = models.CharField(max_length=50, blank=True, null=True)
+    error_reason = models.CharField(max_length=255)
+    errored_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "dibbs_award_staging_errors"
+
+    def __str__(self):
+        return f"StagingError {self.raw_award_basic_number} — {self.error_reason}"

@@ -17,7 +17,14 @@ from sales.models.rfq_phrases import RFQGreeting, RFQSalutation
 from sales.models.quotes import SupplierQuote
 from sales.models.bids import GovernmentBid
 from sales.models.cages import CompanyCAGE
-from sales.models.awards import AwardImportBatch, DibbsAward, DibbsAwardMod, WeWonAward
+from sales.models.awards import (
+    AwardImportBatch,
+    DibbsAward,
+    DibbsAwardMod,
+    DibbsAwardStaging,
+    DibbsAwardStagingError,
+    WeWonAward,
+)
 from sales.models.email_templates import EmailTemplate
 from sales.models.inbox import InboxMessage, InboxMessageRFQLink
 from sales.models.no_quote import NoQuoteCAGE
@@ -43,6 +50,8 @@ __all__ = [
     'AwardImportBatch',
     'DibbsAward',
     'DibbsAwardMod',
+    'DibbsAwardStaging',
+    'DibbsAwardStagingError',
     'WeWonAward',
     'EmailTemplate',
     'InboxMessage',

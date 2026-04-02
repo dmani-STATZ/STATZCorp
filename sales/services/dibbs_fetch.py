@@ -94,6 +94,34 @@ def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
     return result
 
 
+def _check_date_sol_count(session: requests.Session, target_date: date) -> int:
+    """
+    Hit DIBBS RfqRecs.aspx for the given date using the already-authenticated
+    requests session and return the advertised solicitation count.
+    Returns 0 if the page reports no records or if parsing fails.
+    Does NOT raise — caller decides what to do with 0.
+    """
+    url = (
+        "https://www.dibbs.bsm.dla.mil/RFQ/RfqRecs.aspx"
+        f"?category=post&TypeSrch=dt&Value={target_date.strftime('%m-%d-%Y')}"
+    )
+    try:
+        resp = session.get(url, timeout=DEFAULT_TIMEOUT)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        el = soup.find("span", id="ctl00_cph1_lblRecCount")
+        if not el:
+            return 0
+        # Text is like: "Record Found:  0" or "Record Found:  412"
+        text = el.get_text(strip=True)
+        digits = "".join(filter(str.isdigit, text))
+        return int(digits) if digits else 0
+    except Exception:
+        # If the check itself fails, return 0 and let the caller decide.
+        # Logging is the caller's responsibility.
+        return 0
+
+
 def _discover_hrefs(target_date: date) -> tuple[str, str]:
     """Get IN and BQ zip URLs for target_date from www.dibbs RFQ page."""
     tag = target_date.strftime("%y%m%d")

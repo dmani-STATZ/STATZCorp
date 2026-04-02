@@ -342,8 +342,11 @@ def _run_lifecycle_sweep() -> dict:
         Past return_by_date, not in PIPELINE_STATUSES, and (status in NO_BID/New/Active
         or bucket is SKIP) → 'Archived'.
 
+    Pass 3 — Archived blob purge:
+        Single UPDATE: null pdf_blob on all status='Archived' rows that still hold a blob.
+
     Returns:
-        dict with keys new_to_active, expired_to_archived (transition counts).
+        dict with keys new_to_active, expired_to_archived, blob_purged (counts).
     """
     today = timezone.now().date()
 
@@ -369,14 +372,24 @@ def _run_lifecycle_sweep() -> dict:
     if expired_to_archived_count:
         expired_qs.update(status="Archived")
 
+    blob_purged = Solicitation.objects.filter(
+        status="Archived", pdf_blob__isnull=False
+    ).update(pdf_blob=None)
     logger.info(
-        "Lifecycle sweep: %s New→Active, %s Expired→Archived",
+        "_run_lifecycle_sweep: nulled pdf_blob on %d archived solicitation(s).",
+        blob_purged,
+    )
+
+    logger.info(
+        "Lifecycle sweep: %s New→Active, %s Expired→Archived, %s blob(s) purged",
         new_to_active_count,
         expired_to_archived_count,
+        blob_purged,
     )
     return {
         "new_to_active": new_to_active_count,
         "expired_to_archived": expired_to_archived_count,
+        "blob_purged": blob_purged,
     }
 
 
@@ -425,6 +438,7 @@ def run_import(in_file, bq_file, as_file, imported_by: str) -> dict:
         "match_summary":             match_summary,
         "new_to_active":             lifecycle_counts["new_to_active"],
         "expired_to_archived":       lifecycle_counts["expired_to_archived"],
+        "blob_purged":               lifecycle_counts["blob_purged"],
     }
     logger.info(
         f"Import complete: batch={batch.id} sol_created={sol_r['created']} "

@@ -364,6 +364,7 @@ def import_step_parse(request, job_id):
             "parse_errors": cached.get("parse_errors", 0),
             "new_to_active": cached.get("new_to_active", 0),
             "expired_to_archived": cached.get("expired_to_archived", 0),
+            "blob_purged": cached.get("blob_purged", 0),
         })
 
     if job.status == ImportJob.STATUS_ERROR:
@@ -407,6 +408,7 @@ def import_step_parse(request, job_id):
                 "parse_errors": summary["parse_error_count"],
                 "new_to_active": lifecycle_counts["new_to_active"],
                 "expired_to_archived": lifecycle_counts["expired_to_archived"],
+                "blob_purged": lifecycle_counts["blob_purged"],
             })
 
         return JsonResponse({
@@ -418,6 +420,7 @@ def import_step_parse(request, job_id):
             "parse_errors": summary["parse_error_count"],
             "new_to_active": lifecycle_counts["new_to_active"],
             "expired_to_archived": lifecycle_counts["expired_to_archived"],
+            "blob_purged": lifecycle_counts["blob_purged"],
         })
 
     except Exception as exc:

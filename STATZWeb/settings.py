@@ -188,11 +188,12 @@ else:
                 "USER": os.environ.get("DB_USER"),
                 "PASSWORD": os.environ.get("DB_PASSWORD"),
                 "HOST": os.environ.get("DB_HOST"),
+                "PORT": os.environ.get("DB_PORT"),
+                "CONN_MAX_AGE": 600,
                 "OPTIONS": {
-                    "driver": "ODBC Driver 17 for SQL Server",
-                    "timeout": 60,
-                    "autocommit": True,
+                    "driver": "ODBC Driver 18 for SQL Server",
                     "extra_params": "Encrypt=yes;TrustServerCertificate=yes;Connection Timeout=60;",
+                    "host_is_server": True,
                 },
             },
         }

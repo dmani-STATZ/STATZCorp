@@ -147,6 +147,7 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | ⬜ Todo | Bulk no-bid actions | §7 Phase 3 |
 | ⬜ Todo | Role-based access control | §7 Phase 3 |
 | ⬜ Todo | Dark mode | §12.6 |
+| ⬜ Todo | User activity audit log — per-user report showing who triaged, queued, sent RFQs, entered quotes, and linked inbox messages. Data already partially captured via `sent_by`, `entered_by`, `logged_by`, `linked_by` fields. Missing: user FK on `bucket_assigned_by` (currently stores `'auto'`/`'manual'` string, not actual user). Full design TBD. | §13 Future |
 
 ### ⚠ Open Action Items
 
