@@ -29,6 +29,7 @@ from sales.models.email_templates import EmailTemplate
 from sales.models.inbox import InboxMessage, InboxMessageRFQLink
 from sales.models.no_quote import NoQuoteCAGE
 from sales.models.packaging import SolPackaging
+from sales.models.sam_cache import SAMEntityCache
 
 __all__ = [
     'ImportBatch',
@@ -58,4 +59,5 @@ __all__ = [
     'InboxMessageRFQLink',
     'NoQuoteCAGE',
     'SolPackaging',
+    'SAMEntityCache',
 ]

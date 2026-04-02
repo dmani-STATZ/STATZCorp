@@ -2,11 +2,13 @@
 SAM.gov Entity Management API v3 — read-only CAGE code lookup.
 
 Usage:
-    from sales.services.sam_entity import lookup_cage
+    from sales.services.sam_entity import lookup_cage, get_or_fetch_cage
     data = lookup_cage("1ABC5")
     # Returns a cleaned dict of useful fields, or {'found': False, 'cage_code': ...}
     # Raises django.core.exceptions.ImproperlyConfigured if SAM_API_KEY not set.
     # Raises requests.RequestException (with clear message) on network/API errors.
+
+    record = get_or_fetch_cage("1ABC5")  # SAMEntityCache; 30-day TTL; optional force_refresh.
 """
 import logging
 
@@ -227,3 +229,90 @@ def lookup_cage(cage_code: str) -> dict:
         "debug_sba_list": sba_list,  # temporary — remove after diagnosis
         "debug_raw_json": entity,    # temporary — full raw API entity object
     }
+
+
+def _mailing_address_to_text(mailing: dict) -> str:
+    """Serialize SAM mailing_address dict to a newline-separated string for TextField storage."""
+    if not mailing or not isinstance(mailing, dict):
+        return ""
+    parts = []
+    for key in ("street", "street2", "city", "state", "zip", "country"):
+        v = (mailing.get(key) or "").strip()
+        if v:
+            parts.append(v)
+    return "\n".join(parts)
+
+
+def get_or_fetch_cage(cage_code, force_refresh=False):
+    """
+    Returns a SAMEntityCache instance for the given cage_code.
+
+    Logic:
+    1. If force_refresh is False, check for an existing non-stale cache record.
+       If found, return it immediately — no API call.
+    2. If missing, stale, or force_refresh=True, call lookup_cage() and
+       upsert the result into SAMEntityCache.
+    3. If lookup_cage() raises or returns an error payload, save a cache record
+       with fetch_error=True so we don't hammer the API on every page load.
+       Return that error record.
+
+    Always returns a SAMEntityCache instance (never None, never raises).
+    Callers check record.fetch_error to know if the data is valid.
+    """
+    from django.utils import timezone
+
+    from sales.models.sam_cache import SAMEntityCache
+
+    cage_code = (cage_code or "").strip().upper()
+
+    if not force_refresh:
+        try:
+            record = SAMEntityCache.objects.get(pk=cage_code)
+            if not record.is_stale():
+                return record
+        except SAMEntityCache.DoesNotExist:
+            pass
+
+    try:
+        data = lookup_cage(cage_code)
+    except Exception:
+        logger.exception("get_or_fetch_cage: lookup_cage failed for CAGE %s", cage_code)
+        data = {"error": "SAM API call failed", "cage_code": cage_code, "found": False}
+
+    has_error = bool(data.get("error"))
+    physical = data.get("address") or {}
+    if not isinstance(physical, dict):
+        physical = {}
+
+    mailing = data.get("mailing_address")
+    if isinstance(mailing, dict):
+        mailing_text = _mailing_address_to_text(mailing)
+    else:
+        mailing_text = (mailing or "") if isinstance(mailing, str) else ""
+
+    flags = data.get("set_aside_flags") or {}
+    if isinstance(flags, dict):
+        sba_flag_list = sorted(k for k, v in flags.items() if v)
+    else:
+        sba_flag_list = []
+
+    record, _ = SAMEntityCache.objects.update_or_create(
+        cage_code=cage_code,
+        defaults={
+            "entity_name": (data.get("legal_name") or "") if not has_error else "",
+            "website": (data.get("entity_url") or "") if not has_error else "",
+            "physical_address_line1": physical.get("street", "") if not has_error else "",
+            "physical_address_line2": physical.get("street2", "") if not has_error else "",
+            "physical_city": physical.get("city", "") if not has_error else "",
+            "physical_state": physical.get("state", "") if not has_error else "",
+            "physical_zip": physical.get("zip", "") if not has_error else "",
+            "mailing_address": mailing_text if not has_error else "",
+            "sba_flags": sba_flag_list,
+            "naics_codes": (data.get("naics_codes") or []) if not has_error else [],
+            "psc_codes": (data.get("psc_codes") or []) if not has_error else [],
+            "raw_json": data if not has_error else dict(data),
+            "last_fetched": timezone.now(),
+            "fetch_error": has_error,
+        },
+    )
+    return record

@@ -1,13 +1,11 @@
 """
-SAM.gov entity lookup view — read-only, no DB writes.
+SAM.gov entity lookup view — uses SAMEntityCache (30-day TTL) with optional force refresh.
 """
 import json
 import logging
 
-import requests
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ImproperlyConfigured
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -15,7 +13,7 @@ from django.views.decorators.http import require_POST
 
 from sales.models import NoQuoteCAGE
 from sales.services.no_quote import normalize_cage_code
-from sales.services.sam_entity import lookup_cage
+from sales.services.sam_entity import get_or_fetch_cage
 
 logger = logging.getLogger(__name__)
 
@@ -33,72 +31,51 @@ def _address_to_modal_shape(addr):
     }
 
 
-def _entity_lookup_json(cage_code):
+def _entity_lookup_json_payload(record, cage_code):
     """
-    Structured JSON for the solicitation detail SAM modal (?fmt=json).
-    Always HTTP 200; failures use {"error": "..."} so the client can prefill manually.
+    Flat JSON for ?fmt=json (workbench SAM modal). HTTP 200 always.
     """
-    try:
-        data = lookup_cage(cage_code)
-    except ImproperlyConfigured as exc:
-        return JsonResponse(
-            {
-                "error": str(exc),
-                "name": None,
-                "cage_code": cage_code,
-                "website": None,
-                "physical_address": None,
-                "mailing_address": None,
-            }
-        )
-    except requests.RequestException as exc:
-        logger.warning("entity_lookup JSON: API error for CAGE %s: %s", cage_code, exc)
-        return JsonResponse(
-            {
-                "error": str(exc),
-                "name": None,
-                "cage_code": cage_code,
-                "website": None,
-                "physical_address": None,
-                "mailing_address": None,
-            }
-        )
-    except Exception as exc:
-        logger.exception("entity_lookup JSON: unexpected error for CAGE %s", cage_code)
-        return JsonResponse(
-            {
-                "error": "An unexpected error occurred while looking up this CAGE code.",
-                "name": None,
-                "cage_code": cage_code,
-                "website": None,
-                "physical_address": None,
-                "mailing_address": None,
-            }
-        )
+    cage_code = record.cage_code or cage_code
+    days = record.days_since_fetch
+    fetch_error = record.fetch_error
+    base_meta = {
+        "days_since_fetch": days,
+        "fetch_error": fetch_error,
+    }
+    if fetch_error:
+        err = (record.raw_json or {}).get("error") or "Lookup failed."
+        return {
+            **base_meta,
+            "error": err,
+            "name": None,
+            "cage_code": cage_code,
+            "website": None,
+            "physical_address": None,
+            "mailing_address": None,
+        }
 
+    data = record.raw_json or {}
     if not data.get("found"):
-        return JsonResponse(
-            {
-                "error": f"No entity found for CAGE {cage_code}.",
-                "name": None,
-                "cage_code": cage_code,
-                "website": None,
-                "physical_address": None,
-                "mailing_address": None,
-            }
-        )
+        return {
+            **base_meta,
+            "error": f"No entity found for CAGE {cage_code}.",
+            "name": None,
+            "cage_code": cage_code,
+            "website": None,
+            "physical_address": None,
+            "mailing_address": None,
+        }
 
     entity_url = (data.get("entity_url") or "").strip() or None
-    return JsonResponse(
-        {
-            "error": None,
-            "name": data.get("legal_name") or "",
-            "cage_code": data.get("cage_code") or cage_code,
-            "website": entity_url,
-            "physical_address": _address_to_modal_shape(data.get("address")),
-            "mailing_address": _address_to_modal_shape(data.get("mailing_address")),
-        }
-    )
+    return {
+        **base_meta,
+        "error": None,
+        "name": data.get("legal_name") or "",
+        "cage_code": data.get("cage_code") or cage_code,
+        "website": entity_url,
+        "physical_address": _address_to_modal_shape(data.get("address")),
+        "mailing_address": _address_to_modal_shape(data.get("mailing_address")),
+    }
 
 
 @login_required
@@ -106,10 +83,9 @@ def entity_lookup(request, cage_code):
     """
     GET /sales/entity/cage/<cage_code>/
 
-    Calls lookup_cage() and renders a read-only info card.
-    Degrades gracefully on API errors or missing config — no 500s.
-
-    GET ?fmt=json returns structured JSON for the SAM “Add & Queue” modal (HTTP 200 always).
+    Cache-first SAM lookup via get_or_fetch_cage(). Renders read-only info card.
+    GET ?fmt=json returns structured JSON for the workbench SAM modal (HTTP 200 always).
+    GET ?refresh=1 forces a new SAM API fetch (HTML or JSON).
     """
     cage_code = (cage_code or "").strip().upper()
     cage_norm = normalize_cage_code(cage_code)
@@ -118,31 +94,32 @@ def entity_lookup(request, cage_code):
         and NoQuoteCAGE.objects.filter(cage_code=cage_norm, is_active=True).exists()
     )
 
+    force = request.GET.get("refresh") == "1"
+    cache_record = get_or_fetch_cage(cage_code, force_refresh=force)
+
     if request.GET.get("fmt") == "json":
-        return _entity_lookup_json(cage_code)
+        return JsonResponse(_entity_lookup_json_payload(cache_record, cage_code))
 
-    context = {"cage_code": cage_code, "is_no_quote": is_no_quote}
+    context = {
+        "cage_code": cage_code,
+        "is_no_quote": is_no_quote,
+        "cache_record": cache_record,
+        "days_since_fetch": cache_record.days_since_fetch,
+        "fetch_error": cache_record.fetch_error,
+    }
 
-    try:
-        data = lookup_cage(cage_code)
-        context["entity"] = data
-        if request.user.is_staff:
-            context["debug_raw"] = json.dumps(data.get("debug_raw_json", {}), indent=2, default=str)
-    except ImproperlyConfigured as exc:
-        logger.warning("entity_lookup: %s", exc)
-        context["error"] = (
-            "SAM.gov lookup is not configured. "
-            "Please ask your administrator to set SAM_API_KEY in settings."
+    if cache_record.fetch_error:
+        context["error"] = (cache_record.raw_json or {}).get("error") or (
+            "SAM.gov lookup failed. Please try again later."
         )
-    except requests.RequestException as exc:
-        logger.warning("entity_lookup: API error for CAGE %s: %s", cage_code, exc)
-        context["error"] = str(exc)
-    except Exception as exc:
-        logger.exception("entity_lookup: unexpected error for CAGE %s", cage_code)
-        context["error"] = (
-            "An unexpected error occurred while looking up this CAGE code. "
-            "Please try again later."
-        )
+    else:
+        context["entity"] = cache_record.raw_json or {}
+        if request.user.is_staff and context["entity"].get("debug_raw_json") is not None:
+            context["debug_raw"] = json.dumps(
+                context["entity"].get("debug_raw_json", {}),
+                indent=2,
+                default=str,
+            )
 
     return render(request, "sales/entity_lookup.html", context)
 

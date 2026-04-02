@@ -310,7 +310,7 @@ All tables use SQL Server. Django ORM models map directly to these tables. Ident
 | `NO_BID` | Sales team elected not to bid |
 | `Archived` | Past due date, terminal/untouched — hidden from default views |
 
-**Lifecycle sweep (import):** At the start of each daily import (before a new `ImportBatch` is created), `_run_lifecycle_sweep()` in `sales/services/importer.py` runs inside a DB transaction: (1) `New` solicitations whose `ImportBatch.import_date` is before today become `Active`; (2) solicitations past `return_by_date` that are not in active pipeline statuses (`RFQ_PENDING` … `BID_SUBMITTED`) and are in `NO_BID`, `New`, `Active`, or `SKIP` bucket become `Archived`. Counts are stored on the import parse step and shown on the import progress summary.
+**Lifecycle sweep (import):** At the start of each daily import (before a new `ImportBatch` is created), `_run_lifecycle_sweep()` in `sales/services/importer.py` runs inside a DB transaction: (1) `New` solicitations whose `ImportBatch.import_date` is before today become `Active`; (2) solicitations past `return_by_date` that are not in active pipeline statuses (`RFQ_PENDING` … `BID_SUBMITTED`), are **not** `NO_BID`, and are in `New`, `Active`, or `SKIP` bucket become `Archived`. **`NO_BID` is never auto-archived** — those rows stay visible on **Closed Solicitations** under the No-Bid tab. Counts are stored on the import parse step and shown on the import progress summary.
 
 #### `tbl_SolicitationLine` — one row per NSN/line within a solicitation
 
@@ -1055,6 +1055,10 @@ SALES APP
 │    │         Columns: Solicitation #, NSN, Nomenclature,
 │    │                  Qty, Return Date, Set-Aside, Status
 │    │         Status badge colors at a glance
+│    ├── Closed Solicitations              /sales/solicitations/closed/
+│    │         Read-only terminal outcomes: NO_BID, Archived, BID_SUBMITTED, WON, LOST
+│    │         Status tabs via ?status= (no_bid, archived, bid_submitted, won, lost; omit for all)
+│    │         Legacy /sales/solicitations/archive/ redirects here (301)
 │    ├── Solicitation Detail               /sales/solicitations/<sol#>/
 │    │    ├── Overview tab                 NSN, PR#, return date, PDF link
 │    │    ├── Matches tab                  Matched suppliers with tier badges
@@ -2136,6 +2140,8 @@ The command center for a single deal. The pipeline track at the top tells you ex
 **Matches tab**
 
 - **Manual supplier add (workbench sidebar)** — HTMX typeahead on **Add supplier manually**: `hx-get` to `rfq_manual_supplier_search` with debounced `keyup` (300ms), `?q=` plus `solicitation_number` to exclude suppliers who already have a `SupplierRFQ` on this solicitation. JSON API (non-HTMX) returns `[{id, name, cage}]`. Choosing a row `POST`s `rfq_queue_add_manual` (`supplier_id`, `solicitation_number` or `sol_number`): creates `SupplierRFQ(status='QUEUED', sent_by=user)` only — **no** `SupplierMatch` at queue time; `SupplierMatch(match_method='MANUAL', match_tier=3, match_score=0)` is created when a quote is saved in `rfq_enter_quote` if still missing. No Quote CAGE → JSON `409` / HTMX inline error **No Quote CAGE**. Success refreshes `#wb-matches-sidebar` via out-of-band swap. Sidebar rows show a **Manual** badge for manual-queue or MANUAL-match suppliers and an **In Queue** pill when `QUEUED`.
+
+- **Matched & approved sources (sidebar)** — Rows without a `suppliers.Supplier` match show a **Look Up** link that opens **`/sales/entity/cage/<CAGE>/`** in a **new browser tab** (full-page SAM entity lookup; cache-first via `get_or_fetch_cage` / `SAMEntityCache` on that page; **Last verified … ↻** on the entity page). For display **only** (no API call in the workbench view), if a prior visit to the entity page filled `SAMEntityCache` (`fetch_error=False`), the **Supplier** column shows **`entity_name`** with a muted **SAM** badge (tooltip: name from SAM.gov, not in supplier DB); otherwise an em dash until the user opens **Look Up** at least once.
 
 ```html
 {% extends "sales/base.html" %}
@@ -3639,6 +3645,8 @@ Requested explicitly by the sales team. Add to Phase 3 polish items.
 
 ### 13.1 Overview
 DIBBS publishes daily award data on its portal. STATZ scrapes this data automatically each night via a Django management command (`scrape_awards`) triggered by an Azure WebJob. Award records are written directly to `DibbsAward` with no intermediate file. The manual AW file upload at `/sales/awards/import/` is retained as a fallback if the automated scraper fails. `AwardImportBatch` tracks both paths, distinguished by the `source` field (`FILE_UPLOAD` vs `AUTO_SCRAPE`). This is a separate workflow from the daily IN/BQ/AS import; SAM.gov awards sync was removed (DIBBS is the sole source for `DibbsAward` file-style rows).
+
+**SAM.gov entity (CAGE) cache:** `SAMEntityCache` (`dibbs_sam_entity_cache`) stores structured SAM Entity Management v3 lookup results per CAGE for **30 days** (TTL). Rows are created/updated **on demand** when a user loads the standalone entity lookup page (`/sales/entity/cage/<cage>/`, `get_or_fetch_cage`); there is no import/WebJob pre-warm. Failed lookups can be cached with `fetch_error=True` to avoid repeated API calls. Table is not exposed in Django admin.
 
 ### 13.2 AW File Format
 Filename format: `aw[YYMMDD].txt` (e.g. `aw260319.txt`). File is CSV with `#`-prefixed comment

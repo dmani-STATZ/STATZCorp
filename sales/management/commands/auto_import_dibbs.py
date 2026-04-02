@@ -4,18 +4,18 @@
 #   in_file_name, bq_file_name, as_file_name (str paths / names).
 # - ImportBatch: stores import_date (DateField); reconciliation treats any existing row
 #   for a calendar date as "already imported."
-# - Three-phase nightly flow: Loop A (metadata + run_import per missing date;
-#   zero-record dates get RfqRecs.aspx count check + empty ImportBatch, no Playwright),
+# - Nightly flow: Loop A (metadata + run_import per missing date; zero-record dates get
+#   RfqRecs.aspx count check + empty ImportBatch, no Playwright), then _run_lifecycle_sweep,
 #   Loop B (set-aside PDF blob harvest, Playwright batches of 10; excludes Archived),
 #   Loop C (parse pdf_blob → procurement history + packaging; ORM only, after all B sessions).
 import logging
 import math
 import os
 import shutil
-from datetime import datetime
+from datetime import date, datetime
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -27,8 +27,20 @@ HARVEST_BATCH_SIZE = 10
 class Command(BaseCommand):
     help = (
         "Three-phase DIBBS auto-import: IN/BQ/AS daily import, set-aside PDF harvest, "
-        "local PDF parse backlog."
+        "local PDF parse backlog. Use --date to run Loop A for one calendar day only."
     )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--date",
+            type=str,
+            metavar="YYYY-MM-DD",
+            help=(
+                "Process Loop A only for this date (must appear on DIBBS RFQDates with "
+                "IN and BQ). Loop B/C still run as usual. Skips Loop A if ImportBatch "
+                "already exists unless you remove that batch."
+            ),
+        )
 
     def handle(self, *args, **options):
         from sales.services.dibbs_fetch import (
@@ -42,21 +54,21 @@ class Command(BaseCommand):
         from sales.services.dibbs_pdf import fetch_pdfs_for_sols, parse_pdf_data_backlog
         from sales.services.importer import run_import, _run_lifecycle_sweep
 
-        self.stdout.write(f"[{timezone.now().isoformat()}] auto_import_dibbs starting...")
+        only_date = None
+        raw_date = options.get("date")
+        if raw_date:
+            try:
+                only_date = date.fromisoformat(raw_date)
+            except ValueError as e:
+                raise CommandError(
+                    f"Invalid --date {raw_date!r}; use YYYY-MM-DD."
+                ) from e
 
-        # Run lifecycle sweep unconditionally — archives expired sols and purges blobs
-        # regardless of whether Loop A has any dates to import tonight.
-        self.stdout.write("Lifecycle sweep: archiving expired solicitations...")
-        with transaction.atomic():
-            sweep = _run_lifecycle_sweep()
-        self.stdout.write(
-            self.style.SUCCESS(
-                "Lifecycle sweep complete — "
-                f"{sweep.get('new_to_active', 0)} activated, "
-                f"{sweep.get('expired_to_archived', 0)} archived, "
-                f"{sweep.get('blob_purged', 0)} blobs purged."
+        self.stdout.write(f"[{timezone.now().isoformat()}] auto_import_dibbs starting...")
+        if only_date:
+            self.stdout.write(
+                self.style.NOTICE(f"--date mode: Loop A limited to {only_date}.")
             )
-        )
 
         # Discovery (requests only — no Playwright)
         try:
@@ -74,45 +86,55 @@ class Command(BaseCommand):
             ImportBatch.objects.values_list("import_date", flat=True).distinct()
         )
 
-        work_list = []
-        for tag, hrefs in available.items():
-            if not hrefs.get("in") or not hrefs.get("bq"):
-                continue
-            try:
-                d = datetime.strptime(tag, "%y%m%d").date()
-            except ValueError:
-                continue
-            if d in imported_dates:
-                continue
+        if only_date is not None:
+            work_list = self._work_list_single_date(
+                session,
+                available,
+                imported_dates,
+                only_date,
+                _check_date_sol_count,
+                ImportBatch,
+            )
+        else:
+            work_list = []
+            for tag, hrefs in available.items():
+                if not hrefs.get("in") or not hrefs.get("bq"):
+                    continue
+                try:
+                    d = datetime.strptime(tag, "%y%m%d").date()
+                except ValueError:
+                    continue
+                if d in imported_dates:
+                    continue
 
-            # Check DIBBS record count before queuing for Playwright download.
-            sol_count = _check_date_sol_count(session, d)
-            if sol_count == 0:
-                logger.warning(
-                    "auto_import_dibbs: %s has 0 records on DIBBS — stamping empty "
-                    "ImportBatch and skipping.",
-                    d,
-                )
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"  {d} (tag {tag}): 0 records on DIBBS — skipping download, "
-                        "stamping ImportBatch."
+                # Check DIBBS record count before queuing for Playwright download.
+                sol_count = _check_date_sol_count(session, d)
+                if sol_count == 0:
+                    logger.warning(
+                        "auto_import_dibbs: %s has 0 records on DIBBS — stamping empty "
+                        "ImportBatch and skipping.",
+                        d,
                     )
-                )
-                ImportBatch.objects.create(
-                    import_date=d,
-                    in_file_name="",
-                    bq_file_name="",
-                    as_file_name="",
-                    imported_at=timezone.now(),
-                    solicitation_count=0,
-                    imported_by="auto_import_dibbs:empty",
-                )
-                continue
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"  {d} (tag {tag}): 0 records on DIBBS — skipping download, "
+                            "stamping ImportBatch."
+                        )
+                    )
+                    ImportBatch.objects.create(
+                        import_date=d,
+                        in_file_name="",
+                        bq_file_name="",
+                        as_file_name="",
+                        imported_at=timezone.now(),
+                        solicitation_count=0,
+                        imported_by="auto_import_dibbs:empty",
+                    )
+                    continue
 
-            work_list.append((d, tag, hrefs))
+                work_list.append((d, tag, hrefs))
 
-        work_list.sort(key=lambda x: x[0])
+            work_list.sort(key=lambda x: x[0])
 
         failures = []
 
@@ -162,6 +184,20 @@ class Command(BaseCommand):
                 if tmp_dir:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
+        # Lifecycle sweep — runs after import so archived status reflects all newly
+        # imported solicitations. Loop B will then only process non-archived sols.
+        self.stdout.write("Lifecycle sweep: archiving expired solicitations...")
+        with transaction.atomic():
+            sweep = _run_lifecycle_sweep()
+        self.stdout.write(
+            self.style.SUCCESS(
+                "Lifecycle sweep complete — "
+                f"{sweep.get('new_to_active', 0)} activated, "
+                f"{sweep.get('expired_to_archived', 0)} archived, "
+                f"{sweep.get('blob_purged', 0)} blobs purged."
+            )
+        )
+
         # Loop B — harvest PDF blobs for set-aside sols (fresh browser every 10 PDFs)
         self.stdout.write(
             "Loop B: harvesting set-aside PDF blobs (Playwright batches of 10)..."
@@ -188,6 +224,72 @@ class Command(BaseCommand):
             f"auto_import_dibbs complete: Loop A {ok}/{len(work_list)} date(s) imported, "
             f"{len(failures)} failed."
         )
+
+    def _work_list_single_date(
+        self,
+        session,
+        available,
+        imported_dates,
+        only_date,
+        _check_date_sol_count,
+        ImportBatch,
+    ):
+        """
+        Loop A queue for exactly one calendar date. Does not iterate other DIBBS days
+        (avoids stamping empty ImportBatch rows for unrelated dates).
+        """
+        tag = None
+        hrefs = None
+        for t, h in available.items():
+            if not h.get("in") or not h.get("bq"):
+                continue
+            try:
+                d = datetime.strptime(t, "%y%m%d").date()
+            except ValueError:
+                continue
+            if d == only_date:
+                tag, hrefs = t, h
+                break
+
+        if tag is None:
+            raise CommandError(
+                f"{only_date} is not available on DIBBS RFQDates (no day with IN and BQ links)."
+            )
+
+        if only_date in imported_dates:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{only_date} already has an ImportBatch — skipping Loop A. "
+                    "Delete that batch if you need to re-import."
+                )
+            )
+            return []
+
+        sol_count = _check_date_sol_count(session, only_date)
+        if sol_count == 0:
+            logger.warning(
+                "auto_import_dibbs: %s has 0 records on DIBBS — stamping empty "
+                "ImportBatch and skipping.",
+                only_date,
+            )
+            self.stdout.write(
+                self.style.WARNING(
+                    f"  {only_date} (tag {tag}): 0 records on DIBBS — skipping download, "
+                    "stamping ImportBatch."
+                )
+            )
+            ImportBatch.objects.create(
+                import_date=only_date,
+                in_file_name="",
+                bq_file_name="",
+                as_file_name="",
+                imported_at=timezone.now(),
+                solicitation_count=0,
+                imported_by="auto_import_dibbs:empty",
+            )
+            return []
+
+        return [(only_date, tag, hrefs)]
 
     def _harvest_set_aside_pdf_blobs(self) -> tuple[int, int, int]:
         """

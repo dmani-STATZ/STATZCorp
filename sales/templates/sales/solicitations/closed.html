@@ -5,9 +5,9 @@
 
 <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.75rem;">
     <div>
-        <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Solicitation Archive</h1>
+        <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Closed Solicitations</h1>
         <p style="font-size:0.8125rem; color:var(--text-muted,#6b7280); margin:0.35rem 0 0;">
-            Business Development mining view — past-due solicitations retained for analysis.
+            Read-only view — terminal outcomes (no-bid, archived, submitted, won, lost). Filter by status tab or the form below.
         </p>
     </div>
     <a href="{% url 'sales:solicitation_list' %}" style="font-size:0.875rem; color:var(--company-primary,#004eb3); text-decoration:none;">
@@ -15,16 +15,46 @@
     </a>
 </div>
 
+<ul class="nav nav-tabs flex-wrap gap-1 mb-3" style="border-bottom:1px solid var(--border-color,#dee2e6);">
+    <li class="nav-item">
+        <a class="nav-link py-2 px-3 {% if not active_status_filter %}active fw-semibold{% endif %}"
+           href="{% url 'sales:solicitation_closed' %}{% if filter_qs_base %}?{{ filter_qs_base }}{% endif %}">All</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-2 px-3 {% if active_status_filter == 'no_bid' %}active fw-semibold{% endif %}"
+           href="{% url 'sales:solicitation_closed' %}?{% if filter_qs_base %}{{ filter_qs_base }}&{% endif %}status=no_bid">No-Bid</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-2 px-3 {% if active_status_filter == 'archived' %}active fw-semibold{% endif %}"
+           href="{% url 'sales:solicitation_closed' %}?{% if filter_qs_base %}{{ filter_qs_base }}&{% endif %}status=archived">Archived</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-2 px-3 {% if active_status_filter == 'bid_submitted' %}active fw-semibold{% endif %}"
+           href="{% url 'sales:solicitation_closed' %}?{% if filter_qs_base %}{{ filter_qs_base }}&{% endif %}status=bid_submitted">Bid Submitted</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-2 px-3 {% if active_status_filter == 'won' %}active fw-semibold{% endif %}"
+           href="{% url 'sales:solicitation_closed' %}?{% if filter_qs_base %}{{ filter_qs_base }}&{% endif %}status=won">Won</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-2 px-3 {% if active_status_filter == 'lost' %}active fw-semibold{% endif %}"
+           href="{% url 'sales:solicitation_closed' %}?{% if filter_qs_base %}{{ filter_qs_base }}&{% endif %}status=lost">Lost</a>
+    </li>
+</ul>
+
 <p style="font-size:0.8125rem; color:var(--text-muted,#6b7280); margin-bottom:1.25rem;">
     Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} matching
-    ({{ total_archived }} total archived)
+    ({{ total_closed_terminal }} total closed)
 </p>
 
-<form method="get" action="{% url 'sales:solicitation_archive' %}"
+<form method="get" action="{% url 'sales:solicitation_closed' %}"
       style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
              background:var(--surface-secondary, #f9fafb);
              border:1px solid var(--border-color, #e5e7eb);
              border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
+    {% if active_status_filter %}
+    <input type="hidden" name="status" value="{{ active_status_filter }}">
+    {% endif %}
     <div style="display:flex; flex-direction:column; gap:0.25rem;">
         <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Search</label>
         <input type="text" name="q" value="{{ current_filters.q }}"
@@ -80,9 +110,9 @@
 
 {% if page_obj.paginator.count == 0 %}
 <div style="text-align:center; padding:2.5rem 1rem; border:1px dashed var(--border-color,#e5e7eb); border-radius:8px;">
-    <div style="font-size:1rem; font-weight:600; color:var(--text,#374151);">No archived solicitations found</div>
+    <div style="font-size:1rem; font-weight:600; color:var(--text,#374151);">No closed solicitations found</div>
     <p style="font-size:0.875rem; color:var(--text-muted,#9ca3af); margin:0.5rem 0 0;">
-        Solicitations are archived when they pass their return-by date.
+        Adjust filters or choose another status tab.
     </p>
 </div>
 {% else %}
@@ -136,10 +166,19 @@
                     {{ sol.return_by_date|date:"M j, Y"|default:"—" }}
                 </td>
                 <td style="padding:0.625rem 1rem;">
-                    <span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500;
-                                 background:#f3f4f6; color:#6b7280;">
-                        {{ sol.get_status_display|default:sol.status }}
-                    </span>
+                    {% if sol.status == 'NO_BID' %}
+                    <span class="badge text-bg-secondary">{{ sol.get_status_display|default:sol.status }}</span>
+                    {% elif sol.status == 'Archived' %}
+                    <span class="badge text-bg-dark">{{ sol.get_status_display|default:sol.status }}</span>
+                    {% elif sol.status == 'BID_SUBMITTED' %}
+                    <span class="badge text-bg-primary">{{ sol.get_status_display|default:sol.status }}</span>
+                    {% elif sol.status == 'WON' %}
+                    <span class="badge text-bg-success">{{ sol.get_status_display|default:sol.status }}</span>
+                    {% elif sol.status == 'LOST' %}
+                    <span class="badge text-bg-danger">{{ sol.get_status_display|default:sol.status }}</span>
+                    {% else %}
+                    <span class="badge text-bg-secondary">{{ sol.get_status_display|default:sol.status }}</span>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}

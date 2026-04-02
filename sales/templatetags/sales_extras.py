@@ -12,6 +12,14 @@ def dict_key(d, key):
 
 
 @register.filter
+def get_item(dictionary, key):
+    """Allow dict[variable_key] access in templates."""
+    if dictionary is None:
+        return None
+    return dictionary.get(key)
+
+
+@register.filter
 def split(value, delimiter=","):
     """Split a string by delimiter. Usage: "a,b,c"|split:"," """
     return value.split(delimiter)

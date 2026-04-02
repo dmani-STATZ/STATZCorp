@@ -339,8 +339,9 @@ def _run_lifecycle_sweep() -> dict:
         are transitioned to 'Active'. Preserves 'New' as meaning "seen in today's import".
 
     Pass 2 — Expired → Archived:
-        Past return_by_date, not in PIPELINE_STATUSES, and (status in NO_BID/New/Active
+        Past return_by_date, not in PIPELINE_STATUSES, and (status in New/Active
         or bucket is SKIP) → 'Archived'.
+        NO_BID is never auto-archived (see queryset comment below).
 
     Pass 3 — Archived blob purge:
         Single UPDATE: null pdf_blob on all status='Archived' rows that still hold a blob.
@@ -361,12 +362,16 @@ def _run_lifecycle_sweep() -> dict:
         new_qs.update(status="Active")
 
     # --- Pass 2: Expired → Archived ---
+    # NO_BID is intentionally excluded — passed solicitations stay NO_BID permanently
+    # so they remain visible in the Closed Solicitations view under the No-Bid tab.
     expired_qs = Solicitation.objects.filter(
         return_by_date__lt=today,
     ).exclude(
         status__in=PIPELINE_STATUSES,
+    ).exclude(
+        status="NO_BID",
     ).filter(
-        Q(status__in=["NO_BID", "New", "Active"]) | Q(bucket="SKIP")
+        Q(status__in=["New", "Active"]) | Q(bucket="SKIP")
     )
     expired_to_archived_count = expired_qs.count()
     if expired_to_archived_count:

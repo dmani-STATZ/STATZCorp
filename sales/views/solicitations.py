@@ -270,6 +270,8 @@ def build_consolidated_supplier_list(sol, no_quote_cages):
 
 def _workbench_sidebar_context(solicitation):
     """Shared context for workbench right rail (matches + manual add card)."""
+    from sales.models.sam_cache import SAMEntityCache
+
     no_quote_cages = get_no_quote_cage_set()
     supplier_matches = build_consolidated_supplier_list(solicitation, no_quote_cages)
     queued_cages = set(
@@ -280,11 +282,26 @@ def _workbench_sidebar_context(solicitation):
         ).values_list("supplier__cage_code", flat=True)
         if normalize_cage_code(c)
     )
+    unmatched_cages = [
+        row["cage_code"]
+        for row in supplier_matches
+        if not row.get("supplier")
+    ]
+    sam_cache_map = {}
+    if unmatched_cages:
+        sam_cache_map = {
+            r.cage_code: r
+            for r in SAMEntityCache.objects.filter(
+                cage_code__in=unmatched_cages,
+                fetch_error=False,
+            )
+        }
     return {
         "solicitation": solicitation,
         "supplier_matches": supplier_matches,
         "queued_cages": queued_cages,
         "no_quote_cages": no_quote_cages,
+        "sam_cache_map": sam_cache_map,
     }
 
 
@@ -526,33 +543,68 @@ def _workbench_record_counter(solicitation, list_qs_raw, request):
         return prev_sol, next_sol, 1, 1
 
 
-def _redirect_after_workbench_action(request, sol, list_qs_raw, queue_kind_before_mutate):
+def _capture_workbench_list_nav_snapshot(list_qs_raw, sol):
+    """
+    Snapshot (sol_numbers, idx) from list_qs filters before a PASS mutates status to NO_BID.
+    After PASS, _build_list_queryset() often omits the current row, so post-save index fails.
+    """
+    enc = (list_qs_raw or "").strip()
+    if not enc:
+        return None
+    try:
+        list_params = dict(
+            urllib.parse.parse_qsl(enc, keep_blank_values=True)
+        )
+        nav_qs = _build_list_queryset(list_params)
+        sol_numbers = list(nav_qs.values_list("solicitation_number", flat=True))
+        idx = sol_numbers.index(sol.solicitation_number)
+        return (sol_numbers, idx)
+    except (ValueError, Exception):
+        return None
+
+
+def _redirect_after_workbench_action(
+    request,
+    sol,
+    list_qs_raw,
+    queue_kind_before_mutate,
+    *,
+    list_nav_snapshot=None,
+):
     """
     After research / pass / next: next item in list_qs order (skip current), else session queue.
     queue_kind_before_mutate: _infer_queue_kind(sol) before any status-changing save.
+    list_nav_snapshot: optional (sol_numbers, idx) from _capture_workbench_list_nav_snapshot
+    for PASS — same navigation intent as RESEARCH when list_qs is present.
     """
-    enc = list_qs_raw or ''
-    if enc.strip():
-        try:
-            list_params = dict(
-                urllib.parse.parse_qsl(enc, keep_blank_values=True)
-            )
-            nav_qs = _build_list_queryset(list_params)
-            sol_numbers = list(nav_qs.values_list('solicitation_number', flat=True))
-            idx = sol_numbers.index(sol.solicitation_number)
+    enc = (list_qs_raw or "").strip()
+    if enc:
+        sol_numbers = None
+        idx = None
+        if list_nav_snapshot is not None:
+            sol_numbers, idx = list_nav_snapshot
+        else:
+            try:
+                list_params = dict(
+                    urllib.parse.parse_qsl(enc, keep_blank_values=True)
+                )
+                nav_qs = _build_list_queryset(list_params)
+                sol_numbers = list(nav_qs.values_list("solicitation_number", flat=True))
+                idx = sol_numbers.index(sol.solicitation_number)
+            except (ValueError, Exception):
+                pass
+        if sol_numbers is not None and idx is not None:
             for j in range(idx + 1, len(sol_numbers)):
                 sn = sol_numbers[j]
                 cand = Solicitation.objects.filter(solicitation_number=sn).first()
                 if not cand:
                     continue
-                q = urllib.parse.urlencode({'list_qs': enc})
+                q = urllib.parse.urlencode({"list_qs": enc})
                 return redirect(
                     f"{reverse('sales:solicitation_detail', args=[sn])}?{q}"
                 )
-        except (ValueError, Exception):
-            pass
-        q = urllib.parse.urlencode({'list_qs': enc})
-        messages.success(request, 'End of list for current filters.')
+        q = urllib.parse.urlencode({"list_qs": enc})
+        messages.success(request, "End of list for current filters.")
         return redirect(f"{reverse('sales:solicitation_list')}?{enc}")
 
     queue_key, _ = _queue_session_keys(queue_kind_before_mutate)
@@ -594,13 +646,20 @@ def _workbench_post_action(request, sol, action, list_qs_raw):
                 args=[sol.solicitation_number],
             )
             return redirect(f'{url}?{q}' if q else url)
+        list_nav_snapshot = _capture_workbench_list_nav_snapshot(list_qs_raw, sol)
         sol.status = 'NO_BID'
         _release_review_claim(sol)
         sol.save(update_fields=[
             'status',
             'review_claimed_by', 'review_claimed_at', 'review_claim_expires_at',
         ])
-        return _redirect_after_workbench_action(request, sol, list_qs_raw, queue_kind)
+        return _redirect_after_workbench_action(
+            request,
+            sol,
+            list_qs_raw,
+            queue_kind,
+            list_nav_snapshot=list_nav_snapshot,
+        )
 
     if action == 'next':
         _release_review_claim(sol)
@@ -981,6 +1040,7 @@ def solicitation_workbench(request, sol_number):
     supplier_matches = sidebar_ctx["supplier_matches"]
     queued_cages = sidebar_ctx["queued_cages"]
     no_quote_cages = sidebar_ctx["no_quote_cages"]
+    sam_cache_map = sidebar_ctx["sam_cache_map"]
     rfqs_queued = SupplierRFQ.objects.filter(
         line__solicitation=solicitation,
         status="QUEUED",
@@ -1034,6 +1094,7 @@ def solicitation_workbench(request, sol_number):
             "supplier_matches": supplier_matches,
             "rfqs_queued": rfqs_queued,
             "queued_cages": queued_cages,
+            "sam_cache_map": sam_cache_map,
             "return_by_urgent": return_by_urgent,
             "nav_record_num": nav_record_num,
             "nav_total": nav_total,
@@ -1114,14 +1175,25 @@ def global_search(request):
     )
 
 
+CLOSED_STATUSES = ["NO_BID", "Archived", "BID_SUBMITTED", "WON", "LOST"]
+STATUS_MAP = {
+    "no_bid": "NO_BID",
+    "archived": "Archived",
+    "bid_submitted": "BID_SUBMITTED",
+    "won": "WON",
+    "lost": "LOST",
+}
+
+
 @login_required
-def solicitation_archive(request):
+def closed_list(request):
     """
-    Read-only mining view for Archived solicitations.
-    Paginated at 50 per page, sorted by return_by_date descending.
+    Read-only view for terminal solicitations (closed pipeline outcomes).
+    Paginated at 50 per page, default order return_by_date descending.
+    Optional ?status= filter: no_bid, archived, bid_submitted, won, lost, or all / omitted.
     """
     qs = (
-        Solicitation.objects.filter(status="Archived")
+        Solicitation.objects.filter(status__in=CLOSED_STATUSES)
         .select_related("import_batch")
         .prefetch_related(
             Prefetch(
@@ -1129,8 +1201,16 @@ def solicitation_archive(request):
                 queryset=SolicitationLine.objects.order_by("line_number", "id"),
             )
         )
-        .order_by("-return_by_date")
+        .order_by("-return_by_date", "-solicitation_number")
     )
+
+    raw_status = (request.GET.get("status") or "").strip().lower()
+    if raw_status == "all":
+        raw_status = ""
+    active_status_filter = ""
+    if raw_status and raw_status in STATUS_MAP:
+        qs = qs.filter(status=STATUS_MAP[raw_status])
+        active_status_filter = raw_status
 
     set_aside = request.GET.get("set_aside", "").strip()
     item_type = request.GET.get("item_type", "").strip()
@@ -1170,17 +1250,24 @@ def solicitation_archive(request):
 
     filter_params = {k: v for k, v in request.GET.items() if k != "page"}
     filter_querystring = urllib.parse.urlencode(filter_params)
+    filter_qs_base = urllib.parse.urlencode(
+        [(k, v) for k, v in request.GET.items() if k not in ("page", "status")]
+    )
 
-    total_archived = Solicitation.objects.filter(status="Archived").count()
+    total_closed_terminal = Solicitation.objects.filter(
+        status__in=CLOSED_STATUSES
+    ).count()
 
     return render(
         request,
-        "sales/solicitations/archive.html",
+        "sales/solicitations/closed.html",
         {
             "page_obj": page_obj,
-            "total_archived": total_archived,
+            "total_closed_terminal": total_closed_terminal,
             "filter_querystring": filter_querystring,
+            "filter_qs_base": filter_qs_base,
             "set_aside_choices": SET_ASIDE_CHOICES,
+            "active_status_filter": active_status_filter,
             "current_filters": {
                 "set_aside": set_aside,
                 "item_type": item_type,

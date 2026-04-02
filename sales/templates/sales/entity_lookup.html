@@ -71,6 +71,12 @@
   <p style="color:#6b7280; font-size:0.875rem;">
     Search manually on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a>.
   </p>
+  {% if cache_record and not fetch_error %}
+  <p class="text-muted small mb-0">
+    Last verified: {{ days_since_fetch }} day{{ days_since_fetch|pluralize }} ago
+    <a href="?refresh=1" title="Refresh from SAM" style="margin-left:4px; color: inherit;">↻</a>
+  </p>
+  {% endif %}
 
   {% else %}
 
@@ -93,6 +99,12 @@
     <div>
       <div class="field-label">Legal Business Name</div>
       <div style="font-size: 1.25rem; font-weight: 700; color: #0a1628;">{{ entity.legal_name|default:"—" }}</div>
+      {% if cache_record and not fetch_error %}
+      <span class="text-muted small">
+        Last verified: {{ days_since_fetch }} day{{ days_since_fetch|pluralize }} ago
+        <a href="?refresh=1" title="Refresh from SAM" style="margin-left:4px; color: inherit;">↻</a>
+      </span>
+      {% endif %}
       <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
         <span class="pill {% if entity.registration_status == 'Active' %}pill-green{% else %}pill-red{% endif %}">
           {{ entity.registration_status|default:"Unknown" }}

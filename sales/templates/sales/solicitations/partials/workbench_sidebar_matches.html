@@ -1,4 +1,5 @@
-{# Workbench right rail: consolidated matches + manual supplier HTMX card. Expects: solicitation, supplier_matches, queued_cages, no_quote_cages #}
+{# Workbench right rail: consolidated matches + manual supplier HTMX card. Expects: solicitation, supplier_matches, queued_cages, no_quote_cages, sam_cache_map #}
+{% load sales_extras %}
 <h2 class="h6 fw-bold text-uppercase text-muted mb-3" style="letter-spacing:0.06em;">Matched &amp; approved sources</h2>
 <div class="table-responsive border rounded mb-3" style="max-height:320px; overflow-y:auto;">
   <table class="table table-sm mb-0 align-middle small">
@@ -8,7 +9,11 @@
       <tr data-cage="{{ row.cage_code }}">
         <td>
           {% if row.supplier %}<a href="{% url 'suppliers:supplier_detail' row.supplier.pk %}">{{ row.company_name|default:row.supplier.name }}</a>
-          {% else %}{{ row.company_name|default:"—" }}{% endif %}
+          {% else %}{% with sam=sam_cache_map|get_item:row.cage_code %}
+          {% if sam %}{{ sam.entity_name }}
+          <span class="badge bg-secondary ms-1" style="font-size:0.65rem;" title="Name from SAM.gov — not in supplier database">SAM</span>
+          {% else %}<span class="text-muted">—</span>{% endif %}
+          {% endwith %}{% endif %}
           {% if row.is_no_quote %}<span class="badge bg-danger ms-1">No quote</span>{% endif %}
           {% if row.is_manual %}<span class="badge bg-dark ms-1">Manual</span>{% endif %}
           {% if row.cage_code in queued_cages %}<span class="badge bg-success ms-1">In Queue</span>{% endif %}
@@ -37,7 +42,10 @@
                     data-supplier="{{ row.supplier.pk }}">+ Queue</button>
             {% endif %}
           {% else %}
-            <a href="{% url 'sales:entity_cage_lookup' cage_code=row.cage_code %}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Lookup</a>
+            <a href="{% url 'sales:entity_cage_lookup' cage_code=row.cage_code %}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="btn btn-sm btn-outline-secondary">Look Up</a>
           {% endif %}
         </td>
       </tr>

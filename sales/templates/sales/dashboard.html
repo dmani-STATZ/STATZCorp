@@ -27,7 +27,7 @@
   </div>
   <div style="background:#0a1628; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
     <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">SDVOSB Priority</div>
-    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.SDVOSB|default:0 }}</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ sdvosb_count|default:0 }}</div>
   </div>
   <div style="background:{% if urgent_count > 0 %}#dc2626{% else %}#0a1628{% endif %}; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
     <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">Urgent (≤3d)</div>

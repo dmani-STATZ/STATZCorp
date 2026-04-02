@@ -2,6 +2,7 @@
 Sales (DIBBS Bidding) app URL configuration.
 """
 from django.urls import path
+from django.views.generic import RedirectView
 from .views import rfq as views_rfq
 from .views.awards_wins import awards_wins
 from .views import (
@@ -21,7 +22,7 @@ from .views import (
     solicitation_pdf_view,
     solicitation_history_packaging_partial,
     solicitation_reparse,
-    solicitation_archive,
+    closed_list,
     no_bid,
     global_search,
     sol_mass_pass,
@@ -122,7 +123,15 @@ urlpatterns = [
     path("solicitations/research/", research_queue, name="research_queue"),
     path("solicitations/supplier-search/", supplier_search_ajax, name="supplier_search_ajax"),
     path("solicitations/<int:sol_pk>/remove-research/", sol_remove_research, name="sol_remove_research"),
-    path("solicitations/archive/", solicitation_archive, name="solicitation_archive"),
+    path(
+        "solicitations/archive/",
+        RedirectView.as_view(
+            pattern_name="sales:solicitation_closed",
+            permanent=True,
+            query_string=True,
+        ),
+    ),
+    path("solicitations/closed/", closed_list, name="solicitation_closed"),
     path("solicitations/<str:sol_number>/pdf/", solicitation_pdf_view, name="solicitation_pdf"),
     path(
         "solicitations/<str:sol_number>/panels/history-packaging/",
