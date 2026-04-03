@@ -390,7 +390,7 @@ class Command(BaseCommand):
             # dibbs2 session bootstrap — only if more dates remain
             current_idx = import_dates.index(import_d)
             if current_idx < len(import_dates) - 1:
-                self._sleep_with_progress(15, f"  Cooling down before next CA zip")
+                self._sleep_with_progress(120, f"  Cooling down before next CA zip")
 
         return (total_fetched, total_failed)
 
