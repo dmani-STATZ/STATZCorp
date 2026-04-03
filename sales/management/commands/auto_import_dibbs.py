@@ -4,10 +4,9 @@
 #   in_file_name, bq_file_name, as_file_name (str paths / names).
 # - ImportBatch: stores import_date (DateField); reconciliation treats any existing row
 #   for a calendar date as "already imported."
-# - Nightly flow: Loop A (metadata + run_import per missing date; zero-record dates get
-#   RfqRecs.aspx count check + empty ImportBatch, no Playwright), then _run_lifecycle_sweep,
-#   Loop B (set-aside PDF blob harvest from ca{tag}.zip per date; no Playwright),
-#   Loop C (parse pdf_blob → procurement history + packaging; ORM only, after all B sessions).
+# - Nightly flow: Loop A (IN/BQ/AS import via Playwright), 120s F5 cooldown,
+#   then per-date: download ca zip → blob PDFs → parse inline → wait remainder of
+#   120s cooldown before next zip.
 import logging
 import os
 import shutil
@@ -24,11 +23,13 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+COOLDOWN_SECONDS = 120
+
 
 class Command(BaseCommand):
     help = (
-        "Three-phase DIBBS auto-import: IN/BQ/AS daily import, set-aside PDF harvest "
-        "from ca zip, local PDF parse backlog. Use --date to run Loop A for one day only."
+        "DIBBS auto-import: IN/BQ/AS daily import, set-aside PDF harvest "
+        "from ca zip with inline parse. Use --date to run Loop A for one day only."
     )
 
     def add_arguments(self, parser):
@@ -38,7 +39,7 @@ class Command(BaseCommand):
             metavar="YYYY-MM-DD",
             help=(
                 "Process Loop A only for this date (must appear on DIBBS RFQDates with "
-                "IN and BQ). Loop B/C still run as usual. Skips Loop A if ImportBatch "
+                "IN and BQ). PDF harvest still runs as usual. Skips Loop A if ImportBatch "
                 "already exists unless you remove that batch."
             ),
         )
@@ -52,7 +53,6 @@ class Command(BaseCommand):
             fetch_dibbs_archive_files,
         )
         from sales.models import ImportBatch, Solicitation
-        from sales.services.dibbs_pdf import parse_pdf_data_backlog
         from sales.services.importer import run_import, _run_lifecycle_sweep
 
         only_date = None
@@ -138,7 +138,7 @@ class Command(BaseCommand):
 
         failures = []
 
-        # Loop A — metadata & core import (IN/BQ/AS → run_import)
+        # Loop A — IN/BQ/AS import via Playwright
         if work_list:
             self.stdout.write(
                 f"Loop A: dates to import — {[str(d) for d, _, _ in work_list]}"
@@ -197,10 +197,15 @@ class Command(BaseCommand):
             )
         )
 
-        # PDF harvest + inline parse — interleaved per date (no Playwright)
+        # Cooldown before PDF harvest — Loop A just used Playwright against dibbs2.
+        # F5 ASM resets new requests sessions if we hit the warning page too soon
+        # after a Playwright session. Always wait 120s before starting CA zip downloads.
+        self._sleep_with_progress(COOLDOWN_SECONDS, "Cooling down after Loop A before PDF harvest")
+
+        # PDF harvest + inline parse — one ca zip at a time, parse between zips,
+        # wait out remainder of cooldown before next zip.
         self.stdout.write("PDF harvest: fetching CA zips and parsing inline...")
         b_fetched, b_failed, n_parsed = self._harvest_and_parse(available)
-
         self.stdout.write(
             self.style.SUCCESS(
                 f"PDF harvest complete — {b_fetched} fetched, {b_failed} failed, "
@@ -222,21 +227,18 @@ class Command(BaseCommand):
         For each distinct import_date among pending set-aside solicitations:
 
           1. Download ca{tag}.zip (requests only — no Playwright)
-          2. Record timestamp immediately after zip is closed/purged
+          2. Record timestamp immediately after zip is purged
           3. Extract matching PDFs and blob them to the DB
           4. Parse procurement history + packaging inline for those sols
           5. After parse, check elapsed time since step 2 — if less than
              COOLDOWN_SECONDS has passed, wait out the remainder with a
-             progress bar. If parse took longer than the cooldown, go straight
-             to the next zip.
+             progress bar. If parse took longer, go straight to the next zip.
 
         Returns (total_fetched, total_failed, total_parsed).
         """
         from sales.models import Solicitation
         from sales.services.dibbs_fetch import DibbsFetchError, fetch_ca_zip
         from sales.services.dibbs_pdf import persist_pdf_procurement_extract
-
-        COOLDOWN_SECONDS = 120
 
         pending_filter = {
             "pdf_blob__isnull": True,
@@ -319,9 +321,7 @@ class Command(BaseCommand):
 
                     if not zip_members:
                         self.stdout.write(
-                            self.style.WARNING(
-                                f"  {tag}: no .PDF members in zip."
-                            )
+                            self.style.WARNING(f"  {tag}: no .PDF members in zip.")
                         )
 
                     rows = list(
@@ -406,8 +406,6 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"  {tag}: parsing {len(fetched_sol_numbers)} PDF(s)..."
                 )
-                # Re-query blobs from DB — avoids holding all bytes in memory
-                # during the zip phase
                 blob_qs = (
                     Solicitation.objects
                     .filter(
@@ -432,9 +430,7 @@ class Command(BaseCommand):
 
                 total_parsed += parsed
                 self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  {tag}: parsed {parsed} sol(s)."
-                    )
+                    self.style.SUCCESS(f"  {tag}: parsed {parsed} sol(s).")
                 )
 
             # ── Step 4: cooldown — wait remainder of 120s if more dates ahead ─
@@ -445,7 +441,7 @@ class Command(BaseCommand):
                 if remaining > 0:
                     self._sleep_with_progress(
                         int(remaining),
-                        f"  Cooling down before next CA zip",
+                        "  Cooling down before next CA zip",
                     )
                 else:
                     self.stdout.write(
@@ -455,12 +451,7 @@ class Command(BaseCommand):
         return (total_fetched, total_failed, total_parsed)
 
     def _sleep_with_progress(self, seconds: int, label: str = "Cooling down") -> None:
-        """
-        Sleep for `seconds` seconds while displaying a filling progress bar.
-
-          Cooling down before next CA zip (15s)
-          [========                        ] 4/15s
-        """
+        """Display a filling progress bar while sleeping."""
         width = 40
         self.stdout.write(f"{label} ({seconds}s)")
         for i in range(seconds + 1):
