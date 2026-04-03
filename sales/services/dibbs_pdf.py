@@ -1,6 +1,13 @@
 """
 Fetches DIBBS solicitation PDFs via Playwright.
-Reuses the DoD consent bypass pattern from dibbs_fetch.py.
+
+Session bootstrap strategy (matches dibbs_fetch.py):
+  Instead of cold-navigating dodwarning.aspx with Playwright (which F5 ASM
+  intermittently resets from Azure datacenter IPs), we:
+    1. Accept the dibbs2 DoD warning via requests (GET + POST VIEWSTATE).
+    2. Inject the resulting cookies into the Playwright context.
+  Playwright then goes straight to the PDF download URLs without ever touching
+  the warning page, so F5 never sees a headless browser hitting it.
 
 PDF URL pattern:
     https://dibbs2.bsm.dla.mil/Downloads/RFQ/{last_char}/{sol_number}.PDF
@@ -27,7 +34,10 @@ import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urljoin
 
+import requests
+from bs4 import BeautifulSoup
 from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -38,6 +48,12 @@ DIBBS2_MAIN = "https://dibbs2.bsm.dla.mil"
 DIBBS2_WARNING_URL = f"{DIBBS2_MAIN}/dodwarning.aspx?goto=/"
 # Match dibbs_fetch — GCC High / slow DIBBS responses
 REQUEST_TIMEOUT_MS = 60_000
+DEFAULT_TIMEOUT = 30
+
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
 
 # Chunk size for procurement-history bulk SQL (SQL Server parameter limits)
 AW_CHUNK = 100
@@ -50,24 +66,99 @@ def _pdf_url(sol_number: str) -> str:
     return f"{DIBBS2_MAIN}/Downloads/RFQ/{last_char}/{sol}.PDF"
 
 
-def _establish_dibbs2_session(page) -> None:
-    """Open dibbs2 warning page and click OK once to set consent cookie."""
-    logger.info("Establishing dibbs2 session via %s", DIBBS2_WARNING_URL)
-    page.goto(
-        DIBBS2_WARNING_URL, wait_until="domcontentloaded", timeout=REQUEST_TIMEOUT_MS
-    )
-    btn = page.locator("input[type='submit']").first
-    if btn.count() == 0:
+# ---------------------------------------------------------------------------
+# Session bootstrap via requests (no Playwright cold-hit on warning page)
+# ---------------------------------------------------------------------------
+
+
+def _make_dibbs2_session() -> list[dict]:
+    """
+    Accept the dibbs2 DoD warning via requests (no Playwright), return a list of
+    cookie dicts ready for Playwright context.add_cookies().
+
+    Strategy:
+      1. GET dodwarning.aspx — F5 sets its TS* anti-bot cookie, ASP.NET sets VIEWSTATE.
+      2. POST the form back with butAgree=OK — server sets the consent/session cookies.
+      3. Collect all cookies and convert to Playwright format.
+
+    This keeps Chromium away from the cold warning-page hit that F5 ASM resets
+    intermittently from Azure datacenter IPs.
+    """
+    s = requests.Session()
+    s.headers.update({
+        "User-Agent": _BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    })
+
+    logger.info("dibbs2 consent bootstrap: GET %s", DIBBS2_WARNING_URL)
+    resp = s.get(DIBBS2_WARNING_URL, timeout=DEFAULT_TIMEOUT)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    form = soup.find("form")
+    if not form:
         raise RuntimeError(
-            "dibbs2 warning page has no OK/submit button. "
-            "Site may have changed; ensure Playwright can load the page."
+            "dibbs2 warning page has no form — site layout may have changed."
         )
-    btn.click()
-    try:
-        page.wait_for_load_state("domcontentloaded", timeout=10_000)
-    except Exception:
-        pass
-    logger.info("dibbs2 session established")
+
+    action = form.get("action", "")
+    if not action.startswith("http"):
+        action = urljoin(DIBBS2_MAIN + "/", action)
+
+    data = {}
+    for inp in form.find_all("input"):
+        name = inp.get("name")
+        if not name:
+            continue
+        itype = inp.get("type", "text").lower()
+        if itype == "submit" and inp.get("name") == "butAgree":
+            data[name] = inp.get("value", "OK")
+        elif itype != "submit":
+            data[name] = inp.get("value", "")
+
+    logger.info("dibbs2 consent bootstrap: POST %s", action)
+    post_resp = s.post(
+        action,
+        data=data,
+        timeout=DEFAULT_TIMEOUT,
+        headers={"Referer": DIBBS2_WARNING_URL},
+    )
+    post_resp.raise_for_status()
+
+    playwright_cookies = []
+    for cookie in s.cookies:
+        c: dict = {
+            "name": cookie.name,
+            "value": cookie.value,
+            "domain": cookie.domain or ".dibbs2.bsm.dla.mil",
+            "path": cookie.path or "/",
+            "secure": cookie.secure,
+            "httpOnly": True,
+            "sameSite": "Strict",
+        }
+        playwright_cookies.append(c)
+
+    if not playwright_cookies:
+        raise RuntimeError(
+            "dibbs2 consent bootstrap returned no cookies — POST may have failed or "
+            "site rejected the session. Check VIEWSTATE parsing."
+        )
+
+    logger.info(
+        "dibbs2 consent bootstrap complete — %d cookie(s): %s",
+        len(playwright_cookies),
+        [c["name"] for c in playwright_cookies],
+    )
+    return playwright_cookies
+
+
+# ---------------------------------------------------------------------------
+# PDF fetch via Playwright (cookies pre-injected)
+# ---------------------------------------------------------------------------
 
 
 def _read_pdf_download(page, url: str, sol_number: str) -> Optional[bytes]:
@@ -86,7 +177,6 @@ def _read_pdf_download(page, url: str, sol_number: str) -> Optional[bytes]:
             page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
         except Exception:
             # ERR_ABORTED is expected when the response is a file download.
-            # The download event is still fired and captured by expect_download.
             pass
 
     download = download_info.value
@@ -125,7 +215,6 @@ SECTION_AFTER_D_RE = re.compile(
     r"(?:^|\n)\s*Section\s+[EF]\b",
     re.IGNORECASE | re.MULTILINE,
 )
-# Optional labeled lines inside Section D (SF-18 style varies)
 _PACK_STD_LINE = re.compile(
     r"^\s*(?:Packaging\s+(?:Standard|Data|Requirements?)|Level\s*[A-Z0-9]?)\s*[:.]?\s*(.+)$",
     re.IGNORECASE,
@@ -138,7 +227,6 @@ _MARK_LINE = re.compile(
     r"^\s*(?:Marking|Markings?|MIL[-\s]*STD[-\s]*129)\s*[:.]?\s*(.+)$",
     re.IGNORECASE,
 )
-# MIL-style packaging codes (RP001, PK001, etc.) inside Section D
 _PACK_CODE_RE = re.compile(r"\b([A-Z]{2}\d{3})\b")
 
 
@@ -327,7 +415,11 @@ def fetch_pdf_for_sol(sol_number: str) -> Optional[bytes]:
 def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
     """
     Fetch PDFs for multiple solicitations in a single Playwright browser session.
-    Opens browser once, accepts DoD consent once, fetches all PDFs, closes browser.
+
+    Bootstrap dibbs2 consent via requests first (avoids F5 ASM bot fingerprinting),
+    inject cookies into Playwright context, then download all PDFs without
+    ever navigating the warning page with Chromium.
+
     Returns dict mapping sol_number -> bytes (or None if fetch failed for that sol).
     Catches per-PDF exceptions so one failure doesn't abort the batch.
     """
@@ -341,22 +433,38 @@ def fetch_pdfs_for_sols(sol_numbers: list[str]) -> dict[str, Optional[bytes]]:
         logger.exception("Playwright not installed")
         return result
 
+    # Bootstrap consent via requests — no Playwright cold-hit on the warning page
+    try:
+        dibbs2_cookies = _make_dibbs2_session()
+    except Exception as e:
+        logger.exception("fetch_pdfs_for_sols: dibbs2 consent bootstrap failed: %s", e)
+        return result
+
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars",
+                    "--window-size=1920,1080",
+                ],
             )
-            context = browser.new_context(accept_downloads=True)
+            context = browser.new_context(
+                accept_downloads=True,
+                user_agent=_BROWSER_UA,
+                viewport={"width": 1920, "height": 1080},
+                locale="en-US",
+            )
 
-            session_page = context.new_page()
-            try:
-                _establish_dibbs2_session(session_page)
-            finally:
-                try:
-                    session_page.close()
-                except Exception:
-                    pass
+            # Inject requests-obtained cookies — Playwright looks pre-authenticated
+            context.add_cookies(dibbs2_cookies)
+            logger.info(
+                "Injected %d dibbs2 cookie(s) into Playwright context",
+                len(dibbs2_cookies),
+            )
 
             for sol_number in sol_numbers:
                 url = _pdf_url(sol_number)
@@ -388,7 +496,6 @@ def _parse_procurement_header_line(line: str) -> Optional[Tuple[str, str]]:
     """
     s = re.sub(r"\s+", " ", line.strip())
     patterns = [
-        # "Procurement History for NSN/FSC: 123456789/1234" and punctuation variants
         re.compile(
             r"Procurement\s+History\s+for\s+NSN\s*/\s*FSC\s*[:\s#]?\s*(\d{9})\s*/\s*(\d{4})",
             re.IGNORECASE,
@@ -446,7 +553,6 @@ def _match_procurement_row(line: str) -> Optional[re.Match]:
     m = pat.match(norm)
     if m:
         return m
-    # Tighter spaces merged in PDF extraction
     pat2 = re.compile(
         r"^([A-Z0-9]{5})\s+(\S+(?:\s+\S+)*)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{8})\s+([YN])\b",
         re.IGNORECASE,
@@ -483,7 +589,6 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
     current_nsn: Optional[str] = None
     current_fsc: Optional[str] = None
     in_history = False
-    # Carry across pages — history tables often span page breaks without a repeated header.
     header_continuation: Optional[str] = None
 
     for page in reader.pages:
@@ -594,7 +699,6 @@ def save_procurement_history(rows: List[Dict]) -> int:
 
     now = timezone.now()
 
-    # Dedupe by (nsn, contract_number); last row wins
     by_key: Dict[tuple, Dict] = {}
     for raw in rows:
         r = dict(raw)
