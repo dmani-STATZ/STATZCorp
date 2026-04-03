@@ -197,20 +197,15 @@ class Command(BaseCommand):
             )
         )
 
-        # Loop B — harvest PDF blobs from ca zips (one zip per date, no Playwright)
-        self.stdout.write("Loop B: harvesting set-aside PDF blobs from CA zips...")
-        b_fetched, b_failed = self._harvest_pdfs_from_ca_zips(available)
+        # PDF harvest + inline parse — interleaved per date (no Playwright)
+        self.stdout.write("PDF harvest: fetching CA zips and parsing inline...")
+        b_fetched, b_failed, n_parsed = self._harvest_and_parse(available)
+
         self.stdout.write(
             self.style.SUCCESS(
-                f"Loop B: finished — {b_fetched} fetched, {b_failed} failed."
+                f"PDF harvest complete — {b_fetched} fetched, {b_failed} failed, "
+                f"{n_parsed} parsed."
             )
-        )
-
-        # Loop C — local parse only
-        self.stdout.write("Loop C: parsing stored PDFs (procurement history + packaging)...")
-        n_parsed = parse_pdf_data_backlog(lambda m: self.stdout.write(m))
-        self.stdout.write(
-            self.style.SUCCESS(f"Loop C: processed {n_parsed} solicitation(s).")
         )
 
         if failures:
@@ -222,16 +217,26 @@ class Command(BaseCommand):
             f"{len(failures)} failed."
         )
 
-    def _harvest_pdfs_from_ca_zips(self, available: dict) -> tuple[int, int]:
+    def _harvest_and_parse(self, available: dict) -> tuple[int, int, int]:
         """
-        For each distinct import_date among pending set-aside solicitations, download
-        that day's ca{tag}.zip once (requests only), match PDFs by solicitation stem,
-        update rows for that import_date only, then remove the zip before the next date.
+        For each distinct import_date among pending set-aside solicitations:
 
-        Returns (total_fetched, total_failed).
+          1. Download ca{tag}.zip (requests only — no Playwright)
+          2. Record timestamp immediately after zip is closed/purged
+          3. Extract matching PDFs and blob them to the DB
+          4. Parse procurement history + packaging inline for those sols
+          5. After parse, check elapsed time since step 2 — if less than
+             COOLDOWN_SECONDS has passed, wait out the remainder with a
+             progress bar. If parse took longer than the cooldown, go straight
+             to the next zip.
+
+        Returns (total_fetched, total_failed, total_parsed).
         """
         from sales.models import Solicitation
         from sales.services.dibbs_fetch import DibbsFetchError, fetch_ca_zip
+        from sales.services.dibbs_pdf import persist_pdf_procurement_extract
+
+        COOLDOWN_SECONDS = 120
 
         pending_filter = {
             "pdf_blob__isnull": True,
@@ -246,8 +251,8 @@ class Command(BaseCommand):
         )
 
         if not pending_base.exists():
-            self.stdout.write("Loop B: no set-aside PDFs pending — skipping.")
-            return (0, 0)
+            self.stdout.write("PDF harvest: no set-aside PDFs pending — skipping.")
+            return (0, 0, 0)
 
         n_pending = pending_base.count()
         n_distinct_dates = (
@@ -260,13 +265,13 @@ class Command(BaseCommand):
         if n_null_date:
             self.stdout.write(
                 self.style.WARNING(
-                    f"Loop B: {n_null_date} pending solicitation(s) have no import_date — "
+                    f"PDF harvest: {n_null_date} pending sol(s) have no import_date — "
                     "skipping CA zip matching for those rows."
                 )
             )
         self.stdout.write(
-            f"Loop B: {n_pending} set-aside solicitation(s) pending harvest "
-            f"across {n_distinct_dates} distinct import date(s)..."
+            f"PDF harvest: {n_pending} set-aside sol(s) pending across "
+            f"{n_distinct_dates} distinct import date(s)..."
         )
 
         import_dates = list(
@@ -278,25 +283,32 @@ class Command(BaseCommand):
 
         total_fetched = 0
         total_failed = 0
-        now = timezone.now()
+        total_parsed = 0
 
-        for import_d in import_dates:
+        for idx, import_d in enumerate(import_dates):
             tag = import_d.strftime("%y%m%d")
             entry = available.get(tag) or {}
             ca_url = entry.get("ca")
             if not ca_url:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"  Loop B — {tag} ({import_d}): no CA link on RFQDates — skip download."
+                        f"  {tag} ({import_d}): no CA link on RFQDates — skipping."
                     )
                 )
                 continue
 
             zip_path = None
-            fetched = failed = 0
+            fetched = failed = parsed = 0
+            fetched_sol_numbers: list[str] = []
+
+            # ── Step 1: download zip, blob PDFs ──────────────────────────────
             try:
                 zip_path = fetch_ca_zip(ca_url, tag)
-                self.stdout.write(f"  Loop B — {tag} ({import_d}): downloaded {zip_path.name}")
+                self.stdout.write(
+                    f"  {tag} ({import_d}): downloaded {zip_path.name}"
+                )
+
+                now = timezone.now()
 
                 with zipfile.ZipFile(zip_path, "r") as zf:
                     zip_members: dict[str, str] = {}
@@ -308,14 +320,13 @@ class Command(BaseCommand):
                     if not zip_members:
                         self.stdout.write(
                             self.style.WARNING(
-                                f"  Loop B — {tag}: no .PDF members in zip — counting rows as misses."
+                                f"  {tag}: no .PDF members in zip."
                             )
                         )
 
                     rows = list(
                         pending_base.filter(import_date=import_d).values_list(
-                            "solicitation_number",
-                            "pdf_fetch_attempts",
+                            "solicitation_number", "pdf_fetch_attempts"
                         )
                     )
 
@@ -355,44 +366,93 @@ class Command(BaseCommand):
                                 pdf_fetched_at=now,
                                 pdf_fetch_status="DONE",
                             )
+                            fetched_sol_numbers.append(sn)
                             fetched += 1
                         except Exception as e:
                             logger.warning(
-                                "Loop B: failed to extract %s from %s: %s",
-                                stem_key,
-                                zip_path.name,
-                                e,
+                                "PDF harvest: failed to extract %s from %s: %s",
+                                stem_key, zip_path.name, e,
                             )
                             bump_failed()
 
-                total_fetched += fetched
-                total_failed += failed
-                self.stdout.write(
-                    f"  Loop B — {tag} ({import_d}): fetched {fetched}, failed {failed}"
-                )
-
             except DibbsFetchError as e:
-                logger.error("Loop B: CA zip fetch failed for %s: %s", tag, e)
+                logger.error("PDF harvest: CA zip fetch failed for %s: %s", tag, e)
                 self.stdout.write(
-                    self.style.ERROR(f"  Loop B — {tag}: CA zip FAILED — {e}")
+                    self.style.ERROR(f"  {tag}: CA zip FAILED — {e}")
                 )
+                continue
             except Exception as e:
-                logger.exception("Loop B: unexpected error for tag %s", tag)
+                logger.exception("PDF harvest: unexpected error for tag %s", tag)
                 self.stdout.write(
-                    self.style.ERROR(f"  Loop B — {tag}: ERROR — {e}")
+                    self.style.ERROR(f"  {tag}: ERROR — {e}")
                 )
+                continue
             finally:
                 if zip_path is not None:
                     shutil.rmtree(zip_path.parent, ignore_errors=True)
-                    logger.info("Loop B: purged temp dir for %s", tag)
+                    logger.info("PDF harvest: purged temp dir for %s", tag)
 
-            # Sleep between zips so F5 ASM doesn't rate-limit the next
-            # dibbs2 session bootstrap — only if more dates remain
-            current_idx = import_dates.index(import_d)
-            if current_idx < len(import_dates) - 1:
-                self._sleep_with_progress(120, f"  Cooling down before next CA zip")
+            # ── Step 2: record timestamp immediately after zip is purged ─────
+            zip_done_at = time.monotonic()
 
-        return (total_fetched, total_failed)
+            total_fetched += fetched
+            total_failed += failed
+            self.stdout.write(
+                f"  {tag} ({import_d}): fetched {fetched}, failed {failed}"
+            )
+
+            # ── Step 3: parse inline for this date's sols ─────────────────────
+            if fetched_sol_numbers:
+                self.stdout.write(
+                    f"  {tag}: parsing {len(fetched_sol_numbers)} PDF(s)..."
+                )
+                # Re-query blobs from DB — avoids holding all bytes in memory
+                # during the zip phase
+                blob_qs = (
+                    Solicitation.objects
+                    .filter(
+                        solicitation_number__in=fetched_sol_numbers,
+                        pdf_blob__isnull=False,
+                        pdf_data_pulled__isnull=True,
+                    )
+                    .values_list("solicitation_number", "pdf_blob")
+                )
+                for sol_number, blob in list(blob_qs):
+                    if not blob:
+                        continue
+                    key = (sol_number or "").strip().upper()
+                    try:
+                        persist_pdf_procurement_extract(key, bytes(blob))
+                        parsed += 1
+                        self.stdout.write(f"    parsed: {key}")
+                    except Exception as e:
+                        logger.exception(
+                            "PDF harvest: parse failed for %s: %s", key, e
+                        )
+
+                total_parsed += parsed
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  {tag}: parsed {parsed} sol(s)."
+                    )
+                )
+
+            # ── Step 4: cooldown — wait remainder of 120s if more dates ahead ─
+            is_last = idx == len(import_dates) - 1
+            if not is_last:
+                elapsed = time.monotonic() - zip_done_at
+                remaining = COOLDOWN_SECONDS - elapsed
+                if remaining > 0:
+                    self._sleep_with_progress(
+                        int(remaining),
+                        f"  Cooling down before next CA zip",
+                    )
+                else:
+                    self.stdout.write(
+                        f"  Parse took {elapsed:.0f}s — no cooldown needed."
+                    )
+
+        return (total_fetched, total_failed, total_parsed)
 
     def _sleep_with_progress(self, seconds: int, label: str = "Cooling down") -> None:
         """
