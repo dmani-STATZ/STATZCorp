@@ -48,3 +48,5 @@ cryptography==46.0.5
 
 #Extras
 pyOpenSSL==26.0.0
+
+tqdm==4.67.1

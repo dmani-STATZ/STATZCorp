@@ -17,14 +17,12 @@ fetch_ca_zip() — downloads ca{tag}.zip via requests (no Playwright needed).
 
 Returns local paths for the import pipeline. Caller is responsible for cleanup.
 """
-import io
 import logging
-import os
+import shutil
 import tempfile
 import zipfile
 from datetime import date
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urljoin
 
 import requests
@@ -69,6 +67,8 @@ def _make_www_session() -> requests.Session:
         if not action.startswith("http"):
             action = urljoin(DIBBS_MAIN + "/", action)
         data = {i["name"]: i.get("value", "") for i in form.find_all("input") if i.get("name")}
+        if "butAgree" not in data:
+            data["butAgree"] = "OK"
         s.post(action, data=data, timeout=DEFAULT_TIMEOUT)
     return s
 
@@ -174,6 +174,8 @@ def _make_dibbs2_requests_session() -> requests.Session:
             data[name] = inp.get("value", "OK")
         elif itype != "submit":
             data[name] = inp.get("value", "")
+    if "butAgree" not in data:
+        data["butAgree"] = "OK"
     s.post(action, data=data, timeout=DEFAULT_TIMEOUT,
            headers={"Referer": DIBBS2_WARNING_URL})
     return s
@@ -247,106 +249,99 @@ def _fetch_file_via_playwright(context, url: str, dest_path: Path, label: str) -
             pass
 
 
-def fetch_dibbs_archive_files(
-    base_url: str = DIBBS2_MAIN,
-    zip_url: Optional[str] = None,
-    in_url: Optional[str] = None,
-    target_date: Optional[date] = None,
-) -> dict:
-    """Fetch IN + BQ+AS. Bootstraps dibbs2 via requests, injects cookies into Playwright."""
-    if target_date and (not in_url or not zip_url):
-        in_url, zip_url = _discover_hrefs(target_date)
-    if not zip_url:
-        zip_url = f"{base_url.rstrip('/')}/Downloads/RFQ/Archive/bq260312.zip"
-    if not in_url:
-        in_url = f"{base_url.rstrip('/')}/Downloads/RFQ/Archive/in260312.txt"
-
-    tag = "260312"
-    if target_date:
-        tag = target_date.strftime("%y%m%d")
-    else:
-        for u in (in_url, zip_url):
-            if "260312" in u:
-                tag = "260312"
-                break
+def fetch_dibbs_archive_files(target_date: date) -> dict:
+    """
+    Download IN txt + BQ zip for the given calendar date, extract bq/as txt from the zip.
+    Bootstraps dibbs2 via requests (never opens dodwarning in Playwright), then one
+    Playwright browser for the two file downloads.
+    """
+    in_url, zip_url = _discover_hrefs(target_date)
+    tag = target_date.strftime("%y%m%d")
 
     tmp_dir = tempfile.mkdtemp(prefix="dibbs_fetch_")
     tmp = Path(tmp_dir)
 
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        raise DibbsFetchError(
-            "Playwright is required for DIBBS fetch. "
-            "Install with: pip install playwright && playwright install chromium"
-        )
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise DibbsFetchError(
+                "Playwright is required for DIBBS fetch. "
+                "Install with: pip install playwright && playwright install chromium"
+            )
 
-    dibbs2_cookies = _make_dibbs2_session()
+        dibbs2_cookies = _make_dibbs2_session()
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-                "--disable-infobars",
-                "--window-size=1920,1080",
-            ],
-        )
-        context = browser.new_context(
-            accept_downloads=True,
-            user_agent=_BROWSER_UA,
-            viewport={"width": 1920, "height": 1080},
-            locale="en-US",
-        )
-        context.add_cookies(dibbs2_cookies)
-        logger.info("Injected %d dibbs2 cookie(s) into Playwright context", len(dibbs2_cookies))
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars",
+                    "--window-size=1920,1080",
+                ],
+            )
+            context = browser.new_context(
+                accept_downloads=True,
+                user_agent=_BROWSER_UA,
+                viewport={"width": 1920, "height": 1080},
+                locale="en-US",
+            )
+            context.add_cookies(dibbs2_cookies)
+            logger.info(
+                "Injected %d dibbs2 cookie(s) into Playwright context",
+                len(dibbs2_cookies),
+            )
 
-        in_name = f"in{tag}.txt"
-        in_path = tmp / in_name
-        _fetch_file_via_playwright(context, in_url, in_path, in_name)
+            in_name = f"in{tag}.txt"
+            in_path = tmp / in_name
+            _fetch_file_via_playwright(context, in_url, in_path, in_name)
 
-        zip_name = f"bq{tag}.zip"
-        zip_path = tmp / zip_name
-        _fetch_file_via_playwright(context, zip_url, zip_path, zip_name)
+            zip_name = f"bq{tag}.zip"
+            zip_path = tmp / zip_name
+            _fetch_file_via_playwright(context, zip_url, zip_path, zip_name)
 
-        browser.close()
+            browser.close()
 
-    bq_name = as_name = None
-    bq_path = as_path = None
-    members: list[str] = []
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        members = zf.namelist()
-        for member in members:
-            data = zf.read(member)
-            name_l = Path(member).name.lower()
-            if name_l.startswith("as") and name_l.endswith(".txt"):
-                as_name = Path(member).name
-                as_path = tmp / as_name
-                as_path.write_bytes(data)
-                logger.info("Extracted AS from BQ zip: %s", as_name)
-            elif name_l.startswith("bq") and name_l.endswith(".txt"):
-                bq_name = Path(member).name
-                bq_path = tmp / bq_name
-                bq_path.write_bytes(data)
-                logger.info("Extracted %s", bq_name)
-    zip_path.unlink(missing_ok=True)
+        bq_name = as_name = None
+        bq_path = as_path = None
+        members: list[str] = []
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            members = zf.namelist()
+            for member in members:
+                zdata = zf.read(member)
+                name_l = Path(member).name.lower()
+                if name_l.startswith("as") and name_l.endswith(".txt"):
+                    as_name = Path(member).name
+                    as_path = tmp / as_name
+                    as_path.write_bytes(zdata)
+                    logger.info("Extracted AS from BQ zip: %s", as_name)
+                elif name_l.startswith("bq") and name_l.endswith(".txt"):
+                    bq_name = Path(member).name
+                    bq_path = tmp / bq_name
+                    bq_path.write_bytes(zdata)
+                    logger.info("Extracted %s", bq_name)
+        zip_path.unlink(missing_ok=True)
 
-    if not bq_path or not as_path:
-        raise DibbsFetchError(
-            f"BQ zip did not contain expected BQ and AS .txt files. Members: {members}"
-        )
+        if not bq_path or not as_path:
+            raise DibbsFetchError(
+                f"BQ zip did not contain expected BQ and AS .txt files. Members: {members}"
+            )
 
-    return {
-        "tmp_dir": tmp_dir,
-        "in_path": str(in_path),
-        "bq_path": str(bq_path),
-        "as_path": str(as_path),
-        "in_file_name": in_name,
-        "bq_file_name": bq_name or f"bq{tag}.txt",
-        "as_file_name": as_name or f"as{tag}.txt",
-    }
+        return {
+            "tmp_dir": tmp_dir,
+            "in_path": str(in_path),
+            "bq_path": str(bq_path),
+            "as_path": str(as_path),
+            "in_file_name": in_name,
+            "bq_file_name": bq_name or f"bq{tag}.txt",
+            "as_file_name": as_name or f"as{tag}.txt",
+        }
+    except Exception:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -366,13 +361,28 @@ def fetch_ca_zip(ca_url: str, tag: str) -> Path:
     zip_path = tmp_dir / f"ca{tag}.zip"
 
     s = _make_dibbs2_requests_session()
+    from tqdm import tqdm
 
     logger.info("Downloading CA zip: %s -> %s", ca_url, zip_path)
     with s.get(ca_url, stream=True, timeout=120) as r:
         r.raise_for_status()
-        with open(zip_path, "wb") as f:
+        cl = r.headers.get("content-length")
+        try:
+            total = int(cl) if cl is not None else 0
+        except (TypeError, ValueError):
+            total = 0
+        with open(zip_path, "wb") as f, tqdm(
+            total=total,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            desc=f"ca{tag}.zip",
+            ncols=80,
+        ) as bar:
             for chunk in r.iter_content(chunk_size=256 * 1024):
-                f.write(chunk)
+                if chunk:
+                    f.write(chunk)
+                    bar.update(len(chunk))
 
     size = zip_path.stat().st_size
     logger.info("CA zip downloaded: %s (%d bytes)", zip_path.name, size)
