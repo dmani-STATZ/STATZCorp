@@ -190,6 +190,47 @@ class Solicitation(models.Model):
         return None
 
 
+class MassPassLog(models.Model):
+    """Audit row for bulk No-Bid (mass pass); supports one-time undo to Active."""
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='mass_pass_logs',
+    )
+    performed_at = models.DateTimeField(auto_now_add=True)
+    filter_description = models.TextField(
+        blank=True,
+        help_text="Human-readable description of active filters at time of mass pass",
+    )
+    sol_count = models.IntegerField(
+        help_text="Number of solicitations affected",
+    )
+    snapshot = models.JSONField(
+        help_text="List of {sol_id, prior_status} dicts captured before the update",
+    )
+    undone_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mass_pass_undos',
+    )
+    undone_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'dibbs_mass_pass_log'
+        ordering = ['-performed_at']
+
+    def __str__(self):
+        who = self.performed_by or "unknown user"
+        return f"MassPass by {who} at {self.performed_at} ({self.sol_count} sols)"
+
+    @property
+    def is_undone(self):
+        return self.undone_at is not None
+
+
 class SolicitationLine(models.Model):
     """One row per NSN/line within a solicitation."""
     solicitation = models.ForeignKey(

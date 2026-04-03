@@ -29,6 +29,7 @@ from sales.models import (
     WeWonAward,
     NsnProcurementHistory,
     SolPackaging,
+    MassPassLog,
 )
 from sales.services.matching import _normalize_nsn
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
@@ -84,6 +85,14 @@ UNRESTRICTED_TAB_Q = (
     | Q(small_business_set_aside__isnull=True)
 )
 VALID_TABS = frozenset({'matches', 'set_asides', 'unrestricted', 'research', 'nobid'})
+
+# SQL Server IN clause parameter limit — chunk snapshot IDs on mass-pass undo
+_MASS_PASS_UNDO_CHUNK = 100
+
+
+def _mass_pass_chunked(lst, size=_MASS_PASS_UNDO_CHUNK):
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
 
 # Sort: valid GET values are field name (asc) or -field (desc). Third click clears (default order).
 DEFAULT_ORDER = ('return_by_date', 'solicitation_number')
@@ -1341,6 +1350,19 @@ def sol_mass_pass(request):
             .annotate(_has_queued_rfq=Exists(queued_subq))
             .filter(_has_queued_rfq=False)
         )
+        snapshot = list(qs.values('id', 'status'))
+        snapshot_data = [
+            {'sol_id': row['id'], 'prior_status': row['status']} for row in snapshot
+        ]
+        sol_count = len(snapshot_data)
+        filter_desc = filter_qs or 'page selection'
+        if sol_count > 0:
+            MassPassLog.objects.create(
+                performed_by=request.user,
+                filter_description=filter_desc,
+                sol_count=sol_count,
+                snapshot=snapshot_data,
+            )
         updated = qs.update(status='NO_BID')
         messages.success(
             request,
@@ -1354,13 +1376,86 @@ def sol_mass_pass(request):
         messages.warning(request, 'No solicitations selected.')
         return redirect('sales:solicitation_list')
 
-    updated = Solicitation.objects.filter(
+    qs_page = Solicitation.objects.filter(
         pk__in=sol_ids,
         status__in=safe_statuses,
-    ).update(status='NO_BID')
+    )
+    snapshot = list(qs_page.values('id', 'status'))
+    snapshot_data = [
+        {'sol_id': row['id'], 'prior_status': row['status']} for row in snapshot
+    ]
+    sol_count = len(snapshot_data)
+    filter_desc = (request.POST.get('filter_qs') or '').strip() or 'page selection'
+    if sol_count > 0:
+        MassPassLog.objects.create(
+            performed_by=request.user,
+            filter_description=filter_desc,
+            sol_count=sol_count,
+            snapshot=snapshot_data,
+        )
+    updated = qs_page.update(status='NO_BID')
 
     messages.success(request, f'{updated} solicitation(s) marked No Bid.')
     return redirect('sales:solicitation_list')
+
+
+@login_required
+def mass_pass_history(request):
+    logs = MassPassLog.objects.select_related('performed_by', 'undone_by').order_by(
+        '-performed_at'
+    )
+    return render(
+        request,
+        'sales/solicitations/mass_pass_history.html',
+        {'logs': logs},
+    )
+
+
+@login_required
+@require_POST
+def mass_pass_undo(request, log_pk):
+    log = get_object_or_404(MassPassLog, pk=log_pk)
+
+    if log.is_undone:
+        messages.error(request, 'This mass pass has already been undone.')
+        return redirect('sales:mass_pass_history')
+
+    sol_ids_in_snapshot = [row['sol_id'] for row in log.snapshot]
+
+    restored_count = 0
+    for chunk in _mass_pass_chunked(sol_ids_in_snapshot):
+        restored_count += Solicitation.objects.filter(
+            id__in=chunk,
+            status='NO_BID',
+        ).update(status='Active')
+
+    log.undone_by = request.user
+    log.undone_at = timezone.now()
+    log.save(update_fields=['undone_by', 'undone_at'])
+
+    skipped = log.sol_count - restored_count
+    messages.success(
+        request,
+        f'Undo complete. {restored_count} solicitation(s) restored to Active. '
+        f'{skipped} skipped (already moved forward).',
+    )
+    return redirect('sales:mass_pass_history')
+
+
+@login_required
+@require_POST
+def sol_unbid(request, sol_number):
+    sol = get_object_or_404(Solicitation, solicitation_number=sol_number)
+
+    if sol.status != 'NO_BID':
+        messages.error(request, 'This solicitation is not currently No-Bid.')
+        return redirect('sales:solicitation_detail', sol_number=sol_number)
+
+    sol.status = 'Active'
+    sol.save(update_fields=['status'])
+
+    messages.success(request, f'{sol_number} restored to Active.')
+    return redirect('sales:solicitation_detail', sol_number=sol_number)
 
 
 @login_required

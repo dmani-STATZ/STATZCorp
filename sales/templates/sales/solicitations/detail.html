@@ -87,6 +87,14 @@
     <div class="status-banner banner-research"><span>🔬</span><div><strong>Research Flagged</strong><span class="d-block small opacity-90">This solicitation is in the Research pool for deeper triage. Remove the flag when you are ready to return it to the active pipeline.</span></div></div>
     {% elif solicitation.status == 'NO_BID' %}
     <div class="status-banner banner-nobid"><span>🚫</span><div><strong>No-Bid</strong><span class="d-block small">Excluded from the active pipeline.</span></div></div>
+    <form method="post" action="{% url 'sales:sol_unbid' sol_number=solicitation.solicitation_number %}" class="mt-2 mb-0 d-inline-block">
+        {% csrf_token %}
+        <button type="submit"
+                class="btn btn-sm btn-warning"
+                onclick="return confirm('Restore this solicitation to Active?')">
+            ↩ Restore to Active
+        </button>
+    </form>
     {% elif solicitation.status == 'RFQ_PENDING' %}
     <div class="status-banner banner-rfq-pend"><span>📋</span><div><strong>RFQ Pending</strong>
       {% if queued_rfq_count > 0 %}<span class="d-block small">{{ queued_rfq_count }} RFQ{{ queued_rfq_count|pluralize }} staged in the send queue.</span>

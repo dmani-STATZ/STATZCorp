@@ -91,7 +91,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/models/solicitations.py` (STATUS_CHOICES) + every view that checks that status string + `sales/templates/sales/solicitations/list.html` (filter dropdown) + `sales/templates/sales/solicitations/detail.html` (pipeline ribbon **and** status banner block for non–New/Matching statuses) + `sales/context_processors.py` if it affects overdue count logic
 
 ### Changing solicitation list tabs, filters, sort, or NO_BID visibility
-→ `sales/views/solicitations.py` — keep `_list_qs_before_tab`, `_apply_list_tab_filter`, `_apply_list_sort`, and `_build_list_queryset` aligned with `solicitation_list()` so detail **Prev/Next** (`?list_qs=`) matches the list (including `tab=research` Research Pool and `sol_mass_pass` `filter_qs` replay). Update `sales/templates/sales/solicitations/list.html` (tabs, tab counts, **Pass All in This View**, `filter_snapshot` on row links) as needed.
+→ `sales/views/solicitations.py` — keep `_list_qs_before_tab`, `_apply_list_tab_filter`, `_apply_list_sort`, and `_build_list_queryset` aligned with `solicitation_list()` so detail **Prev/Next** (`?list_qs=`) matches the list (including `tab=research` Research Pool and `sol_mass_pass` `filter_qs` replay). Update `sales/templates/sales/solicitations/list.html` (tabs, tab counts, **Pass All in This View**, **Mass Pass History** link, `filter_snapshot` on row links) as needed.
 
 ### Adding a new match tier or method
 → `sales/services/matching.py` + `sales/models/matching.py` (MATCH_METHOD_CHOICES) + new migration + `sales/templates/sales/solicitations/detail.html` (matches tab) + `sales/templates/sales/rfq/partials/mailto_buttons.html`
@@ -150,7 +150,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `awards_import_upload` checks `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
 - **SAM debug JSON** in `sales/templates/sales/entity_lookup.html` is conditionally shown only to staff (`{% if request.user.is_staff %}`). Do not remove this guard.
 - **Import batch delete** (`import_batch_delete`) only deletes solicitations with `status='New'`. This guard prevents accidental deletion of in-progress work. Do not relax this filter.
-- **`sol_mass_pass`** (`POST /solicitations/mass-pass/`) performs bulk No-Bid updates. With `mass_pass_all=1` it rebuilds the list queryset from posted `filter_qs` and runs a single `QuerySet.update(status='NO_BID')` restricted to `New` and `Active` only (never RFQ_SENT, QUOTING, etc.), excluding rows with `QUEUED` RFQs. The `sol_ids` path is page-scoped with the same status filter. Do not widen these guards — they prevent accidental loss of in-flight RFQ/bid work.
+- **`sol_mass_pass`** (`POST /solicitations/mass-pass/`) performs bulk No-Bid updates. With `mass_pass_all=1` it rebuilds the list queryset from posted `filter_qs` and runs a single `QuerySet.update(status='NO_BID')` restricted to `New` and `Active` only (never RFQ_SENT, QUOTING, etc.), excluding rows with `QUEUED` RFQs. The `sol_ids` path is page-scoped with the same status filter. Do not widen these guards — they prevent accidental loss of in-flight RFQ/bid work. **Before** that `update()`, the view snapshots every affected row’s prior status into **`MassPassLog`** (`dibbs_mass_pass_log`) so **`mass_pass_undo`** can restore rows that are still `NO_BID` back to **`Active`** (one undo per log; chunked `id__in` queries). **Do not remove the snapshot / `MassPassLog.objects.create` step from `sol_mass_pass`** — it is required for undo functionality.
 - **File uploads** (IN/BQ/AS files) are saved to temp directories and removed during the match step. Do not change temp file handling without verifying cleanup still occurs.
 - **RFQ mailto flows** generate `mailto:` URLs rather than sending email automatically. This is intentional — `rfq_mark_sent` requires the human to confirm the email was sent. Do not change this to auto-send without understanding the workflow.
 - **`SupplierContactLog`** provides an audit trail for all RFQ communications. Do not remove or bypass log creation in `send_rfq_email` or `rfq_mark_sent`.
@@ -261,6 +261,7 @@ After any change, manually verify these flows:
 | Email template | Set a template as default, trigger an RFQ, confirm template content appears in mailto body |
 | Status context badge | Verify `overdue_rfq_count` badge appears correctly in nav after sending an RFQ with an expired return date |
 | Solicitation list / detail nav | Open list with filters and sort; open a row; confirm Back/Prev/Next and status banners; confirm No-Bid tab only shows `NO_BID` and other tabs exclude it |
+| Mass pass log / undo | Run **Pass All** or **Pass Selected**, open **Mass Pass History**, confirm log row; **Undo** restores only rows still `NO_BID` to `Active`; workbench **Restore to Active** on a single `NO_BID` sol |
 
 **High-risk files to test after any change:** `sales/services/bq_export.py`, `sales/services/matching.py`, `sales/services/importer.py`, `sales/views/rfq.py`, `sales/views/bids.py`.
 
@@ -303,6 +304,8 @@ After any change, manually verify these flows:
 17. **Inbox claim stubs are created on first message open.** When a rep clicks an unlinked message that has no `InboxMessage` DB record yet, a stub record is created with blank `body_html` to enable claim tracking. The full body is only stored at link time (`rfq_inbox_link` view). Do not assume `InboxMessage.body_html` is populated just because the record exists — check `rfq_links` to determine if the message has been fully processed.
 
 18. **`DibbsAward` + `bulk_create` and `auto_now_add`.** Django does not invoke `save()` (or `auto_now_add`) on `bulk_create`. A NOT NULL datetime column on SQL Server plus NULL inserts produces errors (e.g. 8115). AW import timing must continue to use `aw_file_date` and `AwardImportBatch.imported_at`, not a hidden sync timestamp on the award row.
+
+19. **`sol_mass_pass` without `MassPassLog` snapshot.** Removing or reordering the pre-`update()` snapshot + `MassPassLog.objects.create` block breaks **Mass Pass History** and **Undo** (`mass_pass_undo` depends on `snapshot` JSON). Do not delete that block when refactoring bulk pass.
 
 ---
 

@@ -5,6 +5,7 @@ Re-export all sales models so imports work as normal:
 from sales.models.solicitations import (
     ImportBatch,
     ImportJob,
+    MassPassLog,
     NsnProcurementHistory,
     Solicitation,
     SolicitationLine,
@@ -34,6 +35,7 @@ from sales.models.sam_cache import SAMEntityCache
 __all__ = [
     'ImportBatch',
     'ImportJob',
+    'MassPassLog',
     'Solicitation',
     'SolicitationLine',
     'NsnProcurementHistory',

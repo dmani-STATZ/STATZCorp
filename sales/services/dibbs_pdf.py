@@ -736,7 +736,7 @@ def parse_pdf_data_backlog(log=None) -> int:
     )
 
     n = 0
-    for sol_number, blob in qs.iterator(chunk_size=50):
+    for sol_number, blob in list(qs):
         if not blob:
             continue
         key = (sol_number or "").strip().upper()

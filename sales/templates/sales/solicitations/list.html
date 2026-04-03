@@ -132,11 +132,15 @@
         </button>
     </form>
     {% endif %}
+    <a href="{% url 'sales:mass_pass_history' %}" class="btn btn-sm btn-outline-secondary ms-2 align-self-end">
+        Mass Pass History
+    </a>
 </div>
 
 {# ── Bulk reassign form + table ──────────────────────────────────────────── #}
 <form method="post" id="bulk-form" action="">
     {% csrf_token %}
+    <input type="hidden" name="filter_qs" value="{{ filter_snapshot }}">
     <input type="hidden" name="action" value="reassign_bucket">
 
     {% if eligible_for_mass_pass_count %}

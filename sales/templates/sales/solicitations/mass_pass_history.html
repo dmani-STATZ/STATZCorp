@@ -1,0 +1,84 @@
+{% extends "sales/base.html" %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-3">
+    <div>
+        <nav aria-label="breadcrumb" class="mb-1">
+            <ol class="breadcrumb mb-0 py-0 small">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'sales:solicitation_list' %}">Solicitations</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Mass Pass History</li>
+            </ol>
+        </nav>
+        <h1 class="h4 mb-0">Mass Pass History</h1>
+    </div>
+    <a href="{% url 'sales:solicitation_list' %}" class="btn btn-sm btn-outline-secondary">← Back to list</a>
+</div>
+
+{% if logs %}
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th scope="col">Date/Time</th>
+                <th scope="col">Performed By</th>
+                <th scope="col">Filters Active</th>
+                <th scope="col" class="text-end"># Sols Affected</th>
+                <th scope="col">Status</th>
+                <th scope="col">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.performed_at|date:"M d, Y g:i A" }}</td>
+                <td>
+                    {% if log.performed_by %}
+                        {{ log.performed_by.get_full_name|default:log.performed_by.username }}
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td class="small text-break">{{ log.filter_description|truncatechars:80 }}</td>
+                <td class="text-end">{{ log.sol_count }}</td>
+                <td>
+                    {% if log.is_undone %}
+                        <span class="text-muted small">
+                            Undone by
+                            {% if log.undone_by %}
+                                {{ log.undone_by.get_full_name|default:log.undone_by.username }}
+                            {% else %}
+                                —
+                            {% endif %}
+                            on {{ log.undone_at|date:"M d, Y g:i A" }}
+                        </span>
+                    {% else %}
+                        <span class="badge bg-success">Active</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not log.is_undone %}
+                    <form method="post"
+                          action="{% url 'sales:mass_pass_undo' log_pk=log.pk %}"
+                          class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="btn btn-sm btn-danger"
+                                onclick="return confirm('Restore all NO_BID sols from this mass pass back to Active?')">
+                            Undo
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No mass pass actions have been recorded yet.</p>
+{% endif %}
+
+{% endblock %}
