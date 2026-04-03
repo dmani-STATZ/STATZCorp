@@ -11,6 +11,8 @@
 import logging
 import os
 import shutil
+import sys
+import time
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
@@ -267,7 +269,7 @@ class Command(BaseCommand):
             f"across {n_distinct_dates} distinct import date(s)..."
         )
 
-        import_dates = (
+        import_dates = list(
             pending_base.filter(import_date__isnull=False)
             .values_list("import_date", flat=True)
             .distinct()
@@ -384,7 +386,32 @@ class Command(BaseCommand):
                     shutil.rmtree(zip_path.parent, ignore_errors=True)
                     logger.info("Loop B: purged temp dir for %s", tag)
 
+            # Sleep between zips so F5 ASM doesn't rate-limit the next
+            # dibbs2 session bootstrap — only if more dates remain
+            current_idx = import_dates.index(import_d)
+            if current_idx < len(import_dates) - 1:
+                self._sleep_with_progress(15, f"  Cooling down before next CA zip")
+
         return (total_fetched, total_failed)
+
+    def _sleep_with_progress(self, seconds: int, label: str = "Cooling down") -> None:
+        """
+        Sleep for `seconds` seconds while displaying a filling progress bar.
+
+          Cooling down before next CA zip (15s)
+          [========                        ] 4/15s
+        """
+        width = 40
+        self.stdout.write(f"{label} ({seconds}s)")
+        for i in range(seconds + 1):
+            filled = int(width * i / seconds)
+            bar = "=" * filled + " " * (width - filled)
+            sys.stdout.write(f"\r  [{bar}] {i}/{seconds}s")
+            sys.stdout.flush()
+            if i < seconds:
+                time.sleep(1)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
 
     def _work_list_single_date(
         self,
