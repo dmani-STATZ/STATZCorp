@@ -2,18 +2,20 @@
 Fetch DIBBS daily files from DLA.
 
 Phase 1 — Discovery (requests against www.dibbs.bsm.dla.mil)
-  Accept the DoD warning and scrape RFQDates.aspx for IN (.txt) and BQ (.zip) hrefs
-  per date. Optional: if urls are passed in, skip discovery.
+  Accept the DoD warning and scrape RFQDates.aspx for IN (.txt), BQ (.zip),
+  and CA (.zip) hrefs per date.
 
 Phase 2 — Download (Playwright against dibbs2.bsm.dla.mil)
   1. Accept the dibbs2 DoD warning via requests (POST VIEWSTATE) — avoids Playwright
      cold-hitting the warning page and getting fingerprinted/reset by F5 ASM.
-  2. Inject the resulting cookies (TS* F5 session token + ASP.NET session) into a
-     Playwright browser context.
-  3. In that primed context, navigate directly to IN/BQ download URLs.
+  2. Inject the resulting cookies into a Playwright browser context.
+  3. In that primed context, navigate directly to download URLs.
 
-Returns local paths for the import pipeline. Caller is responsible for cleanup
-of tmp_dir after import (existing cleanup in import_step_match).
+fetch_ca_zip() — downloads ca{tag}.zip via requests (no Playwright needed).
+  The ca zip contains all solicitation PDFs for the day. Loop B extracts
+  matching PDFs directly from the zip instead of fetching them one-by-one.
+
+Returns local paths for the import pipeline. Caller is responsible for cleanup.
 """
 import io
 import logging
@@ -30,14 +32,12 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-# Hosts (www = discovery, dibbs2 = file downloads + consent)
 DIBBS_MAIN = "https://www.dibbs.bsm.dla.mil"
 DIBBS2_MAIN = "https://dibbs2.bsm.dla.mil"
 RFQ_DATES_URL = f"{DIBBS_MAIN}/RFQ/RFQDates.aspx?category=recent"
 DIBBS2_WARNING_URL = f"{DIBBS2_MAIN}/dodwarning.aspx?goto=/"
 
 DEFAULT_TIMEOUT = 30
-# Playwright navigation / download waits (GCC High latency)
 REQUEST_TIMEOUT_MS = 60_000
 
 _BROWSER_UA = (
@@ -47,17 +47,14 @@ _BROWSER_UA = (
 
 
 class DibbsFetchError(Exception):
-    """Raised when DIBBS fetch fails (discovery, consent, network, or invalid response)."""
     pass
 
 
 # ---------------------------------------------------------------------------
-# Phase 1: Discovery (requests on www.dibbs)
+# Phase 1: Discovery
 # ---------------------------------------------------------------------------
 
-
 def _make_www_session() -> requests.Session:
-    """Accept DoD warning on www.dibbs and return session for RFQDates scrape."""
     s = requests.Session()
     s.headers["User-Agent"] = _BROWSER_UA
     resp = s.get(
@@ -77,7 +74,7 @@ def _make_www_session() -> requests.Session:
 
 
 def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
-    """Return {"260312": {"in": "...", "bq": "..."}, ...} — IN txt + BQ zip only."""
+    """Return {"260312": {"in": "...", "bq": "...", "ca": "..."}, ...}"""
     resp = session.get(RFQ_DATES_URL, timeout=DEFAULT_TIMEOUT)
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -93,16 +90,14 @@ def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
             fname = href_l.rsplit("/", 1)[-1].split("?")[0]
             tag = fname[2:8]
             result.setdefault(tag, {})["bq"] = href
+        elif "/downloads/rfq/archive/ca" in href_l and href_l.endswith(".zip"):
+            fname = href_l.rsplit("/", 1)[-1].split("?")[0]
+            tag = fname[2:8]
+            result.setdefault(tag, {})["ca"] = href
     return result
 
 
 def _check_date_sol_count(session: requests.Session, target_date: date) -> int:
-    """
-    Hit DIBBS RfqRecs.aspx for the given date using the already-authenticated
-    requests session and return the advertised solicitation count.
-    Returns 0 if the page reports no records or if parsing fails.
-    Does NOT raise — caller decides what to do with 0.
-    """
     url = (
         "https://www.dibbs.bsm.dla.mil/RFQ/RfqRecs.aspx"
         f"?category=post&TypeSrch=dt&Value={target_date.strftime('%m-%d-%Y')}"
@@ -114,7 +109,6 @@ def _check_date_sol_count(session: requests.Session, target_date: date) -> int:
         el = soup.find("span", id="ctl00_cph1_lblRecCount")
         if not el:
             return 0
-        # Text is like: "Record Found:  0" or "Record Found:  412"
         text = el.get_text(strip=True)
         digits = "".join(filter(str.isdigit, text))
         return int(digits) if digits else 0
@@ -123,7 +117,6 @@ def _check_date_sol_count(session: requests.Session, target_date: date) -> int:
 
 
 def _discover_hrefs(target_date: date) -> tuple[str, str]:
-    """Get IN and BQ zip URLs for target_date from www.dibbs RFQ page."""
     tag = target_date.strftime("%y%m%d")
     s = _make_www_session()
     page_data = _scrape_rfq_hrefs(s)
@@ -143,21 +136,15 @@ def _discover_hrefs(target_date: date) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2: Session bootstrap (requests on dibbs2) + cookie injection
+# dibbs2 session bootstrap via requests (shared by fetch_dibbs_archive_files
+# and fetch_ca_zip — keeps Playwright off the warning page entirely)
 # ---------------------------------------------------------------------------
 
-
-def _make_dibbs2_session() -> list[dict]:
+def _make_dibbs2_requests_session() -> requests.Session:
     """
-    Accept the dibbs2 DoD warning via requests (no Playwright), return a list of
-    cookie dicts ready for Playwright context.add_cookies().
-
-    Strategy:
-      1. GET dodwarning.aspx — F5 sets its TS* anti-bot cookie, ASP.NET sets __VIEWSTATE etc.
-      2. POST the form back with butAgree=OK — server sets the consent/session cookies.
-      3. Collect all cookies from the session jar and convert to Playwright format.
-
-    This keeps Chromium away from the cold warning-page hit that F5 ASM was resetting.
+    Accept the dibbs2 DoD warning via requests and return an authenticated
+    session. Used both for cookie injection into Playwright and for direct
+    streaming downloads (ca zip).
     """
     s = requests.Session()
     s.headers.update({
@@ -168,61 +155,51 @@ def _make_dibbs2_session() -> list[dict]:
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     })
-
-    logger.info("dibbs2 consent bootstrap: GET %s", DIBBS2_WARNING_URL)
     resp = s.get(DIBBS2_WARNING_URL, timeout=DEFAULT_TIMEOUT)
     resp.raise_for_status()
-
     soup = BeautifulSoup(resp.text, "html.parser")
     form = soup.find("form")
     if not form:
         raise DibbsFetchError("dibbs2 warning page has no form — site layout may have changed.")
-
-    # Build POST data from all hidden inputs + the submit button value
     action = form.get("action", "")
     if not action.startswith("http"):
         action = urljoin(DIBBS2_MAIN + "/", action)
-
     data = {}
     for inp in form.find_all("input"):
         name = inp.get("name")
         if not name:
             continue
         itype = inp.get("type", "text").lower()
-        if itype == "submit" and inp.get("name") == "butAgree":
+        if itype == "submit" and name == "butAgree":
             data[name] = inp.get("value", "OK")
         elif itype != "submit":
             data[name] = inp.get("value", "")
+    s.post(action, data=data, timeout=DEFAULT_TIMEOUT,
+           headers={"Referer": DIBBS2_WARNING_URL})
+    return s
 
-    logger.info("dibbs2 consent bootstrap: POST %s", action)
-    post_resp = s.post(
-        action,
-        data=data,
-        timeout=DEFAULT_TIMEOUT,
-        headers={"Referer": DIBBS2_WARNING_URL},
-    )
-    post_resp.raise_for_status()
 
-    # Convert requests CookieJar → Playwright add_cookies format
+def _make_dibbs2_session() -> list[dict]:
+    """
+    Return cookies from an authenticated dibbs2 requests session in
+    Playwright add_cookies() format.
+    """
+    s = _make_dibbs2_requests_session()
     playwright_cookies = []
     for cookie in s.cookies:
-        c: dict = {
+        playwright_cookies.append({
             "name": cookie.name,
             "value": cookie.value,
             "domain": cookie.domain or ".dibbs2.bsm.dla.mil",
             "path": cookie.path or "/",
             "secure": cookie.secure,
-            "httpOnly": True,  # conservative — DLA sets HttpOnly on session cookies
+            "httpOnly": True,
             "sameSite": "Strict",
-        }
-        playwright_cookies.append(c)
-
+        })
     if not playwright_cookies:
         raise DibbsFetchError(
-            "dibbs2 consent bootstrap returned no cookies — POST may have failed or "
-            "site rejected the session. Check VIEWSTATE parsing."
+            "dibbs2 consent bootstrap returned no cookies — POST may have failed."
         )
-
     logger.info(
         "dibbs2 consent bootstrap complete — %d cookie(s): %s",
         len(playwright_cookies),
@@ -232,25 +209,18 @@ def _make_dibbs2_session() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2: Download (Playwright on dibbs2, cookies pre-injected)
+# Phase 2: Playwright downloads (IN + BQ)
 # ---------------------------------------------------------------------------
 
-
 def _fetch_file_via_playwright(context, url: str, dest_path: Path, label: str) -> None:
-    """
-    In the primed dibbs2 context, navigate to url and capture download.
-    Handles "Download is starting" as success; clicks OK if interstitial appears.
-    """
     page = context.new_page()
     try:
         from playwright.sync_api import Error as PlaywrightError
-
         with page.expect_download(timeout=REQUEST_TIMEOUT_MS) as dl_info:
             try:
                 page.goto(url, wait_until="commit", timeout=REQUEST_TIMEOUT_MS)
             except PlaywrightError as e:
                 msg = str(e)
-                # File URLs often abort navigation when server sends Content-Disposition: attachment
                 if "Download is starting" in msg or "ERR_ABORTED" in msg:
                     logger.info("%s triggered browser download (navigation aborted)", label)
                 else:
@@ -283,22 +253,7 @@ def fetch_dibbs_archive_files(
     in_url: Optional[str] = None,
     target_date: Optional[date] = None,
 ) -> dict:
-    """
-    Fetch IN + BQ+AS from DIBBS.
-
-    - If target_date is set and in_url/zip_url are not, runs Phase 1 (discovery on
-      www.dibbs) to get IN and BQ zip URLs for that date.
-    - Otherwise uses provided zip_url/in_url, or defaults for 260312.
-    - Phase 2: Bootstrap dibbs2 consent via requests (avoids F5 bot fingerprinting),
-      inject cookies into Playwright context, then download IN file and BQ zip.
-
-    Returns:
-        {
-            "tmp_dir": str,
-            "in_path": str, "bq_path": str, "as_path": str,
-            "in_file_name": str, "bq_file_name": str, "as_file_name": str,
-        }
-    """
+    """Fetch IN + BQ+AS. Bootstraps dibbs2 via requests, injects cookies into Playwright."""
     if target_date and (not in_url or not zip_url):
         in_url, zip_url = _discover_hrefs(target_date)
     if not zip_url:
@@ -322,11 +277,10 @@ def fetch_dibbs_archive_files(
         from playwright.sync_api import sync_playwright
     except ImportError:
         raise DibbsFetchError(
-            "Playwright is required for DIBBS fetch (consent + downloads). "
+            "Playwright is required for DIBBS fetch. "
             "Install with: pip install playwright && playwright install chromium"
         )
 
-    # Bootstrap consent via requests — no Playwright cold-hit on the warning page
     dibbs2_cookies = _make_dibbs2_session()
 
     with sync_playwright() as pw:
@@ -346,8 +300,6 @@ def fetch_dibbs_archive_files(
             viewport={"width": 1920, "height": 1080},
             locale="en-US",
         )
-
-        # Inject the requests-obtained cookies so Playwright looks pre-authenticated
         context.add_cookies(dibbs2_cookies)
         logger.info("Injected %d dibbs2 cookie(s) into Playwright context", len(dibbs2_cookies))
 
@@ -361,7 +313,6 @@ def fetch_dibbs_archive_files(
 
         browser.close()
 
-    # Extract bq{tag}.zip → BQ + AS .txt (AS is packaged inside the BQ zip)
     bq_name = as_name = None
     bq_path = as_path = None
     members: list[str] = []
@@ -396,3 +347,36 @@ def fetch_dibbs_archive_files(
         "bq_file_name": bq_name or f"bq{tag}.txt",
         "as_file_name": as_name or f"as{tag}.txt",
     }
+
+
+# ---------------------------------------------------------------------------
+# CA zip download (requests only — no Playwright)
+# ---------------------------------------------------------------------------
+
+def fetch_ca_zip(ca_url: str, tag: str) -> Path:
+    """
+    Download ca{tag}.zip to a temp directory via an authenticated requests session.
+    No Playwright involved — one connection, streams directly to disk.
+
+    Returns the local Path to the zip file.
+    Caller must delete the parent temp directory when done:
+        shutil.rmtree(zip_path.parent, ignore_errors=True)
+    """
+    tmp_dir = Path(tempfile.mkdtemp(prefix=f"dibbs_ca_{tag}_"))
+    zip_path = tmp_dir / f"ca{tag}.zip"
+
+    s = _make_dibbs2_requests_session()
+
+    logger.info("Downloading CA zip: %s -> %s", ca_url, zip_path)
+    with s.get(ca_url, stream=True, timeout=120) as r:
+        r.raise_for_status()
+        with open(zip_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=256 * 1024):
+                f.write(chunk)
+
+    size = zip_path.stat().st_size
+    logger.info("CA zip downloaded: %s (%d bytes)", zip_path.name, size)
+    if size == 0:
+        raise DibbsFetchError(f"CA zip download produced empty file for tag {tag}")
+
+    return zip_path

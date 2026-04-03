@@ -6,13 +6,14 @@
 #   for a calendar date as "already imported."
 # - Nightly flow: Loop A (metadata + run_import per missing date; zero-record dates get
 #   RfqRecs.aspx count check + empty ImportBatch, no Playwright), then _run_lifecycle_sweep,
-#   Loop B (set-aside PDF blob harvest, Playwright batches of 10; excludes Archived),
+#   Loop B (set-aside PDF blob harvest from ca{tag}.zip per date; no Playwright),
 #   Loop C (parse pdf_blob → procurement history + packaging; ORM only, after all B sessions).
 import logging
-import math
 import os
 import shutil
+import zipfile
 from datetime import date, datetime
+from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -21,13 +22,11 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-HARVEST_BATCH_SIZE = 10
-
 
 class Command(BaseCommand):
     help = (
-        "Three-phase DIBBS auto-import: IN/BQ/AS daily import, set-aside PDF harvest, "
-        "local PDF parse backlog. Use --date to run Loop A for one calendar day only."
+        "Three-phase DIBBS auto-import: IN/BQ/AS daily import, set-aside PDF harvest "
+        "from ca zip, local PDF parse backlog. Use --date to run Loop A for one day only."
     )
 
     def add_arguments(self, parser):
@@ -51,7 +50,7 @@ class Command(BaseCommand):
             fetch_dibbs_archive_files,
         )
         from sales.models import ImportBatch, Solicitation
-        from sales.services.dibbs_pdf import fetch_pdfs_for_sols, parse_pdf_data_backlog
+        from sales.services.dibbs_pdf import parse_pdf_data_backlog
         from sales.services.importer import run_import, _run_lifecycle_sweep
 
         only_date = None
@@ -107,7 +106,6 @@ class Command(BaseCommand):
                 if d in imported_dates:
                     continue
 
-                # Check DIBBS record count before queuing for Playwright download.
                 sol_count = _check_date_sol_count(session, d)
                 if sol_count == 0:
                     logger.warning(
@@ -184,8 +182,7 @@ class Command(BaseCommand):
                 if tmp_dir:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        # Lifecycle sweep — runs after import so archived status reflects all newly
-        # imported solicitations. Loop B will then only process non-archived sols.
+        # Lifecycle sweep
         self.stdout.write("Lifecycle sweep: archiving expired solicitations...")
         with transaction.atomic():
             sweep = _run_lifecycle_sweep()
@@ -198,18 +195,16 @@ class Command(BaseCommand):
             )
         )
 
-        # Loop B — harvest PDF blobs for set-aside sols (fresh browser every 10 PDFs)
-        self.stdout.write(
-            "Loop B: harvesting set-aside PDF blobs (Playwright batches of 10)..."
-        )
-        harvested, b_fetched, b_failed = self._harvest_set_aside_pdf_blobs()
+        # Loop B — harvest PDF blobs from ca zips (one zip per date, no Playwright)
+        self.stdout.write("Loop B: harvesting set-aside PDF blobs from CA zips...")
+        b_fetched, b_failed = self._harvest_pdfs_from_ca_zips(available)
         self.stdout.write(
             self.style.SUCCESS(
-                f"Loop B: finished — {harvested} batch(es), {b_fetched} fetched, {b_failed} failed."
+                f"Loop B: finished — {b_fetched} fetched, {b_failed} failed."
             )
         )
 
-        # Loop C — local parse only; all Playwright from Loop B is closed
+        # Loop C — local parse only
         self.stdout.write("Loop C: parsing stored PDFs (procurement history + packaging)...")
         n_parsed = parse_pdf_data_backlog(lambda m: self.stdout.write(m))
         self.stdout.write(
@@ -225,6 +220,206 @@ class Command(BaseCommand):
             f"{len(failures)} failed."
         )
 
+    def _harvest_pdfs_from_ca_zips(self, available: dict) -> tuple[int, int]:
+        """
+        For each date that has pending set-aside solicitations without a pdf_blob,
+        download the ca{tag}.zip once, extract matching PDFs, blob them to the DB,
+        then purge the zip and extracted files.
+
+        Returns (total_fetched, total_failed).
+        """
+        from sales.models import Solicitation
+        from sales.services.dibbs_fetch import fetch_ca_zip, DibbsFetchError
+        from datetime import datetime
+
+        # Build tag -> ca_url map from available dates that have a ca zip
+        tag_to_ca_url = {
+            tag: hrefs["ca"]
+            for tag, hrefs in available.items()
+            if hrefs.get("ca")
+        }
+
+        # Find all dates that have pending set-aside sols
+        pending_qs = (
+            Solicitation.objects.filter(
+                pdf_blob__isnull=True,
+                pdf_fetch_attempts__lt=5,
+                pdf_data_pulled__isnull=True,
+            )
+            .exclude(small_business_set_aside="N")
+            .exclude(status="Archived")
+        )
+
+        total_pending = pending_qs.count()
+        if total_pending == 0:
+            self.stdout.write("Loop B: no set-aside PDFs pending — skipping.")
+            return (0, 0)
+
+        self.stdout.write(f"Loop B: {total_pending} set-aside solicitation(s) pending harvest...")
+
+        # Group pending sols by their date tag so we download each ca zip once
+        # sol_number format: SPE7M1-26-T-6381 → tag is positions that match yymmdd
+        # ImportBatch tracks import_date; join through that to get the tag
+        from sales.models import ImportBatch
+
+        # Map import_date -> tag from available
+        date_to_tag: dict[date, str] = {}
+        for tag, hrefs in available.items():
+            try:
+                d = datetime.strptime(tag, "%y%m%d").date()
+                date_to_tag[d] = tag
+            except ValueError:
+                continue
+
+        # Get distinct import dates for pending sols via their ImportBatch
+        # Sols don't carry import_date directly, so we process all known tags
+        # that have a ca zip and pending sols — simplest: just try every tag
+        # that has a ca url and pending sols exist globally. Since the ca zip
+        # contains ALL PDFs for that day, we process all pending sols found in it.
+
+        total_fetched = 0
+        total_failed = 0
+        now = timezone.now()
+
+        for tag, ca_url in sorted(tag_to_ca_url.items()):
+            # Check if any pending sols exist before downloading the zip
+            remaining = (
+                Solicitation.objects.filter(
+                    pdf_blob__isnull=True,
+                    pdf_fetch_attempts__lt=5,
+                    pdf_data_pulled__isnull=True,
+                )
+                .exclude(small_business_set_aside="N")
+                .exclude(status="Archived")
+                .count()
+            )
+            if remaining == 0:
+                break
+
+            zip_path = None
+            try:
+                zip_path = fetch_ca_zip(ca_url, tag)
+                self.stdout.write(f"  Loop B — {tag}: downloaded {zip_path.name}")
+
+                # Build index of PDF names in the zip (uppercase, no path)
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    zip_members = {
+                        Path(m).stem.upper(): m
+                        for m in zf.namelist()
+                        if m.upper().endswith(".PDF")
+                    }
+
+                if not zip_members:
+                    self.stdout.write(
+                        self.style.WARNING(f"  Loop B — {tag}: no PDFs found in zip, skipping.")
+                    )
+                    continue
+
+                # Fetch pending sol numbers and match against zip
+                batch_sols = list(
+                    Solicitation.objects.filter(
+                        pdf_blob__isnull=True,
+                        pdf_fetch_attempts__lt=5,
+                        pdf_data_pulled__isnull=True,
+                    )
+                    .exclude(small_business_set_aside="N")
+                    .exclude(status="Archived")
+                    .values_list("solicitation_number", "pdf_fetch_attempts")
+                )
+
+                fetched = 0
+                failed = 0
+
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    for sol_number, attempts in batch_sols:
+                        key = (sol_number or "").strip().upper()
+                        if not key:
+                            continue
+
+                        member = zip_members.get(key)
+                        if member is None:
+                            # Not in this zip — will be picked up by another date's zip
+                            # or increments attempt on final pass
+                            continue
+
+                        try:
+                            pdf_bytes = zf.read(member)
+                            if pdf_bytes:
+                                Solicitation.objects.filter(
+                                    solicitation_number=key
+                                ).update(
+                                    pdf_blob=pdf_bytes,
+                                    pdf_fetched_at=now,
+                                    pdf_fetch_status="DONE",
+                                )
+                                fetched += 1
+                            else:
+                                raise ValueError("empty PDF bytes")
+                        except Exception as e:
+                            logger.warning(
+                                "Loop B: failed to extract %s from %s: %s",
+                                key, zip_path.name, e,
+                            )
+                            new_att = (attempts or 0) + 1
+                            upd = {
+                                "pdf_fetch_status": "FAILED",
+                                "pdf_fetch_attempts": new_att,
+                            }
+                            if new_att >= 5:
+                                upd["pdf_data_pulled"] = now
+                            Solicitation.objects.filter(
+                                solicitation_number=key
+                            ).update(**upd)
+                            failed += 1
+
+                total_fetched += fetched
+                total_failed += failed
+                self.stdout.write(
+                    f"  Loop B — {tag}: fetched {fetched}, failed {failed}"
+                )
+
+            except DibbsFetchError as e:
+                logger.error("Loop B: CA zip fetch failed for %s: %s", tag, e)
+                self.stdout.write(
+                    self.style.ERROR(f"  Loop B — {tag}: CA zip FAILED — {e}")
+                )
+            except Exception as e:
+                logger.exception("Loop B: unexpected error for tag %s", tag)
+                self.stdout.write(
+                    self.style.ERROR(f"  Loop B — {tag}: ERROR — {e}")
+                )
+            finally:
+                if zip_path is not None:
+                    shutil.rmtree(zip_path.parent, ignore_errors=True)
+                    logger.info("Loop B: purged temp dir for %s", tag)
+
+        # Any sols that were never found in any zip get their attempt count bumped
+        still_pending = list(
+            Solicitation.objects.filter(
+                pdf_blob__isnull=True,
+                pdf_fetch_attempts__lt=5,
+                pdf_data_pulled__isnull=True,
+            )
+            .exclude(small_business_set_aside="N")
+            .exclude(status="Archived")
+            .values_list("solicitation_number", "pdf_fetch_attempts")
+        )
+        for sol_number, attempts in still_pending:
+            key = (sol_number or "").strip().upper()
+            if not key:
+                continue
+            new_att = (attempts or 0) + 1
+            upd = {
+                "pdf_fetch_status": "FAILED",
+                "pdf_fetch_attempts": new_att,
+            }
+            if new_att >= 5:
+                upd["pdf_data_pulled"] = now
+            Solicitation.objects.filter(solicitation_number=key).update(**upd)
+            total_failed += 1
+
+        return (total_fetched, total_failed)
+
     def _work_list_single_date(
         self,
         session,
@@ -234,10 +429,6 @@ class Command(BaseCommand):
         _check_date_sol_count,
         ImportBatch,
     ):
-        """
-        Loop A queue for exactly one calendar date. Does not iterate other DIBBS days
-        (avoids stamping empty ImportBatch rows for unrelated dates).
-        """
         tag = None
         hrefs = None
         for t, h in available.items():
@@ -291,105 +482,7 @@ class Command(BaseCommand):
 
         return [(only_date, tag, hrefs)]
 
-    def _harvest_set_aside_pdf_blobs(self) -> tuple[int, int, int]:
-        """
-        Set-aside sols with no pdf_blob: fetch in batches of HARVEST_BATCH_SIZE,
-        one Playwright session per batch. ORM updates only after each session returns.
-
-        Returns (batch_count, total_fetched, total_failed).
-        """
-        from sales.models import Solicitation
-        from sales.services.dibbs_pdf import fetch_pdfs_for_sols
-
-        total_pending = (
-            Solicitation.objects.filter(
-                pdf_blob__isnull=True,
-                pdf_fetch_attempts__lt=5,
-                pdf_data_pulled__isnull=True,
-            )
-            .exclude(small_business_set_aside="N")
-            .exclude(status="Archived")
-            .count()
-        )
-
-        if total_pending == 0:
-            self.stdout.write("Loop B: no set-aside PDFs pending — skipping.")
-            return (0, 0, 0)
-
-        self.stdout.write(
-            f"Loop B: {total_pending} set-aside solicitation(s) pending harvest..."
-        )
-
-        estimated_batches = math.ceil(total_pending / HARVEST_BATCH_SIZE)
-        batches = 0
-        done = 0
-        total_fetched = 0
-        total_failed = 0
-
-        while True:
-            batch = list(
-                Solicitation.objects.filter(
-                    pdf_blob__isnull=True,
-                    pdf_fetch_attempts__lt=5,
-                    pdf_data_pulled__isnull=True,
-                )
-                .exclude(small_business_set_aside="N")
-                .exclude(status="Archived")
-                .order_by("solicitation_number")
-                .values_list("solicitation_number", "pdf_fetch_attempts")[
-                    :HARVEST_BATCH_SIZE
-                ]
-            )
-            if not batch:
-                break
-
-            batches += 1
-            sol_numbers = [
-                (s[0] or "").strip().upper() for s in batch if (s[0] or "").strip()
-            ]
-            attempts_map = {
-                (s[0] or "").strip().upper(): s[1] for s in batch if (s[0] or "").strip()
-            }
-            if not sol_numbers:
-                break
-
-            pdf_map = fetch_pdfs_for_sols(sol_numbers)
-
-            now = timezone.now()
-            for key in sol_numbers:
-                body = pdf_map.get(key)
-                if body:
-                    Solicitation.objects.filter(solicitation_number=key).update(
-                        pdf_blob=body,
-                        pdf_fetched_at=now,
-                        pdf_fetch_status="DONE",
-                    )
-                else:
-                    prev = attempts_map.get(key, 0)
-                    new_att = prev + 1
-                    upd = {
-                        "pdf_fetch_status": "FAILED",
-                        "pdf_fetch_attempts": new_att,
-                    }
-                    if new_att >= 5:
-                        upd["pdf_data_pulled"] = now
-                    Solicitation.objects.filter(solicitation_number=key).update(**upd)
-
-            fetched = sum(1 for key in sol_numbers if pdf_map.get(key))
-            failed = len(sol_numbers) - fetched
-            total_fetched += fetched
-            total_failed += failed
-            done += len(sol_numbers)
-            self.stdout.write(
-                f"  Loop B — batch {batches}/{estimated_batches}: "
-                f"fetched {fetched}, failed {failed} "
-                f"({done} of {total_pending} done)"
-            )
-
-        return (batches, total_fetched, total_failed)
-
     def _send_alert(self, failures):
-        """Send consolidated failure alert via Graph mail if configured."""
         if not getattr(settings, "GRAPH_MAIL_ENABLED", False):
             self.stdout.write("Alert email skipped (GRAPH_MAIL_ENABLED is false).")
             self._print_failure_summary(failures)
