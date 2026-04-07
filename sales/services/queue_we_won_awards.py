@@ -11,7 +11,7 @@ from datetime import datetime, time
 from django.db import transaction
 from django.utils import timezone
 
-from sales.models import AwardImportBatch, DibbsAward, WeWonAward
+from sales.models import AwardImportBatch, DibbsAward, WeWonAward, CompanyCAGE
 
 logger = logging.getLogger(__name__)
 

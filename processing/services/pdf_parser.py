@@ -8,6 +8,7 @@ ingest_parsed_award() only.
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import re
@@ -57,7 +58,7 @@ _CLIN_VARIANT1_LINE = re.compile(
 # No trailing $ anchor: pdfplumber often appends extra characters on the same line
 # after the total. MULTILINE; "\s+" may bridge a newline when a row splits across lines.
 _CLIN_VARIANT2_LINE = re.compile(
-    r"(?:CLIN\.\s*)?(\d{4})\s+"
+    r"(?:^|\n)\s*(?:CLIN\.\s*)?(\d{4})\s+"
     r"(?:PR\.\s*)?(\d+)\s+"
     r"(?:PRLI\.\s*)?(\d+)\s+"
     r"(\w+)\s+"
@@ -116,7 +117,7 @@ _RE_SECTION_B_NSN_NARRATIVE = re.compile(
 )
 # Mid-line safe (no ^ anchor): e.g. "DELIVER FOB: ORIGIN   DELIVER BY: 2027 JAN 04"
 _RE_DELIVER_BY = re.compile(
-    r"DELIVER\s+BY[:\s]+(\d{4}\s+[A-Z]{3}\s+\d{1,2})",
+    r"(?:DELIVER\s+BY|DELIVERY\s+DATE)[:\s]+(\d{4}\s+[A-Z]{3}\s+\d{1,2})",
     re.IGNORECASE,
 )
 _RE_DELIVER_FOB = re.compile(
@@ -133,10 +134,6 @@ _RE_INSPECTION_POINT = re.compile(
 )
 _RE_ACCEPTANCE_POINT = re.compile(
     r"ACCEPTANCE\s+POINT[:\s]+(\w+)",
-    re.IGNORECASE,
-)
-_RE_SECTION_B = re.compile(
-    r"(SECTION\s*B|SUPPLIES\/SERVICES\s*AND\s*PRICES|CLIN\s*PR\s*PRLI)",
     re.IGNORECASE,
 )
 _RE_DLA_CONTRACT = re.compile(
@@ -157,6 +154,7 @@ class ClinParseResult:
     inspection_point: Optional[str]
     acceptance_point: Optional[str]
     fob: Optional[str] = None
+    cage: Optional[str] = None
     clin_parse_note: Optional[str] = None
 
 
@@ -227,6 +225,9 @@ def _normalize_nsn(nsn: Optional[str]) -> Optional[str]:
     s = re.sub(r"\s+", "", str(nsn).strip().upper())
     if not s:
         return None
+    # Pass S-codes (DLA service codes like S00000053) through unchanged
+    if re.match(r"^S\d+$", s):
+        return s
     s = s.replace("-", "")
     if len(s) == 13 and s.isdigit():
         return f"{s[:4]}-{s[4:6]}-{s[6:9]}-{s[9:]}"
@@ -498,10 +499,29 @@ def _extract_contractor(text: str) -> tuple[Optional[str], Optional[str]]:
 
 
 def _section_b_slice(text: str) -> str:
-    m = _RE_SECTION_B.search(text)
-    if not m:
+    """
+    Extract exactly Section B text: from the first occurrence of 'SECTION B'
+    to the first occurrence of any other 'SECTION X' header after it.
+    If no Section B is found, return the full text as fallback.
+    If no closing section header is found, return from Section B to end of text.
+    """
+    start_match = re.search(r"(?:^|\n)\s*SECTION\s+B\b", text, re.IGNORECASE)
+    if not start_match:
         return text
-    return text[m.start() :]
+
+    start = start_match.start()
+    # Find the next SECTION header after Section B that is NOT Section B itself
+    end_match = re.search(
+        r"(?:^|\n)\s*SECTION\s+(?!B\b)[A-Z]\b",
+        text[start + 1 :],
+        re.IGNORECASE,
+    )
+    if end_match:
+        end = start + 1 + end_match.start()
+    else:
+        end = len(text)
+
+    return text[start:end]
 
 
 def _nsn_thirteen_digit_key(nsn: Optional[str]) -> Optional[str]:
@@ -554,6 +574,113 @@ def _extract_ado_days(page_one_text: str) -> Optional[int]:
         return None
 
 
+def _extract_clins_via_claude_api(section_text: str) -> Optional[List[dict]]:
+    """
+    Send Section B text to Claude API and extract CLIN data as structured JSON.
+    Returns a list of dicts with keys: item_number, uom, order_qty, unit_price,
+    due_date (YYYY-MM-DD string or null), fob ('O' or 'D' or null),
+    inspection_point ('O' or 'D' or null), nsn, cage, nsn_description.
+    Returns None if the API call fails or returns unparseable JSON.
+    """
+    try:
+        import urllib.request
+
+        prompt = f"""You are extracting CLIN (Contract Line Item Number) data from a US Government DD Form 1155 purchase order document.
+
+Below is the complete text of Section B of the document. Extract every CLIN row and return ONLY a JSON array with no other text, no markdown, no code fences.
+
+Each object in the array must have exactly these keys:
+- "item_number": 4-digit string like "0001"
+- "uom": unit of measure string (e.g. "EA", "LB", "FT") — this is the value in the "UI" or "UNIT" column, or null if not found
+- "order_qty": numeric string (e.g. "369.000") or null
+- "unit_price": numeric string (e.g. "24.99000") or null
+- "due_date": date string in YYYY-MM-DD format parsed from "DELIVER BY:" or "DELIVERY DATE:" line (e.g. "2027-01-04") or null
+- "fob": "O" if FOB is ORIGIN, "D" if DESTINATION, null if not found
+- "inspection_point": "O" if INSPECTION POINT is ORIGIN, "D" if DESTINATION, null if not found
+- "nsn": the NSN or item identifier for this CLIN — could be a 13-digit NSN like "4730001256889", a hyphenated NSN like "5995-01-569-0560", or a DLA service code like "S00000053". Return whatever identifier appears for this CLIN. null if nothing found.
+- "cage": the supplier/manufacturer CAGE code from the "CAGE/PN:" line within this CLIN block (e.g. "6ZSR8"), or null if not present
+- "nsn_description": the item nomenclature/description for this CLIN, or null if not found
+
+There are two CLIN table formats you will encounter:
+
+FORMAT 1 - Variant 2 (has PR and PRLI columns, NSN on separate line):
+Header: CLIN PR PRLI UI QUANTITY UNIT PRICE CURRENCY TOTAL PRICE
+Data row: 0001 7016091232 0001 EA 369.000 24.99000 USD 9221.31 NSN/MATERIAL:4730001256889
+In this format: 4th token is uom, 5th is order_qty, 6th is unit_price. NSN follows NSN/MATERIAL: label.
+Delivery: "DELIVER FOB: ORIGIN   DELIVER BY: 2027 JAN 04"
+
+FORMAT 2 - Variant 1 (inline NSN in SUPPLIES/SERVICES column):
+Header: ITEM NO. SUPPLIES/SERVICES QUANTITY UNIT UNIT PRICE AMOUNT
+Data row: 0001 5995-01-569-0560 6.000 EA $ 3,869.25 $ 23,215.50
+Followed by: CAGE/PN: 6ZSR8
+             F659-32423-1 CABLE ASSEMBLY,SPEC
+In this format: NSN is 2nd token in data row. CAGE code follows CAGE/PN: label.
+The part number is the token immediately after the CAGE code on the same or next line (e.g. "F659-32423-1").
+The nsn_description is the remaining text after the part number on that line (e.g. "CABLE ASSEMBLY,SPEC").
+If there is no CAGE/PN line, look for a description in the SUPPLIES/SERVICES text or item description block.
+Delivery: "FOB: ORIGIN   DELIVERY DATE: 2028 FEB 18"
+
+For DLA service CLINs (First Article Test, Production Lot Testing, etc.) the item description contains a code like "S00000053" instead of a standard NSN. Return that code as the "nsn" value.
+For these S-code CLINs there is no CAGE/PN line. Instead, look for a descriptive label in the text immediately PRECEDING the CLIN row — it will be a plain English phrase like "Contractor First Article Test", "Government First Article Test", "Production Lot Testing", etc. Return that phrase as the "nsn_description" value for that CLIN. Example:
+
+Contractor First Article Test
+Contractor First Article Test – The number of units shown signifies the test requirement. See FAR clause 52.209-3 for the actual quantity required to be tested.
+ITEM NO. SUPPLIES/SERVICES QUANTITY UNIT UNIT PRICE AMOUNT .
+0003 0001 - S00000053 1.000 EA $ 2,000.00 $ 2,000.00
+
+In this example "Contractor First Article Test" is the nsn_description for CLIN 0003.
+
+Each CLIN has its own INSPECTION POINT, ACCEPTANCE POINT, FOB, and DELIVERY DATE lines that follow its data row. Match each to its own CLIN.
+
+Return ONLY the JSON array. No explanation. No markdown.
+
+SECTION B TEXT:
+{section_text}"""
+
+        payload = json.dumps(
+            {
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 1000,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "x-api-key": os.environ.get("ANTHROPIC_API_KEY", ""),
+            },
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+
+        raw_text = ""
+        for block in body.get("content", []):
+            if block.get("type") == "text":
+                raw_text += block.get("text", "")
+
+        raw_text = raw_text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
+            raw_text = re.sub(r"\n?```$", "", raw_text)
+
+        result = json.loads(raw_text)
+        if isinstance(result, list):
+            logger.debug("Claude API CLIN extraction returned %d CLINs", len(result))
+            print("CLAUDE API RAW CLINS:", result)
+            return result
+        return None
+
+    except Exception as exc:
+        logger.warning("Claude API CLIN extraction failed: %s", exc)
+        return None
+
+
 def _extract_nsn_descriptions_from_section_b(full_text: str) -> dict[str, str]:
     """
     Section B narrative may appear before the CLIN table (e.g. page 3 vs page 4).
@@ -593,7 +720,10 @@ def _parse_deliver_by_date(raw: Optional[str]) -> Optional[date]:
 
 
 def _point_word_to_choice(word: Optional[str]) -> Optional[str]:
-    """Map INSPECTION/ACCEPTANCE capture to QueueClin.ia choice value: 'O' or 'D'."""
+    """Map INSPECTION/ACCEPTANCE / FOB words to QueueClin.ia / QueueClin.fob stored values.
+
+    Must match processing.models.QueueClin: choices=('O','Origin'), ('D','Destination').
+    """
     if not word:
         return None
     u = word.upper()
@@ -630,6 +760,7 @@ def _delivery_due_and_fob_on_line(line: str) -> tuple[Optional[date], Optional[s
     """Run DELIVER BY and DELIVER FOB regexes on one line (same pass)."""
     due_m = _RE_DELIVER_BY.search(line)
     fob_m = _RE_DELIVER_FOB.search(line)
+    logger.debug("_delivery_due_and_fob_on_line: line=%r due_m=%r fob_m=%r", line, due_m, fob_m)
     due_d = _parse_deliver_by_date(due_m.group(1).strip()) if due_m else None
     fob_c = _fob_word_to_choice(fob_m.group(1)) if fob_m else None
     return due_d, fob_c
@@ -657,6 +788,10 @@ def _clin_delivery_due_fob_near(
         due_d, fob_choice = _delivery_due_and_fob_on_line(line)
 
     if due_d is None:
+        logger.debug(
+            "CLIN delivery fwd preview (due_d None after back): %r",
+            fwd[:500],
+        )
         dm2 = _RE_DELIVER_BY.search(fwd)
         if dm2:
             line = _line_slice_containing(fwd, dm2.start(), dm2.end())
@@ -730,10 +865,10 @@ def _parse_variant1_line(line: str) -> Optional[tuple]:
 
 
 def _clin_chunk_bounds(text: str, start: int) -> tuple[int, int]:
-    """End before next 4-digit CLIN at line start or next SECTION."""
+    """End before next Variant 2 CLIN table row (4-digit + PR + PRLI + UOM + qty) or SECTION."""
     rest = text[start:]
     mnext = re.search(
-        r"(?:^|\n)\s*(\d{4})\s+(?=[A-Z0-9\-])",
+        r"(?:^|\n)(\d{4})\s+\d{10,}\s+\d{4}\s+\w+\s+[\d.]+",
         rest[50:],
         re.MULTILINE,
     )
@@ -747,9 +882,73 @@ def _clin_chunk_bounds(text: str, start: int) -> tuple[int, int]:
     return start, min(end, len(text))
 
 
+def _build_clins_from_api_result(
+    api_clins: List[dict],
+    nsn_desc_map: dict,
+) -> List[ClinParseResult]:
+    results = []
+    for c in api_clins:
+        item_number = (c.get("item_number") or "").strip().zfill(4) or None
+        if not item_number:
+            continue
+
+        uom = (c.get("uom") or "").strip() or None
+
+        order_qty = _to_decimal(c.get("order_qty"))
+        unit_price = _to_decimal(c.get("unit_price"))
+
+        due_date_raw = c.get("due_date")
+        due_d: Optional[date] = None
+        if due_date_raw:
+            try:
+                due_d = datetime.strptime(str(due_date_raw).strip(), "%Y-%m-%d").date()
+            except ValueError:
+                due_d = _parse_yyyymmmdd_date(due_date_raw)
+
+        fob = c.get("fob") or None
+        if fob and fob not in ("O", "D"):
+            fob = _fob_word_to_choice(fob)
+
+        insp = c.get("inspection_point") or None
+        if insp and insp not in ("O", "D"):
+            insp = _point_word_to_choice(insp)
+
+        nsn_raw = c.get("nsn")
+        nsn_norm = _normalize_nsn(nsn_raw)
+        desc = _lookup_nsn_description(nsn_desc_map, nsn_norm, nsn_raw)
+        # Fall back to API-returned description if map lookup found nothing
+        if not desc:
+            desc = (c.get("nsn_description") or "").strip() or None
+
+        # Per-CLIN supplier cage code from CAGE/PN: line
+        cage = (c.get("cage") or "").strip().upper() or None
+
+        results.append(
+            ClinParseResult(
+                item_number=item_number,
+                nsn=nsn_norm,
+                nsn_description=desc,
+                order_qty=order_qty,
+                uom=uom,
+                unit_price=unit_price,
+                due_date=due_d,
+                inspection_point=_od_display_for_choice(insp) if insp else None,
+                acceptance_point=_od_display_for_choice(insp) if insp else None,
+                fob=fob,
+                cage=cage,
+                clin_parse_note=None,
+            )
+        )
+
+    return results
+
+
 def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
     section = _section_b_slice(text)
     nsn_desc_map = _extract_nsn_descriptions_from_section_b(text)
+    api_clins = _extract_clins_via_claude_api(section)
+    if api_clins:
+        return _build_clins_from_api_result(api_clins, nsn_desc_map)
     clins: List[ClinParseResult] = []
     seen_item: set[str] = set()
 
@@ -768,10 +967,10 @@ def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
 
         line_stripped = line.strip()
         merged_with_next = False
-        m2 = _CLIN_VARIANT2_LINE.search(line_stripped)
+        m2 = _CLIN_VARIANT2_LINE.search(line_stripped.strip())
         if not m2 and i + 1 < len(lines):
-            merged = f"{line_stripped} {lines[i + 1].strip()}"
-            m2 = _CLIN_VARIANT2_LINE.search(merged)
+            merged = f"{line_stripped}\n{lines[i + 1].strip()}"
+            m2 = _CLIN_VARIANT2_LINE.search(merged.strip())
             if m2:
                 skip_next = True
                 merged_with_next = True
@@ -806,6 +1005,8 @@ def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
                 unit_price_s,
                 _total_s,
             ) = m2.groups()
+            if not clin_num.isdigit():
+                continue
             nsn_line_idx = i + 2 if merged_with_next else i + 1
             if nsn_line_idx < len(lines):
                 nm = _RE_NSN_MATERIAL_LINE.search(lines[nsn_line_idx].strip())
@@ -863,9 +1064,33 @@ def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
         due_d, fob_choice = _clin_delivery_due_fob_near(
             section, line_start, chunk_end
         )
+        _tail_main = chunk[-300:] if len(chunk) > 300 else chunk
+        logger.debug(
+            "CLIN %s: uom=%r due_d=%r fob=%r chunk_len=%d chunk_tail=%r",
+            item_norm,
+            uom_out,
+            due_d,
+            fob_choice,
+            chunk_end - line_start,
+            _tail_main,
+        )
+        if due_d is None and "DELIVER BY" not in _tail_main.upper():
+            logger.debug(
+                "CLIN %s: chunk tail missing DELIVER BY; chunk_span=%d full_chunk=%r",
+                item_norm,
+                chunk_end - line_start,
+                chunk,
+            )
 
         inspection, acceptance, ia_note = _scan_inspection_acceptance(
             chunk, item_norm
+        )
+        logger.debug(
+            "CLIN %s: inspection=%r acceptance=%r ia_note=%r",
+            item_norm,
+            inspection,
+            acceptance,
+            ia_note,
         )
 
         order_qty = _to_decimal(qty_s)
@@ -905,6 +1130,8 @@ def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
                 unit_price_s,
                 _total_fb,
             ) = m.groups()
+            if not clin_num.isdigit():
+                continue
             item_norm = clin_num.zfill(4) if clin_num.isdigit() else clin_num
             if item_norm in seen_item:
                 continue
@@ -925,6 +1152,23 @@ def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
                 nsn_desc_map, nsn_norm_fb, nsn_raw_fb
             )
             due_d, fob_fb = _clin_delivery_due_fob_near(section, start, chunk_end)
+            _tail_fb = chunk[-300:] if len(chunk) > 300 else chunk
+            logger.debug(
+                "CLIN %s: uom=%r due_d=%r fob=%r chunk_len=%d chunk_tail=%r",
+                item_norm,
+                uom_out_fb,
+                due_d,
+                fob_fb,
+                chunk_end - start,
+                _tail_fb,
+            )
+            if due_d is None and "DELIVER BY" not in _tail_fb.upper():
+                logger.debug(
+                    "CLIN %s: chunk tail missing DELIVER BY; chunk_span=%d full_chunk=%r",
+                    item_norm,
+                    chunk_end - start,
+                    chunk,
+                )
             insp_fb, acc_fb, ia_note_fb = _scan_inspection_acceptance(
                 chunk, item_norm
             )
@@ -1186,28 +1430,38 @@ def ingest_parsed_award(
                 create_kwargs["modified_by"] = user
             qc = QueueContract.objects.create(**create_kwargs)
 
-        any_clin_due = any(c.due_date is not None for c in (parse_result.clins or []))
-        if (
-            not any_clin_due
-            and qc.due_date is None
-            and parse_result.award_date is not None
-            and parse_result.ado_days is not None
-        ):
-            due_d = parse_result.award_date + timedelta(days=parse_result.ado_days)
-            dt = datetime.combine(due_d, time.min)
+        due_d_computed: Optional[date] = None
+        if parse_result.ado_days is not None and parse_result.award_date is not None:
+            due_d_computed = parse_result.award_date + timedelta(
+                days=parse_result.ado_days
+            )
+        else:
+            clin_dates = [
+                c.due_date
+                for c in (parse_result.clins or [])
+                if c.due_date is not None
+            ]
+            if clin_dates:
+                due_d_computed = max(clin_dates)
+
+        if due_d_computed is not None:
+            dt = datetime.combine(due_d_computed, time.min)
             if timezone.is_naive(dt):
                 dt = timezone.make_aware(dt)
             qc.due_date = dt
             qc.save(update_fields=["due_date"])
 
-        supplier_str = _supplier_line(
-            parse_result.contractor_name, parse_result.contractor_cage
-        )
-
         for clin in parse_result.clins:
             item_key = (clin.item_number or "").strip()
             if not item_key:
                 continue
+
+            if clin.cage:
+                clin_supplier_str = clin.cage
+            else:
+                clin_supplier_str = _supplier_line(
+                    parse_result.contractor_name, parse_result.contractor_cage
+                )
 
             qclin = (
                 QueueClin.objects.select_for_update()
@@ -1223,7 +1477,7 @@ def ingest_parsed_award(
                 "unit_price": clin.unit_price,
                 "due_date": clin.due_date,
                 "fob": clin.fob,
-                "supplier": supplier_str,
+                "supplier": clin_supplier_str,
                 "ia": _ia_from_inspection(clin.inspection_point),
             }
 

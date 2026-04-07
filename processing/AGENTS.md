@@ -62,9 +62,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - Required headers are hardcoded: `Contract Number`, `Buyer`, `Award Date`, `Due Date`, `Contract Value`, `Contract Type`, `Solicitation Type`, `Item Number`, `Item Type`, `NSN`, `NSN Description`, `Order Qty`, `UOM`, `Unit Price`
 
 ### Before changing award PDF intake
-- Read `upload_award_pdf` in `processing_views.py` and `processing/services/pdf_parser.py` (`parse_award_pdf`, `ingest_parsed_award`) — keep parsing/ingestion logic in `pdf_parser.py` only; views orchestrate and must not duplicate parser rules.
-- Queue UI: `contract_queue.html` (drop zone, PDF column, `processing:upload_award_pdf`) and `modals/pdf_parse_notes_modal.html`.
-- **pdfplumber layout:** `DELIVER BY` and `DELIVER FOB` often appear **mid-line** on a single extracted line — never use `^` anchors on those regexes (and prefer running both patterns against the same line when both phrases appear together).
+- Before changing award PDF intake: `_section_b_slice()` extracts text from SECTION B to the next SECTION X — do not add character limits or reintroduce `_RE_SECTION_B` (it was removed). The full Section B goes to `_extract_clins_via_claude_api()` which calls claude-sonnet-4-20250514. Two CLIN variants exist — see the prompt in `_extract_clins_via_claude_api` for format examples; both variants are documented with examples in the prompt itself. `_RE_DELIVER_BY` matches both DELIVER BY: and DELIVERY DATE: — do not split these back into separate patterns. Per-CLIN CAGE/PN: cage code is the manufacturer/supplier; Block 9 is always STATZ. S-codes are valid NSN values — do not null them, do not skip those CLINs, the description comes from the label preceding the CLIN row. Contract due date logic: ADO days (Block 10) + award date takes priority; fallback is latest CLIN due date. `uom` must be explicitly copied in `start_processing` `ProcessClin.objects.create()` — this was a bug fixed in this session; any new `QueueClin` fields added in future must follow the same pattern.
 
 ---
 
@@ -95,6 +93,9 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 ### Finalization change
 `views/processing_views.py` `finalize_contract` + `finalize_and_email_contract` → `contracts/models.py` (target model fields) → test by completing a full queue-to-finalize flow manually
+
+### New QueueClin field from PDF/CSV ingestion
+`pdf_parser.py` or `upload_csv` → `QueueClin` model/migration → `start_processing` `ProcessClin.objects.create()` call — field must be explicitly copied or it is silently lost at queue-to-processing transition.
 
 ---
 
@@ -204,9 +205,11 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 7. **`print` / `logger.debug` statements are active in `processing_views.py` and `api_views.py`.** These log partial contract data to console. In production this is noise; do not add more print statements and consider removing existing ones when touching those functions.
 
-8. **CSV deduplication is by `contract_number` only.** It checks `Contract.objects.filter(contract_number=...)` and `QueueContract.objects.filter(contract_number=...)`. A re-upload with the same contract number but different CLINs will be silently dropped. Changing this logic requires updating `upload_csv` dedup checks and the error messages returned to the user.
+8. **`services/pdf_parser.py` — `_CLIN_VARIANT2_LINE`:** The pattern must stay anchored at line start (`(?:^|\n)\s*`) so mid-line `NSN/MATERIAL:` on the same pdfplumber string cannot produce a false variant-2 match with a bogus UOM. **`QueueClin.ia` / `QueueClin.fob`** stored values are exactly `'O'` and `'D'` (see `processing/models.py`); `_point_word_to_choice` must stay aligned with those tuples if choices ever change.
 
-9. **`cancel_process_contract` accepts both `process_contract_id` and `queue_id` as optional kwargs.** Two URL patterns call this same function. Both code paths must remain valid if the function signature changes.
+9. **CSV deduplication is by `contract_number` only.** It checks `Contract.objects.filter(contract_number=...)` and `QueueContract.objects.filter(contract_number=...)`. A re-upload with the same contract number but different CLINs will be silently dropped. Changing this logic requires updating `upload_csv` dedup checks and the error messages returned to the user.
+
+10. **`cancel_process_contract` accepts both `process_contract_id` and `queue_id` as optional kwargs.** Two URL patterns call this same function. Both code paths must remain valid if the function signature changes.
 
 ---
 
