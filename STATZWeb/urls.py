@@ -152,6 +152,11 @@ urlpatterns = [
         lambda request: JsonResponse({"status": "ok"}),
         name="health_check",
     ),
+    path(
+        "api/calendar/sharepoint-sync/",
+        views.sharepoint_sync_view,
+        name="sharepoint_sync",
+    ),
     # System test URLs
     path("system-test/", views.system_test, name="system_test"),
     path("api/system-test/", views.system_test_api, name="system_test_api"),

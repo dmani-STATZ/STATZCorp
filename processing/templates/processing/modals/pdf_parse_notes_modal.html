@@ -1,0 +1,44 @@
+{% load static %}
+<div id="pdfParseNotesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50" aria-modal="true" role="dialog">
+    <div class="relative top-20 mx-auto card card-padded border max-w-lg shadow-lg">
+        <div class="border-b pb-3">
+            <h3 class="text-lg font-semibold text-gray-900" id="pdfParseNotesModalTitle">PDF Parse Notes</h3>
+            <p class="text-sm text-gray-600 mt-1" id="pdfParseNotesModalContract"></p>
+        </div>
+        <div class="mt-4">
+            <p class="text-sm text-gray-800 whitespace-pre-wrap" id="pdfParseNotesModalBody"></p>
+        </div>
+        <div class="mt-6 flex justify-end border-t pt-3">
+            <button type="button" id="pdfParseNotesModalClose" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    function closePdfParseNotesModal() {
+        var el = document.getElementById('pdfParseNotesModal');
+        if (el) el.classList.add('hidden');
+    }
+    window.openPdfParseNotesModal = function (contractNumber, parseNotes) {
+        var sub = document.getElementById('pdfParseNotesModalContract');
+        var body = document.getElementById('pdfParseNotesModalBody');
+        if (sub) sub.textContent = contractNumber ? String(contractNumber) : '';
+        if (body) {
+            var t = parseNotes != null ? String(parseNotes).trim() : '';
+            body.textContent = t ? t : 'No details available';
+        }
+        var modal = document.getElementById('pdfParseNotesModal');
+        if (modal) modal.classList.remove('hidden');
+    };
+    window.openPdfParseNotesModalFromTrigger = function (trigger) {
+        if (!trigger) return;
+        var num = trigger.getAttribute('data-contract-number') || '';
+        var notes = trigger.getAttribute('data-parse-notes') || '';
+        window.openPdfParseNotesModal(num, notes);
+    };
+    var closeBtn = document.getElementById('pdfParseNotesModalClose');
+    if (closeBtn) closeBtn.addEventListener('click', closePdfParseNotesModal);
+})();
+</script>

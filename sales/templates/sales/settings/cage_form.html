@@ -12,107 +12,127 @@
           style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1.5rem 2rem;">
         {% csrf_token %}
 
+        {% if form.non_field_errors %}
+        <div style="padding:0.75rem 1rem; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.875rem; margin-bottom:1rem;">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        {{ form.default_fob_point }}
+        {{ form.default_payment_terms }}
+        {{ form.default_child_labor_code }}
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem 2rem; margin-bottom:1.5rem;">
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     CAGE Code <span style="color:#dc2626;">*</span>
                 </label>
-                <input type="text" name="cage_code" maxlength="5" required
-                       value="{{ cage.cage_code|default:'' }}"
-                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-family:monospace; font-size:0.875rem; text-transform:uppercase;">
+                {{ form.cage_code }}
+                {% if form.cage_code.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.cage_code.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
-                    Company Name <span style="color:#dc2626;">*</span>
+                    Linked company (contracts)
                 </label>
-                <input type="text" name="company_name" maxlength="150" required
-                       value="{{ cage.company_name|default:'' }}"
-                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                {{ form.company }}
+                <span style="display:block; font-size:0.75rem; color:#6b7280; margin-top:0.35rem;">
+                    Link this CAGE to a contracts company to enable automatic award queue injection.
+                </span>
+                {% if form.company.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.company.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div style="grid-column:1 / -1;">
+                <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
+                    Company name (legacy)
+                </label>
+                {{ form.company_name }}
+                {% if form.company_name.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.company_name.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     RFQ Reply-To Email
                 </label>
-                <input type="email" name="smtp_reply_to"
-                       value="{{ cage.smtp_reply_to|default:'' }}"
-                       placeholder="bids@company.com"
-                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                {{ form.smtp_reply_to }}
                 <span style="font-size:0.75rem; color:#6b7280;">Supplier responses go here</span>
+                {% if form.smtp_reply_to.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.smtp_reply_to.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     Default Markup %
                 </label>
-                <input type="number" name="default_markup_pct" step="0.01" min="0" max="100"
-                       value="{{ cage.default_markup_pct|default:'3.50' }}"
-                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+                {{ form.default_markup_pct }}
+                {% if form.default_markup_pct.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.default_markup_pct.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     SB Representations Code (BQ col 13)
                 </label>
-                <select name="sb_representations_code"
-                        style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
-                    {% for val, lbl in sb_representations_choices %}
-                    <option value="{{ val }}" {% if cage.sb_representations_code == val or not cage and val == 'N' %}selected{% endif %}>{{ lbl }}</option>
-                    {% endfor %}
-                </select>
+                {{ form.sb_representations_code }}
+                {% if form.sb_representations_code.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.sb_representations_code.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     Affirmative Action Code (BQ col 21)
                 </label>
-                <select name="affirmative_action_code"
-                        style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
-                    {% for val, lbl in affirmative_choices %}
-                    <option value="{{ val }}" {% if cage.affirmative_action_code == val or not cage and val == 'Y6' %}selected{% endif %}>{{ val }} — {{ lbl }}</option>
-                    {% endfor %}
-                </select>
+                {{ form.affirmative_action_code }}
+                {% if form.affirmative_action_code.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.affirmative_action_code.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     Previous Contracts Code (BQ col 22)
                 </label>
-                <select name="previous_contracts_code"
-                        style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
-                    {% for val, lbl in prev_contracts_choices %}
-                    <option value="{{ val }}" {% if cage.previous_contracts_code == val or not cage and val == 'Y4' %}selected{% endif %}>{{ val }} — {{ lbl }}</option>
-                    {% endfor %}
-                </select>
+                {{ form.previous_contracts_code }}
+                {% if form.previous_contracts_code.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.previous_contracts_code.errors }}</div>
+                {% endif %}
             </div>
 
             <div>
                 <label style="display:block; font-size:0.8125rem; font-weight:500; margin-bottom:0.375rem;">
                     Alternate Disputes Resolution (BQ col 23)
                 </label>
-                <select name="alternate_disputes_resolution"
-                        style="width:100%; padding:0.5rem 0.75rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
-                    <option value="A" {% if cage.alternate_disputes_resolution == "A" or not cage %}selected{% endif %}>A — Agree To Use Alternate Disputes Resolution</option>
-                    <option value="B" {% if cage.alternate_disputes_resolution == "B" %}selected{% endif %}>B — Do Not Agree To Use Alternate Disputes Resolution</option>
-                </select>
+                {{ form.alternate_disputes_resolution }}
+                {% if form.alternate_disputes_resolution.errors %}
+                <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.alternate_disputes_resolution.errors }}</div>
+                {% endif %}
             </div>
 
         </div>
 
         <div style="display:flex; gap:2rem; margin-bottom:1.5rem; padding-top:0.5rem; border-top:1px solid #f3f4f6;">
             <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.875rem;">
-                <input type="checkbox" name="is_default" {% if cage.is_default %}checked{% endif %}
-                       style="width:15px; height:15px; cursor:pointer;">
+                {{ form.is_default }}
                 <span><strong>Default CAGE</strong> — pre-selected in bid builder</span>
             </label>
             <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.875rem;">
-                <input type="checkbox" name="is_active" {% if cage is None or cage.is_active %}checked{% endif %}
-                       style="width:15px; height:15px; cursor:pointer;">
+                {{ form.is_active }}
                 <span>Active</span>
             </label>
         </div>
+        {% if form.is_default.errors or form.is_active.errors %}
+        <div style="font-size:0.75rem; color:#dc2626; margin-bottom:1rem;">{{ form.is_default.errors }}{{ form.is_active.errors }}</div>
+        {% endif %}
 
         <div style="display:flex; gap:0.75rem;">
             <button type="submit"

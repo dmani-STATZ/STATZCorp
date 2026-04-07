@@ -34,6 +34,10 @@ from sales.views.solicitations import (
     research_pool_list,
     sol_remove_research,
     supplier_search_ajax,
+    saved_filter_create,
+    saved_filter_update,
+    saved_filter_delete,
+    saved_filter_share,
 )
 from sales.views.suppliers import (
     backfill_nsn,
@@ -142,6 +146,10 @@ __all__ = [
     "research_pool_list",
     "sol_remove_research",
     "supplier_search_ajax",
+    "saved_filter_create",
+    "saved_filter_update",
+    "saved_filter_delete",
+    "saved_filter_share",
     "backfill_nsn",
     "supplier_list",
     "supplier_detail",

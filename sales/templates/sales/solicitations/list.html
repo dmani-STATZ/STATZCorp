@@ -3,66 +3,87 @@
 
 {% block content %}
 
+<style>
+#sf-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1a2940;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 9999;
+}
+#sf-toast.sf-toast--visible {
+    opacity: 1;
+}
+#sf-share-panel .btn-primary {
+    background: var(--company-primary, #004eb3);
+    border-color: var(--company-primary, #004eb3);
+    color: #fff;
+}
+#sf-share-panel .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-muted, #6b7280);
+}
+</style>
+
 {# ── Page header ────────────────────────────────────────────────────────── #}
-<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.25rem;">
+<div style="margin-bottom:1.25rem;">
     <h1 style="font-size:1.375rem; font-weight:600; margin:0;">Solicitations</h1>
-    <span style="font-size:0.8125rem; color:var(--text-muted,#6b7280);">
-        {{ page_obj.paginator.count }} total
-    </span>
 </div>
 
-{# ── Filter tab strip (Matches / Set-Asides / Unrestricted / Research | No-Bid) ─ #}
-<div class="tab-strip" style="display:flex; align-items:center; gap:0; border-bottom:2px solid #eef2f8; margin-bottom:20px;">
-    <div style="display:flex; gap:0;">
-    <a href="?tab=matches{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
-       class="bucket-tab {% if active_tab == 'matches' %}active{% endif %}"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'matches' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
-        Matches
-        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.matches|default:0 }}</span>
-    </a>
-    <a href="?tab=set_asides{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
-       class="bucket-tab {% if active_tab == 'set_asides' %}active{% endif %}"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'set_asides' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
-        Set-Asides
-        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.set_asides|default:0 }}</span>
-    </a>
-    <a href="?tab=unrestricted{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
-       class="bucket-tab {% if active_tab == 'unrestricted' %}active{% endif %}"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'unrestricted' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
-        Unrestricted
-        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.unrestricted|default:0 }}</span>
-    </a>
-    <a href="?tab=research{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
-       class="bucket-tab {% if active_tab == 'research' %}active{% endif %}"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'research' %}border-bottom-color: #7c3aed; color: #7c3aed; font-weight:600;{% else %}color:#374151;{% endif %}">
-        Research
-        <span class="tab-count" style="font-size:0.75rem; background:#ede9fe; color:#5b21b6; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ tab_counts.research|default:0 }}</span>
-    </a>
+{# ── Saved filter chips (system + per-user) + edit control ─────────────── #}
+<div style="display:flex; align-items:flex-start; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+    <div class="tab-strip" style="display:flex; align-items:center; flex-wrap:wrap; gap:0; border-bottom:2px solid #eef2f8; padding-bottom:0; margin-bottom:0; flex:1; min-width:0;">
+        <div style="display:flex; flex-wrap:wrap; gap:0; align-items:center;">
+            {% for chip in system_chip_rows %}
+            <a href="{{ chip.url }}"
+               class="bucket-tab sol-saved-filter-chip {% if chip.is_active %}active{% endif %}"
+               style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if chip.is_active %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+                {{ chip.name }}
+            </a>
+            {% endfor %}
+            {% for chip in user_chip_rows %}
+            <a href="{{ chip.url }}"
+               class="bucket-tab sol-saved-filter-chip {% if chip.is_active %}active{% endif %}"
+               style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if chip.is_active %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
+                {{ chip.name }}
+            </a>
+            {% endfor %}
+        </div>
     </div>
-    <span style="flex:1;"></span>
-    <a href="?tab=nobid{% if filter_querystring_no_tab %}&{{ filter_querystring_no_tab }}{% endif %}"
-       class="bucket-tab {% if active_tab == 'nobid' %}active{% endif %}"
-       style="padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; {% if active_tab == 'nobid' %}border-bottom-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600;{% else %}color:#374151;{% endif %}">
-        No-Bid
-        <span class="tab-count" style="font-size:0.75rem; background:#eef2f8; color:#5a7090; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ nobid_count|default:0 }}</span>
-    </a>
+    <button type="button" id="sol-saved-filter-edit-btn" title="Rename or delete saved filters"
+            style="padding:0.35rem 0.5rem; margin-bottom:-2px; border:1px solid var(--border-color,#d1d5db); border-radius:6px; background:var(--surface,#fff); color:var(--text,#374151); font-size:0.875rem; cursor:pointer; flex-shrink:0;">
+        ✎
+    </button>
 </div>
+<script type="application/json" id="sol-current-filter-params">{{ filter_params_for_save_json|safe }}</script>
+<script type="application/json" id="sol-user-saved-filters-json">{{ user_chips_json|safe }}</script>
 
-{# ── Filter bar (GET + sibling POST for Pass All — no nested forms) ─────── #}
+{# ── Filter bar (GET) ───────────────────────────────────────────────────── #}
 <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
             background:var(--surface-secondary, #f9fafb);
             border:1px solid var(--border-color, #e5e7eb);
-            border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
-<form method="get" action="{% url 'sales:solicitation_list' %}"
+            border-radius:8px; padding:1rem 1.25rem; margin-bottom:1rem;">
+<form method="get" action="{% url 'sales:solicitation_list' %}" id="sol-list-filter-form"
       style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end; flex:1; min-width:0;">
-    <input type="hidden" name="tab" value="{{ active_tab }}">
+    {% if active_tab %}<input type="hidden" name="tab" value="{{ active_tab }}">{% endif %}
+    {% if current_filters.has_matches %}<input type="hidden" name="has_matches" value="1">{% endif %}
+    {% if current_filters.has_approved_source %}<input type="hidden" name="has_approved_source" value="1">{% endif %}
+
     <div style="display:flex; flex-direction:column; gap:0.25rem;">
         <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Set-Aside</label>
         <select name="set_aside"
                 style="border:1px solid var(--border-color,#d1d5db); border-radius:6px;
                        padding:0.375rem 0.625rem; font-size:0.875rem;
                        background:var(--surface,#fff); color:var(--text,#111827); min-width:11rem;">
-            {% for value, label in set_aside_choices %}
+            {% for value, label in set_aside_dropdown %}
             <option value="{{ value }}" {% if current_filters.set_aside == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
@@ -74,8 +95,8 @@
                 style="border:1px solid var(--border-color,#d1d5db); border-radius:6px;
                        padding:0.375rem 0.625rem; font-size:0.875rem;
                        background:var(--surface,#fff); color:var(--text,#111827); min-width:10rem;">
-            <option value="">All statuses</option>
-            {% for value, label in status_choices %}
+            <option value="">All Statuses</option>
+            {% for value, label in pipeline_status_choices %}
             <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
@@ -93,6 +114,24 @@
         </select>
     </div>
 
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+        <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Has Matches</label>
+        <a href="{{ toggle_has_matches_href }}"
+           class="bucket-tab {% if current_filters.has_matches %}active{% endif %}"
+           style="display:inline-block; padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-radius:6px; border:1px solid var(--border-color,#e5e7eb); {% if current_filters.has_matches %}border-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600; background:rgba(0,78,179,0.06);{% else %}color:#374151; background:var(--surface,#fff);{% endif %}">
+            {% if current_filters.has_matches %}On{% else %}Off{% endif %}
+        </a>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+        <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Has Approved Source</label>
+        <a href="{{ toggle_has_approved_href }}"
+           class="bucket-tab {% if current_filters.has_approved_source %}active{% endif %}"
+           style="display:inline-block; padding:0.5rem 1rem; font-size:0.8125rem; font-weight:500; text-decoration:none; border-radius:6px; border:1px solid var(--border-color,#e5e7eb); {% if current_filters.has_approved_source %}border-color: var(--company-primary,#004eb3); color: var(--company-primary,#004eb3); font-weight:600; background:rgba(0,78,179,0.06);{% else %}color:#374151; background:var(--surface,#fff);{% endif %}">
+            {% if current_filters.has_approved_source %}On{% else %}Off{% endif %}
+        </a>
+    </div>
+
     <div style="display:flex; flex-direction:column; gap:0.25rem; flex:1; min-width:12rem;">
         <label style="font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280);">Search</label>
         <input type="text" name="q" value="{{ current_filters.q }}"
@@ -108,7 +147,14 @@
                        background:var(--company-primary,#004eb3); color:#fff; font-size:0.875rem; font-weight:500;">
             Filter
         </button>
-        {% if current_filters.set_aside or current_filters.status or current_filters.item_type or current_filters.q %}
+        {% if show_save_filter %}
+        <button type="button" id="sol-saved-filter-save-btn"
+                style="padding:0.375rem 1rem; border-radius:6px; border:1px solid var(--company-primary,#004eb3); cursor:pointer;
+                       background:#fff; color:var(--company-primary,#004eb3); font-size:0.875rem; font-weight:500;">
+            Save
+        </button>
+        {% endif %}
+        {% if current_filters.set_aside or current_filters.status or current_filters.item_type or current_filters.q or current_filters.has_matches or current_filters.has_approved_source or active_tab %}
         <a href="{% url 'sales:solicitation_list' %}"
            style="padding:0.375rem 1rem; border-radius:6px; border:1px solid var(--border-color,#d1d5db);
                   text-decoration:none; color:var(--text-muted,#6b7280); font-size:0.875rem;">
@@ -117,24 +163,55 @@
         {% endif %}
     </div>
 </form>
-    {% if eligible_for_mass_pass_count %}
-    <form method="post" action="{% url 'sales:sol_mass_pass' %}" id="mass-pass-all-form"
-          data-pass-all-count="{{ eligible_for_mass_pass_count }}"
-          style="display:flex; align-items:flex-end; margin:0; flex-shrink:0;">
-        {% csrf_token %}
-        <input type="hidden" name="mass_pass_all" value="1">
-        <input type="hidden" name="filter_qs" value="{{ filter_snapshot }}">
-        <button type="submit"
-                style="padding:0.375rem 1rem; border-radius:6px; border:1px solid #b45309;
-                       cursor:pointer; background:#fff7ed; color:#9a3412;
-                       font-size:0.875rem; font-weight:600; white-space:nowrap;">
-            Pass All in This View
-        </button>
-    </form>
-    {% endif %}
-    <a href="{% url 'sales:mass_pass_history' %}" class="btn btn-sm btn-outline-secondary ms-2 align-self-end">
-        Mass Pass History
-    </a>
+</div>
+
+{# ── Result count + Work These / Pass All / Mass Pass History ───────────── #}
+<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:1rem;">
+    <span style="font-size:0.9375rem; font-weight:500; color:var(--text,#111827);">
+        Showing {{ total_count }} solicitation{% if total_count != 1 %}s{% endif %}
+    </span>
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem;">
+        {% if first_sol_number %}
+        <a href="{% url 'sales:solicitation_detail' sol_number=first_sol_number %}?list_qs={{ filter_snapshot|urlencode }}"
+           style="padding:0.375rem 1rem; border-radius:6px; border:none; cursor:pointer;
+                  background:var(--company-primary,#004eb3); color:#fff; font-size:0.875rem; font-weight:600;
+                  text-decoration:none; display:inline-block;">
+            Work These
+        </a>
+        {% else %}
+        <span title="No solicitations in the current filtered view"
+              style="padding:0.375rem 1rem; border-radius:6px; font-size:0.875rem; font-weight:600;
+                     color:var(--text-muted,#9ca3af); background:var(--surface-secondary,#f3f4f6);
+                     cursor:not-allowed; display:inline-block;">
+            Work These
+        </span>
+        {% endif %}
+        {% if eligible_for_mass_pass_count %}
+        <form method="post" action="{% url 'sales:sol_mass_pass' %}" id="mass-pass-all-form"
+              data-pass-all-count="{{ eligible_for_mass_pass_count }}"
+              style="display:inline-flex; margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="mass_pass_all" value="1">
+            <input type="hidden" name="filter_qs" value="{{ filter_snapshot }}">
+            <button type="submit"
+                    style="padding:0.375rem 1rem; border-radius:6px; border:1px solid #b45309;
+                           cursor:pointer; background:#fff7ed; color:#9a3412;
+                           font-size:0.875rem; font-weight:600; white-space:nowrap;">
+                Pass All
+            </button>
+        </form>
+        {% else %}
+        <span title="No New/Active rows without queued RFQs in this filtered view"
+              style="padding:0.375rem 1rem; border-radius:6px; border:1px solid var(--border-color,#e5e7eb);
+                     font-size:0.875rem; font-weight:600; color:var(--text-muted,#9ca3af);
+                     background:var(--surface-secondary,#f9fafb); cursor:not-allowed; display:inline-block;">
+            Pass All
+        </span>
+        {% endif %}
+        <a href="{% url 'sales:mass_pass_history' %}" class="btn btn-sm btn-outline-secondary">
+            Mass Pass History
+        </a>
+    </div>
 </div>
 
 {# ── Bulk reassign form + table ──────────────────────────────────────────── #}
@@ -333,7 +410,7 @@
             <tr>
                 <td colspan="9" style="padding:3rem; text-align:center; color:var(--text-muted,#9ca3af); font-size:0.9375rem;">
                     No solicitations found.
-                    {% if current_filters.set_aside or current_filters.status or current_filters.q %}
+                    {% if current_filters.set_aside or current_filters.status or current_filters.item_type or current_filters.q or current_filters.has_matches or current_filters.has_approved_source or active_tab %}
                     <br><a href="{% url 'sales:solicitation_list' %}" style="color:var(--company-primary,#004eb3); text-decoration:none; font-size:0.875rem;">Clear filters</a>
                     {% endif %}
                 </td>
@@ -370,8 +447,363 @@
 {% endif %}
 </form>
 
+{# ── Saved filter modal (New + Edit) ─────────────────────────────────── #}
+{# data-share-users: JSON for share_users (share_users_json). Use escape (not escapejs) so quotes become &quot; and JSON.parse works after getAttribute. #}
+<div id="sol-saved-filter-modal" role="dialog" aria-modal="true" aria-labelledby="sol-sf-modal-title"
+     {% if share_users %}data-share-users="{{ share_users_json|escape }}"{% endif %}
+     style="display:none; position:fixed; inset:0; z-index:1050; align-items:center; justify-content:center; background:rgba(15,23,42,0.45); padding:1rem;">
+    <div style="background:var(--surface,#fff); border-radius:10px; border:1px solid var(--border-color,#e5e7eb);
+                max-width:420px; width:100%; padding:1.25rem; box-shadow:0 10px 40px rgba(0,0,0,0.12);">
+        <h2 id="sol-sf-modal-title" style="font-size:1rem; font-weight:600; margin:0 0 1rem;">Save filter</h2>
+        <div id="sol-sf-edit-picker-wrap" style="display:none; margin-bottom:0.75rem;">
+            <label for="sol-sf-filter-select" style="display:block; font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280); margin-bottom:0.25rem;">Saved filter</label>
+            <select id="sol-sf-filter-select"
+                    style="width:100%; border:1px solid var(--border-color,#d1d5db); border-radius:6px; padding:0.375rem 0.5rem; font-size:0.875rem;">
+            </select>
+        </div>
+        <p id="sol-sf-no-saved-msg" style="display:none; font-size:0.875rem; color:var(--text-muted,#6b7280); margin:0 0 1rem;">No saved filters yet.</p>
+        <div id="sol-sf-name-wrap" style="margin-bottom:1rem;">
+            <label for="sol-sf-name-input" style="display:block; font-size:0.75rem; font-weight:500; color:var(--text-muted,#6b7280); margin-bottom:0.25rem;">Name</label>
+            <input type="text" id="sol-sf-name-input" maxlength="100" autocomplete="off"
+                   style="width:100%; border:1px solid var(--border-color,#d1d5db); border-radius:6px; padding:0.375rem 0.5rem; font-size:0.875rem;">
+        </div>
+        <div id="sf-modal-actions-row" style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end;">
+            <button type="button" id="sol-sf-cancel-btn"
+                    style="padding:0.375rem 0.875rem; border-radius:6px; border:1px solid var(--border-color,#d1d5db); background:#fff; font-size:0.875rem; cursor:pointer;">Cancel</button>
+            {% if share_users %}
+            <button type="button" id="sf-share-btn"
+                    style="display:none; padding:0.375rem 0.875rem; border-radius:6px; border:1px solid var(--border-color,#d1d5db); background:var(--surface,#fff); color:var(--text,#374151); font-size:0.875rem; font-weight:500; cursor:pointer;">Share</button>
+            {% endif %}
+            <button type="button" id="sol-sf-delete-btn"
+                    style="display:none; padding:0.375rem 0.875rem; border-radius:6px; border:1px solid #dc2626; background:#fef2f2; color:#991b1b; font-size:0.875rem; cursor:pointer;">Delete</button>
+            <button type="button" id="sol-sf-confirm-btn"
+                    style="padding:0.375rem 0.875rem; border-radius:6px; border:none; background:var(--company-primary,#004eb3); color:#fff; font-size:0.875rem; font-weight:500; cursor:pointer;">Save</button>
+        </div>
+        <div id="sf-share-panel" style="display:none; margin-top:16px;">
+            <label for="sf-share-user-select" style="font-size:13px; font-weight:500;">Share with</label>
+            <select id="sf-share-user-select" class="form-control"
+                    style="margin-top:6px; width:100%;">
+            </select>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button type="button" id="sf-share-send-btn"
+                        class="btn btn-primary btn-sm">Send</button>
+                <button type="button" id="sf-share-cancel-btn"
+                        class="btn btn-ghost btn-sm">Cancel</button>
+            </div>
+            <div id="sf-share-error"
+                 style="color:red; font-size:12px; margin-top:8px; display:none;"></div>
+        </div>
+    </div>
+</div>
+
+<div id="sf-toast" aria-live="polite"></div>
+
 <script>
 (function() {
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    function readJsonScript(id) {
+        var el = document.getElementById(id);
+        if (!el || !el.textContent) return null;
+        try { return JSON.parse(el.textContent); } catch (e) { return null; }
+    }
+    var modal = document.getElementById('sol-saved-filter-modal');
+    var modalTitle = document.getElementById('sol-sf-modal-title');
+    var editPickerWrap = document.getElementById('sol-sf-edit-picker-wrap');
+    var noSavedMsg = document.getElementById('sol-sf-no-saved-msg');
+    var nameWrap = document.getElementById('sol-sf-name-wrap');
+    var nameInput = document.getElementById('sol-sf-name-input');
+    var filterSelect = document.getElementById('sol-sf-filter-select');
+    var cancelBtn = document.getElementById('sol-sf-cancel-btn');
+    var deleteBtn = document.getElementById('sol-sf-delete-btn');
+    var confirmBtn = document.getElementById('sol-sf-confirm-btn');
+    var sfShareBtn = document.getElementById('sf-share-btn');
+    var actionsRow = document.getElementById('sf-modal-actions-row');
+    var sharePanel = document.getElementById('sf-share-panel');
+    var shareTargetSelect = document.getElementById('sf-share-user-select');
+    var shareSendBtn = document.getElementById('sf-share-send-btn');
+    var shareCancelBtn = document.getElementById('sf-share-cancel-btn');
+    var shareErrorEl = document.getElementById('sf-share-error');
+    var saveOpenBtn = document.getElementById('sol-saved-filter-save-btn');
+    var editOpenBtn = document.getElementById('sol-saved-filter-edit-btn');
+    var solSfMode = 'new';
+
+    function showToast(message) {
+        var toast = document.getElementById('sf-toast');
+        if (!toast) return;
+        toast.textContent = message;
+        toast.classList.add('sf-toast--visible');
+        setTimeout(function() { toast.classList.remove('sf-toast--visible'); }, 3000);
+    }
+
+    function readShareUsersFromModal() {
+        if (!modal || !modal.getAttribute('data-share-users')) return [];
+        try {
+            var raw = modal.getAttribute('data-share-users');
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    (function initShareButtonVisibility() {
+        var shareUsers = readShareUsersFromModal();
+        if (sfShareBtn && shareUsers.length === 0) {
+            sfShareBtn.style.display = 'none';
+        }
+    })();
+
+    function formatShareUserLabel(u) {
+        var fn = (u.first_name || '').trim();
+        var ln = (u.last_name || '').trim();
+        var full = (fn + ' ' + ln).trim();
+        if (full) return full;
+        return (u.username || '').trim() || ('User ' + u.pk);
+    }
+
+    function hideSharePanel() {
+        if (sharePanel) sharePanel.style.display = 'none';
+        if (shareErrorEl) {
+            shareErrorEl.style.display = 'none';
+            shareErrorEl.textContent = '';
+        }
+        if (actionsRow) actionsRow.style.display = 'flex';
+    }
+
+    function showSharePanel() {
+        var users = readShareUsersFromModal();
+        if (!users.length || !sharePanel || !shareTargetSelect || !actionsRow) return;
+        shareTargetSelect.innerHTML = '';
+        users.forEach(function(u) {
+            var opt = document.createElement('option');
+            opt.value = String(u.pk);
+            opt.textContent = formatShareUserLabel(u);
+            shareTargetSelect.appendChild(opt);
+        });
+        if (shareErrorEl) {
+            shareErrorEl.style.display = 'none';
+            shareErrorEl.textContent = '';
+        }
+        actionsRow.style.display = 'none';
+        sharePanel.style.display = 'block';
+        shareTargetSelect.focus();
+    }
+
+    function closeModal() {
+        hideSharePanel();
+        if (modal) modal.style.display = 'none';
+    }
+    function openModalNew() {
+        solSfMode = 'new';
+        hideSharePanel();
+        modalTitle.textContent = 'Save filter';
+        editPickerWrap.style.display = 'none';
+        noSavedMsg.style.display = 'none';
+        nameWrap.style.display = 'block';
+        deleteBtn.style.display = 'none';
+        if (sfShareBtn) sfShareBtn.style.display = 'none';
+        confirmBtn.style.display = 'inline-block';
+        nameInput.value = '';
+        var params = readJsonScript('sol-current-filter-params') || {};
+        confirmBtn.textContent = 'Save';
+        modal.style.display = 'flex';
+        nameInput.focus();
+    }
+    function getUserSavedFilters() {
+        var raw = readJsonScript('sol-user-saved-filters-json');
+        return Array.isArray(raw) ? raw : [];
+    }
+    function openModalEdit() {
+        solSfMode = 'edit';
+        hideSharePanel();
+        modalTitle.textContent = 'Edit saved filter';
+        var list = getUserSavedFilters();
+        filterSelect.innerHTML = '';
+        if (list.length === 0) {
+            editPickerWrap.style.display = 'none';
+            noSavedMsg.style.display = 'block';
+            nameWrap.style.display = 'none';
+            deleteBtn.style.display = 'none';
+            if (sfShareBtn) sfShareBtn.style.display = 'none';
+            confirmBtn.style.display = 'none';
+        } else {
+            noSavedMsg.style.display = 'none';
+            editPickerWrap.style.display = 'block';
+            nameWrap.style.display = 'block';
+            deleteBtn.style.display = 'inline-block';
+            if (sfShareBtn) {
+                var su = readShareUsersFromModal();
+                sfShareBtn.style.display = su.length > 0 ? 'inline-block' : 'none';
+            }
+            confirmBtn.style.display = 'inline-block';
+            confirmBtn.textContent = 'Save';
+            list.forEach(function(row) {
+                var opt = document.createElement('option');
+                opt.value = String(row.id);
+                opt.textContent = row.name;
+                filterSelect.appendChild(opt);
+            });
+            filterSelect.selectedIndex = 0;
+            syncNameFromSelect();
+        }
+        modal.style.display = 'flex';
+        if (list.length > 0) nameInput.focus();
+    }
+    function syncNameFromSelect() {
+        var list = getUserSavedFilters();
+        var id = parseInt(filterSelect.value, 10);
+        var row = list.find(function(r) { return r.id === id; });
+        if (row) nameInput.value = row.name || '';
+    }
+    if (filterSelect) {
+        filterSelect.addEventListener('change', syncNameFromSelect);
+    }
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) closeModal();
+        });
+    }
+    if (saveOpenBtn) saveOpenBtn.addEventListener('click', openModalNew);
+    if (editOpenBtn) editOpenBtn.addEventListener('click', openModalEdit);
+
+    function postForm(url, body) {
+        var csrftoken = getCookie('csrftoken');
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrftoken || ''
+            },
+            body: body,
+            credentials: 'same-origin'
+        }).then(function(r) {
+            return r.text().then(function(t) {
+                var data = {};
+                try { data = t ? JSON.parse(t) : {}; } catch (e) {}
+                return { ok: r.ok, status: r.status, data: data };
+            });
+        });
+    }
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+            var csrftoken = getCookie('csrftoken');
+            if (solSfMode === 'new') {
+                var params = readJsonScript('sol-current-filter-params');
+                if (!params || typeof params !== 'object') params = {};
+                var nm = (nameInput.value || '').trim();
+                if (!nm) { alert('Enter a name.'); return; }
+                var enc = new URLSearchParams();
+                enc.append('csrfmiddlewaretoken', csrftoken || '');
+                enc.append('name', nm);
+                enc.append('filter_params', JSON.stringify(params));
+                postForm('{% url "sales:saved_filter_create" %}', enc.toString()).then(function(res) {
+                    if (res.ok && res.data.id) window.location.reload();
+                    else alert(res.data.error || 'Could not save filter.');
+                }).catch(function() { alert('Could not save filter.'); });
+            } else {
+                var list = getUserSavedFilters();
+                if (!list.length) return;
+                var fid = filterSelect.value;
+                var nm2 = (nameInput.value || '').trim();
+                if (!nm2) { alert('Enter a name.'); return; }
+                var enc2 = new URLSearchParams();
+                enc2.append('csrfmiddlewaretoken', csrftoken || '');
+                enc2.append('filter_id', fid);
+                enc2.append('name', nm2);
+                postForm('{% url "sales:saved_filter_update" %}', enc2.toString()).then(function(res) {
+                    if (res.ok && res.data.id) window.location.reload();
+                    else alert(res.data.error || 'Could not update filter.');
+                }).catch(function() { alert('Could not update filter.'); });
+            }
+        });
+    }
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+            if (solSfMode !== 'edit') return;
+            var list = getUserSavedFilters();
+            if (!list.length) return;
+            if (!confirm('Delete this saved filter?')) return;
+            var fid = filterSelect.value;
+            var csrftoken = getCookie('csrftoken');
+            var enc = new URLSearchParams();
+            enc.append('csrfmiddlewaretoken', csrftoken || '');
+            enc.append('filter_id', fid);
+            postForm('{% url "sales:saved_filter_delete" %}', enc.toString()).then(function(res) {
+                if (res.ok && res.data.deleted) window.location.reload();
+                else alert(res.data.error || 'Could not delete filter.');
+            }).catch(function() { alert('Could not delete filter.'); });
+        });
+    }
+
+    if (sfShareBtn) {
+        sfShareBtn.addEventListener('click', function() {
+            if (solSfMode !== 'edit') return;
+            var list = getUserSavedFilters();
+            if (!list.length) return;
+            showSharePanel();
+        });
+    }
+    if (shareCancelBtn) {
+        shareCancelBtn.addEventListener('click', function() {
+            hideSharePanel();
+        });
+    }
+
+    if (shareSendBtn) {
+        shareSendBtn.addEventListener('click', function() {
+            if (solSfMode !== 'edit' || !shareTargetSelect) return;
+            var list = getUserSavedFilters();
+            if (!list.length) return;
+            var tid = shareTargetSelect.value;
+            if (!tid) {
+                if (shareErrorEl) {
+                    shareErrorEl.textContent = 'Select a user.';
+                    shareErrorEl.style.display = 'block';
+                }
+                return;
+            }
+            var csrftoken = getCookie('csrftoken');
+            var enc = new URLSearchParams();
+            enc.append('csrfmiddlewaretoken', csrftoken || '');
+            enc.append('filter_id', filterSelect.value);
+            enc.append('target_user_id', tid);
+            shareSendBtn.disabled = true;
+            postForm('{% url "sales:saved_filter_share" %}', enc.toString()).then(function(res) {
+                shareSendBtn.disabled = false;
+                if (res.ok && res.data.shared) {
+                    closeModal();
+                    var tn = res.data.target_name || 'user';
+                    showToast('Filter shared with ' + tn);
+                } else {
+                    if (shareErrorEl) {
+                        shareErrorEl.textContent = res.data.error || 'Could not share filter.';
+                        shareErrorEl.style.display = 'block';
+                    }
+                }
+            }).catch(function() {
+                shareSendBtn.disabled = false;
+                if (shareErrorEl) {
+                    shareErrorEl.textContent = 'Could not share filter.';
+                    shareErrorEl.style.display = 'block';
+                }
+            });
+        });
+    }
+
     var selectAll = document.getElementById('select-all');
     var toolbar   = document.getElementById('bulk-toolbar');
     var countEl   = document.getElementById('bulk-count');

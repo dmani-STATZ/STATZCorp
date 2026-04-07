@@ -27,7 +27,7 @@
   </div>
   <div style="background:#0a1628; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
     <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">SDVOSB Priority</div>
-    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ sdvosb_count|default:0 }}</div>
+    <div style="font-size:1.75rem; font-weight:700; margin-top:0.25rem;">{{ sdvosb_priority_count|default:0 }}</div>
   </div>
   <div style="background:{% if urgent_count > 0 %}#dc2626{% else %}#0a1628{% endif %}; color:#fff; padding:1.25rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
     <div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; opacity:0.9;">Urgent (≤3d)</div>
@@ -47,23 +47,23 @@
   </a>
 </div>
 
-{# Bucket breakdown row — 4 mini-cards with links #}
+{# Secondary stat row — set-aside / growth / approved-source pipeline counts (see sales/CONTEXT.md) #}
 <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; margin-bottom:1.5rem;">
-  <a href="{% url 'sales:solicitation_list' %}?bucket=SDVOSB" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+  <a href="{% url 'sales:solicitation_list' %}?set_aside=R" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">SDVOSB</div>
-    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.SDVOSB|default:0 }}</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ sdvosb_count|default:0 }}</div>
   </a>
-  <a href="{% url 'sales:solicitation_list' %}?bucket=HUBZONE" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+  <a href="{% url 'sales:solicitation_list' %}?set_aside=H" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">HUBZone</div>
-    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.HUBZONE|default:0 }}</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ hubzone_count|default:0 }}</div>
   </a>
-  <a href="{% url 'sales:solicitation_list' %}?bucket=GROWTH" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+  <a href="{% url 'sales:solicitation_list' %}?tab=growth" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Growth</div>
-    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.GROWTH|default:0 }}</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ growth_count|default:0 }}</div>
   </a>
-  <a href="{% url 'sales:solicitation_list' %}?bucket=SKIP" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
-    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Skip</div>
-    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ counts_by_bucket.SKIP|default:0 }}</div>
+  <a href="{% url 'sales:solicitation_list' %}?tab=approved_sources" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
+    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Approved Sources</div>
+    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ approved_source_count|default:0 }}</div>
   </a>
 </div>
 

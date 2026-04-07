@@ -1,14 +1,17 @@
 """
 Solicitation list and detail views.
 """
+import json
 import urllib.parse
 from datetime import date, timedelta
 
 from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
-from django.db.models import Count, Exists, F, Prefetch, Q, OuterRef, Subquery, Max
+from django.db.models import Count, Exists, F, Prefetch, Q, OuterRef, Subquery, Max, Value
+from django.db.models.functions import Replace
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.urls import reverse
@@ -30,6 +33,7 @@ from sales.models import (
     NsnProcurementHistory,
     SolPackaging,
     MassPassLog,
+    SavedFilter,
 )
 from sales.services.matching import _normalize_nsn
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
@@ -84,7 +88,85 @@ UNRESTRICTED_TAB_Q = (
     Q(small_business_set_aside__in=UNRESTRICTED_CODES)
     | Q(small_business_set_aside__isnull=True)
 )
-VALID_TABS = frozenset({'matches', 'set_asides', 'unrestricted', 'research', 'nobid'})
+VALID_TABS = frozenset({
+    'matches', 'set_asides', 'unrestricted', 'research', 'nobid',
+    'growth', 'approved_sources',
+})
+
+# Default list view: pipeline only (excludes terminal / closed-out rows). Align with dashboard
+# PIPELINE_STATUSES plus Matching (in-triage). Not applied when tab=nobid.
+LIST_PIPELINE_STATUSES = [
+    'New',
+    'Active',
+    'Matching',
+    'RESEARCH',
+    'RFQ_PENDING',
+    'RFQ_SENT',
+    'QUOTING',
+    'BID_READY',
+    'BID_SUBMITTED',
+]
+
+# GET keys excluded from saved-filter matching and from list_qs / filter_snapshot
+_LIST_FILTER_UI_KEYS = frozenset({'page', 'active_chip'})
+
+
+def _normalize_filter_params_dict(d):
+    """Canonical dict for comparing saved JSON to the current query string."""
+    if not isinstance(d, dict):
+        return {}
+    out = {}
+    for k, v in d.items():
+        sk = str(k).strip()
+        if not sk or sk in _LIST_FILTER_UI_KEYS:
+            continue
+        sv = (str(v) if v is not None else '').strip()
+        if sv == '':
+            continue
+        out[sk] = sv
+    return dict(sorted(out.items()))
+
+
+def _canonical_list_filter_params_from_get(get):
+    """Serialize active list filters from a QueryDict (exclude page)."""
+    out = {}
+    for key in get:
+        if key in _LIST_FILTER_UI_KEYS:
+            continue
+        val = get.get(key)
+        if val is None:
+            continue
+        s = val.strip() if isinstance(val, str) else str(val).strip()
+        if s == '':
+            continue
+        out[key] = s
+    return dict(sorted(out.items()))
+
+
+def _find_matching_saved_filter_pk(saved_filters_ordered, active_canon):
+    if not active_canon:
+        return None
+    for sf in saved_filters_ordered:
+        if _normalize_filter_params_dict(sf.filter_params) == active_canon:
+            return sf.pk
+    return None
+
+
+def _saved_filter_list_url(filter_params):
+    """Build solicitation list URL from stored JSON filter_params."""
+    if not isinstance(filter_params, dict):
+        filter_params = {}
+    pairs = []
+    for k, v in sorted(filter_params.items()):
+        sk = str(k).strip()
+        sv = (str(v) if v is not None else '').strip()
+        if not sk or not sv:
+            continue
+        pairs.append((sk, sv))
+    q = urllib.parse.urlencode(pairs)
+    base = reverse('sales:solicitation_list')
+    return f'{base}?{q}' if q else base
+
 
 # SQL Server IN clause parameter limit — chunk snapshot IDs on mass-pass undo
 _MASS_PASS_UNDO_CHUNK = 100
@@ -392,16 +474,23 @@ def _redirect_next_in_queue(request, kind, after_index_exclusive):
     return redirect(_queue_list_redirect(kind))
 
 
+def _list_tab_from_params(params):
+    raw = (params.get('tab') or '').strip()
+    return raw if raw in VALID_TABS else ''
+
+
 def _list_qs_before_tab(params):
     """
     Apply bucket / set-aside / status / item-type / search filters and match_count annotation.
-    Does not apply tab filter, NO_BID rules, or column sort.
+    Restricts to pipeline statuses by default; skips that restriction for tab=nobid.
+    Does not apply tab filter (beyond pipeline scope), or column sort.
     """
     q = (params.get('q') or '').strip()
     set_aside = params.get('set_aside', '') or ''
     status = params.get('status', '') or ''
     item_type = params.get('item_type', '') or ''
     bucket = params.get('bucket', '') or ''
+    tab = _list_tab_from_params(params)
 
     qs = (
         Solicitation.objects
@@ -414,6 +503,9 @@ def _list_qs_before_tab(params):
         )
         .order_by('return_by_date', 'solicitation_number')
     )
+
+    if tab != 'nobid':
+        qs = qs.filter(status__in=LIST_PIPELINE_STATUSES)
 
     if bucket:
         qs = qs.filter(bucket=bucket)
@@ -431,6 +523,19 @@ def _list_qs_before_tab(params):
             Q(lines__nomenclature__icontains=q)
         ).distinct()
 
+    if (params.get('has_matches') or '').strip() == '1':
+        qs = qs.filter(
+            Exists(SupplierMatch.objects.filter(line__solicitation_id=OuterRef('pk')))
+        )
+    if (params.get('has_approved_source') or '').strip() == '1':
+        qs = qs.filter(
+            Exists(
+                SolicitationLine.objects.filter(solicitation_id=OuterRef('pk'))
+                .annotate(nsn_norm=Replace(F('nsn'), Value('-'), Value('')))
+                .filter(nsn_norm__in=ApprovedSource.objects.values('nsn'))
+            )
+        )
+
     qs = qs.annotate(match_count=Count('lines__supplier_matches', distinct=True))
     return qs
 
@@ -440,13 +545,32 @@ def _apply_list_tab_filter(qs, tab):
         return qs.filter(status='NO_BID')
     if tab == 'research':
         return qs.filter(status='RESEARCH')
-    qs = qs.exclude(status='NO_BID')
+    if tab in ('matches', 'set_asides', 'unrestricted', 'growth', 'approved_sources'):
+        qs = qs.exclude(status='NO_BID')
+    elif tab not in ('',):
+        qs = qs.exclude(status='NO_BID')
     if tab == 'matches':
         return qs.filter(match_count__gt=0)
     if tab == 'set_asides':
         return qs.exclude(UNRESTRICTED_TAB_Q)
     if tab == 'unrestricted':
         return qs.filter(UNRESTRICTED_TAB_Q)
+    if tab == 'growth':
+        return qs.filter(
+            small_business_set_aside__isnull=False,
+        ).exclude(
+            small_business_set_aside__in=['R', 'H', '', 'N'],
+        ).filter(
+            Exists(SupplierMatch.objects.filter(line__solicitation_id=OuterRef('pk'))),
+        )
+    if tab == 'approved_sources':
+        return qs.filter(
+            Exists(
+                SolicitationLine.objects.filter(solicitation_id=OuterRef('pk'))
+                .annotate(nsn_norm=Replace(F('nsn'), Value('-'), Value('')))
+                .filter(nsn_norm__in=ApprovedSource.objects.values('nsn'))
+            )
+        )
     return qs
 
 
@@ -501,8 +625,7 @@ def _build_list_queryset(params):
     Reconstruct the filtered solicitation queryset from GET-like params.
     Used by solicitation_list and solicitation_workbench (prev/next nav).
     """
-    raw_tab = params.get('tab', 'matches')
-    tab = raw_tab if raw_tab in VALID_TABS else 'matches'
+    tab = _list_tab_from_params(params)
     qs = _list_qs_before_tab(params)
     qs = _apply_list_tab_filter(qs, tab)
     qs = _apply_list_sort(qs, params.get('sort', '') or '')
@@ -687,6 +810,7 @@ def _workbench_post_action(request, sol, action, list_qs_raw):
 def solicitation_list(request):
     """
     Lists solicitations with filtering and pagination.
+    Default: all pipeline statuses (LIST_PIPELINE_STATUSES); optional ?tab= / toggles / chips.
     Annotates each solicitation with first_line and total_match_count.
     """
     if request.method == 'POST':
@@ -713,21 +837,98 @@ def solicitation_list(request):
     set_aside = request.GET.get('set_aside', '')
     status = request.GET.get('status', '')
     item_type = request.GET.get('item_type', '')
+    has_matches_on = (request.GET.get('has_matches') or '').strip() == '1'
+    has_approved_on = (request.GET.get('has_approved_source') or '').strip() == '1'
 
-    raw_tab = request.GET.get('tab', 'matches')
-    active_tab = raw_tab if raw_tab in VALID_TABS else 'matches'
-
-    pre_tab = _list_qs_before_tab(request.GET)
-    tab_counts = {
-        'matches': pre_tab.exclude(status='NO_BID').filter(match_count__gt=0).count(),
-        'set_asides': pre_tab.exclude(status='NO_BID').exclude(UNRESTRICTED_TAB_Q).count(),
-        'unrestricted': pre_tab.exclude(status='NO_BID').filter(UNRESTRICTED_TAB_Q).count(),
-        'research': pre_tab.filter(status='RESEARCH').count(),
-    }
-    nobid_count = Solicitation.objects.filter(status='NO_BID').count()
+    active_tab = _list_tab_from_params(request.GET)
 
     qs = _build_list_queryset(request.GET)
+    total_count = qs.count()
+    first_sol_number = qs.values_list('solicitation_number', flat=True).first()
     eligible_for_mass_pass_count = qs.filter(status__in=['New', 'Active']).count()
+
+    distinct_set_aside_codes = list(
+        Solicitation.objects.exclude(status='Archived')
+        .exclude(small_business_set_aside__isnull=True)
+        .exclude(small_business_set_aside='')
+        .values_list('small_business_set_aside', flat=True)
+        .distinct()
+        .order_by('small_business_set_aside')
+    )
+    set_aside_dropdown = [('', 'All Set-Asides')]
+    for code in distinct_set_aside_codes:
+        label = SET_ASIDE_LABELS.get(code, code)
+        set_aside_dropdown.append((code, label))
+    if set_aside and set_aside not in distinct_set_aside_codes:
+        set_aside_dropdown.append((set_aside, SET_ASIDE_LABELS.get(set_aside, set_aside)))
+
+    status_label_map = dict(Solicitation.STATUS_CHOICES)
+    pipeline_status_choices = [
+        (s, status_label_map[s]) for s in LIST_PIPELINE_STATUSES if s in status_label_map
+    ]
+
+    saved_for_list = list(
+        SavedFilter.objects.filter(
+            Q(is_system=True) | Q(user=request.user, is_system=False),
+        ).order_by('is_system', 'name')
+    )
+    system_chips = [sf for sf in saved_for_list if sf.is_system]
+    user_chips = [sf for sf in saved_for_list if not sf.is_system]
+    active_canon = _canonical_list_filter_params_from_get(request.GET)
+    active_chip_id = _find_matching_saved_filter_pk(saved_for_list, active_canon)
+    show_save_filter = active_chip_id is None and bool(active_canon)
+    filter_params_for_save_json = json.dumps(active_canon)
+    user_chips_json = json.dumps([
+        {'id': c.pk, 'name': c.name, 'filter_params': c.filter_params}
+        for c in user_chips
+    ])
+    system_chip_rows = [
+        {
+            'pk': c.pk,
+            'name': c.name,
+            'url': _saved_filter_list_url(c.filter_params),
+            'is_active': c.pk == active_chip_id,
+        }
+        for c in system_chips
+    ]
+    user_chip_rows = [
+        {
+            'pk': c.pk,
+            'name': c.name,
+            'url': _saved_filter_list_url(c.filter_params),
+            'is_active': c.pk == active_chip_id,
+        }
+        for c in user_chips
+    ]
+
+    User = get_user_model()
+    share_users = list(
+        User.objects.filter(is_active=True)
+        .exclude(pk=request.user.pk)
+        .values('pk', 'first_name', 'last_name', 'username')
+        .order_by('first_name', 'last_name')
+    )
+    share_users_json = json.dumps(share_users)
+
+    # Toggle URLs for has_matches / has_approved_source (preserve other filters, omit page/active_chip).
+    base_get = {
+        k: v for k, v in request.GET.items()
+        if k not in _LIST_FILTER_UI_KEYS
+    }
+
+    def _qs_url(extra=None, omit=None):
+        d = dict(base_get)
+        omit = omit or ()
+        for k in omit:
+            d.pop(k, None)
+        if extra:
+            d.update(extra)
+        return f"{reverse('sales:solicitation_list')}?{urllib.parse.urlencode(d)}"
+
+    toggle_has_matches_href = _qs_url(omit=('has_matches',)) if has_matches_on else _qs_url({'has_matches': '1'})
+    toggle_has_approved_href = (
+        _qs_url(omit=('has_approved_source',)) if has_approved_on else _qs_url({'has_approved_source': '1'})
+    )
 
     # Column sort state for header links (must match _apply_list_sort)
     sort_param = (request.GET.get('sort') or '').strip()
@@ -751,10 +952,19 @@ def solicitation_list(request):
         sol.set_aside_display = SET_ASIDE_LABELS.get(sol.small_business_set_aside or '', '')
         sol.is_overdue = bool(sol.return_by_date and sol.return_by_date < today)
 
-    filter_params = {k: v for k, v in request.GET.items() if k != "page"}
+    filter_params = {
+        k: v for k, v in request.GET.items()
+        if k not in _LIST_FILTER_UI_KEYS
+    }
     filter_snapshot = urllib.parse.urlencode(filter_params)
-    filter_params_no_tab = {k: v for k, v in request.GET.items() if k not in ("page", "tab")}
-    filter_params_no_sort = {k: v for k, v in request.GET.items() if k not in ("page", "sort")}
+    filter_params_no_tab = {
+        k: v for k, v in request.GET.items()
+        if k not in _LIST_FILTER_UI_KEYS and k != 'tab'
+    }
+    filter_params_no_sort = {
+        k: v for k, v in request.GET.items()
+        if k not in _LIST_FILTER_UI_KEYS and k != 'sort'
+    }
 
     # Next sort value per column for 3-state toggle: default -> asc -> desc -> default
     def next_sort(current, asc_val):
@@ -779,16 +989,30 @@ def solicitation_list(request):
     return render(request, "sales/solicitations/list.html", {
         "page_obj": page_obj,
         "set_aside_choices": SET_ASIDE_CHOICES,
+        "set_aside_dropdown": set_aside_dropdown,
         "status_choices": Solicitation.STATUS_CHOICES,
+        "pipeline_status_choices": pipeline_status_choices,
         "current_filters": {
             "q": q,
             "set_aside": set_aside,
             "status": status,
             "item_type": item_type,
+            "has_matches": has_matches_on,
+            "has_approved_source": has_approved_on,
         },
         "active_tab": active_tab,
-        "tab_counts": tab_counts,
-        "nobid_count": nobid_count,
+        "system_chips": system_chips,
+        "user_chips": user_chips,
+        "system_chip_rows": system_chip_rows,
+        "user_chip_rows": user_chip_rows,
+        "active_chip_id": active_chip_id,
+        "show_save_filter": show_save_filter,
+        "filter_params_for_save_json": filter_params_for_save_json,
+        "user_chips_json": user_chips_json,
+        "share_users": share_users,
+        "share_users_json": share_users_json,
+        "toggle_has_matches_href": toggle_has_matches_href,
+        "toggle_has_approved_href": toggle_has_approved_href,
         "sort_param": sort_param_val,
         "sort_links": sort_links,
         "filter_querystring": urllib.parse.urlencode(filter_params),
@@ -796,6 +1020,8 @@ def solicitation_list(request):
         "filter_querystring_no_tab": urllib.parse.urlencode(filter_params_no_tab),
         "filter_querystring_no_sort": urllib.parse.urlencode(filter_params_no_sort),
         "eligible_for_mass_pass_count": eligible_for_mass_pass_count,
+        "total_count": total_count,
+        "first_sol_number": first_sol_number,
     })
 
 
@@ -1578,6 +1804,142 @@ def sol_remove_research(request, sol_pk):
     ):
         return redirect(f"{reverse('sales:solicitation_list')}?{next_qs}")
     return redirect(f"{reverse('sales:solicitation_list')}?tab=research")
+
+
+def _parse_saved_filter_params_payload(raw):
+    try:
+        parsed = json.loads(raw or '')
+    except json.JSONDecodeError:
+        return None, 'Invalid filter_params JSON'
+    if not isinstance(parsed, dict):
+        return None, 'filter_params must be a JSON object'
+    normalized = {}
+    for k, v in parsed.items():
+        sk = str(k).strip()
+        if not sk or sk in _LIST_FILTER_UI_KEYS:
+            continue
+        normalized[sk] = (str(v) if v is not None else '').strip()
+    normalized = {k: v for k, v in normalized.items() if v != ''}
+    return normalized, None
+
+
+@login_required
+@require_POST
+def saved_filter_create(request):
+    name = (request.POST.get('name') or '').strip()
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    if len(name) > 100:
+        return JsonResponse({'error': 'Name is too long'}, status=400)
+    parsed, err = _parse_saved_filter_params_payload(
+        request.POST.get('filter_params') or ''
+    )
+    if err:
+        return JsonResponse({'error': err}, status=400)
+    obj = SavedFilter.objects.create(
+        user=request.user,
+        name=name,
+        filter_params=parsed,
+        is_system=False,
+    )
+    return JsonResponse({'id': obj.pk, 'name': obj.name})
+
+
+@login_required
+@require_POST
+def saved_filter_update(request):
+    try:
+        pk = int((request.POST.get('filter_id') or '').strip())
+    except ValueError:
+        return JsonResponse({'error': 'Invalid filter id'}, status=400)
+    name = (request.POST.get('name') or '').strip()
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    if len(name) > 100:
+        return JsonResponse({'error': 'Name is too long'}, status=400)
+    sf = SavedFilter.objects.filter(
+        pk=pk, user=request.user, is_system=False,
+    ).first()
+    if not sf:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    sf.name = name
+    sf.save(update_fields=['name'])
+    return JsonResponse({'id': sf.pk, 'name': sf.name})
+
+
+@login_required
+@require_POST
+def saved_filter_delete(request):
+    try:
+        pk = int((request.POST.get('filter_id') or '').strip())
+    except ValueError:
+        return JsonResponse({'error': 'Invalid filter id'}, status=400)
+    sf = SavedFilter.objects.filter(
+        pk=pk, user=request.user, is_system=False,
+    ).first()
+    if not sf:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    sf.delete()
+    return JsonResponse({'deleted': True})
+
+
+@login_required
+def saved_filter_share(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        filter_id = int((request.POST.get('filter_id') or '').strip())
+    except ValueError:
+        return JsonResponse({'error': 'Invalid filter id'}, status=400)
+
+    try:
+        target_user_id = int((request.POST.get('target_user_id') or '').strip())
+    except ValueError:
+        return JsonResponse({'error': 'Invalid user id'}, status=400)
+
+    User = get_user_model()
+
+    try:
+        saved_filter = SavedFilter.objects.get(
+            pk=filter_id,
+            user=request.user,
+            is_system=False,
+        )
+    except SavedFilter.DoesNotExist:
+        return JsonResponse({'error': 'Filter not found'}, status=404)
+
+    try:
+        target_user = User.objects.get(
+            pk=target_user_id,
+            is_active=True,
+        )
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
+    if target_user == request.user:
+        return JsonResponse(
+            {'error': 'Cannot share with yourself'},
+            status=400,
+        )
+
+    name = saved_filter.name
+    if SavedFilter.objects.filter(
+        user=target_user, name=name, is_system=False
+    ).exists():
+        name = f'{name} (shared)'
+
+    SavedFilter.objects.create(
+        user=target_user,
+        name=name,
+        filter_params=saved_filter.filter_params,
+        is_system=False,
+    )
+
+    return JsonResponse({
+        'shared': True,
+        'target_name': target_user.get_full_name() or target_user.username,
+    })
 
 
 # URL name `solicitation_detail` still resolves to this view; alias for explicit imports.

@@ -14,6 +14,7 @@
 - Provide editable processing records (`ProcessContract`/`ProcessClin`/`ProcessContractSplit`) with calculated values, split management, and matching to canonical `contracts`, `products`, and `suppliers` data.
 - Drive the contract-to-contract workflow via views (`processing_views.*`), API endpoints, and forms so users can save drafts, mark ready, finalize, or cancel without touching the live data until validation succeeds.
 - Offer CSV tooling (template download, test data, upload) to bulk-import queue items, with dedup checks against `Contract` and `QueueContract`.
+- Offer DD Form 1155 award **PDF** upload on the queue page (`upload_award_pdf` → `parse_award_pdf` / `ingest_parsed_award` in `processing/services/pdf_parser.py`), with queue PDF status columns and parse-notes UI.
 - Track sequence numbers for PO/Tab assignment (`SequenceNumber`) and expose management helpers (e.g., `get_next_numbers`, `save_contract`) that power the JavaScript heavy UI.
 
 ## 4. Key Files and What They Do
@@ -21,34 +22,35 @@
 | --- | --- |
 | `models.py` | Defines queue + processing tables: `QueueContract/QueueClin` for raw payloads, `ProcessContract/ProcessClin/ProcessContractSplit` for the editable workflow, `SequenceNumber` for PO/Tab generation, and helper methods (`calculate_contract_value`, split classmethods). |
 | `forms.py` | `ProcessContractForm` wires contract/split widgets and persists split rows; `ProcessClinForm` auto-calculates values and exposes widgets; `ProcessClinFormSet` lets the template edit many CLINs inline. |
-| `views/processing_views.py` | Core HTTP handlers for queue presentation, starting processing, matching helpers, saving drafts, finalizing contracts (including `PaymentHistory`/`ContractSplit` creation), cancellation, CSV import/export, and helper APIs consumed by the template. |
+| `views/processing_views.py` | Core HTTP handlers for queue presentation, starting processing, matching helpers, saving drafts, finalizing contracts (including `PaymentHistory`/`ContractSplit` creation), cancellation, CSV import/export, award PDF upload (`upload_award_pdf`), SharePoint stub (`save_to_sharepoint`), and helper APIs consumed by the template. |
 | `views/api_views.py` | AJAX-friendly endpoints for the UI to sync individual fields, add/delete CLINs, recalc values, and bulk save CLIN details outside the Django formset cycle. |
 | `views/matching_views.py` | Lightweight search endpoints that look up buyers/NSNs/suppliers by partial text to populate modals used in the form. |
-| `urls.py` | Maps queue, processing, matching, API, CSV, and split-management routes (`/queue/`, `/contract/<pk>/edit/`, `/match-*`, `/api/*`, `/upload/`, `/contract/split/*`). |
-| `templates/processing/*.html` | `contract_queue.html` renders the queue table/controls, `process_contract_form.html` is the form-heavy edit page, `process_contract_detail.html` shows readonly state, and `modals/*` hold buyer/IDIQ/NSN/supplier pickers. |
+| `urls.py` | Maps queue, processing, matching, API, CSV/PDF upload, and split-management routes (`/queue/`, `/contract/<pk>/edit/`, `/match-*`, `/api/*`, `/upload/`, `/upload-award-pdf/`, `/contract/split/*`). |
+| `templates/processing/*.html` | `contract_queue.html` renders the queue table/controls (including PDF parse status column and parse-notes modal), `process_contract_form.html` is the form-heavy edit page, `process_contract_detail.html` shows readonly state, and `modals/*` hold buyer/IDIQ/NSN/supplier pickers plus `pdf_parse_notes_modal.html`. |
 | `static/processing/js/*.js` | Client-side scripts (`process_contract.js`, `*_modal.js`) handle asynchronous saves, modal wiring, numeric recalculations, split manipulation, and match dialogs mentioned in templates. |
 | `docs/*.md` | Implementation notes (`API_DOCUMENTATION.md`, workflow guide, split implementation notes, IDIQ modularization) document the intent behind the workflow and highlight future work. |
 | `admin.py` | Registers only `QueueContract` with a read-only view and a force-delete action that cascades through queue/processing records. |
+| `services/pdf_parser.py` | Standalone award PDF parsing (`parse_award_pdf`) and queue upsert (`ingest_parsed_award`); no view/HTTP imports. |
 
 ## 5. Data Model / Domain Objects
-- `QueueContract`/`QueueClin` mirror incoming CSV or queue inputs with text fields for buyer/NSN/supplier and status flags (`is_being_processed`, `matched_*`). They inherit `AuditModel` from `contracts` and default to `Company.get_default_company` when `company_id` is missing.
+- `QueueContract`/`QueueClin` mirror incoming CSV or queue inputs with text fields for buyer/NSN/supplier and status flags (`is_being_processed`, `matched_*`). `QueueContract` also stores award-PDF ingestion metadata: `pdf_parse_status` (`pending` / `success` / `partial`), `pdf_parsed_at`, and `pdf_parse_notes`. They inherit `AuditModel` from `contracts` and default to `Company.get_default_company` when `company_id` is missing.
 - `SequenceNumber` stores the shared PO/Tab counters; UI flows call `advance_po_number`/`advance_tab_number` when creating new processing contracts and finalizers ensure the counters stay ahead of the last assigned values.
 - `ProcessContract` wraps `Contract` metadata plus staging fields (`buyer_text`, `contract_type_text`, `sales_class_text`, `plan_gross`, `planned_split`, `final_contract`). Status choices (`draft` → `completed`) track workflow state. Key methods: `calculate_contract_value`, `calculate_plan_gross`, and `update_calculated_values`, which power the `update_contract_values` API and ensure `contract_value`/`plan_gross` reflect CLIN totals.
 - `ProcessClin` mirrors `Clin` with foreign keys to `Supplier`, `Nsn`, `ClinType`, `SpecialPaymentTerms`, text backups (`nsn_text`, `supplier_text`), numeric fields used by the form to recompute `item_value`/`quote_value`, and late/dates/supplier due flags. `final_clin` links to the canonical `Clin` once finalized.
 - `ProcessContractSplit` holds dynamic split allocations per contract; helper classmethods (`create_split`, `update_split`, `delete_split`) plus the formset wiring keep sums tracked and allow JS to append new rows.
 
 ## 6. Request / User Flow
-1. **Queue intake:** `/processing/upload/` ingests CSV rows into `QueueContract`/`QueueClin`, skipping duplicates already in `Contract` or `QueueContract`. `download-template` and `download-test-data` supply CSV scaffolding/test payloads (with test download limited to `DEBUG` mode).
-2. **Queue dashboard:** `ContractQueueListView` (`/processing/queue/`) lists queue items, counts CLIN totals per contract, and offers buttons wired to start/cancel actions.
+1. **Queue intake:** `/processing/upload/` ingests CSV rows into `QueueContract`/`QueueClin`, skipping duplicates already in `Contract` or `QueueContract`. `/processing/upload-award-pdf/` (`upload_award_pdf`) accepts multipart `pdf_files`, parses each DD Form 1155 PDF, calls `ingest_parsed_award`, then invokes the no-op `save_to_sharepoint` stub (future Microsoft Graph hook). `download-template` and `download-test-data` supply CSV scaffolding/test payloads (with test download limited to `DEBUG` mode).
+2. **Queue dashboard:** `ContractQueueListView` (`/processing/queue/`) lists queue items, counts CLIN totals per contract, shows PDF parse status per row, and offers buttons wired to start/cancel actions. The drop zone accepts CSV and PDF; CSV still posts to `/processing/upload/` only.
 3. **Start processing:** `initiate_processing` marks `QueueContract` as locked, `start_processing` clones queue data into `ProcessContract`/`ProcessClin`, uses `SequenceNumber` to mint PO/Tab, and flags the queue item as in-progress. `start_new_contract` can create a blank process contract + a default CLIN without queue data.
-4. **Editing:** `/processing/contract/<pk>/edit/` renders `ProcessContractForm` + `ProcessClinFormSet` with JS-assisted modals (`buyer`, `NSN`, `supplier`, `IDIQ`). Clients hit AJAX endpoints (`save_contract`, `update_clin_field`, `update_process_contract_field`, `save_clin`, etc.) as fields change, and `process_contract.js` orchestrates instantaneous saves, recalculations, and status badge updates.
+4. **Editing:** `/processing/contract/<pk>/edit/` renders `ProcessContractForm` + `ProcessClinFormSet` with JS-assisted modals (`buyer`, `NSN`, `supplier`, `IDIQ`). `ProcessContractUpdateView` passes `pdf_parse_status`, `pdf_parse_notes`, and `queue_contract` (from `ProcessContract.queue_id`) so analysts can open parse notes when status is `partial`. Clients hit AJAX endpoints (`save_contract`, `update_clin_field`, `update_process_contract_field`, `save_clin`, etc.) as fields change, and `process_contract.js` orchestrates instantaneous saves, recalculations, and status badge updates.
 5. **Matching:** Separate POST endpoints (`match_buyer`, `match_nsn`, `match_supplier`, `match_idiq`) accept IDs from modal pickers and update the FK/text fields on `ProcessContract`/`ProcessClin`.
 6. **Splits:** Split creation/update/delete happen via `/contract/split/*` views or through the form’s `splits-...` payload handling in `ProcessContractForm.save`.
 7. **Finalization:** `/contract/<process_contract_id>/finalize/` (and the more elaborate `finalize_and_email_contract`) validates buyer/NSN/supplier presence, creates `Contract`, `Clin`, `ContractSplit`, and `PaymentHistory` records, updates `SequenceNumber`, deletes the queue/process entries, and optionally builds a `mailto:` URL. `mark_ready_for_review` bumps status and keeps the queue item locked for reviewers.
 8. **Cancellation:** `/process-contract/<pk>/cancel/` or `cancel_processing` roll back queue locks; `cancel_process_contract` also deletes the `ProcessContract` while resetting `QueueContract` flags.
 
 ## 7. Templates and UI Surface Area
-- `processing/templates/processing/contract_queue.html` renders the queue list, statuses, and buttons that call `/start-processing/`, `/start-new-contract/`, or `/cancel-processing/`. The view computes counts (total CLINs, processing count, debug info for first contract).
+- `processing/templates/processing/contract_queue.html` renders the queue list, processing status, **PDF** column (pending/success/partial icons; partial opens parse notes modal), drag/drop for CSV and PDF, and buttons that call `/start-processing/`, `/start-new-contract/`, or `/cancel-processing/`. The view computes counts (total CLINs, processing count, debug info for first contract).
 - `process_contract_form.html` (extends `contracts/contract_base.html`) contains a grid of contract fields, status card, CLIN table, split management UI, and system message region. Buttons/inputs call `saveContract()`/`process_contract.js` to hit `/save-contract/`, match modals, and toggle read-only states. The template also loads the modals under `templates/processing/modals/` for buyer/IDIQ/NSN/supplier lookups.
 - `process_contract_detail.html` displays the contract summary and connected CLINs for readonly review.
 - JS assets (`process_contract.js`, `*_modal.js`, plus placeholder `clin_handling.js`) supply the interactive behavior (AJAX saves, match modal wiring, validation, split row updates).
@@ -66,6 +68,8 @@
 
 ## 10. Business Logic and Services
 - `processing_views` contains the scenario logic: `start_processing` clones queue data, `finalize_contract`/`finalize_and_email_contract` build final `Contract`/`Clin`/`PaymentHistory`/`ContractSplit` and drop the processing records, `cancel_process_contract` resets queue locks, `save_and_return_to_queue` inspects form/formset validity, and `upload_csv` parses rows with strict column/duplicate/date/decimal validation before creating `QueueContract`/`QueueClin`.
+- `upload_award_pdf` validates `.pdf` extensions, calls `parse_award_pdf` and `ingest_parsed_award` (from `processing.services.pdf_parser`) inside per-file `transaction.atomic()` blocks, returns JSON `results` per file, and calls `save_to_sharepoint` (no-op logger stub) after each successful ingestion for a future SharePoint/Microsoft Graph integration.
+- `pdf_parser.py` implements `parse_award_pdf` (text extraction + field/CLIN heuristics) and `ingest_parsed_award` (upsert `QueueContract` by `contract_number`, merge `QueueClin` rows); it uses Django ORM but not views or HTTP. Per CLIN it extracts **UOM** from the Section B “CLIN / PR / PRLI / UI …” row (variant 2), **due date** from `DELIVER BY:` (date parsed after capture), **FOB** from `DELIVER FOB:` on the same pdfplumber line when present, and **IA** from `INSPECTION POINT:` / `ACCEPTANCE POINT:` (choice values `O`/`D` on `QueueClin`, with a parse note if the two points disagree). **`DELIVER BY` / `DELIVER FOB` must not use a `^` line-start anchor** — pdfplumber often places both fragments mid-line on one string (e.g. `DELIVER FOB: ORIGIN   DELIVER BY: 2027 JAN 04`).
 - `SequenceNumber` ensures PO/Tab uniqueness across the workflow and is consulted/advanced before new contracts are created or finalization ensures the counter stays ahead.
 - `ProcessContract.calculate_contract_value`, `calculate_plan_gross`, and `update_calculated_values` are relied upon when `update_contract_values` recomputes totals and inserts “STATZ” splits if totals drift.
 - `ProcessContractSplit` exposes `create_split`, `update_split`, and `delete_split` classmethods used by both the form and AJAX endpoints.
@@ -79,7 +83,7 @@
 - `ProcessContractSplit` data is mirrored into `contracts.ContractSplit` when finalizing, so renaming fields or table names affects both apps. Similarly, `PaymentHistory` entries created during finalization use the `ContentType` framework tied to `contracts`.
 
 ## 12. URL Surface / API Surface
-- **Queue + batch:** `/processing/queue/`, `/processing/start-new-contract/`, `/processing/start-processing/<queue_id>/`, `/processing/get-next-numbers/`, `/processing/upload/`, `/processing/download-template/`, `/processing/download-test-data/`.
+- **Queue + batch:** `/processing/queue/`, `/processing/start-new-contract/`, `/processing/start-processing/<queue_id>/`, `/processing/get-next-numbers/`, `/processing/upload/`, `/processing/upload-award-pdf/` (`processing:upload_award_pdf`), `/processing/download-template/`, `/processing/download-test-data/`.
 - **Processing contract UI:** `/processing/contract/<pk>/`, `/processing/contract/<pk>/edit/`, `/processing/contract/<id>/save/`, `/processing/contract/<id>/finalize/`, `/processing/contract/<id>/finalize-and-email/`, `/processing/process-contract/<id>/cancel/`, `/processing/process-contract/<id>/mark-ready/`.
 - **Matching endpoints:** `/processing/match-buyer/<id>/`, `/processing/match-nsn/<id>/`, `/processing/match-supplier/<id>/`, `/processing/match-idiq/<id>/`.
 - **AJAX/API:** `/processing/api/...` handles GET/PUT for processing contracts, create/update/delete CLINs, update single fields, `save_clin`, and `update_contract_values`.
@@ -106,7 +110,7 @@
 - `migrations/0001_initial.py` introduced the core tables; subsequent migrations tweak `ProcessContract.plan_gross`, `ProcessClin` references, `QueueContract.queue_id`, and rename `ContractSplit` to `ProcessContractSplit`.
 - Migration `0012` adds `company` fields to `ProcessClin`/`ProcessContract`, suggesting a cleanup to track company ownership.
 - Migration `0013` adjusted `nsn`/`supplier` FKs, showing this schema mutates when the supplier/NSN relationships need stricter validation.
-- No migration touches appear after late 2025, implying schema is stable but still small enough that naming changes ripple into both the `processing` and `contracts` splits when finalizing.
+- Later migrations add `QueueContract` PDF ingestion fields (`pdf_parse_status`, `pdf_parsed_at`, `pdf_parse_notes`) and related indexes/defaults as needed.
 
 ## 17. Known Gaps / Ambiguities
 - Entire app lacks tests (no coverage for matching logic, CSV ingestion, finalization, or form handling).
@@ -120,10 +124,11 @@
 3. Before renaming `ProcessContractSplit`, ensure finalization recreates matching `contracts.ContractSplit` rows and `update_contract_values` still sums the right decimals.
 4. Any change to `confirm` finalization (e.g., adding validations) must keep `PaymentHistory` creation and queue/the sequence handling in sync so PO/Tab counters and completed contracts remain consistent.
 5. Re-run `processing_views.upload_csv` logic and the dedup/validation loops when altering columns; the view relies on exact CSV headers and will break quietly if names change.
+6. Keep `pdf_parser.py` free of HTTP/view coupling; extend parsing or ingestion there and wire new behavior from `upload_award_pdf` (or similar orchestration) only.
 
 ## 19. Quick Reference
 - **Primary models:** `QueueContract`, `QueueClin`, `ProcessContract`, `ProcessClin`, `ProcessContractSplit`, `SequenceNumber`.
-- **Main URLs:** `/processing/queue/`, `/processing/contract/<pk>/edit/`, `/processing/start-processing/<queue_id>/`, `/processing/contract/<id>/finalize/`, `/processing/upload/`, `/processing/api/processing/<id>/...`.
-- **Key templates:** `processing/contract_queue.html`, `processing/process_contract_form.html`, `processing/process_contract_detail.html`, plus modals under `processing/modals/`.
+- **Main URLs:** `/processing/queue/`, `/processing/contract/<pk>/edit/`, `/processing/start-processing/<queue_id>/`, `/processing/contract/<id>/finalize/`, `/processing/upload/`, `/processing/upload-award-pdf/`, `/processing/api/processing/<id>/...`.
+- **Key templates:** `processing/contract_queue.html`, `processing/process_contract_form.html`, `processing/process_contract_detail.html`, plus modals under `processing/modals/` (including `pdf_parse_notes_modal.html`).
 - **Key dependencies:** `contracts` (Contract/Clin/Buyer/.../ContractSplit/PaymentHistory), `products.Nsn`, `suppliers.Supplier`, shared `Company` model.
 - **Risky files:** `views/processing_views.py` (central workflow, finalization, CSV import), `forms.py` (split persistence), `static/processing/js/process_contract.js` (AJAX state machine), `processing/models.py` (schema/SequenceNumber), and the large templates that must stay aligned with API payloads.

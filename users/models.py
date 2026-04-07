@@ -234,6 +234,8 @@ class WorkCalendarEvent(models.Model):
     privacy_label = models.CharField(max_length=120, blank=True, help_text="Display text for shared calendars when event is private.")
     source_system = models.CharField(max_length=100, blank=True)
     source_identifier = models.CharField(max_length=255, blank=True)
+    sharepoint_id = models.CharField(max_length=255, blank=True, null=True)
+    sharepoint_last_modified = models.DateTimeField(null=True, blank=True)
     created_via_nlp = models.BooleanField(default=False)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -246,6 +248,14 @@ class WorkCalendarEvent(models.Model):
         indexes = [
             models.Index(fields=['start_at', 'end_at']),
             models.Index(fields=['organizer', 'start_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sharepoint_id'],
+                condition=models.Q(sharepoint_id__isnull=False)
+                & models.Q(sharepoint_id__gt=''),
+                name='users_workcalendarevent_sharepoint_id_uniq_when_set',
+            ),
         ]
 
     def __str__(self):

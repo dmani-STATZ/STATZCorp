@@ -61,6 +61,11 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - Read `upload_csv` — it validates exact column names; changing expected headers breaks silent import failures
 - Required headers are hardcoded: `Contract Number`, `Buyer`, `Award Date`, `Due Date`, `Contract Value`, `Contract Type`, `Solicitation Type`, `Item Number`, `Item Type`, `NSN`, `NSN Description`, `Order Qty`, `UOM`, `Unit Price`
 
+### Before changing award PDF intake
+- Read `upload_award_pdf` in `processing_views.py` and `processing/services/pdf_parser.py` (`parse_award_pdf`, `ingest_parsed_award`) — keep parsing/ingestion logic in `pdf_parser.py` only; views orchestrate and must not duplicate parser rules.
+- Queue UI: `contract_queue.html` (drop zone, PDF column, `processing:upload_award_pdf`) and `modals/pdf_parse_notes_modal.html`.
+- **pdfplumber layout:** `DELIVER BY` and `DELIVER FOB` often appear **mid-line** on a single extracted line — never use `^` anchors on those regexes (and prefer running both patterns against the same line when both phrases appear together).
+
 ---
 
 ## 4. Local Architecture / Change Patterns
@@ -224,7 +229,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 | Category | Files |
 |---|---|
 | Primary models | `processing/models.py` — `QueueContract`, `QueueClin`, `ProcessContract`, `ProcessClin`, `ProcessContractSplit`, `SequenceNumber` |
-| Core workflow | `processing/views/processing_views.py` — `start_processing`, `finalize_contract`, `finalize_and_email_contract`, `upload_csv` |
+| Core workflow | `processing/views/processing_views.py` — `start_processing`, `finalize_contract`, `finalize_and_email_contract`, `upload_csv`, `upload_award_pdf`, `save_to_sharepoint` (stub) |
 | API layer | `processing/views/api_views.py`, `processing/views/matching_views.py` |
 | Form logic | `processing/forms.py` — `ProcessContractForm.save()`, `ProcessClinForm.clean()` |
 | UI state machine | `processing/static/processing/js/process_contract.js` |

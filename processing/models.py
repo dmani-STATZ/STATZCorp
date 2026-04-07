@@ -12,6 +12,17 @@ class QueueContract(AuditModel):
     """Model for storing queued contracts before they become live contracts"""
     company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='queue_contracts', null=False, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True)
+    idiq_number = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name="IDIQ Contract Number",
+        help_text=(
+            "Populated automatically when this contract originated from a DIBBS "
+            "delivery order. Stores the IDIQ parent contract number as a hint for "
+            "the analyst to match the IDIQ contract in the processing form."
+        ),
+    )
     buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
     award_date = models.DateTimeField(null=True, blank=True)
     due_date = models.DateTimeField(null=True, blank=True)
@@ -23,6 +34,26 @@ class QueueContract(AuditModel):
     is_being_processed = models.BooleanField(default=False)
     processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='processing_contracts')
     processing_started = models.DateTimeField(null=True, blank=True)
+
+    pdf_parse_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('success', 'Success'),
+            ('partial', 'Parsed with Errors'),
+        ],
+        default='pending'
+    )
+
+    pdf_parsed_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    pdf_parse_notes = models.TextField(
+        null=True,
+        blank=True
+    )
     
     # Matched references (after processing)
     matched_buyer = models.ForeignKey(Buyer, on_delete=models.SET_NULL, null=True, blank=True)

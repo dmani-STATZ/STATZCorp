@@ -103,6 +103,9 @@
             <div class="flex items-center gap-3">
                 <h2 class="text-xl font-medium text-gray-800 cursor-pointer select-none" onclick="toggleCalendarMenu()">Calendar</h2>
                 <button type="button" onclick="openAddEventModal()" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Add Event</button>
+                <button type="button" id="spSyncBtn" onclick="runSharePointSync()" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
+                    <span id="spSyncIcon">⟳</span> Sync SP
+                </button>
                 <div id="calendarMenu" class="hidden ml-2 text-sm">
                     {% if user.is_staff or user.is_superuser %}
                     <a href="{% url 'users:sharepoint_import_ui' %}" class="px-2 py-1 border rounded hover:bg-gray-100 mr-2">Import from SharePoint</a>
@@ -759,6 +762,74 @@
         }
     }
 
+    function showCalendarSyncStatus(message, isError) {
+        let el = document.getElementById('calendarSyncToast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'calendarSyncToast';
+            document.body.appendChild(el);
+        }
+        el.textContent = message;
+        el.className =
+            'fixed bottom-4 right-4 z-[100] max-w-sm px-4 py-2 rounded shadow-lg text-sm ' +
+            (isError ? 'bg-red-600 text-white' : 'bg-gray-800 text-white');
+        el.classList.remove('hidden', 'opacity-0');
+        clearTimeout(window._calendarSyncToastTimer);
+        window._calendarSyncToastTimer = setTimeout(function () {
+            el.classList.add('opacity-0');
+        }, 4500);
+    }
+
+    async function runSharePointSync(opts) {
+        const options = opts || {};
+        const silent = !!options.silent;
+        const btn = document.getElementById('spSyncBtn');
+        const icon = document.getElementById('spSyncIcon');
+        if (btn) btn.disabled = true;
+        if (icon) icon.textContent = '⏳';
+        try {
+            const resp = await fetch("{% url 'sharepoint_sync' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Accept': 'application/json',
+                },
+            });
+            let data = {};
+            try {
+                data = await resp.json();
+            } catch (_) {}
+            if (!resp.ok) {
+                const msg = data.error || ('HTTP ' + resp.status);
+                if (silent) console.error('SharePoint sync:', msg);
+                showCalendarSyncStatus(msg, true);
+                return;
+            }
+            if (typeof fetchAndPaintEvents === 'function' && typeof calendarPointer !== 'undefined') {
+                await fetchAndPaintEvents(calendarPointer);
+            }
+            if (!silent) {
+                const parts = [];
+                if (data.created_local) parts.push(data.created_local + ' created locally');
+                if (data.updated_local) parts.push(data.updated_local + ' updated locally');
+                if (data.created_sp) parts.push(data.created_sp + ' created in SharePoint');
+                if (data.updated_sp) parts.push(data.updated_sp + ' updated in SharePoint');
+                let msg = parts.length ? ('Synced: ' + parts.join(', ')) : 'Sync complete — no changes';
+                if (data.errors && data.errors.length) {
+                    msg += ' · ' + data.errors.length + ' item warning(s) (see console)';
+                    console.warn('SharePoint sync warnings', data.errors);
+                }
+                showCalendarSyncStatus(msg, false);
+            }
+        } catch (e) {
+            console.error('SharePoint sync', e);
+            showCalendarSyncStatus(String(e), true);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (icon) icon.textContent = '⟳';
+        }
+    }
+
     async function fetchAndPaintContractCounts(date) {
         const year = date.getFullYear();
         const month = date.getMonth();
@@ -1316,6 +1387,9 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         document.body.appendChild(modal);
+    }
+    if (typeof runSharePointSync === 'function') {
+        runSharePointSync({ silent: true });
     }
 });
 

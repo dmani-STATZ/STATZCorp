@@ -545,6 +545,22 @@ AZURE_AD_CONFIG = {
     "auto_create_user": True,
 }
 
+# Optional aliases for app-only / Graph client-credentials (same app registration as MS login)
+AZURE_CLIENT_ID = os.environ.get("MICROSOFT_AUTH_CLIENT_ID") or AZURE_AD_CONFIG["app_id"]
+AZURE_CLIENT_SECRET = os.environ.get("MICROSOFT_AUTH_CLIENT_SECRET") or AZURE_AD_CONFIG["app_secret"]
+AZURE_TENANT_ID = os.environ.get("MICROSOFT_AUTH_TENANT_ID") or AZURE_AD_CONFIG["tenant_id"]
+
+# SharePoint calendar sync (Microsoft Graph GCC High)
+SHAREPOINT_SITE_URL = os.environ.get("SHAREPOINT_SITE_URL", "https://statzcorpgcch.sharepoint.us")
+SHAREPOINT_LIST_NAME = os.environ.get("SHAREPOINT_LIST_NAME", "STATZ New Calendar")
+DELETE_LOCAL_IF_REMOVED_FROM_SP = (os.environ.get("DELETE_LOCAL_IF_REMOVED_FROM_SP", "false").lower() == "true")
+GRAPH_BASE_URL = os.environ.get("GRAPH_BASE_URL", "https://graph.microsoft.us/v1.0")
+_sorg = os.environ.get("SHAREPOINT_SYNC_ORGANIZER_USER_ID", "").strip()
+try:
+    SHAREPOINT_SYNC_ORGANIZER_USER_ID = int(_sorg) if _sorg else None
+except ValueError:
+    SHAREPOINT_SYNC_ORGANIZER_USER_ID = None
+
 # Debug Azure AD configuration
 # print(f"   Azure AD Debug Info:")
 # print(f"   App ID: {'SET' if AZURE_AD_CONFIG['app_id'] else 'NOT SET'}")

@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
 from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ProcessContractSplit
+from processing.services.pdf_parser import parse_award_pdf, ingest_parsed_award
 from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
 from contracts.models import Contract, Clin, Buyer, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
 from products.models import Nsn
@@ -316,6 +317,19 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
 
         # Add all sales classes to the context
         context['sales_classes'] = SalesClass.objects.all().order_by('sales_team')
+
+        queue_contract = None
+        if self.object and self.object.queue_id:
+            queue_contract = QueueContract.objects.filter(
+                pk=self.object.queue_id
+            ).first()
+        context['queue_contract'] = queue_contract
+        context['pdf_parse_status'] = (
+            queue_contract.pdf_parse_status if queue_contract else None
+        )
+        context['pdf_parse_notes'] = (
+            (queue_contract.pdf_parse_notes or "") if queue_contract else ""
+        )
         
         return context
     
@@ -1763,6 +1777,88 @@ def download_test_data(request):
         logger = logging.getLogger(__name__)
         logger.error(f"Error generating test data: {str(e)}")
         return HttpResponse("Error generating test data. Please check the logs for details.", status=500)
+
+def save_to_sharepoint(pdf_file, queue_contract):  # noqa: ARG001
+    """
+    Stub for future Microsoft Graph upload of award PDFs to SharePoint.
+    No network or filesystem side effects.
+    """
+    logger.info(
+        "TODO: Save to SharePoint via Microsoft Graph when permissions are available"
+    )
+
+
+@login_required
+def upload_award_pdf(request):
+    """
+    Accept one or more award PDFs under FILES key 'pdf_files', parse and ingest
+    into QueueContract/QueueClin. Returns per-file JSON results.
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    files = request.FILES.getlist("pdf_files")
+    results = []
+
+    for pdf_file in files:
+        filename = getattr(pdf_file, "name", "") or "unknown"
+        parse_result = None
+        try:
+            if not str(filename).lower().endswith(".pdf"):
+                results.append(
+                    {
+                        "filename": filename,
+                        "contract_number": None,
+                        "pdf_parse_status": "error",
+                        "pdf_parse_notes": f"{filename} is not a valid award document, no contract was created.",
+                        "was_existing_record": False,
+                    }
+                )
+                continue
+
+            parse_result = parse_award_pdf(pdf_file)
+
+            was_existing = False
+            if parse_result.contract_number:
+                was_existing = QueueContract.objects.filter(
+                    contract_number=parse_result.contract_number
+                ).exists()
+
+            with transaction.atomic():
+                queue_contract = ingest_parsed_award(
+                    parse_result, user=request.user
+                )
+
+            save_to_sharepoint(pdf_file, queue_contract)
+
+            results.append(
+                {
+                    "filename": filename,
+                    "contract_number": queue_contract.contract_number,
+                    "pdf_parse_status": queue_contract.pdf_parse_status,
+                    "pdf_parse_notes": queue_contract.pdf_parse_notes or "",
+                    "was_existing_record": was_existing,
+                }
+            )
+        except Exception as exc:
+            logger.exception("upload_award_pdf failed for %s", filename)
+            contract_number = (
+                getattr(parse_result, "contract_number", None)
+                if parse_result is not None
+                else None
+            )
+            results.append(
+                {
+                    "filename": filename,
+                    "contract_number": contract_number,
+                    "pdf_parse_status": "error",
+                    "pdf_parse_notes": str(exc),
+                    "was_existing_record": False,
+                }
+            )
+
+    return JsonResponse({"results": results})
+
 
 @require_http_methods(["POST"])
 @login_required

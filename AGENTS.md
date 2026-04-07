@@ -153,6 +153,7 @@ After behavior changes, expected verification is:
 6. Add/update migrations when schema changes.
 7. Verify with commands and manual smoke tests across coupled flows.
 8. Summarize affected apps, residual risk, and manual checks performed.
+9. **`processing.services.pdf_parser`:** Keep award PDF parsing and queue ingestion (`parse_award_pdf`, `ingest_parsed_award`) independent of HTTP, request objects, and view-layer concerns. Call them only from orchestration code (e.g. `upload_award_pdf` in `processing_views.py`), not from middleware or template tags.
 
 ## 13. Escalation Triggers
 Slow down and inspect deeply before editing when changes involve:

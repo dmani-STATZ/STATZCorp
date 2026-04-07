@@ -87,7 +87,8 @@ def serialize_event(event, user=None):
     # Only the organizer can edit/delete — not even superusers
     can_edit = bool(user and user.is_authenticated and (event.organizer_id == user.id))
 
-    all_day = (
+    meta = event.metadata if isinstance(event.metadata, dict) else {}
+    all_day = bool(meta.get('sharepoint_all_day') or meta.get('all_day')) or (
         event.start_at.hour == 0 and event.start_at.minute == 0 and event.start_at.second == 0 and
         event.end_at.hour == 0 and event.end_at.minute == 0 and event.end_at.second == 0
     )

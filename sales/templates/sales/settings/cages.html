@@ -60,7 +60,9 @@
                 <td style="padding:0.625rem 1rem; font-family:monospace; font-weight:600;">
                     {{ cage.cage_code }}
                 </td>
-                <td style="padding:0.625rem 1rem;">{{ cage.company_name }}</td>
+                <td style="padding:0.625rem 1rem;">
+                    {% if cage.company %}{{ cage.company.name }}{% else %}{{ cage.company_name }}{% endif %}
+                </td>
                 <td style="padding:0.625rem 1rem; color:var(--text-muted,#6b7280); font-size:0.8125rem;">
                     {{ cage.smtp_reply_to|default:"—" }}
                 </td>

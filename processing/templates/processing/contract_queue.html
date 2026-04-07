@@ -21,7 +21,7 @@
                 <button onclick="document.getElementById('csv-upload').click()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
                     Upload CSV
                 </button>
-                <input type="file" id="csv-upload" class="hidden" accept=".csv" onchange="handleFileUpload(this)">
+                <input type="file" id="csv-upload" class="hidden" accept=".csv,.pdf" multiple onchange="handleFileUpload(this)">
             </div>
         </div>
 
@@ -43,11 +43,19 @@
                 <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
-                <p class="text-lg text-gray-600 mb-2">Drag and drop your CSV file here</p>
-                <p class="text-sm text-gray-500">or</p>
+                <p class="text-lg text-gray-600 mb-1">Drag and drop your CSV file</p>
+                <p class="text-sm text-gray-500 mb-1">or</p>
+                <p class="text-lg text-gray-600 mb-2">Award PDF documents here</p>
                 <button onclick="document.getElementById('csv-upload').click()" class="mt-2 text-indigo-600 hover:text-indigo-500">
                     Browse files
                 </button>
+            </div>
+        </div>
+
+        <div id="pdf-upload-progress" class="hidden mb-6">
+            <p id="pdf-upload-progress-text" class="text-sm text-gray-600 mb-2"></p>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="pdf-upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
             </div>
         </div>
 
@@ -61,11 +69,13 @@
                         <th class="px-6 py-3 text-left tracking-wider label">Due Date</th>
                         <th class="px-6 py-3 text-left tracking-wider label">Contract Value</th>
                         <th class="px-6 py-3 text-left tracking-wider label">Status</th>
+                        <th class="px-6 py-3 text-center tracking-wider label">PDF</th>
                         <th class="px-6 py-3 text-left tracking-wider label">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <tr>
+                        <td></td>
                         <td></td>
                         <td></td>
                         <td></td>
@@ -99,6 +109,44 @@
                                 </span>
                             {% endif %}
                         </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                            {% if contract.pdf_parse_status == 'pending' %}
+                                <span class="inline-flex text-red-600" title="No PDF uploaded">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </span>
+                            {% elif contract.pdf_parse_status == 'success' %}
+                                <span class="inline-flex text-green-600" title="PDF parsed successfully">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </span>
+                            {% elif contract.pdf_parse_status == 'partial' %}
+                                <button type="button"
+                                        class="inline-flex text-yellow-600 hover:text-yellow-700 focus:outline-none cursor-pointer"
+                                        title="PDF parsed with warnings — click to review"
+                                        data-contract-number="{{ contract.contract_number|default:'' }}"
+                                        data-parse-notes="{{ contract.pdf_parse_notes|default:''|escapejs }}"
+                                        onclick="openPdfParseNotesModalFromTrigger(this)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                    viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167
+                                        2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516
+                                        2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485
+                                        2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5
+                                        0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                                        clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            {% else %}
+                                <span class="inline-flex text-red-600" title="No PDF uploaded">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             {% if not contract.is_being_processed %}
                                 <button onclick="startProcessing('{{ contract.id }}')" class="text-indigo-600 hover:text-indigo-900 mr-3">
@@ -120,7 +168,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                             No contracts in queue
                         </td>
                     </tr>
@@ -180,6 +228,7 @@
         </div>
     </div>
 
+    {% include "processing/modals/pdf_parse_notes_modal.html" %}
 
     <script>
     function showModal(message, showProgress = true) {
@@ -351,205 +400,224 @@
         });
     }
 
-    function handleFileUpload(input) {
-        if (input.files.length === 0) return;
-
+    function fetchUploadCsv(file) {
         const formData = new FormData();
-        formData.append('csv_file', input.files[0]);
-
-        // Show loading state
-        const loadingToast = showToast('Uploading and processing file...', 'info');
-
-        fetch("{% url 'processing:upload_csv' %}", {
+        formData.append('csv_file', file);
+        return fetch("{% url 'processing:upload_csv' %}", {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken')
             },
             body: formData
-        })
-        .then(response => {
-            console.log('Response status:', response.status);
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-            return response.json().then(data => ({
-                ok: response.ok,
-                status: response.status,
-                data: data
-            }));
-        })
-        .then(result => {
-            // Hide loading toast
-            loadingToast.remove();
+        }).then(response => response.json().then(data => ({
+            ok: response.ok,
+            status: response.status,
+            data: data
+        })));
+    }
 
-            console.log('Full response:', result);
+    function presentCsvUploadFailure(data) {
+        let errorMessage = data.error || 'An unknown error occurred';
+        let errorDetails = '';
+        let traceback = data.traceback || null;
 
-            const data = result.data;
-            if (data.success) {
-                showToast('File uploaded and processed successfully!', 'success');
+        switch (data.error_type) {
+            case 'missing_columns':
+                errorMessage = 'Missing required columns in CSV file:';
+                errorDetails = data.missing_columns.join(', ');
+                break;
 
-                // Add a delay before reloading to ensure database operations complete
-                setTimeout(() => {
-                    console.log('Reloading page to display new contracts...');
-                    location.reload();
-                }, 1000);
-            } else {
-                let errorMessage = data.error || 'An unknown error occurred';
-                let errorDetails = '';
-                let traceback = data.traceback || null;
+            case 'missing_value':
+                errorMessage = `Missing required value in row ${data.row}`;
+                errorDetails = `Column: "${data.column}"`;
+                break;
 
-                // Handle specific error types
-                switch (data.error_type) {
-                    case 'missing_columns':
-                        errorMessage = 'Missing required columns in CSV file:';
-                        errorDetails = data.missing_columns.join(', ');
-                        break;
+            case 'invalid_decimal':
+                errorMessage = `Invalid number format in row ${data.row}`;
+                errorDetails = `Column: "${data.column}", Value: "${data.value}"
+                    Please ensure the number is properly formatted (e.g., 1234.56)`;
+                break;
 
-                    case 'missing_value':
-                        errorMessage = `Missing required value in row ${data.row}`;
-                        errorDetails = `Column: "${data.column}"`;
-                        break;
+            case 'invalid_date':
+                errorMessage = `Invalid date format in row ${data.row}`;
+                errorDetails = `Column: "${data.column}", Value: "${data.value}"
+                    Please use YYYY-MM-DD format (e.g., 2024-03-14)`;
+                break;
 
-                    case 'invalid_decimal':
-                        errorMessage = `Invalid number format in row ${data.row}`;
-                        errorDetails = `Column: "${data.column}", Value: "${data.value}"
-                            Please ensure the number is properly formatted (e.g., 1234.56)`;
-                        break;
+            case 'encoding_error':
+                errorMessage = 'File encoding error';
+                errorDetails = 'Please save your CSV file with UTF-8 encoding';
+                break;
 
-                    case 'invalid_date':
-                        errorMessage = `Invalid date format in row ${data.row}`;
-                        errorDetails = `Column: "${data.column}", Value: "${data.value}"
-                            Please use YYYY-MM-DD format (e.g., 2024-03-14)`;
-                        break;
+            case 'csv_format_error':
+                errorMessage = 'CSV file is malformed';
+                errorDetails = 'Please ensure your CSV file is properly formatted and not corrupted';
+                break;
 
-                    case 'encoding_error':
-                        errorMessage = 'File encoding error';
-                        errorDetails = 'Please save your CSV file with UTF-8 encoding';
-                        break;
+            case 'duplicate_contract':
+            case 'duplicate_queue_contract':
+                errorMessage = 'Duplicate contract number';
+                errorDetails = data.message;
+                break;
 
-                    case 'csv_format_error':
-                        errorMessage = 'CSV file is malformed';
-                        errorDetails = 'Please ensure your CSV file is properly formatted and not corrupted';
-                        break;
+            case 'processing_error':
+                errorMessage = 'Error processing CSV file';
+                errorDetails = data.error;
+                break;
 
-                    case 'duplicate_contract':
-                    case 'duplicate_queue_contract':
-                        errorMessage = 'Duplicate contract number';
-                        errorDetails = data.message;
-                        break;
+            case 'validation_error':
+                errorMessage = 'Validation Error';
+                errorDetails = data.error;
+                break;
+        }
 
-                    case 'processing_error':
-                        errorMessage = 'Error processing CSV file';
-                        errorDetails = data.error;
-                        break;
-
-                    case 'validation_error':
-                        errorMessage = 'Validation Error';
-                        errorDetails = data.error;
-                        break;
-                }
-
-                console.error('Upload Error:', {
-                    message: errorMessage,
-                    details: errorDetails,
-                    traceback: traceback,
-                    fullResponse: data
-                });
-
-                showErrorModal(errorMessage, errorDetails, traceback);
-            }
-        })
-        .catch(error => {
-            // Hide loading toast
-            loadingToast.remove();
-
-            console.error('Fetch Error:', error);
-            showErrorModal('Upload Error', 'An unexpected error occurred while uploading the file. Please try again.', error.toString());
+        console.error('Upload Error:', {
+            message: errorMessage,
+            details: errorDetails,
+            traceback: traceback,
+            fullResponse: data
         });
 
-        // Clear the file input
+        showErrorModal(errorMessage, errorDetails, traceback);
+    }
+
+    function toastPdfResultRow(r, fallbackFilename) {
+        const st = r.pdf_parse_status;
+        const fn = r.filename || fallbackFilename || 'file';
+        const cn = r.contract_number;
+        if (st === 'error') {
+            showToast(`${fn} could not be parsed — no contract was created`, 'error');
+        } else if (st === 'partial') {
+            const label = cn || fn;
+            showToast(`${label} added to queue with warnings — click the PDF status icon to review`, 'info');
+        } else if (st === 'success') {
+            const label = cn || fn;
+            showToast(`${label} added to queue successfully`, 'success');
+        }
+    }
+
+    async function processQueueFiles(fileList) {
+        const files = Array.from(fileList || []);
+        if (files.length === 0) return;
+
+        const loadingToast = showToast('Uploading and processing file...', 'info');
+        const safeRemoveLoadingToast = () => {
+            try {
+                if (loadingToast && typeof loadingToast.remove === 'function') {
+                    loadingToast.remove();
+                }
+            } catch (e) {
+                /* ignore — must not block reload */
+            }
+        };
+
+        const csvFiles = [];
+        const pdfFiles = [];
+        for (const f of files) {
+            const n = (f.name || '').toLowerCase();
+            if (n.endsWith('.csv')) {
+                csvFiles.push(f);
+            } else if (n.endsWith('.pdf')) {
+                pdfFiles.push(f);
+            } else {
+                showToast(`${f.name} is not a supported file type.`, 'error');
+            }
+        }
+
+        if (csvFiles.length === 0 && pdfFiles.length === 0) {
+            safeRemoveLoadingToast();
+            return;
+        }
+
+        try {
+            for (const file of csvFiles) {
+                const result = await fetchUploadCsv(file);
+                console.log('Full response:', result);
+                if (!result.data.success) {
+                    safeRemoveLoadingToast();
+                    presentCsvUploadFailure(result.data);
+                    return;
+                }
+            }
+
+            if (csvFiles.length > 0) {
+                showToast('File uploaded and processed successfully!', 'success');
+            }
+
+            const progressEl = document.getElementById('pdf-upload-progress');
+            const progressText = document.getElementById('pdf-upload-progress-text');
+            const progressBar = document.getElementById('pdf-upload-progress-bar');
+
+            if (pdfFiles.length > 0) {
+                if (progressEl) progressEl.classList.remove('hidden');
+                for (let i = 0; i < pdfFiles.length; i++) {
+                    const f = pdfFiles[i];
+                    if (progressText) {
+                        progressText.textContent = `Parsing ${f.name}... ${i + 1} of ${pdfFiles.length}`;
+                    }
+                    if (progressBar) {
+                        progressBar.style.width = `${(i / pdfFiles.length) * 100}%`;
+                    }
+
+                    const fd = new FormData();
+                    fd.append('pdf_files', f);
+                    const resp = await fetch("{% url 'processing:upload_award_pdf' %}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: fd
+                    });
+
+                    let payload = {};
+                    try {
+                        payload = await resp.json();
+                    } catch (parseErr) {
+                        console.error(parseErr);
+                    }
+
+                    if (!resp.ok) {
+                        showToast(`${f.name} could not be parsed — no contract was created`, 'error');
+                    } else {
+                        const items = payload.results || [];
+                        for (const r of items) {
+                            toastPdfResultRow(r, f.name);
+                        }
+                    }
+
+                    if (progressBar) {
+                        progressBar.style.width = `${((i + 1) / pdfFiles.length) * 100}%`;
+                    }
+                }
+                if (progressEl) progressEl.classList.add('hidden');
+                if (progressBar) progressBar.style.width = '0%';
+            }
+
+            safeRemoveLoadingToast();
+            setTimeout(() => {
+                console.log('Reloading page to display new contracts...');
+                location.reload();
+            }, 1000);
+        } catch (error) {
+            safeRemoveLoadingToast();
+            const progressEl = document.getElementById('pdf-upload-progress');
+            if (progressEl) progressEl.classList.add('hidden');
+            console.error('Fetch Error:', error);
+            showErrorModal('Upload Error', 'An unexpected error occurred while uploading the file. Please try again.', error.toString());
+        }
+    }
+
+    function handleFileUpload(input) {
+        if (input.files.length === 0) return;
+        processQueueFiles(input.files);
         input.value = '';
     }
 
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
-
         if (files.length > 0) {
-            const file = files[0];
-            if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-                const formData = new FormData();
-                formData.append('csv_file', file);
-
-                // Show loading state
-                const loadingToast = showToast('Uploading and processing file...', 'info');
-
-                fetch("{% url 'processing:upload_csv' %}", {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Hide loading toast
-                    loadingToast.remove();
-
-                    if (data.success) {
-                        showToast('File uploaded and processed successfully!', 'success');
-                        location.reload();
-                    } else {
-                        let errorMessage = data.error;
-                        let errorDetails = '';
-                        let traceback = data.traceback || null;
-
-                        // Handle specific error types (same as above)
-                        switch (data.error_type) {
-                            case 'missing_columns':
-                                errorMessage = 'Missing required columns in CSV file:';
-                                errorDetails = data.missing_columns.join(', ');
-                                break;
-
-                            case 'missing_value':
-                                errorMessage = `Missing required value in row ${data.row}`;
-                                errorDetails = `Column: "${data.column}"`;
-                                break;
-
-                            case 'invalid_decimal':
-                                errorMessage = `Invalid number format in row ${data.row}`;
-                                errorDetails = `Column: "${data.column}", Value: "${data.value}"
-                                    Please ensure the number is properly formatted (e.g., 1234.56)`;
-                                break;
-
-                            case 'invalid_date':
-                                errorMessage = `Invalid date format in row ${data.row}`;
-                                errorDetails = `Column: "${data.column}", Value: "${data.value}"
-                                    Please use YYYY-MM-DD format (e.g., 2024-03-14)`;
-                                break;
-
-                            case 'encoding_error':
-                                errorMessage = 'File encoding error';
-                                errorDetails = 'Please save your CSV file with UTF-8 encoding';
-                                break;
-
-                            case 'csv_format_error':
-                                errorMessage = 'CSV file is malformed';
-                                errorDetails = 'Please ensure your CSV file is properly formatted and not corrupted';
-                                break;
-                        }
-
-                        showErrorModal(errorMessage, errorDetails, traceback);
-                    }
-                })
-                .catch(error => {
-                    // Hide loading toast
-                    loadingToast.remove();
-
-                    console.error('Error:', error);
-                    showErrorModal('Upload Error', 'An unexpected error occurred while uploading the file. Please try again.', error.toString());
-                });
-            } else {
-                showToast('Please upload a CSV file', 'error');
-            }
+            processQueueFiles(files);
         }
     }
 
