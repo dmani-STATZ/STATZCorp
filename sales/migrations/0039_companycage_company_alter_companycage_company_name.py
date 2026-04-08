@@ -3,6 +3,27 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
+def _drop_we_won_awards_view(apps, schema_editor):
+    if schema_editor.connection.vendor != "sqlite":
+        return
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute("DROP VIEW IF EXISTS dibbs_we_won_awards")
+
+
+def _recreate_we_won_awards_view(apps, schema_editor):
+    if schema_editor.connection.vendor != "sqlite":
+        return
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE VIEW dibbs_we_won_awards AS
+            SELECT da.id
+            FROM dibbs_award da
+            INNER JOIN dibbs_company_cage cc
+                ON UPPER(da.awardee_cage) = UPPER(cc.cage_code)
+            WHERE cc.is_active = 1
+            """
+        )
 
 class Migration(migrations.Migration):
 
@@ -12,6 +33,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_drop_we_won_awards_view, _recreate_we_won_awards_view),  # ADD
         migrations.AlterField(
             model_name="companycage",
             name="company_name",
@@ -40,4 +62,5 @@ class Migration(migrations.Migration):
                 verbose_name="Linked Company",
             ),
         ),
+        migrations.RunPython(_recreate_we_won_awards_view, _drop_we_won_awards_view),  # ADD
     ]
