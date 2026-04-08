@@ -83,7 +83,11 @@ def dashboard(request):
             COUNT(CASE
                 WHEN status IN ({_p}) AND small_business_set_aside = 'H'
                 THEN 1 END) AS hubzone_count,
-            COUNT(CASE WHEN import_date = CAST(GETUTCDATE() AS DATE) THEN 1 END) AS new_today,
+            COUNT(CASE WHEN EXISTS (
+                SELECT 1 FROM tbl_ImportBatch b
+                WHERE b.id = s.import_batch_id
+                AND CAST(b.imported_at AS DATE) = CAST(GETUTCDATE() AS DATE)
+            ) THEN 1 END) AS new_today,
             COUNT(CASE WHEN status = 'RFQ_PENDING' THEN 1 END) AS rfq_pending,
             (
                 SELECT COUNT(*)
@@ -97,7 +101,7 @@ def dashboard(request):
                       )
                 ) AS wins_distinct
             ) AS wins_this_month
-        FROM dibbs_solicitation
+        FROM dibbs_solicitation s
     """
     scalar_params = (
         *TERMINAL_STATUSES,
