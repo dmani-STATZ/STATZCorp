@@ -1,6 +1,16 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from .models import Company, Contract, Clin, Note, Reminder
+from .models import (
+    CanceledReason,
+    ClinType,
+    Company,
+    Contract,
+    ContractStatus,
+    ContractType,
+    Reminder,
+    SalesClass,
+    SpecialPaymentTerms,
+)
 
 User = get_user_model()
 
@@ -36,3 +46,39 @@ class ReminderAdmin(ActiveUserAdminMixin, admin.ModelAdmin):
     list_display = ['reminder_title', 'reminder_date', 'reminder_user', 'reminder_completed']
     search_fields = ['reminder_title', 'reminder_text']
     list_filter = ['reminder_completed', 'reminder_user']
+
+
+@admin.register(CanceledReason)
+class CanceledReasonAdmin(admin.ModelAdmin):
+    list_display = ('id', 'description')
+    search_fields = ('description',)
+
+
+@admin.register(ClinType)
+class ClinTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'description', 'raw_text')
+    search_fields = ('description', 'raw_text')
+
+
+@admin.register(ContractStatus)
+class ContractStatusAdmin(admin.ModelAdmin):
+    list_display = ('id', 'description')
+    search_fields = ('description',)
+
+
+@admin.register(ContractType)
+class ContractTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'description')
+    search_fields = ('description',)
+
+
+@admin.register(SalesClass)
+class SalesClassAdmin(admin.ModelAdmin):
+    list_display = ('id', 'sales_team')
+    search_fields = ('sales_team',)
+
+
+@admin.register(SpecialPaymentTerms)
+class SpecialPaymentTermsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'code', 'terms')
+    search_fields = ('code', 'terms')

@@ -1,7 +1,8 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import UpdateView, ListView, DetailView, CreateView
+from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.http import HttpResponseRedirect, JsonResponse
 from django.db.models import Q, Count, Sum, Case, When, DecimalField
@@ -25,6 +26,7 @@ from ..models import (
     Contract,
     Clin,
     SpecialPaymentTerms,
+    SalesClass,
 )
 from ..forms import SupplierForm
 
@@ -748,6 +750,7 @@ class SupplierDetailView(DetailView):
             'classification_types': classification_types,
             'contract_stats': contract_stats,
             'active_tab': self.request.GET.get('tab', 'info'),
+            'supplier_content_type_id': ContentType.objects.get_for_model(Supplier).id,
         })
         
         return context
@@ -758,12 +761,21 @@ class SupplierCreateView(CreateView):
     model = Supplier
     template_name = 'suppliers/supplier_form.html'
     form_class = SupplierForm
-    success_url = reverse_lazy('suppliers:supplier_list')
-    
+
+    def get_success_url(self):
+        return reverse('suppliers:supplier_detail', kwargs={'pk': self.object.pk})
+
     def form_valid(self, form):
         response = super().form_valid(form)
         messages.success(self.request, f"Supplier {form.instance.name} created successfully!")
         return response
+
+    def form_invalid(self, form):
+        messages.error(
+            self.request,
+            "Could not create supplier. Fix the errors below and try again.",
+        )
+        return super().form_invalid(form)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -828,7 +840,7 @@ class SupplierUpdateView(UpdateView):
             'probation': supplier.probation,
             'conditional': supplier.conditional,
             'special_terms': supplier.special_terms.id if supplier.special_terms else None,
-            'prime': supplier.prime,
+            'prime': SalesClass.objects.filter(pk=supplier.prime).first() if supplier.prime else None,
             'ppi': supplier.ppi,
             'iso': supplier.iso,
             'notes': supplier.notes,

@@ -19,9 +19,22 @@
     <form method="post" class="card card-padded shadow space-y-6">
         {% csrf_token %}
 
-        {% if form.non_field_errors %}
-            <div class="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-                {{ form.non_field_errors|join:", " }}
+        {% if form.errors %}
+            <div class="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-800" role="alert">
+                <p class="font-medium text-red-900 mb-2">Please fix the following:</p>
+                <ul class="list-disc list-inside space-y-1">
+                    {% for field in form %}
+                        {% if field.errors %}
+                            <li>
+                                <span class="font-medium">{{ field.label }}:</span>
+                                {{ field.errors|join:", " }}
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if form.non_field_errors %}
+                        <li>{{ form.non_field_errors|join:", " }}</li>
+                    {% endif %}
+                </ul>
             </div>
         {% endif %}
 
@@ -33,37 +46,42 @@
                 {% include "contracts/includes/simple_field.html" with field=form.supplier_type %}
                 {% include "contracts/includes/simple_field.html" with field=form.contact %}
                 {% include "contracts/includes/simple_field.html" with field=form.special_terms %}
-                {% include "contracts/includes/simple_field.html" with field=form.packhouse %}
-                {% include "contracts/includes/simple_field.html" with field=form.prime %}
-                {% include "contracts/includes/simple_field.html" with field=form.business_phone %}
-                {% include "contracts/includes/simple_field.html" with field=form.business_fax %}
-                {% include "contracts/includes/simple_field.html" with field=form.business_email %}
-                {% include "contracts/includes/simple_field.html" with field=form.primary_phone %}
-                {% include "contracts/includes/simple_field.html" with field=form.primary_email %}
-                {% include "contracts/includes/simple_field.html" with field=form.website_url %}
-                {% include "contracts/includes/simple_field.html" with field=form.logo_url %}
-            </div>
-        </section>
-
-        <section>
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Addresses</h2>
-            <div class="grid md:grid-cols-3 gap-6">
-                {% include "contracts/includes/simple_field.html" with field=form.physical_address %}
-                {% include "contracts/includes/simple_field.html" with field=form.shipping_address %}
-                {% include "contracts/includes/simple_field.html" with field=form.billing_address %}
-            </div>
-        </section>
-
-        <section>
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Status & Flags</h2>
-            <div class="grid md:grid-cols-3 gap-4">
-                {% include "contracts/includes/checkbox_field.html" with field=form.probation %}
-                {% include "contracts/includes/checkbox_field.html" with field=form.conditional %}
-                {% include "contracts/includes/checkbox_field.html" with field=form.ppi %}
-                {% include "contracts/includes/checkbox_field.html" with field=form.iso %}
-                {% include "contracts/includes/simple_field.html" with field=form.allows_gsi %}
                 {% include "contracts/includes/checkbox_field.html" with field=form.is_packhouse %}
-                {% include "contracts/includes/checkbox_field.html" with field=form.archived %}
+                {% include "contracts/includes/simple_field.html" with field=form.prime %}
+                <div>
+                    <label for="{{ form.business_phone.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        General Phone
+                    </label>
+                    {{ form.business_phone }}
+                    {% if form.business_phone.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.business_phone.errors|join:", " }}</p>
+                    {% elif form.business_phone.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.business_phone.help_text }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.business_fax.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        General Fax
+                    </label>
+                    {{ form.business_fax }}
+                    {% if form.business_fax.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.business_fax.errors|join:", " }}</p>
+                    {% elif form.business_fax.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.business_fax.help_text }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.business_email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        General Email
+                    </label>
+                    {{ form.business_email }}
+                    {% if form.business_email.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.business_email.errors|join:", " }}</p>
+                    {% elif form.business_email.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.business_email.help_text }}</p>
+                    {% endif %}
+                </div>
+                {% include "contracts/includes/simple_field.html" with field=form.website_url %}
             </div>
         </section>
 

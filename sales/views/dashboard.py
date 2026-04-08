@@ -83,11 +83,6 @@ def dashboard(request):
             COUNT(CASE
                 WHEN status IN ({_p}) AND small_business_set_aside = 'H'
                 THEN 1 END) AS hubzone_count,
-            COUNT(CASE WHEN EXISTS (
-                SELECT 1 FROM tbl_ImportBatch b
-                WHERE b.id = s.import_batch_id
-                AND CAST(b.imported_at AS DATE) = CAST(GETUTCDATE() AS DATE)
-            ) THEN 1 END) AS new_today,
             COUNT(CASE WHEN status = 'RFQ_PENDING' THEN 1 END) AS rfq_pending,
             (
                 SELECT COUNT(*)
@@ -101,7 +96,7 @@ def dashboard(request):
                       )
                 ) AS wins_distinct
             ) AS wins_this_month
-        FROM dibbs_solicitation s
+        FROM dibbs_solicitation
     """
     scalar_params = (
         *TERMINAL_STATUSES,
@@ -114,6 +109,14 @@ def dashboard(request):
     with connection.cursor() as cursor:
         cursor.execute(scalar_sql, scalar_params)
         scalars = _row_to_dict(cursor)
+
+        cursor.execute("""
+            SELECT ISNULL(SUM(solicitation_count), 0)
+            FROM tbl_ImportBatch
+            WHERE CAST(imported_at AS DATE) = CAST(GETUTCDATE() AS DATE)
+        """)
+        row = cursor.fetchone()
+        new_today = int(row[0]) if row and row[0] is not None else 0
 
         status_sql = f"""
             SELECT status, COUNT(*) AS n
@@ -144,7 +147,6 @@ def dashboard(request):
     sdvosb_priority_count = _int(scalars, "sdvosb_priority_count")
     sdvosb_count = _int(scalars, "sdvosb_count")
     hubzone_count = _int(scalars, "hubzone_count")
-    new_today = _int(scalars, "new_today")
     rfq_pending = _int(scalars, "rfq_pending")
     wins_this_month = _int(scalars, "wins_this_month")
 

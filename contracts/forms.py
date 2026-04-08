@@ -119,6 +119,13 @@ class NsnForm(BaseModelForm):
         }
 
 class SupplierForm(BaseModelForm):
+    prime = forms.ModelChoiceField(
+        queryset=SalesClass.objects.all().order_by('sales_team'),
+        required=False,
+        empty_label="— Select Sales Team —",
+        label="Prime",
+    )
+
     class Meta:
         model = Supplier
         fields = [
@@ -144,9 +151,6 @@ class SupplierForm(BaseModelForm):
             'notes': forms.Textarea(attrs={
                 'rows': 4
             }),
-            'prime': forms.TextInput(attrs={
-                'class': 'w-10'  # Keep this specific width class
-            }),
             # Boolean fields as checkboxes for toggle switches
             'probation': forms.CheckboxInput(),
             'conditional': forms.CheckboxInput(),
@@ -158,6 +162,10 @@ class SupplierForm(BaseModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Create form (supplier_form.html) does not render allows_gsi; POST omits it and
+        # Django treats the model field as required (blank=False). Default via clean().
+        if 'allows_gsi' in self.fields:
+            self.fields['allows_gsi'].required = False
         # Sort select field choices
         if 'packhouse' in self.fields:
             self.fields['packhouse'].queryset = self.fields['packhouse'].queryset.order_by('name')
@@ -171,6 +179,24 @@ class SupplierForm(BaseModelForm):
                     value = getattr(self.instance, field_name, None)
                     if value is None:
                         self.initial[field_name] = False
+
+        if self.instance and self.instance.pk and self.instance.prime is not None:
+            try:
+                self.initial['prime'] = SalesClass.objects.get(pk=self.instance.prime)
+            except SalesClass.DoesNotExist:
+                self.initial['prime'] = None
+
+    def clean_prime(self):
+        sales_class = self.cleaned_data.get('prime')
+        if sales_class is None:
+            return None
+        return sales_class.id
+
+    def clean_allows_gsi(self):
+        value = self.cleaned_data.get('allows_gsi')
+        if value in (None, ''):
+            return 'UNK'
+        return value
 
 class ContractForm(BaseModelForm):
     assigned_user = ActiveUserModelChoiceField(

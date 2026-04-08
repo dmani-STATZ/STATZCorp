@@ -37,6 +37,7 @@ TRACKED = [
     (Clin, "item_value"),
     (Clin, "uom"),
     # Supplier (supplier detail page)
+    (Supplier, "name"),
     (Supplier, "cage_code"),
     (Supplier, "dodaac"),
     (Supplier, "allows_gsi"),
@@ -47,6 +48,8 @@ TRACKED = [
     (Supplier, "ppi"),
     (Supplier, "special_terms"),
     (Supplier, "supplier_type"),
+    (Supplier, "prime"),
+    (Supplier, "is_packhouse"),
     (Supplier, "business_phone"),
     (Supplier, "primary_phone"),
     (Supplier, "business_email"),
@@ -138,12 +141,13 @@ def store_old_state(sender, instance, **kwargs):
     elif sender is Supplier:
         try:
             row = Supplier.objects.filter(pk=instance.pk).values(
-                "cage_code", "dodaac", "allows_gsi", "probation", "conditional", "archived",
-                "iso", "ppi", "special_terms_id", "supplier_type_id",
+                "name", "cage_code", "dodaac", "allows_gsi", "probation", "conditional", "archived",
+                "iso", "ppi", "special_terms_id", "supplier_type_id", "prime", "is_packhouse",
                 "business_phone", "primary_phone", "business_email", "primary_email", "website_url",
             ).first()
             if row is not None:
                 old_state[key] = {
+                    "name": _serialize(row.get("name")),
                     "cage_code": _serialize(row.get("cage_code")),
                     "dodaac": _serialize(row.get("dodaac")),
                     "allows_gsi": _serialize(row.get("allows_gsi")),
@@ -154,6 +158,8 @@ def store_old_state(sender, instance, **kwargs):
                     "ppi": _serialize(row.get("ppi")),
                     "special_terms": _serialize(row.get("special_terms_id")),
                     "supplier_type": _serialize(row.get("supplier_type_id")),
+                    "prime": _serialize(row.get("prime")),
+                    "is_packhouse": _serialize(row.get("is_packhouse")),
                     "business_phone": _serialize(row.get("business_phone")),
                     "primary_phone": _serialize(row.get("primary_phone")),
                     "business_email": _serialize(row.get("business_email")),

@@ -56,6 +56,18 @@ SUPPLIER_ENRICH_SYSTEM_PROMPT = (
 SUPPLIER_ENRICH_HTML_MAX_CHARS = 120000
 
 
+def format_supplier_address_single_line(addr):
+    """Single-line display for supplier address cards and modal slot labels."""
+    if not addr:
+        return ""
+    parts = [
+        (addr.address_line_1 or "").strip(),
+        (addr.address_line_2 or "").strip(),
+        f"{(addr.city or '').strip()}, {(addr.state or '').strip()} {(addr.zip or '').strip()}".strip(),
+    ]
+    return ", ".join(p for p in parts if p)
+
+
 def _parse_address_text(text: str) -> dict:
     """
     Best-effort parse of an address string into components.
@@ -530,10 +542,24 @@ class SupplierDetailView(DetailView):
         context['certification_types'] = CertificationType.objects.all().order_by('name')
         context['classification_types'] = ClassificationType.objects.all().order_by('name')
         context['today'] = timezone.localdate()
-        context['addresses'] = {
-            'billing': supplier.billing_address,
-            'shipping': supplier.shipping_address,
-            'physical': supplier.physical_address,
+        context['address_slots'] = [
+            {'field': 'billing', 'title': 'Billing', 'addr': supplier.billing_address},
+            {'field': 'shipping', 'title': 'Shipping', 'addr': supplier.shipping_address},
+            {'field': 'physical', 'title': 'Physical', 'addr': supplier.physical_address},
+        ]
+        context['supplier_address_slots_client'] = {
+            'billing': {
+                'display': format_supplier_address_single_line(supplier.billing_address),
+                'id': supplier.billing_address_id,
+            },
+            'shipping': {
+                'display': format_supplier_address_single_line(supplier.shipping_address),
+                'id': supplier.shipping_address_id,
+            },
+            'physical': {
+                'display': format_supplier_address_single_line(supplier.physical_address),
+                'id': supplier.physical_address_id,
+            },
         }
         context['compliance_flags'] = {
             'probation': supplier.probation,
@@ -544,6 +570,7 @@ class SupplierDetailView(DetailView):
             (supplier.business_email or supplier.primary_email)
             or any(c.email for c in context['contacts'])
         )
+        context['has_primary_contact'] = supplier.contact_id is not None
 
         clin_contract_ids = Clin.objects.filter(
             supplier=supplier,

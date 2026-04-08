@@ -72,6 +72,10 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 ### Supplier model field change
 `suppliers/models.py` → `suppliers/migrations/` → `contracts/forms.py` (SupplierForm) → `templates/suppliers/supplier_edit.html` / `supplier_form.html` → `suppliers/admin.py` → any `contracts/views/supplier_views.py` AJAX update endpoint that references the field by name → `SupplierApplyEnrichmentView.ALLOWED_FIELDS` if the field is enrichable
 
+`prime` field: `contracts/forms.py` (ModelChoiceField + clean_prime) ↔ `contracts/views/supplier_views.py` (initial value in get_form)
+
+For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail page also wires inline edits through the transactions modal (`templates/suppliers/supplier_detail.html` + `window.onTransactionSaved`); those fields are listed in `transactions/signals.py` `TRACKED` and captured in the `Supplier` branch of `store_old_state`.
+
 ### Enrichment pipeline change
 `suppliers/views.py` (enrichment helpers) ↔ `suppliers/openrouter_config.py` ↔ `templates/suppliers/supplier_enrich.html` (inline JS) ↔ `static/suppliers/js/supplier_enrich.js`
 
@@ -182,12 +186,13 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 2. **No `LoginRequiredMixin` on `DashboardView` and `SupplierDetailView`** — adding it without understanding project-level auth middleware may break publicly accessible or middleware-guarded routes.
 3. **`suppliers/urls.py` imports from `contracts.views`** — if `contracts` view class names change, `suppliers/urls.py` breaks at startup.
 4. **Inline JS in `supplier_enrich.html`** — this JS block is substantial and directly coupled to view response shapes. It is easy to miss when updating only `views.py`.
-5. **`SupplierApplyEnrichmentView` creates `Address` rows without deduplication** — repeated enrichment runs on the same supplier may accumulate near-duplicate address records.
+5. **`SupplierApplyEnrichmentView` creates `Address` rows without deduplication** — repeated enrichment runs on the same supplier may accumulate near-duplicate address records. The supplier detail page add-address modal avoids duplicate `Address` rows when assigning one new address to multiple slots by POSTing line fields once to `contracts:supplier_update_address`, then chaining follow-up posts with `address_id` only (no line fields) for each additional slot.
 6. **`OpenRouterModelSetting` singleton** — direct ORM delete or bulk_create operations can destroy the singleton. Always use `get_default()`.
 7. **`contracts/forms.py` owns `SupplierForm`** — adding a field to `Supplier` and forgetting to update `SupplierForm` will silently drop that field from the edit UI.
 8. **`supplier_detail` URL has two names** (`supplier_detail` and `supplier_detail_page`) pointing to the same view. Reversals using either name exist in the codebase — removing one breaks callers of that name.
 9. **`utils.scrape_supplier_site` prints debug output** — if wired into a view, it will leak crawl logs to stdout in production.
 10. **`transactions` signals depend on `Supplier`** — renaming or removing `Supplier` fields without checking `transactions/signals.py` can silently break transaction processing.
+11. **`Supplier.prime` is an IntegerField storing a `SalesClass.id`** — it is rendered in `SupplierForm` as a `ModelChoiceField` with a `clean_prime` override that converts the selected instance back to an integer on save. There is no FK constraint at the database level. Do not change this to a real FK without a coordinated migration.
 
 ---
 

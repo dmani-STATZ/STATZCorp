@@ -71,7 +71,8 @@ def queue_we_won_awards(
                 key = str(row.cage_code).strip().upper()
                 cage_map[key] = row
 
-        for award in base_qs.iterator(chunk_size=200):
+        awards = list(base_qs)  # fetch everything into memory first
+        for award in awards:
             try:
                 _process_one_award(
                     award=award,

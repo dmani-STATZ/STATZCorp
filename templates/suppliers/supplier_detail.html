@@ -20,7 +20,11 @@
       {% endif %}
       <div>
         <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
-        <h1 class="text-3xl font-semibold text-gray-900">{{ supplier.name|default:"Supplier" }}</h1>
+        <button type="button"
+          onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'name')"
+          class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none text-3xl font-semibold text-gray-900 dark:text-gray-100 max-w-full">
+          <span id="supplier-name-value">{{ supplier.name|default:"Supplier" }}</span>
+        </button>
         <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
           <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
             <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'cage_code')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">CAGE:</button>
@@ -105,8 +109,22 @@
           <span id="supplier-special-terms-value">{{ supplier.special_terms|default:"—" }}</span>
         </li>
         <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'supplier_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Supplier Type:</button>
-          <span id="supplier-supplier-type-value">{{ supplier.supplier_type|default:"—" }}</span>
+          <span class="text-gray-600">Supplier Type:</span>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'supplier_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
+            <span id="supplier-supplier-type-value">{% if supplier.supplier_type %}{{ supplier.supplier_type.description }}{% else %}—{% endif %}</span>
+          </button>
+        </li>
+        <li>
+          <span class="text-gray-600">Prime:</span>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'prime')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
+            <span id="supplier-prime-value">{{ supplier.prime|default:"—" }}</span>
+          </button>
+        </li>
+        <li>
+          <span class="text-gray-600">Packhouse:</span>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'is_packhouse')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
+            <span id="supplier-is-packhouse-value">{{ supplier.is_packhouse|yesno:"Yes,No,—" }}</span>
+          </button>
         </li>
       </ul>
     </div>
@@ -238,15 +256,27 @@
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <div class="card card-padded shadow-sm lg:col-span-2">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Addresses</h2>
+      {{ supplier_address_slots_client|json_script:"supplier-address-slot-meta" }}
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {% for key, addr in addresses.items %}
+        {% for slot in address_slots %}
           <div class="border border-gray-200 rounded-lg p-3">
-            <p class="label">{{ key|title }} Address</p>
-            {% if addr %}
-              {% with full_addr=addr.address_line_1|add:', '|add:addr.city|add:', '|add:addr.state|add:' '|add:addr.zip %}
-                <a href="https://www.google.com/maps/search/{{ full_addr|urlencode }}" target="_blank" rel="noopener" class="text-sm text-blue-600 hover:text-blue-800">
-                  {{ addr.address_line_1 }}{% if addr.address_line_2 %}, {{ addr.address_line_2 }}{% endif %}, {{ addr.city }}, {{ addr.state }} {{ addr.zip }}
-                </a>
+            <div class="row-between gap-2 items-start mb-1">
+              <p class="label mb-0">{{ slot.title }} Address</p>
+              <button
+                type="button"
+                class="open-supplier-address-modal shrink-0 text-sm font-medium text-blue-600 hover:text-blue-800 px-1"
+                data-initial-slot="{{ slot.field }}"
+                title="Add new address for this slot"
+                aria-label="Add {{ slot.title }} address"
+              >+</button>
+            </div>
+            {% if slot.addr %}
+              {% with addr=slot.addr %}
+                {% with full_addr=addr.address_line_1|add:', '|add:addr.city|add:', '|add:addr.state|add:' '|add:addr.zip %}
+                  <a href="https://www.google.com/maps/search/{{ full_addr|urlencode }}" target="_blank" rel="noopener" class="text-sm text-blue-600 hover:text-blue-800">
+                    {{ addr.address_line_1 }}{% if addr.address_line_2 %}, {{ addr.address_line_2 }}{% endif %}, {{ addr.city }}, {{ addr.state }} {{ addr.zip }}
+                  </a>
+                {% endwith %}
               {% endwith %}
             {% else %}
               <p class="text-sm text-gray-500">Not provided.</p>
@@ -259,27 +289,54 @@
     <div class="card card-padded shadow-sm">
       <div class="row-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
-        <a href="{% url 'contracts:contact_list' %}?supplier_id={{ supplier.id }}" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</a>
+        <button type="button" id="open-contact-modal" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</button>
       </div>
       <div class="space-y-3">
         {% for contact in contacts %}
-          <div class="border border-gray-200 rounded-lg p-3">
-            <p class="text-sm font-semibold">
-              <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
-                {{ contact.name }}
-              </a>
-            </p>
-            <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
-            {% if contact.email %}
-              <p class="text-xs text-gray-600">
-                <a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">{{ contact.email }}</a>
-              </p>
-            {% endif %}
-            {% if contact.phone %}
-              <p class="text-xs text-gray-600">
-                <a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">{{ contact.phone }}</a>
-              </p>
-            {% endif %}
+          <div class="border border-gray-200 rounded-lg p-3 contact-card" data-contact-id="{{ contact.id }}">
+            <div class="row-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold">
+                  <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
+                    {{ contact.name }}
+                  </a>
+                </p>
+                <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
+                {% if contact.email %}
+                  <p class="text-xs text-gray-600">
+                    <a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">{{ contact.email }}</a>
+                  </p>
+                {% endif %}
+                {% if contact.phone %}
+                  <p class="text-xs text-gray-600">
+                    <a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">{{ contact.phone }}</a>
+                  </p>
+                {% endif %}
+              </div>
+              <div class="flex flex-col items-end gap-2 shrink-0">
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="edit-contact-btn text-xs text-blue-600 hover:text-blue-800"
+                    data-contact-id="{{ contact.id }}"
+                    data-contact-name="{{ contact.name|default_if_none:''|escape }}"
+                    data-contact-title="{{ contact.title|default_if_none:''|escape }}"
+                    data-contact-email="{{ contact.email|default_if_none:''|escape }}"
+                    data-contact-phone="{{ contact.phone|default_if_none:''|escape }}"
+                  >
+                    Edit
+                  </button>
+                  <button type="button" class="delete-contact-btn text-xs text-red-600 hover:text-red-800" data-contact-id="{{ contact.id }}">
+                    Delete
+                  </button>
+                </div>
+                <div class="contact-delete-confirm hidden flex flex-wrap items-center justify-end gap-2 text-xs text-gray-700">
+                  <span>Are you sure?</span>
+                  <button type="button" class="contact-delete-yes px-2 py-0.5 rounded border border-red-300 text-red-700 hover:bg-red-50">Yes</button>
+                  <button type="button" class="contact-delete-no px-2 py-0.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+                </div>
+              </div>
+            </div>
           </div>
         {% empty %}
           <p class="text-sm text-gray-500">No contacts yet.</p>
@@ -556,6 +613,118 @@
   </div>
 </div>
 
+<!-- Add / replace supplier address modal -->
+<div id="supplier-address-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+  <div class="card card-padded shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    {% csrf_token %}
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900">Add New Address</h3>
+        <p class="text-sm text-gray-500">Create an address and assign it to one or more slots</p>
+      </div>
+      <button type="button" id="supplier-address-modal-close" class="text-gray-500 hover:text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <p id="supplier-address-modal-error" class="hidden text-sm text-red-600 mb-3"></p>
+    <div class="space-y-3">
+      <div>
+        <label class="block label mb-1" for="supplier-address-line1">Street address <span class="text-red-600">*</span></label>
+        <input id="supplier-address-line1" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="street-address">
+      </div>
+      <div>
+        <label class="block label mb-1" for="supplier-address-line2">Address line 2</label>
+        <input id="supplier-address-line2" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="address-line2">
+      </div>
+      <div>
+        <label class="block label mb-1" for="supplier-address-city">City <span class="text-red-600">*</span></label>
+        <input id="supplier-address-city" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="address-level2">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block label mb-1" for="supplier-address-state">State <span class="text-red-600">*</span></label>
+          <input id="supplier-address-state" type="text" maxlength="2" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm uppercase" autocomplete="address-level1" placeholder="ST">
+        </div>
+        <div>
+          <label class="block label mb-1" for="supplier-address-zip">ZIP <span class="text-red-600">*</span></label>
+          <input id="supplier-address-zip" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="postal-code">
+        </div>
+      </div>
+      <div>
+        <label class="block label mb-1" for="supplier-address-country">Country</label>
+        <input id="supplier-address-country" type="text" value="USA" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="country-name">
+      </div>
+      <fieldset class="border border-gray-200 rounded-md p-3 space-y-2">
+        <legend class="text-sm font-medium text-gray-800 px-1">Assign to slots</legend>
+        <p id="supplier-address-slot-error" class="hidden text-sm text-red-600"></p>
+        <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+          <input type="checkbox" id="supplier-address-slot-physical" value="physical" class="mt-1 rounded border-gray-300">
+          <span id="supplier-address-label-physical">Physical (Add)</span>
+        </label>
+        <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+          <input type="checkbox" id="supplier-address-slot-billing" value="billing" class="mt-1 rounded border-gray-300">
+          <span id="supplier-address-label-billing">Billing (Add)</span>
+        </label>
+        <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+          <input type="checkbox" id="supplier-address-slot-shipping" value="shipping" class="mt-1 rounded border-gray-300">
+          <span id="supplier-address-label-shipping">Shipping (Add)</span>
+        </label>
+      </fieldset>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button type="button" id="supplier-address-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
+      <button type="button" id="supplier-address-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Contact add/edit modal -->
+<div id="contact-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+  <div class="card card-padded shadow-2xl w-full max-w-lg">
+    {% csrf_token %}
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 id="contact-modal-heading" class="text-lg font-semibold text-gray-900">Add Contact</h3>
+        <p id="contact-modal-subtitle" class="text-sm text-gray-500">Create a new contact for this supplier</p>
+      </div>
+      <button type="button" id="contact-modal-close" class="text-gray-500 hover:text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <p id="contact-modal-primary-note" class="hidden text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mb-3">
+      This contact will be set as the primary contact.
+    </p>
+    <p id="contact-modal-error" class="hidden text-sm text-red-600 mb-3"></p>
+    <div class="space-y-3">
+      <input type="hidden" id="contact-modal-id" value="">
+      <div>
+        <label class="block label mb-1" for="contact-modal-name">Name <span class="text-red-600">*</span></label>
+        <input id="contact-modal-name" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" required autocomplete="name">
+      </div>
+      <div>
+        <label class="block label mb-1" for="contact-modal-title-input">Title</label>
+        <input id="contact-modal-title-input" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="organization-title">
+      </div>
+      <div>
+        <label class="block label mb-1" for="contact-modal-phone">Phone</label>
+        <input id="contact-modal-phone" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="tel">
+      </div>
+      <div>
+        <label class="block label mb-1" for="contact-modal-email">Email</label>
+        <input id="contact-modal-email" type="email" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="email">
+      </div>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button type="button" id="contact-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
+      <button type="button" id="contact-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+    </div>
+  </div>
+</div>
+
 {% endblock contract_content %}
 
 {% block extra_scripts %}
@@ -612,6 +781,7 @@
 <script>
     window.supplierContentTypeId = {{ supplier_content_type_id }};
     window.supplierId = {{ supplier.id }};
+    window.supplierHasPrimaryContact = {{ has_primary_contact|yesno:"true,false" }};
     window.onTransactionSaved = function(data) {
         if (!data || !data.success) return;
         var fn = data.field_name;
@@ -627,6 +797,9 @@
             el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="mailto:' + displayVal + '" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
         } else if (fn === 'website_url') {
             el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="' + displayVal + '" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+        } else if (fn === 'is_packhouse') {
+            if (emptyVal) el.textContent = '—';
+            else el.textContent = (displayVal === 'True' || displayVal === 'true') ? 'Yes' : 'No';
         } else {
             el.textContent = emptyVal ? '—' : displayVal;
         }
@@ -854,6 +1027,446 @@
                 .finally(function() {
                     classSaveBtn.disabled = false;
                 });
+            });
+        }
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var contactModal = document.getElementById('contact-modal');
+        var contactModalHeading = document.getElementById('contact-modal-heading');
+        var contactModalSubtitle = document.getElementById('contact-modal-subtitle');
+        var contactModalPrimaryNote = document.getElementById('contact-modal-primary-note');
+        var contactModalError = document.getElementById('contact-modal-error');
+        var contactModalIdInput = document.getElementById('contact-modal-id');
+        var contactModalName = document.getElementById('contact-modal-name');
+        var contactModalTitleInput = document.getElementById('contact-modal-title-input');
+        var contactModalPhone = document.getElementById('contact-modal-phone');
+        var contactModalEmail = document.getElementById('contact-modal-email');
+        var openContactBtn = document.getElementById('open-contact-modal');
+        var contactCloseBtn = document.getElementById('contact-modal-close');
+        var contactCancelBtn = document.getElementById('contact-modal-cancel');
+        var contactSaveBtn = document.getElementById('contact-modal-save');
+        var saveContactUrl = "{% url 'contracts:supplier_save_contact' pk=supplier.id %}";
+        var deleteContactUrlTemplate = "{% url 'contracts:supplier_delete_contact' pk=supplier.id contact_id=0 %}";
+        var editingContactId = null;
+
+        function contactModalCsrfToken() {
+            var input = contactModal && contactModal.querySelector('[name=csrfmiddlewaretoken]');
+            if (input && input.value) return input.value;
+            return getCookie('csrftoken');
+        }
+
+        function clearContactModalError() {
+            if (contactModalError) {
+                contactModalError.textContent = '';
+                contactModalError.classList.add('hidden');
+            }
+        }
+
+        function showContactModalError(msg) {
+            if (!contactModalError) return;
+            contactModalError.textContent = msg || 'Something went wrong.';
+            contactModalError.classList.remove('hidden');
+        }
+
+        function openContactModal(payload) {
+            clearContactModalError();
+            editingContactId = payload && payload.id ? String(payload.id) : null;
+            if (contactModalHeading) {
+                contactModalHeading.textContent = editingContactId ? 'Edit Contact' : 'Add Contact';
+            }
+            if (contactModalSubtitle) {
+                contactModalSubtitle.textContent = editingContactId
+                    ? 'Update contact details'
+                    : 'Create a new contact for this supplier';
+            }
+            if (contactModalPrimaryNote) {
+                var showPrimaryNote = !editingContactId && !window.supplierHasPrimaryContact;
+                contactModalPrimaryNote.classList.toggle('hidden', !showPrimaryNote);
+            }
+            if (contactModalIdInput) contactModalIdInput.value = editingContactId || '';
+            if (contactModalName) contactModalName.value = payload && payload.name ? payload.name : '';
+            if (contactModalTitleInput) contactModalTitleInput.value = payload && payload.title ? payload.title : '';
+            if (contactModalPhone) contactModalPhone.value = payload && payload.phone ? payload.phone : '';
+            if (contactModalEmail) contactModalEmail.value = payload && payload.email ? payload.email : '';
+            if (contactModal) {
+                contactModal.classList.remove('hidden');
+                contactModal.classList.add('flex');
+            }
+        }
+
+        function closeContactModal() {
+            editingContactId = null;
+            if (contactModal) {
+                contactModal.classList.add('hidden');
+                contactModal.classList.remove('flex');
+            }
+            clearContactModalError();
+        }
+
+        function hideAllContactDeleteConfirms() {
+            document.querySelectorAll('.contact-delete-confirm').forEach(function(el) {
+                el.classList.add('hidden');
+            });
+        }
+
+        if (openContactBtn) {
+            openContactBtn.addEventListener('click', function() {
+                hideAllContactDeleteConfirms();
+                openContactModal(null);
+            });
+        }
+        document.querySelectorAll('.edit-contact-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                hideAllContactDeleteConfirms();
+                openContactModal({
+                    id: btn.getAttribute('data-contact-id'),
+                    name: btn.getAttribute('data-contact-name') || '',
+                    title: btn.getAttribute('data-contact-title') || '',
+                    email: btn.getAttribute('data-contact-email') || '',
+                    phone: btn.getAttribute('data-contact-phone') || ''
+                });
+            });
+        });
+        document.querySelectorAll('.delete-contact-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var card = btn.closest('.contact-card');
+                var confirmEl = card ? card.querySelector('.contact-delete-confirm') : null;
+                if (!confirmEl) return;
+                var wasHidden = confirmEl.classList.contains('hidden');
+                hideAllContactDeleteConfirms();
+                if (wasHidden) confirmEl.classList.remove('hidden');
+            });
+        });
+        document.querySelectorAll('.contact-delete-no').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var c = btn.closest('.contact-delete-confirm');
+                if (c) c.classList.add('hidden');
+            });
+        });
+        document.querySelectorAll('.contact-delete-yes').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var card = btn.closest('.contact-card');
+                var cid = card ? card.getAttribute('data-contact-id') : null;
+                if (!cid) return;
+                btn.disabled = true;
+                var url = deleteContactUrlTemplate.replace(/\/contact\/0\/delete\//, '/contact/' + cid + '/delete/');
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': contactModalCsrfToken()
+                    }
+                })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok && !result.data.error) {
+                        window.location.reload();
+                    } else {
+                        alert(result.data.error || 'Failed to delete contact.');
+                    }
+                })
+                .catch(function() {
+                    alert('Failed to delete contact.');
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                });
+            });
+        });
+        [contactCloseBtn, contactCancelBtn].forEach(function(btn) {
+            if (btn) btn.addEventListener('click', closeContactModal);
+        });
+        if (contactModal) {
+            contactModal.addEventListener('click', function(event) {
+                if (event.target === contactModal) closeContactModal();
+            });
+        }
+        if (contactSaveBtn) {
+            contactSaveBtn.addEventListener('click', function() {
+                clearContactModalError();
+                var nameVal = contactModalName ? contactModalName.value.trim() : '';
+                if (!nameVal) {
+                    showContactModalError('Name is required.');
+                    return;
+                }
+                contactSaveBtn.disabled = true;
+                var formData = new FormData();
+                formData.append('name', nameVal);
+                formData.append('title', contactModalTitleInput ? contactModalTitleInput.value.trim() : '');
+                formData.append('phone', contactModalPhone ? contactModalPhone.value.trim() : '');
+                formData.append('email', contactModalEmail ? contactModalEmail.value.trim() : '');
+                var cid = contactModalIdInput ? contactModalIdInput.value.trim() : '';
+                if (cid) formData.append('contact_id', cid);
+                fetch(saveContactUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': contactModalCsrfToken()
+                    },
+                    body: formData
+                })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok && !result.data.error) {
+                        closeContactModal();
+                        window.location.reload();
+                    } else {
+                        showContactModalError(result.data.error || 'Save failed.');
+                    }
+                })
+                .catch(function() {
+                    showContactModalError('Save failed.');
+                })
+                .finally(function() {
+                    contactSaveBtn.disabled = false;
+                });
+            });
+        }
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var metaEl = document.getElementById('supplier-address-slot-meta');
+        var slotMeta = {};
+        if (metaEl && metaEl.textContent) {
+            try {
+                slotMeta = JSON.parse(metaEl.textContent);
+            } catch (e) {
+                slotMeta = {};
+            }
+        }
+
+        var addressModal = document.getElementById('supplier-address-modal');
+        var addressModalError = document.getElementById('supplier-address-modal-error');
+        var addressSlotError = document.getElementById('supplier-address-slot-error');
+        var addressClose = document.getElementById('supplier-address-modal-close');
+        var addressCancel = document.getElementById('supplier-address-modal-cancel');
+        var addressSave = document.getElementById('supplier-address-modal-save');
+        var line1El = document.getElementById('supplier-address-line1');
+        var line2El = document.getElementById('supplier-address-line2');
+        var cityEl = document.getElementById('supplier-address-city');
+        var stateEl = document.getElementById('supplier-address-state');
+        var zipEl = document.getElementById('supplier-address-zip');
+        var countryEl = document.getElementById('supplier-address-country');
+        var cbPhysical = document.getElementById('supplier-address-slot-physical');
+        var cbBilling = document.getElementById('supplier-address-slot-billing');
+        var cbShipping = document.getElementById('supplier-address-slot-shipping');
+        var updateAddressUrl = "{% url 'contracts:supplier_update_address' pk=supplier.id %}";
+
+        var SLOT_ORDER = ['physical', 'billing', 'shipping'];
+        var SLOT_TITLES = { physical: 'Physical', billing: 'Billing', shipping: 'Shipping' };
+        var ID_KEYS = { physical: 'physical_address_id', billing: 'billing_address_id', shipping: 'shipping_address_id' };
+
+        function addressModalCsrfToken() {
+            var input = addressModal && addressModal.querySelector('[name=csrfmiddlewaretoken]');
+            if (input && input.value) return input.value;
+            return getCookie('csrftoken');
+        }
+
+        function clearAddressModalErrors() {
+            if (addressModalError) {
+                addressModalError.textContent = '';
+                addressModalError.classList.add('hidden');
+            }
+            if (addressSlotError) {
+                addressSlotError.textContent = '';
+                addressSlotError.classList.add('hidden');
+            }
+        }
+
+        function showAddressModalError(msg) {
+            if (!addressModalError) return;
+            addressModalError.textContent = msg || 'Something went wrong.';
+            addressModalError.classList.remove('hidden');
+        }
+
+        function showAddressSlotError(msg) {
+            if (!addressSlotError) return;
+            addressSlotError.textContent = msg || '';
+            addressSlotError.classList.toggle('hidden', !msg);
+        }
+
+        function refreshAddressSlotLabels() {
+            SLOT_ORDER.forEach(function(field) {
+                var span = document.getElementById('supplier-address-label-' + field);
+                if (!span) return;
+                var m = slotMeta[field] || { display: '', id: null };
+                var title = SLOT_TITLES[field];
+                if (m.id && m.display) {
+                    span.textContent = title + ' (Replace: ' + m.display + ')';
+                } else {
+                    span.textContent = title + ' (Add)';
+                }
+            });
+        }
+
+        function effectiveLine2() {
+            var line2 = line2El ? line2El.value.trim() : '';
+            var country = countryEl ? countryEl.value.trim() : '';
+            var lc = country.toLowerCase();
+            if (country && lc !== 'usa' && lc !== 'us') {
+                return line2 ? line2 + ', ' + country : country;
+            }
+            return line2;
+        }
+
+        function openAddressModal(initialSlot) {
+            clearAddressModalErrors();
+            refreshAddressSlotLabels();
+            if (line1El) line1El.value = '';
+            if (line2El) line2El.value = '';
+            if (cityEl) cityEl.value = '';
+            if (stateEl) stateEl.value = '';
+            if (zipEl) zipEl.value = '';
+            if (countryEl) countryEl.value = 'USA';
+            if (cbPhysical) cbPhysical.checked = false;
+            if (cbBilling) cbBilling.checked = false;
+            if (cbShipping) cbShipping.checked = false;
+            var allowed = { physical: cbPhysical, billing: cbBilling, shipping: cbShipping };
+            if (initialSlot && allowed[initialSlot]) {
+                allowed[initialSlot].checked = true;
+            }
+            if (addressModal) {
+                addressModal.classList.remove('hidden');
+                addressModal.classList.add('flex');
+            }
+        }
+
+        function closeAddressModal() {
+            if (addressModal) {
+                addressModal.classList.add('hidden');
+                addressModal.classList.remove('flex');
+            }
+            clearAddressModalErrors();
+        }
+
+        document.querySelectorAll('.open-supplier-address-modal').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var slot = btn.getAttribute('data-initial-slot') || 'physical';
+                openAddressModal(slot);
+            });
+        });
+
+        [addressClose, addressCancel].forEach(function(btn) {
+            if (btn) btn.addEventListener('click', closeAddressModal);
+        });
+
+        if (addressModal) {
+            addressModal.addEventListener('click', function(event) {
+                if (event.target === addressModal) closeAddressModal();
+            });
+        }
+
+        function checkedSlotsInOrder() {
+            return SLOT_ORDER.filter(function(field) {
+                var cb = document.getElementById('supplier-address-slot-' + field);
+                return cb && cb.checked;
+            });
+        }
+
+        function postAddressFormData(fd) {
+            return fetch(updateAddressUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': addressModalCsrfToken()
+                },
+                body: fd
+            }).then(function(response) {
+                return response.json().then(function(data) {
+                    return { ok: response.ok, data: data };
+                });
+            });
+        }
+
+        if (addressSave) {
+            addressSave.addEventListener('click', function() {
+                clearAddressModalErrors();
+                var checked = checkedSlotsInOrder();
+                if (!checked.length) {
+                    showAddressSlotError('Select at least one slot.');
+                    return;
+                }
+                var line1 = line1El ? line1El.value.trim() : '';
+                var city = cityEl ? cityEl.value.trim() : '';
+                var state = stateEl ? stateEl.value.trim() : '';
+                var zip = zipEl ? zipEl.value.trim() : '';
+                if (!line1) {
+                    showAddressModalError('Street address is required.');
+                    return;
+                }
+                if (!city) {
+                    showAddressModalError('City is required.');
+                    return;
+                }
+                if (!state || !/^[A-Za-z]{2}$/.test(state)) {
+                    showAddressModalError('State is required (2 letters).');
+                    return;
+                }
+                if (!zip) {
+                    showAddressModalError('ZIP is required.');
+                    return;
+                }
+
+                addressSave.disabled = true;
+                var line2 = effectiveLine2();
+                var firstField = checked[0];
+
+                var fd1 = new FormData();
+                fd1.append('field', firstField);
+                fd1.append('line1', line1);
+                fd1.append('line2', line2);
+                fd1.append('city', city);
+                fd1.append('state', state.toUpperCase());
+                fd1.append('zip', zip);
+
+                postAddressFormData(fd1)
+                    .then(function(result) {
+                        if (!result.ok || (result.data && result.data.error)) {
+                            throw new Error((result.data && result.data.error) || 'Save failed.');
+                        }
+                        var idKey = ID_KEYS[firstField];
+                        var newId = result.data && result.data[idKey];
+                        if (!newId) {
+                            throw new Error('Could not read new address id from response.');
+                        }
+                        var p = Promise.resolve();
+                        for (var i = 1; i < checked.length; i++) {
+                            (function(field) {
+                                p = p.then(function() {
+                                    var fdn = new FormData();
+                                    fdn.append('field', field);
+                                    fdn.append('address_id', String(newId));
+                                    return postAddressFormData(fdn).then(function(res) {
+                                        if (!res.ok || (res.data && res.data.error)) {
+                                            throw new Error((res.data && res.data.error) || 'Save failed.');
+                                        }
+                                    });
+                                });
+                            })(checked[i]);
+                        }
+                        return p;
+                    })
+                    .then(function() {
+                        closeAddressModal();
+                        window.location.reload();
+                    })
+                    .catch(function(err) {
+                        showAddressModalError(err.message || 'Save failed.');
+                    })
+                    .finally(function() {
+                        addressSave.disabled = false;
+                    });
             });
         }
     });

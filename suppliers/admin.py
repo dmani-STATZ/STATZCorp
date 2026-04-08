@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Contact, Supplier
+from .models import (
+    CertificationType,
+    ClassificationType,
+    Contact,
+    Supplier,
+    SupplierType,
+)
 
 
 @admin.register(Supplier)
@@ -34,3 +40,21 @@ class SupplierAdmin(admin.ModelAdmin):
 class ContactAdmin(admin.ModelAdmin):
     list_display = ('name', 'company', 'email', 'phone', 'supplier')
     search_fields = ('name', 'company', 'email', 'supplier__name')
+
+
+@admin.register(SupplierType)
+class SupplierTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'code', 'description')
+    search_fields = ('code', 'description')
+
+
+@admin.register(CertificationType)
+class CertificationTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'code', 'name')
+    search_fields = ('code', 'name')
+
+
+@admin.register(ClassificationType)
+class ClassificationTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
