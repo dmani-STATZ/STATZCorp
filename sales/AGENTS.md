@@ -29,6 +29,10 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **Oryx handles `collectstatic` during deployment build.** Redundant `collectstatic` invocations in **`startup.sh`** must be avoided so cold starts stay **under ~2 minutes** (repeat static collection previously contributed to **~10-minute** startups and health-check timeouts).
 - **Never run full binary installations (like Playwright) in `startup.sh` without first checking for existing files.** Unconditional `playwright install` on every container start significantly delays availability; gate on the presence of cached driver/browser paths (or install during the build image/Oryx phase instead).
 
+### Performance patterns (dashboard / aggregate views)
+
+- **Dashboard-style pages must not use one ORM `.count()` per KPI.** Prefer a single raw SQL statement with `COUNT(CASE WHEN … THEN 1 END)` (and related aggregates) executed through `django.db.connection.cursor()` with `%s` placeholders for variable lists, plus separate batched raw `GROUP BY` queries when the template needs per-status or per-bucket dicts. Follow `sales/views/dashboard.py` for the canonical pattern; pair heavy list sections with `select_related` / `prefetch_related` (including named `Prefetch` + `to_attr`) to avoid N+1 queries.
+
 ### Before changing models
 - Read the relevant `sales/models/*.py` file.
 - Check `sales/migrations/` for the highest migration and existing constraints (includes `NoQuoteCAGE` / `0018_no_quote_cage` or later).

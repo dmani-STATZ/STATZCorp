@@ -47,8 +47,8 @@
   </a>
 </div>
 
-{# Secondary stat row — set-aside / growth / approved-source pipeline counts (see sales/CONTEXT.md) #}
-<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; margin-bottom:1.5rem;">
+{# Secondary stat row — set-aside / growth pipeline counts (see sales/CONTEXT.md) #}
+<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:1rem; margin-bottom:1.5rem;">
   <a href="{% url 'sales:solicitation_list' %}?set_aside=R" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">SDVOSB</div>
     <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ sdvosb_count|default:0 }}</div>
@@ -60,10 +60,6 @@
   <a href="{% url 'sales:solicitation_list' %}?tab=growth" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Growth</div>
     <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ growth_count|default:0 }}</div>
-  </a>
-  <a href="{% url 'sales:solicitation_list' %}?tab=approved_sources" style="text-decoration:none; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1rem; color:#111827;">
-    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Approved Sources</div>
-    <div style="font-size:1.25rem; font-weight:700; margin-top:0.25rem;">{{ approved_source_count|default:0 }}</div>
   </a>
 </div>
 
@@ -86,8 +82,8 @@
       {% for sol in recent_solicitations %}
       <tr style="border-bottom:1px solid #eef2f8;">
         <td style="padding:0.625rem 1rem;"><a href="{% url 'sales:solicitation_detail' sol_number=sol.solicitation_number %}" style="font-weight:500; color:var(--company-primary,#004eb3); text-decoration:none; font-family:ui-monospace, monospace;">{{ sol.solicitation_number }}</a></td>
-        <td style="padding:0.625rem 1rem; font-family:ui-monospace, monospace;">{{ sol.first_line.nsn|default:"—" }}</td>
-        <td style="padding:0.625rem 1rem; max-width:14rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ sol.first_line.nomenclature|default:"—" }}</td>
+        <td style="padding:0.625rem 1rem; font-family:ui-monospace, monospace;">{% if sol.prefetched_lines %}{{ sol.prefetched_lines.0.nsn|default:"—" }}{% else %}—{% endif %}</td>
+        <td style="padding:0.625rem 1rem; max-width:14rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{% if sol.prefetched_lines %}{{ sol.prefetched_lines.0.nomenclature|default:"—" }}{% else %}—{% endif %}</td>
         <td style="padding:0.625rem 1rem;">{{ sol.return_by_date|date:"M j, Y"|default:"—" }}</td>
         <td style="padding:0.625rem 1rem;"><span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#eef2f8; color:#374151;">{{ sol.get_bucket_display|default:sol.bucket }}</span></td>
         <td style="padding:0.625rem 1rem;"><span style="display:inline-block; padding:0.125rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:500; background:#f3f4f6; color:#374151;">{{ sol.status }}</span></td>
