@@ -2137,6 +2137,8 @@ The master list. Users filter down to what they need, then click through to the 
 
 The command center for a single deal. The pipeline track at the top tells you exactly where this solicitation is. Five tabs break the work into logical stages so nothing gets missed.
 
+**Cost of Money Calculator:** a Bootstrap modal (`#costOfMoneyModal`) triggered from the **Sales primary nav** (**💰 Cost of Money**, right side) on any page under `/sales/solicitations/…` (list, workbench, closed, mass pass, review queues, etc.). Markup and script live in `sales/base.html`; `solicitation_nav_tools` sets visibility. Calculates carry cost using `COST_OF_MONEY_DAILY_RATE` (defined in `sales/views/solicitations.py`, default `0.000329` ≈ 12% annual). Front-end only — no model, no URL, no persistence.
+
 **Matches tab**
 
 - **Manual supplier add (workbench sidebar)** — HTMX typeahead on **Add supplier manually**: `hx-get` to `rfq_manual_supplier_search` with debounced `keyup` (300ms), `?q=` plus `solicitation_number` to exclude suppliers who already have a `SupplierRFQ` on this solicitation. JSON API (non-HTMX) returns `[{id, name, cage}]`. Choosing a row `POST`s `rfq_queue_add_manual` (`supplier_id`, `solicitation_number` or `sol_number`): creates `SupplierRFQ(status='QUEUED', sent_by=user)` only — **no** `SupplierMatch` at queue time; `SupplierMatch(match_method='MANUAL', match_tier=3, match_score=0)` is created when a quote is saved in `rfq_enter_quote` if still missing. No Quote CAGE → JSON `409` / HTMX inline error **No Quote CAGE**. Success refreshes `#wb-matches-sidebar` via out-of-band swap. Sidebar rows show a **Manual** badge for manual-queue or MANUAL-match suppliers and an **In Queue** pill when `QUEUED`.

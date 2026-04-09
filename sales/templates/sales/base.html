@@ -58,7 +58,8 @@
     </style>
 
     {# ── Sales sub-navigation ───────────────────────────────────────────── #}
-    <nav style="display:flex; gap:0.25rem; border-bottom:2px solid var(--border-color, #e5e7eb); margin-bottom:1.75rem; padding-top:1.25rem;">
+    <nav style="display:flex; align-items:stretch; flex-wrap:wrap; gap:0.25rem; border-bottom:2px solid var(--border-color, #e5e7eb); margin-bottom:1.75rem; padding-top:1.25rem;">
+        <div style="display:flex; flex-wrap:wrap; gap:0.25rem; align-items:stretch; flex:1; min-width:0;">
         <a href="{% url 'sales:dashboard' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
                   {% if request.resolver_match.url_name == 'dashboard' %}
@@ -147,6 +148,18 @@
                   {% endif %}">
             Settings
         </a>
+        </div>
+
+        <div style="display:flex; align-items:center; flex-shrink:0;">
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#costOfMoneyModal"
+                    style="white-space:nowrap;">
+                💰 Cost of Money
+            </button>
+        </div>
+
 <!--        {% if request.user.is_superuser %}
         <a href="{% url 'sales:backfill_nsn' %}"
            style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border-radius:6px 6px 0 0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px;
@@ -208,7 +221,99 @@
     </nav>
     {% endif %}
 
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
+
     {% block content %}{% endblock content %}
+
+
+    <div class="modal fade" id="costOfMoneyModal" tabindex="-1" aria-labelledby="costOfMoneyModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="costOfMoneyModalLabel">Cost of Money Calculator</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="com-validation-alert" class="alert alert-danger d-none py-2 small mb-3" role="alert">Please enter a valid amount and number of days.</div>
+            <div class="mb-3">
+              <label for="com-amount" class="form-label">Advance Payment Amount</label>
+              <input type="text" class="form-control" id="com-amount" inputmode="decimal" autocomplete="off" placeholder="0.00">
+            </div>
+            <div class="mb-3">
+              <label for="com-days" class="form-label">Lead Time in Days</label>
+              <input type="number" class="form-control" id="com-days" min="1" step="1" autocomplete="off">
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="com-calc-btn">Calculate</button>
+            <div id="com-result" class="mt-3 d-none">
+              <p class="mb-1 fw-semibold" id="com-result-line1"></p>
+              <p class="mb-2 fw-semibold" id="com-result-line2"></p>
+              <p class="text-muted small mb-0">Based on a daily rate of 0.0329% (~12% annually). Update rate in solicitations.py if directed by management.</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function () {
+      // Must match COST_OF_MONEY_DAILY_RATE in sales/views/solicitations.py
+      var COST_OF_MONEY_DAILY_RATE = 0.000329;
+      var calcBtn = document.getElementById('com-calc-btn');
+      var modalEl = document.getElementById('costOfMoneyModal');
+      if (!calcBtn || !modalEl) return;
+
+      function hideValidation() {
+        var a = document.getElementById('com-validation-alert');
+        if (a) a.classList.add('d-none');
+      }
+      function showValidation() {
+        var a = document.getElementById('com-validation-alert');
+        if (a) a.classList.remove('d-none');
+      }
+      function hideResult() {
+        var r = document.getElementById('com-result');
+        var l1 = document.getElementById('com-result-line1');
+        var l2 = document.getElementById('com-result-line2');
+        if (r) r.classList.add('d-none');
+        if (l1) l1.textContent = '';
+        if (l2) l2.textContent = '';
+      }
+
+      calcBtn.addEventListener('click', function () {
+        hideValidation();
+        hideResult();
+        var rawAmt = (document.getElementById('com-amount') && document.getElementById('com-amount').value || '').replace(/[$,\s]/g, '').trim();
+        var rawDays = (document.getElementById('com-days') && document.getElementById('com-days').value || '').trim();
+        var amount = parseFloat(rawAmt);
+        var daysNum = Number(rawDays);
+        var amountOk = Number.isFinite(amount) && amount > 0;
+        var daysOk = Number.isFinite(daysNum) && daysNum > 0 && Math.floor(daysNum) === daysNum;
+        if (!amountOk || !daysOk) {
+          showValidation();
+          return;
+        }
+        var cost = amount * COST_OF_MONEY_DAILY_RATE * daysNum;
+        var formatted = cost.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+        var l1 = document.getElementById('com-result-line1');
+        var l2 = document.getElementById('com-result-line2');
+        var res = document.getElementById('com-result');
+        if (l1) l1.textContent = 'Carrying cost: ' + formatted;
+        if (l2) l2.textContent = 'Add to your quote: ' + formatted;
+        if (res) res.classList.remove('d-none');
+      });
+
+      modalEl.addEventListener('hidden.bs.modal', function () {
+        hideResult();
+        hideValidation();
+      });
+    })();
+    </script>
+    
 
     {# Global search typeahead #}
     <script>

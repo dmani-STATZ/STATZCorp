@@ -39,6 +39,11 @@ from sales.services.matching import _normalize_nsn
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
 from suppliers.models import Supplier
 
+# Cost of money daily rate — assumed 12% annually (0.12 / 365)
+# UPDATE THIS VALUE once confirmed with management.
+# 0.000329 = ~12% annual. Do NOT use 0.00075 (that implies ~27% annual).
+COST_OF_MONEY_DAILY_RATE = 0.000329
+
 PIPELINE = [
     ("New", "📥", "New"),
     ("Active", "📌", "Active"),

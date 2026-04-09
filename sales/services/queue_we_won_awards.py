@@ -19,6 +19,27 @@ _LOG_PREFIX = "[queue_we_won_awards]"
 _MAX_CONTRACT_NUMBER_LEN = 25
 
 
+def _normalize_contract_number(raw: str) -> str:
+    """
+    Normalize a DLA contract number to the canonical dashed format XXXXXX-XX-X-XXXX.
+    Only transforms 13-character strings that contain no dashes.
+    All other inputs are returned unchanged with a warning logged.
+    """
+    if not raw:
+        return raw
+    if "-" in raw:
+        return raw  # already formatted
+    if len(raw) == 13:
+        return f"{raw[0:6]}-{raw[6:8]}-{raw[8]}-{raw[9:13]}"
+    # Unexpected format — log and return as-is
+    logger.warning(
+        "[queue_we_won_awards] unexpected contract number format (len=%d): %r — storing as-is",
+        len(raw),
+        raw,
+    )
+    return raw
+
+
 def queue_we_won_awards(
     batch: AwardImportBatch,
     activity_log: Callable[[str], None] | None = None,
@@ -107,6 +128,7 @@ def _process_one_award(
     from contracts.models import Contract
     from processing.models import QueueClin, QueueContract
     contract_number, idiq_number = _resolve_contract_numbers(award)
+    contract_number = _normalize_contract_number(contract_number)
     if not contract_number:
         result["skipped"] += 1
         emit(
