@@ -1,10 +1,8 @@
 """
-Supplier-related views: backfill, list, detail, add/remove NSN and FSC capabilities.
+Supplier-related views: list, detail, add/remove NSN and FSC capabilities.
 """
-import traceback
-
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods, require_POST
 from django.db.models import Count, Q
 from django.core.paginator import Paginator
@@ -14,16 +12,12 @@ from django.urls import reverse
 from suppliers.models import Supplier
 from sales.models import (
     SupplierNSN,
+    SupplierNSNScored,
     SupplierFSC,
     SupplierQuote,
     NoQuoteCAGE,
 )
 from sales.services.no_quote import normalize_cage_code
-from sales.services.matching import backfill_nsn_from_contracts
-
-
-def _staff_required(user):
-    return user.is_authenticated and user.is_staff
 
 
 @login_required
@@ -56,11 +50,17 @@ def supplier_list(request):
     })
 
 
+def _supplier_capabilities_redirect(supplier_pk):
+    return redirect(reverse("sales:supplier_detail", args=[supplier_pk]) + "?tab=capabilities")
+
+
 @login_required
 def supplier_detail(request, supplier_id):
     """3-tab detail: Profile, Capabilities, Quote History."""
     supplier = get_object_or_404(Supplier, pk=supplier_id)
-    nsn_capabilities = SupplierNSN.objects.filter(supplier=supplier).order_by("-match_score")
+    nsn_capabilities = SupplierNSNScored.objects.filter(supplier=supplier).order_by(
+        "-match_score", "nsn"
+    )
     fsc_capabilities = SupplierFSC.objects.filter(supplier=supplier).order_by("fsc_code")
     quote_history = (
         SupplierQuote.objects.filter(supplier=supplier)
@@ -87,64 +87,131 @@ def supplier_detail(request, supplier_id):
 @login_required
 @require_http_methods(["GET", "POST"])
 def supplier_add_nsn(request, supplier_id):
-    """GET: form to add NSN. POST: validate 13-digit NSN, get_or_create with source=manual, match_score=100."""
+    """Bulk paste NSNs (one per line); normalize, validate, get_or_create."""
     supplier = get_object_or_404(Supplier, pk=supplier_id)
-    error = None
 
     if request.method == "POST":
-        nsn_raw = (request.POST.get("nsn") or "").strip().replace("-", "").replace(" ", "")
-        part_number = (request.POST.get("part_number") or "").strip()[:100] or None
-        notes = (request.POST.get("notes") or "").strip()[:255] or None
+        raw = request.POST.get("nsns", "")
+        lines = raw.splitlines()
+        error_list = []
+        created_count = 0
+        duplicate_count = 0
+        valid_count = 0
 
-        if len(nsn_raw) != 13 or not nsn_raw.isdigit():
-            error = "NSN must be 13 digits (hyphens/spaces optional)."
-        else:
-            cleaned_nsn = f"{nsn_raw[0:4]}-{nsn_raw[4:6]}-{nsn_raw[6:9]}-{nsn_raw[9:13]}"
-            SupplierNSN.objects.get_or_create(
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line:
+                continue
+            normalized = line.replace("-", "").strip()
+            if len(normalized) != 13 or not normalized.isdigit():
+                error_list.append(raw_line.strip())
+                continue
+            valid_count += 1
+            _obj, created = SupplierNSN.objects.get_or_create(
                 supplier=supplier,
-                nsn=cleaned_nsn,
-                defaults={
-                    "part_number": part_number,
-                    "notes": notes,
-                    "source": "manual",
-                    "match_score": 100,
-                },
+                nsn=normalized,
+                defaults={"notes": "", "added_by": request.user},
             )
-            messages.success(request, f"NSN {cleaned_nsn} added.")
-            return redirect(reverse("sales:supplier_detail", args=[supplier.pk]) + "?tab=capabilities")
+            if created:
+                created_count += 1
+            else:
+                duplicate_count += 1
+
+        if valid_count == 0:
+            messages.error(request, "No valid NSNs to add. Enter one 13-digit NSN per line.")
+            return _supplier_capabilities_redirect(supplier.pk)
+
+        if created_count:
+            messages.success(
+                request,
+                f"{created_count} NSN(s) added. {duplicate_count} duplicate(s) skipped.",
+            )
+        else:
+            messages.success(
+                request,
+                f"0 NSN(s) added. {duplicate_count} duplicate(s) skipped.",
+            )
+
+        if error_list:
+            preview = ", ".join(error_list[:20])
+            if len(error_list) > 20:
+                preview += f" … and {len(error_list) - 20} more"
+            messages.warning(
+                request,
+                f"Invalid entries (not 13 digits): {preview}",
+            )
+
+        return _supplier_capabilities_redirect(supplier.pk)
 
     return render(request, "sales/suppliers/add_nsn.html", {
         "supplier": supplier,
-        "error": error,
-        "errors": {"nsn": error} if error else {},
     })
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def supplier_add_fsc(request, supplier_id):
-    """GET: form to add FSC. POST: validate 4 alphanumeric (uppercase), get_or_create. Redirect tab=capabilities."""
+    """Bulk paste FSC codes (one per line)."""
     supplier = get_object_or_404(Supplier, pk=supplier_id)
-    error = None
 
     if request.method == "POST":
-        fsc_code = (request.POST.get("fsc_code") or "").strip()[:4].upper()
-        notes = (request.POST.get("notes") or "").strip()[:255] or None
-        if len(fsc_code) != 4 or not fsc_code.isalnum():
-            error = "FSC code must be exactly 4 alphanumeric characters."
-        else:
-            SupplierFSC.objects.get_or_create(
+        raw = request.POST.get("fscs", "")
+        lines = raw.splitlines()
+        error_list = []
+        created_count = 0
+        duplicate_count = 0
+        valid_count = 0
+
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line:
+                continue
+            value = line.upper()
+            if len(value) != 4 or not value.isalnum():
+                error_list.append(raw_line.strip())
+                continue
+            valid_count += 1
+            _obj, created = SupplierFSC.objects.get_or_create(
                 supplier=supplier,
-                fsc_code=fsc_code,
-                defaults={"notes": notes},
+                fsc_code=value,
+                defaults={"notes": ""},
             )
-            messages.success(request, f"FSC {fsc_code} added.")
-            return redirect(reverse("sales:supplier_detail", args=[supplier.pk]) + "?tab=capabilities")
+            if created:
+                created_count += 1
+            else:
+                duplicate_count += 1
+
+        if valid_count == 0:
+            messages.error(
+                request,
+                "No valid FSC codes to add. Enter one 4-character alphanumeric code per line.",
+            )
+            return _supplier_capabilities_redirect(supplier.pk)
+
+        if created_count:
+            messages.success(
+                request,
+                f"{created_count} FSC(s) added. {duplicate_count} duplicate(s) skipped.",
+            )
+        else:
+            messages.success(
+                request,
+                f"0 FSC(s) added. {duplicate_count} duplicate(s) skipped.",
+            )
+
+        if error_list:
+            preview = ", ".join(error_list[:20])
+            if len(error_list) > 20:
+                preview += f" … and {len(error_list) - 20} more"
+            messages.warning(
+                request,
+                f"Invalid entries (must be 4 alphanumeric characters): {preview}",
+            )
+
+        return _supplier_capabilities_redirect(supplier.pk)
 
     return render(request, "sales/suppliers/add_fsc.html", {
         "supplier": supplier,
-        "error": error,
-        "errors": {"fsc_code": error} if error else {},
     })
 
 
@@ -157,7 +224,7 @@ def supplier_remove_nsn(request, supplier_id):
     if nsn_id:
         SupplierNSN.objects.filter(supplier=supplier, pk=nsn_id).delete()
         messages.success(request, "NSN capability removed.")
-    return redirect(reverse("sales:supplier_detail", args=[supplier.pk]) + "?tab=capabilities")
+    return _supplier_capabilities_redirect(supplier.pk)
 
 
 @login_required
@@ -169,7 +236,7 @@ def supplier_remove_fsc(request, supplier_id):
     if fsc_id:
         SupplierFSC.objects.filter(supplier=supplier, pk=fsc_id).delete()
         messages.success(request, "FSC capability removed.")
-    return redirect(reverse("sales:supplier_detail", args=[supplier.pk]) + "?tab=capabilities")
+    return _supplier_capabilities_redirect(supplier.pk)
 
 
 @login_required
@@ -197,38 +264,3 @@ def supplier_no_quote_add(request, supplier_id):
     )
     messages.success(request, f"CAGE {cage_norm} added to the No Quote list.")
     return redirect(reverse("sales:supplier_detail", args=[supplier.pk]))
-
-
-@login_required
-@user_passes_test(_staff_required)
-@require_http_methods(["GET", "POST"])
-def backfill_nsn(request):
-    """
-    GET:  show confirmation page
-    POST: run backfill_nsn_from_contracts(), show results
-    Dry-run option via POST field dry_run=1
-    """
-    result = None
-    error = None
-    run_dry = False
-
-    if request.method == "POST":
-        run_dry = "dry_run" in request.POST
-        try:
-            result = backfill_nsn_from_contracts(dry_run=run_dry)
-        except Exception as e:
-            error = {
-                "message": str(e),
-                "traceback": traceback.format_exc(),
-            }
-
-    return render(
-        request,
-        "sales/suppliers/backfill_nsn.html",
-        {
-            "dry_run": run_dry,
-            "result": result,
-            "error": error,
-            "page_title": "Backfill NSN from Contract History",
-        },
-    )

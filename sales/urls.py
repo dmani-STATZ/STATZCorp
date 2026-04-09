@@ -39,7 +39,6 @@ from .views import (
     saved_filter_update,
     saved_filter_delete,
     saved_filter_share,
-    backfill_nsn,
     rfq_pending,
     rfq_sent,
     rfq_send_single,
@@ -186,7 +185,6 @@ urlpatterns = [
     path("solicitations/<str:sol_number>/nobid/", no_bid, name="no_bid"),
     path("dashboard/", dashboard, name="dashboard"),
     path("search/", global_search, name="global_search"),
-    path("suppliers/backfill-nsn/", backfill_nsn, name="backfill_nsn"),
     # RFQ Center
     path("rfq/", rfq_pending, name="rfq_pending"),
     path("rfq/pending/", rfq_pending),

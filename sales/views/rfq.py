@@ -687,8 +687,8 @@ def rfq_enter_quote(request, rfq_id):
                         supplier_id=rfq.supplier_id,
                         nsn=n_norm,
                         defaults={
-                            "match_score": Decimal("50.00"),
-                            "source": "quote_confirmed",
+                            "notes": "",
+                            "added_by": request.user,
                         },
                     )
             from django.utils import timezone

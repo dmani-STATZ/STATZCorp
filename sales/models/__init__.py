@@ -11,7 +11,7 @@ from sales.models.solicitations import (
     SolicitationLine,
 )
 from sales.models.approved_sources import ApprovedSource
-from sales.models.suppliers import SupplierNSN, SupplierFSC
+from sales.models.suppliers import SupplierNSN, SupplierNSNScored, SupplierFSC
 from sales.models.matching import SupplierMatch
 from sales.models.rfq import SupplierRFQ, SupplierContactLog
 from sales.models.rfq_phrases import RFQGreeting, RFQSalutation
@@ -42,6 +42,7 @@ __all__ = [
     'NsnProcurementHistory',
     'ApprovedSource',
     'SupplierNSN',
+    'SupplierNSNScored',
     'SupplierFSC',
     'SupplierMatch',
     'SupplierRFQ',

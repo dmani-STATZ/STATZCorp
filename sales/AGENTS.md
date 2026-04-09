@@ -14,7 +14,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
-**Does not own:** Authentication (`auth.User`), contracts data (`contracts.models.Clin` is read for NSN backfill only).
+**Does not own:** Authentication (`auth.User`). Tier-1 NSN scoring joins `contracts_*` tables inside SQL Server view `dibbs_supplier_nsn_scored`, not via Django `Clin` queries in matching code.
 
 **App type:** Core domain app. This is the operational heart of the product. It is tightly coupled internally and fragile in the import → match → RFQ → bid status pipeline.
 
@@ -113,7 +113,12 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/urls.py` + `sales/views/imports.py` + `sales/templates/sales/import/progress.html` (step checklist) + `sales/services/importer.py` if new service logic needed
 
 ### Changing `SupplierNSN` or `SupplierFSC` fields
-→ `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html`
+→ `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html` + if tier-1 **score formula** or view columns change: `sales/sql/dibbs_supplier_nsn_scored.sql` (redeploy view in SSMS) + unmanaged `SupplierNSNScored` field alignment + `sales/CONTEXT.md` / `DIBBS_System_Spec.md` score description
+
+### `dibbs_supplier_nsn_scored` view (tier-1 NSN scores)
+→ DDL lives in `sales/sql/dibbs_supplier_nsn_scored.sql` — deploy changes via SSMS with `CREATE OR ALTER VIEW` — **never** run this file from Django migrations or management commands  
+→ Unmanaged Django model: `SupplierNSNScored` in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`)  
+→ If the scoring formula or selected columns change: update the `.sql` file, redeploy in SSMS, align `SupplierNSNScored` fields, refresh `sales/CONTEXT.md` and `DIBBS_System_Spec.md`
 
 ### Flagging or restoring a No Quote CAGE
 → `sales/models/no_quote.py` + migration + `sales/services/no_quote.py` + `sales/views/suppliers.py` + `sales/views/entity_lookup.py` + `sales/views/settings.py` + `sales/views/solicitations.py` + `sales/views/rfq.py` (batch send, queue add/send, `supplier_create_and_queue`) + `sales/templates/sales/suppliers/detail.html` + `sales/entity_lookup.html` + `sales/templates/sales/solicitations/detail.html` + `sales/templates/sales/rfq/pending.html` + `sales/base.html` / `sales/settings/cages.html` nav
@@ -135,7 +140,6 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ### This app depends on:
 - **`suppliers.Supplier`** (table: `contracts_supplier`) — every SupplierMatch, SupplierRFQ, SupplierQuote, SupplierContactLog, SupplierNSN, SupplierFSC, and GovernmentBid references it. Renaming or restructuring `Supplier` fields (`contact`, `primary_email`, `business_email`, `name`, `cage_code`) breaks `sales/services/email.py` (`_supplier_email()`), supplier list/detail views, and RFQ send flows.
-- **`contracts.models.Clin`** — read in `sales/services/matching.py::backfill_nsn_from_contracts()`. If `Clin` fields change (especially nsn, supplier FK), this function breaks silently.
 - **`auth.User`** — referenced as FK in `SupplierRFQ.sent_by`, `SupplierContactLog.logged_by`, `SupplierQuote.entered_by`, `EmailTemplate.created_by`. If `AUTH_USER_MODEL` changes or user fields are restructured, update these models.
 - **`settings.DEFAULT_FROM_EMAIL`** — used in `sales/services/email.py` for outbound email sender.
 - **`settings.SAM_API_KEY`** — required by `sam_entity.py` for CAGE lookup; missing values cause graceful degradation (entity lookup errors shown to user).
@@ -155,7 +159,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 - **Every view must retain `@login_required`**. This app handles sensitive procurement data (solicitation numbers, supplier pricing, bid data). Do not remove or weaken auth decorators.
 - **`saved_filter_create`**, **`saved_filter_update`**, **`saved_filter_delete`**, and **`saved_filter_share`** must always scope writes to the authenticated user: create sets `user=request.user`; update/delete/share require an existing row with `user=request.user` and **`is_system=False`** before updating, deleting, or duplicating (return **403**/**404** as implemented). **`saved_filter_share`** additionally requires an active target user who is not the requester; it creates a **new** row for the target (name collision → ` (shared)` suffix). System seeded filters must not be removable, renamable, or shareable through these endpoints.
-- **Staff-only endpoints:** `backfill_nsn` uses `@user_passes_test(lambda u: u.is_authenticated and u.is_staff)`. `awards_import_upload` checks `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
+- **Staff-only endpoints:** `awards_import_upload` checks `request.user.is_staff`. `no_quote_list` and `no_quote_deactivate` require `is_staff`. Do not remove these checks or widen access.
 - **SAM debug JSON** in `sales/templates/sales/entity_lookup.html` is conditionally shown only to staff (`{% if request.user.is_staff %}`). Do not remove this guard.
 - **Import batch delete** (`import_batch_delete`) only deletes solicitations with `status='New'`. This guard prevents accidental deletion of in-progress work. Do not relax this filter.
 - **`sol_mass_pass`** (`POST /solicitations/mass-pass/`) performs bulk No-Bid updates. With `mass_pass_all=1` it rebuilds the list queryset from posted `filter_qs` and runs a single `QuerySet.update(status='NO_BID')` restricted to `New` and `Active` only (never RFQ_SENT, QUOTING, etc.), excluding rows with `QUEUED` RFQs. The `sol_ids` path is page-scoped with the same status filter. Do not widen these guards — they prevent accidental loss of in-flight RFQ/bid work. **Before** that `update()`, the view snapshots every affected row’s prior status into **`MassPassLog`** (`dibbs_mass_pass_log`) so **`mass_pass_undo`** can restore rows that are still `NO_BID` back to **`Active`** (one undo per log; chunked `id__in` queries). **Do not remove the snapshot / `MassPassLog.objects.create` step from `sol_mass_pass`** — it is required for undo functionality.
@@ -202,7 +206,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - **Import progress page** (`import/progress.html`) drives four steps and reads each step’s JSON response in the browser. `_save_step` in `imports.py` merges into `ImportJob.step_results`; keep keys aligned with the views: parse (`import_date`, `sol_count`, `bq_count`, `as_count`, `parse_errors`, `new_to_active`, `expired_to_archived`), solicitations (`sols_created`, `sols_updated`), lines (`lines_created`, `lines_updated`, `as_loaded`), match (`matches_found`, `tier1`, `tier2`, `tier3`). `ImportJob.batch_id` and `ImportJob.import_date` are set on the job row during the parse step.
 - **`global_search` view** returns JSON when `?fmt=json` is present, plain HTML otherwise. The top-bar search in `sales/base.html` calls it with `fmt=json`. Do not remove the format check.
 - **Solicitation list ↔ workbench navigation:** The list encodes active filters (except `page` and UI-only `active_chip`) into `?list_qs=` on each row’s detail link. The primary solicitation screen is `solicitation_workbench` (URL name `solicitation_detail`). It **should** receive `list_qs` whenever the user should have stable **Previous / Next / Record X of Y** that matches list filters and sort; without `list_qs`, prev/next fall back to the Sol Review / Research session queue when applicable, or show a single-record counter. `_build_list_queryset()` must stay aligned with `solicitation_list()`. **PASS** uses `_capture_workbench_list_nav_snapshot()` before setting `NO_BID` so post-action redirects advance to the next list row like **RESEARCH** (after PASS, a rebuilt list queryset often drops the current sol from non–no-bid tabs). **Closed Solicitations** live at `sales:solicitation_closed` (`/sales/solicitations/closed/`); `/solicitations/archive/` is a permanent redirect. `queued_rfq_count` for banners uses `SupplierRFQ` filtered by `line__solicitation` and `status='QUEUED'`. **`solicitation_reparse`** (POST `/solicitations/<sol>/reparse/`) re-runs `parse_procurement_history` + `parse_packaging_data` against stored `pdf_blob`; keep `@login_required` and CSRF expectations aligned with other JSON POSTs. **Saved filter share:** `saved_filter_share` (POST `/solicitations/saved-filters/share/`) duplicates the caller’s non-system filter to another user; list template shows a toast on success (`#sf-toast`).
-- **Workbench manual supplier autocomplete:** `rfq_manual_supplier_search` (GET `q` min 2 chars; optional `solicitation_number` / `sol_number` excludes suppliers who already have any `SupplierRFQ` on that solicitation) returns an HTML fragment when `HX-Request` is set (HTMX typeahead target `#wb-manual-results`) or a JSON array `[{id, name, cage}]` otherwise. `rfq_queue_add_manual` stages `SupplierRFQ(QUEUED, sent_by=user)` on the solicitation’s first line, advances `New`/`Active`/`Matching` → `RFQ_PENDING`, and may set `pdf_fetch_status='PENDING'` when `pdf_blob` is empty — it does **not** create `SupplierMatch`. No Quote CAGE → JSON `409` with error `No Quote CAGE`; HTMX errors swap OOB into `#wb-manual-results`. Success (HTMX) returns OOB `innerHTML` for `#wb-matches-sidebar` via `_workbench_sidebar_context` + `workbench_sidebar_matches.html`. Standalone refresh: GET `solicitation_workbench_sidebar_partial`. **`rfq_enter_quote` POST (success):** if no `SupplierMatch` for `(line, supplier)`, create `MANUAL` tier 3 score `0`; then `SupplierNSN.get_or_create` with normalized NSN, `match_score=50`, `source='quote_confirmed'` when the line has an NSN. **`build_consolidated_supplier_list`** supplies `is_manual` and merges RFQ-only suppliers into the sidebar; templates show **Manual** + **In Queue** badges. **`+ Queue`** on the workbench uses `document.body` click delegation so buttons work after HTMX sidebar swaps.
+- **Workbench manual supplier autocomplete:** `rfq_manual_supplier_search` (GET `q` min 2 chars; optional `solicitation_number` / `sol_number` excludes suppliers who already have any `SupplierRFQ` on that solicitation) returns an HTML fragment when `HX-Request` is set (HTMX typeahead target `#wb-manual-results`) or a JSON array `[{id, name, cage}]` otherwise. `rfq_queue_add_manual` stages `SupplierRFQ(QUEUED, sent_by=user)` on the solicitation’s first line, advances `New`/`Active`/`Matching` → `RFQ_PENDING`, and may set `pdf_fetch_status='PENDING'` when `pdf_blob` is empty — it does **not** create `SupplierMatch`. No Quote CAGE → JSON `409` with error `No Quote CAGE`; HTMX errors swap OOB into `#wb-manual-results`. Success (HTMX) returns OOB `innerHTML` for `#wb-matches-sidebar` via `_workbench_sidebar_context` + `workbench_sidebar_matches.html`. Standalone refresh: GET `solicitation_workbench_sidebar_partial`. **`rfq_enter_quote` POST (success):** if no `SupplierMatch` for `(line, supplier)`, create `SupplierMatch(MANUAL, tier 3, score 0)`; then `SupplierNSN.objects.get_or_create` with normalized NSN, `defaults={'notes': '', 'added_by': request.user}` when the line has an NSN — existing `SupplierNSN` rows are not overwritten. **`build_consolidated_supplier_list`** supplies `is_manual` and merges RFQ-only suppliers into the sidebar; templates show **Manual** + **In Queue** badges. **`+ Queue`** on the workbench uses `document.body` click delegation so buttons work after HTMX sidebar swaps.
 - **Context processor dependency:** `overdue_rfq_count` is available in every template because `sales.context_processors.rfq_counts` is registered in settings. **`solicitation_nav_tools`** supplies solicitation-route flags for the Cost of Money nav control. Do not remove these processors without updating `STATZWeb/settings.py` and `sales/base.html`.
 
 ---
@@ -326,7 +330,7 @@ After any change, manually verify these flows:
    - Field renames: search `sales/services/`, `sales/views/`, `sales/templates/` for the field name.
    - URL name changes: `grep -r "sales:<name>" sales/templates/` and `sales/base.html`.
    - Status string changes: `grep -r "'<STATUS>'" sales/` (views, services, templates all use raw strings).
-4. **Check cross-app impact**: `suppliers.Supplier` field references in `sales/services/email.py`, `matching.py`, `views/suppliers.py`; `contracts.Clin` in `matching.backfill_nsn_from_contracts`.
+4. **Check cross-app impact**: `suppliers.Supplier` field references in `sales/services/email.py`, `matching.py`, `views/suppliers.py`; tier-1 scoring SQL view joins `contracts_*` tables — update `sales/sql/dibbs_supplier_nsn_scored.sql` if contract/NSN join keys change.
 5. **Make minimal, scoped changes.** Do not refactor adjacent code unless it is directly broken.
 6. **Update all coupled files** (see Section 5 clusters).
 7. **Run `makemigrations sales`** if any model was changed and review the output.
@@ -357,12 +361,10 @@ After any change, manually verify these flows:
 
 ### Main cross-app dependencies
 - `suppliers.Supplier` — central supplier record; all matching, RFQ, quote, and bid FKs point here
-- `contracts.models.Clin` — read by `backfill_nsn_from_contracts()`
 - `sales.context_processors.rfq_counts` registered in `STATZWeb/settings.py`
 
 ### Main security-sensitive areas
 - All views — must retain `@login_required`
-- `backfill_nsn` — must retain staff-only guard
 - SAM debug JSON — must remain staff-only in `entity_lookup.html`
 - `import_batch_delete` — must retain `status='New'` filter
 

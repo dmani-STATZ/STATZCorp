@@ -40,7 +40,6 @@ from sales.views.solicitations import (
     saved_filter_share,
 )
 from sales.views.suppliers import (
-    backfill_nsn,
     supplier_list,
     supplier_detail,
     supplier_add_nsn,
@@ -150,7 +149,6 @@ __all__ = [
     "saved_filter_update",
     "saved_filter_delete",
     "saved_filter_share",
-    "backfill_nsn",
     "supplier_list",
     "supplier_detail",
     "supplier_add_nsn",

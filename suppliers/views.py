@@ -859,7 +859,7 @@ class SuppliersInfoByType(LoginRequiredMixin, ListView):
     template_name = 'suppliers/suppliers_by_type.html'
     model = Supplier
     context_object_name = 'suppliers'
-    paginate_by = 2
+    paginate_by = 50
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -867,9 +867,9 @@ class SuppliersInfoByType(LoginRequiredMixin, ListView):
         self.type_slug = self.kwargs.get('type_slug', '').lower()
 
         if self.type_slug == 'unspecified':
-            return qs.filter(supplier_type__isnull=True)
+            return qs.filter(supplier_type__isnull=True).order_by('name')
 
-        return qs.filter(supplier_type__description__iexact=self.type_slug)
+        return qs.filter(supplier_type__description__iexact=self.type_slug).order_by('name')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -34,7 +34,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `contracts/migrations/` — check the latest migration before adding fields; 37+ migrations exist with compound indexes
 - `transactions` app signals — signals in `transactions/` fire on `Contract` and `Clin` post/pre_save; renaming tracked fields will silently break the audit trail
 - `processing/models.py` — `QueueContract` and `QueueClin` mirror Contract/Clin fields; a schema change may require parallel updates there
-- `sales/` views that reference contract fields directly (`sales/matching.py`, `sales/views/`)
+- `sales/` views/services that reference contract fields (e.g. SQL view DDL under `sales/sql/` joining `contracts_clin` / `contracts_contract` / `contracts_nsn`)
 
 ### Before changing views
 - `contracts/views/mixins.py` — `ActiveCompanyQuerysetMixin` must remain on every queryset-based view; removing it leaks cross-tenant data
@@ -140,7 +140,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 |-----|---------------|
 | `processing` | `QueueContract`/`QueueClin` map fields to `Contract`/`Clin`; matching engine creates live `Contract`/`Clin` rows |
 | `transactions` | Registers pre/post_save signals on `Contract` and `Clin`; reads a list of tracked field names — **renaming any tracked field on these models silently drops audit history** |
-| `sales` | Imports `Contract`, `Clin` for backfill and supplier matching logic in `sales/matching.py` and `sales/views/` |
+| `sales` | Tier-1 supplier NSN scoring reads `contracts_*` via SQL Server view `dibbs_supplier_nsn_scored` (not Django `Clin` in `matching.py`) |
 | `suppliers` | Some supplier URL patterns may reverse into contracts URLs |
 
 ### Specific high-risk field names (tracked by `transactions` signals):
@@ -309,7 +309,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 ### Main cross-app dependencies
 - `transactions` app: audit signals on `Contract`/`Clin` saves
 - `processing` app: `QueueContract`/`QueueClin` mirror Contract/Clin schema
-- `sales` app: reads `Contract`/`Clin` for matching and backfill
+- `sales` app: tier-1 NSN scoring joins `contracts_*` in SQL Server view `dibbs_supplier_nsn_scored` (deployed via SSMS; see `sales/sql/dibbs_supplier_nsn_scored.sql`)
 - `suppliers` app: `Supplier` model FKed from `Clin`
 - `products` app: `Nsn` model FKed from `Clin` (PROTECT)
 - `users` app: `request.active_company` middleware, `UserCompanyMembership`

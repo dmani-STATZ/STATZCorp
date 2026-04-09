@@ -4,11 +4,12 @@ Tables: dibbs_supplier_nsn, dibbs_supplier_fsc.
 FK to suppliers.Supplier (contracts_supplier).
 """
 
+from django.conf import settings
 from django.db import models
 
 
 class SupplierNSN(models.Model):
-    """Explicit NSN-level supplier capability."""
+    """Explicit NSN-level supplier capability (manual rows; scores from SQL view)."""
 
     supplier = models.ForeignKey(
         "suppliers.Supplier",
@@ -16,18 +17,42 @@ class SupplierNSN(models.Model):
         related_name="nsn_capabilities",
     )
     nsn = models.CharField(max_length=46, db_index=True)
-    part_number = models.CharField(max_length=100, null=True, blank=True)
-    is_preferred = models.BooleanField(default=False)
     notes = models.CharField(max_length=255, null=True, blank=True)
-    match_score = models.DecimalField(max_digits=6, decimal_places=2, default=0)
-    source = models.CharField(max_length=20, default="manual")
-    last_synced = models.DateField(null=True, blank=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="nsn_capabilities_added",
+    )
 
     class Meta:
         db_table = "dibbs_supplier_nsn"
         unique_together = ("supplier", "nsn")
         verbose_name = "Supplier NSN"
         verbose_name_plural = "Supplier NSNs"
+
+
+class SupplierNSNScored(models.Model):
+    """
+    Unmanaged model — reads from dibbs_supplier_nsn_scored SQL Server view.
+    Created manually in SSMS. Never modified by Django migrations.
+    Do not add to migrations.
+    """
+
+    id = models.BigIntegerField(primary_key=True)
+    supplier = models.ForeignKey(
+        "suppliers.Supplier",
+        on_delete=models.DO_NOTHING,
+        related_name="nsn_scored",
+    )
+    nsn = models.CharField(max_length=46)
+    match_score = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        managed = False
+        db_table = "dibbs_supplier_nsn_scored"
 
 
 class SupplierFSC(models.Model):

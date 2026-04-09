@@ -1,17 +1,14 @@
 """
-3-tier supplier matching engine and one-time contract history backfill.
-Only reads from contracts in backfill_nsn_from_contracts(); matching uses dibbs_* tables only.
+3-tier supplier matching engine.
+Tier 1 NSN scores are read from the dibbs_supplier_nsn_scored SQL view (SupplierNSNScored).
 """
 import logging
-from datetime import date
 from decimal import Decimal
-
-from django.db import transaction
 
 from sales.models import (
     SolicitationLine,
     SupplierMatch,
-    SupplierNSN,
+    SupplierNSNScored,
     SupplierFSC,
     ApprovedSource,
     ImportBatch,
@@ -19,6 +16,9 @@ from sales.models import (
 from suppliers.models import Supplier
 
 logger = logging.getLogger(__name__)
+
+# SQL Server: keep IN clause size safely under the 2100-parameter ceiling
+NSN_IN_CHUNK = 100
 
 
 def _normalize_nsn(nsn: str) -> str:
@@ -31,23 +31,18 @@ def normalize_nsn(nsn: str) -> str:
     Public alias for NSN normalization (views, imports, RFQ quote entry).
 
     `rfq_enter_quote` uses this when `get_or_create`ing `SupplierNSN` after a successful
-    quote save (`match_score=50`, `source='quote_confirmed'`).
+    quote save (ties the supplier to the line NSN for tier-1 matching).
     """
     return _normalize_nsn(nsn)
 
 
 def _match_tier1_nsn(line: SolicitationLine) -> list[dict]:
-    """
-    Query dibbs_supplier_nsn for exact NSN match.
-    Returns list of match dicts ordered by match_score desc.
-    Excludes archived suppliers.
-    """
     normalized = _normalize_nsn(line.nsn)
     if not normalized:
         return []
 
     qs = (
-        SupplierNSN.objects.filter(nsn=normalized)
+        SupplierNSNScored.objects.filter(nsn=normalized)
         .exclude(supplier__archived=True)
         .select_related("supplier")
         .order_by("-match_score")
@@ -184,31 +179,36 @@ def run_matching_for_batch(batch_id: int) -> dict:
             if normalized:
                 nsn_to_lines.setdefault(normalized, []).append(line.id)
 
-    # Single query: all SupplierNSN records for all NSNs
+    # Chunked queries: SupplierNSNScored for all NSNs in this batch
     tier1_matches = {}  # nsn → list of {supplier_id, match_score}
     if nsn_to_lines:
-        tier1_rows = SupplierNSN.objects.filter(
-            nsn__in=nsn_to_lines.keys()
-        ).exclude(
-            supplier__archived=True
-        ).values("nsn", "supplier_id", "match_score")
-        for row in tier1_rows:
-            tier1_matches.setdefault(row["nsn"], []).append({
-                "supplier_id": row["supplier_id"],
-                "match_score": row["match_score"] or Decimal("0"),
-            })
+        nsn_keys = list(nsn_to_lines.keys())
+        for i in range(0, len(nsn_keys), NSN_IN_CHUNK):
+            chunk = nsn_keys[i : i + NSN_IN_CHUNK]
+            tier1_rows = SupplierNSNScored.objects.filter(
+                nsn__in=chunk
+            ).exclude(
+                supplier__archived=True
+            ).values("nsn", "supplier_id", "match_score")
+            for row in tier1_rows:
+                tier1_matches.setdefault(row["nsn"], []).append({
+                    "supplier_id": row["supplier_id"],
+                    "match_score": row["match_score"] or Decimal("0"),
+                })
 
     # ── BATCH TIER 2: Fetch all ApprovedSource + Supplier matches ──
     # Build set of unique NSNs again for approved source lookups
     tier2_matches = {}  # nsn → list of supplier_ids
     if nsn_to_lines:
-        # Single query: all approved cages for all NSNs
         approved_cages = {}
-        for as_row in ApprovedSource.objects.filter(
-            nsn__in=nsn_to_lines.keys()
-        ).values_list("nsn", "approved_cage").distinct():
-            nsn, cage = as_row
-            approved_cages.setdefault(nsn, set()).add(cage)
+        nsn_keys = list(nsn_to_lines.keys())
+        for i in range(0, len(nsn_keys), NSN_IN_CHUNK):
+            chunk = nsn_keys[i : i + NSN_IN_CHUNK]
+            for as_row in ApprovedSource.objects.filter(
+                nsn__in=chunk
+            ).values_list("nsn", "approved_cage").distinct():
+                nsn, cage = as_row
+                approved_cages.setdefault(nsn, set()).add(cage)
 
         # Single query: all suppliers matching those cages
         if approved_cages:
@@ -239,13 +239,16 @@ def run_matching_for_batch(batch_id: int) -> dict:
     # Single query: all SupplierFSC records for all FSCs
     tier3_matches = {}  # fsc → list of supplier_ids
     if fsc_to_lines:
-        for row in SupplierFSC.objects.filter(
-            fsc_code__in=fsc_to_lines.keys()
-        ).exclude(
-            supplier__archived=True
-        ).values_list("fsc_code", "supplier_id").distinct():
-            fsc, supplier_id = row
-            tier3_matches.setdefault(fsc, []).append(supplier_id)
+        fsc_keys = list(fsc_to_lines.keys())
+        for i in range(0, len(fsc_keys), NSN_IN_CHUNK):
+            chunk = fsc_keys[i : i + NSN_IN_CHUNK]
+            for row in SupplierFSC.objects.filter(
+                fsc_code__in=chunk
+            ).exclude(
+                supplier__archived=True
+            ).values_list("fsc_code", "supplier_id").distinct():
+                fsc, supplier_id = row
+                tier3_matches.setdefault(fsc, []).append(supplier_id)
 
     # ── Now match each line using the batched data ──────────────────
     by_tier = {1: 0, 2: 0, 3: 0}
@@ -311,119 +314,4 @@ def run_matching_for_batch(batch_id: int) -> dict:
         "lines_processed": len(lines),
         "matches_found": total_matches,
         "by_tier": by_tier,
-    }
-
-
-def backfill_nsn_from_contracts(dry_run: bool = False) -> dict:
-    """
-    One-time backfill of dibbs_supplier_nsn from contracts_clin history.
-
-    - Groups CLINs by (nsn, supplier)
-    - Calculates recency-weighted score per group
-    - Upserts into dibbs_supplier_nsn with source='contract_history'
-    - Does NOT overwrite records where source='manual'
-    - dry_run=True: calculate and return counts without writing
-
-    Returns: {processed, created, updated, skipped_manual, errors}
-    """
-    from contracts.models import Clin
-
-    today = date.today()
-    processed = 0
-    created = 0
-    updated = 0
-    skipped_manual = 0
-    errors = 0
-
-    clins = (
-        Clin.objects.exclude(supplier__is_packhouse=True)
-        .exclude(supplier_id__isnull=True)
-        .exclude(nsn_id__isnull=True)
-        .select_related("contract", "supplier", "nsn")
-    )
-
-    # Group by (normalized_nsn, supplier_id) -> list of (award_date,)
-    groups = {}
-    for clin in clins:
-        if not clin.contract or not clin.contract.award_date:
-            continue
-        nsn_raw = getattr(clin.nsn, "nsn_code", None) or ""
-        normalized = _normalize_nsn(nsn_raw)
-        if not normalized or not clin.supplier_id:
-            continue
-        key = (normalized, clin.supplier_id)
-        award_dt = clin.contract.award_date
-        award_date = award_dt.date() if hasattr(award_dt, "date") else award_dt
-        groups.setdefault(key, []).append(award_date)
-        processed += 1
-
-    def _weight(age_years: float) -> float:
-        if age_years <= 2:
-            return 1.0
-        if age_years <= 5:
-            return 0.6
-        if age_years <= 10:
-            return 0.3
-        return 0.1
-
-    if dry_run:
-        for (norm_nsn, supplier_id), dates in groups.items():
-            score = sum(
-                _weight((today - d).days / 365) for d in dates
-            )
-            existing = SupplierNSN.objects.filter(
-                nsn=norm_nsn, supplier_id=supplier_id
-            ).first()
-            if existing:
-                if existing.source == "manual":
-                    skipped_manual += 1
-                else:
-                    updated += 1
-            else:
-                created += 1
-        return {
-            "processed": processed,
-            "created": created,
-            "updated": updated,
-            "skipped_manual": skipped_manual,
-            "errors": errors,
-        }
-
-    with transaction.atomic():
-        for (norm_nsn, supplier_id), dates in groups.items():
-            try:
-                score = sum(
-                    _weight((today - d).days / 365) for d in dates
-                )
-                existing = SupplierNSN.objects.filter(
-                    nsn=norm_nsn, supplier_id=supplier_id
-                ).first()
-                if existing:
-                    if existing.source == "manual":
-                        skipped_manual += 1
-                        continue
-                    existing.match_score = Decimal(str(round(score, 2)))
-                    existing.source = "contract_history"
-                    existing.last_synced = today
-                    existing.save()
-                    updated += 1
-                else:
-                    SupplierNSN.objects.create(
-                        supplier_id=supplier_id,
-                        nsn=norm_nsn,
-                        match_score=Decimal(str(round(score, 2))),
-                        source="contract_history",
-                        last_synced=today,
-                    )
-                    created += 1
-            except Exception as e:
-                logger.exception("backfill_nsn_from_contracts row error: %s", e)
-                errors += 1
-
-    return {
-        "processed": processed,
-        "created": created,
-        "updated": updated,
-        "skipped_manual": skipped_manual,
-        "errors": errors,
     }

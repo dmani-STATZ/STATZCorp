@@ -109,8 +109,8 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | Status | Task | Spec Section | Session |
 |--------|------|-------------|---------|
 | ✅ Done | 3-tier supplier matching engine (`services/matching.py`) | §4, §12.3 | S2 |
-| ✅ Done | Contract history backfill — `backfill_nsn_from_contracts()` one-time seed of `dibbs_supplier_nsn` | §4.2, §12.3 | S2 |
-| ✅ Done | Backfill trigger — view + URL + template (`suppliers/backfill-nsn/`) | §4.2 | S2 |
+| ✅ Superseded | ~~Contract history backfill~~ — replaced by SQL view `dibbs_supplier_nsn_scored` + unmanaged `SupplierNSNScored`; `dibbs_supplier_nsn` is manual/quote-driven rows only | §4.2, §12.3 | Apr 2026 |
+| ✅ Removed | ~~Backfill trigger~~ (`suppliers/backfill-nsn/`) — deleted | §4.2 | Apr 2026 |
 | ✅ Done | Match review UI on solicitation detail — Matches tab with tier badges | §9.7 | S3 |
 | ⬜ Todo | HUBZone flag UI — bulk-mark solicitations as HUBZone from solicitation list | §12.2 | S7 |
 | ✅ Done | RFQ email generation (`services/email.py`) — outbound + follow-up templates | §10.2, §10.7 | S4 |
@@ -172,10 +172,10 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 |------|---------|--------|
 | Mar 2026 | S0 — Models + initial migration | All `dibbs_*` models, migration file |
 | Mar 2026 | S1 — Import pipeline + solicitation list | `parser.py`, `importer.py`, `views/imports.py`, `views/solicitations.py` (list), `urls.py`, `base.html`, `upload.html`, `list.html` |
-| Mar 2026 | S2 — Matching engine + backfill | `services/matching.py` (3-tier engine + `backfill_nsn_from_contracts()`), backfill view/URL/template, matching wired into import |
+| Mar 2026 | S2 — Matching engine + backfill | `services/matching.py` (3-tier engine); backfill path later replaced by live SQL view (Apr 2026) |
 | Mar 2026 | S4 — RFQ dispatch, quote entry, email service | `services/email.py`, `models/cages.py` (CompanyCAGE), `models/rfq.py` (SupplierRFQ + SupplierContactLog), `views/rfq.py` (9 views), solicitation detail tabs, `rfq/pending.html`, `rfq/sent.html`, `rfq/quote_entry.html` |
 | Mar 11, 2026 | S5 — BQ export, bid views, supplier views, import rewrite, RFQ Center + templates | `services/bq_export.py`, `services/importer.py` (perf rewrite), `views/bids.py` (stubs), `views/suppliers.py` (stubs), all templates: `rfq/center.html`, `rfq/partials/center_panel.html`, `bids/ready.html`, `bids/builder.html`, `bids/export_queue.html`, `suppliers/list.html`, `suppliers/detail.html`, `suppliers/add_nsn.html`, `suppliers/add_fsc.html` |
-| Mar 11, 2026 | S6 — Missing view functions wired up | `views/rfq.py` (`rfq_center`, `rfq_center_detail`), `views/bids.py` (all 5 views complete), `views/suppliers.py` (all views complete, `backfill_nsn` preserved), `views/__init__.py` updated |
+| Mar 11, 2026 | S6 — Missing view functions wired up | `views/rfq.py` (`rfq_center`, `rfq_center_detail`), `views/bids.py` (all 5 views complete), `views/suppliers.py` (all views complete), `views/__init__.py` updated |
 
 ---
 
@@ -388,16 +388,17 @@ Key fields relevant to the bidding system:
 
 **RFQ email priority:** `contact.email` → `primary_email` → `business_email`
 
-#### `dibbs_supplier_nsn` *(new)* — explicit NSN-level supplier capability
+#### `dibbs_supplier_nsn` — explicit NSN-level supplier capability (manual + quote learning)
 
 ```python
 class SupplierNSN(models.Model):
-    supplier = models.ForeignKey('contracts.Supplier', on_delete=models.CASCADE,
+    supplier = models.ForeignKey('suppliers.Supplier', on_delete=models.CASCADE,
                                   related_name='nsn_capabilities')
-    nsn = models.CharField(max_length=46, db_index=True)
-    part_number = models.CharField(max_length=100, null=True, blank=True)
-    is_preferred = models.BooleanField(default=False)
+    nsn = models.CharField(max_length=46, db_index=True)  # normalized 13 digits, no hyphens
     notes = models.CharField(max_length=255, null=True, blank=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                 null=True, blank=True, related_name='nsn_capabilities_added')
 
     class Meta:
         db_table = 'dibbs_supplier_nsn'
@@ -408,10 +409,12 @@ class SupplierNSN(models.Model):
 |--------|------|-------|
 | id | INT IDENTITY PK | |
 | supplier_id | INT FK | → contracts_supplier.id |
-| nsn | VARCHAR(46) | Specific NSN this supplier can provide. Indexed. |
-| part_number | VARCHAR(100) NULL | Supplier's part number for this NSN |
-| is_preferred | BIT | Preferred supplier for this NSN |
+| nsn | VARCHAR(46) | NSN (normalized: 13 digits, no hyphens). Indexed. |
 | notes | VARCHAR(255) NULL | |
+| added_at | DATETIME | When the row was created |
+| added_by_id | INT NULL FK | → auth_user (who added, if known) |
+
+**Tier-1 match score** is **not** stored on this table. It is computed at read time by SQL Server view **`dibbs_supplier_nsn_scored`** (DDL in `sales/sql/dibbs_supplier_nsn_scored.sql`; deploy with `CREATE OR ALTER` in SSMS). Django reads it via unmanaged model **`SupplierNSNScored`** (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`). Score = **1.0** base + sum of contract weights from `contracts_clin` / `contracts_contract` / `contracts_nsn` (1.0 if award ≤2y, 0.75 if ≤4y, 0.5 older).
 
 #### `dibbs_supplier_fsc` *(new)* — FSC/category-level supplier capability
 
@@ -611,109 +614,44 @@ Stores historical DLA purchase records per NSN, extracted from DIBBS solicitatio
 
 When a daily import completes, the matching engine runs automatically and attempts to link each solicitation line to one or more capable suppliers. Three matching tiers are applied in priority order.
 
-**Key asset: 20+ years of contract history.** STATZ has 10,000+ contracts in the existing database. The `contracts_clin` table links NSNs directly to suppliers through won contracts. This history is synced into `dibbs_supplier_nsn` via a dedicated sync job (see §4.2), so the matching engine runs entirely within the `sales` app and never queries `contracts` directly at match time.
+**Key asset: contract history for ranking.** `contracts_clin` links NSNs to suppliers. Tier-1 **ranking** uses that history inside the SQL view `dibbs_supplier_nsn_scored` (joined at query time). The Django matching service reads **`SupplierNSNScored`** (unmanaged) and does not import `Clin` in Python.
 
-**Architecture principle:** `contracts` and `sales` are kept separate. The contracts database is the *source* that populates DIBBS tables; it is not a live dependency during matching. All matching reads only from `dibbs_*` tables.
+**Architecture principle:** `contracts` and `sales` remain separate apps. Matching **Python** code reads `dibbs_*` tables and the scored view; the view itself joins `contracts_*` tables inside SQL Server.
 
 ### 4.1 Matching Tiers
 
 | Priority | Method | Source Table | Logic |
 |----------|--------|-------------|-------|
-| 1 — Direct NSN | Exact NSN match | `dibbs_supplier_nsn` | Query by NSN, order by `match_score` desc — score is pre-calculated from contract history at sync time |
+| 1 — Direct NSN | Exact NSN match | `dibbs_supplier_nsn_scored` (view over `dibbs_supplier_nsn` + `contracts_*`) | Query by NSN on `SupplierNSNScored`, order by `match_score` desc — score computed live in SQL Server |
 | 2 — Approved Source | AS file CAGE cross-ref | `dibbs_approved_source` + `contracts_supplier` | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
 | 3 — FSC Category | 4-digit FSC match | `dibbs_supplier_fsc` | `SupplierFSC.objects.filter(fsc_code=line.fsc, supplier__archived=False)` |
 
-A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found. Tier 1 matches carry a `match_score` pre-calculated during the sync job. Suppliers with `probation=True` or `conditional=True` are included but visually flagged. Suppliers with `archived=True` are excluded entirely.
+A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found. Tier 1 `match_score` on **`dibbs_supplier_match`** is copied from the scored view at match time. Suppliers with `probation=True` or `conditional=True` are included but visually flagged. Suppliers with `archived=True` are excluded entirely.
 
-**`match_score` field:** Add to `dibbs_supplier_match`:
+**`match_score` on `dibbs_supplier_match`:**
 ```python
 match_score = models.DecimalField(max_digits=6, decimal_places=2, default=0)
-# Tier 1: recency-weighted contract win score, pre-calculated at sync time (see §4.2, §12.3.1)
+# Tier 1: from SupplierNSNScored / view dibbs_supplier_nsn_scored (live SQL formula; see §12.3)
 # Tier 2: 1.0 fixed (approved source is a strong signal)
 # Tier 3: 0.5 fixed (FSC is a weak/broad signal)
 ```
 
-### 4.2 Contract History Backfill
+### 4.2 Live NSN scoring (SQL view)
 
-The `dibbs_supplier_nsn` table is seeded **once** from `contracts_clin` via a one-time backfill job. This is the only point where `sales` ever reads from `contracts` data. After the backfill, `dibbs_supplier_nsn` grows organically — new supplier-NSN relationships are written directly by the sales app when quotes are won, with no further dependency on the contracts database.
+- **`dibbs_supplier_nsn`** holds only rows users/system create (bulk NSN add, quote-confirmed `get_or_create`, etc.). There is **no** `contract_history` sync job and **no** Python backfill.
+- **`dibbs_supplier_nsn_scored`** is a SQL Server **view** (see `sales/sql/dibbs_supplier_nsn_scored.sql`). Deploy with SSMS (`CREATE OR ALTER VIEW`). Do not run the `.sql` file from Django or management commands.
+- Matching tier 1 queries this view via Django unmanaged model **`SupplierNSNScored`**.
 
 ```
-DAY 1 — ONE TIME:
-contracts_clin ──[backfill]──→ dibbs_supplier_nsn  (seeded with 20 years of history)
-
 ONGOING:
-New won quote ──[sales app]──→ dibbs_supplier_nsn  (grows from new DIBBS activity)
+Staff / quotes ──→ dibbs_supplier_nsn
+                          │
+                          ▼
+contracts_clin + contracts_contract + contracts_nsn ──→ dibbs_supplier_nsn_scored (VIEW)
+                          │
+                          ▼
+              matching.py (SupplierNSNScored) ──→ dibbs_supplier_match
 ```
-
-**Backfill logic (`services/matching.py` → `backfill_nsn_from_contracts()`):**
-
-```python
-def sync_nsn_from_contracts():
-    """
-    Read contracts_clin, calculate recency-weighted scores per NSN+supplier,
-    upsert into dibbs_supplier_nsn. Excludes packaging facilities.
-    Run nightly or on-demand from Settings.
-    """
-    from contracts.models import CLIN  # only import at sync time
-    from datetime import date
-
-    today = date.today()
-
-    # Group CLINs by (nsn, supplier), excluding packaging facilities
-    # ⚠ Confirm packaging facility filter field with dev (see §12.3)
-    clins = (
-        CLIN.objects
-        .exclude(supplier__is_packhouse=True)
-        .select_related('supplier', 'contract')
-        .values('nsn', 'supplier_id', 'contract__award_date')
-    )
-
-    # Build score map: {(nsn, supplier_id): weighted_score}
-    score_map = {}
-    for clin in clins:
-        key = (clin['nsn'], clin['supplier_id'])
-        age_years = (today - clin['contract__award_date']).days / 365
-        if age_years <= 2:
-            weight = 1.0
-        elif age_years <= 5:
-            weight = 0.6
-        elif age_years <= 10:
-            weight = 0.3
-        else:
-            weight = 0.1
-        score_map[key] = round(score_map.get(key, 0) + weight, 2)
-
-    # Upsert into dibbs_supplier_nsn
-    for (nsn, supplier_id), score in score_map.items():
-        SupplierNSN.objects.update_or_create(
-            nsn=nsn,
-            supplier_id=supplier_id,
-            defaults={
-                'match_score': score,
-                'source': 'contract_history',
-                'last_synced': today,
-            }
-        )
-```
-
-**Add fields to `dibbs_supplier_nsn`:**
-```python
-match_score  = models.DecimalField(max_digits=6, decimal_places=2, default=0)
-source       = models.CharField(max_length=20, default='manual')
-# 'contract_history' = populated by sync job
-# 'manual' = added by staff directly
-last_synced  = models.DateField(null=True, blank=True)
-```
-
-**When to run:**
-- **Once**, on initial deployment, from the Settings page ("Load Contract History" button)
-- Can be re-run manually if needed (e.g. after a large batch of new contracts is entered) but this is not expected to be routine
-- Does not need to be scheduled or automated
-
-**What it does NOT do:**
-- Does not delete manually-added `dibbs_supplier_nsn` records (`source='manual'`)
-- Does not modify any data in the `contracts` app
-- Does not run automatically — it is a one-time on-demand operation
 
 #### `dibbs_supplier_match` *(new)* — results of matching engine
 
@@ -3548,64 +3486,36 @@ contracts_contract
         └── nsn_fk       →  (NSN record)
 ```
 
-**Architecture decision:** `contracts` and `sales` remain separate apps and are not directly coupled at query time. The contract history is synced into `dibbs_supplier_nsn` via a dedicated sync job (§4.2). The matching engine then reads only from `dibbs_supplier_nsn` — it never queries `contracts_clin` directly during normal operation.
+**Architecture decision:** `contracts` and `sales` remain separate Django apps. **Tier-1 NSN scores** are computed in SQL Server view **`dibbs_supplier_nsn_scored`** (see `sales/sql/dibbs_supplier_nsn_scored.sql`), which joins `dibbs_supplier_nsn` to `contracts_clin`, `contracts_contract`, and `contracts_nsn`. Django matching reads the view through unmanaged **`SupplierNSNScored`** — Python does not query `Clin` for matching.
 
 ```
-contracts_clin ──[one-time backfill]──→ dibbs_supplier_nsn ──[matching engine]──→ dibbs_supplier_match
-                                              ↑
-                              new won quotes added here by sales app
+Staff / quotes ──→ dibbs_supplier_nsn
+                         │
+contracts_clin + contracts_contract + contracts_nsn ──→ dibbs_supplier_nsn_scored (VIEW)
+                         │
+                         ▼
+              matching (SupplierNSNScored) ──→ dibbs_supplier_match
 ```
 
-**Packaging facility filter:**
-The CLIN table links both suppliers and packaging facilities via the same `supplier_fk + nsn_fk` pattern. The sync job must exclude packaging facilities so they never enter `dibbs_supplier_nsn`. There is a distinguishing field on the supplier record (type, category, or flag — confirm exact field name with dev) that identifies packaging facilities.
-
-**Confirmed:** `is_packhouse=True` on `contracts_supplier` identifies packaging facilities. Exclude with `.exclude(supplier__is_packhouse=True)`.
+**Packaging facilities:** If packaging-only suppliers must never appear in tier 1, filter them when **creating** `dibbs_supplier_nsn` rows or extend the view SQL to exclude `contracts_supplier.is_packhouse = 1`. The view DDL shipped in-repo is the source of truth for the exact join filters.
 
 ---
 
-### 12.3.1 Contract History Weighting
+### 12.3.1 Contract history weighting (live view)
 
-Raw contract count is not enough — a supplier win from 2006 should carry less weight than one from 2024. The matching engine should apply a recency-weighted score when ranking Tier 1 matches so the most relevant suppliers surface first.
+Recency weighting is applied **inside** `dibbs_supplier_nsn_scored` (not in Python). Each matching `contracts_clin` row with a non-null contract `award_date` adds:
 
-**Proposed weighting tiers:**
-
-| Contract Age | Weight Multiplier |
+| Age (calendar days from award to today) | Weight per contract |
 |---|---|
-| 0–2 years | 1.0 × (full weight) |
-| 2–5 years | 0.6 × |
-| 5–10 years | 0.3 × |
-| 10+ years | 0.1 × |
+| ≤ 730 (~2 years) | 1.0 |
+| ≤ 1460 (~4 years) | 0.75 |
+| Older | 0.5 |
 
-**Proposed match score formula:**
-```python
-def contract_match_score(clins):
-    from datetime import date
-    score = 0
-    today = date.today()
-    for clin in clins:
-        age_years = (today - clin.contract.award_date).days / 365
-        if age_years <= 2:
-            weight = 1.0
-        elif age_years <= 5:
-            weight = 0.6
-        elif age_years <= 10:
-            weight = 0.3
-        else:
-            weight = 0.1
-        score += weight
-    return round(score, 2)
-```
+**Base bonus:** Every row in `dibbs_supplier_nsn` contributes **+1.0** to `match_score` in the view so manually added capabilities rank above zero but below suppliers with strong contract history.
 
-**Volume bonus:** Each additional CLIN win on the same NSN adds to the score, so a supplier with 8 wins on an NSN outranks one with a single win even within the same recency tier.
+**What the score drives:** Order of Tier 1 matches on solicitation Matches tab and import-time `dibbs_supplier_match.match_score` for tier 1.
 
-**What this score drives:**
-- Rank order of Tier 1 matches shown on the solicitation Matches tab
-- Surfacing the "best" supplier to send the RFQ to first when auto-dispatching
-- Over time, recent quotes and wins from `dibbs_supplier_quote` feed back into the score as new contract records are created
-
-**Implementation note:** The matching engine queries `contracts_clin` filtered by NSN, excludes packaging facilities, groups by supplier, computes the weighted score, and returns ranked results. This is a read-only query on the existing contracts data — no migration or data movement required.
-
-**Confirmed:** `award_date` is the field name on the Contract model. `is_packhouse=True` is the field that identifies packaging facilities on the Supplier model.
+**Confirmed:** `award_date` lives on `contracts_contract`. NSN text for the join uses `contracts_nsn.nsn_code` matched to `dibbs_supplier_nsn.nsn` (normalized 13-digit, no hyphens).
 
 ---
 
