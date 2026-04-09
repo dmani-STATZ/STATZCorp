@@ -1,0 +1,42 @@
+{# Single panel: packaging & preservation (id wb-packaging-panel for PDF refresh JS). #}
+<div id="wb-packaging-panel">
+  <div class="card border shadow-sm mb-3">
+    <div class="card-header py-2 fw-semibold d-flex align-items-center justify-content-between gap-2">
+      <span>Packaging &amp; preservation</span>
+      <button type="button"
+              class="btn btn-sm btn-outline-secondary border-0 wb-reparse-btn p-1 lh-1"
+              title="Re-parse stored PDF into this section"
+              aria-label="Re-parse packaging from PDF"
+              data-wb-reparse-panel="packaging"
+              {% if not has_pdf_blob %}disabled{% endif %}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+      </button>
+    </div>
+    <div class="card-body small">
+      {% if packaging %}
+        {% if packaging.packaging_standard %}
+        <div class="mb-2"><span class="text-muted fw-semibold">Packaging standard</span><br>{{ packaging.packaging_standard }}</div>
+        {% endif %}
+        {% if packaging.preservation_requirements %}
+        <div class="mb-2"><span class="text-muted fw-semibold">Preservation</span><br>{{ packaging.preservation_requirements|linebreaksbr }}</div>
+        {% endif %}
+        {% if packaging.marking_requirements %}
+        <div class="mb-0"><span class="text-muted fw-semibold">Marking</span><br>{{ packaging.marking_requirements|linebreaksbr }}</div>
+        {% endif %}
+        {% if not packaging.packaging_standard and not packaging.preservation_requirements and not packaging.marking_requirements %}
+        <p class="text-muted mb-2">No extracted packaging text on file.</p>
+        <p class="mb-0 small">No data found during initial scrape.
+          {% if has_pdf_blob %}<button type="button" class="btn btn-link btn-sm p-0 align-baseline wb-reparse-btn" data-wb-reparse-panel="packaging">Try Re-parsing</button>
+          {% else %}<span class="text-muted">Fetch the PDF first, then use Re-parse.</span>{% endif %}
+        </p>
+        {% endif %}
+      {% else %}
+      <p class="text-muted mb-2">No packaging record for this solicitation.</p>
+      <p class="mb-0 small">No data found during initial scrape.
+        {% if has_pdf_blob %}<button type="button" class="btn btn-link btn-sm p-0 align-baseline wb-reparse-btn" data-wb-reparse-panel="packaging">Try Re-parsing</button>
+        {% else %}<span class="text-muted">Fetch the PDF first (View RFQ PDF), then use Re-parse.</span>{% endif %}
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>

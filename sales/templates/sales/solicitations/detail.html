@@ -174,7 +174,63 @@
       </div>
       {% endif %}
 
-      {% include "sales/solicitations/partials/workbench_procurement_packaging.html" with procurement_history=procurement_history packaging=packaging has_pdf_blob=has_pdf_blob only %}
+      {% include "sales/solicitations/partials/workbench_procurement_panel.html" with procurement_history=procurement_history has_pdf_blob=has_pdf_blob only %}
+
+      <div class="row g-0 mt-3">
+        <div class="col-7 pe-2">
+          <div class="card border shadow-sm mb-3">
+            <div class="card-header py-2 fw-semibold">Approved Sources</div>
+            <div class="card-body p-0">
+              {% if approved_sources_display %}
+              <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>CAGE</th>
+                      <th>Name</th>
+                      <th>Part #</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for src in approved_sources_display %}
+                    <tr>
+                      <td class="mono">{{ src.cage }}</td>
+                      <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                          title="{{ src.name|default:'' }}">
+                        {{ src.name|default:"—" }}
+                      </td>
+                      <td>{{ src.part_number|default:"—" }}</td>
+                      <td class="text-end">
+                        {% if src.has_supplier %}
+                        <a href="{% url 'sales:supplier_detail' supplier_id=src.supplier_id %}"
+                           target="_blank"
+                           class="btn btn-outline-secondary btn-sm py-0 px-2">
+                          View
+                        </a>
+                        {% else %}
+                        <a href="{% url 'sales:entity_cage_lookup' cage_code=src.cage %}"
+                           target="_blank"
+                           class="btn btn-outline-secondary btn-sm py-0 px-2">
+                          Look Up
+                        </a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <div class="p-3 small text-muted mb-0">No approved sources on file.</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-5">
+          {% include "sales/solicitations/partials/workbench_packaging_panel.html" with packaging=packaging has_pdf_blob=has_pdf_blob only %}
+        </div>
+      </div>
 
       <div class="card border shadow-sm mb-3">
         <div class="card-header py-2 fw-semibold small">Activity</div>

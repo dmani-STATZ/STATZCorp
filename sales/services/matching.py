@@ -315,3 +315,93 @@ def run_matching_for_batch(batch_id: int) -> dict:
         "matches_found": total_matches,
         "by_tier": by_tier,
     }
+
+
+def get_live_workbench_matches(line):
+    """
+    Returns live-queried supplier matches for a single SolicitationLine,
+    grouped into three tiers. Used by the workbench view only.
+    Does not read from or write to dibbs_supplier_match.
+
+    Returns a dict:
+    {
+        'tier1': [ <SupplierNSNScored with .supplier select_related> ],
+        'tier2': [ <Supplier objects matched via ApprovedSource CAGE> ],
+        'tier3': [ <Supplier objects matched via SupplierFSC> ],
+    }
+
+    All tiers exclude archived suppliers.
+    tier1 is ordered by match_score DESC.
+    tier2 and tier3 are ordered by supplier name ASC.
+    """
+    from sales.services.no_quote import normalize_cage_code
+
+    if not line:
+        return {"tier1": [], "tier2": [], "tier3": []}
+
+    is_part_number = getattr(line, "item_type_indicator", None) == "2"
+    normalized_nsn = "" if is_part_number else _normalize_nsn(line.nsn)
+
+    tier1_list = []
+    tier1_ids = set()
+    if normalized_nsn:
+        tier1_list = list(
+            SupplierNSNScored.objects.filter(nsn=normalized_nsn)
+            .exclude(supplier__archived=True)
+            .select_related("supplier")
+            .order_by("-match_score")
+        )
+        tier1_ids = {row.supplier_id for row in tier1_list}
+
+    tier2_list = []
+    if normalized_nsn:
+        raw_cages = ApprovedSource.objects.filter(nsn=normalized_nsn).values_list(
+            "approved_cage", flat=True
+        )
+        cages = []
+        seen_cages = set()
+        for c in raw_cages:
+            cage = normalize_cage_code(c)
+            if not cage or cage in seen_cages:
+                continue
+            seen_cages.add(cage)
+            cages.append(cage)
+
+        tier2_by_id = {}
+        for i in range(0, len(cages), NSN_IN_CHUNK):
+            chunk = cages[i : i + NSN_IN_CHUNK]
+            for sup in Supplier.objects.filter(
+                cage_code__in=chunk,
+                archived=False,
+            ):
+                if sup.id in tier1_ids:
+                    continue
+                tier2_by_id[sup.id] = sup
+        tier2_list = sorted(
+            tier2_by_id.values(),
+            key=lambda s: (s.name or "").lower(),
+        )
+
+    fsc = (line.fsc or "").strip()
+    tier3_list = []
+    if fsc:
+        tier12_ids = tier1_ids | {s.id for s in tier2_list}
+        tier3_by_id = {}
+        for row in SupplierFSC.objects.filter(
+            fsc_code=fsc,
+            supplier__archived=False,
+        ).select_related("supplier"):
+            sid = row.supplier_id
+            if sid in tier12_ids:
+                continue
+            tier3_by_id[sid] = row.supplier
+        tier3_list = sorted(
+            tier3_by_id.values(),
+            key=lambda s: (s.name or "").lower(),
+        )
+
+    return {
+        "tier1": tier1_list,
+        "tier2": tier2_list,
+        "tier3": tier3_list,
+    }

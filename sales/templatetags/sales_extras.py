@@ -1,5 +1,7 @@
 from django import template
 
+from sales.services.no_quote import normalize_cage_code
+
 register = template.Library()
 
 
@@ -23,3 +25,9 @@ def get_item(dictionary, key):
 def split(value, delimiter=","):
     """Split a string by delimiter. Usage: "a,b,c"|split:"," """
     return value.split(delimiter)
+
+
+@register.filter
+def normalize_cage(value):
+    """Uppercase/strip CAGE for comparison with queued_cages / no_quote_cages sets."""
+    return normalize_cage_code(value)

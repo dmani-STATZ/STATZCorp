@@ -46,8 +46,9 @@ from sales.models import (
     MassPassLog,
     SavedFilter,
     SolicitationMatchCount,
+    SAMEntityCache,
 )
-from sales.services.matching import _normalize_nsn
+from sales.services.matching import _normalize_nsn, get_live_workbench_matches
 from sales.services.no_quote import get_no_quote_cage_set, normalize_cage_code
 from suppliers.models import Supplier
 
@@ -239,149 +240,14 @@ def _infer_queue_kind(sol):
     return QUEUE_KIND_RESEARCH if sol.status == 'RESEARCH' else QUEUE_KIND_ACTIVE
 
 
-def _match_method_source_label(method: str) -> str:
-    if method == "MANUAL":
-        return "Manual"
-    if method == "DIRECT_NSN":
-        return "NSN Match"
-    if method == "APPROVED_SOURCE":
-        return "Approved Source"
-    if method == "FSC":
-        return "FSC"
-    return "Match"
-
-
-def build_consolidated_supplier_list(sol, no_quote_cages):
-    """
-    Merge SupplierMatch rows and ApprovedSource rows for this solicitation's lines,
-    deduped by normalized CAGE. Sorted: non–no-quote first, then by tier, then name.
-
-    Rows may include `is_manual` (manual queue without engine match, or MANUAL match)
-    for workbench badges. RFQ-only suppliers (no SupplierMatch yet) appear as Manual.
-    """
-    lines = list(sol.lines.all())
-    nsn_set = {_normalize_nsn(l.nsn) for l in lines if l.nsn}
-    by_cage = {}
-
-    matches = (
-        SupplierMatch.objects.filter(line__solicitation=sol)
-        .select_related('supplier')
-    )
-    for m in matches:
-        sup = m.supplier
-        cage = normalize_cage_code(sup.cage_code)
-        if not cage:
-            continue
-        src = _match_method_source_label(m.match_method)
-        if cage not in by_cage:
-            by_cage[cage] = {
-                'supplier': sup,
-                'cage_code': cage,
-                'company_name': (sup.name or '').strip(),
-                'sources': [src],
-                'match_tier': m.match_tier,
-                'is_no_quote': cage in no_quote_cages,
-            }
-        else:
-            e = by_cage[cage]
-            if src not in e['sources']:
-                e['sources'].append(src)
-            e['match_tier'] = min(
-                e['match_tier'] if e['match_tier'] is not None else 99,
-                m.match_tier,
-            )
-
-    for n in nsn_set:
-        if not n:
-            continue
-        for asrc in ApprovedSource.objects.filter(nsn=n):
-            cage = normalize_cage_code(asrc.approved_cage)
-            if not cage:
-                continue
-            cname = (asrc.company_name or '').strip()
-            if cage not in by_cage:
-                sup = Supplier.objects.filter(cage_code__iexact=cage, archived=False).first()
-                by_cage[cage] = {
-                    'supplier': sup,
-                    'cage_code': cage,
-                    'company_name': cname or (sup.name if sup else '') or cage,
-                    'sources': ['Approved Source'],
-                    'match_tier': None,
-                    'is_no_quote': cage in no_quote_cages,
-                }
-            else:
-                e = by_cage[cage]
-                if 'Approved Source' not in e['sources']:
-                    e['sources'].append('Approved Source')
-                if not e['company_name'] and cname:
-                    e['company_name'] = cname
-                if e['supplier'] is None:
-                    e['supplier'] = Supplier.objects.filter(
-                        cage_code__iexact=cage, archived=False
-                    ).first()
-                    if e['supplier'] and not e['company_name']:
-                        e['company_name'] = (e['supplier'].name or '').strip()
-
-    match_pairs = set(
-        SupplierMatch.objects.filter(line__solicitation=sol).values_list(
-            "line_id", "supplier_id"
-        )
-    )
-    for rfq in SupplierRFQ.objects.filter(line__solicitation=sol).select_related("supplier"):
-        sup = rfq.supplier
-        cage = normalize_cage_code(sup.cage_code)
-        if not cage:
-            continue
-        if (rfq.line_id, sup.pk) in match_pairs:
-            continue
-        if cage not in by_cage:
-            by_cage[cage] = {
-                "supplier": sup,
-                "cage_code": cage,
-                "company_name": (sup.name or "").strip(),
-                "sources": ["Manual"],
-                "match_tier": None,
-                "is_no_quote": cage in no_quote_cages,
-            }
-        else:
-            e = by_cage[cage]
-            if "Manual" not in e["sources"]:
-                e["sources"].append("Manual")
-
-    manual_supplier_ids = set(
-        SupplierMatch.objects.filter(
-            line__solicitation=sol, match_method="MANUAL"
-        ).values_list("supplier_id", flat=True)
-    )
-    rfq_only_manual_ids = set()
-    for line_id, sup_id in SupplierRFQ.objects.filter(
-        line__solicitation=sol
-    ).values_list("line_id", "supplier_id"):
-        if (line_id, sup_id) not in match_pairs:
-            rfq_only_manual_ids.add(sup_id)
-    show_manual_ids = manual_supplier_ids | rfq_only_manual_ids
-
-    rows = list(by_cage.values())
-    for e in rows:
-        sup = e.get("supplier")
-        e["is_manual"] = bool(sup and sup.pk in show_manual_ids)
-
-    rows.sort(
-        key=lambda e: (
-            e['is_no_quote'],
-            e['match_tier'] if e['match_tier'] is not None else 99,
-            (e['company_name'] or '').lower(),
-        )
-    )
-    return rows
-
-
 def _workbench_sidebar_context(solicitation):
     """Shared context for workbench right rail (matches + manual add card)."""
-    from sales.models.sam_cache import SAMEntityCache
-
     no_quote_cages = get_no_quote_cage_set()
-    supplier_matches = build_consolidated_supplier_list(solicitation, no_quote_cages)
+    line = solicitation.lines.order_by("line_number", "id").first()
+    live_matches = get_live_workbench_matches(line) if line else {"tier1": [], "tier2": [], "tier3": []}
+    tier1_matches = live_matches["tier1"]
+    tier2_matches = live_matches["tier2"]
+    tier3_matches = live_matches["tier3"]
     queued_cages = set(
         normalize_cage_code(c)
         for c in SupplierRFQ.objects.filter(
@@ -390,23 +256,35 @@ def _workbench_sidebar_context(solicitation):
         ).values_list("supplier__cage_code", flat=True)
         if normalize_cage_code(c)
     )
-    unmatched_cages = [
-        row["cage_code"]
-        for row in supplier_matches
-        if not row.get("supplier")
-    ]
+    unmatched_cages = []
+    if line:
+        norm = _normalize_nsn(line.nsn)
+        if norm:
+            seen = set()
+            for c in ApprovedSource.objects.filter(nsn=norm).values_list(
+                "approved_cage", flat=True
+            ):
+                cage = normalize_cage_code(c)
+                if not cage or cage in seen:
+                    continue
+                seen.add(cage)
+                if not Supplier.objects.filter(
+                    cage_code__iexact=cage, archived=False
+                ).exists():
+                    unmatched_cages.append(cage)
     sam_cache_map = {}
     if unmatched_cages:
-        sam_cache_map = {
-            r.cage_code: r
+        for chunk in _mass_pass_chunked(unmatched_cages, 100):
             for r in SAMEntityCache.objects.filter(
-                cage_code__in=unmatched_cages,
+                cage_code__in=chunk,
                 fetch_error=False,
-            )
-        }
+            ):
+                sam_cache_map[r.cage_code] = r
     return {
         "solicitation": solicitation,
-        "supplier_matches": supplier_matches,
+        "tier1_matches": tier1_matches,
+        "tier2_matches": tier2_matches,
+        "tier3_matches": tier3_matches,
         "queued_cages": queued_cages,
         "no_quote_cages": no_quote_cages,
         "sam_cache_map": sam_cache_map,
@@ -1053,6 +931,66 @@ def solicitation_list(request):
     })
 
 
+def _workbench_approved_sources_display(line):
+    """
+    Approved source rows for the workbench NSN: internal Supplier name first,
+    then SAMEntityCache.entity_name (reads only; chunked cage_code__in).
+    """
+    if not line:
+        return []
+    normalized_nsn = (line.nsn or "").replace("-", "").strip()
+    if not normalized_nsn:
+        return []
+    rows = list(
+        ApprovedSource.objects.filter(nsn=normalized_nsn).only(
+            "approved_cage", "part_number"
+        )
+    )
+    if not rows:
+        return []
+    unique_cages = []
+    seen_cage = set()
+    for r in rows:
+        c = normalize_cage_code(r.approved_cage)
+        if not c or c in seen_cage:
+            continue
+        seen_cage.add(c)
+        unique_cages.append(c)
+    supplier_by_norm = {}
+    for chunk in _mass_pass_chunked(unique_cages, 100):
+        for s in Supplier.objects.filter(cage_code__in=chunk, archived=False):
+            supplier_by_norm[normalize_cage_code(s.cage_code)] = s
+    sam_name_map = {}
+    for chunk in _mass_pass_chunked(unique_cages, 100):
+        for ent in SAMEntityCache.objects.filter(cage_code__in=chunk).only(
+            "cage_code", "entity_name"
+        ):
+            sam_name_map[normalize_cage_code(ent.cage_code)] = ent.entity_name
+    out = []
+    for r in rows:
+        cage_norm = normalize_cage_code(r.approved_cage)
+        sup = supplier_by_norm.get(cage_norm) if cage_norm else None
+        if sup:
+            name = sup.name
+            supplier_id = sup.id
+            has_supplier = True
+        else:
+            supplier_id = None
+            has_supplier = False
+            raw_sam = sam_name_map.get(cage_norm) if cage_norm else None
+            name = raw_sam.strip() if (raw_sam and raw_sam.strip()) else None
+        out.append(
+            {
+                "cage": r.approved_cage,
+                "part_number": r.part_number,
+                "name": name,
+                "supplier_id": supplier_id,
+                "has_supplier": has_supplier,
+            }
+        )
+    return out
+
+
 def _workbench_procurement_packaging_context(solicitation, line):
     sol_nsn = _normalize_nsn(line.nsn) if line else ""
     procurement_history = (
@@ -1299,8 +1237,11 @@ def solicitation_workbench(request, sol_number):
     procurement_history = _rpc["procurement_history"]
     packaging = _rpc["packaging"]
     has_pdf_blob = _rpc["has_pdf_blob"]
+    approved_sources_display = _workbench_approved_sources_display(line)
     sidebar_ctx = _workbench_sidebar_context(solicitation)
-    supplier_matches = sidebar_ctx["supplier_matches"]
+    tier1_matches = sidebar_ctx["tier1_matches"]
+    tier2_matches = sidebar_ctx["tier2_matches"]
+    tier3_matches = sidebar_ctx["tier3_matches"]
     queued_cages = sidebar_ctx["queued_cages"]
     no_quote_cages = sidebar_ctx["no_quote_cages"]
     sam_cache_map = sidebar_ctx["sam_cache_map"]
@@ -1354,7 +1295,10 @@ def solicitation_workbench(request, sol_number):
             "procurement_history": procurement_history,
             "packaging": packaging,
             "has_pdf_blob": has_pdf_blob,
-            "supplier_matches": supplier_matches,
+            "approved_sources_display": approved_sources_display,
+            "tier1_matches": tier1_matches,
+            "tier2_matches": tier2_matches,
+            "tier3_matches": tier3_matches,
             "rfqs_queued": rfqs_queued,
             "queued_cages": queued_cages,
             "sam_cache_map": sam_cache_map,

@@ -626,9 +626,11 @@ When a daily import completes, the matching engine runs automatically and attemp
 | 2 — Approved Source | AS file CAGE cross-ref | `tbl_ApprovedSource` + `contracts_supplier` | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
 | 3 — FSC Category | 4-digit FSC match | `dibbs_supplier_fsc` | `SupplierFSC.objects.filter(fsc_code=line.fsc, supplier__archived=False)` |
 
-**Solicitation list MATCHES column (UI):** The pipeline list at `/sales/solicitations/` shows a **live** per-solicitation total from the SQL Server view **`dibbs_solicitation_match_counts`** (additive **T1 + T2 + T3** row counts derived from line NSNs — same three source tables as above, not deduplicated; display-only). Django reads it through unmanaged **`SolicitationMatchCount`** (`sales/sql/dibbs_solicitation_match_counts.sql` — deploy with `CREATE OR ALTER VIEW` in SSMS). That count is **not** read from **`dibbs_supplier_match`** (the match table is still the canonical result of the import matching engine and powers the workbench).
+**Solicitation list MATCHES column (UI):** The pipeline list at `/sales/solicitations/` shows a **live** per-solicitation total from the SQL Server view **`dibbs_solicitation_match_counts`** (additive **T1 + T2 + T3** row counts derived from line NSNs — same three source tables as above, not deduplicated; display-only). Django reads it through unmanaged **`SolicitationMatchCount`** (`sales/sql/dibbs_solicitation_match_counts.sql` — deploy with `CREATE OR ALTER VIEW` in SSMS). That count is **not** read from **`dibbs_supplier_match`**.
 
-A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found. Tier 1 `match_score` on **`dibbs_supplier_match`** is copied from the scored view at match time. Suppliers with `probation=True` or `conditional=True` are included but visually flagged. Suppliers with `archived=True` are excluded entirely.
+**Review Workbench sidebar:** Supplier rows are loaded **live** on each page load via **`get_live_workbench_matches()`** in `sales/services/matching.py` (ORM over `SupplierNSNScored`, **`tbl_ApprovedSource`** + `contracts_supplier`, and `SupplierFSC`), with cross-tier deduplication. The workbench does **not** read **`dibbs_supplier_match`**; that table remains the import-time persistence of the matching engine for other consumers (e.g. `?tab=growth`, quotes), and its retirement as a dependency is deferred.
+
+A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found at import. Tier 1 `match_score` on **`dibbs_supplier_match`** is copied from the scored view at match time. Suppliers with `probation=True` or `conditional=True` are included but visually flagged. Suppliers with `archived=True` are excluded entirely.
 
 **`match_score` on `dibbs_supplier_match`:**
 ```python
@@ -669,7 +671,9 @@ Staff / quotes ──→ dibbs_supplier_nsn
 contracts_clin + contracts_contract + contracts_nsn ──→ dibbs_supplier_nsn_scored (VIEW)
                           │
                           ▼
-              matching (SupplierNSNScored) ──→ dibbs_supplier_match
+              matching (SupplierNSNScored) ──→ dibbs_supplier_match   (import-time persistence)
+                                    │
+                                    └── Review Workbench sidebar: live ORM via get_live_workbench_matches() (does not read dibbs_supplier_match)
 ```
 
 #### `dibbs_supplier_match` *(new)* — results of matching engine
@@ -3513,7 +3517,9 @@ Staff / quotes ──→ dibbs_supplier_nsn
 contracts_clin + contracts_contract + contracts_nsn ──→ dibbs_supplier_nsn_scored (VIEW)
                          │
                          ▼
-              matching (SupplierNSNScored) ──→ dibbs_supplier_match
+              matching (SupplierNSNScored) ──→ dibbs_supplier_match   (import-time persistence)
+                                    │
+                                    └── Review Workbench: live `get_live_workbench_matches()` (does not read dibbs_supplier_match)
 ```
 
 **Packaging facilities:** If packaging-only suppliers must never appear in tier 1, filter them when **creating** `dibbs_supplier_nsn` rows or extend the view SQL to exclude `contracts_supplier.is_packhouse = 1`. The view DDL shipped in-repo is the source of truth for the exact join filters.
@@ -3532,7 +3538,7 @@ Recency weighting is applied **inside** `dibbs_supplier_nsn_scored` (not in Pyth
 
 **Base bonus:** Every row in `dibbs_supplier_nsn` contributes **+1.0** to `match_score` in the view so manually added capabilities rank above zero but below suppliers with strong contract history.
 
-**What the score drives:** Order of Tier 1 matches on solicitation Matches tab and import-time `dibbs_supplier_match.match_score` for tier 1.
+**What the score drives:** Order of Tier 1 matches on the Review Workbench (`get_live_workbench_matches` → `SupplierNSNScored`) and import-time `dibbs_supplier_match.match_score` for tier 1.
 
 **Confirmed:** `award_date` lives on `contracts_contract`. NSN text for the join uses `contracts_nsn.nsn_code` matched to `dibbs_supplier_nsn.nsn` (normalized 13-digit, no hyphens).
 

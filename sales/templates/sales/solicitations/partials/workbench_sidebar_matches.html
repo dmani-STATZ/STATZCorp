@@ -1,82 +1,171 @@
-{# Workbench right rail: consolidated matches + manual supplier HTMX card. Expects: solicitation, supplier_matches, queued_cages, no_quote_cages, sam_cache_map #}
+{# Workbench right rail: live tier matches + manual supplier HTMX card. Expects: solicitation, tier1_matches, tier2_matches, tier3_matches, queued_cages, no_quote_cages, sam_cache_map #}
 {% load sales_extras %}
-<h2 class="h6 fw-bold text-uppercase text-muted mb-3" style="letter-spacing:0.06em;">Matched &amp; approved sources</h2>
-<div class="table-responsive border rounded mb-3" style="max-height:320px; overflow-y:auto;">
-  <table class="table table-sm mb-0 align-middle small">
-    <thead class="table-light sticky-top"><tr><th>Supplier</th><th>CAGE</th><th></th></tr></thead>
-    <tbody>
-      {% for row in supplier_matches %}
-      <tr data-cage="{{ row.cage_code }}">
-        <td>
-          {% if row.supplier %}<a href="{% url 'suppliers:supplier_detail' row.supplier.pk %}">{{ row.company_name|default:row.supplier.name }}</a>
-          {% else %}{% with sam=sam_cache_map|get_item:row.cage_code %}
-          {% if sam %}{{ sam.entity_name }}
-          <span class="badge bg-secondary ms-1" style="font-size:0.65rem;" title="Name from SAM.gov — not in supplier database">SAM</span>
-          {% else %}<span class="text-muted">—</span>{% endif %}
-          {% endwith %}{% endif %}
-          {% if row.is_no_quote %}<span class="badge bg-danger ms-1">No quote</span>{% endif %}
-          {% if row.is_manual %}<span class="badge bg-dark ms-1">Manual</span>{% endif %}
-          {% if row.cage_code in queued_cages %}<span class="badge bg-success ms-1">In Queue</span>{% endif %}
-          <div class="mt-1">
-            {% for src in row.sources %}
-            {% if not row.is_manual or src != 'Manual' %}
-            {% if src == 'NSN Match' %}<span class="badge bg-primary me-1">{{ src }}</span>
-            {% elif src == 'Approved Source' %}<span class="badge bg-success me-1">{{ src }}</span>
-            {% elif src == 'FSC' %}<span class="badge bg-secondary me-1">{{ src }}</span>
-            {% else %}<span class="badge bg-secondary me-1">{{ src }}</span>{% endif %}
+
+<div class="mb-0">
+  <p class="text-muted small fw-semibold text-uppercase mb-2">Tier 1 — Direct NSN Match</p>
+  {% if not tier1_matches %}
+  <p class="text-muted small mb-0">No direct NSN matches.</p>
+  {% else %}
+  <div class="table-responsive border rounded">
+    <table class="table table-sm mb-0 align-middle small">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier</th>
+          <th class="font-monospace">CAGE</th>
+          <th>Score</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for match in tier1_matches %}
+        {% with sup=match.supplier %}
+        <tr>
+          <td>
+            <a href="{% url 'suppliers:supplier_detail' sup.pk %}"
+               class="d-inline-block text-truncate align-middle"
+               style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+               title="{{ sup.name }}">{{ sup.name }}</a>
+            {% if sup.probation or sup.conditional %}
+            <span class="badge bg-warning text-dark ms-1 small">⚠ Flagged</span>
             {% endif %}
-            {% endfor %}
-            {% if row.match_tier %}<span class="badge badge-tier{{ row.match_tier }}">T{{ row.match_tier }}</span>{% endif %}
-          </div>
-        </td>
-        <td class="mono">{{ row.cage_code }}</td>
-        <td class="text-end">
-          {% if row.supplier %}
-            {% if row.cage_code in queued_cages %}
+          </td>
+          <td class="font-monospace">{{ sup.cage_code }}</td>
+          <td><span class="badge bg-primary">{{ match.match_score|floatformat:2 }}</span></td>
+          <td class="text-end">
+            {% if sup.cage_code|normalize_cage in queued_cages %}
             <button type="button" class="btn btn-sm btn-success" disabled>Queued</button>
-            {% elif row.is_no_quote %}
+            {% elif sup.cage_code|normalize_cage in no_quote_cages %}
             <button type="button" class="btn btn-sm btn-outline-danger wb-queue-btn wb-queue-anyway"
-                    data-supplier="{{ row.supplier.pk }}" data-cage="{{ row.cage_code }}">+ Queue</button>
+                    data-supplier="{{ sup.pk }}" data-cage="{{ sup.cage_code|normalize_cage }}">+ Queue</button>
             {% else %}
             <button type="button" class="btn btn-sm btn-outline-primary wb-queue-btn"
-                    data-supplier="{{ row.supplier.pk }}">+ Queue</button>
+                    data-supplier="{{ sup.pk }}">+ Queue</button>
             {% endif %}
-          {% else %}
-            <a href="{% url 'sales:entity_cage_lookup' cage_code=row.cage_code %}"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="btn btn-sm btn-outline-secondary">Look Up</a>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="3" class="text-muted p-3">No consolidated matches or approved sources.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 </div>
 
-<div class="card border mb-3" id="wb-manual-add-card">
-  <div class="card-header py-2 small fw-semibold">Add supplier manually</div>
-  <div class="card-body py-2">
-    <div id="wb-manual-add-fields">
-      {% csrf_token %}
-      <input type="hidden" name="solicitation_number" value="{{ solicitation.solicitation_number }}">
-      <label class="visually-hidden" for="wb-manual-q">Search suppliers</label>
-      <input type="search"
-             id="wb-manual-q"
-             name="q"
-             class="form-control form-control-sm mb-2"
-             placeholder="Name or CAGE (min 2 chars)"
-             autocomplete="off"
-             hx-get="{% url 'sales:rfq_manual_supplier_search' %}"
-             hx-trigger="keyup changed delay:300ms, search"
-             hx-target="#wb-manual-results"
-             hx-include="#wb-manual-add-fields"
-             hx-indicator="#wb-manual-htmx-indicator">
-      <span id="wb-manual-htmx-indicator" class="htmx-indicator small text-muted">Searching…</span>
+<div class="border-top mt-3 pt-3">
+  <p class="text-muted small fw-semibold text-uppercase mb-2">Tier 2 — Approved Source</p>
+  {% if not tier2_matches %}
+  <p class="text-muted small mb-0">No approved source matches.</p>
+  {% else %}
+  <div class="table-responsive border rounded">
+    <table class="table table-sm mb-0 align-middle small">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier</th>
+          <th class="font-monospace">CAGE</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sup in tier2_matches %}
+        <tr>
+          <td>
+            <a href="{% url 'suppliers:supplier_detail' sup.pk %}"
+               class="d-inline-block text-truncate align-middle"
+               style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+               title="{{ sup.name }}">{{ sup.name }}</a>
+            {% if sup.probation or sup.conditional %}
+            <span class="badge bg-warning text-dark ms-1 small">⚠ Flagged</span>
+            {% endif %}
+          </td>
+          <td class="font-monospace">{{ sup.cage_code }}</td>
+          <td class="text-end">
+            {% if sup.cage_code|normalize_cage in queued_cages %}
+            <button type="button" class="btn btn-sm btn-success" disabled>Queued</button>
+            {% elif sup.cage_code|normalize_cage in no_quote_cages %}
+            <button type="button" class="btn btn-sm btn-outline-danger wb-queue-btn wb-queue-anyway"
+                    data-supplier="{{ sup.pk }}" data-cage="{{ sup.cage_code|normalize_cage }}">+ Queue</button>
+            {% else %}
+            <button type="button" class="btn btn-sm btn-outline-primary wb-queue-btn"
+                    data-supplier="{{ sup.pk }}">+ Queue</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="border-top mt-3 pt-3">
+  <p class="text-muted small fw-semibold text-uppercase mb-2">Tier 3 — FSC Category</p>
+  {% if not tier3_matches %}
+  <p class="text-muted small mb-0">No FSC category matches.</p>
+  {% else %}
+  <div class="table-responsive border rounded">
+    <table class="table table-sm mb-0 align-middle small">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier</th>
+          <th class="font-monospace">CAGE</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sup in tier3_matches %}
+        <tr>
+          <td>
+            <a href="{% url 'suppliers:supplier_detail' sup.pk %}"
+               class="d-inline-block text-truncate align-middle"
+               style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+               title="{{ sup.name }}">{{ sup.name }}</a>
+            {% if sup.probation or sup.conditional %}
+            <span class="badge bg-warning text-dark ms-1 small">⚠ Flagged</span>
+            {% endif %}
+          </td>
+          <td class="font-monospace">{{ sup.cage_code }}</td>
+          <td class="text-end">
+            {% if sup.cage_code|normalize_cage in queued_cages %}
+            <button type="button" class="btn btn-sm btn-success" disabled>Queued</button>
+            {% elif sup.cage_code|normalize_cage in no_quote_cages %}
+            <button type="button" class="btn btn-sm btn-outline-danger wb-queue-btn wb-queue-anyway"
+                    data-supplier="{{ sup.pk }}" data-cage="{{ sup.cage_code|normalize_cage }}">+ Queue</button>
+            {% else %}
+            <button type="button" class="btn btn-sm btn-outline-primary wb-queue-btn"
+                    data-supplier="{{ sup.pk }}">+ Queue</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="border-top mt-3 pt-3">
+  <p class="text-muted small fw-semibold text-uppercase mb-2">Add Supplier Manually</p>
+  <div class="card border mb-3" id="wb-manual-add-card">
+    <div class="card-header py-2 small fw-semibold">Add supplier manually</div>
+    <div class="card-body py-2">
+      <div id="wb-manual-add-fields">
+        {% csrf_token %}
+        <input type="hidden" name="solicitation_number" value="{{ solicitation.solicitation_number }}">
+        <label class="visually-hidden" for="wb-manual-q">Search suppliers</label>
+        <input type="search"
+               id="wb-manual-q"
+               name="q"
+               class="form-control form-control-sm mb-2"
+               placeholder="Name or CAGE (min 2 chars)"
+               autocomplete="off"
+               hx-get="{% url 'sales:rfq_manual_supplier_search' %}"
+               hx-trigger="keyup changed delay:300ms, search"
+               hx-target="#wb-manual-results"
+               hx-include="#wb-manual-add-fields"
+               hx-indicator="#wb-manual-htmx-indicator">
+        <span id="wb-manual-htmx-indicator" class="htmx-indicator small text-muted">Searching…</span>
+      </div>
+      <div id="wb-manual-results" class="list-group list-group-flush small border rounded"></div>
     </div>
-    <div id="wb-manual-results" class="list-group list-group-flush small border rounded"></div>
   </div>
 </div>
-
