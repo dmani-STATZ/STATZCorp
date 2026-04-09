@@ -55,6 +55,26 @@ class SupplierNSNScored(models.Model):
         db_table = "dibbs_supplier_nsn_scored"
 
 
+class SolicitationMatchCount(models.Model):
+    """
+    Unmanaged model — reads from dibbs_solicitation_match_counts SQL Server view.
+    Created manually in SSMS. Never modified by Django migrations.
+    Provides live T1+T2+T3 additive match count per solicitation.
+    """
+
+    solicitation = models.OneToOneField(
+        "Solicitation",
+        on_delete=models.DO_NOTHING,
+        primary_key=True,
+        related_name="+",
+    )
+    match_count = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "dibbs_solicitation_match_counts"
+
+
 class SupplierFSC(models.Model):
     """FSC/category-level supplier capability."""
 

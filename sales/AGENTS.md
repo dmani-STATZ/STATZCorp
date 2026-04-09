@@ -10,7 +10,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and DIBBS AW file award import (`DibbsAward`).
 
-**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, **`SupplierNSNScored`** (unmanaged; SQL view `dibbs_supplier_nsn_scored` for tier-1 live scores), `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`, **`SavedFilter`** (`dibbs_saved_filter` — list-view filter presets; system rows seeded by data migration, not deletable via UI).
+**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, **`ApprovedSource`** (table **`tbl_ApprovedSource`** — legacy name predating `dibbs_*`), `SupplierNSN`, **`SupplierNSNScored`** (unmanaged; SQL view `dibbs_supplier_nsn_scored` for tier-1 live scores), `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`, **`SavedFilter`** (`dibbs_saved_filter` — list-view filter presets; system rows seeded by data migration, not deletable via UI).
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
@@ -39,7 +39,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - Search templates under `sales/templates/sales/` for field references — many field names appear in templates directly.
 - Check `sales/services/bq_export.py` for `COMPANY_FILLED_COLUMNS` — it maps 1-based BQ column indices to exact model field names on `GovernmentBid` and `CompanyCAGE`.
 - Check `sales/services/importer.py` for chunking constants (`SOLICITATION_CHUNK=200`, `LINE_CHUNK=230`, `AS_CHUNK=400`) and any field references in upsert logic.
-- Check `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSNScored.nsn`, `SupplierNSNScored.match_score`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name. Tier 1 reads from `SupplierNSNScored` (unmanaged model → `dibbs_supplier_nsn_scored` view). Do not replace with direct `SupplierNSN` reads — the view is required for live score ordering.
+- Check `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSNScored.nsn`, `SupplierNSNScored.match_score`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name. Tier 1 reads from `SupplierNSNScored` (unmanaged model → `dibbs_supplier_nsn_scored` view). Tier 2 uses the `ApprovedSource` model (DB table **`tbl_ApprovedSource`**). Do not replace with direct `SupplierNSN` reads — the view is required for live score ordering.
 
 ### Before changing views
 - Read the full view module being changed (`sales/views/*.py`).
@@ -50,7 +50,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ### Before changing services
 - `sales/services/bq_export.py` — any rename of `GovernmentBid` or `CompanyCAGE` fields listed in `COMPANY_FILLED_COLUMNS` will silently produce wrong BQ output (no attribute error, wrong column filled).
-- `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSNScored.nsn`, `SupplierNSNScored.match_score`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name. Tier 1 reads from `SupplierNSNScored` (unmanaged model → `dibbs_supplier_nsn_scored` view). Do not replace with direct `SupplierNSN` reads — the view is required for live score ordering. The three tiers are interdependent; changing tier boundaries or deduplication logic affects bid quality downstream.
+- `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSNScored.nsn`, `SupplierNSNScored.match_score`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name. Tier 1 reads from `SupplierNSNScored` (unmanaged model → `dibbs_supplier_nsn_scored` view). Tier 2 uses the `ApprovedSource` model (DB table **`tbl_ApprovedSource`**). Do not replace with direct `SupplierNSN` reads — the view is required for live score ordering. The three tiers are interdependent; changing tier boundaries or deduplication logic affects bid quality downstream.
 - `sales/services/email.py` — `_default_cage()` must always find exactly one `CompanyCAGE(is_default=True, is_active=True)`. If that invariant breaks, every RFQ email fails.
 - `sales/services/importer.py` — step results stored in `ImportJob.step_results` as JSON must include `batch_id` and `import_date`; the progress template reads those keys by name.
 - `_run_lifecycle_sweep()` in `services/importer.py` runs at the start of every import inside `transaction.atomic()` (parse step in `imports.py`, and the legacy `run_import()` entry point). It transitions `New → Active` for prior-batch records and `→ Archived` for expired eligible records using **per-pass `QuerySet.update()`** (not chunked `bulk_update`) to avoid SQLite write-lock storms. **`NO_BID` is excluded** from the expired→Archived sweep — passed solicitations stay `NO_BID` permanently and appear under **Closed Solicitations** (`solicitation_closed`) / No-Bid tab. It must remain the first database write in the parse-step `try` block (before `create_import_batch`) and the first operation inside `run_import()`'s lifecycle `atomic` block. Do not move it after batch creation or call it conditionally.
@@ -84,6 +84,8 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Background processing:** Azure WebJobs run `scrape_awards`, `auto_import_dibbs`, and optionally `fetch_pending_pdfs` (deprecated as a 5‑minute default; use for manual/queue catch-up). **`auto_import_dibbs`** is a **three-phase** nightly job: **Loop A** — missing DIBBS dates → `fetch_dibbs_archive_files` (IN + BQ zip only; AS inside zip) + `run_import()`. **Loop B** — set-aside sols (`small_business_set_aside != 'N'`) with no `pdf_blob`, fetch PDFs in **batches of 10**, **one Playwright session per batch** (full browser restart between batches for connection hygiene). **Loop C** — after all B sessions close, `parse_pdf_data_backlog()` parses every sol with a blob and null `pdf_data_pulled` (procurement history + packaging; `pdf_data_pulled` always set). `fetch_pending_pdfs` mirrors the batch-of-10 fetch pattern for PENDING/FAILED queue sols, then runs the same parse backlog. The interactive import pipeline runs via four sequential AJAX HTTP POSTs, not an internal task queue.
 
+**`dibbs_solicitation_match_counts` view (solicitation list live match total):** DDL lives in `sales/sql/dibbs_solicitation_match_counts.sql` — deploy changes via SSMS with `CREATE OR ALTER VIEW` — **never** via Django migrations or management commands. Unmanaged Django model: **`SolicitationMatchCount`** in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_solicitation_match_counts'`). The solicitation list annotates **`live_match_count`** in `_list_qs_before_tab()` (`sales/views/solicitations.py`); **`has_matches=1`** and **`?tab=matches`** filter on **`live_match_count__gt=0`**; sorting by the Matches column (`?sort=match_count`) orders by **`live_match_count`**. The view exposes an **additive T1+T2+T3** total (not deduplicated) for display only — **`dibbs_supplier_match` remains** for the workbench and matching engine. If the tiers or counting rules for that display total change: update the `.sql` file, redeploy in SSMS, and refresh `sales/CONTEXT.md` / `sales/DIBBS_System_Spec.md`.
+
 ---
 
 ## 5. Files That Commonly Need to Change Together
@@ -101,7 +103,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/models/saved_filters.py` + migration + `sales/views/solicitations.py` (`solicitation_list`, `saved_filter_create` / `saved_filter_update` / `saved_filter_delete` / `saved_filter_share`) + `sales/urls.py` + `sales/templates/sales/solicitations/list.html`. **System filters** (`is_system=True`) are created by data migration; **`saved_filter_update` / `saved_filter_delete` / `saved_filter_share` must always verify `user=request.user` and `is_system=False`** on the source filter before mutating or duplicating (guard is in the view, not the model). Do not expose system rows in the edit-mode dropdown (template/JSON already limits to user-owned rows). **`solicitation_list` passes `share_users` as a JSON-safe list of dicts** (`pk`, `first_name`, `last_name`, `username`) for the share dropdown — embed via `json.dumps` / `data-share-users` on the modal; **do not pass full `User` model instances** into a `data-` attribute.
 
 ### Adding a new match tier or method
-→ `sales/services/matching.py` + `sales/models/matching.py` (MATCH_METHOD_CHOICES) + new migration + `sales/templates/sales/solicitations/detail.html` (matches tab) + `sales/templates/sales/rfq/partials/mailto_buttons.html`
+→ `sales/services/matching.py` + `sales/models/matching.py` (MATCH_METHOD_CHOICES) + new migration + `sales/templates/sales/solicitations/detail.html` (matches tab) + `sales/templates/sales/rfq/partials/mailto_buttons.html` + `sales/sql/dibbs_solicitation_match_counts.sql` (if the **list-page** additive match total should reflect the new tier — redeploy view via SSMS; see §4 `dibbs_solicitation_match_counts` entry)
 
 ### Changing `CompanyCAGE` fields
 → `sales/models/cages.py` + new migration + `sales/services/bq_export.py` (check `COMPANY_FILLED_COLUMNS`) + `sales/services/email.py` (`_default_cage()` and `_rfq_body()`) + `sales/views/settings.py` (cage add/edit form handling) + `sales/templates/sales/settings/cage_form.html` (RFQ inbox reads the shared mailbox via Graph env vars — not CAGE fields)
@@ -366,6 +368,7 @@ After any change, manually verify these flows:
 - `SolicitationLine.bq_raw_columns` ↔ BQ export overlay logic
 - `ImportJob.step_results` keys ↔ `import/progress.html`
 - `CompanyCAGE.is_default` ↔ every RFQ and BQ export
+- `ApprovedSource` ↔ DB table **`tbl_ApprovedSource`** (legacy; tier-2 matching and list match counts)
 - `rfq/partials/mailto_buttons.html` ↔ solicitation detail + RFQ pending
 
 ### Main cross-app dependencies

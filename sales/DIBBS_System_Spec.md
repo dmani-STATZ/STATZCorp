@@ -616,15 +616,17 @@ When a daily import completes, the matching engine runs automatically and attemp
 
 **Key asset: contract history for ranking.** `contracts_clin` links NSNs to suppliers. Tier-1 **ranking** uses that history inside the SQL view `dibbs_supplier_nsn_scored` (joined at query time). The Django matching service reads **`SupplierNSNScored`** (unmanaged) and does not import `Clin` in Python.
 
-**Architecture principle:** `contracts` and `sales` remain separate apps. Matching **Python** code reads `dibbs_*` tables and the scored view; the view itself joins `contracts_*` tables inside SQL Server.
+**Architecture principle:** `contracts` and `sales` remain separate apps. Matching **Python** code reads `dibbs_*` tables where applicable, approved-source rows from the legacy **`tbl_ApprovedSource`** table (`ApprovedSource` model), and the scored view; the view itself joins `contracts_*` tables inside SQL Server.
 
 ### 4.1 Matching Tiers
 
 | Priority | Method | Source Table | Logic |
 |----------|--------|-------------|-------|
 | 1 — Direct NSN | Exact NSN match | `dibbs_supplier_nsn_scored` (view) | Query by NSN from `SupplierNSNScored` unmanaged model, order by computed `match_score` desc — score is calculated live by the SQL view from contract history + manual entry bonus |
-| 2 — Approved Source | AS file CAGE cross-ref | `dibbs_approved_source` + `contracts_supplier` | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
+| 2 — Approved Source | AS file CAGE cross-ref | `tbl_ApprovedSource` + `contracts_supplier` | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
 | 3 — FSC Category | 4-digit FSC match | `dibbs_supplier_fsc` | `SupplierFSC.objects.filter(fsc_code=line.fsc, supplier__archived=False)` |
+
+**Solicitation list MATCHES column (UI):** The pipeline list at `/sales/solicitations/` shows a **live** per-solicitation total from the SQL Server view **`dibbs_solicitation_match_counts`** (additive **T1 + T2 + T3** row counts derived from line NSNs — same three source tables as above, not deduplicated; display-only). Django reads it through unmanaged **`SolicitationMatchCount`** (`sales/sql/dibbs_solicitation_match_counts.sql` — deploy with `CREATE OR ALTER VIEW` in SSMS). That count is **not** read from **`dibbs_supplier_match`** (the match table is still the canonical result of the import matching engine and powers the workbench).
 
 A match result row is written to `dibbs_supplier_match` for each supplier-line pairing found. Tier 1 `match_score` on **`dibbs_supplier_match`** is copied from the scored view at match time. Suppliers with `probation=True` or `conditional=True` are included but visually flagged. Suppliers with `archived=True` are excluded entirely.
 
@@ -3235,7 +3237,7 @@ The global search must handle all of these. It is the single most important navi
 | Supplier name | `contracts_supplier` (via matched RFQs) | `tactical gear`, `TGI` |
 | Supplier CAGE | `contracts_supplier` | `8J931` |
 | Part number quoted | `dibbs_supplier_quote` | `TGI-DUFFL-MK2` |
-| Part number (approved source) | `dibbs_approved_source` | `L8A`, `4J12024-102B` |
+| Part number (approved source) | `tbl_ApprovedSource` | `L8A`, `4J12024-102B` |
 
 **Search behavior:**
 - Results appear as a dropdown after 2+ characters (no need to press Enter for quick lookup)

@@ -395,14 +395,7 @@
                 </td>
 
                 <td style="padding:0.625rem 1rem; text-align:center;">
-                    {% if sol.match_count > 0 %}
-                    <span style="display:inline-block; padding:0.125rem 0.625rem; border-radius:10px; font-size:0.75rem; font-weight:600;
-                                 background:rgba(0,78,179,0.1); color:var(--company-primary,#004eb3);">
-                        {{ sol.match_count }}
-                    </span>
-                    {% else %}
-                    <span style="color:var(--text-muted,#d1d5db); font-size:0.875rem;">—</span>
-                    {% endif %}
+                    {{ sol.live_match_count|default_if_none:"—" }}
                 </td>
 
             </tr>
