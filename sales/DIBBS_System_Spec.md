@@ -109,8 +109,8 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 | Status | Task | Spec Section | Session |
 |--------|------|-------------|---------|
 | ✅ Done | 3-tier supplier matching engine (`services/matching.py`) | §4, §12.3 | S2 |
-| ✅ Superseded | ~~Contract history backfill~~ — replaced by SQL view `dibbs_supplier_nsn_scored` + unmanaged `SupplierNSNScored`; `dibbs_supplier_nsn` is manual/quote-driven rows only | §4.2, §12.3 | Apr 2026 |
-| ✅ Removed | ~~Backfill trigger~~ (`suppliers/backfill-nsn/`) — deleted | §4.2 | Apr 2026 |
+| ✅ Done | Live scoring view `dibbs_supplier_nsn_scored` — replaces static contract-to-NSN seeding on `dibbs_supplier_nsn`; tier-1 score computed from contract history at query time via unmanaged `SupplierNSNScored`; capability table remains manual/quote-driven rows only | §4.2, §12.3 | Apr 2026 |
+| ✅ Removed | Staff NSN backfill trigger page — superseded by live scoring view (removed; do not reintroduce) | §4.2 | Apr 2026 |
 | ✅ Done | Match review UI on solicitation detail — Matches tab with tier badges | §9.7 | S3 |
 | ⬜ Todo | HUBZone flag UI — bulk-mark solicitations as HUBZone from solicitation list | §12.2 | S7 |
 | ✅ Done | RFQ email generation (`services/email.py`) — outbound + follow-up templates | §10.2, §10.7 | S4 |
@@ -172,7 +172,7 @@ Progress tracker for the DIBBS build. Each item links to the spec section with t
 |------|---------|--------|
 | Mar 2026 | S0 — Models + initial migration | All `dibbs_*` models, migration file |
 | Mar 2026 | S1 — Import pipeline + solicitation list | `parser.py`, `importer.py`, `views/imports.py`, `views/solicitations.py` (list), `urls.py`, `base.html`, `upload.html`, `list.html` |
-| Mar 2026 | S2 — Matching engine + backfill | `services/matching.py` (3-tier engine); backfill path later replaced by live SQL view (Apr 2026) |
+| Mar 2026 | S2 — Matching engine + tier-1 live scoring | `services/matching.py` (3-tier engine); tier-1 NSN ordering from SQL view `dibbs_supplier_nsn_scored` / `SupplierNSNScored` (Apr 2026) |
 | Mar 2026 | S4 — RFQ dispatch, quote entry, email service | `services/email.py`, `models/cages.py` (CompanyCAGE), `models/rfq.py` (SupplierRFQ + SupplierContactLog), `views/rfq.py` (9 views), solicitation detail tabs, `rfq/pending.html`, `rfq/sent.html`, `rfq/quote_entry.html` |
 | Mar 11, 2026 | S5 — BQ export, bid views, supplier views, import rewrite, RFQ Center + templates | `services/bq_export.py`, `services/importer.py` (perf rewrite), `views/bids.py` (stubs), `views/suppliers.py` (stubs), all templates: `rfq/center.html`, `rfq/partials/center_panel.html`, `bids/ready.html`, `bids/builder.html`, `bids/export_queue.html`, `suppliers/list.html`, `suppliers/detail.html`, `suppliers/add_nsn.html`, `suppliers/add_fsc.html` |
 | Mar 11, 2026 | S6 — Missing view functions wired up | `views/rfq.py` (`rfq_center`, `rfq_center_detail`), `views/bids.py` (all 5 views complete), `views/suppliers.py` (all views complete), `views/__init__.py` updated |
@@ -388,7 +388,7 @@ Key fields relevant to the bidding system:
 
 **RFQ email priority:** `contact.email` → `primary_email` → `business_email`
 
-#### `dibbs_supplier_nsn` — explicit NSN-level supplier capability (manual + quote learning)
+#### `dibbs_supplier_nsn` — explicit NSN-level supplier capability (manual + quote learning; manual rows only)
 
 ```python
 class SupplierNSN(models.Model):
@@ -409,12 +409,12 @@ class SupplierNSN(models.Model):
 |--------|------|-------|
 | id | INT IDENTITY PK | |
 | supplier_id | INT FK | → contracts_supplier.id |
-| nsn | VARCHAR(46) | NSN (normalized: 13 digits, no hyphens). Indexed. |
+| nsn | VARCHAR(46) | Normalized (no hyphens). Indexed. |
 | notes | VARCHAR(255) NULL | |
-| added_at | DATETIME | When the row was created |
-| added_by_id | INT NULL FK | → auth_user (who added, if known) |
+| added_at | DATETIME | Auto-set on creation |
+| added_by_id | INT FK NULL | → auth_user |
 
-**Tier-1 match score** is **not** stored on this table. It is computed at read time by SQL Server view **`dibbs_supplier_nsn_scored`** (DDL in `sales/sql/dibbs_supplier_nsn_scored.sql`; deploy with `CREATE OR ALTER` in SSMS). Django reads it via unmanaged model **`SupplierNSNScored`** (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`). Score = **1.0** base + sum of contract weights from `contracts_clin` / `contracts_contract` / `contracts_nsn` (1.0 if award ≤2y, 0.75 if ≤4y, 0.5 older).
+**Tier-1 match score** is **not** stored on this table. It is computed at query time by SQL Server view **`dibbs_supplier_nsn_scored`** (DDL in `sales/sql/dibbs_supplier_nsn_scored.sql`; deploy with `CREATE OR ALTER VIEW` in SSMS — not Django migrations). Django reads the view via unmanaged model **`SupplierNSNScored`** (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`). **Live formula:** **1.0** bonus per manual row in `dibbs_supplier_nsn` + **SUM** of contract weights from `contracts_clin` (via `contracts_contract` / `contracts_nsn`): **+1.0** if award ≤ 2 years, **+0.75** if ≤ 4 years, **+0.5** if older.
 
 #### `dibbs_supplier_fsc` *(new)* — FSC/category-level supplier capability
 
@@ -622,7 +622,7 @@ When a daily import completes, the matching engine runs automatically and attemp
 
 | Priority | Method | Source Table | Logic |
 |----------|--------|-------------|-------|
-| 1 — Direct NSN | Exact NSN match | `dibbs_supplier_nsn_scored` (view over `dibbs_supplier_nsn` + `contracts_*`) | Query by NSN on `SupplierNSNScored`, order by `match_score` desc — score computed live in SQL Server |
+| 1 — Direct NSN | Exact NSN match | `dibbs_supplier_nsn_scored` (view) | Query by NSN from `SupplierNSNScored` unmanaged model, order by computed `match_score` desc — score is calculated live by the SQL view from contract history + manual entry bonus |
 | 2 — Approved Source | AS file CAGE cross-ref | `dibbs_approved_source` + `contracts_supplier` | Find CAGEs in AS file for this NSN where a matching `contracts_supplier` exists with `archived=False` |
 | 3 — FSC Category | 4-digit FSC match | `dibbs_supplier_fsc` | `SupplierFSC.objects.filter(fsc_code=line.fsc, supplier__archived=False)` |
 
@@ -636,21 +636,38 @@ match_score = models.DecimalField(max_digits=6, decimal_places=2, default=0)
 # Tier 3: 0.5 fixed (FSC is a weak/broad signal)
 ```
 
-### 4.2 Live NSN scoring (SQL view)
+### 4.2 SupplierNSN live scoring — `dibbs_supplier_nsn_scored` view
 
-- **`dibbs_supplier_nsn`** holds only rows users/system create (bulk NSN add, quote-confirmed `get_or_create`, etc.). There is **no** `contract_history` sync job and **no** Python backfill.
-- **`dibbs_supplier_nsn_scored`** is a SQL Server **view** (see `sales/sql/dibbs_supplier_nsn_scored.sql`). Deploy with SSMS (`CREATE OR ALTER VIEW`). Do not run the `.sql` file from Django or management commands.
-- Matching tier 1 queries this view via Django unmanaged model **`SupplierNSNScored`**.
+Match scores for Tier 1 NSN matching are computed live by a SQL Server view. There is no batch job or Django management command that seeds or refreshes scores into `dibbs_supplier_nsn`. The view is deployed via SSMS and is never applied by Django migrations.
+
+- **View:** `dibbs_supplier_nsn_scored`
+- **Source file:** `sales/sql/dibbs_supplier_nsn_scored.sql`
+- **Django model:** `SupplierNSNScored` (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`)
+
+**Score formula**
+
+`match_score` = **1.0** (manual confirmation bonus — a row exists in `dibbs_supplier_nsn` for that supplier/NSN)
+
++ **SUM** of per-contract weights from `contracts_clin` (joined through `contracts_contract` for `award_date`, and `contracts_nsn` for NSN text as implemented in the view):
+
+- `award_date` **≤ 2 years** ago: **+1.0** per contract  
+- `award_date` **≤ 4 years** ago: **+0.75** per contract  
+- `award_date` **> 4 years** ago: **+0.5** per contract  
+
+The score is recomputed on every query. Suppliers with proven contract history outrank suppliers that appear only as manual capability rows with no history.
+
+**`dibbs_supplier_nsn` (table)** contains **manual entries only**. Each row means a sales rep confirmed the supplier can provide that NSN (bulk add UI, quote-driven `get_or_create`, etc.). Fields: `id`, `supplier_id`, `nsn` (normalized, no hyphens), `notes`, `added_at`, `added_by_id`.
+
+**Operations:** To change the scoring formula, edit the `.sql` file, redeploy with `CREATE OR ALTER VIEW` in SSMS, and update this section plus `sales/CONTEXT.md`.
 
 ```
-ONGOING:
 Staff / quotes ──→ dibbs_supplier_nsn
                           │
                           ▼
 contracts_clin + contracts_contract + contracts_nsn ──→ dibbs_supplier_nsn_scored (VIEW)
                           │
                           ▼
-              matching.py (SupplierNSNScored) ──→ dibbs_supplier_match
+              matching (SupplierNSNScored) ──→ dibbs_supplier_match
 ```
 
 #### `dibbs_supplier_match` *(new)* — results of matching engine
@@ -1015,8 +1032,8 @@ SALES APP
 │    │    ├── Capabilities tab             NSNs and FSC codes this supplier covers
 │    │    ├── Quote History tab            All past quotes with prices + dates
 │    │    └── Bid Performance tab          Win/loss record for this supplier's parts
-│    ├── Add NSN Capability               /sales/suppliers/<id>/nsn/add/
-│    └── Add FSC Capability               /sales/suppliers/<id>/fsc/add/
+│    ├── Add NSN Capability               /sales/suppliers/<id>/nsn/add/  (textarea bulk paste; no match-score field — tier-1 score from live view)
+│    └── Add FSC Capability               /sales/suppliers/<id>/fsc/add/  (textarea bulk paste)
 │
 ├── 📨  RFQ Center                         /sales/rfq/queue/
 │    ├── Queue (sub-nav)                   /sales/rfq/queue/               (default view)
@@ -3486,7 +3503,7 @@ contracts_contract
         └── nsn_fk       →  (NSN record)
 ```
 
-**Architecture decision:** `contracts` and `sales` remain separate Django apps. **Tier-1 NSN scores** are computed in SQL Server view **`dibbs_supplier_nsn_scored`** (see `sales/sql/dibbs_supplier_nsn_scored.sql`), which joins `dibbs_supplier_nsn` to `contracts_clin`, `contracts_contract`, and `contracts_nsn`. Django matching reads the view through unmanaged **`SupplierNSNScored`** — Python does not query `Clin` for matching.
+**Architecture decision:** `contracts` and `sales` remain separate Django apps. **Tier-1 NSN ranking** does **not** copy contract history into `dibbs_supplier_nsn` or store a static score on that table. Instead, **match_score** is computed **live at query time** in SQL Server view **`dibbs_supplier_nsn_scored`** (see `sales/sql/dibbs_supplier_nsn_scored.sql`), which joins manual capability rows in `dibbs_supplier_nsn` to `contracts_clin`, `contracts_contract`, and `contracts_nsn`. Django matching reads the view through unmanaged **`SupplierNSNScored`** — Python does not import `contracts.models.Clin` or run a sync job to maintain tier-1 scores.
 
 ```
 Staff / quotes ──→ dibbs_supplier_nsn

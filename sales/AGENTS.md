@@ -10,11 +10,11 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and DIBBS AW file award import (`DibbsAward`).
 
-**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`, **`SavedFilter`** (`dibbs_saved_filter` — list-view filter presets; system rows seeded by data migration, not deletable via UI).
+**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `SupplierNSN`, **`SupplierNSNScored`** (unmanaged; SQL view `dibbs_supplier_nsn_scored` for tier-1 live scores), `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`, **`SavedFilter`** (`dibbs_saved_filter` — list-view filter presets; system rows seeded by data migration, not deletable via UI).
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
-**Does not own:** Authentication (`auth.User`). Tier-1 NSN scoring joins `contracts_*` tables inside SQL Server view `dibbs_supplier_nsn_scored`, not via Django `Clin` queries in matching code.
+**Does not own:** Authentication (`auth.User`). **Contracts data:** `contracts.models.Clin` / `contracts_clin` rows are read by the `dibbs_supplier_nsn_scored` SQL Server view only — not imported by any Python service file in `sales`.
 
 **App type:** Core domain app. This is the operational heart of the product. It is tightly coupled internally and fragile in the import → match → RFQ → bid status pipeline.
 
@@ -39,7 +39,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 - Search templates under `sales/templates/sales/` for field references — many field names appear in templates directly.
 - Check `sales/services/bq_export.py` for `COMPANY_FILLED_COLUMNS` — it maps 1-based BQ column indices to exact model field names on `GovernmentBid` and `CompanyCAGE`.
 - Check `sales/services/importer.py` for chunking constants (`SOLICITATION_CHUNK=200`, `LINE_CHUNK=230`, `AS_CHUNK=400`) and any field references in upsert logic.
-- Check `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSN.nsn`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name.
+- Check `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSNScored.nsn`, `SupplierNSNScored.match_score`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name. Tier 1 reads from `SupplierNSNScored` (unmanaged model → `dibbs_supplier_nsn_scored` view). Do not replace with direct `SupplierNSN` reads — the view is required for live score ordering.
 
 ### Before changing views
 - Read the full view module being changed (`sales/views/*.py`).
@@ -50,7 +50,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ### Before changing services
 - `sales/services/bq_export.py` — any rename of `GovernmentBid` or `CompanyCAGE` fields listed in `COMPANY_FILLED_COLUMNS` will silently produce wrong BQ output (no attribute error, wrong column filled).
-- `sales/services/matching.py` — the three tiers are interdependent; changing tier boundaries or deduplication logic affects bid quality downstream.
+- `sales/services/matching.py` — references `SupplierMatch.match_method`, `SupplierNSNScored.nsn`, `SupplierNSNScored.match_score`, `SupplierFSC.fsc_code`, `ApprovedSource.approved_cage` by name. Tier 1 reads from `SupplierNSNScored` (unmanaged model → `dibbs_supplier_nsn_scored` view). Do not replace with direct `SupplierNSN` reads — the view is required for live score ordering. The three tiers are interdependent; changing tier boundaries or deduplication logic affects bid quality downstream.
 - `sales/services/email.py` — `_default_cage()` must always find exactly one `CompanyCAGE(is_default=True, is_active=True)`. If that invariant breaks, every RFQ email fails.
 - `sales/services/importer.py` — step results stored in `ImportJob.step_results` as JSON must include `batch_id` and `import_date`; the progress template reads those keys by name.
 - `_run_lifecycle_sweep()` in `services/importer.py` runs at the start of every import inside `transaction.atomic()` (parse step in `imports.py`, and the legacy `run_import()` entry point). It transitions `New → Active` for prior-batch records and `→ Archived` for expired eligible records using **per-pass `QuerySet.update()`** (not chunked `bulk_update`) to avoid SQLite write-lock storms. **`NO_BID` is excluded** from the expired→Archived sweep — passed solicitations stay `NO_BID` permanently and appear under **Closed Solicitations** (`solicitation_closed`) / No-Bid tab. It must remain the first database write in the parse-step `try` block (before `create_import_batch`) and the first operation inside `run_import()`'s lifecycle `atomic` block. Do not move it after batch creation or call it conditionally.
@@ -113,7 +113,16 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/urls.py` + `sales/views/imports.py` + `sales/templates/sales/import/progress.html` (step checklist) + `sales/services/importer.py` if new service logic needed
 
 ### Changing `SupplierNSN` or `SupplierFSC` fields
-→ `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html` + if tier-1 **score formula** or view columns change: `sales/sql/dibbs_supplier_nsn_scored.sql` (redeploy view in SSMS) + unmanaged `SupplierNSNScored` field alignment + `sales/CONTEXT.md` / `DIBBS_System_Spec.md` score description
+→ `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html` + `sales/sql/dibbs_supplier_nsn_scored.sql` — if scoring formula changes, update this file and redeploy via SSMS using `CREATE OR ALTER VIEW` + unmanaged `SupplierNSNScored` field alignment + `sales/CONTEXT.md` / `DIBBS_System_Spec.md` score description
+
+### Changing the SupplierNSN live scoring formula
+→ Edit `sales/sql/dibbs_supplier_nsn_scored.sql`  
+→ Deploy via SSMS: `CREATE OR ALTER VIEW [dbo].[dibbs_supplier_nsn_scored]`  
+→ Never deploy via Django migrations or management commands  
+→ Unmanaged Django model: `SupplierNSNScored` in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`)  
+→ Update scoring formula description in `sales/CONTEXT.md` and `sales/DIBBS_System_Spec.md`  
+→ No migration required — the view is not managed by Django  
+→ Score formula: **+1.0** per row in `dibbs_supplier_nsn` (manual confirmation bonus) + **+1.0** per contract ≤ 2 years old (from `contracts_clin` via `contracts_contract`), **+0.75** per contract ≤ 4 years, **+0.5** per contract > 4 years  
 
 ### `dibbs_supplier_nsn_scored` view (tier-1 NSN scores)
 → DDL lives in `sales/sql/dibbs_supplier_nsn_scored.sql` — deploy changes via SSMS with `CREATE OR ALTER VIEW` — **never** run this file from Django migrations or management commands  
@@ -330,7 +339,7 @@ After any change, manually verify these flows:
    - Field renames: search `sales/services/`, `sales/views/`, `sales/templates/` for the field name.
    - URL name changes: `grep -r "sales:<name>" sales/templates/` and `sales/base.html`.
    - Status string changes: `grep -r "'<STATUS>'" sales/` (views, services, templates all use raw strings).
-4. **Check cross-app impact**: `suppliers.Supplier` field references in `sales/services/email.py`, `matching.py`, `views/suppliers.py`; tier-1 scoring SQL view joins `contracts_*` tables — update `sales/sql/dibbs_supplier_nsn_scored.sql` if contract/NSN join keys change.
+4. **Check cross-app impact**: `suppliers.Supplier` field references in `sales/services/email.py`, `matching.py`, `views/suppliers.py`; `contracts_clin` is accessed only by the `dibbs_supplier_nsn_scored` SQL Server view — not by any Python import in `matching.py`. Update `sales/sql/dibbs_supplier_nsn_scored.sql` if contract/NSN join keys change.
 5. **Make minimal, scoped changes.** Do not refactor adjacent code unless it is directly broken.
 6. **Update all coupled files** (see Section 5 clusters).
 7. **Run `makemigrations sales`** if any model was changed and review the output.
@@ -361,7 +370,8 @@ After any change, manually verify these flows:
 
 ### Main cross-app dependencies
 - `suppliers.Supplier` — central supplier record; all matching, RFQ, quote, and bid FKs point here
-- `sales.context_processors.rfq_counts` registered in `STATZWeb/settings.py`
+- `contracts_clin` (SQL Server table) — read by `dibbs_supplier_nsn_scored` view only; not imported by any Python service in `sales`
+- `sales.context_processors.rfq_counts` and **`sales.context_processors.solicitation_nav_tools`** registered in `STATZWeb/settings.py`
 
 ### Main security-sensitive areas
 - All views — must retain `@login_required`
