@@ -16,7 +16,7 @@ def dict_key(d, key):
 @register.filter
 def get_item(dictionary, key):
     """Allow dict[variable_key] access in templates."""
-    if dictionary is None:
+    if dictionary is None or not isinstance(dictionary, dict):
         return None
     return dictionary.get(key)
 

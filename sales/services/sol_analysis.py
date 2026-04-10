@@ -22,6 +22,7 @@ USER_PROMPT_TEMPLATE = """Analyze the following DIBBS solicitation document text
 Extract the following fields and return them as a JSON object:
 
 {{
+  "date_issued": <string or null — date the solicitation was issued in YYYY-MM-DD format>,
   "fat_required": <true/false — is First Article Test (FAT) required?>,
   "fat_units": <integer or null — how many units must be tested for FAT?>,
   "fat_days": <integer or null — how many calendar days to submit FAT report?>,
@@ -42,7 +43,15 @@ Extract the following fields and return them as a JSON object:
   "special_packaging_instructions": <string or null — any supplemental or special packaging instructions verbatim>,
   "marking_standard": <string or null — marking standard cited e.g. MIL-STD-129>,
   "quantity_ranges_encouraged": <true/false — does the solicitation encourage submitting quantity ranges?>,
-  "other_notable_requirements": <array of strings — any other notable requirements not covered above, each as a brief plain-English statement. Empty array if none.>
+  "dpas_rating": <string or null — DPAS priority rating code found in the RATING block of the SF-18 cover page e.g. DO-C9 or DX-C9. If not present return null>,
+  "buyer_name": <string or null — the buyer or contracting officer name from the Issued By block on the SF-18 cover page. Usually follows "Name:" label>,
+  "buyer_email": <string or null — buyer email address from the Issued By block. Usually follows "Email:" label>,
+  "buyer_phone": <string or null — buyer phone number from the Issued By block. Usually follows "Tel:" label>,
+  "issuing_office": <string or null — DLA office name and division from the Issued By block e.g. "DLA Land and Maritime, Fluid Handling Division">,
+  "issue_date": <string or null — the date this solicitation was issued, found in block 2 of the SF-18 cover page labeled DATE ISSUED. Return in YYYY-MM-DD format e.g. 2026-03-30>,
+  "other_notable_requirements": <array of strings — any other notable requirements not covered above, each as a brief plain-English statement. Empty array if none.>,
+  "extraction_confidence": <"HIGH", "MEDIUM", or "LOW" — your overall confidence in the accuracy of this extraction. HIGH = all key fields found clearly stated in the document. MEDIUM = most fields found but one or more required inference or were ambiguous. LOW = significant portions of the document were unclear, missing, or contradictory>,
+  "extraction_notes": <string or null — brief plain-English explanation of any fields you were uncertain about, could not find, or had to infer. null if confidence is HIGH and all fields were clearly stated>
 }}
 
 Solicitation text:
@@ -152,3 +161,75 @@ def analyze_solicitation_pdf(pdf_blob_bytes: bytes, solicitation_number: str, mo
     }
 
     return result
+
+
+def save_analysis_result(solicitation, result: dict, model_key: str) -> None:
+    """
+    Persist LLM extraction result to dibbs_sol_analysis.
+    Creates or replaces the row for this solicitation.
+    Date fields are parsed from YYYY-MM-DD strings; invalid dates stored as None.
+    other_notable_requirements stored as JSON text.
+    """
+    import json as _json
+    from datetime import datetime
+
+    from sales.models.sol_analysis import SolAnalysis
+
+    def parse_date(val):
+        if not val:
+            return None
+        try:
+            return datetime.strptime(val, "%Y-%m-%d").date()
+        except Exception:
+            return None
+
+    usage = result.get("_usage", {})
+
+    SolAnalysis.objects.update_or_create(
+        solicitation=solicitation,
+        defaults={
+            "model_key": model_key,
+            "input_tokens": usage.get("input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0),
+            # Page 1
+            "issue_date": parse_date(result.get("issue_date")),
+            "dpas_rating": result.get("dpas_rating"),
+            "issuing_office": result.get("issuing_office"),
+            "buyer_name": result.get("buyer_name"),
+            "buyer_email": result.get("buyer_email"),
+            "buyer_phone": result.get("buyer_phone"),
+            # Critical
+            "fat_required": result.get("fat_required"),
+            "fat_units": result.get("fat_units"),
+            "fat_days": result.get("fat_days"),
+            "fat_summary": result.get("fat_summary"),
+            "itar_export_control": result.get("itar_export_control"),
+            "origin_inspection_required": result.get("origin_inspection_required"),
+            "iso_9001_required": result.get("iso_9001_required"),
+            "buy_american_applies": result.get("buy_american_applies"),
+            "additive_manufacturing_prohibited": result.get(
+                "additive_manufacturing_prohibited"
+            ),
+            "cmmc_required": result.get("cmmc_required"),
+            "cmmc_level": result.get("cmmc_level"),
+            "quantity_ranges_encouraged": result.get("quantity_ranges_encouraged"),
+            # Delivery
+            "fob_point": result.get("fob_point"),
+            "delivery_destination": result.get("delivery_destination"),
+            "need_ship_date": parse_date(result.get("need_ship_date")),
+            "required_delivery_date": parse_date(result.get("required_delivery_date")),
+            # Packaging
+            "packaging_standard": result.get("packaging_standard"),
+            "preservation_method": result.get("preservation_method"),
+            "special_packaging_instructions": result.get(
+                "special_packaging_instructions"
+            ),
+            "marking_standard": result.get("marking_standard"),
+            # Other
+            "other_notable_requirements": _json.dumps(
+                result.get("other_notable_requirements") or []
+            ),
+            "extraction_confidence": result.get("extraction_confidence"),
+            "extraction_notes": result.get("extraction_notes"),
+        },
+    )

@@ -43,6 +43,7 @@ from sales.models import (
     WeWonAward,
     NsnProcurementHistory,
     SolPackaging,
+    SolAnalysis,
     MassPassLog,
     SavedFilter,
     SolicitationMatchCount,
@@ -1009,6 +1010,42 @@ def _workbench_procurement_packaging_context(solicitation, line):
     }
 
 
+def _build_supplier_name_map(cage_codes: set) -> dict:
+    """
+    Given a set of normalized CAGE strings (from normalize_cage_code), return a dict
+    mapping normalized cage -> display name.
+
+    Priority: Supplier table (archived=False) first, then SAMEntityCache
+    (fetch_error=False). No SAM API calls — cache/DB reads only.
+    """
+    cage_codes = {c for c in cage_codes if c and str(c).strip()}
+    if not cage_codes:
+        return {}
+
+    name_map = {}
+    supplier_qs = Supplier.objects.filter(
+        cage_code__in=cage_codes,
+        archived=False,
+    ).values("cage_code", "name")
+    for row in supplier_qs:
+        k = normalize_cage_code(row["cage_code"])
+        name = row["name"]
+        if k and name and str(name).strip():
+            name_map[k] = str(name).strip()
+    remaining = cage_codes - set(name_map.keys())
+    if remaining:
+        sam_qs = SAMEntityCache.objects.filter(
+            cage_code__in=remaining,
+            fetch_error=False,
+        ).values("cage_code", "entity_name")
+        for row in sam_qs:
+            k = normalize_cage_code(row["cage_code"])
+            en = row["entity_name"]
+            if k and k not in name_map and en and str(en).strip():
+                name_map[k] = str(en).strip()
+    return name_map
+
+
 @login_required
 def solicitation_history_packaging_partial(request, sol_number):
     solicitation = get_object_or_404(
@@ -1017,6 +1054,13 @@ def solicitation_history_packaging_partial(request, sol_number):
     )
     line = solicitation.lines.order_by("line_number", "id").first()
     ctx = _workbench_procurement_packaging_context(solicitation, line)
+    procurement_history = ctx["procurement_history"]
+    cage_codes = set()
+    for h in procurement_history:
+        c = normalize_cage_code(h.cage_code)
+        if c:
+            cage_codes.add(c)
+    ctx["supplier_name_map"] = _build_supplier_name_map(cage_codes)
     return render(
         request,
         "sales/solicitations/partials/workbench_procurement_packaging.html",
@@ -1105,9 +1149,17 @@ def sol_analyze(request, sol_number):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
     try:
-        from ..services.sol_analysis import analyze_solicitation_pdf
+        from ..services.sol_analysis import analyze_solicitation_pdf, save_analysis_result
 
         result = analyze_solicitation_pdf(bytes(sol.pdf_blob), sol_number, model_key)
+        try:
+            save_analysis_result(sol, result, model_key)
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).error(
+                "Failed to save SolAnalysis for %s: %s", sol_number, e
+            )
         return JsonResponse({"ok": True, "data": result})
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
@@ -1173,7 +1225,9 @@ def solicitation_workbench(request, sol_number):
     research/pass, and list_qs/session-aware prev–next navigation.
     """
     solicitation = get_object_or_404(
-        Solicitation.objects.select_related("import_batch").prefetch_related("lines"),
+        Solicitation.objects.select_related("import_batch", "analysis").prefetch_related(
+            "lines"
+        ),
         solicitation_number=sol_number,
     )
     list_qs_raw = ""
@@ -1280,6 +1334,12 @@ def solicitation_workbench(request, sol_number):
     procurement_history = _rpc["procurement_history"]
     packaging = _rpc["packaging"]
     has_pdf_blob = _rpc["has_pdf_blob"]
+    cage_codes_proc = set()
+    for h in procurement_history:
+        c = normalize_cage_code(h.cage_code)
+        if c:
+            cage_codes_proc.add(c)
+    supplier_name_map = _build_supplier_name_map(cage_codes_proc)
     approved_sources_display = _workbench_approved_sources_display(line)
     sidebar_ctx = _workbench_sidebar_context(solicitation)
     tier1_matches = sidebar_ctx["tier1_matches"]
@@ -1316,6 +1376,63 @@ def solicitation_workbench(request, sol_number):
     )
     show_research_button = solicitation.status in ("New", "Active", "Matching")
 
+    try:
+        sol_analysis = solicitation.analysis
+    except SolAnalysis.DoesNotExist:
+        sol_analysis = None
+    sol_analysis_json = None
+    if sol_analysis:
+        sol_analysis_json = json.dumps(
+            {
+                "fat_required": sol_analysis.fat_required,
+                "fat_units": sol_analysis.fat_units,
+                "fat_days": sol_analysis.fat_days,
+                "fat_summary": sol_analysis.fat_summary,
+                "itar_export_control": sol_analysis.itar_export_control,
+                "origin_inspection_required": sol_analysis.origin_inspection_required,
+                "iso_9001_required": sol_analysis.iso_9001_required,
+                "buy_american_applies": sol_analysis.buy_american_applies,
+                "additive_manufacturing_prohibited": sol_analysis.additive_manufacturing_prohibited,
+                "cmmc_required": sol_analysis.cmmc_required,
+                "cmmc_level": sol_analysis.cmmc_level,
+                "quantity_ranges_encouraged": sol_analysis.quantity_ranges_encouraged,
+                "fob_point": sol_analysis.fob_point,
+                "delivery_destination": sol_analysis.delivery_destination,
+                "need_ship_date": (
+                    sol_analysis.need_ship_date.strftime("%Y-%m-%d")
+                    if sol_analysis.need_ship_date
+                    else None
+                ),
+                "required_delivery_date": (
+                    sol_analysis.required_delivery_date.strftime("%Y-%m-%d")
+                    if sol_analysis.required_delivery_date
+                    else None
+                ),
+                "packaging_standard": sol_analysis.packaging_standard,
+                "preservation_method": sol_analysis.preservation_method,
+                "special_packaging_instructions": sol_analysis.special_packaging_instructions,
+                "marking_standard": sol_analysis.marking_standard,
+                "issue_date": (
+                    sol_analysis.issue_date.strftime("%Y-%m-%d")
+                    if sol_analysis.issue_date
+                    else None
+                ),
+                "dpas_rating": sol_analysis.dpas_rating,
+                "issuing_office": sol_analysis.issuing_office,
+                "buyer_name": sol_analysis.buyer_name,
+                "buyer_email": sol_analysis.buyer_email,
+                "buyer_phone": sol_analysis.buyer_phone,
+                "other_notable_requirements": sol_analysis.get_other_notable_list(),
+                "extraction_confidence": sol_analysis.extraction_confidence,
+                "extraction_notes": sol_analysis.extraction_notes,
+                "_usage": {
+                    "model": sol_analysis.model_key,
+                    "input_tokens": sol_analysis.input_tokens,
+                    "output_tokens": sol_analysis.output_tokens,
+                },
+            }
+        )
+
     return render(
         request,
         "sales/solicitations/detail.html",
@@ -1338,6 +1455,7 @@ def solicitation_workbench(request, sol_number):
             "procurement_history": procurement_history,
             "packaging": packaging,
             "has_pdf_blob": has_pdf_blob,
+            "supplier_name_map": supplier_name_map,
             "approved_sources_display": approved_sources_display,
             "tier1_matches": tier1_matches,
             "tier2_matches": tier2_matches,
@@ -1351,6 +1469,8 @@ def solicitation_workbench(request, sol_number):
             "workbench_claim_blocked": workbench_claim_blocked,
             "show_triage_actions": show_triage_actions,
             "show_research_button": show_research_button,
+            "sol_analysis": sol_analysis,
+            "sol_analysis_json": sol_analysis_json,
         },
     )
 

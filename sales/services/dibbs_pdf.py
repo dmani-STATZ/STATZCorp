@@ -28,6 +28,7 @@ Note on ERR_ABORTED:
 """
 
 import logging
+import os
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -835,7 +836,32 @@ def parse_pdf_data_backlog(log=None) -> int:
         if not blob:
             continue
         key = (sol_number or "").strip().upper()
-        persist_pdf_procurement_extract(key, bytes(blob))
+        pdf_blob_bytes = bytes(blob)
+        persist_pdf_procurement_extract(key, pdf_blob_bytes)
+        # Loop C LLM analysis hook — enabled via SOL_ANALYSIS_ENABLED=True env var
+        if os.environ.get("SOL_ANALYSIS_ENABLED", "False").lower() == "true":
+            try:
+                from sales.models.sol_analysis import SolAnalysis
+
+                sol = Solicitation.objects.get(solicitation_number=key)
+                if not SolAnalysis.objects.filter(solicitation=sol).exists():
+                    from sales.services.sol_analysis import (
+                        analyze_solicitation_pdf,
+                        save_analysis_result,
+                    )
+
+                    _result = analyze_solicitation_pdf(
+                        pdf_blob_bytes,
+                        sol.solicitation_number,
+                        "haiku45",
+                    )
+                    save_analysis_result(sol, _result, "haiku45")
+            except Exception as _e:
+                logger.error(
+                    "Loop C SolAnalysis failed for %s: %s",
+                    key,
+                    _e,
+                )
         n += 1
         if log:
             log(f"  parse backlog: {key}")

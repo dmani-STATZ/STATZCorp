@@ -171,69 +171,81 @@
     {# —— Left 70% —— #}
     <div class="wb-left">
       <div class="form-card mb-3" style="background:#fff;border:1px solid #dde3ec;border-radius:8px;padding:0.75rem 1rem;">
-        {# Row 1 — identity bar #}
-        <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
-          <div class="text-nowrap">
-            <div class="form-label mb-0">Sol #</div>
-            <div class="mono" style="font-size: 15px; font-weight: 600; color: #0a1628;">{{ solicitation.solicitation_number }}</div>
-          </div>
-          <div class="text-nowrap">
-            <div class="form-label mb-0">NSN</div>
-            <div class="mono" style="font-size: 15px; font-weight: 600; color: #0a1628;">{{ line.nsn|default:"—" }}</div>
-          </div>
-          <div class="text-nowrap">
-            <div class="form-label mb-0">Return date</div>
-            <div class="d-flex align-items-center flex-wrap gap-1">
-              <span class="mono {% if return_by_urgent %}text-danger fw-semibold{% endif %}" style="font-size: 15px; font-weight: 600;{% if not return_by_urgent %} color: #0a1628;{% endif %}">{{ solicitation.return_by_date|date:"M j, Y"|default:"—" }}</span>
-              {% if return_by_urgent %}<span class="badge bg-danger" style="font-size:0.65rem;">Urgent</span>{% endif %}
+        <div class="d-flex gap-3 align-items-stretch">
+          <div class="d-flex flex-column" style="flex: 0 0 65%;">
+            {# Row 1 — identity bar #}
+            <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+              <div class="text-nowrap">
+                <div class="form-label mb-0">Sol #</div>
+                <div class="mono" style="font-size: 15px; font-weight: 600; color: #0a1628;">{{ solicitation.solicitation_number }}</div>
+              </div>
+              <div class="text-nowrap">
+                <div class="form-label mb-0">NSN</div>
+                <div class="mono" style="font-size: 15px; font-weight: 600; color: #0a1628;">{{ line.nsn|default:"—" }}</div>
+              </div>
+              <div class="text-nowrap">
+                <div class="form-label mb-0">Return date</div>
+                <div class="d-flex align-items-center flex-wrap gap-1">
+                  <span class="mono {% if return_by_urgent %}text-danger fw-semibold{% endif %}" style="font-size: 15px; font-weight: 600;{% if not return_by_urgent %} color: #0a1628;{% endif %}">{{ solicitation.return_by_date|date:"M j, Y"|default:"—" }}</span>
+                  {% if return_by_urgent %}<span class="badge bg-danger" style="font-size:0.65rem;">Urgent</span>{% endif %}
+                </div>
+              </div>
+              {% if solicitation.small_business_set_aside and solicitation.small_business_set_aside != 'N' %}
+              <div class="text-nowrap">
+                <div class="form-label mb-0">Set-aside</div>
+                <div><span class="badge bg-secondary">{{ solicitation.set_aside_display|default:solicitation.small_business_set_aside }}</span></div>
+              </div>
+              {% endif %}
+            </div>
+            {# Row 2 — nomenclature #}
+            <div style="font-size: 15px; font-weight: 600; color: #1a2940; margin-bottom: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ line.nomenclature|default:'' }}">{{ line.nomenclature|default:"—" }}</div>
+            {# Row 3 — actions #}
+            <div class="mt-auto d-flex align-items-center gap-2 flex-wrap">
+              {% if solicitation.pdf_blob %}
+              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost btn-sm" style="border-color:#0d9488; color:#0d9488;"
+                        onclick="runAnalysis('haiku45')">
+                  Haiku 4.5
+                </button>
+                <!-- {# SONNET/OPUS BUTTONS HIDDEN — Haiku selected as production model
+                  <button type="button" class="btn btn-ghost btn-sm" style="border-color:#7c3aed; color:#7c3aed;"
+                          onclick="runAnalysis('sonnet46')">
+                    Sonnet 4.6
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="border-color:#dc2626; color:#dc2626;"
+                          onclick="runAnalysis('opus46')">
+                    Opus 4.6
+                  </button>
+                  #} -->
+              </div>
+              {% endif %}
+              <a href="{% url 'sales:solicitation_pdf' sol_number=solicitation.solicitation_number %}"
+                 id="wb-view-pdf-btn"
+                 class="btn btn-sm btn-outline-primary"
+                 role="button">View RFQ PDF</a>
             </div>
           </div>
-          {% if solicitation.small_business_set_aside and solicitation.small_business_set_aside != 'N' %}
-          <div class="text-nowrap">
-            <div class="form-label mb-0">Set-aside</div>
-            <div><span class="badge bg-secondary">{{ solicitation.set_aside_display|default:solicitation.small_business_set_aside }}</span></div>
-          </div>
-          {% endif %}
-        </div>
-        {# Row 2 — nomenclature #}
-        <div style="font-size: 15px; font-weight: 600; color: #1a2940; margin-bottom: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ line.nomenclature|default:'' }}">{{ line.nomenclature|default:"—" }}</div>
-        {# Row 3 — stat cards + PDF #}
-        <div style="display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap;">
-          <div class="stat-card accent" style="min-width: 180px;">
-            <div class="stat-label">Quantity</div>
-            <div class="stat-value">{{ line.quantity }} <span style="font-size: 22px; font-weight: 500;">{{ line.unit_of_issue }}</span></div>
-          </div>
-          {% if procurement_history %}
-          <div class="stat-card success" style="min-width: 200px;">
-            <div class="stat-label">Est. Value</div>
-            <div class="stat-value" id="est-value-display"
-                 data-qty="{{ line.quantity }}"
-                 data-unit-cost="{{ procurement_history.0.unit_cost }}"
-                 style="color: var(--success);">—</div>
-            <div class="stat-sub">based on {{ procurement_history.0.award_date|date:"M Y" }} price</div>
-          </div>
-          {% endif %}
-          <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            {% if solicitation.pdf_blob %}
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <button type="button" class="btn btn-ghost btn-sm" style="border-color:#0d9488; color:#0d9488;"
-                      onclick="runAnalysis('haiku45')">
-                Haiku 4.5
-              </button>
-              <button type="button" class="btn btn-ghost btn-sm" style="border-color:#7c3aed; color:#7c3aed;"
-                      onclick="runAnalysis('sonnet46')">
-                Sonnet 4.6
-              </button>
-              <button type="button" class="btn btn-ghost btn-sm" style="border-color:#dc2626; color:#dc2626;"
-                      onclick="runAnalysis('opus46')">
-                Opus 4.6
-              </button>
+          <div class="flex-grow-1 d-flex align-items-stretch">
+            <div class="d-flex flex-row flex-grow-1 gap-2 align-items-stretch w-100 h-100">
+              <div class="flex-fill d-flex align-items-stretch" style="min-width: 0;">
+                <div class="stat-card accent" style="min-width: 180px; height: 100%; width: 100%;">
+                  <div class="stat-label">Quantity</div>
+                  <div class="stat-value">{{ line.quantity }} <span style="font-size: 22px; font-weight: 500;">{{ line.unit_of_issue }}</span></div>
+                </div>
+              </div>
+              {% if procurement_history %}
+              <div class="flex-fill d-flex align-items-stretch" style="min-width: 0;">
+                <div class="stat-card success" style="min-width: 200px; height: 100%; width: 100%;">
+                  <div class="stat-label">Est. Value</div>
+                  <div class="stat-value" id="est-value-display"
+                       data-qty="{{ line.quantity }}"
+                       data-unit-cost="{{ procurement_history.0.unit_cost }}"
+                       style="color: var(--success);">—</div>
+                  <div class="stat-sub">based on {{ procurement_history.0.award_date|date:"M Y" }} price</div>
+                </div>
+              </div>
+              {% endif %}
             </div>
-            {% endif %}
-            <a href="{% url 'sales:solicitation_pdf' sol_number=solicitation.solicitation_number %}"
-               id="wb-view-pdf-btn"
-               class="btn btn-sm btn-outline-primary"
-               role="button">View RFQ PDF</a>
           </div>
         </div>
         <script>
@@ -289,7 +301,7 @@
       </div>
       {% endif %}
 
-      {% include "sales/solicitations/partials/workbench_procurement_panel.html" with procurement_history=procurement_history has_pdf_blob=has_pdf_blob only %}
+      {% include "sales/solicitations/partials/workbench_procurement_panel.html" with procurement_history=procurement_history has_pdf_blob=has_pdf_blob supplier_name_map=supplier_name_map only %}
 
       <div style="display: flex; gap: 1rem; margin-top: 1rem; width: 100%;">
         <div style="flex: 0 0 calc(60% - 0.5rem); min-width: 0;">
@@ -658,6 +670,10 @@ document.body.addEventListener('htmx:configRequest', function (event) {
 
   // State: keyed by model_key -> {status: 'pending'|'loading'|'done'|'error', data, error}
   var results = {};
+  {% if sol_analysis %}
+  var _stored = {{ sol_analysis_json|safe }};
+  results['haiku45'] = { status: 'done', data: _stored };
+  {% endif %}
   var activeTab = null;
 
   window.runAnalysis = function(modelKey) {
@@ -790,6 +806,17 @@ document.body.addEventListener('htmx:configRequest', function (event) {
 
     var html = '';
 
+    // Confidence banner
+    var confColor = {'HIGH': '#16a34a', 'MEDIUM': '#d97706', 'LOW': '#dc2626'}[d.extraction_confidence] || '#7a90b0';
+    var confBg = {'HIGH': '#f0fff4', 'MEDIUM': '#fffbeb', 'LOW': '#fff0f1'}[d.extraction_confidence] || '#f7f9fc';
+    html += '<div style="background:' + confBg + '; border-left:4px solid ' + confColor + '; padding:10px 14px; border-radius:4px; margin-bottom:16px;">';
+    html += '<span style="font-weight:600; color:' + confColor + ';">Extraction Confidence: ' + (d.extraction_confidence || 'Unknown') + '</span>';
+    if (d.extraction_notes) {
+      var notesEsc = String(d.extraction_notes).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html += '<div style="font-size:12px; color:#4b5563; margin-top:4px;">' + notesEsc + '</div>';
+    }
+    html += '</div>';
+
     // Usage footer first (build it, append at end)
     var usageHtml = '';
     if (d._usage) {
@@ -837,6 +864,23 @@ document.body.addEventListener('htmx:configRequest', function (event) {
       'Not mentioned', '#2563eb', '#7a90b0'));
     html += '</table>';
 
+    // Buyer / Issuing Office
+    if (d.buyer_name || d.buyer_email || d.issuing_office || d.dpas_rating || d.issue_date) {
+      html += sectionHeader('Buyer / Issuing Office');
+      html += '<table style="width:100%; border-collapse:collapse;">';
+      html += row('Issuing Office', d.issuing_office);
+      html += row('Issue Date', d.issue_date);
+      html += row('Buyer', d.buyer_name);
+      html += row('Email', d.buyer_email
+        ? '<a href="mailto:' + d.buyer_email + '" style="color:#2563eb;">' + d.buyer_email + '</a>'
+        : null);
+      html += row('Phone', d.buyer_phone);
+      html += row('DPAS Rating', d.dpas_rating
+        ? '<span style="font-weight:600; color:#dc2626;">' + d.dpas_rating + ' — Priority Rated Order</span>'
+        : null);
+      html += '</table>';
+    }
+
     // Delivery
     html += sectionHeader('Delivery');
     html += '<table style="width:100%; border-collapse:collapse;">';
@@ -871,6 +915,13 @@ document.body.addEventListener('htmx:configRequest', function (event) {
 
   // Expose switchTab globally for inline onclick handlers
   window.switchTab = switchTab;
+
+  {% if sol_analysis %}
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('sol-analysis-panel').style.display = 'block';
+    switchTab('haiku45');
+  });
+  {% endif %}
 
 })();
 </script>

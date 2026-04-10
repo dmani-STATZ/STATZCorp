@@ -37,6 +37,7 @@ from sales.models.no_quote import NoQuoteCAGE
 from sales.models.packaging import SolPackaging
 from sales.models.sam_cache import SAMEntityCache
 from sales.models.saved_filters import SavedFilter
+from sales.models.sol_analysis import SolAnalysis
 
 __all__ = [
     'ImportBatch',
@@ -71,4 +72,5 @@ __all__ = [
     'SolPackaging',
     'SAMEntityCache',
     'SavedFilter',
+    'SolAnalysis',
 ]

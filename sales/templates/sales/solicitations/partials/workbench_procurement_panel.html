@@ -1,3 +1,4 @@
+{% load sales_extras %}
 {# Single panel: procurement history (id wb-procurement-panel for PDF refresh JS). #}
 <div id="wb-procurement-panel">
   <div class="card border shadow-sm mb-3">
@@ -16,15 +17,35 @@
       {% if procurement_history %}
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0 small">
-          <thead class="table-light"><tr><th>CAGE</th><th>Contract #</th><th>Date</th><th>Qty</th><th>Unit price</th></tr></thead>
+          <thead class="table-light"><tr><th>CAGE</th><th>Awardee</th><th>Contract #</th><th>Date</th><th>Qty</th><th>Unit price</th><th></th></tr></thead>
           <tbody>
             {% for row in procurement_history %}
             <tr>
               <td class="mono">{{ row.cage_code }}</td>
+              {% with cn=row.cage_code|normalize_cage %}
+              {% with aw=supplier_name_map|get_item:cn %}
+              <td>
+                {% if aw %}
+                  <span style="display:inline-block; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom;" title="{{ aw }}">{{ aw }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
               <td class="mono">{{ row.contract_number }}</td>
               <td>{{ row.award_date|date:"M j, Y" }}</td>
               <td>{{ row.quantity }}</td>
               <td class="mono">${{ row.unit_cost }}</td>
+              <td class="text-end">
+                {% if not aw and cn %}
+                <a href="{% url 'sales:entity_cage_lookup' cage_code=cn %}"
+                   target="_blank"
+                   class="btn btn-outline-secondary btn-sm py-0 px-2">
+                  Look Up
+                </a>
+                {% endif %}
+              </td>
+              {% endwith %}
+              {% endwith %}
             </tr>
             {% endfor %}
           </tbody>
