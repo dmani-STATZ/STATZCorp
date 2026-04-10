@@ -30,6 +30,9 @@ reportlab==4.3.0
 pypdf==6.7.2  # Latest version with enhanced security and performance
 pdfplumber==0.11.5
 
+# LLM — solicitation PDF analysis (workbench)
+anthropic>=0.40.0
+
 # Utilities
 python-dateutil==2.9.0.post0
 requests==2.32.4  # Latest version with .netrc fix

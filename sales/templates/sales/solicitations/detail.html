@@ -2,7 +2,52 @@
 {% load static %}
 {% block content %}
 <style>
-  :root { --wb-navy: #0a1628; --wb-accent: #00b4d8; --wb-success: #2dc653; --wb-footer-h: 56px; }
+  :root {
+    --wb-navy: #0a1628;
+    --wb-accent: #00b4d8;
+    --wb-success: #2dc653;
+    --wb-footer-h: 56px;
+    --accent: var(--wb-accent);
+    --success: var(--wb-success);
+    --navy: var(--wb-navy);
+  }
+  /* Workbench header stat cards (DIBBS spec pattern) */
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid #dde3ec;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .stat-card.accent::before { background: var(--accent); }
+  .stat-card.success::before { background: var(--success); }
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a90b0;
+    margin-bottom: 8px;
+  }
+  .stat-card .stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #0a1628;
+    line-height: 1;
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: #7a90b0;
+    margin-top: 4px;
+  }
   .wb-wrap { padding-bottom: calc(var(--wb-footer-h) + 1.5rem); }
   .pipeline-track { display: flex; align-items: center; gap: 0; background: white; border: 1px solid #dde3ec; border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
   .pipeline-step { flex: 1; padding: 8px 6px; text-align: center; background: #f7f9fc; border-right: 1px solid #dde3ec; font-size: 10px; }
@@ -125,40 +170,110 @@
   <div class="d-flex flex-wrap wb-main-row">
     {# —— Left 70% —— #}
     <div class="wb-left">
-      <div class="card border shadow-sm mb-3">
-        <div class="card-body">
-          <div class="row g-3 small">
-            <div class="col-md-4">
-              <div class="text-muted text-uppercase fw-semibold" style="font-size:0.65rem;">Solicitation #</div>
-              <div class="mono fw-bold fs-6">{{ solicitation.solicitation_number }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="text-muted text-uppercase fw-semibold" style="font-size:0.65rem;">NSN</div>
-              <div class="mono fw-semibold">{{ line.nsn|default:"—" }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="text-muted text-uppercase fw-semibold" style="font-size:0.65rem;">Quantity</div>
-              <div class="mono">{{ line.quantity|default:"—" }} {{ line.unit_of_issue|default:"" }}</div>
-            </div>
-            <div class="col-12">
-              <div class="text-muted text-uppercase fw-semibold" style="font-size:0.65rem;">Nomenclature</div>
-              <div>{{ line.nomenclature|default:"—" }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="text-muted text-uppercase fw-semibold" style="font-size:0.65rem;">Return date</div>
-              <div class="{% if return_by_urgent %}text-danger fw-semibold{% endif %}">{{ solicitation.return_by_date|date:"M j, Y"|default:"—" }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="text-muted text-uppercase fw-semibold" style="font-size:0.65rem;">Set-aside</div>
-              <div>{% if solicitation.small_business_set_aside and solicitation.small_business_set_aside != 'N' %}<span class="badge bg-secondary">{{ solicitation.set_aside_display|default:solicitation.small_business_set_aside }}</span>{% else %}<span class="text-muted">Unrestricted</span>{% endif %}</div>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-              <a href="{% url 'sales:solicitation_pdf' sol_number=solicitation.solicitation_number %}"
-                 id="wb-view-pdf-btn"
-                 class="btn btn-sm btn-outline-primary"
-                 role="button">View RFQ PDF</a>
+      <div class="form-card mb-3" style="background:#fff;border:1px solid #dde3ec;border-radius:8px;padding:0.75rem 1rem;">
+        {# Row 1 — identity bar #}
+        <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+          <div class="text-nowrap">
+            <div class="form-label mb-0">Sol #</div>
+            <div class="mono" style="font-size: 15px; font-weight: 600; color: #0a1628;">{{ solicitation.solicitation_number }}</div>
+          </div>
+          <div class="text-nowrap">
+            <div class="form-label mb-0">NSN</div>
+            <div class="mono" style="font-size: 15px; font-weight: 600; color: #0a1628;">{{ line.nsn|default:"—" }}</div>
+          </div>
+          <div class="text-nowrap">
+            <div class="form-label mb-0">Return date</div>
+            <div class="d-flex align-items-center flex-wrap gap-1">
+              <span class="mono {% if return_by_urgent %}text-danger fw-semibold{% endif %}" style="font-size: 15px; font-weight: 600;{% if not return_by_urgent %} color: #0a1628;{% endif %}">{{ solicitation.return_by_date|date:"M j, Y"|default:"—" }}</span>
+              {% if return_by_urgent %}<span class="badge bg-danger" style="font-size:0.65rem;">Urgent</span>{% endif %}
             </div>
           </div>
+          {% if solicitation.small_business_set_aside and solicitation.small_business_set_aside != 'N' %}
+          <div class="text-nowrap">
+            <div class="form-label mb-0">Set-aside</div>
+            <div><span class="badge bg-secondary">{{ solicitation.set_aside_display|default:solicitation.small_business_set_aside }}</span></div>
+          </div>
+          {% endif %}
+        </div>
+        {# Row 2 — nomenclature #}
+        <div style="font-size: 15px; font-weight: 600; color: #1a2940; margin-bottom: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ line.nomenclature|default:'' }}">{{ line.nomenclature|default:"—" }}</div>
+        {# Row 3 — stat cards + PDF #}
+        <div style="display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap;">
+          <div class="stat-card accent" style="min-width: 180px;">
+            <div class="stat-label">Quantity</div>
+            <div class="stat-value">{{ line.quantity }} <span style="font-size: 22px; font-weight: 500;">{{ line.unit_of_issue }}</span></div>
+          </div>
+          {% if procurement_history %}
+          <div class="stat-card success" style="min-width: 200px;">
+            <div class="stat-label">Est. Value</div>
+            <div class="stat-value" id="est-value-display"
+                 data-qty="{{ line.quantity }}"
+                 data-unit-cost="{{ procurement_history.0.unit_cost }}"
+                 style="color: var(--success);">—</div>
+            <div class="stat-sub">based on {{ procurement_history.0.award_date|date:"M Y" }} price</div>
+          </div>
+          {% endif %}
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            {% if solicitation.pdf_blob %}
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <button type="button" class="btn btn-ghost btn-sm" style="border-color:#0d9488; color:#0d9488;"
+                      onclick="runAnalysis('haiku45')">
+                Haiku 4.5
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="border-color:#7c3aed; color:#7c3aed;"
+                      onclick="runAnalysis('sonnet46')">
+                Sonnet 4.6
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="border-color:#dc2626; color:#dc2626;"
+                      onclick="runAnalysis('opus46')">
+                Opus 4.6
+              </button>
+            </div>
+            {% endif %}
+            <a href="{% url 'sales:solicitation_pdf' sol_number=solicitation.solicitation_number %}"
+               id="wb-view-pdf-btn"
+               class="btn btn-sm btn-outline-primary"
+               role="button">View RFQ PDF</a>
+          </div>
+        </div>
+        <script>
+          (function() {
+            var el = document.getElementById('est-value-display');
+            if (!el) return;
+            var qty = parseFloat(el.dataset.qty) || 0;
+            var cost = parseFloat(el.dataset.unitCost) || 0;
+            if (qty && cost) {
+              el.textContent = (qty * cost).toLocaleString('en-US', {
+                style: 'currency', currency: 'USD', maximumFractionDigits: 0
+              });
+            }
+          })();
+        </script>
+      </div>
+
+      <!-- Sol Analysis Panel -->
+      <div id="sol-analysis-panel"
+           style="display:none; background:white; border:1px solid #dde3ec; border-radius:8px;
+                  margin-bottom:20px; overflow:hidden;">
+
+        <!-- Tab bar -->
+        <div style="display:flex; border-bottom:2px solid #eef2f8; background:#f7f9fc;">
+          <div style="padding:10px 16px; font-family:'IBM Plex Mono',monospace; font-size:11px;
+                      letter-spacing:0.05em; text-transform:uppercase; color:#7a90b0;
+                      border-right:1px solid #eef2f8; display:flex; align-items:center; gap:6px;">
+            🔍 Analysis
+          </div>
+          <div id="analysis-tabs" style="display:flex; flex:1;">
+            <!-- Tabs injected by JS -->
+          </div>
+          <button onclick="closeAnalysisPanel()"
+                  style="margin-left:auto; padding:0 16px; background:none; border:none;
+                         color:#a0aec0; cursor:pointer; font-size:18px; line-height:1;">×</button>
+        </div>
+
+        <!-- Content area -->
+        <div id="analysis-content" style="padding:24px;">
+          <!-- Content injected by JS -->
         </div>
       </div>
 
@@ -176,8 +291,8 @@
 
       {% include "sales/solicitations/partials/workbench_procurement_panel.html" with procurement_history=procurement_history has_pdf_blob=has_pdf_blob only %}
 
-      <div class="row g-0 mt-3">
-        <div class="col-7 pe-2">
+      <div style="display: flex; gap: 1rem; margin-top: 1rem; width: 100%;">
+        <div style="flex: 0 0 calc(60% - 0.5rem); min-width: 0;">
           <div class="card border shadow-sm mb-3">
             <div class="card-header py-2 fw-semibold">Approved Sources</div>
             <div class="card-body p-0">
@@ -227,7 +342,7 @@
             </div>
           </div>
         </div>
-        <div class="col-5">
+        <div style="flex: 0 0 calc(40% - 0.5rem); min-width: 0;">
           {% include "sales/solicitations/partials/workbench_packaging_panel.html" with packaging=packaging has_pdf_blob=has_pdf_blob only %}
         </div>
       </div>
@@ -326,11 +441,11 @@
   </div>
 </div>
 
-{% if list_qs %}
+<!-- {% if list_qs %}
 <div class="text-center mb-2">
   <a href="{% url 'sales:solicitation_list' %}?{{ list_qs }}" class="small text-muted">↩ Back to list</a>
 </div>
-{% endif %}
+{% endif %} -->
 
 <div class="modal fade" id="wbNoQuoteModal" tabindex="-1">
   <div class="modal-dialog">
@@ -340,6 +455,27 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger" id="wbNoQuoteConfirm">Queue anyway</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sol Analysis Modal -->
+<div class="modal fade" id="solAnalysisModal" tabindex="-1" aria-labelledby="solAnalysisModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background: #0a1628; color: white;">
+        <h5 class="modal-title" id="solAnalysisModalLabel">
+          🔍 Solicitation Analysis — {{ solicitation.solicitation_number }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="sol-analysis-body">
+        <!-- Content injected by JS -->
+      </div>
+      <div class="modal-footer" style="justify-content: space-between; font-size: 12px; color: #7a90b0;">
+        <span id="sol-analysis-usage"></span>
+        <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -509,6 +645,233 @@ document.body.addEventListener('htmx:configRequest', function (event) {
     }
     postQueue(b, false);
   });
+})();
+</script>
+<script>
+(function() {
+  // Model display config
+  var MODEL_CONFIG = {
+    haiku45:  { label: 'Haiku 4.5',  color: '#0891b2' },
+    sonnet46: { label: 'Sonnet 4.6', color: '#7c3aed' },
+    opus46:   { label: 'Opus 4.6',   color: '#dc2626' },
+};
+
+  // State: keyed by model_key -> {status: 'pending'|'loading'|'done'|'error', data, error}
+  var results = {};
+  var activeTab = null;
+
+  window.runAnalysis = function(modelKey) {
+    var panel = document.getElementById('sol-analysis-panel');
+    panel.style.display = 'block';
+
+    // If already done, just switch to that tab
+    if (results[modelKey] && results[modelKey].status === 'done') {
+      switchTab(modelKey);
+      return;
+    }
+
+    // Mark as loading
+    results[modelKey] = { status: 'loading' };
+    renderTabs();
+    switchTab(modelKey);
+
+    fetch("{% url 'sales:sol_analyze' solicitation.solicitation_number %}", {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ model_key: modelKey })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(resp) {
+      if (resp.ok) {
+        results[modelKey] = { status: 'done', data: resp.data };
+      } else {
+        results[modelKey] = { status: 'error', error: resp.error || 'Unknown error' };
+      }
+      renderTabs();
+      if (activeTab === modelKey) renderContent(modelKey);
+    })
+    .catch(function(err) {
+      results[modelKey] = { status: 'error', error: String(err) };
+      renderTabs();
+      if (activeTab === modelKey) renderContent(modelKey);
+    });
+  };
+
+  window.closeAnalysisPanel = function() {
+    document.getElementById('sol-analysis-panel').style.display = 'none';
+  };
+
+  function switchTab(modelKey) {
+    activeTab = modelKey;
+    renderTabs();
+    renderContent(modelKey);
+  }
+
+  function renderTabs() {
+    var container = document.getElementById('analysis-tabs');
+    var html = '';
+    Object.keys(MODEL_CONFIG).forEach(function(key) {
+      var cfg = MODEL_CONFIG[key];
+      var state = results[key];
+      if (!state) return; // Don't render tab if never triggered
+
+      var isActive = (key === activeTab);
+      var statusIcon = '';
+      if (state.status === 'loading') statusIcon = ' ⏳';
+      else if (state.status === 'error') statusIcon = ' ⚠';
+      else if (state.status === 'done') statusIcon = ' ✓';
+
+      var borderBottom = isActive ? ('2px solid ' + cfg.color) : '2px solid transparent';
+      var color = isActive ? cfg.color : '#7a90b0';
+      var bg = isActive ? 'white' : 'transparent';
+
+      html += '<button onclick="switchTab(\'' + key + '\')" ' +
+        'style="padding:10px 16px; background:' + bg + '; border:none; border-bottom:' + borderBottom + '; ' +
+        'color:' + color + '; font-size:12px; font-weight:600; cursor:pointer; ' +
+        'font-family:\'Barlow\',sans-serif; white-space:nowrap; margin-bottom:-2px;">' +
+        cfg.label + statusIcon + '</button>';
+    });
+    container.innerHTML = html;
+  }
+
+  function renderContent(modelKey) {
+    var container = document.getElementById('analysis-content');
+    var state = results[modelKey];
+    if (!state) { container.innerHTML = ''; return; }
+
+    if (state.status === 'loading') {
+      container.innerHTML =
+        '<div style="text-align:center; padding:32px; color:#7a90b0;">' +
+        '<div style="font-size:28px; margin-bottom:10px;">⏳</div>' +
+        '<div style="font-size:13px;">Analyzing with ' + MODEL_CONFIG[modelKey].label + '...<br>' +
+        '<span style="font-size:11px;">This may take 5–15 seconds.</span></div></div>';
+      return;
+    }
+
+    if (state.status === 'error') {
+      container.innerHTML =
+        '<div style="background:#fff0f1; border-left:4px solid #dc2626; padding:12px 16px; ' +
+        'border-radius:4px; color:#7a0010; font-size:13px;">⚠ ' + state.error + '</div>';
+      return;
+    }
+
+    container.innerHTML = renderAnalysisData(state.data, MODEL_CONFIG[modelKey]);
+  }
+
+  function renderAnalysisData(d, cfg) {
+    function flag(val, trueLabel, falseLabel, trueColor, falseColor) {
+      if (val === null || val === undefined) {
+        return '<span style="color:#a0aec0; font-size:12px;">Not determined</span>';
+      }
+      if (val) {
+        return '<span style="color:' + (trueColor || '#dc2626') + '; font-weight:600;">● ' + trueLabel + '</span>';
+      }
+      return '<span style="color:' + (falseColor || '#16a34a') + ';">○ ' + falseLabel + '</span>';
+    }
+
+    function row(label, value) {
+      if (value === null || value === undefined || value === '') return '';
+      return '<tr>' +
+        '<td style="padding:7px 16px 7px 0; color:#7a90b0; font-size:11px; font-family:\'IBM Plex Mono\',monospace; ' +
+        'white-space:nowrap; vertical-align:top; width:220px; text-transform:uppercase; letter-spacing:0.05em;">' +
+        label + '</td>' +
+        '<td style="padding:7px 0; font-size:13px; color:#1a2940; vertical-align:top;">' + value + '</td>' +
+        '</tr>';
+    }
+
+    function sectionHeader(title) {
+      return '<div style="font-family:\'IBM Plex Mono\',monospace; font-size:10px; letter-spacing:0.1em; ' +
+        'text-transform:uppercase; color:' + cfg.color + '; font-weight:600; ' +
+        'margin:20px 0 8px 0; padding-bottom:6px; border-bottom:1px solid #eef2f8;">' + title + '</div>';
+    }
+
+    var html = '';
+
+    // Usage footer first (build it, append at end)
+    var usageHtml = '';
+    if (d._usage) {
+      var u = d._usage;
+      usageHtml = '<div style="margin-top:20px; padding-top:12px; border-top:1px solid #eef2f8; ' +
+        'font-family:\'IBM Plex Mono\',monospace; font-size:11px; color:#a0aec0;">' +
+        'Model: ' + u.model + ' &nbsp;·&nbsp; ' +
+        'Input: ' + u.input_tokens.toLocaleString() + ' tokens &nbsp;·&nbsp; ' +
+        'Output: ' + u.output_tokens.toLocaleString() + ' tokens' +
+        '</div>';
+    }
+
+    // Critical Requirements
+    html += sectionHeader('Critical Requirements');
+    html += '<table style="width:100%; border-collapse:collapse;">';
+    html += row('First Article Test', flag(d.fat_required, 'FAT REQUIRED', 'No FAT Required', '#dc2626', '#16a34a'));
+    if (d.fat_required) {
+      if (d.fat_summary) html += row('FAT Summary', d.fat_summary);
+      if (d.fat_units)   html += row('Units to Test', d.fat_units + ' unit(s)');
+      if (d.fat_days)    html += row('Report Due', 'Within ' + d.fat_days + ' calendar days of contract award');
+    }
+    html += row('ITAR / Export Control', flag(d.itar_export_control,
+      'EXPORT CONTROLLED — JCP Certification Required',
+      'No export control noted', '#dc2626', '#16a34a'));
+    html += row('Origin Inspection', flag(d.origin_inspection_required,
+      'Inspection at Contractor Facility Required',
+      'No origin inspection requirement', '#ea580c', '#16a34a'));
+    html += row('ISO 9001:2015', flag(d.iso_9001_required,
+      'ISO 9001:2015 or Equivalent Required',
+      'Not specified', '#ea580c', '#7a90b0'));
+    html += row('Buy American / Berry', flag(d.buy_american_applies,
+      'Buy American Act / Berry Amendment Applies',
+      'Not specified', '#ea580c', '#7a90b0'));
+    html += row('Additive Manufacturing', flag(d.additive_manufacturing_prohibited,
+      'AM Prohibited Unless Pre-Approved',
+      'No AM restriction noted', '#ea580c', '#16a34a'));
+    if (d.cmmc_required) {
+      html += row('CMMC', flag(true,
+        'CMMC Level ' + (d.cmmc_level || '?') + ' Required', '', '#ea580c'));
+    } else {
+      html += row('CMMC', flag(false, '', 'Not Required', '', '#16a34a'));
+    }
+    html += row('Quantity Ranges', flag(d.quantity_ranges_encouraged,
+      'Submitting quantity ranges is encouraged',
+      'Not mentioned', '#2563eb', '#7a90b0'));
+    html += '</table>';
+
+    // Delivery
+    html += sectionHeader('Delivery');
+    html += '<table style="width:100%; border-collapse:collapse;">';
+    html += row('FOB Point', d.fob_point);
+    html += row('Destination', d.delivery_destination);
+    html += row('Need Ship Date', d.need_ship_date);
+    html += row('Required Delivery', d.required_delivery_date);
+    html += '</table>';
+
+    // Packaging
+    html += sectionHeader('Packaging');
+    html += '<table style="width:100%; border-collapse:collapse;">';
+    html += row('Standard', d.packaging_standard);
+    html += row('Preservation Method', d.preservation_method);
+    html += row('Marking Standard', d.marking_standard);
+    html += row('Special Instructions', d.special_packaging_instructions);
+    html += '</table>';
+
+    // Other Notable
+    if (d.other_notable_requirements && d.other_notable_requirements.length > 0) {
+      html += sectionHeader('Other Notable Requirements');
+      html += '<ul style="margin:0; padding-left:20px;">';
+      d.other_notable_requirements.forEach(function(item) {
+        html += '<li style="font-size:13px; color:#1a2940; margin-bottom:5px;">' + item + '</li>';
+      });
+      html += '</ul>';
+    }
+
+    html += usageHtml;
+    return html;
+  }
+
+  // Expose switchTab globally for inline onclick handlers
+  window.switchTab = switchTab;
+
 })();
 </script>
 {% endblock content %}

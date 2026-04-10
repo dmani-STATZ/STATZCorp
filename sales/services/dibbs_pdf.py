@@ -27,8 +27,6 @@ Note on ERR_ABORTED:
     swallowed — the expect_download context manager is what matters.
 """
 
-import io
-from pypdf import PdfReader
 import logging
 import re
 from datetime import date
@@ -196,6 +194,30 @@ def _read_pdf_download(page, url: str, sol_number: str) -> Optional[bytes]:
     return body
 
 
+def extract_pdf_text(pdf_blob_bytes: bytes) -> str:
+    """
+    Extract raw text from a PDF blob using pypdf.
+    Returns full concatenated text of all pages.
+    Returns empty string if extraction fails or input is empty.
+    """
+    if not pdf_blob_bytes:
+        return ""
+    try:
+        import io
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(pdf_blob_bytes))
+        pages = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                pages.append(text)
+        return "\n".join(pages)
+    except Exception:
+        return ""
+
+
 SECTION_D_START_RES = [
     re.compile(
         r"(?:^|\n)\s*Section\s+D\s*[-–—:.]?\s*Packaging\s+and\s+Marking",
@@ -240,25 +262,6 @@ def _section_d_start_in_text(text: str) -> Optional[re.Match]:
     return best
 
 
-def _extract_full_pdf_text(pdf_bytes: bytes, sol_number: str) -> str:
-    if not pdf_bytes:
-        return ""
-    try:
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-    except Exception as e:
-        logger.warning("_extract_full_pdf_text(%s): %s", sol_number, e)
-        return ""
-    parts: List[str] = []
-    for page in reader.pages:
-        try:
-            parts.append(page.extract_text() or "")
-        except Exception as e:
-            logger.warning(
-                "_extract_full_pdf_text(%s): page extract failed: %s", sol_number, e
-            )
-    return "\n".join(parts)
-
-
 def _packaging_code_blocks(raw: str) -> str:
     """
     Split Section D text on codes like RP001 / PK001 and format as labeled blocks.
@@ -292,7 +295,7 @@ def parse_packaging_data(pdf_bytes: bytes, sol_number: str = "") -> Dict[str, st
         "marking_requirements": "",
         "raw_section_d": "",
     }
-    text = _extract_full_pdf_text(pdf_bytes, sol_number)
+    text = extract_pdf_text(pdf_bytes)
     if not text.strip():
         return empty
 
@@ -579,10 +582,8 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
         re.IGNORECASE,
     )
 
-    try:
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-    except Exception as e:
-        logger.warning("parse_procurement_history(%s): failed to open PDF: %s", sol_number, e)
+    full_text = extract_pdf_text(pdf_bytes)
+    if not full_text.strip():
         return []
 
     rows: Dict[str, Dict] = {}
@@ -591,93 +592,83 @@ def parse_procurement_history(pdf_bytes: bytes, sol_number: str) -> List[Dict]:
     in_history = False
     header_continuation: Optional[str] = None
 
-    for page in reader.pages:
-        try:
-            text = page.extract_text() or ""
-        except Exception as e:
-            logger.warning(
-                "parse_procurement_history(%s): failed to extract text from page: %s",
-                sol_number, e,
-            )
+    for line in full_text.splitlines():
+        raw_line = line
+        line = line.strip()
+        if header_continuation is not None:
+            line = f"{header_continuation} {line}".strip()
+            header_continuation = None
+
+        if not line:
             continue
 
-        for line in text.splitlines():
-            raw_line = line
-            line = line.strip()
-            if header_continuation is not None:
-                line = f"{header_continuation} {line}".strip()
-                header_continuation = None
-
-            if not line:
-                continue
-
-            hdr = _parse_procurement_header_line(line)
-            if hdr is None and re.match(
-                r"^Procurement\s+History\b",
-                re.sub(r"\s+", " ", line),
-                re.IGNORECASE,
-            ):
-                cont = _parse_procurement_header_continuation(line)
-                if cont:
-                    current_nsn, current_fsc = cont
-                    in_history = True
-                else:
-                    header_continuation = line
-                continue
-            if hdr:
-                current_nsn, current_fsc = hdr
+        hdr = _parse_procurement_header_line(line)
+        if hdr is None and re.match(
+            r"^Procurement\s+History\b",
+            re.sub(r"\s+", " ", line),
+            re.IGNORECASE,
+        ):
+            cont = _parse_procurement_header_continuation(line)
+            if cont:
+                current_nsn, current_fsc = cont
                 in_history = True
-                continue
-
-            if not in_history or current_nsn is None:
-                continue
-
-            if COLUMN_HEADER_RE.search(line):
-                continue
-
-            if line == ".":
-                continue
-
-            row_match = _match_procurement_row(raw_line)
-            if not row_match:
-                row_match = _match_procurement_row(line)
-            if row_match:
-                contract_num = row_match.group(2).strip()
-                if contract_num in rows:
-                    continue
-                try:
-                    qty = Decimal(row_match.group(3).replace(",", ""))
-                    cost = Decimal(row_match.group(4).replace(",", ""))
-                    awd_str = row_match.group(5)
-                    awd_date = date(
-                        int(awd_str[:4]),
-                        int(awd_str[4:6]),
-                        int(awd_str[6:8]),
-                    )
-                except (InvalidOperation, ValueError):
-                    logger.warning(
-                        "Skipping malformed procurement history row for %s: %r",
-                        sol_number,
-                        line,
-                    )
-                    continue
-
-                rows[contract_num] = {
-                    "nsn": current_nsn,
-                    "fsc": current_fsc,
-                    "cage_code": row_match.group(1).upper(),
-                    "contract_number": contract_num,
-                    "quantity": qty,
-                    "unit_cost": cost,
-                    "award_date": awd_date,
-                    "surplus_material": row_match.group(6).upper() == "Y",
-                    "sol_number": sol_number,
-                }
             else:
-                if rows:
-                    in_history = False
-                    current_nsn = None
-                    current_fsc = None
+                header_continuation = line
+            continue
+        if hdr:
+            current_nsn, current_fsc = hdr
+            in_history = True
+            continue
+
+        if not in_history or current_nsn is None:
+            continue
+
+        if COLUMN_HEADER_RE.search(line):
+            continue
+
+        if line == ".":
+            continue
+
+        row_match = _match_procurement_row(raw_line)
+        if not row_match:
+            row_match = _match_procurement_row(line)
+        if row_match:
+            contract_num = row_match.group(2).strip()
+            if contract_num in rows:
+                continue
+            try:
+                qty = Decimal(row_match.group(3).replace(",", ""))
+                cost = Decimal(row_match.group(4).replace(",", ""))
+                awd_str = row_match.group(5)
+                awd_date = date(
+                    int(awd_str[:4]),
+                    int(awd_str[4:6]),
+                    int(awd_str[6:8]),
+                )
+            except (InvalidOperation, ValueError):
+                logger.warning(
+                    "Skipping malformed procurement history row for %s: %r",
+                    sol_number,
+                    line,
+                )
+                continue
+
+            rows[contract_num] = {
+                "nsn": current_nsn,
+                "fsc": current_fsc,
+                "cage_code": row_match.group(1).upper(),
+                "contract_number": contract_num,
+                "quantity": qty,
+                "unit_cost": cost,
+                "award_date": awd_date,
+                "surplus_material": row_match.group(6).upper() == "Y",
+                "sol_number": sol_number,
+            }
+        else:
+            if rows:
+                in_history = False
+                current_nsn = None
+                current_fsc = None
 
     return list(rows.values())
 

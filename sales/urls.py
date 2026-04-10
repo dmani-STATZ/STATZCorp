@@ -22,6 +22,7 @@ from .views import (
     solicitation_pdf_view,
     solicitation_history_packaging_partial,
     solicitation_reparse,
+    sol_analyze,
     closed_list,
     no_bid,
     global_search,
@@ -174,6 +175,11 @@ urlpatterns = [
         "solicitations/<str:sol_number>/reparse/",
         solicitation_reparse,
         name="solicitation_reparse",
+    ),
+    path(
+        "solicitations/<str:sol_number>/analyze/",
+        sol_analyze,
+        name="sol_analyze",
     ),
     path(
         "solicitations/<str:sol_number>/workbench/sidebar/",

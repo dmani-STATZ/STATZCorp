@@ -1075,15 +1075,58 @@ def solicitation_reparse(request, sol_number):
 
 
 @login_required
+def sol_analyze(request, sol_number):
+    """
+    POST only. Accepts JSON body with {"model_key": "<key>"}.
+    Calls Anthropic Claude API to extract bid-critical requirements
+    from the solicitation PDF blob.
+    Returns JSON {ok, data} or {error}.
+    Valid model_key values: haiku35, haiku45, sonnet45, opus45
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    sol = get_object_or_404(Solicitation, solicitation_number=sol_number)
+
+    if not sol.pdf_blob:
+        return JsonResponse(
+            {
+                "error": (
+                    "No PDF available for this solicitation. Click View RFQ PDF first to fetch it."
+                ),
+            },
+            status=400,
+        )
+
+    try:
+        body = json.loads(request.body)
+        model_key = body.get("model_key", "sonnet45")
+    except Exception:
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    try:
+        from ..services.sol_analysis import analyze_solicitation_pdf
+
+        result = analyze_solicitation_pdf(bytes(sol.pdf_blob), sol_number, model_key)
+        return JsonResponse({"ok": True, "data": result})
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": f"Analysis failed: {str(e)}"}, status=500)
+
+
+@login_required
 def solicitation_pdf_view(request, sol_number):
     from sales.services.dibbs_pdf import fetch_pdf_for_sol
+
 
     solicitation = get_object_or_404(Solicitation, solicitation_number=sol_number)
 
     if solicitation.pdf_blob:
         payload = bytes(solicitation.pdf_blob)
         resp = HttpResponse(payload, content_type="application/pdf")
-        resp["Content-Disposition"] = f'inline; filename="{sol_number}.pdf"'
+        filename = solicitation.pdf_file_name or f"{solicitation.solicitation_number}.pdf"
+        resp["Content-Disposition"] = f'inline; filename="{filename}"'
         resp["X-SBZ-PDF-From-Cache"] = "1"
         return resp
 
