@@ -8,7 +8,12 @@
       "Bash(2)",
       "Bash(wc -l /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp/contracts/views/*.py)",
       "Bash(grep -E \"\\\\.\\(html|js|py\\)$\")",
-      "Bash(find /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp -path */suppliers/static* -o -path */static/*supplier*)"
+      "Bash(find /c/Users/dionm/OneDrive/Documents/cursorprojects/STATZCorp/STATZCorp -path */suppliers/static* -o -path */static/*supplier*)",
+      "Bash(head -5 templates/landing.html)",
+      "Bash(head -5 templates/index.html)",
+      "Bash(ls theme_tw/static/)",
+      "Bash(ls theme_tw/static/css/)",
+      "Bash(ls theme_tw/static/css/dist/)"
     ]
   }
 }
