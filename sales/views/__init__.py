@@ -48,6 +48,7 @@ from sales.views.suppliers import (
     supplier_remove_nsn,
     supplier_remove_fsc,
     supplier_no_quote_add,
+    refresh_match_counts_view,
 )
 from sales.views.rfq import (
     rfq_pending,

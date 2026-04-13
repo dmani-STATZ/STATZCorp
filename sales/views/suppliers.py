@@ -1,13 +1,19 @@
 """
 Supplier-related views: list, detail, add/remove NSN and FSC capabilities.
 """
-from django.shortcuts import render, get_object_or_404, redirect
+import re
+from io import StringIO
+
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods, require_POST
-from django.db.models import Count, Q
-from django.core.paginator import Paginator
 from django.contrib import messages
+from django.core.management import call_command
+from django.core.paginator import Paginator
+from django.db.models import Count, Q
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods, require_POST
 
 from suppliers.models import Supplier
 from sales.models import (
@@ -237,6 +243,23 @@ def supplier_remove_fsc(request, supplier_id):
         SupplierFSC.objects.filter(supplier=supplier, pk=fsc_id).delete()
         messages.success(request, "FSC capability removed.")
     return _supplier_capabilities_redirect(supplier.pk)
+
+
+@staff_member_required
+@require_POST
+def refresh_match_counts_view(request):
+    """On-demand refresh of Solicitation.match_count from the SQL view."""
+    import traceback
+    try:
+        out = StringIO()
+        call_command('refresh_match_counts', stdout=out)
+        output = out.getvalue()
+        match = re.search(r'(\d+)', output)
+        updated = int(match.group(1)) if match else 0
+        return JsonResponse({'status': 'ok', 'updated': updated})
+    except Exception:
+        error_detail = traceback.format_exc()
+        return JsonResponse({'status': 'error', 'detail': error_detail}, status=500)
 
 
 @login_required

@@ -9,7 +9,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/manifest.json">
+    {% is_development as dev_mode %}
+    {% if not dev_mode %}<link rel="manifest" href="/manifest.json">{% endif %}
     {% if active_company %}
     <meta name="theme-color" content="{{ active_company.get_primary_color }}">
     {% else %}

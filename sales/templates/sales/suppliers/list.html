@@ -10,9 +10,18 @@
   td { padding: 0.625rem 1rem; border-bottom: 1px solid #f3f4f6; }
 </style>
 
+<!-- Toast container -->
+<div id="toast-container" style="position: fixed; bottom: 1rem; right: 1rem; z-index: 1100; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+
 <div style="margin-bottom: 1.25rem;">
-  <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0;">Suppliers</h1>
-  <form method="get" style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; flex-wrap: wrap;">
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+    <h1 style="font-size: 1.375rem; font-weight: 600; margin: 0;">Suppliers</h1>
+    {% if request.user.is_staff %}
+    <button id="btn-refresh-match-counts" type="button" class="btn btn-ghost btn-sm" style="font-size: 0.8125rem;">&#x21BB; Refresh Match Counts</button>
+    {% csrf_token %}
+    {% endif %}
+  </div>
+  <form method="get" style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; flex-wrap: wrap;" id="supplier-search-form">
     <input type="text" name="q" value="{{ q }}" placeholder="Search name or CAGE" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; width: 220px;">
     <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.875rem;"><input type="checkbox" name="has_nsn" value="1" {% if has_nsn %}checked{% endif %}> Has NSN capabilities</label>
     <button type="submit" class="btn btn-ghost">Search</button>
@@ -45,4 +54,76 @@
     {% endfor %}
   </tbody>
 </table>
+{% if request.user.is_staff %}
+<script>
+(function () {
+  const btn = document.getElementById('btn-refresh-match-counts');
+  if (!btn) return;
+
+  function getCsrfToken() {
+    const name = 'csrftoken';
+    const cookies = document.cookie.split(';');
+    for (let c of cookies) {
+      c = c.trim();
+      if (c.startsWith(name + '=')) return decodeURIComponent(c.slice(name.length + 1));
+    }
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function showToast(message, isError) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.style.cssText = [
+      'background:' + (isError ? '#fee2e2' : '#f0fdf4'),
+      'color:' + (isError ? '#991b1b' : '#166534'),
+      'border:1px solid ' + (isError ? '#fca5a5' : '#86efac'),
+      'border-radius:6px',
+      'padding:0.625rem 1rem',
+      'font-size:0.875rem',
+      'box-shadow:0 2px 8px rgba(0,0,0,.12)',
+      'max-width:520px',
+      'white-space:pre-wrap',
+      'word-break:break-all',
+      'cursor:pointer',
+    ].join(';');
+    toast.textContent = message;
+    toast.addEventListener('click', () => toast.remove());
+    container.appendChild(toast);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, isError ? 30000 : 5000);
+  }
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.textContent = 'Refreshing\u2026';
+    fetch('{% url "sales:refresh_match_counts" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken(), 'Accept': 'application/json' },
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          return { ok: resp.ok, status: resp.status, data: data };
+        });
+      })
+      .then(function (result) {
+        btn.disabled = false;
+        btn.textContent = '\u21BB Refresh Match Counts';
+        if (result.ok && result.data.status === 'ok') {
+          showToast('Match counts refreshed \u2014 ' + result.data.updated + ' solicitations updated.', false);
+        } else {
+          var detail = (result.data && result.data.detail) ? result.data.detail : ('HTTP ' + result.status);
+          showToast('Refresh failed: ' + detail, true);
+          console.error('refresh_match_counts error:', result.data);
+        }
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = '\u21BB Refresh Match Counts';
+        showToast('Refresh failed (network or parse error): ' + err, true);
+        console.error('refresh_match_counts fetch error:', err);
+      });
+  });
+}());
+</script>
+{% endif %}
 {% endblock content %}

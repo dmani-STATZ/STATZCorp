@@ -158,6 +158,8 @@ class Solicitation(models.Model):
     review_claimed_at = models.DateTimeField(null=True, blank=True)
     review_claim_expires_at = models.DateTimeField(null=True, blank=True)
 
+    match_count = models.IntegerField(default=0, db_index=True)
+
     # Research queue fields
     research_flagged_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

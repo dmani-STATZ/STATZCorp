@@ -87,6 +87,7 @@ from .views import (
     supplier_remove_nsn,
     supplier_remove_fsc,
     supplier_no_quote_add,
+    refresh_match_counts_view,
     settings_index,
     settings_cages,
     settings_cage_add,
@@ -246,6 +247,7 @@ urlpatterns = [
     path("bids/export/download/", bids_export_download, name="bids_export_download"),
     path("bids/history/", bids_history, name="bids_history"),
     # Suppliers (DIBBS capability management)
+    path("suppliers/refresh-match-counts/", refresh_match_counts_view, name="refresh_match_counts"),
     path("suppliers/", supplier_list, name="supplier_list"),
     path("suppliers/<int:supplier_id>/no-quote/add/", supplier_no_quote_add, name="supplier_no_quote_add"),
     path("suppliers/<int:supplier_id>/", supplier_detail, name="supplier_detail"),

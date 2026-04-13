@@ -14,7 +14,6 @@ from django.db.models import (
     Count,
     Exists,
     F,
-    IntegerField,
     Prefetch,
     Q,
     OuterRef,
@@ -22,7 +21,7 @@ from django.db.models import (
     Max,
     Value,
 )
-from django.db.models.functions import Coalesce, Replace
+from django.db.models.functions import Replace
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.urls import reverse
@@ -46,7 +45,6 @@ from sales.models import (
     SolAnalysis,
     MassPassLog,
     SavedFilter,
-    SolicitationMatchCount,
     SAMEntityCache,
 )
 from sales.services.matching import _normalize_nsn, get_live_workbench_matches
@@ -376,10 +374,10 @@ def _list_tab_from_params(params):
 
 def _list_qs_before_tab(params):
     """
-    Apply bucket / set-aside / status / item-type / search filters and live_match_count
-    annotation (from dibbs_solicitation_match_counts via SolicitationMatchCount).
+    Apply bucket / set-aside / status / item-type / search filters.
     Restricts to pipeline statuses by default; skips that restriction for tab=nobid.
     Does not apply tab filter (beyond pipeline scope), or column sort.
+    match_count is a real indexed column on Solicitation — no Subquery needed.
     """
     q = (params.get('q') or '').strip()
     set_aside = params.get('set_aside', '') or ''
@@ -419,18 +417,8 @@ def _list_qs_before_tab(params):
             Q(lines__nomenclature__icontains=q)
         ).distinct()
 
-    live_match_sq = SolicitationMatchCount.objects.filter(
-        solicitation_id=OuterRef('pk')
-    ).values('match_count')[:1]
-    qs = qs.annotate(
-        live_match_count=Coalesce(
-            Subquery(live_match_sq, output_field=IntegerField()),
-            Value(0),
-        )
-    )
-
     if (params.get('has_matches') or '').strip() == '1':
-        qs = qs.filter(live_match_count__gt=0)
+        qs = qs.filter(match_count__gt=0)
     if (params.get('has_approved_source') or '').strip() == '1':
         qs = qs.filter(
             Exists(
@@ -453,7 +441,7 @@ def _apply_list_tab_filter(qs, tab):
     elif tab not in ('',):
         qs = qs.exclude(status='NO_BID')
     if tab == 'matches':
-        return qs.filter(live_match_count__gt=0)
+        return qs.filter(match_count__gt=0)
     if tab == 'set_asides':
         return qs.exclude(UNRESTRICTED_TAB_Q)
     if tab == 'unrestricted':
@@ -517,7 +505,7 @@ def _apply_list_sort(qs, sort_param):
     elif sort_field == 'set_aside':
         order_field = 'small_business_set_aside'
     elif sort_field == 'match_count':
-        order_field = 'live_match_count'
+        order_field = 'match_count'
     else:
         order_field = sort_field
 
@@ -716,8 +704,7 @@ def solicitation_list(request):
     """
     Lists solicitations with filtering and pagination.
     Default: all pipeline statuses (LIST_PIPELINE_STATUSES); optional ?tab= / toggles / chips.
-    Annotates each solicitation with first_line; list rows use live_match_count
-    (dibbs_solicitation_match_counts view via Subquery in _list_qs_before_tab).
+    match_count is a real indexed column on Solicitation — refreshed nightly by refresh_match_counts.
     """
     if request.method == 'POST':
         action = request.POST.get('action')
