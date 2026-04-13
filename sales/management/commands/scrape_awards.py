@@ -252,7 +252,10 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
     def _run_full_reconciliation(self, dry_run: bool = False) -> None:
         self._activity("Full reconciliation: starting.")
         available_dates = self._fetch_available_dates()
-        self._sync_dates_to_db(available_dates)
+        today = date.today()
+        dates_to_sync = [d for d in available_dates if d < today]
+        print(f"[scrape_awards] Today ({today}) excluded from scrape queue. {len(dates_to_sync)} date(s) eligible.")
+        self._sync_dates_to_db(dates_to_sync)
 
         queue = self._build_work_queue()
         self.stdout.write(f"Work queue: {len(queue)} date(s) to scrape.")

@@ -3642,6 +3642,8 @@ on who last won and at what price — critical for bid pricing decisions.
 **Phase 1 — Inventory (browser, no ORM)**  
 Launch headless Chromium, accept the DoD warning, navigate to `AwdDates.aspx?category=post`, parse all available award dates from link `href`s (`Value=MM-DD-YYYY`), close the browser. Returns the date list sorted oldest-first.
 
+Before Phase 2 sync, dates equal to `date.today()` are filtered out. The scraper never queues today's date during a reconciliation run. The `--date` override is not affected.
+
 **Phase 2 — Sync dates to DB (pure ORM)**  
 For each date returned by Phase 1 that does not yet have an `AwardImportBatch` with `source=AUTO_SCRAPE`, insert a row with `scrape_status=MISSING` (never downgrade existing rows).
 
