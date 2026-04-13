@@ -41,7 +41,8 @@
             <th>Nomenclature</th>
             <th>Qty + UOM</th>
             <th>Return By</th>
-            <th></th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -62,7 +63,22 @@
               {% else %}—{% endif %}
             </td>
             <td>
+              {% if rfq.status == 'READY_TO_SEND' %}
+              <span class="badge bg-warning text-dark">Pending Send</span>
+              {% elif rfq.status == 'SENT' %}
+              <span class="badge bg-success">Sent</span>
+              {% elif rfq.status == 'RESPONDED' %}
+              <span class="badge bg-info text-dark">Responded</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ rfq.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if rfq.status != 'READY_TO_SEND' %}
               <a href="{% url 'sales:rfq_enter_quote' rfq_id=rfq.id %}" class="btn btn-sm btn-outline-primary">Enter Quote</a>
+              {% else %}
+              <span class="text-muted small">After send</span>
+              {% endif %}
             </td>
           </tr>
           {% endwith %}
@@ -70,6 +86,7 @@
         </tbody>
       </table>
     </div>
+    {% if group.followup_rfq %}
     {% if group.response_status == 'AWAITING' or group.response_status == 'OVERDUE' %}
     {% with fr=group.followup_rfq %}
     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -93,6 +110,7 @@
       {% endif %}
     </div>
     {% endwith %}
+    {% endif %}
     {% endif %}
   </div>
 </div>

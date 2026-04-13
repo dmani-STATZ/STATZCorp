@@ -978,7 +978,7 @@ The current implementation uses **manual approval**. The flow is:
 5. System generates RFQ emails and sets `dibbs_supplier_rfq.status = SENT`
 6. A `auto_dispatch_enabled` boolean on `CompanyCAGE` (or a Django setting) gates the automated pathway for future use
 
-**Email transport:** The system uses Microsoft Graph API (`GRAPH_MAIL_ENABLED=True`) for automated outbound RFQ dispatch from `quotes@statzcorp.com`. When Graph is unavailable or disabled, the queue send flow generates `mailto:` URLs that open in the user's local email client (Outlook). The user sends manually and clicks **Mark All Sent** to confirm. Both paths log `SupplierContactLog` entries and advance `SupplierRFQ` status to `SENT`. The Graph app registration is **STATZ Web App Mail** in the `statzcorpgcch` tenant with **Mail.Send** application permission for outbound sends and **Mail.Read** (or **Mail.ReadWrite**) for the RFQ Inbox reader (`services/graph_inbox.py`), which lists messages in the `GRAPH_MAIL_SENDER` mailbox (GCC High: `graph.microsoft.us`).
+**Email transport:** The system uses Microsoft Graph API (`GRAPH_MAIL_ENABLED=True`) for automated outbound RFQ dispatch from `quotes@statzcorp.com` via the **`send_queued_rfqs`** background task (grouped queue: `READY_TO_SEND` → Graph → `SENT`). When Graph is unavailable or disabled, queued RFQs remain in **`READY_TO_SEND`** until Graph is enabled (the queue POST path no longer opens `mailto:` for bulk send). **`rfq_queue_mark_sent`** still supports manual confirmation for legacy **`QUEUED`** mailto flows where applicable. Successful Graph sends log `SupplierContactLog` entries. The Graph app registration is **STATZ Web App Mail** in the `statzcorpgcch` tenant with **Mail.Send** application permission for outbound sends and **Mail.Read** (or **Mail.ReadWrite**) for the RFQ Inbox reader (`services/graph_inbox.py`), which lists messages in the `GRAPH_MAIL_SENDER` mailbox (GCC High: `graph.microsoft.us`).
 
 **Sender mailbox decision (standing):** `quotes@statzcorp.com` is the designated production RFQ sender. This address was used by the legacy Sales Patriot platform; suppliers have existing email relationships with it and it carries established sending reputation in the M365 tenant. Switching the production sender requires sales team sign-off. `rfq@statzcorp.com` is the designated dev/test sender — it is a mature mailbox with sending history (critical: newly provisioned accounts are flagged as spam almost immediately at cold RFQ volumes). Environment separation is enforced via `GRAPH_MAIL_SENDER`: `quotes@statzcorp.com` in Azure App Service production config, `rfq@statzcorp.com` in local `.env`.
 
@@ -2102,7 +2102,7 @@ The command center for a single deal. The pipeline track at the top tells you ex
 
 **Matches tab**
 
-- **Manual supplier add (workbench sidebar)** — HTMX typeahead on **Add supplier manually**: `hx-get` to `rfq_manual_supplier_search` with debounced `keyup` (300ms), `?q=` plus `solicitation_number` to exclude suppliers who already have a `SupplierRFQ` on this solicitation. JSON API (non-HTMX) returns `[{id, name, cage}]`. Choosing a row `POST`s `rfq_queue_add_manual` (`supplier_id`, `solicitation_number` or `sol_number`): creates `SupplierRFQ(status='QUEUED', sent_by=user)` only — **no** `SupplierMatch` at queue time; `SupplierMatch(match_method='MANUAL', match_tier=3, match_score=0)` is created when a quote is saved in `rfq_enter_quote` if still missing. No Quote CAGE → JSON `409` / HTMX inline error **No Quote CAGE**. Success refreshes `#wb-matches-sidebar` via out-of-band swap. Sidebar rows show a **Manual** badge for manual-queue or MANUAL-match suppliers and an **In Queue** pill when `QUEUED`.
+- **Manual supplier add (workbench sidebar)** — HTMX typeahead on **Add supplier manually**: `hx-get` to `rfq_manual_supplier_search` with debounced `keyup` (300ms), `?q=` plus `solicitation_number` to exclude suppliers who already have a `SupplierRFQ` on this solicitation. JSON API (non-HTMX) returns `[{id, name, cage}]`. Choosing a row `POST`s `rfq_queue_add_manual` (`supplier_id`, `solicitation_number` or `sol_number`): creates `SupplierRFQ(status='QUEUED', sent_by=user)` only — **no** `SupplierMatch` at queue time; `SupplierMatch(match_method='MANUAL', match_tier=3, match_score=0)` is created when a quote is saved in `rfq_enter_quote` if still missing. No Quote CAGE → JSON `409` / HTMX inline error **No Quote CAGE**. Success refreshes `#wb-matches-sidebar` via out-of-band swap. Sidebar rows show a **Manual** badge for manual-queue or MANUAL-match suppliers and an **In Queue** pill when the supplier has a `QUEUED` or `READY_TO_SEND` RFQ on the solicitation.
 
 - **Matched & approved sources (sidebar)** — Rows without a `suppliers.Supplier` match show a **Look Up** link that opens **`/sales/entity/cage/<CAGE>/`** in a **new browser tab** (full-page SAM entity lookup; cache-first via `get_or_fetch_cage` / `SAMEntityCache` on that page; **Last verified … ↻** on the entity page). For display **only** (no API call in the workbench view), if a prior visit to the entity page filled `SAMEntityCache` (`fetch_error=False`), the **Supplier** column shows **`entity_name`** with a muted **SAM** badge (tooltip: name from SAM.gov, not in supplier DB); otherwise an em dash until the user opens **Look Up** at least once.
 
@@ -2930,26 +2930,9 @@ The app cannot control how suppliers reply. What it **can** do is make the trans
 
 ### 10.2 Outbound RFQ Email Flow
 
-```
-Sales team clicks "Send RFQ" for a matched supplier
-        │
-        ▼
-System generates email from template (CAGE defaults pre-filled)
- - Subject: "RFQ: SPE1C126T0694 — BAG, DUFFEL — Return by Mar 19"
- - Body:    Full structured RFQ with NSN, qty, required delivery,
-            return-by date, part number if known, PDF attachment link
-        │
-        ▼
-Email sent via Django send_mail() to supplier's contact email
-(priority: contact.email → primary_email → business_email)
-        │
-        ▼
-dibbs_supplier_rfq record created with status=SENT, sent_at=now,
-email_sent_to=snapshot of address used
-        │
-        ▼
-Solicitation status advances to RFQ_SENT
-```
+**RFQ Queue (grouped send):** On **Send Selected RFQs**, the app saves `personalization_text` on each `SupplierRFQ` row and sets status from **`QUEUED`** to **`READY_TO_SEND`** (no Microsoft Graph call in the HTTP request). A scheduled Azure WebJob (**`background_tasks`**) runs `manage.py run_background_tasks` (management command in the **`core`** app), which executes **`send_queued_rfqs`**: for each supplier with `READY_TO_SEND` rows, the task builds one grouped message using **`compose_grouped_rfq_email_message`** and sends via **`send_mail_via_graph`** (GCC High). On success, each row becomes **`SENT`** with `sent_at`, `SupplierContactLog` is written, and solicitations advance to **`RFQ_SENT`** where applicable. On failure, rows stay **`READY_TO_SEND`**, **`send_attempts`** increments, and **`last_send_error`** stores the message for staff (also visible on **`SupplierRFQ`** in Django admin). The WebJob runs on a 15-minute cadence within a fixed UTC window (see `webjobs/background_tasks/README.md`).
+
+**Legacy / other paths:** Single-line or `PENDING` RFQ flows may still use Django `EmailMessage` / SMTP or `mailto:` + manual confirm, depending on the view; the queue’s primary path is async Graph dispatch as above.
 
 **What goes in the RFQ email:**
 - Solicitation number and line number
@@ -3186,6 +3169,10 @@ The RFQ Center is redesigned around the sales team's actual daily rhythm. A sale
 - Does not navigate away — user stays in the RFQ Center after saving
 
 **Inbox tab — supplier replies (Graph):** The RFQ Center **Inbox** tab links to `/sales/rfq/inbox/`, a two-panel page: recent messages from the `GRAPH_MAIL_SENDER` mailbox (read via Graph on each request; no background sync), message body loaded on demand, and **Link to RFQ** to attach a message to one or more sent RFQs. IMAP and per-CAGE mailbox settings are not used; configuration is environment-only (`GRAPH_MAIL_*`).
+
+**RFQ Queue (queued suppliers) — `/sales/rfq/queue/`:** Supplier cards list only **`QUEUED`** RFQs for that supplier (rows in **`READY_TO_SEND`** do not appear here — they are listed on **Sent RFQs** with a **Pending Send** badge until the WebJob sends them). Each **`QUEUED`** line has a small **Remove** control (danger outline, trash icon): inline confirm (“Remove this supplier from the queue?”) then POST **`/sales/rfq/queue/delete/<rfq_id>/`** (`rfq_queue_delete_item`, JSON). Only **`QUEUED`** rows may be deleted. When the last **`QUEUED`** or **`READY_TO_SEND`** row for that solicitation is removed and the solicitation is still **`RFQ_PENDING`**, the solicitation reverts to **`Active`** (toast: “{sol_number} returned to Active — no suppliers remaining in queue”). **RFQ email** is shown read-only from `Supplier.rfq_email` (muted “No email on file” when blank). A small outline **Edit** control (pencil) or clicking the read-only field opens a **single shared** Bootstrap modal titled **Set RFQ Email — {supplier name}**. The client GETs `/sales/rfq/queue/supplier-emails/<cage_code>/` (`rfq_supplier_email_options`) and renders deduplicated options in a list-group: RFQ email, primary email, business email, and each related `contracts_contact` row with a **Contact: {name}** label. Choosing a row fills the “Or enter a new address” field; **Save** POSTs to the existing `/sales/rfq/queue/update-email/` endpoint (`rfq_update_supplier_email`). On success the modal closes, the read-only line updates, and a short inline checkmark (`text-success`) fades after a few seconds. **Personal note** uses a textarea posted as `personalization_{supplier_id}` so the server applies the same text to every in-scope RFQ for that supplier, then sets `QUEUED` → `READY_TO_SEND` on **Send Selected** (no Graph call in the POST). The **Preview Email** modal uses `compose_grouped_rfq_email_message` the same way the background sender does (minus live send).
+
+**Sent RFQs — `/sales/rfq/sent/`:** Lists **`SENT`**, **`RESPONDED`**, and **`READY_TO_SEND`** RFQs grouped by supplier. **`READY_TO_SEND`** rows use badge **`Pending Send`** (`badge bg-warning text-dark`). **Enter Quote** and **Send Follow-Up** apply only after a row is **`SENT`** (pending-send rows show line detail but no quote/follow-up actions).
 
 ---
 

@@ -55,8 +55,7 @@ from suppliers.models import Supplier
 
 # Cost of money daily rate — assumed 12% annually (0.12 / 365)
 # UPDATE THIS VALUE once confirmed with management.
-# 0.000329 = ~12% annual. Do NOT use 0.00075 (that implies ~27% annual).
-COST_OF_MONEY_DAILY_RATE = 0.000329
+COST_OF_MONEY_DAILY_RATE = 0.00075
 
 PIPELINE = [
     ("New", "📥", "New"),
@@ -253,7 +252,7 @@ def _workbench_sidebar_context(solicitation):
         normalize_cage_code(c)
         for c in SupplierRFQ.objects.filter(
             line__solicitation=solicitation,
-            status="QUEUED",
+            status__in=("QUEUED", "READY_TO_SEND"),
         ).values_list("supplier__cage_code", flat=True)
         if normalize_cage_code(c)
     )
@@ -672,7 +671,7 @@ def _workbench_post_action(request, sol, action, list_qs_raw):
     if action == 'pass':
         if SupplierRFQ.objects.filter(
             line__solicitation=sol,
-            status='QUEUED',
+            status__in=('QUEUED', 'READY_TO_SEND'),
         ).exists():
             messages.error(
                 request,
@@ -1296,7 +1295,7 @@ def solicitation_workbench(request, sol_number):
 
     queued_rfq_count = SupplierRFQ.objects.filter(
         line__solicitation=solicitation,
-        status="QUEUED",
+        status__in=("QUEUED", "READY_TO_SEND"),
     ).count()
 
     line = solicitation.lines.order_by("line_number", "id").first()
@@ -1326,7 +1325,7 @@ def solicitation_workbench(request, sol_number):
     queued_supplier_ids = set(
         SupplierRFQ.objects.filter(
             line__solicitation=solicitation,
-            status="QUEUED",
+            status__in=("QUEUED", "READY_TO_SEND"),
         ).values_list("supplier_id", flat=True)
     )
 
@@ -1350,7 +1349,7 @@ def solicitation_workbench(request, sol_number):
     sam_cache_map = sidebar_ctx["sam_cache_map"]
     rfqs_queued = SupplierRFQ.objects.filter(
         line__solicitation=solicitation,
-        status="QUEUED",
+        status__in=("QUEUED", "READY_TO_SEND"),
     ).exists()
 
     nsn_raw = getattr(line, "nsn", None) if line else None
@@ -1685,8 +1684,8 @@ def sol_mass_pass(request):
 
     - ``mass_pass_all=1`` + ``filter_qs``: rebuild the list queryset from the same
       GET params as the current filtered view; one ``QuerySet.update`` for all rows
-      with status New or Active only (excludes RFQ_SENT, QUOTING, etc.). Rows with
-      QUEUED RFQs are skipped (same guard as single-record Pass on the workbench).
+      with status       New or Active only (excludes RFQ_SENT, QUOTING, etc.). Rows with
+      QUEUED or READY_TO_SEND RFQs are skipped (same guard as single-record Pass on the workbench).
     - ``sol_ids``: legacy page-scoped pass for checked rows (still restricted to
       New/Active at the database).
     """
@@ -1704,7 +1703,7 @@ def sol_mass_pass(request):
         base = _build_list_queryset(list_params)
         queued_subq = SupplierRFQ.objects.filter(
             line__solicitation_id=OuterRef('pk'),
-            status='QUEUED',
+            status__in=('QUEUED', 'READY_TO_SEND'),
         )
         qs = (
             base.filter(status__in=safe_statuses)

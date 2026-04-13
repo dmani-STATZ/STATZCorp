@@ -74,6 +74,7 @@ from sales.views.rfq import (
     rfq_inbox_rfq_search,
     rfq_queue,
     rfq_update_supplier_email,
+    rfq_supplier_email_options,
     rfq_preview_email,
     rfq_queue_add,
     rfq_manual_supplier_search,
@@ -82,6 +83,7 @@ from sales.views.rfq import (
     rfq_queue_fetch_pdfs,
     rfq_queue_send,
     rfq_queue_mark_sent,
+    rfq_queue_delete_item,
 )
 from sales.views.bids import (
     bids_ready,
@@ -182,6 +184,7 @@ __all__ = [
     "rfq_inbox_rfq_search",
     "rfq_queue",
     "rfq_update_supplier_email",
+    "rfq_supplier_email_options",
     "rfq_preview_email",
     "rfq_queue_add",
     "rfq_manual_supplier_search",
@@ -190,6 +193,7 @@ __all__ = [
     "rfq_queue_fetch_pdfs",
     "rfq_queue_send",
     "rfq_queue_mark_sent",
+    "rfq_queue_delete_item",
     "bids_ready",
     "bid_builder",
     "bid_select_quote",

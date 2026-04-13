@@ -64,6 +64,7 @@ from .views import (
     rfq_inbox_rfq_search,
     rfq_queue,
     rfq_update_supplier_email,
+    rfq_supplier_email_options,
     rfq_preview_email,
     rfq_queue_add,
     rfq_manual_supplier_search,
@@ -72,6 +73,7 @@ from .views import (
     rfq_queue_fetch_pdfs,
     rfq_queue_send,
     rfq_queue_mark_sent,
+    rfq_queue_delete_item,
     bids_ready,
     bid_builder,
     bid_select_quote,
@@ -220,6 +222,11 @@ urlpatterns = [
     path("rfq/inbox/", rfq_inbox, name="rfq_inbox"),
     # RFQ Queue (grouped add / fetch PDFs / send)
     path("rfq/queue/update-email/", rfq_update_supplier_email, name="rfq_update_supplier_email"),
+    path(
+        "rfq/queue/supplier-emails/<str:cage_code>/",
+        rfq_supplier_email_options,
+        name="rfq_supplier_email_options",
+    ),
     path("rfq/queue/preview/<str:cage_code>/", rfq_preview_email, name="rfq_preview_email"),
     path("rfq/queue/", rfq_queue, name="rfq_queue"),
     path("rfq/manual-supplier-search/", rfq_manual_supplier_search, name="rfq_manual_supplier_search"),
@@ -229,6 +236,7 @@ urlpatterns = [
     path("rfq/queue/fetch-pdfs/", rfq_queue_fetch_pdfs, name="rfq_queue_fetch_pdfs"),
     path("rfq/queue/send/", rfq_queue_send, name="rfq_queue_send"),
     path("rfq/queue/mark-sent/", rfq_queue_mark_sent, name="rfq_queue_mark_sent"),
+    path("rfq/queue/delete/<int:rfq_id>/", rfq_queue_delete_item, name="rfq_queue_delete_item"),
     # Bid Center
     path("bids/", bids_ready, name="bids_ready"),
     path("bids/ready/", bids_ready, name="bids_ready"),

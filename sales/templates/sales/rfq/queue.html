@@ -61,9 +61,28 @@
     <span class="text-muted small">CAGE: {{ s.cage_code|default:"—" }}</span>
     {% if group.is_no_quote %}<span class="badge bg-danger">No-Quote</span>{% endif %}
     <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
-      <input type="email" class="form-control form-control-sm queue-email-input" style="min-width:200px;" name="email_{{ field_key }}" value="{{ group.email }}" data-cage="{{ s.cage_code|default:'' }}" data-field-key="{{ field_key }}" placeholder="RFQ email">
-      <span class="email-save-indicator small" style="min-width:1.25rem;" id="email-ind-{{ field_key }}"></span>
-      <button type="button" class="btn btn-outline-primary btn-sm btn-preview-email" data-cage-raw="{{ s.cage_code|default:'' }}" data-name="{{ s.name|default:'Supplier' }}" data-field-key="{{ field_key }}" {% if not s.cage_code %}disabled{% endif %}>Preview Email</button>
+      <div class="d-flex align-items-center gap-1 flex-wrap" style="min-width:200px;max-width:420px;">
+        <div tabindex="0" role="button"
+             class="form-control form-control-sm form-control-plaintext border rounded px-2 py-1 flex-grow-1 text-truncate rfq-email-display-trigger"
+             style="min-height:31px;cursor:pointer;max-width:280px;"
+             data-cage="{{ s.cage_code|default:'' }}"
+             data-supplier-pk="{{ s.pk }}"
+             data-supplier-name="{{ s.name|default:'Supplier'|escapejs }}"
+             data-current-rfq-email="{{ s.rfq_email|default:''|escapejs }}"
+             id="rfq-email-display-{{ s.pk }}"
+             title="Click to set RFQ email">{% if s.rfq_email %}<span class="rfq-email-display-text">{{ s.rfq_email }}</span>{% else %}<span class="text-muted rfq-email-display-text">No email on file</span>{% endif %}</div>
+        <button type="button" class="btn btn-outline-secondary btn-sm rfq-email-edit-btn px-2" title="Set RFQ email"
+                data-cage="{{ s.cage_code|default:'' }}"
+                data-supplier-pk="{{ s.pk }}"
+                data-supplier-name="{{ s.name|default:'Supplier'|escapejs }}"
+                data-current-rfq-email="{{ s.rfq_email|default:''|escapejs }}"
+                {% if not s.cage_code %}disabled{% endif %}
+                aria-label="Set RFQ email">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
+        </button>
+        <span class="email-save-indicator small" style="min-width:1.25rem;" id="email-ind-{{ s.pk }}"></span>
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm btn-preview-email" data-cage-raw="{{ s.cage_code|default:'' }}" data-name="{{ s.name|default:'Supplier' }}" data-supplier-pk="{{ s.pk }}" {% if not s.cage_code %}disabled{% endif %}>Preview Email</button>
     </div>
   </div>
   <div class="card-body">
@@ -76,7 +95,7 @@
       </div>
     </div>
     <label class="form-label small text-muted mb-1">Personal note for this email (optional)</label>
-    <textarea class="form-control form-control-sm mb-1 personalization-ta" name="personalization_{{ field_key }}" id="pers-{{ field_key }}" rows="2">{{ group.personalization_text }}</textarea>
+    <textarea class="form-control form-control-sm mb-1 personalization-ta" name="personalization_{{ s.pk }}" id="pers-{{ s.pk }}" rows="2">{{ group.personalization_text }}</textarea>
     <p class="small text-muted mb-3">This text will appear at the top of the email, after the greeting.</p>
     <div class="ps-2 border-start border-2 border-secondary">
       <table class="table table-sm table-bordered mb-0 bg-white small">
@@ -88,12 +107,14 @@
             <th>Qty + UOM</th>
             <th>Return By</th>
             <th>PDF</th>
+            <th>Status</th>
+            <th class="text-end" style="width:1%">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for rfq in group.rfqs %}
           {% with line=rfq.line sol=rfq.line.solicitation %}
-          <tr>
+          <tr data-rfq-row="{{ rfq.pk }}" data-supplier-id="{{ s.pk }}">
             <td class="font-monospace">{{ sol.solicitation_number }}</td>
             <td class="font-monospace">{{ line.nsn|default:"—" }}</td>
             <td>{{ line.nomenclature|default:"—"|truncatewords:8 }}</td>
@@ -108,6 +129,26 @@
               {% else %}—{% endif %}
             </td>
             <td>{% if sol.pdf_blob %}✓{% else %}⚠{% endif %}</td>
+            <td class="small">{{ rfq.get_status_display }}</td>
+            <td class="text-end align-middle">
+              {% if rfq.status == 'QUEUED' %}
+              <div class="rfq-queue-row-actions d-inline-block text-start" data-rfq-id="{{ rfq.pk }}" data-delete-url="{% url 'sales:rfq_queue_delete_item' rfq_id=rfq.pk %}">
+                <div class="rfq-row-delete-idle d-flex justify-content-end">
+                  <button type="button" class="btn btn-outline-danger btn-sm rfq-queue-delete-open" title="Remove from queue" aria-label="Remove from queue">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                  </button>
+                </div>
+                <div class="rfq-row-delete-confirm d-none border rounded p-2 bg-light shadow-sm" style="min-width: 200px;">
+                  <div class="small mb-2">Remove this supplier from the queue?</div>
+                  <div class="d-flex flex-wrap gap-1 justify-content-end">
+                    <button type="button" class="btn btn-sm btn-danger rfq-queue-delete-confirm">Confirm</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rfq-queue-delete-cancel">Cancel</button>
+                  </div>
+                </div>
+                <div class="rfq-row-delete-err small text-danger mt-1 d-none text-end"></div>
+              </div>
+              {% endif %}
+            </td>
           </tr>
           {% endwith %}
           {% endfor %}
@@ -121,6 +162,15 @@
 {% endfor %}
 {% endif %}
 </form>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+  <div id="rfq-queue-toast" class="toast align-items-center text-bg-light border" role="alert" aria-live="polite" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body small" id="rfq-queue-toast-body"></div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
 
 <div class="modal fade" id="emailPreviewModal" tabindex="-1" aria-labelledby="emailPreviewModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -142,11 +192,36 @@
   </div>
 </div>
 
+<div class="modal fade" id="rfqSetEmailModal" tabindex="-1" aria-labelledby="rfqSetEmailModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rfqSetEmailModalLabel">Set RFQ Email</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">Choose an address or enter a new one.</p>
+        <div id="rfq-email-options-spinner" class="text-center py-3 d-none">
+          <div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+        </div>
+        <div id="rfq-email-options-list" class="list-group mb-3"></div>
+        <label for="rfq-email-modal-input" class="form-label small mb-1">Or enter a new address:</label>
+        <input type="email" class="form-control form-control-sm" id="rfq-email-modal-input" autocomplete="email" placeholder="name@example.com">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="rfq-email-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 <script>
 (function() {
   var csrfToken = '{{ csrf_token }}';
   var previewPathPrefix = '/sales/rfq/queue/preview/';
+  var supplierEmailsUrlTpl = "{% url 'sales:rfq_supplier_email_options' cage_code='ZZPLACEHOLDERZZ' %}";
 
   document.getElementById('queue-check-all') && document.getElementById('queue-check-all').addEventListener('click', function() {
     document.querySelectorAll('.supplier-cb:not(:disabled)').forEach(function(c) { c.checked = true; });
@@ -162,7 +237,7 @@
       alert('Select at least one supplier.');
       return false;
     }
-    if (!confirm('Send RFQs to ' + n + ' supplier(s)?')) {
+    if (!confirm('Approve ' + n + ' supplier(s) for send? Emails go out within about 15 minutes.')) {
       e.preventDefault();
       return false;
     }
@@ -190,29 +265,138 @@
     });
   });
 
-  document.querySelectorAll('.queue-email-input').forEach(function(inp) {
-    inp.addEventListener('blur', function() {
-      var cage = (inp.getAttribute('data-cage') || '').trim();
-      var fk = inp.getAttribute('data-field-key') || '';
-      var ind = document.getElementById('email-ind-' + fk);
-      if (!cage) { if (ind) ind.textContent = ''; return; }
-      if (ind) { ind.textContent = '…'; ind.className = 'email-save-indicator small text-muted'; }
-      var fd = new FormData();
-      fd.append('csrfmiddlewaretoken', csrfToken);
-      fd.append('cage_code', cage);
-      fd.append('email', inp.value || '');
-      fetch("{% url 'sales:rfq_update_supplier_email' %}", {
-        method: 'POST',
-        headers: {'X-CSRFToken': csrfToken},
-        body: fd
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (ind) {
-          ind.textContent = data.success ? '✓' : '✗';
-          ind.className = 'email-save-indicator small ' + (data.success ? 'text-success' : 'text-danger');
+  function supplierEmailsFetchUrl(cage) {
+    return supplierEmailsUrlTpl.replace('ZZPLACEHOLDERZZ', encodeURIComponent((cage || '').trim()));
+  }
+
+  function setRfqEmailDisplayContent(displayEl, emailVal) {
+    if (!displayEl) return;
+    displayEl.textContent = '';
+    var v = (emailVal || '').trim();
+    if (v) {
+      var s = document.createElement('span');
+      s.className = 'rfq-email-display-text';
+      s.textContent = v;
+      displayEl.appendChild(s);
+    } else {
+      var m = document.createElement('span');
+      m.className = 'text-muted rfq-email-display-text';
+      m.textContent = 'No email on file';
+      displayEl.appendChild(m);
+    }
+  }
+
+  function showEmailSaveSuccess(supplierPk) {
+    var ind = document.getElementById('email-ind-' + supplierPk);
+    if (!ind) return;
+    ind.textContent = '';
+    var ok = document.createElement('span');
+    ok.className = 'text-success';
+    ok.title = 'Saved';
+    ok.textContent = '✓';
+    ind.appendChild(ok);
+    ind.className = 'email-save-indicator small';
+    setTimeout(function() {
+      ind.textContent = '';
+      ind.className = 'email-save-indicator small';
+    }, 3000);
+  }
+
+  var setEmailModalEl = document.getElementById('rfqSetEmailModal');
+  var setEmailModal = setEmailModalEl ? new bootstrap.Modal(setEmailModalEl) : null;
+  var setEmailTitle = document.getElementById('rfqSetEmailModalLabel');
+  var setEmailList = document.getElementById('rfq-email-options-list');
+  var setEmailSpin = document.getElementById('rfq-email-options-spinner');
+  var setEmailInput = document.getElementById('rfq-email-modal-input');
+  var setEmailSaveBtn = document.getElementById('rfq-email-modal-save');
+  var setEmailState = { cage: '', supplierPk: '' };
+
+  function openSetEmailModal(cage, supplierPk, supplierName, currentEmail) {
+    if (!setEmailModal || !cage) return;
+    setEmailState.cage = cage.trim();
+    setEmailState.supplierPk = String(supplierPk);
+    if (setEmailTitle) setEmailTitle.textContent = 'Set RFQ Email — ' + (supplierName || 'Supplier');
+    if (setEmailInput) setEmailInput.value = (currentEmail || '').trim();
+    if (setEmailList) setEmailList.innerHTML = '';
+    if (setEmailSpin) setEmailSpin.classList.remove('d-none');
+    setEmailModal.show();
+    fetch(supplierEmailsFetchUrl(setEmailState.cage))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (setEmailSpin) setEmailSpin.classList.add('d-none');
+        if (!setEmailList) return;
+        setEmailList.innerHTML = '';
+        (data.options || []).forEach(function(opt) {
+          var a = document.createElement('button');
+          a.type = 'button';
+          a.className = 'list-group-item list-group-item-action small text-start';
+          a.textContent = opt.label + ' — ' + opt.email;
+          a.addEventListener('click', function() {
+            if (setEmailInput) setEmailInput.value = opt.email || '';
+          });
+          setEmailList.appendChild(a);
+        });
+        if (!(data.options || []).length) {
+          var empty = document.createElement('div');
+          empty.className = 'text-muted small';
+          empty.textContent = 'No saved addresses yet. Enter one below.';
+          setEmailList.appendChild(empty);
         }
-      }).catch(function() {
-        if (ind) { ind.textContent = '✗'; ind.className = 'email-save-indicator small text-danger'; }
+      })
+      .catch(function() {
+        if (setEmailSpin) setEmailSpin.classList.add('d-none');
+        if (setEmailList) {
+          setEmailList.innerHTML = '<p class="text-danger small mb-0">Could not load email list.</p>';
+        }
       });
+  }
+
+  function wireOpenEmailModal(el) {
+    if (!el) return;
+    el.addEventListener('click', function() {
+      var cage = (el.getAttribute('data-cage') || '').trim();
+      var pk = el.getAttribute('data-supplier-pk') || '';
+      var nm = el.getAttribute('data-supplier-name') || 'Supplier';
+      var cur = el.getAttribute('data-current-rfq-email') || '';
+      openSetEmailModal(cage, pk, nm, cur);
+    });
+    el.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        el.click();
+      }
+    });
+  }
+  document.querySelectorAll('.rfq-email-display-trigger').forEach(wireOpenEmailModal);
+  document.querySelectorAll('.rfq-email-edit-btn').forEach(wireOpenEmailModal);
+
+  setEmailSaveBtn && setEmailSaveBtn.addEventListener('click', function() {
+    var cage = setEmailState.cage;
+    var pk = setEmailState.supplierPk;
+    var email = setEmailInput ? setEmailInput.value.trim() : '';
+    if (!cage) return;
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrfToken);
+    fd.append('cage_code', cage);
+    fd.append('email', email);
+    fetch("{% url 'sales:rfq_update_supplier_email' %}", {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrfToken},
+      body: fd
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.success) {
+        var disp = document.getElementById('rfq-email-display-' + pk);
+        setRfqEmailDisplayContent(disp, email);
+        if (disp) disp.setAttribute('data-current-rfq-email', email);
+        var editBtn = document.querySelector('.rfq-email-edit-btn[data-supplier-pk="' + pk + '"]');
+        if (editBtn) editBtn.setAttribute('data-current-rfq-email', email);
+        setEmailModal.hide();
+        showEmailSaveSuccess(pk);
+      } else {
+        alert(data.error || 'Save failed.');
+      }
+    }).catch(function() {
+      alert('Save failed.');
     });
   });
 
@@ -231,8 +415,8 @@
     btn.addEventListener('click', function() {
       var cage = (btn.getAttribute('data-cage-raw') || '').trim();
       var name = btn.getAttribute('data-name') || 'Supplier';
-      var fk = btn.getAttribute('data-field-key');
-      var ta = document.getElementById('pers-' + fk);
+      var spk = btn.getAttribute('data-supplier-pk') || '';
+      var ta = document.getElementById('pers-' + spk);
       var pers = ta ? ta.value : '';
       if (!cage) { alert('Supplier needs a CAGE code for preview.'); return; }
       if (titleEl) titleEl.textContent = 'Email Preview — ' + name;
@@ -257,6 +441,93 @@
           }
         });
     });
+  });
+
+  function showQueueToast(message) {
+    var toastEl = document.getElementById('rfq-queue-toast');
+    var bodyEl = document.getElementById('rfq-queue-toast-body');
+    if (!toastEl || !bodyEl || typeof bootstrap === 'undefined') return;
+    bodyEl.textContent = message;
+    var t = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4500 });
+    t.show();
+  }
+
+  function resetRowDeleteUi(wrap) {
+    if (!wrap) return;
+    var idle = wrap.querySelector('.rfq-row-delete-idle');
+    var conf = wrap.querySelector('.rfq-row-delete-confirm');
+    var err = wrap.querySelector('.rfq-row-delete-err');
+    if (idle) idle.classList.remove('d-none');
+    if (conf) conf.classList.add('d-none');
+    if (err) { err.classList.add('d-none'); err.textContent = ''; }
+  }
+
+  document.addEventListener('click', function(ev) {
+    var t = ev.target;
+    if (!(t instanceof Element)) return;
+    var openBtn = t.closest('.rfq-queue-delete-open');
+    if (openBtn) {
+      ev.preventDefault();
+      var wrap = openBtn.closest('.rfq-queue-row-actions');
+      if (!wrap) return;
+      document.querySelectorAll('.rfq-queue-row-actions').forEach(function(w) {
+        if (w !== wrap) resetRowDeleteUi(w);
+      });
+      var idle = wrap.querySelector('.rfq-row-delete-idle');
+      var conf = wrap.querySelector('.rfq-row-delete-confirm');
+      if (idle) idle.classList.add('d-none');
+      if (conf) conf.classList.remove('d-none');
+      return;
+    }
+    var cancelBtn = t.closest('.rfq-queue-delete-cancel');
+    if (cancelBtn) {
+      ev.preventDefault();
+      resetRowDeleteUi(cancelBtn.closest('.rfq-queue-row-actions'));
+      return;
+    }
+    var confirmBtn = t.closest('.rfq-queue-delete-confirm');
+    if (confirmBtn) {
+      ev.preventDefault();
+      var wrap2 = confirmBtn.closest('.rfq-queue-row-actions');
+      if (!wrap2) return;
+      var url = wrap2.getAttribute('data-delete-url');
+      var rfqId = parseInt(wrap2.getAttribute('data-rfq-id'), 10);
+      var errEl = wrap2.querySelector('.rfq-row-delete-err');
+      if (errEl) { errEl.classList.add('d-none'); errEl.textContent = ''; }
+      fetch(url, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken, 'Accept': 'application/json'},
+        credentials: 'same-origin'
+      }).then(function(r) {
+        return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+      }).then(function(res) {
+        if (!res.ok || !res.data || !res.data.success) {
+          var msg = (res.data && res.data.error) ? res.data.error : 'Could not remove this item.';
+          if (errEl) {
+            errEl.textContent = msg;
+            errEl.classList.remove('d-none');
+          }
+          return;
+        }
+        var row = document.querySelector('tr[data-rfq-row="' + rfqId + '"]');
+        var sid = row ? row.getAttribute('data-supplier-id') : null;
+        if (row) row.remove();
+        if (sid) {
+          var card = document.querySelector('.card[data-supplier-id="' + sid + '"]');
+          if (card && !card.querySelector('tbody tr')) {
+            card.remove();
+          }
+        }
+        if (res.data.sol_reverted && res.data.sol_number) {
+          showQueueToast(res.data.sol_number + ' returned to Active — no suppliers remaining in queue');
+        }
+      }).catch(function() {
+        if (errEl) {
+          errEl.textContent = 'Network error.';
+          errEl.classList.remove('d-none');
+        }
+      });
+    }
   });
 })();
 </script>

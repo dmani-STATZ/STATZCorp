@@ -10,6 +10,7 @@ class SupplierRFQ(models.Model):
     """RFQ sent to a supplier for a solicitation line."""
     STATUS_CHOICES = [
         ('QUEUED', 'Queued'),
+        ('READY_TO_SEND', 'Ready to send'),
         ('PENDING', 'Pending'),
         ('SENT', 'Sent'),
         ('RESPONDED', 'Responded'),
@@ -49,6 +50,8 @@ class SupplierRFQ(models.Model):
         default='',
         help_text='Optional personal note injected into the top of this supplier RFQ email'
     )
+    send_attempts = models.IntegerField(default=0)
+    last_send_error = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'dibbs_supplier_rfq'

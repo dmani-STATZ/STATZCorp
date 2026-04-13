@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "products",
     "tools.apps.ToolsConfig",
     "transactions.apps.TransactionsConfig",
+    "core.apps.CoreConfig",
 ]
 
 # Middleware - Environment aware

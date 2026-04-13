@@ -30,8 +30,9 @@ This repository is a multi-app Django monolith with app-based ownership but stro
 - Audit side effects: `transactions` signals on `Contract`, `Clin`, and `Supplier` saves.
 - Supplier/NSN split ownership: `suppliers` and `products` models, but important UI/views in `contracts`.
 - Reporting/export-heavy runtime: `contracts`, `sales`, `reports`, `training`, `tools`, `accesslog`, `users` all stream files.
+- Cross-cutting infrastructure: **`core`** — lightweight app for shared wiring (e.g. **`core/management/commands/run_background_tasks.py`**, the Azure WebJob orchestrator that invokes task modules such as **`sales/tasks/send_queued_rfqs.py`**).
 - UI pattern mix: server-rendered templates with significant inline JS in several apps.
-- Background pattern: no Celery/task queue files; most heavy work is synchronous request-time logic.
+- Background pattern: no Celery/task queue files; most heavy work is synchronous request-time logic. The **`core`** app houses cross-cutting infrastructure; **`core/management/commands/run_background_tasks.py`** is the WebJob entry that orchestrates registered tasks (Azure **`webjobs/background_tasks/`**). Individual task modules live under app-owned packages such as **`sales/tasks/`** (e.g. **`send_queued_rfqs`**) and are imported by that command. **Pattern:** add a new callable in the owning app’s **`tasks/`** package, then register it in **`core/management/commands/run_background_tasks.py`**.
 
 ## 4. Global Safe-Edit Rules
 - Keep changes scoped to the requested behavior. Do not do opportunistic cleanup in unrelated files.
