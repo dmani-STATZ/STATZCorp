@@ -13,7 +13,10 @@
       "Bash(head -5 templates/index.html)",
       "Bash(ls theme_tw/static/)",
       "Bash(ls theme_tw/static/css/)",
-      "Bash(ls theme_tw/static/css/dist/)"
+      "Bash(ls theme_tw/static/css/dist/)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(head -c 0 /c/Users/Dion/Documents/STATZWeb/STATZCorp/users/templates/tailwind/*.html)",
+      "Bash(.venv/Scripts/pip install:*)"
     ]
   }
 }

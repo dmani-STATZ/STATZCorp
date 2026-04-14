@@ -49,7 +49,7 @@ ALLOWED_HOSTS = os.environ.get(
 ).split(",")
 
 # CORS settings for PWA
-CORS_ALLOW_ALL_ORIGINS = not DEBUG  # Restrict in production
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development only; restrict in production
 CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken"]
 CORS_ALLOW_HEADERS = ["Content-Type", "X-CSRFToken", "Authorization"]
@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "accesslog.apps.AccesslogConfig",
     "td_now.apps.TDNowConfig",
     "crispy_forms",
+    "crispy_bootstrap5",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -76,8 +77,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-    "tailwind",
-    "theme_tw",
     "corsheaders",
     "django_extensions",
     "processing.apps.ProcessingConfig",
@@ -286,6 +285,7 @@ if IS_PRODUCTION:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
     WHITENOISE_USE_FINDERS = True
     WHITENOISE_AUTOREFRESH = False
+    WHITENOISE_MANIFEST_STRICT = False  # Fall back to unhashed path instead of raising ValueError for files not in manifest
 else:
     # Development: Standard static files storage
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
@@ -313,8 +313,8 @@ OPENROUTER_MODEL_FALLBACKS = [m.strip() for m in _fallbacks.split(",") if m.stri
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
-CRISPY_TEMPLATE_PACK = "tailwind"
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # ──────────────────────────────────────────────
 # EMAIL — Microsoft 365 SMTP (GCC High tenant)
@@ -355,11 +355,7 @@ REQUIRE_LOGIN = (
     == "true"
 )
 
-TAILWIND_APP_NAME = "theme_tw"
-
 INTERNAL_IPS = ["127.0.0.1", "localhost"]
-
-NPM_BIN_PATH = "C:\\Program Files\\nodejs\\npm.cmd"
 
 # Logging configuration - Environment aware
 if IS_PRODUCTION:

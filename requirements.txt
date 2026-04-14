@@ -13,8 +13,7 @@ msal>=1.28.0
 
 # Forms and UI
 django-crispy-forms==2.3
-django-tailwind==3.8.0
-pytailwindcss==0.2.0
+crispy-bootstrap5==2024.10
 
 # CORS and API
 django-cors-headers==4.4.0

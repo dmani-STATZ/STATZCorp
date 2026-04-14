@@ -1,15 +1,16 @@
 <!doctype html>
-{% load static tailwind_tags %}
 {% load static %}
 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% tailwind_css %}
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Tailwind compatibility shim -->
+    <link rel="stylesheet" href="{% static 'css/tailwind-compat.css' %}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
     {% if title %}
@@ -70,6 +71,7 @@
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
+        overflow-y: auto;
     }
     </style>
 
@@ -77,17 +79,17 @@
     </head>
 <body>
     <header id="header">
-        <div class="flex items-center">
+        <div class="d-flex align-items-center gap-2">
             <a href="{% url 'landing' %}">
                 {% if active_company and active_company.logo_url %}
-                <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" class="h-8 w-18 mr-4">
+                <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" style="height: 30px;">
                 {% else %}
-                <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" class="h-8 w-18 mr-4">
+                <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="Logo" style="height: 30px;">
                 {% endif %}
             </a>
             {% if active_company %}
             {% with section=request.resolver_match.app_name %}
-            <span class="ml-3 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-white/20 text-white">
+            <span class="badge rounded-pill text-white small" style="background:rgba(255,255,255,0.2);">
                 {% if section %}{{ section|title }} - {% endif %}{{ active_company.name }}
             </span>
             {% endwith %}
@@ -95,13 +97,13 @@
         </div>
 
         {% if user.is_authenticated %}
-        <div class="flex items-center space-x-3">
+        <div class="d-flex align-items-center gap-2">
             {% if available_companies|length > 1 %}
-            <form method="post" action="{% url 'users:switch_company' %}" class="inline-flex items-center space-x-2">
+            <form method="post" action="{% url 'users:switch_company' %}" class="d-inline-flex align-items-center gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <label for="company_id" class="text-white text-sm">Company</label>
-                <select name="company_id" id="company_id" class="bg-white text-gray-800 text-sm rounded-md px-2 py-1" onchange="this.form.submit()">
+                <label for="company_id" class="text-white small mb-0">Company</label>
+                <select name="company_id" id="company_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
                     {% for c in available_companies %}
                         <option value="{{ c.id }}" {% if active_company and c.id == active_company.id %}selected{% endif %}>{{ c.name }}</option>
                     {% endfor %}
@@ -110,33 +112,37 @@
             {% endif %}
 
             {% if user.is_superuser %}
-                <a href="{% url 'admin:index' %}" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                <a href="{% url 'admin:index' %}" class="nav-link text-white px-2 py-1">{{ user.username }}</a>
             {% else %}
-                <a href="#" class="nav-item nav-link text-white px-3 py-2">{{ user.username }}</a>
+                <a href="#" class="nav-link text-white px-2 py-1">{{ user.username }}</a>
             {% endif %}
 
-            <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="inline">
+            <form id="logout-form" method="post" action="{% url 'users:logout' %}" class="d-inline">
                 {% csrf_token %}
-                <button type="submit" class="nav-link text-white hover:text-gray-200 px-3 py-2">Sign Out</button>
+                <button type="submit" class="btn btn-sm btn-outline-light px-3">Sign Out</button>
             </form>
         </div>
         {% else %}
-        <div class="flex flex-col md:flex-row md:ml-auto">
-            <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:login' %}">Sign In</a>
-            <a class="nav-link text-white hover:text-gray-200 px-3 py-2" href="{% url 'users:register' %}">Sign Up</a>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-sm btn-outline-light px-3" href="{% url 'users:login' %}">Sign In</a>
+            <a class="btn btn-sm btn-light px-3" href="{% url 'users:register' %}">Sign Up</a>
         </div>
         {% endif %}
-    </header>   
+    </header>
     <div class="main-background">
         {% if messages %}
+        <div class="position-absolute top-0 start-0 end-0 px-3 pt-2">
             {% for message in messages %}
-                <div class="mb-4 p-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-700{% elif message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
                     {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             {% endfor %}
+        </div>
         {% endif %}
         {% block content %}{% endblock content %}
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

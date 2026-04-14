@@ -318,6 +318,10 @@ header {
 }
 
 .reminderbar {
+    position: fixed;
+    top: 4rem;       /* below the 48px header */
+    right: 0;
+    width: 20rem;    /* equivalent to Tailwind w-80 */
     transition: transform 0.3s;
     z-index: 1100;
     overflow-y: auto;

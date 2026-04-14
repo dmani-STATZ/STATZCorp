@@ -6,11 +6,11 @@
 
 {% block body %}
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div class="min-h-screen bg-gray-50">
     <!-- Main Content -->
     <main>
         <!-- Default width container that all pages will inherit -->
-        <div class="w-[75%] mx-auto dark:bg-gray-800 dark:text-gray-100">
+        <div class="mx-auto" style="width: 75%; max-width: 1400px;">
             {% block content %}
                 {% block contract_content %}{% endblock contract_content %}
             {% endblock content %}
@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- Reminders Sidebar -->
-<div class="reminderbar bg-white text-gray-800 w-80 h-[calc(100vh-4rem)] fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col dark:bg-gray-900 dark:text-gray-100" id="reminderbar">
+<div class="reminderbar bg-white inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar">
     <div class="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0 dark:border-gray-700">
         <div>
             <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">My Reminders</h2>
