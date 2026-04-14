@@ -82,7 +82,7 @@
                         <td></td>
                         <td></td>
                         <td></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
                             <button onclick="showContractNumberPrompt()" class="text-blue-600 hover:text-blue-900 mr-3 btn btn-nav">
                                 Start New Contract
                             </button>
@@ -95,7 +95,7 @@
                         <td class="px-6 py-2 whitespace-nowrap">{{ contract.award_date|date:"Y-m-d" }}</td>
                         <td class="px-6 py-2 whitespace-nowrap">{{ contract.due_date|date:"Y-m-d" }}</td>
                         <td class="px-6 py-2 whitespace-nowrap">${{ contract.contract_value|floatformat:2 }}</td>
-                        <td class="px-6 py-2 whitespace-nowrap">
+                        <td class="px-6 py-2">
                             {% if contract.is_being_processed %}
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                     Being Processed by {{ contract.processed_by.username }}
@@ -109,7 +109,7 @@
                                 </span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
                             {% if contract.pdf_parse_status == 'pending' %}
                                 <span class="inline-flex text-red-600" title="No PDF uploaded">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -146,7 +146,7 @@
                                 </span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
                             {% if not contract.is_being_processed %}
                                 <button onclick="startProcessing('{{ contract.id }}')" class="text-indigo-600 hover:text-indigo-900 mr-3 btn btn-nav">
                                     Start Processing
@@ -167,7 +167,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="8" class="px-3 py-2 text-center text-gray-500">
                             No contracts in queue
                         </td>
                     </tr>
@@ -206,7 +206,7 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="button" id="modal-close" class="hidden w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="hideModal()">
+                    <button type="button" id="modal-close" class="hidden inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="hideModal()">
                         Close
                     </button>
                 </div>

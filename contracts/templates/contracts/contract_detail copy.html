@@ -167,7 +167,7 @@
                                 <div class="py-1">
                                     {% if contract.status.description != 'Cancelled' %}
                                     <button onclick="showCancelModal('{{ contract.id }}', '{{ contract.contract_number }}')"
-                                            class="group flex w-full items-center px-4 py-2 text-sm btn btn-caution">
+                                            class="group flex items-center px-4 py-2 text-sm btn btn-caution">
                                         <svg class="mr-3 h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                         </svg>
@@ -320,28 +320,28 @@
                         <tr id="clin-row-{{ clin.id }}"
                             data-clin-id="{{ clin.id }}"
                             class="{% if clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                 <a href="{% url 'contracts:clin_detail' clin.id %}" class="text-blue-600 hover:text-blue-800" onclick="event.stopPropagation();">
                                     {{ clin.item_number|default:"0000" }}
                                 </a>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 py-2 text-sm text-gray-900">
                                 {{ clin.supplier.name|default:"N/A" }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                 {{ clin.nsn.nsn_code|default:"N/A" }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                 {{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm {% if clin.due_date_late %}text-red-600{% endif %}">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm {% if clin.due_date_late %}text-red-600{% endif %}">
                                 {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
                             </td>
                             <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="event.stopPropagation();">Edit</button>
                                 <button class="text-red-600 hover:text-red-800" onclick="event.stopPropagation();">Delete</button>
                             </td> -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                 <a href="{% url 'contracts:clin_update' clin.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -351,7 +351,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            <td colspan="6" class="px-3 py-2 text-center text-gray-500">
                                 No CLINs found for this contract
                             </td>
                         </tr>
@@ -401,7 +401,7 @@
                         <button
                             onclick="toggleExpediteStatus('initiate')"
                             id="expedite_initiate_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
+                            class="px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
                             {% if expedite and expedite.initiated %}disabled{% endif %}>
@@ -414,7 +414,7 @@
                         <button
                             onclick="toggleExpediteStatus('successful')"
                             id="expedite_successful_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
+                            class="px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if not expedite or not expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% elif expedite and expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
@@ -428,7 +428,7 @@
                         <button
                             onclick="toggleExpediteStatus('use')"
                             id="expedite_use_btn"
-                            class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
+                            class="px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
                                 {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed
                                 {% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
                             {% if expedite.used %}disabled{% endif %}>

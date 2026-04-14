@@ -348,7 +348,7 @@
                     </td>
                     <td class="whitespace-nowrap">{{ folder.contract.contract_number }}</td>
                     <td class="whitespace-nowrap">{{ folder.contract.po_number }}</td>
-                    <td class="whitespace-nowrap editable-cell">
+                    <td class="editable-cell">
                         <input type="text" class="editable-input" value="{{ folder.partial|default:'' }}"
                                data-id="{{ folder.id }}" data-field="partial" onchange="updateField(this)"
                                placeholder="Enter partial...">
@@ -383,18 +383,18 @@
                                data-id="{{ folder.id }}" data-field="sir_scn" onchange="updateField(this)"
                                placeholder="Enter SIR SCN...">
                     </td>
-                    <td class="whitespace-nowrap editable-cell">
+                    <td class="editable-cell">
                         <input type="text" class="editable-input" value="{{ folder.tracking|default:'' }}"
                                data-id="{{ folder.id }}" data-field="tracking" onchange="updateField(this)"
                                placeholder="Enter tracking...">
                     </td>
-                    <td class="whitespace-nowrap editable-cell">
+                    <td class="editable-cell">
                         <input type="text" class="editable-input" value="{{ folder.tracking_number|default:'' }}"
                                data-id="{{ folder.id }}" data-field="tracking_number" onchange="updateField(this)"
                                placeholder="Enter tracking number...">
                     </td>
-                    <td class="whitespace-nowrap">{{ folder.sort_data|default:'' }}</td>
-                    <td class="whitespace-nowrap editable-cell">
+                    <td>{{ folder.sort_data|default:'' }}</td>
+                    <td class="editable-cell">
                         <input type="text" class="editable-input" value="{{ folder.note|default:'' }}"
                                data-id="{{ folder.id }}" data-field="note" onchange="updateField(this)"
                                placeholder="Enter note...">
@@ -514,7 +514,7 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                    <button type="button" id="cancelBtn" class="mt-3 inline-flex w-full justify-center rounded-md btn btn-caution px-3 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-gray-300 sm:mt-0 sm:w-auto">
+                    <button type="button" id="cancelBtn" class="mt-3 inline-flex justify-center rounded-md btn btn-caution px-3 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-gray-300 sm:mt-0 sm:w-auto">
                         Cancel
                     </button>
                 </div>
