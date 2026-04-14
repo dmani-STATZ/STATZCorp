@@ -16,7 +16,8 @@
       "Bash(ls theme_tw/static/css/dist/)",
       "Bash(.venv/Scripts/python.exe:*)",
       "Bash(head -c 0 /c/Users/Dion/Documents/STATZWeb/STATZCorp/users/templates/tailwind/*.html)",
-      "Bash(.venv/Scripts/pip install:*)"
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(curl -I http://localhost:8000/admin/)"
     ]
   }
 }
