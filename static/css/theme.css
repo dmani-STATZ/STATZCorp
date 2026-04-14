@@ -64,62 +64,65 @@
   cursor: pointer;
 }
 
-.btn-primary {
-  background-color: var(--primary);
-  color: var(--primary-text);
+.btn.btn-primary, .btn-primary {
+  background-color: var(--primary) !important;
+  color: var(--primary-text) !important;
 }
 
-.btn-primary:hover {
+.btn.btn-primary:hover, .btn-primary:hover {
   background-color: var(--primary-hover);
   color: var(--primary-text-hover);
 }
 
-.btn-save {
-  background-color: var(--save);
-  color: var(--save-text);
+.btn.btn-save, .btn-save {
+  background-color: var(--save) !important;
+  color: var(--save-text) !important;
+  border-color: var(--save) !important;
 }
 
-.btn-save:hover {
-  background-color: var(--save-hover);
-  color: var(--save-text-hover);
+.btn.btn-save:hover, .btn-save:hover {
+  background-color: var(--save-hover) --!important;
+  color: var(--save-text-hover) --!important;
 }
 
-.btn-secondary {
-  background-color: var(--secondary);
-  color: var(--secondary-text);
+.btn.btn-secondary, .btn-secondary {
+  background-color: var(--secondary) --!important;
+  color: var(--secondary-text) --!important;
 }
 
 .btn-secondary:hover {
-  background-color: var(--secondary-hover);
-  color: var(--secondary-text-hover);
+  background-color: var(--secondary-hover) --!important  ;
+  color: var(--secondary-text-hover) --!important;
 }
 
-.btn-delete {
-  background-color: var(--danger);
-  color: var(--danger-text);
+.btn.btn-delete, .btn-delete {
+  background-color: var(--danger) !important;
+  color: var(--danger-text) !important;
+  border-color: var(--danger) !important;
 }
 
 .btn-delete:hover {
-  background-color: var(--danger-hover);
-  color: var(--danger-text-hover);
+  background-color: var(--danger-hover) --!important;
+  color: var(--danger-text-hover) --!important;
 }
 
-.btn-caution {
-  background-color: var(--caution);
-  color: var(--caution-text);
+.btn.btn-caution, .btn-caution {
+  background-color: var(--caution) !important;
+  color: var(--caution-text) !important;
+  border-color: var(--caution) !important;
 }
 
 .btn-caution:hover {
-  background-color: var(--caution-hover);
-  color: var(--caution-text-hover);
+  background-color: var(--caution-hover) --!important;
+  color: var(--caution-text-hover) --!important;
 }
 
-.btn-nav {
-  background-color: var(--nav);
-  color: var(--nav-text);
+.btn.btn-nav, .btn-nav {
+  background-color: var(--nav) --!important;
+  color: var(--nav-text) --!important;
 }
 
-.btn-nav:hover {
-  background-color: var(--nav-hover);
-  color: var(--nav-text-hover);
+.btn.btn-nav:hover, .btn-nav:hover {
+  background-color: var(--nav-hover) --!important;
+  color: var(--nav-text-hover) --!important;
 }

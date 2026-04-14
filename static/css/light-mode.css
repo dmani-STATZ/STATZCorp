@@ -204,11 +204,13 @@ textarea:focus {
  * BUTTONS
  * Controls the appearance of buttons that don't have specific background classes
  */
-button:not([class*="bg-"]):not(.btn) {
-    background-color: #374151 !important;
-    /* gray-700 - Default button background */
+ button:not([class*="bg-"]):not(.btn):not([class*="btn-"]):not(.text-indigo-600):not(.text-red-600):not(.text-green-600) {
+    background-color: #374151;
     color: #f3f4f6 !important;
-    /* gray-100 - Default button text */
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem !important;
+    border: none !important;
+    cursor: pointer;
 }
 
 /**

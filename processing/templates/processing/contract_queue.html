@@ -46,7 +46,7 @@
                 <p class="text-lg text-gray-600 mb-1">Drag and drop your CSV file</p>
                 <p class="text-sm text-gray-500 mb-1">or</p>
                 <p class="text-lg text-gray-600 mb-2">Award PDF documents here</p>
-                <button onclick="document.getElementById('csv-upload').click()" class="mt-2 text-indigo-600 hover:text-indigo-500">
+                <button onclick="document.getElementById('csv-upload').click()" class="mt-2 text-indigo-600 hover:text-indigo-500 btn btn-nav">
                     Browse files
                 </button>
             </div>
@@ -59,18 +59,18 @@
             </div>
         </div>
 
-        <div class="card shadow-md overflow-hidden">
+        <div class="card shadow-md overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left tracking-wider label">Contract Number</th>
-                        <th class="px-6 py-3 text-left tracking-wider label">Buyer</th>
-                        <th class="px-6 py-3 text-left tracking-wider label">Award Date</th>
-                        <th class="px-6 py-3 text-left tracking-wider label">Due Date</th>
-                        <th class="px-6 py-3 text-left tracking-wider label">Contract Value</th>
-                        <th class="px-6 py-3 text-left tracking-wider label">Status</th>
-                        <th class="px-6 py-3 text-center tracking-wider label">PDF</th>
-                        <th class="px-6 py-3 text-left tracking-wider label">Actions</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Contract Number</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Buyer</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Award Date</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Due Date</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Contract Value</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Status</th>
+                        <th class="px-6 py-2 text-center tracking-wider label">PDF</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -83,19 +83,19 @@
                         <td></td>
                         <td></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button onclick="showContractNumberPrompt()" class="text-blue-600 hover:text-blue-900 mr-3">
+                            <button onclick="showContractNumberPrompt()" class="text-blue-600 hover:text-blue-900 mr-3 btn btn-nav">
                                 Start New Contract
                             </button>
                         </td>
                     </tr>
                     {% for contract in queued_contracts %}
                     <tr data-contract-id="{{ contract.id }}">
-                        <td class="px-6 py-4 whitespace-nowrap">{{ contract.contract_number }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">{{ contract.buyer }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">{{ contract.award_date|date:"Y-m-d" }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">{{ contract.due_date|date:"Y-m-d" }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${{ contract.contract_value|floatformat:2 }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-6 py-2 whitespace-nowrap">{{ contract.contract_number }}</td>
+                        <td class="px-6 py-2">{{ contract.buyer }}</td>
+                        <td class="px-6 py-2 whitespace-nowrap">{{ contract.award_date|date:"Y-m-d" }}</td>
+                        <td class="px-6 py-2 whitespace-nowrap">{{ contract.due_date|date:"Y-m-d" }}</td>
+                        <td class="px-6 py-2 whitespace-nowrap">${{ contract.contract_value|floatformat:2 }}</td>
+                        <td class="px-6 py-2 whitespace-nowrap">
                             {% if contract.is_being_processed %}
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                     Being Processed by {{ contract.processed_by.username }}
@@ -124,19 +124,18 @@
                                 </span>
                             {% elif contract.pdf_parse_status == 'partial' %}
                                 <button type="button"
-                                        class="inline-flex text-yellow-600 hover:text-yellow-700 focus:outline-none cursor-pointer"
+                                        class="inline-flex focus:outline-none cursor-pointer border-0 bg-transparent p-0"
                                         title="PDF parsed with warnings — click to review"
                                         data-contract-number="{{ contract.contract_number|default:'' }}"
                                         data-parse-notes="{{ contract.pdf_parse_notes|default:''|escapejs }}"
                                         onclick="openPdfParseNotesModalFromTrigger(this)">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-                                    viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167
-                                        2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516
-                                        2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485
-                                        2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5
-                                        0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-                                        clip-rule="evenodd" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" aria-hidden="true">
+                                        <!-- Yellow triangle -->
+                                        <path fill="#EAB308" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495z"/>
+                                        <!-- Black exclamation stem -->
+                                        <path fill="#000000" d="M10.75 5.75a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z"/>
+                                        <!-- Black exclamation dot -->
+                                        <circle fill="#000000" cx="10" cy="14" r="1"/>
                                     </svg>
                                 </button>
                             {% else %}
@@ -149,16 +148,16 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             {% if not contract.is_being_processed %}
-                                <button onclick="startProcessing('{{ contract.id }}')" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                <button onclick="startProcessing('{{ contract.id }}')" class="text-indigo-600 hover:text-indigo-900 mr-3 btn btn-nav">
                                     Start Processing
                                 </button>
                             {% elif contract.processed_by == user %}
-                                <button onclick="resumeProcessing('{{ contract.id }}')" class="text-green-600 hover:text-green-900">
+                                <button onclick="resumeProcessing('{{ contract.id }}')" class="text-green-600 hover:text-green-900 btn btn-nav">
                                     Resume Processing
                                 </button>
                             {% endif %}
                             {% if user.is_superuser %}
-                                <button onclick="deleteContract('{{ contract.id }}')" class="text-red-600 hover:text-red-900">
+                                <button onclick="deleteContract('{{ contract.id }}')" class="text-red-600 hover:text-red-900 btn btn-nav">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="red">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>

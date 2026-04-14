@@ -203,12 +203,20 @@ body.dark textarea:focus {
 /**
  * BUTTONS
  * Controls the appearance of buttons that don't have specific background classes
+     background-color: #374151;
+    color: #f3f4f6 !important;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    border: none;
+    cursor: pointer;
  */
-body.dark button:not([class*="bg-"]):not(.btn) {
+body.dark button:not([class*="bg-"]):not(.btn):not([class*="btn-"]):not(.text-indigo-600):not(.text-red-600):not(.text-green-600) {
     background-color: #f3f4f6;
-    /* gray-100 - Default button background */
-    color: #111827;
-    /* gray-900 - Default button text */
+    color: #111827 !important;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem !important;
+    border: none !important;
+    cursor: pointer;
 }
 
 /**
