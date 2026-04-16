@@ -48,6 +48,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 ### Before changing templates
 - Check for `{% include %}` partials: `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html`, `contract_splits.html` are included in multiple parent templates
+- NSN and Supplier modals for the CLIN form are in `contracts/templates/contracts/modals/supplier_modal.html` and `nsn_modal.html`. The modal JS (`openSupplierModal`, `openNsnModal`, search/pagination helpers, and clear handlers) is defined in `clin_form.html`'s `extra_scripts` block. Element IDs `id_nsn`, `nsn_display`, `id_supplier`, and `supplier_display` are referenced by both the modal result wiring and the form — do not rename them without updating the script and modal templates together.
 - JS files in `contracts/static/contracts/js/` are tightly bound to specific template IDs and form names; changing template element IDs or form field names breaks the JS
 
 ### Before changing exports/reports
@@ -95,7 +96,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `contracts/models.py` + new migration
 - `contracts/forms.py` (`ClinForm`, especially `clean()`)
 - `contracts/views/clin_views.py`, `api_views.py` (update-field API)
-- `contracts/templates/contracts/clin_form.html`, `clin_detail.html`
+- `contracts/templates/contracts/clin_form.html` (create flow only) and `clin_detail.html` (read-only display with Transaction edit buttons on labels for tracked fields)
 - `contracts/views/contract_log_views.py` (if exported)
 - `processing/models.py` `QueueClin` (if imported)
 - `transactions` app tracked-fields list (if auditable)
@@ -221,7 +222,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 **After view changes:**
 - Manually verify the contract management page (`/<pk>/`) loads for a real contract
-- Verify the CLIN create and edit forms submit without errors
+- Verify the CLIN create form submits without errors and the CLIN detail page loads (Transactions modal for field edits)
 - Open folder tracking view and verify the stack displays correctly
 - If you changed an API view, test the HTMX interaction in the browser (notes add/delete, shipment add/edit, split operations)
 
@@ -269,6 +270,8 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 11. **The `AcknowledgementLetter` view references fields that do not exist on the model** (`recipient_name`, `recipient_address` per CONTEXT.md §17). This is a known stale view/template. Do not add logic that depends on these fields without first adding them to the model.
 
 12. **`api_add_note` has debug `print` statements** and reads `request.content_type` (which is not set in AJAX requests). AJAX callers must pass `content_type_id` and `object_id` explicitly. This is a known bug.
+
+13. **There is no longer a standalone CLIN edit page.** CLIN field edits are handled by the Transactions edit modal (`openTransactionsEditModal`). Do not re-add a dedicated CLIN edit view or `/contracts/clin/<pk>/edit/` route without removing the Transaction wiring from `clin_detail.html` first.
 
 ---
 

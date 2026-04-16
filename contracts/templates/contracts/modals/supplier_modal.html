@@ -1,0 +1,49 @@
+<!-- Supplier Selection Modal (contracts CLIN form) -->
+<div id="supplier-modal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-600 bg-opacity-50 pt-16 pb-8" style="display: none;">
+    <div class="relative mx-4 w-full max-w-md rounded-lg border bg-white shadow-lg card card-padded">
+        <div class="row-between border-b pb-3">
+            <h3 class="text-lg font-semibold text-gray-900">Select Supplier</h3>
+            <button type="button" onclick="closeSupplierModal()" class="text-gray-400 hover:text-gray-500" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="mt-4">
+            <div class="mb-4">
+                <a href="{% url 'contracts:supplier_create' %}"
+                   class="inline-flex items-center rounded-md bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Add as New Supplier
+                </a>
+            </div>
+
+            <div class="mb-4">
+                <label for="supplier_search" class="mb-1 block text-sm font-medium text-gray-700">Search Supplier</label>
+                <div class="flex gap-2">
+                    <input type="text" id="supplier_search" class="form-control min-w-0 flex-1" placeholder="Enter supplier name or CAGE code" autocomplete="off">
+                    <button type="button" onclick="searchSupplier()" class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
+                        Search
+                    </button>
+                </div>
+                <p class="mt-1 text-sm text-gray-500">Enter at least 3 characters to search</p>
+            </div>
+
+            <div id="supplier_search_results" class="mt-4 max-h-[300px] overflow-y-auto rounded border border-gray-100">
+                <div class="py-4 text-center text-gray-500">Search for supplier by name or CAGE code</div>
+            </div>
+
+            <div id="supplier_pagination" class="mt-3 hidden flex items-center justify-between gap-2">
+                <button type="button" id="supplier_prev_page" class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-800 hover:bg-gray-300 disabled:opacity-50" disabled>Previous</button>
+                <span id="supplier_page_info" class="text-sm text-gray-600">Page 1 of 1</span>
+                <button type="button" id="supplier_next_page" class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-800 hover:bg-gray-300 disabled:opacity-50" disabled>Next</button>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-end border-t pt-3">
+            <button type="button" onclick="closeSupplierModal()" class="btn btn-caution rounded-md px-4 py-2">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>

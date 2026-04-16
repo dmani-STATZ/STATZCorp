@@ -24,7 +24,6 @@ from .views import (
     # CLIN views
     ClinDetailView,
     ClinCreateView,
-    ClinUpdateView,
     ClinAcknowledgmentUpdateView,
     get_clin_notes,
     toggle_clin_acknowledgment,
@@ -233,7 +232,6 @@ urlpatterns = [
         name="contract_clin_create",
     ),
     path("clin/<int:pk>/", ClinDetailView.as_view(), name="clin_detail"),
-    path("clin/<int:pk>/edit/", ClinUpdateView.as_view(), name="clin_update"),
     path("clin/<int:pk>/delete/", clin_delete, name="clin_delete"),
     path(
         "clin/acknowledgment/<int:pk>/edit/",

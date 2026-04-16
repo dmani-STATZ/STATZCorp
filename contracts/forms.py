@@ -467,9 +467,9 @@ class ClinForm(BaseModelForm):
     class Meta:
         model = Clin
         fields = [
-            'contract', 'po_num_ext', 'tab_num', 
-            'clin_po_num', 'po_number', 'supplier', 
-            'nsn', 'ia', 'fob', 'order_qty', 'ship_qty', 
+            'contract', 'po_num_ext', 'tab_num',
+            'clin_po_num', 'po_number', 'supplier',
+            'nsn', 'ia', 'fob', 'order_qty', 'uom', 'ship_qty',
             'due_date', 'supplier_due_date', 'ship_date',
             'special_payment_terms', 'special_payment_terms_paid', 
             'quote_value', 'paid_amount','unit_price', 'price_per_unit',
@@ -512,7 +512,14 @@ class ClinForm(BaseModelForm):
             }),
             'item_value': forms.NumberInput(attrs={
                 'step': '0.01'
-            })
+            }),
+            'order_qty': forms.NumberInput(attrs={
+                'step': 'any'
+            }),
+            'uom': forms.TextInput(attrs={
+                'maxlength': '10',
+                'placeholder': 'EA',
+            }),
         }
         
     def __init__(self, *args, **kwargs):
@@ -520,7 +527,16 @@ class ClinForm(BaseModelForm):
         Initialize the form with querysets for foreign key fields.
         """
         super().__init__(*args, **kwargs)
-        
+
+        if (
+            not kwargs.get('instance')
+            and 'uom' in self.fields
+            and not self.is_bound
+            and not (kwargs.get('initial') or {}).get('uom')
+            and not self.fields['uom'].initial
+        ):
+            self.fields['uom'].initial = 'EA'
+
         # For new forms, initialize with appropriate querysets
         if not kwargs.get('instance'):
             # If we have a contract_id in initial data, pre-select it

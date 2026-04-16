@@ -22,95 +22,23 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
     model = Clin
     template_name = 'contracts/clin_detail.html'
     context_object_name = 'clin'
-    
-    def get_object(self, queryset=None):
-        """
-        Get the CLIN object using the optimized ClinView if available,
-        otherwise fall back to the regular Clin model.
-        """
-        pk = self.kwargs.get(self.pk_url_kwarg)
-        
-        try:
-            # Try to get the data from the optimized view
-            clin_view = Clin.objects.get(pk=pk)
-            
-            # Create a Clin object with the data from ClinView
-            clin = Clin(
-                id=clin_view.id,
-                contract_id=clin_view.contract_id,
-                item_number=clin_view.item_number,
-                item_type=clin_view.item_type,
-                item_value=clin_view.item_value,
-                clin_po_num=clin_view.clin_po_num,
-                po_number=clin_view.po_number,
-                po_num_ext=clin_view.po_num_ext,
-                clin_type_id=clin_view.clin_type_id,
-                supplier_id=clin_view.supplier_id,
-                nsn_id=clin_view.nsn_id,
-                ia=clin_view.ia,
-                fob=clin_view.fob,
-                order_qty=clin_view.order_qty,
-                ship_qty=clin_view.ship_qty,
-                due_date=clin_view.due_date,
-                due_date_late=clin_view.due_date_late,
-                supplier_due_date=clin_view.supplier_due_date,
-                supplier_due_date_late=clin_view.supplier_due_date_late,
-                ship_date=clin_view.ship_date,
-                ship_date_late=clin_view.ship_date_late,
-                special_payment_terms_id=clin_view.special_payment_terms_id,
-                special_payment_terms_paid=clin_view.special_payment_terms_paid,
-                quote_value=clin_view.quote_value,
-                paid_amount=clin_view.paid_amount,
-                unit_price=clin_view.unit_price,
-                price_per_unit=clin_view.price_per_unit,
-                created_by_id=clin_view.created_by_id,
-                created_on=clin_view.created_on,
-                modified_by_id=clin_view.modified_by_id,
-                modified_on=clin_view.modified_on,
-            )
-            
-            # Add additional attributes from the view for convenience
-            clin.contract_number = getattr(clin_view.contract, "contract_number", None)
-            clin.item_type_description = clin_view.item_type
 
-            # Related objects may be null; guard each access.
-            clin.supplier_name = getattr(clin_view.supplier, "name", None)
-            clin.supplier_cage_code = getattr(clin_view.supplier, "cage_code", None)
+    def get_queryset(self):
+        company = self.get_active_company()
+        return Clin.objects.select_related(
+            'contract',
+            'clin_type',
+            'supplier',
+            'nsn',
+            'special_payment_terms',
+            'created_by',
+            'modified_by',
+        ).filter(company=company)
 
-            clin.nsn_code = getattr(clin_view.nsn, "nsn_code", None)
-            clin.nsn_description = getattr(clin_view.nsn, "description", None)
-
-            if getattr(clin_view, "special_payment_terms", None):
-                clin.special_payment_terms_code = clin_view.special_payment_terms.code
-                clin.special_payment_terms_description = clin_view.special_payment_terms.terms
-            else:
-                clin.special_payment_terms_code = None
-                clin.special_payment_terms_description = None
-
-            clin.created_by_username = getattr(clin_view.created_by, "username", None)
-            clin.modified_by_username = getattr(clin_view.modified_by, "username", None)
-            
-            return clin
-            
-        except Clin.DoesNotExist:
-            # Fall back to the regular Clin model with select_related
-            return get_object_or_404(
-                Clin.objects.select_related(
-                    'contract',
-                    'clin_type',
-                    'supplier',
-                    'nsn',
-                    'special_payment_terms',
-                    'created_by',
-                    'modified_by'
-                ).filter(company=self.request.active_company),
-                pk=pk
-            )
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         clin = self.object
-        
+
         # Add notes to context
         clin_type = ContentType.objects.get_for_model(Clin)
         notes = Note.objects.filter(
@@ -118,14 +46,15 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
             object_id=clin.id
         ).order_by('-created_on')
         context['notes'] = notes
-        
+
         # Add acknowledgment data
         try:
             acknowledgment = ClinAcknowledgment.objects.get(clin=clin)
             context['acknowledgment'] = acknowledgment
         except ClinAcknowledgment.DoesNotExist:
             context['acknowledgment'] = None
-        
+
+        context['clin_content_type_id'] = ContentType.objects.get_for_model(Clin).id
         return context
 
 
@@ -234,21 +163,7 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
     def get_success_url(self):
         if self.object.contract_id:
             return reverse('contracts:contract_management', kwargs={'pk': self.object.contract_id})
-        return reverse('contracts:clin_detail', kwargs={'pk': self.object.pk})
-
-
-@method_decorator(conditional_login_required, name='dispatch')
-class ClinUpdateView(UpdateView):
-    model = Clin
-    form_class = ClinForm
-    template_name = 'contracts/clin_form.html'
-    
-    def form_valid(self, form):
-        messages.success(self.request, 'CLIN updated successfully.')
-        return super().form_valid(form)
-    
-    def get_success_url(self):
-        return reverse('contracts:clin_detail', kwargs={'pk': self.object.pk})
+        return reverse('contracts:contracts_dashboard')
 
 
 @method_decorator(conditional_login_required, name='dispatch')

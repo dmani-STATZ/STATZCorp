@@ -15,7 +15,6 @@ from .contract_views import (
 from .clin_views import (
     ClinDetailView,
     ClinCreateView,
-    ClinUpdateView,
     ClinAcknowledgmentUpdateView,
     get_clin_notes,
     toggle_clin_acknowledgment,
