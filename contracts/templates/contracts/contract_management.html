@@ -394,7 +394,7 @@
         </div>
         <div class="grid grid-cols-12 gap-2">
             <!-- CLIN Table - left ~35% -->
-            <div class="col-span-4 overflow-x-auto max-h-[220px] overflow-y-auto border border-gray-200 rounded">
+            <div class="col-span-4 overflow-x-auto overflow-y-auto border border-gray-200 rounded" style="max-height: 220px">
 <p class="px-3 pt-1 text-lg font-bold text-gray-800 uppercase tracking-wider">Contract Line Items</p>
             <div class="min-w-full">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -519,11 +519,11 @@
                 </nav>
             </div>
             <!-- Contract tab content -->
-            <div id="notes-panel-contract" class="notes-panel space-y-2 max-h-[360px] overflow-y-auto">
+            <div id="notes-panel-contract" class="notes-panel space-y-2 overflow-y-auto" style="max-height: 360px">
                 {% include "contracts/partials/notes_list.html" with notes=contract_notes entity_type="contract" show_note_type=False content_type_id=contract_content_type_id object_id=contract.id note_empty_msg="No contract notes" %}
             </div>
             <!-- CLIN tab content (single panel, populated via fetch when a CLIN tab is clicked) -->
-            <div id="notes-panel-clin" class="notes-panel hidden space-y-2 max-h-[360px] overflow-y-auto">
+            <div id="notes-panel-clin" class="notes-panel hidden space-y-2 overflow-y-auto" style="max-height: 360px">
                 {% if selected_clin %}
                 {% include "contracts/partials/notes_list.html" with notes=clin_notes entity_type="clin" show_note_type=False content_type_id=clin_content_type_id object_id=selected_clin.id note_empty_msg="No CLIN notes" %}
                 {% else %}
@@ -555,7 +555,7 @@
                         <span class="ml-1 text-sm">New</span>
                     </button>
                 </div>
-                <div class="overflow-x-auto max-h-[220px] overflow-y-auto">
+                <div class="overflow-x-auto overflow-y-auto" style="max-height: 220px">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>

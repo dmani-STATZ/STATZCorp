@@ -10,7 +10,7 @@
     <!-- Main Content -->
     <main>
         <!-- Default width container that all pages will inherit -->
-        <div class="w-[75%] mx-auto dark:bg-gray-800 dark:text-gray-100">
+        <div class="mx-auto dark:bg-gray-800 dark:text-gray-100" style="width: 75%">
             {% block content %}
                 {% block contract_content %}{% endblock contract_content %}
             {% endblock content %}
@@ -96,7 +96,7 @@
         </div>
         <div class="space-y-4">
             <div class="flex items-center gap-4 flex-wrap">
-                <div class="relative flex-1 min-w-[200px]">
+                <div class="relative flex-1" style="min-width: 200px">
                     <input type="text" id="contract-search-modal-input"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                         placeholder="Search by contract number, last 4 digits, or PO number..."
@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- Reminders Sidebar -->
-<div class="reminderbar bg-white text-gray-800 w-80 h-[calc(100vh-4rem)] fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col dark:bg-gray-900 dark:text-gray-100" id="reminderbar">
+<div class="reminderbar bg-white text-gray-800 w-80 fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col dark:bg-gray-900 dark:text-gray-100" id="reminderbar" style="height: calc(100vh - 4rem)">
     <div class="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0 dark:border-gray-700">
         <div>
             <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">My Reminders</h2>
@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="space-y-3">
                 {% for reminder in reminders %}
                         {% if not reminder.completed %}
-                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800/50{% elif reminder.is_upcoming %}bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800/50{% else %}bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/50{% endif %} shadow-sm cursor-pointer reminder-item"
+                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200 dark:border-red-800/50{% elif reminder.is_upcoming %}bg-green-50 border border-green-200 dark:border-green-800/50{% else %}bg-blue-50 border border-blue-200 dark:border-blue-800/50{% endif %} shadow-sm cursor-pointer reminder-item"
                                  data-reminder-id="{{ reminder.id }}"
                                  data-reminder-title="{{ reminder.title|escapejs }}"
                                  data-reminder-text="{{ reminder.description|escapejs }}"
@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div>
                                         {% if reminder.is_overdue %}
-                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs">Overdue</span>
+                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 dark:text-red-300 text-xs">Overdue</span>
                                         {% elif reminder.is_upcoming %}
                                             <span class="inline-block px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs">Upcoming</span>
                                         {% else %}

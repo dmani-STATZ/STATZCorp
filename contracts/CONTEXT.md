@@ -129,6 +129,19 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - No automated tests exist, so assumptions about GovAction/log, reminders, or payment history have not been regression-tested.
 - Supplier admin CSV/XLSX import uses fuzzy matching, so renaming suppliers can break bulk updates if matching fails.
 
+## Tailwind Compat Patches (CDN / no JIT)
+
+Several contracts templates were adjusted so layout and focus styles work with the project’s Tailwind **CDN** setup and `static/css/tailwind-compat.css` (no arbitrary-value or `file:` JIT output). Patched files and change types:
+
+- `contracts/templates/contracts/contract_base.html` — fixed width/min-width and reminder sidebar height via inline `style`; removed unshimmed `dark:bg-*-900/20` and `dark:bg-red-900/30` from reminder cards.
+- `contracts/templates/contracts/contract_management.html` — `max-h-[…]` replaced with inline `max-height` on scroll regions and notes panels.
+- `contracts/templates/contracts/idiq_contract_detail.html` — notes scroller `max-height` inline; checkbox focus ring via inline `box-shadow` instead of compound `focus:ring*` utilities.
+- `contracts/templates/contracts/modals/nsn_modal.html` — search results `max-height` inline.
+- `contracts/templates/contracts/contacts/contact_list.html` — card header gradient via inline `background` instead of `bg-gradient-to-r` / `from-*` / `to-*`.
+- `contracts/templates/contracts/contract_form.html` — DD1155 file input: `file:*` utilities replaced with `.file-upload-input` + scoped `<style>` using `::file-selector-button`.
+
+Compat CSS was extended where shared utilities were missing: `static/css/tailwind-compat.css` — `.mt-0\.5`, and at `sm` breakpoint `.sm\:p-6`, `.sm\:pb-4`, `.sm\:text-left` (folder tracking search modal).
+
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Respect `request.active_company`. When querying models with a `company` FK, either filter manually or use `ActiveCompanyQuerysetMixin`; otherwise you risk leaking cross-tenant data.
 - Changing contract/CLIN fields requires updates across `contracts/forms.py`, the relevant templates/partials, `contracts/views/contract_views.py`, search APIs, and `contracts/CONTRACTS_APP_CURRENT_STATE.md` so the documented workflow stays accurate.
