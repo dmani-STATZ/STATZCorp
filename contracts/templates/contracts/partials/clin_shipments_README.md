@@ -9,13 +9,13 @@ A reusable Django template component for displaying and managing CLIN shipments 
 - AJAX-based CRUD operations
 - Visual feedback for unsaved changes
 - Show/Hide functionality
-- Responsive design with Tailwind CSS
+- Responsive design with Bootstrap CSS
 - Toast notifications for actions
 
 ## Prerequisites
 
 - Django 3.2+
-- Tailwind CSS
+- Bootstrap CSS
 - CSRF token enabled
 - jQuery (optional, for toast notifications)
 
@@ -147,7 +147,7 @@ async function loadClinShipments(clinId) {
 ## Customization
 
 ### 1. Styling
-The component uses Tailwind CSS classes. Override these classes in your CSS:
+The component uses Bootstrap CSS classes. Override these classes in your CSS:
 
 ```css
 /* Your CSS */
@@ -212,7 +212,7 @@ document.addEventListener('shipmentDeleted', (e) => {
    - Check if totalShipQty element exists
 
 3. **Styling issues:**
-   - Verify Tailwind CSS is properly loaded
+   - Verify Bootstrap CSS is properly loaded
    - Check for CSS conflicts in your main stylesheet
 
 ## Best Practices

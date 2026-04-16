@@ -64,6 +64,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-2 text-left tracking-wider label">Contract Number</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Type</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Buyer</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Award Date</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Due Date</th>
@@ -82,6 +83,7 @@
                         <td></td>
                         <td></td>
                         <td></td>
+                        <td></td>
                         <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
                             <button onclick="showContractNumberPrompt()" class="text-blue-600 hover:text-blue-900 mr-3 btn btn-nav">
                                 Start New Contract
@@ -89,8 +91,31 @@
                         </td>
                     </tr>
                     {% for contract in queued_contracts %}
-                    <tr data-contract-id="{{ contract.id }}">
-                        <td class="px-6 py-2 whitespace-nowrap">{{ contract.contract_number }}</td>
+                    <tr data-contract-id="{{ contract.id }}"
+                        data-contract-type="{{ contract.contract_type|default:'' }}"
+                        data-process-contract-id="">
+                        <td class="px-6 py-2 whitespace-nowrap">{% if contract.contract_number %}{{ contract.contract_number }}{% else %}<span class="text-gray-500">—</span>{% endif %}</td>
+                        <td class="px-6 py-2 whitespace-nowrap">
+                            {% if contract.contract_type == 'IDIQ' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">IDIQ</span>
+                            {% elif contract.contract_type == 'DO' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">DO</span>
+                            {% elif contract.contract_type == 'AWD' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">AWD</span>
+                            {% elif contract.contract_type == 'PO' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-900">PO</span>
+                            {% elif contract.contract_type == 'MOD' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-800">MOD</span>
+                            {% elif contract.contract_type == 'AMD' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-900">AMD</span>
+                            {% elif contract.contract_type == 'INTERNAL' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">INTERNAL</span>
+                            {% elif contract.contract_type %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">{{ contract.contract_type }}</span>
+                            {% else %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">—</span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-2">{{ contract.buyer }}</td>
                         <td class="px-6 py-2 whitespace-nowrap">{{ contract.award_date|date:"Y-m-d" }}</td>
                         <td class="px-6 py-2 whitespace-nowrap">{{ contract.due_date|date:"Y-m-d" }}</td>
@@ -148,13 +173,37 @@
                         </td>
                         <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
                             {% if not contract.is_being_processed %}
-                                <button onclick="startProcessing('{{ contract.id }}')" class="text-indigo-600 hover:text-indigo-900 mr-3 btn btn-nav">
+                                {% if not contract.contract_number %}
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm me-2"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#matchOrphanContractModal"
+                                        data-queue-id="{{ contract.id }}">
+                                    Match Contract
+                                </button>
+                                {% elif contract.contract_type == 'IDIQ' %}
+                                <button onclick="startProcessing('{{ contract.id }}')"
+                                        class="text-purple-600 hover:text-purple-900 mr-3 btn btn-nav">
+                                    Start IDIQ
+                                </button>
+                                {% else %}
+                                <button onclick="startProcessing('{{ contract.id }}')"
+                                        class="text-indigo-600 hover:text-indigo-900 mr-3 btn btn-nav">
                                     Start Processing
                                 </button>
+                                {% endif %}
                             {% elif contract.processed_by == user %}
-                                <button onclick="resumeProcessing('{{ contract.id }}')" class="text-green-600 hover:text-green-900 btn btn-nav">
+                                {% if contract.contract_type == 'IDIQ' %}
+                                <button onclick="resumeProcessing('{{ contract.id }}')"
+                                        class="text-purple-600 hover:text-purple-900 btn btn-nav">
+                                    Resume IDIQ
+                                </button>
+                                {% else %}
+                                <button onclick="resumeProcessing('{{ contract.id }}')"
+                                        class="text-green-600 hover:text-green-900 btn btn-nav">
                                     Resume Processing
                                 </button>
+                                {% endif %}
                             {% endif %}
                             {% if user.is_superuser %}
                                 <button onclick="deleteContract('{{ contract.id }}')" class="text-red-600 hover:text-red-900 btn btn-nav">
@@ -167,7 +216,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="px-3 py-2 text-center text-gray-500">
+                        <td colspan="9" class="px-3 py-2 text-center text-gray-500">
                             No contracts in queue
                         </td>
                     </tr>
@@ -229,7 +278,48 @@
 
     {% include "processing/modals/pdf_parse_notes_modal.html" %}
 
+    <div class="modal fade" id="matchOrphanContractModal" tabindex="-1" aria-labelledby="matchOrphanContractModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="matchContractForm" method="post" action="">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="matchOrphanContractModalLabel">Match Orphaned Contract Data</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label for="matchTargetContractNumber" class="form-label">Enter or Paste Contract Number</label>
+                        <input type="text" class="form-control" name="target_contract_number" id="matchTargetContractNumber" autocomplete="off" required maxlength="25">
+                        <p class="form-text text-muted small mt-2 mb-0">
+                            Merging into an existing contract will overwrite duplicate CLIN data with the PDF results.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Confirm Match</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
+    (function () {
+        const matchModalEl = document.getElementById('matchOrphanContractModal');
+        if (matchModalEl) {
+            matchModalEl.addEventListener('show.bs.modal', function (event) {
+                const trigger = event.relatedTarget;
+                const queueId = trigger && trigger.getAttribute('data-queue-id');
+                const form = document.getElementById('matchContractForm');
+                if (queueId && form) {
+                    form.action = '{% url "processing:match_contract_number" queue_id=987654321 %}'.replace('987654321', queueId);
+                    const input = document.getElementById('matchTargetContractNumber');
+                    if (input) input.value = '';
+                }
+            });
+        }
+    })();
+
     function showModal(message, showProgress = true) {
         document.getElementById('modal-message').textContent = message;
         document.getElementById('modal-error').classList.add('hidden');
@@ -355,7 +445,11 @@
                 updateProgress(100);
                 // Add a small delay to show the completion
                 setTimeout(() => {
-                    window.location.href = `{% url 'processing:process_contract_edit' pk=0 %}`.replace('0', data.process_contract_id);
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        window.location.href = `{% url 'processing:process_contract_edit' pk=0 %}`.replace('0', data.process_contract_id);
+                    }
                 }, 500);
             } else {
                 throw new Error(data.error || 'An error occurred while processing the contract.');
@@ -388,7 +482,11 @@
         })
         .then(data => {
             if (data.success) {
-                window.location.href = `{% url 'processing:process_contract_edit' pk=0 %}`.replace('0', data.process_contract_id);
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    window.location.href = `{% url 'processing:process_contract_edit' pk=0 %}`.replace('0', data.process_contract_id);
+                }
             } else {
                 throw new Error(data.error || 'Could not find processing contract');
             }

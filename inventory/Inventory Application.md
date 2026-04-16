@@ -58,13 +58,13 @@
         *   `/autocomplete/manufacturer/`: `autocomplete_manufacturer`
 
 5.  **Templates (`inventory/templates/inventory/`):**
-    *   `dashboard.html`: Main inventory list view with Tailwind CSS styling
+    *   `dashboard.html`: Main inventory list view with Bootstrap CSS styling
         *   Displays inventory items in a responsive table
         *   Shows total inventory value
         *   Includes add, edit, and delete functionality
         *   Implements AJAX-based deletion with confirmation modal
     *   `item_form.html`: Form for adding/editing items
-        *   Uses Tailwind CSS for styling
+        *   Uses Bootstrap CSS for styling
         *   Implements autocomplete functionality
         *   Proper field labeling and validation
 
@@ -77,7 +77,7 @@
 5.  **Autocomplete:** Type-ahead search functionality for NSN, description, and manufacturer fields to improve data consistency.
 
 The application uses modern web technologies including:
-- Tailwind CSS for responsive styling
+- Bootstrap CSS for responsive styling
 - AJAX for smooth user interactions
 - Autocomplete for improved data entry
 - Conditional login protection for secure access

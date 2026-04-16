@@ -125,7 +125,53 @@ td {
     font-family: var(--main-font);
 }
 
+/* Global reset for 'Label Links' to ensure they look like plain text */
+button.bg-transparent.border-none {
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    appearance: none;
+    -webkit-appearance: none;
+}
 
+/* Ensure hover states remain clean */
+button.bg-transparent.border-none:hover,
+button.bg-transparent.border-none:focus {
+    background-color: transparent !important;
+    border: 0 !important;
+}
+
+/* base.css additions */
+.field-group {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05); /* Subtle divider */
+}
+
+/* Ensure the label button inherits these styles */
+.field-label-btn {
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    font-weight: 700 !important;
+    color: #6b7280 !important; /* text-gray-500 */
+    text-align: left !important;
+    margin-bottom: 1px !important;
+    letter-spacing: 0.025em;
+}
+
+.field-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827; /* text-gray-900 */
+    line-height: 1.2;
+}
+
+/* Remove border from last items in a section if desired */
+.no-border-bottom {
+    border-bottom: none !important;
+}
 
 /**
  * BASE LAYOUT STYLES

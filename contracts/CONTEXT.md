@@ -61,7 +61,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 ## 7. Templates and UI Surface Area
 - Server-rendered templates under `contracts/templates/contracts/`: `contract_management.html` (primary hub), `contract_detail.html`, `contract_form.html`, `clin_detail.html`, `clin_form.html`, `contract_lifecycle_dashboard.html`, `contract_log_view.html`, `folder_tracking.html`, `finance_audit.html`, and modals such as `admin_tools.html`.
 - Shared partials for reusable UI: `contract_menu_items.html`, `cancel_contract_modal.html`, `folderstack_modal.html`, `checkbox_field.html`, `payment_history_popup.html`, `notes_list.html`, `note_modal.html`, `clin_shipments.html`, `contract_splits.html`, `acknowledgment_letter_form.html`.
-- Static assets: JS under `contracts/static/contracts/js/` (CLIN shipments, contract splits, note modal interactions) plus `contracts/static/js/supplier_modal.js`; CSS/JS align with Tailwind-style classes applied in `BaseFormMixin`.
+- Static assets: JS under `contracts/static/contracts/js/` (CLIN shipments, contract splits, note modal interactions) plus `contracts/static/js/supplier_modal.js`; CSS/JS align with Bootstrap-style classes applied in `BaseFormMixin`.
 - Templates rely on HTMX-like endpoints (note modal, payment history) and modals for splits/shipments; dashboards offer CSV exports, charts, and contract search modals.
 
 ## 8. Admin / Staff Functionality

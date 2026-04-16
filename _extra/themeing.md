@@ -10,7 +10,6 @@ You can paste this into Jira, Notion, or a markdown file.
 
 * [x] Back up original CSS files
 * [x] Restore original menu / sidebar behavior CSS
-* [x] Move `{% tailwind_css %}` after custom CSS
 * [x] Ensure `<body>` always has `dark` or `light`
 * [x] Confirm app loads with no visual regressions
 
@@ -82,7 +81,7 @@ Checklist per template:
   * `.bg-*`
   * `.text-*`
   * `.border`
-* [ ] Add a temporary safety flag (e.g. `.tailwind-legacy`)
+* [ ] Add a temporary safety flag 
 * [ ] Verify which overrides are still needed
 * [ ] Stop introducing new Tailwind color classes
 
@@ -108,7 +107,7 @@ This is important. You don’t want to re-explain context every time.
 Use this as the **system / project prompt** in Codex:
 
 ```
-This is a Django app using Tailwind CSS with a semantic CSS layer.
+This is a Django app using Bootstrap CSS with a semantic CSS layer.
 
 Rules:
 - Do NOT modify menus, sidebars, modals, overlays, or settings panels
@@ -119,7 +118,7 @@ Rules:
 - If unsure, leave code unchanged
 
 Goal:
-Reduce Tailwind utility noise by replacing repeated class patterns
+Remove Tailwind utility noise by replacing repeated class patterns
 with semantic classes such as card, label, row, btn, etc.
 ```
 

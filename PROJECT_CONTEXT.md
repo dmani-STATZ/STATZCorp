@@ -24,7 +24,6 @@ Top-level layout (verified from repository tree):
 - Shared UI assets:
   - Global templates: `templates/` (notably `templates/base_template.html`)
   - Static assets: `static/` (plus collected `staticfiles/`)
-  - Tailwind/theme app: `theme_tw/`
 - Ops/support files:
   - `manage.py`, `requirements.txt`, `requirements-dev.txt`, `pytest.ini`
   - Deployment/environment artifacts: `Procfile`, `startup.sh`, `web.config`, `.deployment`

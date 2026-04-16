@@ -151,7 +151,7 @@ grep -r "training:" --include="*.html" --include="*.py" .
 
 ## 10. Forms / Serializers / Input Validation Rules
 
-- `BaseFormMixin._style_fields()` applies Tailwind CSS classes to all form widgets automatically. New form fields inherit styling without extra attrs — only override if a specific widget class is needed.
+- `BaseFormMixin._style_fields()` applies Bootstrap CSS classes to all form widgets automatically. New form fields inherit styling without extra attrs — only override if a specific widget class is needed.
 - `CmmcDocumentUploadForm` is a plain `Form` (not `ModelForm`) — it validates the business rule that a user must have an active `Matrix` entry for the course before accepting the upload. This check must not be moved to the view or frontend only.
 - `TrainingDocForm.save()` handles file-to-binary conversion, filename sanitization, and SHA-256 hashing. Any change to how `TrainingDoc` stores files must keep `save()`, `admin.py` inline, and the admin upload view in sync.
 - There is no serializer layer — this app uses Django forms exclusively.

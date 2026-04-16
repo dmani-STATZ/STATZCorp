@@ -6,11 +6,11 @@
 
 {% block body %}
 
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Main Content -->
     <main>
         <!-- Default width container that all pages will inherit -->
-        <div class="mx-auto" style="width: 95%; max-width: 1500px;">
+        <div class="w-[75%] mx-auto dark:bg-gray-800 dark:text-gray-100">
             {% block content %}
                 {% block contract_content %}{% endblock contract_content %}
             {% endblock content %}
@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- Reminders Sidebar -->
-<div class="reminderbar bg-white inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar">
+<div class="reminderbar bg-white text-gray-800 w-80 h-[calc(100vh-4rem)] fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col dark:bg-gray-900 dark:text-gray-100" id="reminderbar">
     <div class="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0 dark:border-gray-700">
         <div>
             <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">My Reminders</h2>
@@ -609,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endif %}
     </div>
     <div class="border-t border-gray-200 bg-white p-3 text-center flex-shrink-0 dark:bg-gray-900 dark:border-gray-700">
-        <button type="button" onclick="showNewReminderModal()" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm flex items-center justify-center">
+        <button type="button" onclick="showNewReminderModal()" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md w-full text-sm flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>

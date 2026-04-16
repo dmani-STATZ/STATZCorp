@@ -15,9 +15,9 @@
       "Bash(ls theme_tw/static/css/)",
       "Bash(ls theme_tw/static/css/dist/)",
       "Bash(.venv/Scripts/python.exe:*)",
-      "Bash(head -c 0 /c/Users/Dion/Documents/STATZWeb/STATZCorp/users/templates/tailwind/*.html)",
       "Bash(.venv/Scripts/pip install:*)",
-      "Bash(curl -I http://localhost:8000/admin/)"
+      "Bash(curl -I http://localhost:8000/admin/)",
+      "Bash(curl -s http://localhost:8000/processing/contract/10002/edit/ -H \"User-Agent: Mozilla\")"
     ]
   }
 }

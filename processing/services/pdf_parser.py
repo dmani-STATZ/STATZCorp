@@ -21,6 +21,10 @@ import pdfplumber
 from django.db import transaction
 from django.utils import timezone
 
+from processing.services.contract_utils import (
+    detect_contract_type,
+    normalize_nsn as _normalize_nsn_util,
+)
 from processing.models import QueueClin, QueueContract
 
 PdfInput = Union[str, os.PathLike[str], BinaryIO]
@@ -137,9 +141,57 @@ _RE_ACCEPTANCE_POINT = re.compile(
     re.IGNORECASE,
 )
 _RE_DLA_CONTRACT = re.compile(
-    r"\b(SPE[A-Z0-9]{2,3}-\d{2}-[A-Z]-\d{4})\b",
+    r"\b(SPE[A-Z0-9]{2,3}-\d{2}-[A-Z]-[A-Z0-9]{4})\b",
     re.IGNORECASE,
 )
+
+# IDIQ / Indefinite Delivery detection
+# Text-based fallback; the primary gate is the 'D' type-code at position 9 (no hyphens).
+_RE_IDIQ_TEXT_DETECT = re.compile(
+    r"Indefinite\s+Delivery\s+Contract",
+    re.IGNORECASE,
+)
+_RE_IDIQ_MAX_VALUE = re.compile(
+    r"Contract\s+Maximum\s+Value:\s*\$\s*([\d,]+\.?\d*)",
+    re.IGNORECASE,
+)
+_RE_IDIQ_MIN_GUARANTEE = re.compile(
+    r"Guaranteed\s+Contract\s+Minimum\s+Quantity:\s*(\d[\d,]*\.?\d*)",
+    re.IGNORECASE,
+)
+# Captures "<word/number> year(s)|month(s) [period]" — e.g. "one year period", "five year period"
+_RE_IDIQ_TERM = re.compile(
+    r"(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)"
+    r"\s+(year|month)s?(?:\s+period)?",
+    re.IGNORECASE,
+)
+_RE_MIN_ORDER_QTY = re.compile(
+    r"Minimum\s+Delivery\s+Order\s+Quantity[:\s]*([\d]+(?:\.\d+)?\s*[A-Za-z]*)",
+    re.IGNORECASE,
+)
+
+_WORD_TO_NUM = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "eighteen": 18, "twenty-four": 24,
+}
+
+
+def _term_to_months(qty_str: str, unit: str) -> Optional[int]:
+    """
+    Convert a qty+unit pair captured by _RE_IDIQ_TERM into integer months.
+    qty_str: word ("one") or digit string ("5").
+    unit: "year" or "month" (singular form; plural handled by caller's regex).
+    """
+    qty_str = qty_str.strip().lower()
+    unit = unit.strip().lower()
+    try:
+        n = int(qty_str)
+    except ValueError:
+        n = _WORD_TO_NUM.get(qty_str)
+    if n is None:
+        return None
+    return n * 12 if unit.startswith("year") else n
 
 
 @dataclass
@@ -156,6 +208,7 @@ class ClinParseResult:
     fob: Optional[str] = None
     cage: Optional[str] = None
     clin_parse_note: Optional[str] = None
+    min_order_qty_text: Optional[str] = None
 
 
 @dataclass
@@ -173,6 +226,9 @@ class AwardParseResult:
     pdf_parse_notes: str
     ado_days: Optional[int] = None
     clins: List[ClinParseResult] = field(default_factory=list)
+    idiq_max_value: Optional[Decimal] = None
+    idiq_min_guarantee: Optional[Decimal] = None
+    idiq_term_months: Optional[int] = None
 
 
 def _strip_money(value: Optional[str]) -> Optional[str]:
@@ -220,18 +276,8 @@ def _parse_yyyymmmdd_date(raw: Optional[str]) -> Optional[date]:
 
 
 def _normalize_nsn(nsn: Optional[str]) -> Optional[str]:
-    if not nsn:
-        return None
-    s = re.sub(r"\s+", "", str(nsn).strip().upper())
-    if not s:
-        return None
-    # Pass S-codes (DLA service codes like S00000053) through unchanged
-    if re.match(r"^S\d+$", s):
-        return s
-    s = s.replace("-", "")
-    if len(s) == 13 and s.isdigit():
-        return f"{s[:4]}-{s[4:6]}-{s[6:9]}-{s[9:]}"
-    return str(nsn).strip()
+    """Delegates to processing.services.contract_utils.normalize_nsn."""
+    return _normalize_nsn_util(nsn)
 
 
 def _extract_full_text(pdf) -> str:
@@ -1238,6 +1284,27 @@ def _finalize_status_and_notes(
     return status, notes_clean
 
 
+def _extract_min_order_qty_map(text: str, item_numbers: List[str]) -> dict:
+    """
+    For each CLIN item number, scan up to 800 characters after the CLIN marker
+    to find a 'Minimum Delivery Order Quantity' value.  Returns {item_number: "5 EA"}.
+    """
+    result: dict = {}
+    for item in item_numbers:
+        clin_m = re.search(
+            rf"(?:^|\n)\s*{re.escape(item)}\b",
+            text,
+            re.MULTILINE,
+        )
+        if not clin_m:
+            continue
+        chunk = text[clin_m.start() : min(clin_m.start() + 800, len(text))]
+        moq_m = _RE_MIN_ORDER_QTY.search(chunk)
+        if moq_m:
+            result[item] = moq_m.group(1).strip()
+    return result
+
+
 def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
     notes: List[str] = []
     page_one_text = ""
@@ -1282,6 +1349,16 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
         contract_number, idiq_number, contract_type = _apply_contract_number_rules(
             contract_num, delivery_order_num
         )
+        # Derive contract type from position-9 character of the contract number.
+        # This is the authoritative detection path. The text-based IDIQ phrase
+        # detection (_RE_IDIQ_TEXT_DETECT) is kept as a secondary override only for
+        # contracts where the contract number was not extractable or lacks a
+        # mapped type character.
+        derived_type = detect_contract_type(contract_number)
+        if derived_type:
+            contract_type = derived_type
+        elif _RE_IDIQ_TEXT_DETECT.search(text):
+            contract_type = "IDIQ"
         if not contract_number:
             notes.append("Could not extract a DLA contract number from document")
         buyer_text = _extract_buyer(text)
@@ -1304,6 +1381,29 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
                     notes.append(c.clin_parse_note)
         except Exception as exc:
             notes.append(f"CLIN section parse error (partial extraction may be empty): {exc}")
+
+        # Extract IDIQ-specific metadata
+        idiq_max_value: Optional[Decimal] = None
+        idiq_min_guarantee: Optional[Decimal] = None
+        idiq_term_months: Optional[int] = None
+        if contract_type == "IDIQ":
+            m_max = _RE_IDIQ_MAX_VALUE.search(text)
+            if m_max:
+                idiq_max_value = _to_decimal(m_max.group(1))
+            m_min = _RE_IDIQ_MIN_GUARANTEE.search(text)
+            if m_min:
+                idiq_min_guarantee = _to_decimal(m_min.group(1))
+            m_term = _RE_IDIQ_TERM.search(text)
+            if m_term:
+                idiq_term_months = _term_to_months(m_term.group(1), m_term.group(2))
+            # Attach per-CLIN minimum delivery order quantity
+            if clins:
+                moq_map = _extract_min_order_qty_map(
+                    text, [c.item_number for c in clins if c.item_number]
+                )
+                for c in clins:
+                    if c.item_number and c.item_number in moq_map:
+                        c.min_order_qty_text = moq_map[c.item_number]
 
         status, merged_notes = _finalize_status_and_notes(
             notes,
@@ -1329,6 +1429,9 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             pdf_parse_notes=merged_notes,
             ado_days=ado_days,
             clins=clins,
+            idiq_max_value=idiq_max_value,
+            idiq_min_guarantee=idiq_min_guarantee,
+            idiq_term_months=idiq_term_months,
         )
     except Exception as exc:
         return AwardParseResult(
@@ -1404,6 +1507,8 @@ def ingest_parsed_award(
         common_contract = {
             "idiq_number": parse_result.idiq_contract_number,
             "buyer": parse_result.buyer_text,
+            "contractor_name": parse_result.contractor_name,
+            "contractor_cage": parse_result.contractor_cage,
             "award_date": award_dt,
             "contract_value": parse_result.contract_value,
             "contract_type": parse_result.contract_type,
@@ -1451,6 +1556,19 @@ def ingest_parsed_award(
             qc.due_date = dt
             qc.save(update_fields=["due_date"])
 
+        # Pack IDIQ shadow-schema metadata into the description field
+        if parse_result.contract_type == "IDIQ":
+            parts = ["IDIQ_META"]
+            if parse_result.idiq_term_months is not None:
+                parts.append(f"TERM:{parse_result.idiq_term_months}")
+            if parse_result.idiq_max_value is not None:
+                parts.append(f"MAX:{int(parse_result.idiq_max_value)}")
+            if parse_result.idiq_min_guarantee is not None:
+                parts.append(f"MIN:{int(parse_result.idiq_min_guarantee)}")
+            if len(parts) > 1:
+                qc.description = "|".join(parts)
+                qc.save(update_fields=["description"])
+
         for clin in parse_result.clins:
             item_key = (clin.item_number or "").strip()
             if not item_key:
@@ -1469,9 +1587,14 @@ def ingest_parsed_award(
                 .first()
             )
 
+            # For IDIQ CLINs, nsn_description carries the minimum delivery order qty
+            nsn_desc = clin.nsn_description
+            if parse_result.contract_type == "IDIQ" and clin.min_order_qty_text:
+                nsn_desc = clin.min_order_qty_text
+
             clin_kwargs = {
                 "nsn": clin.nsn,
-                "nsn_description": clin.nsn_description,
+                "nsn_description": nsn_desc,
                 "order_qty": float(clin.order_qty) if clin.order_qty is not None else None,
                 "uom": clin.uom,
                 "unit_price": clin.unit_price,

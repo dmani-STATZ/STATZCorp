@@ -2,7 +2,7 @@
 
 #### Purpose
 
-This project uses Tailwind CSS **with a semantic abstraction layer**.
+This project uses Bootstrap CSS **with a semantic abstraction layer**.
 Codex must follow these rules when modifying templates or CSS.
 
 ---
@@ -12,13 +12,13 @@ unless explicitly instructed.
 ---
 The Contracts app has completed semantic normalization.
 Codex must preserve existing semantic classes in contracts/*
-and must not reintroduce Tailwind utility stacks
+and must not reintroduce Bootstrap utility stacks
 for card, row, row-between, or label patterns.
 ---
 
 ### 1. Semantic classes are preferred
 
-When encountering repeated Tailwind utility patterns, prefer these semantic classes:
+When encountering repeated Bootstrap utility patterns, prefer these semantic classes:
 
 * `card`
 * `card-padded`
@@ -28,7 +28,7 @@ When encountering repeated Tailwind utility patterns, prefer these semantic clas
 * `btn`
 * `btn-primary`
 
-Semantic classes may coexist with Tailwind utilities.
+Semantic classes may coexist with Bootstrap utilities.
 
 ---
 

@@ -113,7 +113,7 @@ So there is a mix of full-page forms, modals, and API-driven updates; no single 
 - **Forms**: `contracts/forms.py` — ContractForm, ClinForm, NoteForm, ReminderForm, and others; BaseFormMixin for styling.
 - **URLs**: `contracts/urls.py` — Many named routes for dashboard, CRUD, APIs, reminders, notes, folder tracking, IDIQ, companies, code tables.
 - **Templates**: `contracts/templates/contracts/` — contract_management.html (main hub), contract_detail, contract_form, clin_detail, clin_form, partials (notes_list, note_modal, clin_shipments, contract_splits, payment_history_popup), includes (modals, menu items), and feature-specific templates.
-- **Frontend**: TailwindCSS; AJAX for notes, payment history, toggles, and some dropdowns; modals for notes and payment history.
+- **Frontend**: Bootstrap; AJAX for notes, payment history, toggles, and some dropdowns; modals for notes and payment history.
 
 ---
 

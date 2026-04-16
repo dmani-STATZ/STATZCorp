@@ -6,8 +6,9 @@ from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
 from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ProcessContractSplit
 from processing.services.pdf_parser import parse_award_pdf, ingest_parsed_award
+from processing.services.contract_utils import detect_contract_type
 from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
-from contracts.models import Contract, Clin, Buyer, IdiqContract, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
+from contracts.models import Contract, Clin, Buyer, IdiqContract, IdiqContractDetails, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
 from products.models import Nsn
 from suppliers.models import Supplier
 import csv
@@ -191,6 +192,7 @@ def start_processing(request, queue_id):
             tab_num=new_tab_number,
             status='in_progress',
             queue_id=queue_id,
+            description=queue_item.description,
             files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number,
             created_by=request.user,
             modified_by=request.user
@@ -234,7 +236,17 @@ def start_processing(request, queue_id):
         queue_item.processed_by = request.user
         queue_item.processing_started = timezone.now()
         queue_item.save()
-        
+
+        # Route IDIQ contracts to their dedicated processing page
+        if queue_item.contract_type == 'IDIQ':
+            redirect_url = reverse('processing:idiq_processing_edit', args=[process_contract.id])
+            return JsonResponse({
+                'success': True,
+                'process_contract_id': process_contract.id,
+                'redirect_url': redirect_url,
+                'message': 'IDIQ contract processing started successfully'
+            })
+
         return JsonResponse({
             'success': True,
             'process_contract_id': process_contract.id,
@@ -412,94 +424,153 @@ def match_buyer(request, process_contract_id):
 
 @login_required
 def match_nsn(request, process_clin_id):
-    """Match an NSN based on ID"""
+    """Match an NSN by ID, search NSNs (GET), or create a new NSN and link (POST)."""
+    if request.method == 'GET':
+        action = request.GET.get('action')
+        if action == 'search':
+            q = request.GET.get('q', '').strip()
+            if len(q) < 3:
+                return JsonResponse({'results': []})
+            results = Nsn.objects.filter(
+                models.Q(nsn_code__icontains=q) | models.Q(description__icontains=q)
+            )[:20]
+            return JsonResponse({
+                'results': [
+                    {'id': n.id, 'nsn_code': n.nsn_code, 'nsn': n.nsn_code, 'description': n.description or ''}
+                    for n in results
+                ]
+            })
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
-    
+
     try:
         data = json.loads(request.body)
-        nsn_id = data.get('id')
-        
+        action = data.get('action')
+
+        if action == 'create':
+            nsn_code = (data.get('nsn_code') or '').strip()
+            description = (data.get('description') or '').strip()
+            if not nsn_code:
+                return JsonResponse({'success': False, 'error': 'NSN code required'}, status=400)
+            nsn = Nsn.objects.create(
+                nsn_code=nsn_code,
+                description=description,
+                created_by=request.user,
+                modified_by=request.user,
+            )
+            process_clin = ProcessClin.objects.get(id=process_clin_id)
+            process_clin.nsn = nsn
+            process_clin.nsn_text = nsn.nsn_code
+            process_clin.nsn_description_text = (nsn.description or '')[:255]
+            process_clin.save()
+            return JsonResponse({'success': True, 'nsn_id': nsn.id, 'nsn_code': nsn.nsn_code})
+
+        nsn_id = data.get('id') or data.get('nsn_id')
         if not nsn_id:
             return JsonResponse({'error': 'No NSN ID provided'}, status=400)
-        
+
         process_clin = ProcessClin.objects.get(id=process_clin_id)
         nsn = Nsn.objects.get(id=nsn_id)
-        
-        # Update all NSN fields using the correct field names
         process_clin.nsn = nsn
         process_clin.nsn_text = nsn.nsn_code
-        process_clin.nsn_description_text = nsn.description
+        process_clin.nsn_description_text = (nsn.description or '')[:255]
         process_clin.save()
-        
+
         return JsonResponse({
             'success': True,
             'nsn_id': nsn.id,
             'nsn_number': nsn.nsn_code,
-            'nsn_description': nsn.description
+            'nsn_description': nsn.description,
         })
     except ProcessClin.DoesNotExist:
-        return JsonResponse({
-            'error': 'Process CLIN not found'
-        }, status=404)
+        return JsonResponse({'error': 'Process CLIN not found'}, status=404)
     except Nsn.DoesNotExist:
-        return JsonResponse({
-            'error': 'NSN not found'
-        }, status=404)
+        return JsonResponse({'error': 'NSN not found'}, status=404)
     except json.JSONDecodeError:
-        return JsonResponse({
-            'error': 'Invalid JSON data'
-        }, status=400)
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
         import traceback
         print("Unexpected error:", str(e))
         print("Traceback:", traceback.format_exc())
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @login_required
 def match_supplier(request, process_clin_id):
-    """Match a supplier based on ID"""
+    """Match a supplier by ID, search suppliers (GET), or create and link (POST)."""
+    if request.method == 'GET':
+        action = request.GET.get('action')
+        if action == 'search':
+            q = request.GET.get('q', '').strip()
+            if len(q) < 3:
+                return JsonResponse({'results': []})
+            results = Supplier.objects.filter(
+                models.Q(name__icontains=q) | models.Q(cage_code__icontains=q)
+            )[:20]
+            return JsonResponse({
+                'results': [
+                    {
+                        'id': s.id,
+                        'name': s.name,
+                        'cage': s.cage_code,
+                        'cage_code': s.cage_code,
+                    }
+                    for s in results
+                ]
+            })
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
-    
+
     try:
         data = json.loads(request.body)
-        supplier_id = data.get('supplier_id')
-        
+        action = data.get('action')
+
+        if action == 'create':
+            name = (data.get('name') or '').strip()
+            cage_code = (data.get('cage_code') or data.get('cage') or '').strip()
+            if not name:
+                return JsonResponse({'success': False, 'error': 'Supplier name required'}, status=400)
+            if not cage_code:
+                return JsonResponse({'success': False, 'error': 'CAGE code required'}, status=400)
+            supplier = Supplier.objects.create(
+                name=name,
+                cage_code=cage_code,
+                created_by=request.user,
+                modified_by=request.user,
+            )
+            process_clin = ProcessClin.objects.get(id=process_clin_id)
+            process_clin.supplier = supplier
+            process_clin.supplier_text = supplier.name
+            process_clin.save()
+            return JsonResponse({'success': True, 'supplier_id': supplier.id, 'supplier_name': supplier.name})
+
+        supplier_id = data.get('supplier_id') or data.get('id')
         if not supplier_id:
             return JsonResponse({'error': 'No supplier ID provided'}, status=400)
-        
+
         process_clin = ProcessClin.objects.get(id=process_clin_id)
         supplier = Supplier.objects.get(id=supplier_id)
-        
-        # Update all supplier fields
         process_clin.supplier = supplier
         process_clin.supplier_text = supplier.name
         process_clin.save()
-        
+
         return JsonResponse({
             'success': True,
             'supplier_id': supplier.id,
-            'supplier_name': supplier.name
+            'supplier_name': supplier.name,
         })
     except ProcessClin.DoesNotExist:
-        return JsonResponse({
-            'error': 'Process CLIN not found'
-        }, status=404)
+        return JsonResponse({'error': 'Process CLIN not found'}, status=404)
     except Supplier.DoesNotExist:
-        return JsonResponse({
-            'error': 'Supplier not found'
-        }, status=404)
+        return JsonResponse({'error': 'Supplier not found'}, status=404)
     except json.JSONDecodeError:
-        return JsonResponse({
-            'error': 'Invalid JSON data'
-        }, status=400)
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @transaction.atomic
@@ -671,27 +742,32 @@ def match_idiq(request, process_contract_id):
         }, status=500)
 
 
+@login_required
 def get_process_contract(request, queue_id):
-    """Get the process contract ID for a queue item to resume processing"""
+    """Get the process contract ID for a queue item to resume processing."""
     try:
-        queue_item = get_object_or_404(QueueContract, id=queue_id)
-        process_contract = ProcessContract.objects.filter(queue_id=queue_id).first()
-        
-        if process_contract:
-            return JsonResponse({
-                'success': True,
-                'process_contract_id': process_contract.id
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': 'No processing contract found for this queue item'
-            })
+        process_contract = ProcessContract.objects.get(queue_id=queue_id)
+        queue_contract = QueueContract.objects.filter(id=queue_id).first()
+
+        response_data = {
+            'success': True,
+            'process_contract_id': process_contract.id,
+        }
+
+        if queue_contract and queue_contract.contract_type == 'IDIQ':
+            response_data['redirect_url'] = reverse(
+                'processing:idiq_processing_edit',
+                args=[process_contract.id]
+            )
+
+        return JsonResponse(response_data)
+    except ProcessContract.DoesNotExist:
+        return JsonResponse(
+            {'success': False, 'error': 'No processing contract found'},
+            status=404,
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 @require_POST
@@ -1364,6 +1440,7 @@ class ContractQueueListView(ListView):
                 context['first_contract_debug'] = {
                     'id': first_contract.id,
                     'contract_number': first_contract.contract_number,
+                    'contract_type': first_contract.contract_type,
                     'clins': first_contract.clins.count(),
                     'created_on': first_contract.created_on
                 }
@@ -1992,13 +2069,14 @@ def upload_csv(request):
                         
                         # Create contract
                         try:
+                            csv_type = (row.get('Contract Type') or '').strip()
                             current_contract = QueueContract.objects.create(
                                 contract_number=contract_number,
                                 buyer=row['Buyer'],
                                 award_date=award_date,
                                 due_date=due_date,
                                 contract_value=contract_value,
-                                contract_type=row['Contract Type'],
+                                contract_type=detect_contract_type(contract_number) or csv_type or None,
                                 solicitation_type=row['Solicitation Type'],
                                 created_by=request.user,
                                 modified_by=request.user
@@ -2120,6 +2198,170 @@ def validate_contract_number(request, contract_number):
             'traceback': tb
         })
 
+def _queue_clin_item_key(item_number):
+    """Normalize CLIN line number for collision checks between queue rows."""
+    if item_number is None:
+        return ''
+    return str(item_number).strip()
+
+
+def _orphan_char_wins(value):
+    """True if orphan should overwrite a string field (non-null and non-blank)."""
+    if value is None:
+        return False
+    return str(value).strip() != ''
+
+
+def _coalesce_queue_contract_header_from_orphan(orphan, target, user):
+    """Orphan wins per field: set target from orphan only when orphan has a value."""
+    for fname in (
+        'buyer',
+        'contract_type',
+        'idiq_number',
+        'contractor_name',
+        'contractor_cage',
+    ):
+        v = getattr(orphan, fname, None)
+        if _orphan_char_wins(v):
+            setattr(target, fname, v)
+    if orphan.award_date is not None:
+        target.award_date = orphan.award_date
+    if orphan.due_date is not None:
+        target.due_date = orphan.due_date
+    if orphan.contract_value is not None:
+        target.contract_value = orphan.contract_value
+    target.modified_by = user
+
+
+def _merged_pdf_parse_notes_for_queue_contract(target_notes, orphan_notes):
+    """Preserve both sides' notes and append merge audit line."""
+    parts = []
+    if (target_notes or '').strip():
+        parts.append(str(target_notes).strip())
+    if (orphan_notes or '').strip():
+        parts.append(str(orphan_notes).strip())
+    parts.append('Data merged from orphaned PDF record.')
+    return '\n\n'.join(parts)
+
+
+def _copy_queue_clin_payload(source, target, user):
+    """Copy data fields from orphan QueueClin onto target (orphan wins). Does not change PK or item_number."""
+    field_names = [
+        'item_type', 'nsn', 'nsn_description', 'ia', 'fob', 'due_date',
+        'order_qty', 'item_value', 'unit_price', 'uom',
+        'supplier', 'supplier_due_date', 'supplier_unit_price', 'supplier_price',
+        'supplier_payment_terms', 'matched_nsn', 'matched_supplier',
+    ]
+    for name in field_names:
+        setattr(target, name, getattr(source, name))
+    target.modified_by = user
+    target.save()
+
+
+@login_required
+@require_POST
+def match_contract_number(request, queue_id):
+    """Attach orphaned queue rows (no contract_number) to an existing queue contract or set the number.
+
+    Uses select_for_update on the orphan and, when merging, the target row to avoid double-merge races.
+    """
+    target_raw = (request.POST.get('target_contract_number') or '').strip()
+    if not target_raw:
+        messages.error(request, 'Please enter a contract number.')
+        return redirect('processing:queue')
+
+    with transaction.atomic():
+        orphan = (
+            QueueContract.objects.select_for_update()
+            .filter(pk=queue_id)
+            .first()
+        )
+        if not orphan:
+            messages.error(request, 'Queue item not found.')
+            return redirect('processing:queue')
+
+        if orphan.contract_number is not None:
+            messages.error(
+                request,
+                'This queue item already has a contract number; match is only for orphaned rows.',
+            )
+            return redirect('processing:queue')
+
+        if orphan.is_being_processed:
+            messages.error(
+                request,
+                'Cannot match while this item is being processed. Cancel or finish processing first.',
+            )
+            return redirect('processing:queue')
+
+        if ProcessContract.objects.filter(queue_id=queue_id).exists():
+            messages.error(
+                request,
+                'A processing session exists for this queue item; cancel it before matching.',
+            )
+            return redirect('processing:queue')
+
+        existing = (
+            QueueContract.objects.select_for_update()
+            .filter(
+                company_id=orphan.company_id,
+                contract_number=target_raw,
+            )
+            .exclude(pk=orphan.pk)
+            .first()
+        )
+
+        if existing:
+            orphan_clins = list(orphan.clins.select_for_update().all())
+            target_clins = list(existing.clins.select_for_update().all())
+            by_item_key = {}
+            for tc in target_clins:
+                k = _queue_clin_item_key(tc.item_number)
+                if k not in by_item_key:
+                    by_item_key[k] = []
+                by_item_key[k].append(tc)
+
+            for o_clin in orphan_clins:
+                key = _queue_clin_item_key(o_clin.item_number)
+                bucket = by_item_key.get(key) if key else None
+                if bucket:
+                    t_clin = bucket.pop(0)
+                    _copy_queue_clin_payload(o_clin, t_clin, request.user)
+                    o_clin.delete()
+                else:
+                    o_clin.contract_queue = existing
+                    o_clin.company_id = existing.company_id
+                    o_clin.modified_by = request.user
+                    o_clin.save()
+
+            _coalesce_queue_contract_header_from_orphan(orphan, existing, request.user)
+            existing.pdf_parse_status = 'success'
+            existing.pdf_parsed_at = orphan.pdf_parsed_at
+            existing.pdf_parse_notes = _merged_pdf_parse_notes_for_queue_contract(
+                existing.pdf_parse_notes,
+                orphan.pdf_parse_notes,
+            )
+            existing.save()
+
+            orphan.delete()
+            messages.success(
+                request,
+                f'Merged orphaned PDF data into queue contract {target_raw}.',
+            )
+        else:
+            orphan.contract_number = target_raw
+            orphan.pdf_parse_status = 'success'
+            orphan.pdf_parse_notes = None
+            orphan.modified_by = request.user
+            orphan.save()
+            messages.success(
+                request,
+                f'Contract number set to {target_raw}.',
+            )
+
+    return redirect('processing:queue')
+
+
 @login_required
 @require_POST
 def delete_queue_contract(request, queue_id):
@@ -2166,3 +2408,120 @@ def delete_queue_contract(request, queue_id):
             'error': str(e)
         }, status=500)
 
+
+# ---------------------------------------------------------------------------
+# IDIQ Processing views
+# ---------------------------------------------------------------------------
+
+def _unpack_idiq_meta(description: str) -> dict:
+    """Unpack IDIQ_META shadow-schema string from ProcessContract.description."""
+    result = {'term_months': None, 'max_value': None, 'min_guarantee': None}
+    if not description or not description.startswith('IDIQ_META'):
+        return result
+    for part in description.split('|')[1:]:
+        if part.startswith('TERM:'):
+            try:
+                result['term_months'] = int(part[5:])
+            except ValueError:
+                pass
+        elif part.startswith('MAX:'):
+            try:
+                result['max_value'] = Decimal(part[4:])
+            except InvalidOperation:
+                pass
+        elif part.startswith('MIN:'):
+            try:
+                result['min_guarantee'] = Decimal(part[4:])
+            except InvalidOperation:
+                pass
+    return result
+
+
+@login_required
+def idiq_processing_edit(request, process_contract_id):
+    """IDIQ contract processing and editing page."""
+    process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+    meta = _unpack_idiq_meta(process_contract.description or '')
+    term_months = meta['term_months']
+    clins = process_contract.clins.all().order_by('item_number')
+    context = {
+        'process_contract': process_contract,
+        'clins': clins,
+        'idiq_term_months': term_months,
+        'idiq_term_years': (term_months / 12) if term_months else None,
+        'idiq_max_value': meta['max_value'],
+        'idiq_min_guarantee': meta['min_guarantee'],
+    }
+    return render(request, 'processing/idiq_processing_edit.html', context)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def finalize_idiq_contract(request, process_contract_id):
+    """Create IdiqContract + IdiqContractDetails from a matched IDIQ ProcessContract."""
+    try:
+        process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+        clins = list(process_contract.clins.all())
+
+        # Validate each CLIN is fully matched
+        for pc in clins:
+            if not pc.nsn:
+                return JsonResponse({'success': False, 'error': f'NSN must be matched for CLIN {pc.item_number}'})
+            if not pc.supplier:
+                return JsonResponse({'success': False, 'error': f'Supplier must be matched for CLIN {pc.item_number}'})
+
+        # Read header values from POST
+        try:
+            term_months = int(request.POST.get('term_months') or 0) or None
+        except (ValueError, TypeError):
+            term_months = None
+
+        try:
+            max_value = Decimal(request.POST.get('max_value', ''))
+        except InvalidOperation:
+            max_value = None
+
+        try:
+            min_guarantee = Decimal(request.POST.get('min_guarantee', ''))
+        except InvalidOperation:
+            min_guarantee = None
+
+        # Create the canonical IdiqContract record
+        idiq_contract = IdiqContract.objects.create(
+            contract_number=process_contract.contract_number,
+            buyer=process_contract.buyer,
+            award_date=process_contract.award_date,
+            term_length=term_months,
+            max_value=max_value,
+            min_guarantee=min_guarantee,
+            closed=False,
+            created_by=request.user,
+            modified_by=request.user,
+        )
+
+        # Create one IdiqContractDetails row per CLIN
+        for pc in clins:
+            min_order_qty = (request.POST.get(f'min_order_qty_{pc.id}') or '').strip() or None
+            IdiqContractDetails.objects.create(
+                idiq_contract=idiq_contract,
+                nsn=pc.nsn,
+                supplier=pc.supplier,
+                min_order_qty=min_order_qty,
+            )
+
+        # Cleanup: delete processing + queue records
+        queue_id = process_contract.queue_id
+        process_contract.delete()
+        if queue_id:
+            QueueContract.objects.filter(id=queue_id).delete()
+
+        return JsonResponse({
+            'success': True,
+            'idiq_contract_id': idiq_contract.id,
+            'message': 'IDIQ contract finalized successfully',
+        })
+
+    except Exception as e:
+        logger.exception("Error finalizing IDIQ contract %s", process_contract_id)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

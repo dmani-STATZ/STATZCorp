@@ -28,7 +28,10 @@ from .views.processing_views import (
     upload_award_pdf,
     initiate_processing,
     delete_queue_contract,
-    save_contract
+    match_contract_number,
+    save_contract,
+    idiq_processing_edit,
+    finalize_idiq_contract,
 )
 from .views.api_views import (
     get_processing_contract,
@@ -48,6 +51,7 @@ urlpatterns = [
     # Queue Management
     path('queue/', ContractQueueListView.as_view(), name='queue'),
     path('queue/delete/<int:queue_id>/', delete_queue_contract, name='delete_queue_contract'),
+    path('queue/match/<int:queue_id>/', match_contract_number, name='match_contract_number'),
     path('start-new-contract/', start_new_contract, name='start_new_contract'),
     path('next-numbers/', get_next_numbers, name='get_next_numbers'),
     path('queue/cancel/<int:queue_id>/', cancel_process_contract, name='queue_cancel_processing'),
@@ -94,5 +98,9 @@ urlpatterns = [
 
     path('process-contract/<int:process_contract_id>/cancel/', cancel_process_contract, name='cancel_processing'),
     path('process-contract/<int:process_contract_id>/mark-ready/', mark_ready_for_review, name='mark_ready_for_review'),
+
+    # IDIQ Processing
+    path('idiq/<int:process_contract_id>/edit/', idiq_processing_edit, name='idiq_processing_edit'),
+    path('idiq/<int:process_contract_id>/finalize/', finalize_idiq_contract, name='finalize_idiq_contract'),
 
 ] 

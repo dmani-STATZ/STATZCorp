@@ -61,7 +61,7 @@ The `training` app is the compliance training hub inside STATZCorp, pairing acco
 - Staff pathways also include the dashboard admin action buttons (visible when `request.user.is_superuser`).
 
 ## 9. Forms, Validation, and Input Handling
-- `BaseFormMixin` applies consistent Tailwind-esque classes (`form-input`, `form-select`, etc.) and auto-placeholder text to every field.
+- `BaseFormMixin` applies consistent Bootstrap-esque classes (`form-input`, `form-select`, etc.) and auto-placeholder text to every field.
 - Model forms (`CourseForm`, `AccountForm`, `MatrixForm`, `ArcticWolfCourseForm`) expose the expected fields to admin UIs; `MatrixForm` is used in admin registration.
 - `MatrixManagementForm` wraps the account selector used in the matrix page and disallows empty selection.
 - `CmmcDocumentUploadForm` lets staff upload supporting docs only when the chosen user has an active `Matrix` entry for the chosen course; its `clean` raises `ValidationError` for invalid combos, and it limits course dropdowns via `UserAccount` lookup.

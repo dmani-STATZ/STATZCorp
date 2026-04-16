@@ -7,7 +7,7 @@
 4. [Common Modal Patterns](#common-modal-patterns)
 5. [State Management](#state-management)
 6. [Security Considerations](#security-considerations)
-7. [TailwindCSS Integration](#tailwindcss-integration)
+7. [Bootstrap Integration](#Bootstrap-integration)
 8. [Error Handling Best Practices](#error-handling-best-practices)
 9. [Testing Strategy](#testing-strategy)
 10. [Performance Considerations](#performance-considerations)
@@ -445,11 +445,11 @@ def secure_modal_endpoint(request):
         return JsonResponse({'error': str(e)}, status=500)
 ```
 
-## TailwindCSS Integration
+## Bootstrap Integration
 
 ### Modal Base Styles
 ```html
-<!-- Base modal structure with Tailwind classes -->
+<!-- Base modal structure with Bootstrap classes -->
 <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" 
      id="{{ modal_id }}">
     <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">

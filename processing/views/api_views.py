@@ -165,7 +165,7 @@ def update_processing_clin(request, id, clin_id):
         })
 
 @login_required
-@require_http_methods(["DELETE"])
+@require_http_methods(["DELETE", "POST"])
 def delete_processing_clin(request, id, clin_id):
     """Delete a CLIN from a processing contract"""
     try:

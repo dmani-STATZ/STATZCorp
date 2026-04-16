@@ -13,6 +13,8 @@ from django.utils import timezone
 
 from sales.models import AwardImportBatch, DibbsAward, WeWonAward, CompanyCAGE
 
+from processing.services.contract_utils import detect_contract_type
+
 logger = logging.getLogger(__name__)
 
 _LOG_PREFIX = "[queue_we_won_awards]"
@@ -189,6 +191,7 @@ def _process_one_award(
         qc = QueueContract.objects.create(
             company=cage_row.company,
             contract_number=contract_number,
+            contract_type=detect_contract_type(contract_number),
             idiq_number=idiq_number,
             award_date=award_dt,
             contract_value=award.total_contract_price,

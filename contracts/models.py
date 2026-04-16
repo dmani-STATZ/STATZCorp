@@ -415,6 +415,8 @@ class IdiqContract(AuditModel):
     option_length = models.IntegerField(null=True, blank=True)
     closed = models.BooleanField(null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
+    max_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    min_guarantee = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='idiq_contract')
 
     class Meta:
@@ -437,6 +439,7 @@ class IdiqContractDetails(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
     nsn = models.ForeignKey(Nsn, on_delete=models.CASCADE)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
+    min_order_qty = models.CharField(max_length=50, null=True, blank=True)
 
     class Meta:
         indexes = [

@@ -39,14 +39,14 @@
    * Comprehensive audit trails for both training types
    * Automated tracking of completion dates and frequencies
    * Staff-only administrative functions
-   * Modern UI with Tailwind CSS styling
+   * Modern UI with Bootstrap CSS styling
 
 4. **Technical Implementation:**
    * Built on Django's MVT architecture
    * Uses Django's built-in authentication system
    * Implements form styling rules for consistent UI
    * AJAX for smooth user interactions
-   * Responsive design using Tailwind CSS
+   * Responsive design using Bootstrap CSS
    * Secure document storage and retrieval
    * URL-based completion tracking for Arctic Wolf training
 
@@ -123,7 +123,7 @@ The application successfully implements all planned features from the initial wr
 
 
 The application uses modern web technologies including:
-- Tailwind CSS for responsive styling
+- Bootstrap CSS for responsive styling
 - AJAX for smooth user interactions
 - Autocomplete for improved data entry
 - Conditional login protection for secure access
@@ -159,7 +159,7 @@ Here's an overview of how we can approach this:
     x Design templates, extending `base_template.html` and using a `training_base.html` for the training app's specific layout.
 
 5.  **Additional Features:**
-    * Integrate Tailwind CSS for styling.
+    * Integrate Bootstrap CSS for styling.
     * Implement AJAX for interactive elements.
     * Incorporate autocomplete for forms.
     * Set up conditional login protection.

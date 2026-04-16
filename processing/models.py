@@ -24,6 +24,8 @@ class QueueContract(AuditModel):
         ),
     )
     buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
+    contractor_name = models.CharField(max_length=255, null=True, blank=True)
+    contractor_cage = models.CharField(max_length=20, null=True, blank=True)
     award_date = models.DateTimeField(null=True, blank=True)
     due_date = models.DateTimeField(null=True, blank=True)
     contract_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
@@ -54,7 +56,16 @@ class QueueContract(AuditModel):
         null=True,
         blank=True
     )
-    
+
+    description = models.TextField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Shadow-schema metadata for special contract types. "
+            "IDIQ format: IDIQ_META|TERM:<months>|MAX:<value>|MIN:<value>"
+        ),
+    )
+
     # Matched references (after processing)
     matched_buyer = models.ForeignKey(Buyer, on_delete=models.SET_NULL, null=True, blank=True)
     matched_contract_type = models.ForeignKey(ContractType, on_delete=models.SET_NULL, null=True, blank=True)

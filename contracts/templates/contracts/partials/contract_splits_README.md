@@ -9,14 +9,14 @@ A reusable Django template component for displaying and managing contract splits
 - AJAX-based CRUD operations
 - Visual feedback for unsaved changes
 - Show/Hide functionality
-- Responsive design with Tailwind CSS
+- Responsive design with Bootstrap CSS
 - Automatic validation against plan_gross
 - Toast notifications for actions
 
 ## Prerequisites
 
 - Django 3.2+
-- Tailwind CSS
+- Bootstrap CSS
 - CSRF token enabled
 - jQuery (optional, for toast notifications)
 
@@ -148,7 +148,7 @@ async function loadContractSplits(contractId) {
 ## Customization
 
 ### 1. Styling
-The component uses Tailwind CSS classes. Override these classes in your CSS:
+The component uses Bootstrap CSS classes. Override these classes in your CSS:
 
 ```css
 /* Your CSS */
@@ -213,7 +213,7 @@ document.addEventListener('splitDeleted', (e) => {
    - Check if totalSplitValue/totalSplitPaid elements exist
 
 3. **Styling issues:**
-   - Verify Tailwind CSS is properly loaded
+   - Verify Bootstrap CSS is properly loaded
    - Check for CSS conflicts in your main stylesheet
 
 ## Best Practices

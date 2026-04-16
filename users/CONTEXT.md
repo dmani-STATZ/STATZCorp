@@ -5,7 +5,8 @@ The users app owns all authentication, fine-grained application access control, 
 
 ## 2. App Identity
 - Django app name: users. The project installs it as users (see STATZWeb/settings.py).
-- AppConfig: UsersConfig in users/apps.py registers users.signals in eady(), ensuring default settings/states are created on user creation.
+- AppConfig: UsersConfig in users/apps.py registers users.signals in 
+eady(), ensuring default settings/states are created on user creation.
 - Filesystem path: <repo root>/users/.
 - Role: A feature-level identity + workspace hub. It combines authentication/authorization (login views, Azure backend, AppRegistry), portal/dashboard APIs, and user experience helpers (settings, system messages, company switching) that support both end users and staff.
 
@@ -26,7 +27,8 @@ The users app owns all authentication, fine-grained application access control, 
 - zure_auth.py: A Microsoft backend that talks to MSAL/Graph, creates users if allowed, stores/refreshes UserOAuthToken, and exposes get_valid_microsoft_token for other code that needs API access.
 - ms_views.py: HTTP flows that build the MSAL authorization URL, manage callback state, log users in, set session flags, and redirect back to the PWA.
 - context_processors.py: Supplies user_preferences (from UserSettings), cache_version, OpenRouter AI model defaults (suppliers.openrouter_config), unread_messages_count, and ctive_company/available_companies using contracts.Company and UserCompanyMembership.
-- middleware.py: ActiveCompanyMiddleware keeps equest.active_company in sync with the session, user setting, or default contract company.
+- middleware.py: ActiveCompanyMiddleware keeps 
+equest.active_company in sync with the session, user setting, or default contract company.
 - user_settings.py: Central helper with get_setting, save_setting, and mass operations, ensuring typed conversions between UserSettingState rows and forms.
 - signals.py: Adds default setting states for newly created User objects; the prior AppPermission creation signal is commented out.
 - sql_fix.py: Contains a SQL Server-friendly script to create the users_appregistry table manually and populate it with AppRegistry.register_apps_from_system().
@@ -38,7 +40,8 @@ The users app owns all authentication, fine-grained application access control, 
 
 ## 5. Data Model / Domain Objects
 - Announcement: Simple any-user post with 	itle, content, posted_by (FK to User), and posted_at; surfaced in portal_dashboard_data.
-- PortalSection & PortalResource: Configurable sections with visibility/layout preferences, editor M2M ties, and JSON/effect data that restrict who can edit/see resources. The resource model enforces required fields per esource_type (ile, link, embed) in its own clean().
+- PortalSection & PortalResource: Configurable sections with visibility/layout preferences, editor M2M ties, and JSON/effect data that restrict who can edit/see resources. The resource model enforces required fields per 
+esource_type (ile, link, embed) in its own clean().
 - WorkCalendarTask: Owner, due date, importance/energy metadata, status, and arbitrary metadata; tasks are created via portal_task_create.
 - WorkCalendarEvent: Organizer-owned events with privacy flags, predicted attendance, energy/priority, NLP metadata, attachment/task relations, and clean() enforcing end_at > start_at. Attachments link back via EventAttachment.
 - RecurrenceRule: One-to-one with WorkCalendarEvent, stores req/interval and weekday JSON to let _expand_recurrences feed the calendar.
@@ -47,24 +50,28 @@ The users app owns all authentication, fine-grained application access control, 
 - CalendarAnalyticsSnapshot: Aggregated stats per user per date range (meeting_hours, ghost_meeting_rate, context_switches, suggestions) used by portal_services.latest_snapshot().
 - ScheduledMicroBreak: Records auto/manual micro-breaks with insertion mode references for portal_microbreak_feed and the NLP auto-break insertion.
 - UserCompanyMembership: Bridges User → contracts.Company, ensures a single is_default, and is used by middleware/context processors and contracts views/forms to show available companies.
-- AppRegistry: Holds the set of registered apps with display_name/is_active, supports egister_apps_from_system(), and backs AppPermission.
+- AppRegistry: Holds the set of registered apps with display_name/is_active, supports 
+egister_apps_from_system(), and backs AppPermission.
 - AppPermission: Links users to registry entries with has_access; get_permissions_for_user() returns a simple dict. The admin form rebuilds these rows from dynamic checkbox fields per active app.
 - UserSetting & UserSettingState: Define named settings (
 ame, setting_type, default_value) and the per-user value+type conversions (boolean/string/integer/json) used by UserSettings and AJAX endpoints.
-- UserOAuthToken: Stores Microsoft ccess_token/efresh_token/expires_at per user; is_expired and refresh helpers keep the token valid for API calls.
+- UserOAuthToken: Stores Microsoft ccess_token/
+efresh_token/expires_at per user; is_expired and refresh helpers keep the token valid for API calls.
 - SystemMessage: Per-user notifications with priority, source metadata (source_app/model/id), ction_url, and helper methods like mark_as_read()/get_unread_count() consumed by the system_messages UI.
 
 ## 6. Request / User Flow
 - **Authentication:** /users/login/ shows Microsoft + password tabs (iews.login_view). The Microsoft flow starts in ms_views.MicrosoftAuthView, runs through zure_auth.MicrosoftAuthBackend, stores tokens in UserOAuthToken, and finishes in MicrosoftCallbackView. Password login uses AdminLoginForm and uthenticate(). /users/register/ simply redirects users to Microsoft. /users/logout/ is the Django auth LogoutView.
 - **Password lifecycle:** /users/password-reset/... reuses Django’s auth views; custom_password_reset reroutes OAuth-only users to /users/oauth_migration/, where EmailLookupForm captures the Microsoft email and sends the user to /users/oauth_password_set/ (OAuthPasswordSetForm) to choose a password. Logged-in users can run /users/password-change/ (PasswordChangeForm) or /users/password-set/ if they currently lack a password.
 - **User settings:** /users/settings/view/ renders manage_settings.html (super user grid + AJAX) and /users/settings/ajax/* endpoints let JS read/write UserSetting values after consulting UserSettingState. /users/settings/view/ itself also shows personal settings via settings_view.html and posts to save_user_setting for quick edits.
-- **Company/context:** The ActiveCompanyMiddleware (with contracts.Company, UserCompanyMembership, and UserSettings) keeps equest.active_company current. /users/switch-company/ enforces membership before writing ctive_company_id to the session and settings. Context processors expose ctive_company, vailable_companies, preferences, and unread message counts to templates.
+- **Company/context:** The ActiveCompanyMiddleware (with contracts.Company, UserCompanyMembership, and UserSettings) keeps 
+equest.active_company current. /users/switch-company/ enforces membership before writing ctive_company_id to the session and settings. Context processors expose ctive_company, vailable_companies, preferences, and unread message counts to templates.
 - **Portal/dashboard APIs:** /users/portal/dashboard/ returns portal_services.build_portal_context() plus announcements. /users/portal/sections/ lists sections for all users (GET) and permits superusers to create/update (PortalSectionForm). Resources are upserted/deleted via /portal/resources/... respecting section editors and restricting file uploads to superusers. Tasks/events can be created via /portal/tasks/create/ and /portal/events/create/; the portal_event_feed endpoint returns upcoming events (expanding recurrences via _expand_recurrences). Event operations (detail/update/delete, attachments) are organizer-bound, with JSON payloads and forms ensuring validation. /portal/nlp-schedule/ parses natural language text, stores NaturalLanguageScheduleRequest, optionally auto-creates WorkCalendarEvent, and auto-inserts a ScheduledMicroBreak. /portal/microbreaks/*, /portal/events/export/csv/, /portal/events/import/sharepoint/, and /users/sharepoint-import-ui/ round out the async UX for schedule management.
 - **System messaging:** /users/messages/ lists SystemMessage rows, /users/messages/create/ lets staff build notifications, /mark-read/ + /mark-all-read/ update statuses, and /unread-count/ powers the badge shown by the context processor.
 - **Permissions/debug:** /users/permission-denied/ renders a reusable error page. /users/debug/permissions/ dumps all AppPermission rows for debugging. /users/test-app-name/ and /users/check-auth-method/ provide helpers for middleware diagnostics.
 
 ## 7. Templates and UI Surface Area
-- Authentication UIs live in 	emplates/users/ (login.html, logout.html, egister.html, custom_password_reset.html, oauth_migration.html, oauth_password_set.html, password_* templates). login.html uses a tabbed layout with a Microsoft button (static asset static/users/img/ms-logo.svg) and a hidden password form.
+- Authentication UIs live in 	emplates/users/ (login.html, logout.html, 
+egister.html, custom_password_reset.html, oauth_migration.html, oauth_password_set.html, password_* templates). login.html uses a tabbed layout with a Microsoft button (static asset static/users/img/ms-logo.svg) and a hidden password form.
 - Settings UIs include manage_settings.html (AJAX-powered grid that fetches/saves settings via /settings/ajax/*), settings_view.html (simple per-user list), and profile.html (a stub rendering users/profile.html). The management page injects vanilla JS that handles input highlighting, etch calls, and dynamic setting creation.
 - System messages are rendered by system_messages.html (uses user_tags.get_username to show senders, includes buttons wired to the JSON APIs for marking read). create_message.html is the form staff use to send messages.
 - Portal interface is entirely JSON-driven; the templates here are only for auth/settings. The portal front-end consumes the JSON from portal_dashboard_data, portal_sections_api, portal_event_feed, etc., and the serialization helpers in portal_services.py guarantee the payload shape.
@@ -78,7 +85,7 @@ ame, setting_type, default_value) and the per-user value+type conversions (boole
 - Management commands under management/commands/ let staff refresh the registry (update_app_registry, ix_appregistry), clean orphaned permissions (cleanup_permissions, cleanup_app_permissions, ix_apppermissions), and inspect legacy contracts tables (check_contract_table, check_clin_tables, migrate_notes).
 
 ## 9. Forms, Validation, and Input Handling
-- BaseFormMixin/BaseModelForm apply consistent Tailwind-inspired classes to widgets across the app.
+- BaseFormMixin/BaseModelForm apply consistent Bootstrap-inspired classes to widgets across the app.
 - PortalSectionForm/PortalResourceForm and the calendar/task/attachment forms wrap the models used by the portal endpoints; PortalResourceForm.clean_external_url allows non-HTTP schemes (mailto, 	el, etc.), while EventAttachmentForm.clean() enforces the required field per attachment type.
 - AdminLoginForm, PasswordChangeForm, PasswordSetForm, EmailLookupForm, and OAuthPasswordSetForm encapsulate validation rules (e.g., password length, field matching, lookups). Password change/set forms require the two password fields to match and enforce an 8-character minimum.
 - AJAX endpoints rely on _request_data(), json.loads, and QueryDict helpers to accept JSON or form-data, so the same views serve both browser forms and fetch requests.
@@ -87,7 +94,8 @@ ame, setting_type, default_value) and the per-user value+type conversions (boole
 - portal_services.py centralizes portal payload construction (uild_portal_context) so views and any other consumer get the same serialized representation of sections, events, tasks, micro-breaks, analytics, and NLP requests.
 - iews._parse_natural_language_request, _next_available_slot, _calculate_predicted_attendance, _auto_insert_microbreak, _import_sharepoint_xlsx_core, and _expand_recurrences contain the domain logic for NLP scheduling, conflict avoidance, auto micro-break insertion, SharePoint import, and recurrence expansion.
 - UserSettings (user_settings.py) adds typed conversion helpers plus bulk getters/setters so views and context processors can rely on a single API instead of working with UserSettingState directly.
-- ActiveCompanyMiddleware consults user settings/session/default companies to maintain equest.active_company, persist the selection, and expose it via the context processor.
+- ActiveCompanyMiddleware consults user settings/session/default companies to maintain 
+equest.active_company, persist the selection, and expose it via the context processor.
 - zure_auth.py manages the MSAL token lifecycle (acquire token by auth code, refresh, log errors, store UserOAuthToken) and keeps session flags (microsoft_auth_success) useful for the login flow.
 - signals.py ensures every new User gets every setting’s default state.
 - sql_fix.py and the management commands automate AppRegistry creation/cleanup in SQL Server deployments.
@@ -99,7 +107,8 @@ ame, setting_type, default_value) and the per-user value+type conversions (boole
 - docs/MULTI-COMPANY_Process.md (outside the app) references users.UserCompanyMembership, showing that documentation relies on this model for multi-company workflows.
 - management/commands include inspectors (check_contract_table, check_clin_tables, migrate_notes) that inspect or migrate data from the contracts app, tying the user-maintenance scripts to that domain.
 - Settings dependencies: zure_auth, ms_views, and iews all expect settings.AZURE_AD_CONFIG, settings.AUTHENTICATION_BACKENDS, and settings.LOGIN_REDIRECT_URL, plus settings.REQUIRE_LOGIN in middleware.
-- Third-party libs: msal, equests, openpyxl, and optionally dateutil/python-dateutil (fall-back). The portal scheduler also uses Python’s json, datetime, and django.db.models.Q heavily.
+- Third-party libs: msal, 
+equests, openpyxl, and optionally dateutil/python-dateutil (fall-back). The portal scheduler also uses Python’s json, datetime, and django.db.models.Q heavily.
 
 ## 12. URL Surface / API Surface
 - Authentication: /users/register/, /users/login/, /users/logout/, /users/profile/, /users/password-reset/ + Django’s password reset/done/confirm/complete URLs, /users/custom-password-reset/, /users/oauth-migration/, /users/oauth-password-set/, /users/password-change/, /users/password-set/, and /users/check-auth-method/.
@@ -113,7 +122,8 @@ ame, setting_type, default_value) and the per-user value+type conversions (boole
 ## 13. Permissions / Security Considerations
 - Most views use the STATZWeb.decorators.login_required wrapper so toggling settings.REQUIRE_LOGIN flips access across the app.
 - Superusers only: editing portal sections/resources marked ile, deleting sections, the SharePoint UI (@user_passes_test(_is_staff)), and the portal_sections_api POST branch.
-- Event CRUD is organizer-only—portal_event_update/delete, portal_event_attachment_* ensure equest.user is the event creator. Superusers cannot edit others’ events.
+- Event CRUD is organizer-only—portal_event_update/delete, portal_event_attachment_* ensure 
+equest.user is the event creator. Superusers cannot edit others’ events.
 - Portal resources enforce editor lists; _is_section_editor defers to editors, staff, or superusers. File-type resources are restricted to superusers for write/delete actions.
 - switch_company forces membership checks via UserCompanyMembership; the middleware also validates membership before persisting the session value.
 - AppPermission with AppRegistry and STATZWeb/middleware deny entry to any non-users/dmin app if the user lacks a row—or if has_access is False.
@@ -135,7 +145,9 @@ users/tests.py is a stub (TestCase with “Create your tests here”), so there 
 
 ## 17. Known Gaps / Ambiguities
 - sharepoint_import_ui() renders users/import_sharepoint.html, but that template does not exist in 	emplates/users/, so uploading via the UI will 404 (the API endpoint /portal/events/import/sharepoint/ still works if hit directly).
-- The egister() view immediately redirects to Microsoft, so the existing egister.html template never renders unless another view uses it.
+- The 
+egister() view immediately redirects to Microsoft, so the existing 
+egister.html template never renders unless another view uses it.
 - The admin tries to include dmin/js/app_permissions.js (AppPermissionAdmin.Media), yet no such static file lives in the repo, so any custom client behavior tied to that script is undefined.
 - No tests cover any of the login, portal, or settings flows, leaving behavior unverified if the login stack or portal serialization changes.
 
@@ -151,5 +163,6 @@ users/tests.py is a stub (TestCase with “Create your tests here”), so there 
 - **Primary models:** AppRegistry/AppPermission, UserSetting/UserSettingState, UserOAuthToken, Announcement, PortalSection/PortalResource, WorkCalendarTask, WorkCalendarEvent (+ recurrence/attachments/attendance/reminders), NaturalLanguageScheduleRequest, CalendarAnalyticsSnapshot, ScheduledMicroBreak, UserCompanyMembership, SystemMessage.
 - **Main URLs:** /users/login/, /users/microsoft/login/, /users/permission-denied/, /users/settings/view/, /users/portal/dashboard/, /users/portal/events/feed/, /users/messages/, /users/sharepoint-import-ui/.
 - **Key templates:** 	emplates/users/login.html, manage_settings.html, settings_view.html, system_messages.html, create_message.html, and the password-reset/OAuth templates under 	emplates/users/.
-- **Key dependencies:** Microsoft MSAL (msal + equests), openpyxl for SharePoint import, optional python-dateutil, Django auth/password reset stack, and suppliers.openrouter_config for AI-model defaults.
+- **Key dependencies:** Microsoft MSAL (msal + 
+equests), openpyxl for SharePoint import, optional python-dateutil, Django auth/password reset stack, and suppliers.openrouter_config for AI-model defaults.
 - **Risky files to inspect first:** users/views.py (large and handles virtually every user flow), portal_services.py (central serialization), users/models.py (dozens of intertwined models), zure_auth.py (token lifecycle), and dmin.py/management/commands when changing the permission registry.

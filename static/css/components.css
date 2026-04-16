@@ -1,0 +1,176 @@
+/* ============================================================
+   components.css — reusable component styles for STATZCorp
+   ============================================================ */
+
+/* ----------------------------------------------------------
+   Segmented Control Toggle (Table / Cards)
+   ---------------------------------------------------------- */
+.seg-control {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 9999px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.seg-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 14px;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.6);
+    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    white-space: nowrap;
+    line-height: 1.4;
+    box-shadow: none !important;
+    outline: none;
+}
+
+.seg-option svg {
+    flex-shrink: 0;
+    stroke: currentColor;
+}
+
+.seg-option:hover:not(.active) {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.seg-option:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.seg-option.active {
+    background: #ffffff;
+    color: #1d4ed8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+.seg-option.active svg {
+    stroke: #1d4ed8;
+}
+
+body.dark .seg-control {
+    background: rgba(0, 0, 0, 0.4);
+}
+body.dark .seg-option.active {
+    background: #e2e8f0;
+    color: #1e3a8a;
+}
+body.dark .seg-option.active svg {
+    stroke: #1e3a8a;
+}
+
+/* ----------------------------------------------------------
+   Section header gradient bar
+   ---------------------------------------------------------- */
+.section-header-gradient {
+    background: linear-gradient(to right, #2563eb, #1e40af);
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.section-header-gradient * {
+    color: #ffffff !important;
+}
+
+/* ----------------------------------------------------------
+   Status badges in contract tables
+   ---------------------------------------------------------- */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    line-height: 1.25rem;
+}
+.status-badge.open      { background: #dcfce7; color: #166534; }
+.status-badge.closed    { background: #f3f4f6; color: #374151; }
+.status-badge.cancelled { background: #fee2e2; color: #991b1b; }
+
+/* ----------------------------------------------------------
+   Stat card hover animation
+   ---------------------------------------------------------- */
+.stat-card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card-hover:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
+}
+
+/* ----------------------------------------------------------
+   Recent Contracts table — column width helpers
+   ---------------------------------------------------------- */
+.supplier-name-cell {
+    display: block;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.idiq-cell {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------
+   Contract table row hover
+   ---------------------------------------------------------- */
+.contract-table-row {
+    transition: background-color 0.12s ease;
+    cursor: pointer;
+}
+.contract-table-row:hover {
+    background-color: #eff6ff !important;
+    border-left: 3px solid var(--primary);
+}
+body.dark .contract-table-row:hover {
+    background-color: #1e3a8a22 !important;
+    border-left: 3px solid var(--primary);
+}
+
+/* ----------------------------------------------------------
+   Period navigation buttons (prev / next)
+   ---------------------------------------------------------- */
+.period-nav-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-bg);
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.period-nav-btn:hover {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+/* ----------------------------------------------------------
+   Search bar focus glow
+   ---------------------------------------------------------- */
+#contract-search:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    transition: box-shadow 0.15s ease;
+}

@@ -39,7 +39,7 @@
 - Template path: `templates/tools/pdf_merger.html` (extends `base_template.html`), so it inherits the global navigation/layout from the project while providing only this tool’s content block.
 - UI components: header with description, buttons for merging/deleting/splitting/clearing, drag-and-drop zone with hidden native `<input>`, ordered file list with action buttons (reorder/delete), preview pane with `iframe`, range input, and status banner.
 - Inline `<script>` (inside `{% block extra_scripts %}`) encapsulates logic for uploads, drag/drop, UUID generation, preview updates (`iframe.src`), file reordering events, exporting, deleting, splitting, CSRF token extraction, and dynamic status messaging. There are no separate static JS assets; the behavior lives entirely inside this template.
-- The UI relies on Tailwind-esque utility classes defined in the overarching project styles; no app-specific static files exist under `tools/static`.
+- The UI relies on Bootstrap-esque utility classes defined in the overarching project styles; no app-specific static files exist under `tools/static`.
 
 ## 8. Admin / Staff Functionality
 - No models are registered in `admin.py`, so Django admin offers nothing for this app. All staff interactions happen through the `/tools/` UI.

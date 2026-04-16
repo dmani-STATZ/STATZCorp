@@ -176,7 +176,7 @@ The application leverages:
 - Django's ORM for complex queries
 - Class-based views for consistency
 - Generic relations for flexibility
-- Tailwind CSS for styling
+- Bootstrap CSS for styling
 - AJAX for smooth interactions
 - Modern JavaScript for enhanced UX
 - PDF processing libraries

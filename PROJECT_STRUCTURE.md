@@ -40,7 +40,6 @@ Each app is a package with `models`, `views`, `urls`, `admin`, etc.:
 | `static/` | Project-level static files (STATICFILES_DIRS). |
 | `staticfiles/` | Collected static output (STATIC_ROOT). |
 | `media/` | Uploaded files (MEDIA_ROOT in dev). |
-| `theme_tw/` | Tailwind theme app. |
 | `logs/` | Log files (when file logging is used). |
 
 ## Other

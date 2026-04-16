@@ -23,7 +23,7 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 - `views.py`: Houses all UI endpoints (dashboard, add/edit/delete, delete AJAX, three autocomplete lookups); most views are wrapped with `@conditional_login_required` from `STATZWeb/decorators.py`.
 - `urls.py`: Maps `/inventory/` to the views above, including separate paths for AJAX deletion plus the autocomplete endpoints.
 - `admin.py`: Registers `InventoryItem` so it appears in Django admin with default options.
-- `templates/inventory/dashboard.html`: Tailwind-styled dashboard page that lists every inventory row, shows total value, formats money with `custom_currency`, and bundles inline JS for modal deletion + client-side sorting/clear-sorting controls.
+- `templates/inventory/dashboard.html`: Bootstrap-styled dashboard page that lists every inventory row, shows total value, formats money with `custom_currency`, and bundles inline JS for modal deletion + client-side sorting/clear-sorting controls.
 - `templates/inventory/item_form.html`: Custom-styled add/edit form that reuses the same `InventoryItemForm`, applies bespoke row/label markup, and wires jQuery UI autocomplete to the three AJAX endpoints.
 - `templates/inventory/delete_form.html`: Simple confirmation page (currently unused by any view but still in repo).
 - `templatetags/custom_filters.py`: Defines `custom_currency` filter used to format `purchaseprice`, `totalcost`, and the dashboard total value.
@@ -45,7 +45,7 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 
 ## 7. Templates and UI Surface Area
 - Templates extend `base_template.html`, so the app inherits the global navigation, scripts, and styles defined in `templates/base_template.html` (which already links to `inventory:dashboard` from the main nav and mobile menu).
-- `dashboard.html` renders a Tailwind-styled table with columns for every inventory field, a large total value display, and a modal for confirm deletions. Inline `<style>` defines sort-state indicators, and `<script>` handles the modal lifecycle, AJAX delete, and client-side sorting/ordering with a `Clear Sorting` toggle.
+- `dashboard.html` renders a Bootstrap-styled table with columns for every inventory field, a large total value display, and a modal for confirm deletions. Inline `<style>` defines sort-state indicators, and `<script>` handles the modal lifecycle, AJAX delete, and client-side sorting/ordering with a `Clear Sorting` toggle.
 - `item_form.html` renders the same form for both adds and edits. It writes per-field labels (with manual overrides for NSN/Part Number/Location/Purchase Price), styles inputs with custom `.input-field` classes, and initializes autocomplete widgets inside a jQuery `$(document).ready()` block, which implies the base template must load jQuery/jQuery UI.
 - `delete_form.html` is a legacy form-only confirmation screen that is not referenced in any view, suggesting either retired logic or a shortcut for manual testing.
 
@@ -68,7 +68,7 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 
 ## 11. Integrations and Cross-App Dependencies
 - `STATZWeb/urls.py` includes `inventory.urls` under `/inventory/`, so the app is wired to the main routing tree.
-- Templates extend `templates/base_template.html`, which renders the global navigation entry for Inventory and presumably loads the JS (jQuery, Tailwind, etc.) that the app’s templates expect.
+- Templates extend `templates/base_template.html`, which renders the global navigation entry for Inventory and presumably loads the JS (jQuery, Bootstrap, etc.) that the app’s templates expect.
 - `dashboard`, `add_item`, `edit_item`, and `delete_item` are decorated with `conditional_login_required` from `STATZWeb/decorators.py`, which checks `settings.REQUIRE_LOGIN` before applying Django’s `login_required`. The decorator and views both rely on the `REQUIRE_LOGIN` sentinel documented in `STATZWeb/settings.py`.
 - The form module depends on `crispy_forms` components (`FormHelper`, `Layout`, `Fieldset`, `Column`, `Submit`) to assemble the UI.
 - Templates load `custom_filters` (`custom_currency`), defined locally under `templatetags/custom_filters.py`, to format monetary values.

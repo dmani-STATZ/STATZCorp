@@ -18,7 +18,7 @@
     *   Provides `ModelForms` for most major models (`ContractForm`, `ClinForm`, `SupplierForm`, `NsnForm`, `NoteForm`, `ReminderForm`, `AddressForm`, `ContactForm`, `IdiqContractForm`, etc.).
     *   Includes specialized forms for specific actions (`ContractCloseForm`, `ContractCancelForm`).
     *   Uses custom `ActiveUserModelChoiceField` for selecting active users.
-    *   Applies Tailwind CSS classes for styling via widgets.
+    *   Applies Bootstrap CSS classes for styling via widgets.
     *   Includes standard forms like `ContractSearchForm`.
 
 3.  **Views (Modular Structure in `contracts/views/`):

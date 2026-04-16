@@ -50,7 +50,7 @@ All views are decorated with `@login_required`, and `transaction_edit_field` use
   - `transaction_list.html`: Tabular history with `humanize` formatting, clickable rows, and truncated old/new values.
   - `transaction_detail.html`: Metadata plus the `TransactionForm` fields (read-only) for a single change.
   - `transaction_edit.html`: Table and field labels, current value, the `EditFieldForm`, Save/Cancel buttons, a 20-row history table, and an embedded script that submits the form via `fetch` and triggers `window.onTransactionSaved`.
-- UI is server-rendered partials injected via JavaScript; no heavy SPA framework is present, just vanilla `fetch` and DOM updates with Tailwind-style classes.
+- UI is server-rendered partials injected via JavaScript; no heavy SPA framework is present, just vanilla `fetch` and DOM updates with Bootstrap-style classes.
 
 ## 8. Admin / Staff Functionality
 `transactions/admin.py` registers `Transaction` with list display columns for the model/field/user/timestamp, filters on `content_type` and `created_at`, readonly fields for historical data, search over field names and values, and `date_hierarchy = "created_at"` so staff can browse the audit trail by time.

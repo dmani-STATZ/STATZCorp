@@ -211,6 +211,12 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 10. **`cancel_process_contract` accepts both `process_contract_id` and `queue_id` as optional kwargs.** Two URL patterns call this same function. Both code paths must remain valid if the function signature changes.
 
+11. **`startProcessing()` and `resumeProcessing()` in `contract_queue.html`** use `data.redirect_url` from the JSON response when the server supplies it (IDIQ resume/start paths). Hardcoding the fallback `process_contract_edit` URL in the template is intentional for non-IDIQ contracts.
+
+12. **`match_nsn` and `match_supplier` are dual-purpose.** Same URL accepts **GET** with `action=search` and `q` (min length 3 on the client) for JSON `results`, and **POST** JSON for either `{id}` / `{supplier_id}` match-by-ID or `{action: 'create', ...}` to create and link. The standard contract form modals continue to use **POST** with `{ id: … }` (NSN) or `{ supplier_id: … }` (supplier) for matching; only the IDIQ inline page relies on GET search and POST create on these endpoints.
+
+13. **`_normalize_nsn` in `pdf_parser.py` is a thin wrapper around `contract_utils.normalize_nsn`.** Do not add NSN normalization logic to `pdf_parser.py` directly — update `contract_utils.py` instead. **`detect_contract_type`** reads position 9 (the character between the 2nd and 3rd hyphens in a dashed DLA number). The `_RE_IDIQ_TEXT_DETECT` regex phrase detection in `parse_award_pdf` is a **fallback only** — position-9 detection takes priority when the contract number yields a mapped type. **`_apply_contract_number_rules`** in `pdf_parser.py` still returns `"Delivery Order"` / `"Purchase Order"` strings as initial values that get overridden by `detect_contract_type`. Do not remove `_apply_contract_number_rules` — it also handles the delivery-order/base-contract swap logic.
+
 ---
 
 ## 14. Safe Change Workflow
@@ -242,3 +248,13 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 | Riskiest edits | Finalization flow, field renames, URL renames, split key format in forms/JS |
 | Security-sensitive | `@login_required` on all views, `is_superuser` on delete, `DEBUG` guard on test data download |
 | Test coverage | **None** — all verification must be manual |
+
+---
+
+## 16. UI Improvements
+
+(`processing/templates/processing/process_contract_form.html` and related layout)
+
+- Sidebar buttons standardized for centering (removed `.row`).
+- Vertical density optimized in CLIN detail blocks.
+- Persistent expansion state implemented via `localStorage`.
