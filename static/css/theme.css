@@ -81,18 +81,18 @@
 }
 
 .btn.btn-save:hover, .btn-save:hover {
-  background-color: var(--save-hover) --!important;
-  color: var(--save-text-hover) --!important;
+  background-color: var(--save-hover) !important;
+  color: var(--save-text-hover) !important;
 }
 
 .btn.btn-secondary, .btn-secondary {
-  background-color: var(--secondary) --!important;
-  color: var(--secondary-text) --!important;
+  background-color: var(--secondary) !important;
+  color: var(--secondary-text) !important;
 }
 
 .btn-secondary:hover {
-  background-color: var(--secondary-hover) --!important  ;
-  color: var(--secondary-text-hover) --!important;
+  background-color: var(--secondary-hover) !important  ;
+  color: var(--secondary-text-hover) !important;
 }
 
 .btn.btn-delete, .btn-delete {
@@ -102,8 +102,8 @@
 }
 
 .btn-delete:hover {
-  background-color: var(--danger-hover) --!important;
-  color: var(--danger-text-hover) --!important;
+  background-color: var(--danger-hover) !important;
+  color: var(--danger-text-hover) !important;
 }
 
 .btn.btn-caution, .btn-caution {
@@ -113,16 +113,16 @@
 }
 
 .btn-caution:hover {
-  background-color: var(--caution-hover) --!important;
-  color: var(--caution-text-hover) --!important;
+  background-color: var(--caution-hover) !important;
+  color: var(--caution-text-hover) !important;
 }
 
 .btn.btn-nav, .btn-nav {
-  background-color: var(--nav) --!important;
-  color: var(--nav-text) --!important;
+  background-color: var(--nav) !important;
+  color: var(--nav-text) !important;
 }
 
 .btn.btn-nav:hover, .btn-nav:hover {
-  background-color: var(--nav-hover) --!important;
-  color: var(--nav-text-hover) --!important;
+  background-color: var(--nav-hover) !important;
+  color: var(--nav-text-hover) !important;
 }
