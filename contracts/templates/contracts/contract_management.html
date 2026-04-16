@@ -232,23 +232,7 @@
                         </p>
                         <p id="contract-buyer-value" class="font-medium text-sm">{{ contract.buyer.description|default:"N/A" }}</p>
                     </div>
-                    <div class="field-group">
-                    {% with sharepoint_url=contract.get_sharepoint_documents_url %}
-                    {% if sharepoint_url %}
-                    <a href="{{ sharepoint_url }}" target="_blank" rel="noopener noreferrer"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-600 hover:bg-blue-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-0.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" /></svg>
-                        Documents
-                    </a>
-                    {% elif contract.files_url %}
-                    <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')"
-                        class="flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-0.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clip-rule="evenodd" /><path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" /></svg>
-                        Copy Path
-                    </button>
-                    {% endif %}
-                    {% endwith %}
-                    </div>
+
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
                             <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'award_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Award Date</button>
@@ -279,40 +263,47 @@
                 <!-- Contract Controls: Expedite (top) + NIST (below) -->
                 <div class="shrink-0 flex flex-col gap-2 border-l border-gray-200 pl-3">
                     <!-- Expedite panel: bordered, title + X top, buttons stacked vertically -->
-                    <div id="expedite_container" class="border border-gray-300 rounded-md p-1.5
-                        {% if expedite and expedite.used %}bg-fuchsia-200{% elif expedite and expedite.successful %}bg-yellow-200{% else %}bg-gray-50{% endif %}">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <span class="text-sm font-semibold text-gray-800">Expedite</span>
-                            <button type="button" onclick="resetExpedite()"
-                                class="bg-red-100 hover:bg-red-200 text-red-600 rounded p-1 flex items-center justify-center transition-colors" title="Reset">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-                        <div class="space-y-2">
-                            {% if not expedite or not expedite.successful %}
-                            <button onclick="toggleExpediteStatus('initiate')" id="expedite_initiate_btn"
-                                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-                                    {% if expedite and expedite.initiated %}bg-gray-300 text-gray-600 cursor-not-allowed{% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
-                                {% if expedite and expedite.initiated %}disabled{% endif %}>Initiate</button>
-                            <button onclick="toggleExpediteStatus('successful')" id="expedite_successful_btn"
-                                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-                                    {% if not expedite or not expedite.initiated or expedite.successful %}bg-gray-300 text-gray-600 cursor-not-allowed{% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
-                                {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>Successful</button>
-                            {% endif %}
-                            {% if expedite and expedite.successful %}
-                            <button onclick="toggleExpediteStatus('use')" id="expedite_use_btn"
-                                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-                                    {% if expedite.used %}bg-gray-300 text-gray-600 cursor-not-allowed{% else %}bg-red-200 text-red-800 hover:bg-red-300{% endif %}"
-                                {% if expedite.used %}disabled{% endif %}>Use Expedite</button>
-                            {% endif %}
-                        </div>
-                        {% if expedite and expedite.initiated %}
-                        <div class="mt-1 text-xs text-gray-700">
-                            {% if expedite.successful %}<span>✓ Successful</span>{% endif %}
-                            {% if expedite.used %}<span>Used</span>{% endif %}
-                        </div>
+                    <div id="expedite_container" class="border rounded p-2
+                    {% if expedite and expedite.used %}bg-pink-subtle{% elif expedite and expedite.successful %}bg-warning-subtle{% else %}bg-light{% endif %}"
+                    style="border-color: #d1d5db;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span style="font-size: 0.875rem; font-weight: 600; color: #1f2937;">Expedite</span>
+                        <button type="button" onclick="resetExpedite()" title="Reset"
+                            class="btn d-flex align-items-center justify-content-center p-1 rounded"
+                            style="background-color: #fee2e2; color: #dc2626; border: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="d-flex flex-row gap-2">
+                        {% if not expedite or not expedite.successful %}
+                        <button onclick="toggleExpediteStatus('initiate')" id="expedite_initiate_btn"
+                            class="btn rounded"
+                            style="padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 500;
+                                {% if expedite and expedite.initiated %}background-color: #d1d5db; color: #4b5563; cursor: not-allowed;{% else %}background-color: #fecaca; color: #991b1b;{% endif %}"
+                            {% if expedite and expedite.initiated %}disabled{% endif %}>Initiate</button>
+                        <button onclick="toggleExpediteStatus('successful')" id="expedite_successful_btn"
+                            class="btn rounded"
+                            style="padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 500;
+                                {% if not expedite or not expedite.initiated or expedite.successful %}background-color: #d1d5db; color: #4b5563; cursor: not-allowed;{% else %}background-color: #fecaca; color: #991b1b;{% endif %}"
+                            {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>Successful</button>
+                        {% endif %}
+                        {% if expedite and expedite.successful %}
+                        <button onclick="toggleExpediteStatus('use')" id="expedite_use_btn"
+                            class="btn rounded"
+                            style="padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 500;
+                                {% if expedite.used %}background-color: #d1d5db; color: #4b5563; cursor: not-allowed;{% else %}background-color: #fecaca; color: #991b1b;{% endif %}"
+                            {% if expedite.used %}disabled{% endif %}>Use Expedite</button>
                         {% endif %}
                     </div>
+                    {% if expedite and expedite.initiated %}
+                    <div class="mt-1" style="font-size: 0.75rem; color: #374151;">
+                        {% if expedite.successful %}<span>✓ Successful</span>{% endif %}
+                        {% if expedite.used %}<span>Used</span>{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
                     <!-- NIST button below Expedite -->
                     <div class="flex justify-center">
                         <button onclick="toggleContractField('nist')" id="nist_btn"
@@ -321,6 +312,39 @@
                             <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-7">
                         </button>
                     </div>
+
+                    <!-- Documents button -->
+                    <div class="d-flex justify-content-center">
+                        {% with sharepoint_url=contract.get_sharepoint_documents_url %}
+                        {% if sharepoint_url %}
+                        <a href="{{ sharepoint_url }}" target="_blank" rel="noopener noreferrer"
+                        class="d-inline-flex align-items-center justify-content-center gap-1 w-100"
+                            style="font-size: 0.75rem; font-weight: 500; color: #374151;">
+                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 22px; height: 22px; flex-shrink: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <rect x="6" y="5" width="11" height="14" rx="1"/>
+                                <rect x="4" y="3" width="11" height="14" rx="1" fill="white" stroke="currentColor"/>
+                                <line x1="7" y1="8" x2="12" y2="8" stroke-linecap="round"/>
+                                <line x1="7" y1="11" x2="12" y2="11" stroke-linecap="round"/>
+                                <line x1="7" y1="14" x2="10" y2="14" stroke-linecap="round"/>
+                            </svg>
+                            Documents
+                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px; flex-shrink: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>
+                        {% elif contract.files_url %}
+                        <button onclick="copyContractPath('{{ contract.files_url | escapejs }}')"
+                        class="d-inline-flex align-items-center justify-content-center gap-1 w-100 btn"
+                            style="font-size: 0.75rem; font-weight: 500; color: #374151;">
+                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 22px; height: 22px; flex-shrink: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy Path
+                        </button>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+
                 </div>
             </div>
             <!-- Toast message for clipboard copy -->

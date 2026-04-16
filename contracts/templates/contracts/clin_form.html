@@ -8,6 +8,27 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<style>
+    .section-header {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #0f1216;
+        background-color: #f8f9fa;
+        margin-bottom: 1rem;
+        padding: 0.5rem 0.75rem;
+        border-left: 3px solid #004eb3;
+        border-bottom: 1px solid #e5e7eb;
+        font-family: inherit;
+    }
+    .form-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        display: block;
+        margin-bottom: 0.25rem;
+        font-family: inherit;
+    }
+</style>
 {% endblock extra_head %}
 
 {% block content %}
@@ -40,11 +61,11 @@
         </div>
         {% endif %}
 
-        <form method="post" class="space-y-8" id="clin-form">
+        <form method="post" id="clin-form">
             {% csrf_token %}
 
             {% if not form.instance.pk and not form.initial.contract %}
-            <div class="rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div class="rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-4">
                 <label for="{{ form.contract.id_for_label }}" class="form-label font-semibold">Contract</label>
                 {{ form.contract }}
                 {% if form.contract.errors %}
@@ -54,155 +75,156 @@
             {% endif %}
 
             {# Section 1 — CLIN Identification #}
-            <section>
-                <h2 class="mb-4 border-b border-gray-200 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    CLIN Identification
-                </h2>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                    <div class="md:col-span-3">
+            <div class="mb-5">
+                <h2 class="section-header">CLIN Identification</h2>
+
+                <div class="d-flex flex-nowrap gap-3 mb-3">
+                    <div style="width:15%">
                         <label for="{{ form.item_number.id_for_label }}" class="form-label">Item Number</label>
                         {{ form.item_number }}
                         {% if form.item_number.errors %}<div class="mt-1 text-sm text-red-600">{{ form.item_number.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
+                    <div style="width:15%">
                         <label for="{{ form.item_type.id_for_label }}" class="form-label">Item Type</label>
                         {{ form.item_type }}
                         {% if form.item_type.errors %}<div class="mt-1 text-sm text-red-600">{{ form.item_type.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
+                    <div style="width:35%">
                         <label for="{{ form.clin_po_num.id_for_label }}" class="form-label">CLIN PO Number</label>
                         {{ form.clin_po_num }}
                         {% if form.clin_po_num.errors %}<div class="mt-1 text-sm text-red-600">{{ form.clin_po_num.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
+                    <div style="width:35%">
                         <label for="{{ form.tab_num.id_for_label }}" class="form-label">Tab Number</label>
                         {{ form.tab_num }}
                         {% if form.tab_num.errors %}<div class="mt-1 text-sm text-red-600">{{ form.tab_num.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
+                </div>
+
+                <div class="d-flex flex-nowrap gap-3 mb-3">
+                    <div style="width:25%">
                         <label for="{{ form.ia.id_for_label }}" class="form-label">IA</label>
                         {{ form.ia }}
                         {% if form.ia.errors %}<div class="mt-1 text-sm text-red-600">{{ form.ia.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
+                    <div style="width:25%">
                         <label for="{{ form.fob.id_for_label }}" class="form-label">FOB</label>
                         {{ form.fob }}
                         {% if form.fob.errors %}<div class="mt-1 text-sm text-red-600">{{ form.fob.errors }}</div>{% endif %}
                     </div>
                 </div>
-            </section>
+            </div>
 
-            {# Section 2 — Item Details (CLIN) #}
-            <section>
-                <h2 class="mb-4 border-b border-gray-200 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Item Details (CLIN)
-                </h2>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                    <div class="md:col-span-8">
+            <hr class="my-4 border-gray-200">
+
+            {# Section 2 — Item Details (CLIN / Gov Side) #}
+            <div class="mb-5">
+                <h2 class="section-header">Item Details (CLIN)</h2>
+
+                <div class="d-flex flex-nowrap gap-3 mb-3">
+                    <div style="width:66%">
                         <label for="nsn_display" class="form-label">NSN<span class="text-red-600">*</span></label>
-                        <div class="flex flex-wrap items-stretch gap-2">
+                        <div class="input-group input-group-sm">
                             <input type="text" id="nsn_display" readonly
-                                   class="form-control min-w-0 flex-1 cursor-pointer rounded-md border border-gray-300 bg-gray-50 py-2"
+                                   class="form-control cursor-pointer bg-gray-50"
                                    placeholder="Click to select NSN"
                                    value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% elif form.nsn_value %}{{ form.nsn_value.nsn_code }} - {{ form.nsn_value.description }}{% endif %}">
                             <button type="button" onclick="openNsnModal()"
-                                    class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Match</button>
+                                    class="btn btn-primary btn-sm">Match</button>
                             <button type="button" onclick="clearNsnSelection()"
-                                    class="rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50" title="Clear NSN">✕</button>
+                                    class="btn btn-outline-danger btn-sm" title="Clear NSN">✕</button>
                         </div>
                         <input type="hidden" name="nsn" id="id_nsn" value="{% if form.instance.nsn %}{{ form.instance.nsn.id }}{% elif form.nsn_value %}{{ form.nsn_value.id }}{% elif form.data.nsn %}{{ form.data.nsn }}{% endif %}">
                         {% if form.nsn.errors %}<div class="mt-1 text-sm text-red-600">{{ form.nsn.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-4">
+                    <div style="width:34%">
                         <label for="{{ form.due_date.id_for_label }}" class="form-label">CLIN Due Date</label>
                         {{ form.due_date }}
                         {% if form.due_date.errors %}<div class="mt-1 text-sm text-red-600">{{ form.due_date.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
+                </div>
+
+                <div class="d-flex flex-nowrap gap-3 mb-3">
+                    <div style="width:15%">
                         <label for="{{ form.order_qty.id_for_label }}" class="form-label">Quantity</label>
                         {{ form.order_qty }}
                         {% if form.order_qty.errors %}<div class="mt-1 text-sm text-red-600">{{ form.order_qty.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-1">
+                    <div style="width:10%">
                         <label for="{{ form.uom.id_for_label }}" class="form-label">UOM</label>
                         {{ form.uom }}
                         {% if form.uom.errors %}<div class="mt-1 text-sm text-red-600">{{ form.uom.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-4">
+                    <div style="width:35%">
                         <label for="{{ form.unit_price.id_for_label }}" class="form-label">Unit Price</label>
                         {{ form.unit_price }}
                         {% if form.unit_price.errors %}<div class="mt-1 text-sm text-red-600">{{ form.unit_price.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-4">
+                    <div style="width:40%">
                         <label for="{{ form.item_value.id_for_label }}" class="form-label">Total Value</label>
-                        <div class="flex gap-2">
-                            <div class="min-w-0 flex-1 rounded-md bg-gray-50">{{ form.item_value }}</div>
+                        <div class="input-group input-group-sm">
+                            <div class="flex-1">{{ form.item_value }}</div>
                             <button type="button" id="btn-recalc-item-value"
-                                    class="shrink-0 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">ReCalc</button>
+                                    class="btn btn-success btn-sm">ReCalc</button>
                         </div>
                         {% if form.item_value.errors %}<div class="mt-1 text-sm text-red-600">{{ form.item_value.errors }}</div>{% endif %}
                     </div>
                 </div>
-            </section>
+            </div>
+
+            <hr class="my-4 border-gray-200">
 
             {# Section 3 — Order Information (Supplier) #}
-            <section>
-                <h2 class="mb-4 border-b border-gray-200 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Order Information (Supplier)
-                </h2>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                    <div class="md:col-span-8">
+            <div class="mb-5">
+                <h2 class="section-header">Order Information (Supplier)</h2>
+
+                <div class="d-flex flex-nowrap gap-3 mb-3">
+                    <div style="width:66%">
                         <label for="supplier_display" class="form-label">Supplier<span class="text-red-600">*</span></label>
-                        <div class="flex flex-wrap items-stretch gap-2">
+                        <div class="input-group input-group-sm">
                             <input type="text" id="supplier_display" readonly
-                                   class="form-control min-w-0 flex-1 cursor-pointer rounded-md border border-gray-300 bg-gray-50 py-2"
+                                   class="form-control cursor-pointer bg-gray-50"
                                    placeholder="Click to select Supplier"
                                    value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% elif form.supplier_value %}{{ form.supplier_value.name }} ({{ form.supplier_value.cage_code }}){% endif %}">
                             <button type="button" onclick="openSupplierModal()"
-                                    class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Match</button>
+                                    class="btn btn-primary btn-sm">Match</button>
                             <button type="button" onclick="clearSupplierSelection()"
-                                    class="rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50" title="Clear Supplier">✕</button>
+                                    class="btn btn-outline-danger btn-sm" title="Clear Supplier">✕</button>
                         </div>
                         <input type="hidden" name="supplier" id="id_supplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% elif form.supplier_value %}{{ form.supplier_value.id }}{% elif form.data.supplier %}{{ form.data.supplier }}{% endif %}">
                         {% if form.supplier.errors %}<div class="mt-1 text-sm text-red-600">{{ form.supplier.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-4">
+                    <div style="width:34%">
                         <label for="{{ form.supplier_due_date.id_for_label }}" class="form-label">Supplier Due Date</label>
                         {{ form.supplier_due_date }}
                         {% if form.supplier_due_date.errors %}<div class="mt-1 text-sm text-red-600">{{ form.supplier_due_date.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-3">
-                        <label for="order_qty_mirror" class="form-label">Order Qty</label>
-                        <input type="text" id="order_qty_mirror" class="form-control cursor-not-allowed bg-gray-50" readonly disabled>
-                    </div>
-                    <div class="md:col-span-1">
-                        <label for="supplier_uom_mirror" class="form-label">UOM</label>
-                        <input type="text" id="supplier_uom_mirror" class="form-control cursor-not-allowed bg-gray-50" readonly disabled>
-                    </div>
-                    <div class="md:col-span-4">
-                        <label for="{{ form.price_per_unit.id_for_label }}" class="form-label">Price Per Unit</label>
-                        {{ form.price_per_unit }}
-                        {% if form.price_per_unit.errors %}<div class="mt-1 text-sm text-red-600">{{ form.price_per_unit.errors }}</div>{% endif %}
-                    </div>
-                    <div class="md:col-span-4">
-                        <label for="{{ form.quote_value.id_for_label }}" class="form-label">Quote Total</label>
-                        <div class="flex gap-2">
-                            <div class="min-w-0 flex-1 rounded-md bg-gray-50">{{ form.quote_value }}</div>
-                            <button type="button" id="btn-recalc-quote-value"
-                                    class="shrink-0 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">ReCalc</button>
-                        </div>
-                        {% if form.quote_value.errors %}<div class="mt-1 text-sm text-red-600">{{ form.quote_value.errors }}</div>{% endif %}
-                    </div>
-                    <div class="md:col-span-4">
+                </div>
+
+                <div class="d-flex flex-nowrap gap-3 mb-3">
+                    <div style="width:33%">
                         <label for="{{ form.special_payment_terms.id_for_label }}" class="form-label">Special Payment Terms</label>
                         {{ form.special_payment_terms }}
                         {% if form.special_payment_terms.errors %}<div class="mt-1 text-sm text-red-600">{{ form.special_payment_terms.errors }}</div>{% endif %}
                     </div>
-                    <div class="md:col-span-4"></div>
-                    <div class="md:col-span-4"></div>
+                    <div style="width:33%">
+                        <label for="{{ form.price_per_unit.id_for_label }}" class="form-label">Price Per Unit</label>
+                        {{ form.price_per_unit }}
+                        {% if form.price_per_unit.errors %}<div class="mt-1 text-sm text-red-600">{{ form.price_per_unit.errors }}</div>{% endif %}
+                    </div>
+                    <div style="width:34%">
+                        <label for="{{ form.quote_value.id_for_label }}" class="form-label">Quote Total</label>
+                        <div class="input-group input-group-sm">
+                            <div class="flex-1">{{ form.quote_value }}</div>
+                            <button type="button" id="btn-recalc-quote-value"
+                                    class="btn btn-success btn-sm">ReCalc</button>
+                        </div>
+                        {% if form.quote_value.errors %}<div class="mt-1 text-sm text-red-600">{{ form.quote_value.errors }}</div>{% endif %}
+                    </div>
                 </div>
-            </section>
+            </div>
 
+            {# Hidden fields — not displayed but must be submitted #}
             <div class="hidden" aria-hidden="true">
                 {{ form.po_num_ext }}
                 {{ form.po_number }}
@@ -220,12 +242,10 @@
             <input type="hidden" name="contract" id="id_contract" value="{{ form.initial.contract }}">
             {% endif %}
 
-            <div class="mt-8 flex flex-col gap-4 border-t border-gray-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex flex-wrap items-center gap-3">
-                    <button type="submit" class="rounded-md bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700">
-                        Save CLIN
-                    </button>
-                </div>
+            <div class="mt-6 d-flex align-items-center justify-content-between border-t border-gray-200 pt-4">
+                <button type="submit" class="btn btn-success px-5">
+                    Save CLIN
+                </button>
                 <div>
                     {% if form.initial.contract %}
                     <a href="{% url 'contracts:contract_management' form.initial.contract %}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Cancel</a>
@@ -448,31 +468,10 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         var orderQty = document.getElementById('id_order_qty');
-        var orderMirror = document.getElementById('order_qty_mirror');
         var uom = document.getElementById('id_uom');
-        var uomMirror = document.getElementById('supplier_uom_mirror');
         var nsnDisplay = document.getElementById('nsn_display');
         var nsnModal = document.getElementById('nsn-modal');
         var supplierModal = document.getElementById('supplier-modal');
-
-        function syncMirrors() {
-            if (orderMirror && orderQty) orderMirror.value = orderQty.value || '';
-            if (uomMirror && uom) uomMirror.value = uom.value || '';
-        }
-
-        syncMirrors();
-        if (orderQty) {
-            orderQty.addEventListener('input', syncMirrors);
-            orderQty.addEventListener('change', syncMirrors);
-        }
-        if (uom) {
-            uom.addEventListener('change', function () {
-                syncMirrors();
-            });
-            uom.addEventListener('input', function () {
-                if (uomMirror) uomMirror.value = uom.value || '';
-            });
-        }
 
         var itemVal = document.getElementById('id_item_value');
         var unitPrice = document.getElementById('id_unit_price');
@@ -571,85 +570,7 @@
             if (window.notify) window.notify(type, msg, duration);
         };
 
-        window.updateCellValue = function (clinId, fieldType, newValue) {
-            var displayField = document.getElementById(fieldType + '_display');
-            var hiddenField = document.getElementById('id_' + fieldType);
-            if (displayField && hiddenField) {
-                var numericValue = parseFloat(newValue);
-                var formattedValue = numericValue.toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-                displayField.value = formattedValue;
-                hiddenField.value = numericValue.toFixed(2);
-                displayField.setAttribute('data-current-value', numericValue.toFixed(2));
-                var currentValueElement = document.querySelector('.payment-history-popup .current-value');
-                if (currentValueElement) currentValueElement.textContent = formattedValue;
-                var currentValueText = document.querySelector('.payment-history-popup .current-value-text');
-                if (currentValueText) currentValueText.textContent = 'Current Value: ' + formattedValue;
-                displayField.style.transition = 'background-color 0.5s ease';
-                displayField.style.backgroundColor = '#e6ffe6';
-                setTimeout(function () { displayField.style.backgroundColor = ''; }, 1000);
-                notifyToast(fieldType.replace(/_/g, ' ').replace(/\b\w/g, function (l) { return l.toUpperCase(); }) + ' updated to ' + formattedValue, 'success');
-                return true;
-            }
-            notifyToast('Error: Could not update display value', 'error');
-            return false;
-        };
-
-        window.updatePaymentHistoryTotal = function (fieldType) {
-            var table = document.querySelector('.payment-history-table');
-            if (!table) return;
-            var total = 0;
-            table.querySelectorAll('tr:not(:first-child):not(:last-child) td:nth-child(2)').forEach(function (cell) {
-                var amount = parseFloat(cell.textContent.replace(/[^-\d.]/g, '')) || 0;
-                total += amount;
-            });
-            var totalRow = table.querySelector('tr:last-child td:nth-child(2)');
-            if (totalRow) {
-                totalRow.textContent = total.toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            }
-            if (window.updateCellValue) {
-                var clinEl = document.querySelector('[data-clin]');
-                var cid = clinEl ? clinEl.getAttribute('data-clin') : '';
-                window.updateCellValue(cid, fieldType, total);
-            }
-        };
-
-        var paymentHistoryForm = document.querySelector('.payment-history-form');
-        if (paymentHistoryForm) {
-            paymentHistoryForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                var fieldType = document.querySelector('.payment-history-popup') && document.querySelector('.payment-history-popup').dataset.fieldType;
-                var fd = new FormData(paymentHistoryForm);
-                fetch(paymentHistoryForm.action, {
-                    method: 'POST',
-                    body: fd,
-                    headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
-                })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (data.success) {
-                            var tableBody = document.querySelector('.payment-history-table tbody');
-                            if (tableBody && data.html) tableBody.innerHTML = data.html;
-                            if (fieldType && window.updatePaymentHistoryTotal) window.updatePaymentHistoryTotal(fieldType);
-                            paymentHistoryForm.reset();
-                            notifyToast('Payment entry added successfully', 'success');
-                        } else {
-                            notifyToast(data.error || 'Error adding payment entry', 'error');
-                        }
-                    })
-                    .catch(function () { notifyToast('Error adding payment entry', 'error'); });
-            });
-        }
-
+        // Form submission validation
         var clinForm = document.getElementById('clin-form');
         if (clinForm) {
             clinForm.addEventListener('submit', function (e) {
