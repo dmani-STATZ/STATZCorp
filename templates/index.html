@@ -306,7 +306,11 @@
 {% endblock body %}
 
 {% block extra_scripts %}
+{% load tz %}
+{% get_current_timezone as TIME_ZONE %}
 <script>
+
+    const DISPLAY_TZ = "{{ TIME_ZONE }}";
 
     // --- Admin Toggle (superuser only) ---
     (function initAdminToggle(){
@@ -633,6 +637,30 @@
         updateExportLink(calendarPointer);
     }
 
+    function formatEventTime(isoString) {
+        const dt = new Date(isoString);
+        const parts = dt.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            timeZone: DISPLAY_TZ
+        });
+        // toLocaleTimeString returns "HH:MM:SS" — take only HH:MM
+        return parts.slice(0, 5);
+    }
+
+    function extractLocalDateParts(isoString) {
+        const dt = new Date(isoString);
+        return dt.toLocaleDateString('en-CA', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            timeZone: DISPLAY_TZ
+        });
+    }
+
+    function extractLocalTimeParts(isoString) {
+        return formatEventTime(isoString);
+    }
+
     async function fetchAndPaintEvents(date) {
         const year = date.getFullYear();
         const month = date.getMonth();
@@ -685,18 +713,14 @@
                             label = `${lock}${icon}${ev.title}`;
                             sortKey = '00:00';
                         } else {
-                            const time = new Date(ev.start);
-                            const hh = String(time.getHours()).padStart(2,'0');
-                            const mm = String(time.getMinutes()).padStart(2,'0');
-                            label = `${lock}${icon}${hh}:${mm} ${ev.title}`;
-                            sortKey = `${hh}:${mm}`;
+                            const timeStr = formatEventTime(ev.start);
+                            label = `${lock}${icon}${timeStr} ${ev.title}`;
+                            sortKey = timeStr;
                         }
                     } else if (segEnd && !ev.all_day) {
-                        const time = new Date(ev.end);
-                        const hh = String(time.getHours()).padStart(2,'0');
-                        const mm = String(time.getMinutes()).padStart(2,'0');
-                        label = `${lock}${icon}${ev.title} (${hh}:${mm})`;
-                        sortKey = `${hh}:${mm}`;
+                        const timeStr = formatEventTime(ev.end);
+                        label = `${lock}${icon}${ev.title} (${timeStr})`;
+                        sortKey = timeStr;
                     } else {
                         label = `${lock}${icon}${ev.title}`;
                         sortKey = '00:00';
@@ -941,21 +965,18 @@
             if (prefill.location) document.getElementById('eventLocation').value = prefill.location;
             if (prefill.description) document.getElementById('eventDescription').value = prefill.description;
             if (prefill.start) {
-                const st = new Date(prefill.start);
-                dateInput.value = `${st.getFullYear()}-${String(st.getMonth()+1).padStart(2,'0')}-${String(st.getDate()).padStart(2,'0')}`;
-                document.getElementById('eventStartTime').value = `${String(st.getHours()).padStart(2,'0')}:${String(st.getMinutes()).padStart(2,'0')}`;
+                dateInput.value = extractLocalDateParts(prefill.start);
+                document.getElementById('eventStartTime').value = extractLocalTimeParts(prefill.start);
             }
             if (prefill.end) {
-                const en = new Date(prefill.end);
-                document.getElementById('eventEndTime').value = `${String(en.getHours()).padStart(2,'0')}:${String(en.getMinutes()).padStart(2,'0')}`;
+                document.getElementById('eventEndTime').value = extractLocalTimeParts(prefill.end);
             }
             if (prefill.allDay) {
                 document.getElementById('eventAllDay').checked = true;
                 onAllDayChange();
                 // Fill end date for all-day prefill
                 if (prefill.end) {
-                    const en = new Date(prefill.end);
-                    endDateInput.value = `${en.getFullYear()}-${String(en.getMonth()+1).padStart(2,'0')}-${String(en.getDate()).padStart(2,'0')}`;
+                    endDateInput.value = extractLocalDateParts(prefill.end);
                 }
             }
             if (typeof prefill.isPrivate !== 'undefined') {
@@ -1166,14 +1187,15 @@
         const st = new Date(el.dataset.start);
         const en = new Date(el.dataset.end);
         let range = '';
+        const tzOpts = { timeZone: DISPLAY_TZ };
         if (el.dataset.allDay === '1') {
-            if (st.toDateString() === en.toDateString()) {
-                range = st.toLocaleDateString();
+            if (extractLocalDateParts(el.dataset.start) === extractLocalDateParts(el.dataset.end)) {
+                range = st.toLocaleDateString('en-US', tzOpts);
             } else {
-                range = `${st.toLocaleDateString()} - ${en.toLocaleDateString()}`;
+                range = `${st.toLocaleDateString('en-US', tzOpts)} - ${en.toLocaleDateString('en-US', tzOpts)}`;
             }
         } else {
-            range = `${st.toLocaleString()} - ${en.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            range = `${st.toLocaleString('en-US', tzOpts)} - ${formatEventTime(el.dataset.end)}`;
         }
         document.getElementById('detailWhen').textContent = range;
         document.getElementById('detailLocation').textContent = el.dataset.location ? `Location: ${el.dataset.location}` : '';
