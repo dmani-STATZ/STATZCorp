@@ -13,6 +13,8 @@ from urllib.parse import quote
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import connection, transaction
+from django.db.utils import Error as DjangoDbError
 from django.utils import dateparse
 from django.utils import timezone
 
@@ -25,6 +27,16 @@ GRAPH_BASE = "https://graph.microsoft.us/v1.0"
 GRAPH_SCOPE = "https://graph.microsoft.us/.default"
 
 User = get_user_model()
+
+try:
+    import pyodbc
+except ImportError:  # pragma: no cover
+    pyodbc = None  # type: ignore[assignment]
+
+CHUNK_SIZE = 50  # process this many items per DB connection cycle
+CHUNK_DB_ERRORS: tuple = (
+    (DjangoDbError, pyodbc.Error) if pyodbc is not None else (DjangoDbError,)
+)
 
 
 def get_graph_service_token() -> str:
@@ -140,6 +152,15 @@ def _fetch_all_list_items(token: str, site_id: str, list_id: str) -> List[Dict[s
     return items
 
 
+def _ensure_db_connection() -> None:
+    """Close and reopen the DB connection to recover from dropped connections."""
+    try:
+        connection.close()
+    except Exception:
+        pass
+    # Django will automatically open a new connection on next query
+
+
 def sync_sharepoint_calendar() -> Dict[str, int]:
     """
     Pull SharePoint calendar list items and upsert WorkCalendarEvent rows.
@@ -175,96 +196,140 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
 
     created = updated = skipped = errors = 0
 
-    for item in items:
-        sp_id = item.get("id")
-        if sp_id is None:
-            logger.warning("Skipping list item with no id: %s", item)
-            errors += 1
-            continue
-        sp_id_str = str(sp_id).strip()
-        fields = item.get("fields") or {}
+    chunks = [items[i : i + CHUNK_SIZE] for i in range(0, len(items), CHUNK_SIZE)]
 
-        lm_raw = item.get("lastModifiedDateTime")
-        sp_lm = _parse_graph_datetime(lm_raw)
-        if sp_lm is None and lm_raw:
-            logger.warning(
-                "Could not parse lastModifiedDateTime for item id=%s (%r); using None.",
-                sp_id_str,
-                lm_raw,
-            )
-
-        start_raw = _event_start_field(fields)
-        end_raw = _event_end_field(fields)
-        start_at = _parse_graph_datetime(start_raw)
-        end_at = _parse_graph_datetime(end_raw)
-        if start_at is None or end_at is None:
-            logger.warning(
-                "Skipping SharePoint item id=%s: missing or unparsable start/end "
-                "(start=%r end=%r).",
-                sp_id_str,
-                start_raw,
-                end_raw,
-            )
-            errors += 1
-            continue
-
-        title = _event_title(fields)
-        kind = _map_category_to_kind(fields.get("Category"))
-
+    for chunk_index, chunk in enumerate(chunks):
+        chunk_lo = chunk_index * CHUNK_SIZE
+        chunk_hi = chunk_lo + len(chunk) - 1
+        _ensure_db_connection()
         try:
-            existing = WorkCalendarEvent.objects.filter(sharepoint_id=sp_id_str).first()
-            if existing:
-                stored_lm = existing.sharepoint_last_modified
-                if sp_lm is not None and stored_lm is not None and sp_lm <= stored_lm:
-                    skipped += 1
-                    continue
+            with transaction.atomic():
+                for item in chunk:
+                    sp_id = item.get("id")
+                    if sp_id is None:
+                        logger.warning("Skipping list item with no id: %s", item)
+                        errors += 1
+                        continue
+                    sp_id_str = str(sp_id).strip()
+                    fields = item.get("fields") or {}
 
-                existing.title = title
-                existing.kind = kind
-                existing.start_at = start_at
-                existing.end_at = end_at
-                existing.organizer = owner
-                existing.source_system = "sharepoint"
-                existing.source_identifier = sp_id_str
-                existing.sharepoint_id = sp_id_str
-                existing.sharepoint_last_modified = sp_lm
-                existing.full_clean()
-                existing.save()
-                updated += 1
-                logger.info(
-                    "Updated WorkCalendarEvent id=%s sharepoint_id=%s",
-                    existing.pk,
-                    sp_id_str,
-                )
-            else:
-                ev = WorkCalendarEvent(
-                    title=title,
-                    description="",
-                    kind=kind,
-                    start_at=start_at,
-                    end_at=end_at,
-                    organizer=owner,
-                    priority="normal",
-                    is_private=False,
-                    source_system="sharepoint",
-                    source_identifier=sp_id_str,
-                    sharepoint_id=sp_id_str,
-                    sharepoint_last_modified=sp_lm,
-                )
-                ev.full_clean()
-                ev.save()
-                created += 1
-                logger.info(
-                    "Created WorkCalendarEvent id=%s sharepoint_id=%s",
-                    ev.pk,
-                    sp_id_str,
-                )
-        except Exception as ex:
-            errors += 1
-            logger.exception(
-                "Error processing SharePoint item id=%s: %s",
-                sp_id_str,
+                    try:
+                        lm_raw = item.get("lastModifiedDateTime")
+                        sp_lm = _parse_graph_datetime(lm_raw)
+                        if sp_lm is None and lm_raw:
+                            logger.warning(
+                                "Could not parse lastModifiedDateTime for item id=%s (%r); using None.",
+                                sp_id_str,
+                                lm_raw,
+                            )
+
+                        start_raw = _event_start_field(fields)
+                        end_raw = _event_end_field(fields)
+                        start_at = _parse_graph_datetime(start_raw)
+                        end_at = _parse_graph_datetime(end_raw)
+                        if start_at is None or end_at is None:
+                            logger.warning(
+                                "Skipping SharePoint item id=%s: missing or unparsable start/end "
+                                "(start=%r end=%r).",
+                                sp_id_str,
+                                start_raw,
+                                end_raw,
+                            )
+                            errors += 1
+                            continue
+
+                        title = _event_title(fields)
+                        kind = _map_category_to_kind(fields.get("Category"))
+                    except ValueError as ex:
+                        errors += 1
+                        logger.warning(
+                            "Parse error for SharePoint item id=%s: %s",
+                            sp_id_str,
+                            ex,
+                        )
+                        continue
+
+                    try:
+                        existing = WorkCalendarEvent.objects.filter(
+                            sharepoint_id=sp_id_str
+                        ).first()
+                        if existing:
+                            stored_lm = existing.sharepoint_last_modified
+                            if (
+                                sp_lm is not None
+                                and stored_lm is not None
+                                and sp_lm <= stored_lm
+                            ):
+                                skipped += 1
+                                continue
+
+                            existing.title = title
+                            existing.kind = kind
+                            existing.start_at = start_at
+                            existing.end_at = end_at
+                            existing.organizer = owner
+                            existing.source_system = "sharepoint"
+                            existing.source_identifier = sp_id_str
+                            existing.sharepoint_id = sp_id_str
+                            existing.sharepoint_last_modified = sp_lm
+                            existing.full_clean()
+                            existing.save()
+                            updated += 1
+                            logger.info(
+                                "Updated WorkCalendarEvent id=%s sharepoint_id=%s",
+                                existing.pk,
+                                sp_id_str,
+                            )
+                        else:
+                            ev = WorkCalendarEvent(
+                                title=title,
+                                description="",
+                                kind=kind,
+                                start_at=start_at,
+                                end_at=end_at,
+                                organizer=owner,
+                                priority="normal",
+                                is_private=False,
+                                source_system="sharepoint",
+                                source_identifier=sp_id_str,
+                                sharepoint_id=sp_id_str,
+                                sharepoint_last_modified=sp_lm,
+                            )
+                            ev.full_clean()
+                            ev.save()
+                            created += 1
+                            logger.info(
+                                "Created WorkCalendarEvent id=%s sharepoint_id=%s",
+                                ev.pk,
+                                sp_id_str,
+                            )
+                    except CHUNK_DB_ERRORS:
+                        raise
+                    except Exception as ex:
+                        errors += 1
+                        logger.exception(
+                            "Error processing SharePoint item id=%s: %s",
+                            sp_id_str,
+                            ex,
+                        )
+        except CHUNK_DB_ERRORS as ex:
+            errors += len(chunk)
+            logger.warning(
+                "Database error while processing SharePoint calendar chunk "
+                "items[%s:%s] (indices): %s",
+                chunk_lo,
+                chunk_hi,
                 ex,
+            )
+        else:
+            logger.info(
+                "Chunk complete: processed %s items, running totals: "
+                "created=%s updated=%s skipped=%s errors=%s",
+                len(chunk),
+                created,
+                updated,
+                skipped,
+                errors,
             )
 
     stats = {
