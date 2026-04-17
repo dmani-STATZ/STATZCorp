@@ -2,7 +2,7 @@
  * STATZ Corporation - Theme Toggle System
  *
  * This JavaScript file handles the theme toggle functionality between light and dark modes.
- * It works in conjunction with the light-mode.css and dark-mode.css files to provide a
+ * It works with `theme-vars.css` (CSS variables on `body` / `body.dark`) and `app-core.css` for a
  * consistent theming experience.
  * 
  * The main components:

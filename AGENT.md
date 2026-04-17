@@ -54,6 +54,53 @@ Blocked cases: row already has a contract number, item is `is_being_processed`, 
 
 ## UI Improvements
 
+### CSS Refactor Phase 1 — theme-vars.css (2026-04-16)
+
+Created `static/css/theme-vars.css` as the single source of truth for all color tokens. Merged contents from:
+- `:root` block from `base.css` (brand tokens: `--company-primary`, `--company-secondary`, `--company-danger`, `--main-font`, `--header-height`)
+- `semantic-light.css` (all light-mode semantic variables, selector changed from `body.light` → `:root, body`)
+- `semantic-dark.css` (all dark-mode semantic variables, `body.dark` selector preserved)
+
+**Bug fixes included:**
+- `--secondary` was referencing `--company-secondary` (`#e5e7eb`) making secondary buttons nearly invisible on light backgrounds. Fixed to hardcoded `#6b7280` in both light and dark modes.
+- `--danger` in light mode wired to `var(--company-danger)` brand token for consistency (was hardcoded `#dc2626`).
+- `--danger-hover` in light mode adjusted from `#b91c1c` → `#991b1b` to maintain visual contrast with the new base danger color.
+- `--secondary-hover` in light mode adjusted from `#6b7280` → `#4b5563` so hover state is visually distinct from base state.
+- Dead CSS fallback values removed from `--primary`, `--secondary`, and `--danger` (fallbacks never fired because brand tokens are always defined in `:root`).
+- Applied style declarations (`background-color`, `color`) removed from theme variable blocks — these will be handled by `app-core.css` using `var()` references.
+
+**Files deleted:** `semantic-light.css`, `semantic-dark.css` (fully consumed by `theme-vars.css`).
+
+### CSS Refactor Phase 2 — app-core.css + HTML Link Update (2026-04-16)
+
+Created `static/css/app-core.css` consolidating all layout, structural, and component styles. Merged contents from:
+- `base.css` (everything except `:root` block)
+- `light-mode.css` (structural rules only, color assignments replaced with `var()` references)
+- `dark-mode.css` (all `body.dark` overrides, hex colors converted to `var()` references)
+- `components.css` (all rules)
+- `theme.css` (all rules, already var-based)
+
+**Duplicate conflicts resolved:**
+1. **Button class war:** `.btn-brand` deleted, triple `.btn-primary` consolidated to single `theme.css` version using `var(--primary)`. Old `base.css` `.btn-secondary` (hardcoded grays) replaced with `theme.css` version using `var(--secondary)`.
+2. **Layout helpers:** Deduplicated `.row`, `.row-between`, `.label`, `.text-muted`, `.card`, `.card-padded` — single copy of each, `.card` keeps the border from `base.css`.
+3. **`.section-header`:** Five definitions across three files collapsed to one using `var(--text-strong)`, `var(--surface-muted-bg)`, `var(--border-muted)`, `var(--primary)`. No `body.dark` override needed.
+4. **`.form-label`:** Two definitions collapsed to one using `var(--text-muted)`. No `body.dark` override needed.
+
+**Dead code removed:**
+- All `composes:` directives (CSS Modules syntax, non-functional in browser CSS)
+- `.nsn-modal*` empty stubs (HTML already applies `.modal-base` class directly)
+- Redundant `body.dark` overrides now handled by CSS variables
+
+**`/* NEEDS VAR */` flags placed on:**
+- `body.dark th` background (`#111827` — no semantic token for dark table header bg)
+- `body.dark a:not([class*="text-"])` link color (`#93c5fd` — needs lighter-than-primary token)
+- `body.dark .hover\:bg-*:hover` (`#4b5563` — needs hover-above-muted token)
+- `.protal-card-text` color (`#3966c9` — typo class with accent color, no matching token)
+
+**Files deleted:** `base.css`, `light-mode.css`, `dark-mode.css`, `components.css`, `theme.css`
+
+**HTML updated:** `templates/base_template.html` `<link>` tags replaced with new load order: `theme-vars.css` → `app-core.css` → `utilities.css`. Old `tailwind-compat.css` reference updated to `utilities.css` (copy of compat utilities).
+
 ### Global Width Expansion, Status Key Pairs & Action Button Refactor (2026-04-15)
 
 Updated `processing/templates/processing/process_contract_form.html` for 1920×1080 optimisation:

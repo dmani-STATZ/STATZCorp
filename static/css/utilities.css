@@ -1,5 +1,5 @@
 /*
- * tailwind-compat.css  — v2
+ * utilities.css  — v2 (Tailwind utility shim; formerly tailwind-compat.css)
  * Drop-in shim that covers ~85-90% of the Tailwind utility classes used
  * across the STATZCorp Django project.  Load this AFTER Bootstrap so
  * Bootstrap's resets are in place, then these classes can override where

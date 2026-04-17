@@ -1,11 +1,11 @@
 // Service Worker for STATZ Corporation PWA - No Offline Support
-const CACHE_NAME = 'statz-cache-v1';
+const CACHE_NAME = 'statz-cache-v2';
 
 // Assets to cache for performance improvements only (not offline)
 const STATIC_ASSETS = [
-    '/static/css/base.css',
-    '/static/css/light-mode.css',
-    '/static/css/dark-mode.css',
+    '/static/css/theme-vars.css',
+    '/static/css/app-core.css',
+    '/static/css/utilities.css',
     '/static/images/StatzCorpColorFINAL.png',
     '/static/favicon/favicon.ico',
     // Icon files
