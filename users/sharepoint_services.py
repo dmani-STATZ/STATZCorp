@@ -6,7 +6,7 @@ Uses the STATZ Web App Mail service principal (client credentials), not user OAu
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
@@ -96,7 +96,7 @@ def _event_title(fields: Dict[str, Any]) -> str:
 
 
 def _event_start_field(fields: Dict[str, Any]) -> Any:
-    for key in ("EventDate", "StartDate", "Start_x0020_Date"):
+    for key in ("StartDate", "EventDate", "Start_x0020_Date"):
         if fields.get(key) not in (None, ""):
             return fields.get(key)
     return None
@@ -237,6 +237,9 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
                             )
                             errors += 1
                             continue
+
+                        if end_at <= start_at:
+                            end_at = start_at + timedelta(hours=24)
 
                         title = _event_title(fields)
                         kind = _map_category_to_kind(fields.get("Category"))
