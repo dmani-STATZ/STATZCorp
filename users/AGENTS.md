@@ -102,6 +102,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 | Change auth flow | `azure_auth.py` → `ms_views.py` → `views.py` (login_view, oauth_* views) → templates (login.html, oauth_*.html) |
 | Change password forms | `forms.py` → templates (password_change.html, password_set.html, oauth_password_set.html) |
 | Change `SystemMessage` | `models.py` → `migrations/` → `views.py` (message views) → `context_processors.py` (unread count) → `urls.py` → `templates/users/system_messages.html` |
+| SharePoint sync config change | `sharepoint_services.py` → `STATZWeb/settings.py` → `users/CONTEXT.md` |
 
 ---
 
@@ -232,6 +233,8 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 11. **`UserOAuthToken.is_expired` uses `timezone.now()`.** If the system clock is wrong or tokens have unusual expiry times, token refresh logic can misbehave silently.
 
 12. **`STATZWeb/middleware.py` also imports `AppPermission` and `AppRegistry`** — separate from `users/middleware.py`. Two middleware files manage related concerns; a change to the permission model must be reflected in both.
+
+13. **`sharepoint_services.get_graph_service_token()`** uses the client credentials flow against `login.microsoftonline.us` — not the user OAuth flow. Do not mix these two token flows. Do not pass a service token to `UserOAuthToken` or `azure_auth` helpers. The calendar list and the document library are on different SharePoint sites. Always use `SHAREPOINT_CALENDAR_SITE_ID` for calendar Graph calls and `SHAREPOINT_SITE_ID` for document library Graph calls. Never substitute one for the other.
 
 ---
 

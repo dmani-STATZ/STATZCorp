@@ -16,6 +16,7 @@ eady(), ensuring default settings/states are created on user creation.
 - Power the portal/dashboard JSON APIs for sections, resources, tasks, events, NLP scheduling, micro-breaks, analytics, and announcements (iews.port*, portal_services.py, models.WorkCalendar*, models.Portal*).
 - Manage user-level configuration through UserSetting/UserSettingState, the UserSettings helper, AJAX endpoints, and context processors that inject preferences, unread message counts, and the active company into templates.
 - Offer staff utilities such as system messaging, SharePoint calendar import/export, company switching, and management commands that clean up or refresh the permission registry.
+- Sync SharePoint calendar list items into WorkCalendarEvent records via the Microsoft Graph API service principal (sharepoint_services.py).
 
 ## 4. Key Files and What They Do
 - pps.py: Defines UsersConfig and hooks the users.signals module so new users get default UserSettingState rows.
@@ -24,6 +25,7 @@ eady(), ensuring default settings/states are created on user creation.
 - orms.py: Stylized BaseFormMixin, plus domain forms (PortalSectionForm, PortalResourceForm, WorkCalendarEventForm, WorkCalendarTaskForm, EventAttachmentForm, PasswordChange/Set, EmailLookup, OAuthPasswordSet, AdminLoginForm) that validate the concrete business rules (link/file requirements, password length/matching, etc.).
 - dmin.py: Custom AppPermissionAdmin that rebuilds permissions per user, portal/admin model registrations for sections/resources, calendar objects, natural language requests, analytics/micro-breaks, and UserCompanyMembership, plus the supporting inline forms shown in staff screens.
 - portal_services.py: Serializes portal data for the dashboard (serialize_section, serialize_event, etc.) and selects the visible sections/events/tasks using the same models iews expose.
+- sharepoint_services.py: Client-credentials Graph API token acquisition and SharePoint calendar list sync logic. Uses GRAPH_MAIL_* and SHAREPOINT_* settings. Two SharePoint sites are in use: `SHAREPOINT_SITE_ID` targets the Statz site (contract document library); `SHAREPOINT_CALENDAR_SITE_ID` targets the Communication site (Events calendar list). Entry point: sync_sharepoint_calendar().
 - zure_auth.py: A Microsoft backend that talks to MSAL/Graph, creates users if allowed, stores/refreshes UserOAuthToken, and exposes get_valid_microsoft_token for other code that needs API access.
 - ms_views.py: HTTP flows that build the MSAL authorization URL, manage callback state, log users in, set session flags, and redirect back to the PWA.
 - context_processors.py: Supplies user_preferences (from UserSettings), cache_version, OpenRouter AI model defaults (suppliers.openrouter_config), unread_messages_count, and ctive_company/available_companies using contracts.Company and UserCompanyMembership.
@@ -116,7 +118,7 @@ equests, openpyxl, and optionally dateutil/python-dateutil (fall-back). The port
 - Company/settings: /users/switch-company/, /users/settings/view/, /users/settings/ajax/get/, /users/settings/ajax/save/, /users/settings/ajax/types/, /users/settings/view/.
 - Microsoft auth: /users/microsoft/login/, /users/microsoft/auth-callback/.
 - System messages: /users/messages/, /users/messages/create/, /users/messages/mark-read/<pk>/, /users/messages/mark-all-read/, /users/messages/unread-count/.
-- Portal APIs: /users/portal/dashboard/, /users/portal/sections/ (GET lists, POST upserts, /sections/<id>/delete/), /users/portal/resources/ (upsert/delete), /users/portal/tasks/create/, /users/portal/events/create/, /users/portal/events/import/sharepoint/, /users/portal/events/import/ui/, /users/portal/events/export/csv/, /users/portal/events/feed/, /users/portal/events/<id>/detail/, /users/portal/events/<id>/attachments/upsert/, /users/portal/events/attachments/<id>/delete/, /users/portal/events/<id>/update/, /users/portal/events/<id>/delete/, /users/portal/nlp-schedule/, /users/portal/microbreaks/create/, /users/portal/microbreaks/feed/.
+- Portal APIs: /users/portal/dashboard/, /users/portal/sections/ (GET lists, POST upserts, /sections/<id>/delete/), /users/portal/resources/ (upsert/delete), /users/portal/tasks/create/, /users/portal/events/create/, /users/portal/events/import/sharepoint/ (POST calls sync_sharepoint_calendar() and returns JSON sync stats: fetched, created, updated, skipped, errors), /users/portal/events/import/ui/, /users/portal/events/export/csv/, /users/portal/events/feed/, /users/portal/events/<id>/detail/, /users/portal/events/<id>/attachments/upsert/, /users/portal/events/attachments/<id>/delete/, /users/portal/events/<id>/update/, /users/portal/events/<id>/delete/, /users/portal/nlp-schedule/, /users/portal/microbreaks/create/, /users/portal/microbreaks/feed/.
 - SharePoint UI: /users/sharepoint-import-ui/ (staff-only, renders a form to call the endpoint above).
 
 ## 13. Permissions / Security Considerations
@@ -131,8 +133,9 @@ equest.user is the event creator. Superusers cannot edit others’ events.
 - System messages and settings pages employ CSRF-protected forms and JSON endpoints that only accept the advertised HTTP verbs.
 
 ## 14. Background Processing / Scheduled Work
-- No Celery workers or scheduled jobs live in this app. The asynchronous behaviors originate from HTTP endpoints (portal APIs, NLP parsing, SharePoint import). NaturalLanguageScheduleRequest rows are created synchronously when a user calls /portal/nlp-schedule/, and the auto-scheduling logic immediately persists WorkCalendarEvent + optional micro-break.
-- Management commands (update_app_registry, ix_*, cleanup_*, check_*, migrate_notes) are the only repeated maintenance tasks; they run manually or from deployment scripts.
+- No Celery workers live in this app. The asynchronous behaviors originate from HTTP endpoints (portal APIs, NLP parsing, SharePoint calendar sync trigger). NaturalLanguageScheduleRequest rows are created synchronously when a user calls /portal/nlp-schedule/, and the auto-scheduling logic immediately persists WorkCalendarEvent + optional micro-break.
+- Azure WebJobs (or similar) may run `python manage.py run_background_tasks` from the `core` app; that command invokes registered tasks including `users.tasks.sync_calendar.run()` (SharePoint list → WorkCalendarEvent sync via sharepoint_services.sync_sharepoint_calendar).
+- Management commands (update_app_registry, ix_*, cleanup_*, check_*, migrate_notes, discover_sharepoint_ids) are the main repeated maintenance tasks; they run manually or from deployment scripts.
 - Signals automatically create UserSettingState rows on User.post_save, giving new users the same default preferences without extra jobs.
 
 ## 15. Testing Coverage
@@ -144,7 +147,7 @@ users/tests.py is a stub (TestCase with “Create your tests here”), so there 
 - The portal models declare custom ordering/indexes (e.g., WorkCalendarEvent indexes on start_at and organizer, ScheduledMicroBreak ordered by start_at). The models also embed JSON blobs for metadata (PortalSection.configuration, WorkCalendarEvent.metadata, ScheduledMicroBreak.notes).
 
 ## 17. Known Gaps / Ambiguities
-- sharepoint_import_ui() renders users/import_sharepoint.html, but that template does not exist in 	emplates/users/, so uploading via the UI will 404 (the API endpoint /portal/events/import/sharepoint/ still works if hit directly).
+- sharepoint_import_ui() renders users/import_sharepoint.html, but that template does not exist in 	emplates/users/, so uploading via the UI will 404 (POST /portal/events/import/sharepoint/ still works for Graph-based calendar sync if hit directly with a logged-in session).
 - The 
 egister() view immediately redirects to Microsoft, so the existing 
 egister.html template never renders unless another view uses it.

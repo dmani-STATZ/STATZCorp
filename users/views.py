@@ -1514,24 +1514,20 @@ def _import_sharepoint_xlsx_core(workbook, organizer):
 @login_required
 @require_http_methods(["POST"])
 def portal_import_sharepoint_xlsx(request):
-    """Import SharePoint calendar export (XLSX) via API. Returns JSON counts."""
-    from openpyxl import load_workbook
-    from io import BytesIO
-    import os
+    """Sync SharePoint calendar list into WorkCalendarEvent via Graph API. Returns JSON stats."""
+    from users.sharepoint_services import sync_sharepoint_calendar
 
-    f = request.FILES.get('file') if hasattr(request, 'FILES') else None
     try:
-        if f:
-            wb = load_workbook(filename=BytesIO(f.read()), data_only=True)
-        else:
-            path = os.path.join(os.path.dirname(__file__), 'AllItems.xlsx')
-            if not os.path.exists(path):
-                return JsonResponse({'error': 'No file uploaded and default AllItems.xlsx not found.'}, status=400)
-            wb = load_workbook(filename=path, data_only=True)
-        created, errors = _import_sharepoint_xlsx_core(wb, request.user)
-        return JsonResponse({'imported': created, 'skipped': errors})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        stats = sync_sharepoint_calendar()
+        return JsonResponse(stats, status=200)
+    except RuntimeError as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    except Exception:
+        logger.exception("portal_import_sharepoint_xlsx: sync failed")
+        return JsonResponse(
+            {"error": "Sync failed. Check server logs."},
+            status=500,
+        )
 
 
 def _is_staff(user):

@@ -344,6 +344,28 @@ GRAPH_MAIL_ENABLED = (
     os.environ.get("GRAPH_MAIL_ENABLED", "False").strip().lower() == "true"
 )
 
+# ---------------------------------------------------------------------------
+# SharePoint / Graph API — Service Principal (STATZ Web App Mail registration)
+# Used for app-only (client credentials) access to SharePoint calendar
+# and document library. NOT the same as the user OAuth flow in AZURE_AD_CONFIG.
+# Run: python manage.py discover_sharepoint_ids  to find Site/Drive/List IDs.
+#
+# TWO SITES ARE IN USE:
+#   SHAREPOINT_SITE_ID          = Statz site (contract document library)
+#   SHAREPOINT_CALENDAR_SITE_ID = Communication site (Events calendar list)
+# ---------------------------------------------------------------------------
+SHAREPOINT_SITE_ID = os.environ.get("SHAREPOINT_SITE_ID", "")
+SHAREPOINT_DRIVE_ID = os.environ.get("SHAREPOINT_DRIVE_ID", "")
+SHAREPOINT_CALENDAR_SITE_ID = os.environ.get("SHAREPOINT_CALENDAR_SITE_ID", "")
+SHAREPOINT_CALENDAR_LIST_ID = os.environ.get(
+    "SHAREPOINT_CALENDAR_LIST_ID",
+    "74b6b9bd-479a-4892-893f-84611c753734",
+)
+SHAREPOINT_SYNC_USER_EMAIL = os.environ.get(
+    "SHAREPOINT_SYNC_USER_EMAIL",
+    "Info@statzcorp.com",
+)
+
 # Authentication settings
 LOGIN_REDIRECT_URL = "index"
 LOGOUT_REDIRECT_URL = "landing"
