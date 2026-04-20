@@ -195,6 +195,12 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
         ) from exc
 
     created = updated = skipped = errors = 0
+    has_all_day_field = any(
+        getattr(field, "name", None) == "all_day"
+        for field in WorkCalendarEvent._meta.get_fields()
+    )
+    # NOTE: If WorkCalendarEvent lacks `all_day`, add that model field + migration
+    # to persist SharePoint all-day semantics for UI time-label suppression.
 
     chunks = [items[i : i + CHUNK_SIZE] for i in range(0, len(items), CHUNK_SIZE)]
 
@@ -238,8 +244,11 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
                             errors += 1
                             continue
 
+                        original_start_at = start_at
+                        original_end_at = end_at
                         if end_at <= start_at:
                             end_at = start_at + timedelta(hours=24)
+                        is_all_day = original_end_at == original_start_at
 
                         title = _event_title(fields)
                         kind = _map_category_to_kind(fields.get("Category"))
@@ -270,6 +279,8 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
                             existing.kind = kind
                             existing.start_at = start_at
                             existing.end_at = end_at
+                            if has_all_day_field:
+                                existing.all_day = is_all_day
                             existing.organizer = owner
                             existing.source_system = "sharepoint"
                             existing.source_identifier = sp_id_str
@@ -297,6 +308,7 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
                                 source_identifier=sp_id_str,
                                 sharepoint_id=sp_id_str,
                                 sharepoint_last_modified=sp_lm,
+                                **({"all_day": is_all_day} if has_all_day_field else {}),
                             )
                             ev.full_clean()
                             ev.save()

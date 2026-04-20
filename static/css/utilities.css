@@ -695,6 +695,7 @@
    .bg-lime-500    { background-color: #84cc16; }
    
    /* Misc */
+   .bg-opacity-10  { background-color: rgba(0,0,0,0.1); }
    .bg-opacity-40  { background-color: rgba(0,0,0,0.4); }
    .bg-opacity-50  { background-color: rgba(0,0,0,0.5); }
    .bg-gray-600\/50 { background-color: rgba(75,85,99,0.5); }

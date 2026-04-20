@@ -133,7 +133,7 @@
     </div>
 
     <!-- Add Event Modal -->
-    <div id="addEventModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+    <div id="addEventModal" class="hidden fixed inset-0 bg-black bg-opacity-10 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-lg">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold">Add Event</h3>
@@ -221,7 +221,7 @@
     </div>
 
     <!-- Event Details Modal -->
-    <div id="eventDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+    <div id="eventDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-10 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold" id="detailTitle">Event</h3>
@@ -262,7 +262,7 @@
     </div>
 
     <!-- Day Events Modal -->
-    <div id="dayEventsModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+    <div id="dayEventsModal" class="hidden fixed inset-0 bg-black bg-opacity-10 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold" id="dayEventsDate">Events</h3>
@@ -674,6 +674,10 @@
         const url = `{% url 'users:portal_event_feed' %}?start=${encodeURIComponent(toISO(start))}&end=${encodeURIComponent(toISO(end))}`;
         const MAX_PER_DAY = 3;
         window.dayEventsData = {};
+        // Clear all existing event elements from calendar cells
+        document.querySelectorAll('[data-event-list]').forEach(el => {
+            el.innerHTML = '';
+        });
         try {
             const resp = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
             if (!resp.ok) return;
