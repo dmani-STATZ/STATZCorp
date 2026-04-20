@@ -103,9 +103,11 @@
             <div class="flex items-center gap-3">
                 <h2 class="text-xl font-medium text-gray-800 cursor-pointer select-none" onclick="toggleCalendarMenu()">Calendar</h2>
                 <button type="button" onclick="openAddEventModal()" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Add Event</button>
-                <button type="button" id="spSyncBtn" onclick="runSharePointSync()" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
+                {% if request.user.is_superuser %}
+                <button type="button" id="spSyncBtn" onclick="runSharePointSync()" class="admin-ui px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
                     <span id="spSyncIcon">⟳</span> Sync SP
                 </button>
+                {% endif %}
                 <div id="calendarMenu" class="hidden ml-2 text-sm">
                     {% if user.is_staff or user.is_superuser %}
                     <a href="{% url 'users:sharepoint_import_ui' %}" class="px-2 py-1 border rounded hover:bg-gray-100 mr-2">Import from SharePoint</a>
@@ -1420,9 +1422,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         document.body.appendChild(modal);
-    }
-    if (typeof runSharePointSync === 'function') {
-        runSharePointSync({ silent: true });
     }
 });
 

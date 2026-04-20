@@ -238,6 +238,8 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 14. **SharePoint calendar timezone correction:** `sharepoint_services._correct_sharepoint_datetime()` is required for every Graph start/end datetime entering `WorkCalendarEvent` from `sync_sharepoint_calendar()`. Do not bypass it or parse Graph UTC values directly for those fields — the SharePoint site is Pacific-configured while users type Central, so raw Graph UTC is offset-corrupted. Behavior is driven by env var `SHAREPOINT_SOURCE_TIMEZONE`.
 
+15. **Calendar sync triggers**: Do NOT re-add auto-sync on index page load — the scheduled WebJob owns recurring sync. The manual "Sync SP" button is intentionally superuser-gated (both in the template and at the view level). Re-exposing it to all users would double-bill Graph API calls against the already-running WebJob.
+
 ---
 
 ## 14. Safe Change Workflow

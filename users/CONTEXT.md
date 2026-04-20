@@ -35,6 +35,11 @@ eady(), ensuring default settings/states are created on user creation.
 - Env var `SHAREPOINT_SOURCE_TIMEZONE` (default `America/Los_Angeles`) drives the source-timezone step. If IT changes the SharePoint site regional setting, update this env var (for example to `America/Chicago`) without a code deploy.
 - All-day detection runs after timezone correction: corrected `start.time() == 00:00` with `start == end` sets `all_day=True` and applies the existing `timedelta(hours=24)` end workaround for `end_at > start_at` validation; two midnights with `end > start` preserves multi-day all-day spans.
 
+### Sync Triggers
+- The calendar sync is driven by a scheduled WebJob; in-page auto-sync on index load has been removed.
+- A manual "Sync SP" button remains on the index page but is rendered only for superusers and the backend endpoint requires superuser permission.
+- Regular users rely on the WebJob for calendar freshness; they cannot trigger a manual sync from the UI.
+
 ### Calendar UI — client-side date handling
 - `templates/index.html` derives every per-day key (event buckets, month-grid cell IDs, today-highlight, day-modal lookup) through `extractLocalDateParts` against `DISPLAY_TZ` (= Django `TIME_ZONE`). Buckets, cell IDs, and the time labels emitted by `formatEventTime` therefore all reference the same timezone regardless of the viewer's browser TZ.
 - Rationale: when bucketing read calendar-day components via `Date.getFullYear/getMonth/getDate` (browser-local) while labels used `DISPLAY_TZ`, events near midnight dropped into the wrong cell — or silently disappeared — for anyone outside Central. The two sides of the join must derive keys through the same helper.

@@ -4,7 +4,7 @@ Main views for STATZWeb application.
 
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from users.forms import PortalResourceForm, PortalSectionForm, WorkCalendarEventForm, WorkCalendarTaskForm
@@ -156,6 +156,7 @@ def delete_announcement(request, announcement_id):
 
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser)
 @require_http_methods(["POST"])
 def sharepoint_sync_view(request):
     """Run two-way SharePoint list sync for work calendar events (Microsoft Graph)."""
