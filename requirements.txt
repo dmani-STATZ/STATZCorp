@@ -22,11 +22,11 @@ django-cors-headers==4.4.0
 python-docx==1.1.0
 docx2pdf==0.1.8
 openpyxl==3.1.5
-Pillow==12.1.1
+Pillow==12.2.0
 reportlab==4.3.0
 
 # PDF processing - Migrated to pypdf for better security and maintenance
-pypdf==6.7.2  # Latest version with enhanced security and performance
+pypdf==6.7.3  # Latest version with enhanced security and performance
 pdfplumber==0.11.5
 
 # LLM — solicitation PDF analysis (workbench)
@@ -34,7 +34,7 @@ anthropic>=0.40.0
 
 # Utilities
 python-dateutil==2.9.0.post0
-requests==2.32.4  # Latest version with .netrc fix
+requests==2.33.0  # Latest version with .netrc fix
 beautifulsoup4==4.12.3
 playwright==1.49.0  # DIBBS fetch: consent + file downloads on dibbs2
 python-slugify==8.0.4
@@ -46,7 +46,7 @@ django-browser-reload==1.15.0
 python-dotenv==1.0.1
 
 # Security
-cryptography==46.0.5
+cryptography==46.0.6
 
 #Extras
 pyOpenSSL==26.0.0

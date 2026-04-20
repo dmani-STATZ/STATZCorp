@@ -26,6 +26,14 @@ eady(), ensuring default settings/states are created on user creation.
 - dmin.py: Custom AppPermissionAdmin that rebuilds permissions per user, portal/admin model registrations for sections/resources, calendar objects, natural language requests, analytics/micro-breaks, and UserCompanyMembership, plus the supporting inline forms shown in staff screens.
 - portal_services.py: Serializes portal data for the dashboard (serialize_section, serialize_event, etc.) and selects the visible sections/events/tasks using the same models iews expose.
 - sharepoint_services.py: Client-credentials Graph API token acquisition and SharePoint calendar list sync logic. Uses GRAPH_MAIL_* and SHAREPOINT_* settings. Two SharePoint sites are in use: `SHAREPOINT_SITE_ID` targets the Statz site (contract document library); `SHAREPOINT_CALENDAR_SITE_ID` targets the Communication site (Events calendar list). Entry point: sync_sharepoint_calendar().
+
+### SharePoint calendar sync — timezone handling (critical)
+- SharePoint site is configured as `America/Los_Angeles` (Pacific) — IT-managed and outside app control.
+- STATZ users are in `America/Chicago` (Central) and enter event times as Central wall-clock values.
+- SharePoint stores UTC using the site regional assumption, so Graph returns offset-corrupted UTC for those inputs.
+- `sharepoint_services._correct_sharepoint_datetime()` reinterprets each incoming Graph start/end: UTC → Pacific wall-clock → strip tz → re-localize as Central (`settings.TIME_ZONE`) → convert to UTC for `WorkCalendarEvent` storage.
+- Env var `SHAREPOINT_SOURCE_TIMEZONE` (default `America/Los_Angeles`) drives the source-timezone step. If IT changes the SharePoint site regional setting, update this env var (for example to `America/Chicago`) without a code deploy.
+- All-day detection runs after timezone correction: corrected `start.time() == 00:00` with `start == end` sets `all_day=True` and applies the existing `timedelta(hours=24)` end workaround for `end_at > start_at` validation; two midnights with `end > start` preserves multi-day all-day spans.
 - zure_auth.py: A Microsoft backend that talks to MSAL/Graph, creates users if allowed, stores/refreshes UserOAuthToken, and exposes get_valid_microsoft_token for other code that needs API access.
 - ms_views.py: HTTP flows that build the MSAL authorization URL, manage callback state, log users in, set session flags, and redirect back to the PWA.
 - context_processors.py: Supplies user_preferences (from UserSettings), cache_version, OpenRouter AI model defaults (suppliers.openrouter_config), unread_messages_count, and ctive_company/available_companies using contracts.Company and UserCompanyMembership.

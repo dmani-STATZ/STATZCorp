@@ -236,6 +236,8 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 13. **`sharepoint_services.get_graph_service_token()`** uses the client credentials flow against `login.microsoftonline.us` — not the user OAuth flow. Do not mix these two token flows. Do not pass a service token to `UserOAuthToken` or `azure_auth` helpers. The calendar list and the document library are on different SharePoint sites. Always use `SHAREPOINT_CALENDAR_SITE_ID` for calendar Graph calls and `SHAREPOINT_SITE_ID` for document library Graph calls. Never substitute one for the other.
 
+14. **SharePoint calendar timezone correction:** `sharepoint_services._correct_sharepoint_datetime()` is required for every Graph start/end datetime entering `WorkCalendarEvent` from `sync_sharepoint_calendar()`. Do not bypass it or parse Graph UTC values directly for those fields — the SharePoint site is Pacific-configured while users type Central, so raw Graph UTC is offset-corrupted. Behavior is driven by env var `SHAREPOINT_SOURCE_TIMEZONE`.
+
 ---
 
 ## 14. Safe Change Workflow

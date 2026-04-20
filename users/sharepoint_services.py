@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import requests
 from django.conf import settings
@@ -85,6 +86,44 @@ def _parse_graph_datetime(value: Any) -> Optional[datetime]:
     if timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone=timezone.utc)
     return dt
+
+
+def _correct_sharepoint_datetime(value: Any) -> Optional[datetime]:
+    """
+    Reinterpret a Graph-returned UTC datetime to correct for the SharePoint site's
+    regional timezone misalignment with STATZ users (Central wall-clock vs
+    Pacific-configured site).
+
+    Pipeline:
+      1. Parse UTC ISO string from Graph.
+      2. Convert UTC -> SHAREPOINT_SOURCE_TIMEZONE to recover the user-typed wall-clock.
+      3. Strip tz to get naive datetime.
+      4. Re-localize as settings.TIME_ZONE (user's intended timezone).
+      5. Return timezone-aware datetime in that zone.
+
+    Caller converts to UTC before DB storage if needed.
+    """
+    if value is None or value == "":
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        utc_dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if utc_dt.tzinfo is None:
+        utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
+    else:
+        utc_dt = utc_dt.astimezone(ZoneInfo("UTC"))
+
+    source_tz = ZoneInfo(settings.SHAREPOINT_SOURCE_TIMEZONE)
+    target_tz = ZoneInfo(settings.TIME_ZONE)
+
+    source_wallclock = utc_dt.astimezone(source_tz)
+    naive = source_wallclock.replace(tzinfo=None)
+    corrected = naive.replace(tzinfo=target_tz)
+    return corrected
 
 
 def _event_title(fields: Dict[str, Any]) -> str:
@@ -231,9 +270,9 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
 
                         start_raw = _event_start_field(fields)
                         end_raw = _event_end_field(fields)
-                        start_at = _parse_graph_datetime(start_raw)
-                        end_at = _parse_graph_datetime(end_raw)
-                        if start_at is None or end_at is None:
+                        start_corrected = _correct_sharepoint_datetime(start_raw)
+                        end_corrected = _correct_sharepoint_datetime(end_raw)
+                        if start_corrected is None or end_corrected is None:
                             logger.warning(
                                 "Skipping SharePoint item id=%s: missing or unparsable start/end "
                                 "(start=%r end=%r).",
@@ -244,11 +283,22 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
                             errors += 1
                             continue
 
-                        original_start_at = start_at
-                        original_end_at = end_at
-                        if end_at <= start_at:
-                            end_at = start_at + timedelta(hours=24)
-                        is_all_day = original_end_at == original_start_at
+                        is_all_day = False
+                        if start_corrected.time() == datetime.min.time():
+                            if start_corrected == end_corrected:
+                                is_all_day = True
+                                end_corrected = end_corrected + timedelta(hours=24)
+                            elif (
+                                end_corrected.time() == datetime.min.time()
+                                and end_corrected > start_corrected
+                            ):
+                                is_all_day = True
+                        if not is_all_day and end_corrected <= start_corrected:
+                            end_corrected = start_corrected + timedelta(hours=24)
+
+                        utc_tz = ZoneInfo("UTC")
+                        start_at = start_corrected.astimezone(utc_tz)
+                        end_at = end_corrected.astimezone(utc_tz)
 
                         title = _event_title(fields)
                         kind = _map_category_to_kind(fields.get("Category"))

@@ -365,6 +365,13 @@ SHAREPOINT_SYNC_USER_EMAIL = os.environ.get(
     "SHAREPOINT_SYNC_USER_EMAIL",
     "Info@statzcorp.com",
 )
+# Source timezone of the SharePoint site. Used to reinterpret naive wall-clock times
+# entered by Central-timezone users into a Pacific-configured site. Set to
+# America/Chicago if IT fixes the site regional setting.
+SHAREPOINT_SOURCE_TIMEZONE = os.environ.get(
+    "SHAREPOINT_SOURCE_TIMEZONE",
+    "America/Los_Angeles",
+)
 
 # Authentication settings
 LOGIN_REDIRECT_URL = "index"
