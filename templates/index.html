@@ -697,7 +697,7 @@
             for (const ev of data.events) {
                 const styles = styleForEvent(ev);
                 const startKey = extractLocalDateParts(ev.start);
-                const endKey = extractLocalDateParts(ev.end);
+                const endKey = extractLocalDateParts(new Date(new Date(ev.end).getTime() - 1).toISOString());
                 let dateKey = startKey;
                 while (dateKey <= endKey) {
                     const segStart = (dateKey === startKey);
