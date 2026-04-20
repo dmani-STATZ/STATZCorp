@@ -34,6 +34,12 @@ eady(), ensuring default settings/states are created on user creation.
 - `sharepoint_services._correct_sharepoint_datetime()` reinterprets each incoming Graph start/end: UTC → Pacific wall-clock → strip tz → re-localize as Central (`settings.TIME_ZONE`) → convert to UTC for `WorkCalendarEvent` storage.
 - Env var `SHAREPOINT_SOURCE_TIMEZONE` (default `America/Los_Angeles`) drives the source-timezone step. If IT changes the SharePoint site regional setting, update this env var (for example to `America/Chicago`) without a code deploy.
 - All-day detection runs after timezone correction: corrected `start.time() == 00:00` with `start == end` sets `all_day=True` and applies the existing `timedelta(hours=24)` end workaround for `end_at > start_at` validation; two midnights with `end > start` preserves multi-day all-day spans.
+
+### Calendar UI — client-side date handling
+- `templates/index.html` derives every per-day key (event buckets, month-grid cell IDs, today-highlight, day-modal lookup) through `extractLocalDateParts` against `DISPLAY_TZ` (= Django `TIME_ZONE`). Buckets, cell IDs, and the time labels emitted by `formatEventTime` therefore all reference the same timezone regardless of the viewer's browser TZ.
+- Rationale: when bucketing read calendar-day components via `Date.getFullYear/getMonth/getDate` (browser-local) while labels used `DISPLAY_TZ`, events near midnight dropped into the wrong cell — or silently disappeared — for anyone outside Central. The two sides of the join must derive keys through the same helper.
+- Multi-day iteration uses `addDaysToDateKey(key, n)` — pure integer arithmetic on `YYYY-MM-DD` strings via `Date.UTC` — so day-stepping never introduces a timezone reinterpretation. Do not replace with `setDate()` cursors.
+- "Today" highlighting and the Today button resolve to DISPLAY_TZ-today via `todayInDisplayTz()`, so a shared company calendar lands every viewer on the same cell.
 - zure_auth.py: A Microsoft backend that talks to MSAL/Graph, creates users if allowed, stores/refreshes UserOAuthToken, and exposes get_valid_microsoft_token for other code that needs API access.
 - ms_views.py: HTTP flows that build the MSAL authorization URL, manage callback state, log users in, set session flags, and redirect back to the PWA.
 - context_processors.py: Supplies user_preferences (from UserSettings), cache_version, OpenRouter AI model defaults (suppliers.openrouter_config), unread_messages_count, and ctive_company/available_companies using contracts.Company and UserCompanyMembership.

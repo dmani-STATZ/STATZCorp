@@ -547,12 +547,12 @@
             grid.appendChild(cell);
         }
 
-        const today = new Date();
-        const isTodayMonth = (today.getFullYear() === year && today.getMonth() === month);
+        const todayKey = extractLocalDateParts(new Date());
         for (let d = 1; d <= daysInMonth; d++) {
+            const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const cell = document.createElement('div');
             let classes = 'p-2 text-xs border rounded h-28 text-left flex flex-col';
-            if (isTodayMonth && d === today.getDate()) {
+            if (dateKey === todayKey) {
                 classes += ' bg-blue-600 text-white font-semibold';
             } else {
                 classes += ' bg-white dark:bg-gray-700';
@@ -561,7 +561,6 @@
             const topRow = document.createElement('div');
             topRow.className = 'flex items-start justify-between';
             const counts = document.createElement('div');
-            const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             counts.id = `counts-${dateKey}`;
             counts.className = 'text-[10px] leading-none';
             counts.innerHTML = '';
@@ -575,8 +574,7 @@
             const list = document.createElement('div');
             list.className = 'mt-1 space-y-1';
             list.setAttribute('data-event-list', '');
-            const idKey = `cal-day-${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            cell.id = idKey;
+            cell.id = `cal-day-${dateKey}`;
             cell.appendChild(list);
             grid.appendChild(cell);
         }
@@ -617,7 +615,7 @@
     // Render current month on load
     document.addEventListener('DOMContentLoaded', function() {
         try {
-            calendarPointer = new Date();
+            calendarPointer = todayInDisplayTz();
             renderCalendarFor(calendarPointer);
             fetchAndPaintEvents(calendarPointer);
             fetchAndPaintContractCounts(calendarPointer);
@@ -661,6 +659,17 @@
         return formatEventTime(isoString);
     }
 
+    function addDaysToDateKey(key, n) {
+        const [y, m, d] = key.split('-').map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d + n));
+        return dt.toISOString().slice(0, 10);
+    }
+
+    function todayInDisplayTz() {
+        const parts = extractLocalDateParts(new Date()).split('-').map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
     async function fetchAndPaintEvents(date) {
         const year = date.getFullYear();
         const month = date.getMonth();
@@ -684,19 +693,17 @@
             const data = await resp.json();
             if (!data || !Array.isArray(data.events)) return;
 
-            // Aggregate events per visible day
+            // Aggregate events per visible day (keys in DISPLAY_TZ)
             for (const ev of data.events) {
                 const styles = styleForEvent(ev);
-                const startDt = new Date(ev.start);
-                const endDt = new Date(ev.end);
-                const startDay = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate());
-                const endDay = new Date(endDt.getFullYear(), endDt.getMonth(), endDt.getDate());
-                for (let d = new Date(startDay); d <= endDay; d.setDate(d.getDate() + 1)) {
-                    const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                    const segStart = (d.getTime() === startDay.getTime());
-                    const segEnd = (d.getTime() === endDay.getTime());
+                const startKey = extractLocalDateParts(ev.start);
+                const endKey = extractLocalDateParts(ev.end);
+                let dateKey = startKey;
+                while (dateKey <= endKey) {
+                    const segStart = (dateKey === startKey);
+                    const segEnd = (dateKey === endKey);
                     let segClasses = '';
-                    if (startDay.getTime() === endDay.getTime()) {
+                    if (startKey === endKey) {
                         segClasses = 'rounded';
                     } else if (segStart && segEnd) {
                         segClasses = 'rounded';
@@ -709,7 +716,6 @@
                     }
                     const icon = styles.icon ? styles.icon + ' ' : '';
                     const lock = ev.is_private ? '🔒 ' : '';
-                    const prefix = '';
                     let label;
                     let sortKey;
                     if (segStart) {
@@ -748,6 +754,7 @@
                         sortKey,
                     };
                     (window.dayEventsData[dateKey] ||= []).push(rec);
+                    dateKey = addDaysToDateKey(dateKey, 1);
                 }
             }
 
@@ -890,7 +897,7 @@
     }
 
     function goToToday() {
-        calendarPointer = new Date();
+        calendarPointer = todayInDisplayTz();
         renderCalendarFor(calendarPointer);
         fetchAndPaintEvents(calendarPointer);
         fetchAndPaintContractCounts(calendarPointer);
