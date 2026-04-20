@@ -21,6 +21,12 @@
                 <button onclick="document.getElementById('csv-upload').click()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
                     Upload CSV
                 </button>
+                <button onclick="scanAllSharepoint()" id="scan-sharepoint-btn" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded inline-flex items-center gap-1">
+                    <svg id="scan-sp-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Scan SharePoint
+                </button>
                 <input type="file" id="csv-upload" class="hidden" accept=".csv,.pdf" multiple onchange="handleFileUpload(this)">
             </div>
         </div>
@@ -63,6 +69,8 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th class="px-3 py-2 text-center tracking-wider label" title="SharePoint Folder">Folder</th>
+                        <th class="px-3 py-2 text-center tracking-wider label" title="Award PDF in SharePoint">PDF</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Contract Number</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Type</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Buyer</th>
@@ -84,6 +92,8 @@
                         <td></td>
                         <td></td>
                         <td></td>
+                        <td></td>
+                        <td></td>
                         <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
                             <button onclick="showContractNumberPrompt()" class="text-blue-600 hover:text-blue-900 mr-3 btn btn-nav">
                                 Start New Contract
@@ -94,6 +104,67 @@
                     <tr data-contract-id="{{ contract.id }}"
                         data-contract-type="{{ contract.contract_type|default:'' }}"
                         data-process-contract-id="">
+                        {# SharePoint folder status #}
+                        <td class="px-3 py-2 whitespace-nowrap text-center" id="sp-folder-cell-{{ contract.id }}">
+                            {% if contract.sharepoint_folder_status == 'created' or contract.sharepoint_folder_status == 'exists' %}
+                                {% if contract.sharepoint_folder_url %}
+                                <a href="{{ contract.sharepoint_folder_url }}" target="_blank" title="SharePoint folder exists — click to open">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z" />
+                                    </svg>
+                                </a>
+                                {% else %}
+                                <span title="SharePoint folder exists">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z" />
+                                    </svg>
+                                </span>
+                                {% endif %}
+                            {% elif contract.sharepoint_folder_status == 'error' %}
+                                <span title="Folder error: {{ contract.sharepoint_notes|default:''|truncatechars:80 }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-500 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15Zm-6.75-10.5a.75.75 0 0 0-1.5 0v4.19l-1.72-1.72a.75.75 0 0 0-1.06 1.06l3 3a.75.75 0 0 0 1.06 0l3-3a.75.75 0 1 0-1.06-1.06l-1.72 1.72V10.5ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            {% else %}
+                                <span title="SharePoint folder not yet created">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-300 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z" />
+                                    </svg>
+                                </span>
+                            {% endif %}
+                            <button type="button"
+                                    onclick="scanRowSharepoint({{ contract.id }})"
+                                    class="ml-1 text-gray-300 hover:text-teal-600 focus:outline-none align-middle"
+                                    id="sp-scan-btn-{{ contract.id }}"
+                                    title="Re-check SharePoint status for this contract">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                            </button>
+                        </td>
+                        {# Award PDF upload status #}
+                        <td class="px-3 py-2 whitespace-nowrap text-center" id="sp-pdf-cell-{{ contract.id }}">
+                            {% if contract.award_pdf_status == 'uploaded' %}
+                                <span title="Award PDF uploaded to SharePoint">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.25 6a.75.75 0 0 0-1.5 0v4.94l-1.72-1.72a.75.75 0 0 0-1.06 1.06l3 3a.75.75 0 0 0 1.06 0l3-3a.75.75 0 1 0-1.06-1.06l-1.72 1.72V9.75Z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            {% elif contract.award_pdf_status == 'error' %}
+                                <span title="PDF upload error: {{ contract.sharepoint_notes|default:''|truncatechars:80 }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-500 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.03 5.47a.75.75 0 0 0-1.06 0L9 11.69 6.53 9.22a.75.75 0 0 0-1.06 1.06L7.94 12.75l-2.47 2.47a.75.75 0 1 0 1.06 1.06L9 13.81l2.47 2.47a.75.75 0 1 0 1.06-1.06l-2.47-2.47 2.47-2.47a.75.75 0 0 0 0-1.06Z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            {% else %}
+                                <span title="Award PDF not yet uploaded to SharePoint">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-300 inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.25 6a.75.75 0 0 0-1.5 0v4.94l-1.72-1.72a.75.75 0 0 0-1.06 1.06l3 3a.75.75 0 0 0 1.06 0l3-3a.75.75 0 1 0-1.06-1.06l-1.72 1.72V9.75Z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-2 whitespace-nowrap">{% if contract.contract_number %}{{ contract.contract_number }}{% else %}<span class="text-gray-500">—</span>{% endif %}</td>
                         <td class="px-6 py-2 whitespace-nowrap">
                             {% if contract.contract_type == 'IDIQ' %}
@@ -216,7 +287,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="px-3 py-2 text-center text-gray-500">
+                        <td colspan="11" class="px-3 py-2 text-center text-gray-500">
                             No contracts in queue
                         </td>
                     </tr>
@@ -863,6 +934,79 @@
         .catch(error => {
             console.error('Error:', error);
             showToast('An error occurred while deleting the contract', 'error');
+        });
+    }
+
+    const SCAN_SP_URL = "{% url 'processing:scan_sharepoint_status' %}";
+    const FOLDER_SVG_GREEN = `<a href="{url}" target="_blank" title="SharePoint folder exists — click to open"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600 inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/></svg></a>`;
+    const FOLDER_SVG_GRAY = `<span title="SharePoint folder not yet created"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-300 inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/></svg></span>`;
+    const PDF_SVG_GREEN = `<span title="Award PDF present in SharePoint"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600 inline" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.25 6a.75.75 0 0 0-1.5 0v4.94l-1.72-1.72a.75.75 0 0 0-1.06 1.06l3 3a.75.75 0 0 0 1.06 0l3-3a.75.75 0 1 0-1.06-1.06l-1.72 1.72V9.75Z" clip-rule="evenodd"/></svg></span>`;
+    const PDF_SVG_GRAY = `<span title="Award PDF not found in SharePoint"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-300 inline" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.25 6a.75.75 0 0 0-1.5 0v4.94l-1.72-1.72a.75.75 0 0 0-1.06 1.06l3 3a.75.75 0 0 0 1.06 0l3-3a.75.75 0 1 0-1.06-1.06l-1.72 1.72V9.75Z" clip-rule="evenodd"/></svg></span>`;
+    const SPIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400 inline animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`;
+
+    function _applySpResult(result) {
+        const folderCell = document.getElementById(`sp-folder-cell-${result.queue_id}`);
+        const pdfCell = document.getElementById(`sp-pdf-cell-${result.queue_id}`);
+        const scanBtn = document.getElementById(`sp-scan-btn-${result.queue_id}`);
+        if (!folderCell || !pdfCell) return;
+
+        const scanBtnHtml = scanBtn ? scanBtn.outerHTML : '';
+
+        if (result.error) {
+            folderCell.innerHTML = `<span class="text-red-400 text-xs" title="${result.error}">err</span>${scanBtnHtml}`;
+            return;
+        }
+        const folderHtml = result.folder_exists
+            ? FOLDER_SVG_GREEN.replace('{url}', result.folder_url || '#')
+            : FOLDER_SVG_GRAY;
+        folderCell.innerHTML = folderHtml + scanBtnHtml;
+
+        pdfCell.innerHTML = result.pdf_exists ? PDF_SVG_GREEN : PDF_SVG_GRAY;
+    }
+
+    function scanRowSharepoint(queueId) {
+        const scanBtn = document.getElementById(`sp-scan-btn-${queueId}`);
+        const folderCell = document.getElementById(`sp-folder-cell-${queueId}`);
+        if (folderCell) folderCell.innerHTML = SPIN_SVG;
+
+        fetch(SCAN_SP_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+            body: JSON.stringify({queue_id: queueId}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            const result = (data.results || [])[0];
+            if (result) _applySpResult(result);
+        })
+        .catch(() => {
+            if (folderCell) folderCell.innerHTML = `<span class="text-red-400 text-xs">err</span>`;
+        });
+    }
+
+    function scanAllSharepoint() {
+        const btn = document.getElementById('scan-sharepoint-btn');
+        const icon = document.getElementById('scan-sp-icon');
+        if (btn) btn.disabled = true;
+        if (icon) icon.classList.add('animate-spin');
+
+        fetch(SCAN_SP_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+            body: JSON.stringify({all: true}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            const results = data.results || [];
+            results.forEach(_applySpResult);
+            const checked = results.length;
+            const found = results.filter(r => r.folder_exists).length;
+            showToast(`Scanned ${checked} contract(s) — ${found} folder(s) found in SharePoint`, 'info');
+        })
+        .catch(() => showToast('SharePoint scan failed', 'error'))
+        .finally(() => {
+            if (btn) btn.disabled = false;
+            if (icon) icon.classList.remove('animate-spin');
         });
     }
     </script>

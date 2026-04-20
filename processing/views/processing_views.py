@@ -1857,14 +1857,88 @@ def download_test_data(request):
         logger.error(f"Error generating test data: {str(e)}")
         return HttpResponse("Error generating test data. Please check the logs for details.", status=500)
 
-def save_to_sharepoint(pdf_file, queue_contract):  # noqa: ARG001
+@login_required
+@require_http_methods(["POST"])
+def scan_sharepoint_status(request):
     """
-    Stub for future Microsoft Graph upload of award PDFs to SharePoint.
-    No network or filesystem side effects.
+    Read-only SharePoint check for one or all queued contracts.
+    Body JSON: {"queue_id": 123} for a single record, or {"all": true} for all unconfirmed.
+    Updates sharepoint_folder_status, sharepoint_folder_url, and award_pdf_status on each record.
     """
-    logger.info(
-        "TODO: Save to SharePoint via Microsoft Graph when permissions are available"
-    )
+    from users.sharepoint_services import check_contract_sharepoint_status
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError, ValueError):
+        body = {}
+
+    queue_id = body.get("queue_id")
+    scan_all = body.get("all")
+
+    if queue_id:
+        contracts = QueueContract.objects.filter(pk=queue_id, contract_number__isnull=False).exclude(contract_number="")
+    elif scan_all:
+        contracts = QueueContract.objects.filter(
+            contract_number__isnull=False
+        ).exclude(contract_number="").filter(
+            models.Q(sharepoint_folder_status__in=["pending", "error"]) |
+            models.Q(award_pdf_status__in=["pending", "error"])
+        )
+    else:
+        return JsonResponse({"error": "Provide queue_id or all=true"}, status=400)
+
+    results = []
+    for qc in contracts:
+        try:
+            status = check_contract_sharepoint_status(qc)
+            results.append({
+                "queue_id": qc.pk,
+                "contract_number": qc.contract_number,
+                "folder_status": qc.sharepoint_folder_status,
+                "folder_url": qc.sharepoint_folder_url or "",
+                "pdf_status": qc.award_pdf_status,
+                "folder_exists": status["folder_exists"],
+                "pdf_exists": status["pdf_exists"],
+            })
+        except Exception as exc:
+            logger.warning("SharePoint scan failed for queue %s: %s", qc.pk, exc)
+            results.append({
+                "queue_id": qc.pk,
+                "contract_number": qc.contract_number,
+                "error": str(exc)[:200],
+            })
+
+    return JsonResponse({"results": results})
+
+
+def save_to_sharepoint(pdf_file, queue_contract):
+    """
+    Create the contract folder in SharePoint and upload the award PDF.
+    Failure is non-fatal: status fields on queue_contract are updated to reflect the outcome.
+    """
+    if not queue_contract or not queue_contract.contract_number:
+        return
+    from users.sharepoint_services import ensure_contract_folder, upload_award_pdf_to_sharepoint
+    try:
+        folder_url, folder_existed = ensure_contract_folder(queue_contract)
+        queue_contract.sharepoint_folder_status = "exists" if folder_existed else "created"
+        queue_contract.sharepoint_folder_url = folder_url
+        queue_contract.save(update_fields=["sharepoint_folder_status", "sharepoint_folder_url"])
+        upload_award_pdf_to_sharepoint(pdf_file, queue_contract)
+        queue_contract.award_pdf_status = "uploaded"
+        queue_contract.save(update_fields=["award_pdf_status"])
+    except Exception as exc:
+        logger.warning(
+            "SharePoint save failed for %s: %s",
+            queue_contract.contract_number,
+            exc,
+        )
+        queue_contract.sharepoint_folder_status = "error"
+        queue_contract.sharepoint_notes = str(exc)[:500]
+        queue_contract.award_pdf_status = "error"
+        queue_contract.save(
+            update_fields=["sharepoint_folder_status", "sharepoint_notes", "award_pdf_status"]
+        )
 
 
 @login_required

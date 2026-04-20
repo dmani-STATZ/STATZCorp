@@ -406,3 +406,232 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
     }
     logger.info("SharePoint calendar sync finished: %s", stats)
     return stats
+
+
+_DEFAULT_DOCS_PATH = "Statz-Public/data/V87/aFed-DOD"
+
+
+def _get_drive_id() -> str:
+    drive_id = (getattr(settings, "SHAREPOINT_DRIVE_ID", None) or "").strip()
+    if not drive_id:
+        raise RuntimeError(
+            "SHAREPOINT_DRIVE_ID is not configured. "
+            "Run the discover_sharepoint_ids management command to find it."
+        )
+    return drive_id
+
+
+def _check_path_exists(token: str, drive_id: str, item_path: str) -> Optional[Dict[str, Any]]:
+    """
+    GET a drive item by path. Returns the item dict if it exists (HTTP 200), None if not found (HTTP 404).
+    Raises RuntimeError for other HTTP errors.
+    """
+    enc_drive = quote(drive_id, safe="")
+    enc_path = quote(item_path, safe="/")
+    url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_path}"
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(url, headers=headers, timeout=60)
+    if resp.status_code == 200:
+        return resp.json()
+    if resp.status_code == 404:
+        return None
+    raise RuntimeError(
+        f"Graph path check failed (path={item_path!r}) with HTTP {resp.status_code}: {resp.text}"
+    )
+
+
+def _create_folder(token: str, drive_id: str, parent_path: str, folder_name: str) -> Dict[str, Any]:
+    """
+    Create a folder at parent_path/folder_name using the Graph API.
+    Uses conflictBehavior=fail so we only POST when we know the folder doesn't exist.
+    Returns the drive item JSON from Graph.
+    """
+    enc_drive = quote(drive_id, safe="")
+    if parent_path:
+        enc_parent = quote(parent_path, safe="/")
+        url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_parent}:/children"
+    else:
+        url = f"{GRAPH_BASE}/drives/{enc_drive}/root/children"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "name": folder_name,
+        "folder": {},
+        "@microsoft.graph.conflictBehavior": "fail",
+    }
+    resp = requests.post(url, headers=headers, json=body, timeout=60)
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"Graph folder creation failed (parent={parent_path!r}, name={folder_name!r}) "
+            f"with HTTP {resp.status_code}: {resp.text}"
+        )
+    return resp.json()
+
+
+def ensure_contract_folder(queue_contract) -> tuple:
+    """
+    Ensure the SharePoint contract folder exists for the given QueueContract, creating it
+    (and any required parent folders) if necessary.
+
+    Folder path logic:
+      - IDIQ: {documents_path}/Contract {contract_number}/
+      - DO (has idiq_number): {documents_path}/Contract {idiq_number}/Delivery Order {contract_number}/
+      - All others (PO, AWD, MOD, …): {documents_path}/Contract {contract_number}/
+
+    Returns (web_url: str, already_existed: bool).
+    Raises RuntimeError on Graph API errors.
+    """
+    token = get_graph_service_token()
+    drive_id = _get_drive_id()
+
+    company = getattr(queue_contract, "company", None)
+    docs_path = (
+        (company.sharepoint_documents_path or "").strip().rstrip("/")
+        if company
+        else ""
+    ) or _DEFAULT_DOCS_PATH
+
+    contract_number = (queue_contract.contract_number or "").strip()
+    contract_type = (queue_contract.contract_type or "").strip().upper()
+    idiq_number = (queue_contract.idiq_number or "").strip()
+
+    if contract_type == "DO" and idiq_number:
+        target_path = f"{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}"
+    else:
+        target_path = f"{docs_path}/Contract {contract_number}"
+
+    # Check if the target folder already exists before creating anything
+    existing = _check_path_exists(token, drive_id, target_path)
+    if existing:
+        web_url = existing.get("webUrl") or ""
+        logger.info("SharePoint folder already exists for %s: %s", contract_number, web_url)
+        return web_url, True
+
+    # Folder doesn't exist — create it (and the IDIQ parent for DOs if needed)
+    if contract_type == "DO" and idiq_number:
+        idiq_path = f"{docs_path}/Contract {idiq_number}"
+        if not _check_path_exists(token, drive_id, idiq_path):
+            _create_folder(token, drive_id, docs_path, f"Contract {idiq_number}")
+        item = _create_folder(token, drive_id, idiq_path, f"Delivery Order {contract_number}")
+    else:
+        item = _create_folder(token, drive_id, docs_path, f"Contract {contract_number}")
+
+    web_url = item.get("webUrl") or ""
+    logger.info("SharePoint contract folder created for %s: %s", contract_number, web_url)
+    return web_url, False
+
+
+def upload_award_pdf_to_sharepoint(pdf_file, queue_contract) -> bool:
+    """
+    Upload pdf_file to the contract's SharePoint folder if not already present.
+    The file is named Award_{contract_number}.pdf inside the folder.
+
+    pdf_file must be a file-like object (Django InMemoryUploadedFile or TemporaryUploadedFile).
+    The file pointer is seeked back to 0 before reading, since pdfplumber may have
+    consumed the stream during parsing.
+
+    Returns True if the file already existed (skipped upload), False if it was uploaded.
+    """
+    token = get_graph_service_token()
+    drive_id = _get_drive_id()
+
+    company = getattr(queue_contract, "company", None)
+    docs_path = (
+        (company.sharepoint_documents_path or "").strip().rstrip("/")
+        if company
+        else ""
+    ) or _DEFAULT_DOCS_PATH
+
+    contract_number = (queue_contract.contract_number or "").strip()
+    contract_type = (queue_contract.contract_type or "").strip().upper()
+    idiq_number = (queue_contract.idiq_number or "").strip()
+
+    if contract_type == "DO" and idiq_number:
+        folder_path = f"{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}"
+    else:
+        folder_path = f"{docs_path}/Contract {contract_number}"
+
+    filename = f"Award_{contract_number}.pdf"
+    file_path = f"{folder_path}/{filename}"
+
+    # Check if the file is already in SharePoint before uploading
+    if _check_path_exists(token, drive_id, file_path):
+        logger.info("Award PDF already exists in SharePoint, skipping upload: %s", file_path)
+        return True
+
+    # Seek to start — pdfplumber reads the stream during parsing
+    if hasattr(pdf_file, "seek"):
+        pdf_file.seek(0)
+    file_bytes = pdf_file.read()
+
+    enc_drive = quote(drive_id, safe="")
+    enc_file_path = quote(file_path, safe="/")
+    url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_file_path}:/content"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/octet-stream",
+    }
+    resp = requests.put(url, headers=headers, data=file_bytes, timeout=120)
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"Graph file upload failed (path={file_path!r}) "
+            f"with HTTP {resp.status_code}: {resp.text}"
+        )
+    logger.info("Uploaded award PDF to SharePoint: %s", file_path)
+    return False
+
+
+def check_contract_sharepoint_status(queue_contract) -> Dict[str, bool]:
+    """
+    Read-only check: does the SharePoint contract folder exist? Does the award PDF exist?
+    Updates queue_contract status fields and saves. Returns {"folder_exists": bool, "pdf_exists": bool}.
+    Does NOT create folders or upload files.
+    """
+    token = get_graph_service_token()
+    drive_id = _get_drive_id()
+
+    company = getattr(queue_contract, "company", None)
+    docs_path = (
+        (company.sharepoint_documents_path or "").strip().rstrip("/")
+        if company
+        else ""
+    ) or _DEFAULT_DOCS_PATH
+
+    contract_number = (queue_contract.contract_number or "").strip()
+    contract_type = (queue_contract.contract_type or "").strip().upper()
+    idiq_number = (queue_contract.idiq_number or "").strip()
+
+    if contract_type == "DO" and idiq_number:
+        folder_path = f"{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}"
+    else:
+        folder_path = f"{docs_path}/Contract {contract_number}"
+
+    file_path = f"{folder_path}/Award_{contract_number}.pdf"
+
+    folder_item = _check_path_exists(token, drive_id, folder_path)
+    pdf_item = _check_path_exists(token, drive_id, file_path)
+
+    folder_exists = folder_item is not None
+    pdf_exists = pdf_item is not None
+
+    if folder_exists:
+        queue_contract.sharepoint_folder_status = "exists"
+        queue_contract.sharepoint_folder_url = folder_item.get("webUrl") or ""
+    else:
+        queue_contract.sharepoint_folder_status = "pending"
+        queue_contract.sharepoint_folder_url = None
+
+    queue_contract.award_pdf_status = "uploaded" if pdf_exists else "pending"
+    queue_contract.save(
+        update_fields=["sharepoint_folder_status", "sharepoint_folder_url", "award_pdf_status"]
+    )
+
+    logger.info(
+        "SharePoint status check for %s: folder=%s pdf=%s",
+        contract_number,
+        folder_exists,
+        pdf_exists,
+    )
+    return {"folder_exists": folder_exists, "pdf_exists": pdf_exists}

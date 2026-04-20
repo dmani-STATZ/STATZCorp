@@ -57,6 +57,28 @@ class QueueContract(AuditModel):
         blank=True
     )
 
+    sharepoint_folder_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('created', 'Created'),
+            ('exists', 'Already Exists'),
+            ('error', 'Error'),
+        ],
+        default='pending',
+    )
+    sharepoint_folder_url = models.CharField(max_length=500, null=True, blank=True)
+    award_pdf_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Not Uploaded'),
+            ('uploaded', 'Uploaded'),
+            ('error', 'Upload Error'),
+        ],
+        default='pending',
+    )
+    sharepoint_notes = models.TextField(null=True, blank=True)
+
     description = models.TextField(
         null=True,
         blank=True,

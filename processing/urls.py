@@ -32,6 +32,7 @@ from .views.processing_views import (
     save_contract,
     idiq_processing_edit,
     finalize_idiq_contract,
+    scan_sharepoint_status,
 )
 from .views.api_views import (
     get_processing_contract,
@@ -85,6 +86,9 @@ urlpatterns = [
     path('contract/<int:id>/update-values/', update_contract_values, name='update_contract_values'),
     path('save_contract/', save_contract, name='save_contract'),
     path('save-contract/', save_contract, name='save_contract'),
+
+    # SharePoint
+    path('queue/scan-sharepoint/', scan_sharepoint_status, name='scan_sharepoint_status'),
 
     # File Management
     path('download-template/', download_csv_template, name='download_csv_template'),
