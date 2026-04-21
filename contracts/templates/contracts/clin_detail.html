@@ -32,6 +32,7 @@
 
 <script>
 window.clinContentTypeId = {{ clin_content_type_id }};
+window.clinShipmentContentTypeId = {{ clinshipment_content_type_id }};
 window.clinId = {{ clin.id }};
 
 window.onTransactionSaved = function(data) {
@@ -46,6 +47,11 @@ window.onTransactionSaved = function(data) {
         var hist = document.getElementById('clin-transaction-history');
         if (hist) hist.innerHTML = html;
       });
+  }
+  if (data.content_type_id == window.clinShipmentContentTypeId) {
+    var fieldHyphen = data.field_name.replace(/_/g, '-');
+    var el = document.getElementById('shipment-' + data.object_id + '-' + fieldHyphen + '-value');
+    if (el) el.textContent = data.display_value || '—';
   }
 };
 </script>
@@ -305,8 +311,8 @@ window.onTransactionSaved = function(data) {
             </div>
         </div>
 
-        <div class="mb-8 mt-6">
-            {% include "contracts/partials/clin_shipments.html" with mode="detail" %}
+        <div class="mb-8 mt-6" id="shipping-information">
+            {% include "contracts/partials/clin_shipments.html" with mode="form" %}
         </div>
 
         <div>

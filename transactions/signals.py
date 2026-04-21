@@ -7,7 +7,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import Contract, Clin
+from contracts.models import Contract, Clin, ClinShipment
 from suppliers.models import Supplier
 from .models import Transaction
 from .middleware import get_current_user
@@ -36,6 +36,7 @@ TRACKED = [
     (Clin, "ship_date"),
     (Clin, "item_value"),
     (Clin, "uom"),
+    (ClinShipment, "pod_date"),
     # Supplier (supplier detail page)
     (Supplier, "name"),
     (Supplier, "cage_code"),
@@ -135,6 +136,15 @@ def store_old_state(sender, instance, **kwargs):
                     "ship_date": _serialize(row.get("ship_date")),
                     "item_value": _serialize(row.get("item_value")),
                     "uom": _serialize(row.get("uom")),
+                }
+        except Exception:
+            pass
+    elif sender is ClinShipment:
+        try:
+            row = ClinShipment.objects.filter(pk=instance.pk).values("pod_date").first()
+            if row is not None:
+                old_state[key] = {
+                    "pod_date": _serialize(row.get("pod_date")),
                 }
         except Exception:
             pass

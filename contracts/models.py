@@ -310,6 +310,7 @@ class ClinShipment(AuditModel):
     uom = models.CharField(max_length=10, null=True, blank=True)  # Unit of Measure
     ship_date = models.DateField(null=True, blank=True)
     comments = models.TextField(null=True, blank=True)
+    pod_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ['-ship_date', '-created_on']

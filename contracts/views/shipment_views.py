@@ -42,7 +42,9 @@ def create_shipment(request):
             ship_qty=float(data.get('ship_qty', 0.00)),
             uom=data.get('uom', clin.uom),  # Get UOM from data or default to what is in the CLIN
             ship_date=data.get('ship_date'),
-            comments=data.get('comments', '')
+            comments=data.get('comments', ''),
+            created_by=request.user,
+            modified_by=request.user,
         )
         
         logger.info(f"Successfully created shipment {shipment.id}")
@@ -91,7 +93,10 @@ def update_shipment(request, shipment_id):
             shipment.ship_date = data['ship_date']
         if 'comments' in data:
             shipment.comments = data['comments']
+        if 'pod_date' in data:
+            shipment.pod_date = data['pod_date'] or None
         
+        shipment.modified_by = request.user
         shipment.save()
         
         return JsonResponse({
@@ -134,7 +139,8 @@ def get_shipment(request, clin_id, shipment_id):
                 'ship_qty': shipment.ship_qty,
                 'uom': shipment.uom,
                 'ship_date': shipment.ship_date.isoformat() if shipment.ship_date else None,
-                'comments': shipment.comments
+                'comments': shipment.comments,
+                'pod_date': shipment.pod_date.isoformat() if shipment.pod_date else None,
             }
         })
     except Exception as e:
@@ -159,3 +165,40 @@ def get_clin_shipments(request, clin_id):
         'success': True,
         'html': html
     })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def complete_clin_shipping(request, clin_id):
+    """
+    Updates clin.ship_date and clin.ship_qty from the completed
+    shipments. Transaction records are written automatically by signals.
+    """
+    try:
+        data = json.loads(request.body)
+        clin = get_object_or_404(Clin, id=clin_id)
+
+        ship_date = data.get('ship_date')
+        ship_qty = data.get('ship_qty')
+
+        if not ship_date:
+            raise ValueError('Ship date is required')
+        if ship_qty is None:
+            raise ValueError('Ship quantity is required')
+
+        clin.ship_date = ship_date
+        clin.ship_qty = float(ship_qty)
+        clin.modified_by = request.user
+        clin.save(update_fields=['ship_date', 'ship_qty', 'modified_by',
+                                 'modified_on'])
+
+        return JsonResponse({
+            'success': True,
+            'ship_date': ship_date,
+            'ship_qty': float(ship_qty)
+        })
+
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

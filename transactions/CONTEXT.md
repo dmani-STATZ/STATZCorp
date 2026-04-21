@@ -1,7 +1,7 @@
 ﻿# Transactions Context
 
 ## 1. Purpose
-Track field-level edits for a handful of auditable models and surface that history in the UI while also letting staff overwrite a single field without leaving the page. The `transactions` app records every change to fields listed in `signals.TRACKED` (Contracts, CLINs, and Supplier detail fields) and exposes an AJAX-powered modal plus edit flow that reads from `Transaction` rows, shows typed values, and lets the user submit a new value that reuses the same history recording logic.
+Track field-level edits for a handful of auditable models and surface that history in the UI while also letting staff overwrite a single field without leaving the page. The `transactions` app records every change to fields listed in `signals.TRACKED` (Contracts, CLINs, `ClinShipment.pod_date`, and Supplier detail fields) and exposes an AJAX-powered modal plus edit flow that reads from `Transaction` rows, shows typed values, and lets the user submit a new value that reuses the same history recording logic.
 
 ## 2. App Identity
 - **Django app name:** `transactions`
@@ -23,7 +23,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 - `urls.py`: Namespaced `transactions` routes under `/transactions/...` for list, detail, edit, and field-info endpoints.
 - `field_types.py`: Computes widget type (`WIDGET_*` constants) plus optional choices (booleans, ForeignKeys, fields with `choices`), limiting FK choice lists to 500 rows for performance.
 - `utils.py`: Provides `get_field_value_display`, `set_field_value` (coercion for dates, FKs, numbers, booleans), and `get_display_value` for rendering updated values.
-- `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
+- `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, `ClinShipment` (currently `pod_date`), and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
 - `middleware.py`: `TransactionUserMiddleware` writes the authenticated user to a contextvar, clears the `old_state` cache each request, and is wired into `MIDDLEWARE` after authentication (`STATZWeb/settings.py:86/98`).
 - `admin.py`: Registers `Transaction` with read-only fields, filters, search, and `date_hierarchy` to support audits.
 - `templates/transactions/transaction_modal.html` plus `templates/transactions/partials/*`: Provide the modal shell, history table, edit form, detail view HTML, and embedded scripts that manage the modal lifecycle.
@@ -62,7 +62,7 @@ All views are decorated with `@login_required`, and `transaction_edit_field` use
 - `field_types.get_field_info` inspects the concrete field type, supplies `(value,label)` choices for booleans, ForeignKeys (using `_fk_choices` limited to 500 rows), and fields with `choices`, and returns the verbose name for UI labels.
 
 ## 10. Business Logic and Services
-- `signals.py` contains the core logic: `TRACKED` enumerates the fields audited on `Contract` (contract_number, po_number, tab_num, buyer, due_date, award_date, sales_class, solicitation_type), `Clin` (item_type, clin_po_num, supplier, nsn, ia, fob, special_payment_terms, supplier_due_date, due_date, order_qty, ship_qty, ship_date, item_value, uom), and `Supplier` (cage_code, dodaac, allows_gsi, probation, conditional, archived, iso, ppi, special_terms, supplier_type, business_phone, primary_phone, business_email, primary_email, website_url).
+- `signals.py` contains the core logic: `TRACKED` enumerates the fields audited on `Contract` (contract_number, po_number, tab_num, buyer, due_date, award_date, sales_class, solicitation_type), `Clin` (item_type, clin_po_num, supplier, nsn, ia, fob, special_payment_terms, supplier_due_date, due_date, order_qty, ship_qty, ship_date, item_value, uom), `ClinShipment` (`pod_date`), and `Supplier` (cage_code, dodaac, allows_gsi, probation, conditional, archived, iso, ppi, special_terms, supplier_type, business_phone, primary_phone, business_email, primary_email, website_url).
 - `store_old_state` (pre_save) queries the database for tracked values before the change, serializes them via `_serialize` (handling dates, datetimes, and FKs), and caches them in a request-scoped dictionary keyed by `(model_class, pk)`.
 - `record_transactions` (post_save) compares serialized old values to the instance’s new values and creates `Transaction` rows only when the value changed; `get_current_user()` provides the user for attribution.
 - `utils.set_field_value` handles coercion: it trims strings, enforces nullability, parses ISO dates/datetimes, resolves ForeignKeys by PK, converts numeric/decimal inputs, and normalizes booleans; it returns `False` when the conversion fails so the edit view can reject the request.
@@ -70,7 +70,7 @@ All views are decorated with `@login_required`, and `transaction_edit_field` use
 - `field_types`, `forms`, `utils`, and `views.transaction_edit_field` cooperate so edits are validated, coerced, saved, and trigger signal-driven `Transaction` creation without duplicate logic.
 
 ## 11. Integrations and Cross-App Dependencies
-- `contracts` and `suppliers` are imported directly in `signals.py`; only `contracts.models.Contract`, `contracts.models.Clin`, and `suppliers.models.Supplier` fields can currently trigger transactions (see `TRACKED`).
+- `contracts` and `suppliers` are imported directly in `signals.py`; `contracts.models.Contract`, `contracts.models.Clin`, `contracts.models.ClinShipment` (`pod_date`), and `suppliers.models.Supplier` fields listed in `TRACKED` trigger transactions.
 - `users` (via `get_user_model()` in `models.py`) supplies the `user` FK on `Transaction`, and the middleware saves `request.user` into a contextvar consumed by `signals` (`middleware.py`, `signals.py`).
 - `contenttypes` lets each `Transaction` point at any model; `ContentType` lookups appear in `models.py`, `views.py`, and `field_types.py`.
 - `STATZWeb/settings.py` lists `"transactions.apps.TransactionsConfig"` under `INSTALLED_APPS` and adds `"transactions.middleware.TransactionUserMiddleware"` (after authentication) to `MIDDLEWARE`, ensuring the middleware runs every request.

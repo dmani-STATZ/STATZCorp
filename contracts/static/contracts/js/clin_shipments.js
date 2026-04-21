@@ -56,11 +56,21 @@ const ClinShipments = {
 
         const totalQtySpan = document.getElementById('totalShipQty');
         if (totalQtySpan) totalQtySpan.textContent = totalQty.toFixed(2);
+
+        // Show Complete Shipping button only when fully shipped
+        const section = document.querySelector('.section');
+        const orderQty = section ? parseFloat(section.dataset.orderQty || 0) : 0;
+        const completeRow = document.getElementById('complete-shipping-row');
+        if (completeRow) {
+            completeRow.style.display = (orderQty > 0 && totalQty === orderQty)
+                ? '' : 'none';
+        }
     },
 
     addNewShipment() {
         const table = document.querySelector('#shipments-table');
-        
+        const section = document.querySelector('.section');
+
         // Remove the "No shipments found" message if it exists
         const noShipmentsMsg = document.getElementById('no-shipments-message');
         if (noShipmentsMsg) {
@@ -73,7 +83,8 @@ const ClinShipments = {
         const today = new Date().toISOString().split('T')[0];
         
         // Get the CLIN's UOM from the shipping_uom_display field
-        const clinUom = document.getElementById('shipping_uom_display').value || 'EA';
+        const uomEl = document.getElementById('shipping_uom_display');
+        const clinUom = (uomEl ? uomEl.value : null) || section.dataset.uom || 'EA';
         
         const newRow = document.createElement('tr');
         newRow.className = 'shipment-row unsaved-shipment';
@@ -117,6 +128,9 @@ const ClinShipments = {
                        id="ship-comments-new-${timestamp}"
                        name="shipments-new-${timestamp}-comments" 
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
+            </td>
+            <td class="px-4 py-3">
+                <span class="text-gray-400 text-sm">—</span>
             </td>
             <td class="px-4 py-3">
                 <div class="flex justify-center space-x-2">
@@ -177,7 +191,7 @@ const ClinShipments = {
             clin_id: clinId,
             ship_date: dateInput.value,
             ship_qty: parseFloat(qtyInput.value) || 0.00,
-            uom: uomInput.value.trim() || document.getElementById('shipping_uom_display').value || 'EA',
+            uom: uomInput.value.trim() || (document.getElementById('shipping_uom_display') ? document.getElementById('shipping_uom_display').value : null) || section.dataset.uom || 'EA',
             comments: commentsInput.value.trim()
         };
 
@@ -292,6 +306,106 @@ const ClinShipments = {
         } catch (error) {
             console.error('Delete shipment error:', error);
             this.showMessage('Error deleting shipment: ' + error.message, 'error');
+        }
+    },
+
+    showAuditInfo(button) {
+        const row = button.closest('tr');
+        document.getElementById('audit-comment').textContent = row.dataset.comment || '—';
+        document.getElementById('audit-created-by').textContent = row.dataset.createdBy || '—';
+        document.getElementById('audit-created-on').textContent = row.dataset.createdOn || '—';
+        document.getElementById('audit-modified-by').textContent = row.dataset.modifiedBy || '—';
+        document.getElementById('audit-modified-on').textContent = row.dataset.modifiedOn || '—';
+        const modal = new bootstrap.Modal(document.getElementById('shipment-audit-modal'));
+        modal.show();
+    },
+
+    completeShipping() {
+        // Pre-fill with last shipment's ship_date and total shipped qty
+        const rows = document.querySelectorAll(
+            '#shipments-table .shipment-row:not(.unsaved-shipment)'
+        );
+        let lastDate = '';
+        if (rows.length > 0) {
+            // Last row in DOM order (table is ordered -ship_date so first
+            // rendered = most recent; we want the most recent)
+            const firstRow = rows[0];
+            const dateInput = firstRow.querySelector('input[name$="-date"]');
+            if (dateInput) lastDate = dateInput.value;
+        }
+
+        // Total shipped from the span
+        const totalSpan = document.getElementById('totalShipQty');
+        const totalQty = totalSpan ? totalSpan.textContent.split('/')[0].trim() : '0';
+
+        document.getElementById('complete-ship-date').value = lastDate;
+        document.getElementById('complete-ship-qty').value = totalQty;
+
+        const modal = new bootstrap.Modal(
+            document.getElementById('completeShippingModal')
+        );
+        modal.show();
+    },
+
+    async saveCompleteShipping() {
+        const section = document.querySelector('.section');
+        const clinId = section ? section.dataset.clinId : null;
+        if (!clinId) {
+            this.showMessage('Cannot determine CLIN ID', 'error');
+            return;
+        }
+
+        const shipDate = document.getElementById('complete-ship-date').value;
+        const shipQty = document.getElementById('complete-ship-qty').value;
+
+        if (!shipDate) {
+            this.showMessage('Ship date is required', 'error');
+            return;
+        }
+
+        try {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const response = await fetch(
+                `/contracts/api/shipments/${clinId}/complete/`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        ship_date: shipDate,
+                        ship_qty: parseFloat(shipQty)
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Close modal
+                bootstrap.Modal.getInstance(
+                    document.getElementById('completeShippingModal')
+                ).hide();
+
+                // Update the CLIN detail page field displays if they exist
+                // (id pattern matches clin_detail.html onTransactionSaved targets)
+                const shipDateEl = document.getElementById('clin-ship-date-value');
+                if (shipDateEl && data.ship_date) {
+                    // Format date for display m/d/Y
+                    const d = new Date(data.ship_date + 'T00:00:00');
+                    const formatted = (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear();
+                    shipDateEl.textContent = formatted;
+                }
+                const shipQtyEl = document.getElementById('clin-ship-qty-value');
+                if (shipQtyEl) shipQtyEl.textContent = parseFloat(data.ship_qty).toFixed(0);
+
+                this.showMessage('Shipping completed successfully', 'success');
+            } else {
+                throw new Error(data.error || 'Failed to complete shipping');
+            }
+        } catch (error) {
+            this.showMessage('Error: ' + error.message, 'error');
         }
     }
 };

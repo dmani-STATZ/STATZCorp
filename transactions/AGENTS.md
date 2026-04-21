@@ -20,8 +20,8 @@ Defines how to modify the `transactions` app safely. This is an audit/support ap
 - Widget-type resolution (`field_types.py`) and coercion (`utils.py`)
 
 **Does not own:**
-- The models being tracked (`Contract`, `Clin`, `Supplier` belong to `contracts` and `suppliers`)
-- The UI templates that call `openTransactionsEditModal` (those live in `templates/suppliers/supplier_detail.html` and `contracts/templates/contracts/contract_management.html`)
+- The models being tracked (`Contract`, `Clin`, `ClinShipment`, `Supplier` belong to `contracts` and `suppliers`)
+- The UI templates that call `openTransactionsEditModal` (those live in `templates/suppliers/supplier_detail.html`, `contracts/templates/contracts/contract_management.html`, and `contracts/templates/contracts/clin_detail.html` for CLIN / shipment POD)
 - Authentication or user management
 
 This is a **glue/audit app** — thin in domain logic, but structurally fragile because its signal handlers are globally registered on all saves.

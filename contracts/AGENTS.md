@@ -21,7 +21,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `Nsn` (National Stock Number) — owned by `products` app; `Clin` holds an FK to it
 - `SequenceNumber` — owned by `processing` app; used for PO/TAB number defaults
 - `UserCompanyMembership` — owned by `users` app; `CompanyForm` syncs to it but does not define it
-- The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves
+- The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves and on `ClinShipment` when `pod_date` changes. `Clin.ship_date` and `Clin.ship_qty` are tracked in `transactions/signals.py`; do not manually create `Transaction` rows when saving those fields — normal `Clin.save()` (including `save(update_fields=[...])` from views such as `complete_clin_shipping`) is enough for the audit trail.
 
 **Role:** This is the core domain app of the project. Nearly every other app depends on or integrates with it.
 
@@ -32,7 +32,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 ### Before changing models
 - `contracts/models.py` — understand `on_delete` choices; `Company` uses `PROTECT` and `Nsn` uses `PROTECT`, meaning deletion will hard-fail if children exist
 - `contracts/migrations/` — check the latest migration before adding fields; 37+ migrations exist with compound indexes
-- `transactions` app signals — signals in `transactions/` fire on `Contract` and `Clin` post/pre_save; renaming tracked fields will silently break the audit trail
+- `transactions` app signals — signals in `transactions/` fire on `Contract`, `Clin`, `ClinShipment` (tracked `pod_date`), and `Supplier` post/pre_save; renaming tracked fields will silently break the audit trail
 - `processing/models.py` — `QueueContract` and `QueueClin` mirror Contract/Clin fields; a schema change may require parallel updates there
 - `sales/` views/services that reference contract fields (e.g. SQL view DDL under `sales/sql/` joining `contracts_clin` / `contracts_contract` / `contracts_nsn`)
 
@@ -48,6 +48,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 ### Before changing templates
 - Check for `{% include %}` partials: `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html`, `contract_splits.html` are included in multiple parent templates
+- **`clin_shipments.html` table layout:** In `mode="form"`, the data columns are Ship Date, Quantity, UOM, Comments, POD Date, then Actions (sixth column). Empty-state and footer `colspan` values must match that column count if the table changes. `ClinShipment.pod_date` is transaction-tracked; POD is edited via `openTransactionsEditModal` on CLIN detail (`window.clinShipmentContentTypeId`). The shipment audit (ⓘ) button is only rendered for server-rendered existing rows; rows injected by `ClinShipments.addNewShipment()` in `clin_shipments.js` intentionally omit it until the row exists in the database. The `#complete-shipping-row` footer action is only for form mode when fully shipped (`total_shipped == order_qty`); its visibility is toggled by `updateTotalShipQty()` in `clin_shipments.js` using `data-order-qty` on the `.section` wrapper (keep that attribute in sync if the partial changes).
 - NSN and Supplier modals for the CLIN form are in `contracts/templates/contracts/modals/supplier_modal.html` and `nsn_modal.html`. The modal JS (`openSupplierModal`, `openNsnModal`, search/pagination helpers, and clear handlers) is defined in `clin_form.html`'s `extra_scripts` block. Element IDs `id_nsn`, `nsn_display`, `id_supplier`, and `supplier_display` are referenced by both the modal result wiring and the form — do not rename them without updating the script and modal templates together.
 - JS files in `contracts/static/contracts/js/` are tightly bound to specific template IDs and form names; changing template element IDs or form field names breaks the JS
 - **Tailwind CDN / compat layer:** The site uses Tailwind via CDN without JIT. Do not rely on arbitrary-value classes (`w-[…]`, `h-[…]`, `max-h-[…]`, etc.), `file:` / `hover:file:` variants, gradient arbitrary stops, or slash-opacity `dark:` backgrounds in templates unless you also add real CSS (e.g. inline `style`, a named class in a `<style>` block, or an entry in `static/css/tailwind-compat.css`). Prefer utilities already mirrored in that compat stylesheet.
@@ -183,6 +184,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 - **URL namespace is `contracts`.** There are ~90 named patterns. Before renaming any URL name, search the entire codebase for `contracts:<url_name>` (in templates with `{% url %}`) and `reverse('contracts:...')` in Python.
 - **`ContractManagementView`** builds a large context dict from multiple queries (CLINs, notes, splits, GovActions, expedite, folder tracking). Adding a new context key is safe; removing or renaming an existing key requires checking `contract_management.html` and all its `{% include %}` partials.
+- **`openShipmentsModal(clinId)`** on `contract_management.html` opens the read-only shipments modal and loads HTML from `GET /contracts/api/shipments/<clin_id>/?mode=detail`. If the CLIN card markup or the JavaScript that rebuilds the card (e.g. `fetchClinDetails`) is refactored, keep the **Shipments** button and its `onclick="openShipmentsModal(...)"` in sync with the server-rendered CLIN card (including `id="cd-shipments-btn"` on the initial SSR button when applicable).
 - **HTMX partial views** (notes, shipments, splits, payment history) return HTML fragments. These views have an implicit contract with the frontend: the element IDs and `hx-target` selectors in templates must match. Changing response structure without updating `hx-target` references breaks the UI silently.
 - **`contract_base.html`** (inferred from `contracts/templates/contracts/`) may serve as a base template for other templates in this app. Changing its block structure requires updating all child templates.
 - **`clin_shipments.js`, `contract_splits.js`, `note_modal.js`, `supplier_modal.js`** reference DOM element IDs and form field `name` attributes. If you rename form fields or template element IDs, update these JS files.

@@ -12,7 +12,7 @@ from datetime import timedelta, datetime, time
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinAcknowledgment, Contract, Note, Reminder, Nsn, Supplier
+from ..models import Clin, ClinAcknowledgment, ClinShipment, Contract, Note, Reminder, Nsn, Supplier
 from .mixins import ActiveCompanyQuerysetMixin
 from ..forms import ClinForm, ClinAcknowledgmentForm
 
@@ -55,6 +55,7 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
             context['acknowledgment'] = None
 
         context['clin_content_type_id'] = ContentType.objects.get_for_model(Clin).id
+        context['clinshipment_content_type_id'] = ContentType.objects.get_for_model(ClinShipment).id
         return context
 
 

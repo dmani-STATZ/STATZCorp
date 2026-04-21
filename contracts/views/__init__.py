@@ -168,6 +168,7 @@ from .shipment_views import (
     update_shipment,
     delete_shipment,
     get_clin_shipments,
+    complete_clin_shipping,
 )
 
 from .code_table_views import (

@@ -526,7 +526,7 @@ def ensure_contract_folder(queue_contract) -> tuple:
 def upload_award_pdf_to_sharepoint(pdf_file, queue_contract) -> bool:
     """
     Upload pdf_file to the contract's SharePoint folder if not already present.
-    The file is named Award_{contract_number}.pdf inside the folder.
+    The file is named {contract_number}.pdf inside the folder.
 
     pdf_file must be a file-like object (Django InMemoryUploadedFile or TemporaryUploadedFile).
     The file pointer is seeked back to 0 before reading, since pdfplumber may have
@@ -553,7 +553,7 @@ def upload_award_pdf_to_sharepoint(pdf_file, queue_contract) -> bool:
     else:
         folder_path = f"{docs_path}/Contract {contract_number}"
 
-    filename = f"Award_{contract_number}.pdf"
+    filename = f"{contract_number}.pdf"
     file_path = f"{folder_path}/{filename}"
 
     # Check if the file is already in SharePoint before uploading
@@ -608,7 +608,7 @@ def check_contract_sharepoint_status(queue_contract) -> Dict[str, bool]:
     else:
         folder_path = f"{docs_path}/Contract {contract_number}"
 
-    file_path = f"{folder_path}/Award_{contract_number}.pdf"
+    file_path = f"{folder_path}/{contract_number}.pdf"
 
     folder_item = _check_path_exists(token, drive_id, folder_path)
     pdf_item = _check_path_exists(token, drive_id, file_path)

@@ -125,6 +125,7 @@ from .views import (
     update_shipment,
     delete_shipment,
     get_clin_shipments,
+    complete_clin_shipping,
     # Code table views
     code_table_admin,
 )
@@ -182,6 +183,11 @@ urlpatterns = [
         name="delete_shipment",
     ),
     path("api/shipments/<int:clin_id>/", get_clin_shipments, name="get_clin_shipments"),
+    path(
+        "api/shipments/<int:clin_id>/complete/",
+        complete_clin_shipping,
+        name="complete_clin_shipping",
+    ),
     # Dashboard views
     path("", ContractLifecycleDashboardView.as_view(), name="contracts_dashboard"),
     path(

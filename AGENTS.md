@@ -27,7 +27,7 @@ This repository is a multi-app Django monolith with app-based ownership but stro
 - Core domain center: `contracts`.
 - Identity/permissions center: `users` plus `STATZWeb/middleware.py`.
 - Staging-to-canonical pipeline: `processing` writes into `contracts`.
-- Audit side effects: `transactions` signals on `Contract`, `Clin`, and `Supplier` saves.
+- Audit side effects: `transactions` signals on `Contract`, `Clin`, `ClinShipment` (`pod_date` only), and `Supplier` saves.
 - Supplier/NSN split ownership: `suppliers` and `products` models, but important UI/views in `contracts`.
 - Reporting/export-heavy runtime: `contracts`, `sales`, `reports`, `training`, `tools`, `accesslog`, `users` all stream files.
 - Cross-cutting infrastructure: **`core`** — lightweight app for shared wiring (e.g. **`core/management/commands/run_background_tasks.py`**, the Azure WebJob orchestrator that invokes task modules such as **`sales/tasks/send_queued_rfqs.py`**).
@@ -40,7 +40,7 @@ This repository is a multi-app Django monolith with app-based ownership but stro
 - Before renaming shared fields, URL names, templates, or JSON keys, run repo-wide search and update all call sites.
 - Preserve global auth/permission flow in `STATZWeb/middleware.py`, `users` models/admin, and view decorators.
 - Preserve company scoping (`request.active_company` and `contracts.views.mixins.ActiveCompanyQuerysetMixin`) for company-owned data.
-- Do not bypass model `save()` on tracked models (`Contract`, `Clin`, `Supplier`) when audit history is required; `transactions` depends on save signals.
+- Do not bypass model `save()` on tracked models (`Contract`, `Clin`, `ClinShipment` for `pod_date`, `Supplier`) when audit history is required; `transactions` depends on save signals.
 - Treat `templates/base_template.html` as a shared contract. URL-name changes there break multiple apps.
 - Keep SQL execution guardrails in `reports/utils.py` (`run_select`, `is_safe_select`) and do not bypass them in views.
 - Treat export/download endpoints as sensitive. Keep access controls, filters, and expected columns intact.
