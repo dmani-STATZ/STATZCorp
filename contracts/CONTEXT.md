@@ -12,7 +12,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 ## 3. High-Level Responsibilities
 - Host the canonical `Contract`/`Clin`/`Company` data model, including contract status flows, SharePoint document links, and contract splits (`contracts/models.py`).
 - Drive the operational UI: dashboards, contract management page, CLIN detail, contract log, folder tracking, finance audit, supplier search, and acknowledgements (`contracts/views/*.py` and `contracts/templates/contracts/`).
-- Manage transactional data (notes, reminders, payment history, shipments, GovActions, acknowledgements) through forms, partials, and API endpoints so users can add contextual data without leaving the contract workspace (`contracts/forms.py`, `contracts/views/note_views.py`, `contracts/views/reminder_views.py`, `contracts/views/payment_history_views.py`).
+- Manage transactional data (notes, reminders, payment history, shipments, GovActions, acknowledgements) through forms, partials, and API endpoints so users can add contextual data without leaving the contract workspace (`contracts/forms.py`, `contracts/views/note_views.py`, `contracts/views/reminder_views.py`, `contracts/views/payment_history_views.py`). Reminder data is also accessible via a chrome-free popup window (`reminders_popup` view, `contracts/templates/contracts/reminders_popup.html`) opened from the reminder sidebar's pop-out button. The popup supports full create/edit/complete/delete/filter operations and redirects back to itself after all actions.
 - Provide admin/superuser conveniences: code table CRUD (`contracts/views/code_table_views.py`), company CRUD plus branding controls (`contracts/views/company_views.py`), and supplier admin bulk imports (`contracts/views/admin_tools.py`).
 - Expose structured APIs for UI widgets and integrators (`contracts/views/api_views.py`, `contracts/urls.py`), including select-option APIs, payment-history, IDIQ helpers, splits/shipments, and contract-day counts.
 
@@ -33,6 +33,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - `contracts/management/commands/initialize_sequence_numbers.py`: seeds the shared PO/TAB sequence numbers from existing contracts; `refresh_nsn_view.py` now only reports the legacy `nsn_view` database view.
 - `contracts/CONTRACTS_APP_CURRENT_STATE.md` & `Contracts Application.md`: living documentation summarizing current features (dashboard, notes split, reminders, GovActions) that future changes should keep in sync.
 - `contracts/templates/contracts/`: main user-facing templates (`contract_management.html`, `clin_form.html`, `clin_detail.html`, `contract_lifecycle_dashboard.html`, `folder_tracking.html`, `contract_log_view.html`) plus reusable partials/includes (`notes_list.html`, `note_modal.html`, `clin_shipments.html`, `contract_splits.html`, `payment_history_popup.html`). The CLIN create form (`clin_form.html`, create-only) loads NSN and Supplier picker modals from `contracts/templates/contracts/modals/nsn_modal.html` and `supplier_modal.html` (included templates), not inline modal markup. CLIN detail (`clin_detail.html`) wires tracked fields to the Transactions edit modal and change-history panel.
+- `contracts/templates/contracts/contract_base.html` — shared contracts layout with reminder sidebar; `reminders_popup_base.html` — bare chrome-free base template (no nav, no footer) used exclusively by the reminders popup window. `reminders_popup.html` — self-contained reminders manager rendered in a `window.open()` popup; extends `reminders_popup_base.html`.
 - `contracts/static/contracts/js/`: JS glue for contract splits, CLIN shipments, note modal interactions, and the supplier modal (`supplier_modal.js`).
 
 ## 5. Data Model / Domain Objects
@@ -130,18 +131,19 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - No automated tests exist, so assumptions about GovAction/log, reminders, or payment history have not been regression-tested.
 - Supplier admin CSV/XLSX import uses fuzzy matching, so renaming suppliers can break bulk updates if matching fails.
 
-## Tailwind Compat Patches (CDN / no JIT)
+## CSS Architecture
 
-Several contracts templates were adjusted so layout and focus styles work with the project’s Tailwind **CDN** setup and `static/css/tailwind-compat.css` (no arbitrary-value or `file:` JIT output). Patched files and change types:
+The project no longer uses Tailwind in any form. The CSS refactor replaced all Tailwind with Bootstrap 5 and a custom three-file CSS architecture:
 
-- `contracts/templates/contracts/contract_base.html` — fixed width/min-width and reminder sidebar height via inline `style`; removed unshimmed `dark:bg-*-900/20` and `dark:bg-red-900/30` from reminder cards.
-- `contracts/templates/contracts/contract_management.html` — `max-h-[…]` replaced with inline `max-height` on scroll regions and notes panels.
-- `contracts/templates/contracts/idiq_contract_detail.html` — notes scroller `max-height` inline; checkbox focus ring via inline `box-shadow` instead of compound `focus:ring*` utilities.
-- `contracts/templates/contracts/modals/nsn_modal.html` — search results `max-height` inline.
-- `contracts/templates/contracts/contacts/contact_list.html` — card header gradient via inline `background` instead of `bg-gradient-to-r` / `from-*` / `to-*`.
-- `contracts/templates/contracts/contract_form.html` — DD1155 file input: `file:*` utilities replaced with `.file-upload-input` + scoped `<style>` using `::file-selector-button`.
+- `static/css/theme-vars.css` — CSS custom properties only (color tokens, brand vars, dark mode overrides via `body.dark`). Hex values live here. Do not put layout or component styles here.
+- `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here.
+- `static/css/utilities.css` — utility and helper classes.
 
-Compat CSS was extended where shared utilities were missing: `static/css/tailwind-compat.css` — `.mt-0\.5`, and at `sm` breakpoint `.sm\:p-6`, `.sm\:pb-4`, `.sm\:text-left` (folder tracking search modal).
+**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
+
+**When encountering Tailwind classes in templates:** replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.
+
+**Button pattern:** `.btn-outline-brand` in `app-core.css` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for a pill-style variant with a light `#eff6ff` background (e.g. the reminders pop-out button in `contract_base.html`).
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Respect `request.active_company`. When querying models with a `company` FK, either filter manually or use `ActiveCompanyQuerysetMixin`; otherwise you risk leaking cross-tenant data.

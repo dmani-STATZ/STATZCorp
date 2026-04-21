@@ -101,6 +101,19 @@ button.bg-transparent.border-none:focus {
     color: var(--primary-text) !important;
 }
 
+.btn-outline-brand.btn-tinted {
+    background-color: #eff6ff;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 999px;
+    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
 .hover-brand-border:hover {
     border-color: var(--company-primary) !important;
 }

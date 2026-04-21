@@ -130,3 +130,18 @@ No Celery/RQ tasks, cron jobs, or scheduled imports live here—the AI enrichmen
 - Key templates: `templates/suppliers/dashboard.html`, `supplier_detail.html`, `supplier_enrich.html`, `supplier_edit.html`/`supplier_form.html`, `suppliers_by_type.html`.
 - Key dependencies: `contracts` app for models/forms/views, `STATZWeb` login/URL wiring, external OpenRouter API (`requests` + env vars) and `beautifulsoup4` for `utils`.
 - Risky files to review first: `views.py` (AI/enrichment logic), `openrouter_config.py`, `static/suppliers/js/supplier_enrich.js`, `templates/suppliers/supplier_detail.html`, `templates/suppliers/supplier_enrich.html`.
+
+
+## CSS Architecture
+
+This project does not use Tailwind in any form. The CSS refactor replaced all Tailwind with Bootstrap 5 and a custom three-file CSS architecture:
+
+- `static/css/theme-vars.css` — CSS custom properties only (color tokens, brand vars, dark mode overrides via `body.dark`). Hex values live here. Do not put layout or component styles here.
+- `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here.
+- `static/css/utilities.css` — utility and helper classes.
+
+**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
+
+**When encountering Tailwind classes in templates:** replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.
+
+**Button pattern:** `.btn-outline-brand` in `app-core.css` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for a pill-style variant with a light `#eff6ff` background (e.g. the reminders pop-out button in `contract_base.html`).

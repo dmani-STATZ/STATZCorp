@@ -167,6 +167,120 @@ class ReminderListView(ListView):
 
 
 @conditional_login_required
+def reminders_popup(request):
+    """
+    Bare-chrome reminders window opened via window.open() from the sidebar pop-out button.
+    Renders the same data as ReminderListView but in a chrome-free popup template.
+    Supports ?status= and ?due= query params identically to ReminderListView.
+    """
+    user = request.user
+    today = timezone.now().date()
+    seven_days_ago = today - timedelta(days=7)
+
+    queryset = Reminder.objects.filter(
+        reminder_user=user
+    ).select_related(
+        'reminder_user', 'reminder_completed_user', 'note'
+    ).order_by('reminder_date')
+
+    if getattr(request, 'active_company', None):
+        queryset = queryset.filter(company=request.active_company)
+
+    status_filter = request.GET.get('status', '')
+    due_filter = request.GET.get('due', '')
+
+    if status_filter == 'completed':
+        queryset = queryset.filter(reminder_completed=True)
+    elif status_filter == 'pending':
+        queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
+
+    if due_filter == 'overdue':
+        queryset = queryset.filter(reminder_date__date__lte=seven_days_ago, reminder_completed=False)
+    elif due_filter == 'due':
+        queryset = queryset.filter(
+            reminder_date__date__lte=today,
+            reminder_date__date__gt=seven_days_ago,
+            reminder_completed=False
+        )
+    elif due_filter == 'upcoming':
+        queryset = queryset.filter(reminder_date__date__gt=today, reminder_completed=False)
+
+    all_reminders = Reminder.objects.filter(reminder_user=user)
+    if getattr(request, 'active_company', None):
+        all_reminders = all_reminders.filter(company=request.active_company)
+
+    active_reminders = all_reminders.filter(
+        Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
+    )
+
+    for reminder in queryset:
+        reminder.is_overdue = reminder.reminder_date.date() <= seven_days_ago
+
+    context = {
+        'reminders': queryset,
+        'status_filter': status_filter,
+        'due_filter': due_filter,
+        'total_count': all_reminders.count(),
+        'completed_count': all_reminders.filter(reminder_completed=True).count(),
+        'pending_count': active_reminders.count(),
+        'overdue_count': active_reminders.filter(reminder_date__date__lte=seven_days_ago).count(),
+        'due_count': active_reminders.filter(
+            reminder_date__date__lte=today,
+            reminder_date__date__gt=seven_days_ago
+        ).count(),
+        'upcoming_count': active_reminders.filter(reminder_date__date__gt=today).count(),
+        'today': today,
+        'seven_days_ago': seven_days_ago,
+    }
+
+    return render(request, 'contracts/reminders_popup.html', context)
+
+
+@conditional_login_required
+def reminders_popup_add(request):
+    """
+    Handles the New Reminder form POST from the popup window.
+    On success redirects back to the popup window (not the main reminders_list).
+    On GET, redirects to the popup window (the modal opens from there).
+    """
+    if request.method == 'POST':
+        form = ReminderForm(request.POST)
+        if form.is_valid():
+            reminder = form.save(commit=False)
+            reminder.reminder_user = request.user
+            if getattr(request, 'active_company', None):
+                reminder.company = request.active_company
+            reminder.save()
+            messages.success(request, 'Reminder added successfully.')
+        else:
+            messages.error(request, 'Error saving reminder. Please check the form.')
+    return HttpResponseRedirect(reverse('contracts:reminders_popup'))
+
+
+@conditional_login_required
+def reminders_popup_edit(request, reminder_id):
+    """
+    Handles the Edit Reminder form POST from the popup window.
+    On success redirects back to the popup window preserving current filters.
+    """
+    reminder = get_object_or_404(Reminder, id=reminder_id)
+
+    if reminder.reminder_user != request.user and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to edit this reminder.')
+        return HttpResponseRedirect(reverse('contracts:reminders_popup'))
+
+    if request.method == 'POST':
+        form = ReminderForm(request.POST, instance=reminder)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Reminder updated.')
+        else:
+            messages.error(request, 'Error updating reminder. Please check the form.')
+
+    return HttpResponseRedirect(reverse('contracts:reminders_popup'))
+
+
+@conditional_login_required
 def toggle_reminder_completion(request, reminder_id):
     reminder = get_object_or_404(Reminder, id=reminder_id)
     

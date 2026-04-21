@@ -199,3 +199,18 @@ If `reportlab` is missing or outdated, `generate_report` will raise an import er
 | Security-sensitive areas | Every view needs `@conditional_login_required`; PDF export streams PII |
 | Riskiest edit types | Renaming `Visitor` fields (PDF + JS + form + template); changing `VisitorHistoryField` value format (JS detection logic); modifying `generate_report` column layout |
 | No automated tests | Verify manually using the checklist in Section 12 |
+
+
+## CSS / Styling Rules
+
+This project does not use Tailwind in any form. All styling uses Bootstrap 5 plus the project's three-file CSS architecture:
+
+- `static/css/theme-vars.css` — color tokens and dark mode overrides only
+- `static/css/app-core.css` — all component, layout, and button styles
+- `static/css/utilities.css` — utility and helper classes
+
+**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
+
+**When editing templates:** if you encounter Tailwind utility classes, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
+
+**Button pattern:** `.btn-outline-brand` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for pill-style with `#eff6ff` background tint.

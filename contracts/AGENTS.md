@@ -51,7 +51,13 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - **`clin_shipments.html` table layout:** In `mode="form"`, the data columns are Ship Date, Quantity, UOM, Comments, POD Date, then Actions (sixth column). Empty-state and footer `colspan` values must match that column count if the table changes. `ClinShipment.pod_date` is transaction-tracked; POD is edited via `openTransactionsEditModal` on CLIN detail (`window.clinShipmentContentTypeId`). The shipment audit (ⓘ) button is only rendered for server-rendered existing rows; rows injected by `ClinShipments.addNewShipment()` in `clin_shipments.js` intentionally omit it until the row exists in the database. The `#complete-shipping-row` footer action is only for form mode when fully shipped (`total_shipped == order_qty`); its visibility is toggled by `updateTotalShipQty()` in `clin_shipments.js` using `data-order-qty` on the `.section` wrapper (keep that attribute in sync if the partial changes).
 - NSN and Supplier modals for the CLIN form are in `contracts/templates/contracts/modals/supplier_modal.html` and `nsn_modal.html`. The modal JS (`openSupplierModal`, `openNsnModal`, search/pagination helpers, and clear handlers) is defined in `clin_form.html`'s `extra_scripts` block. Element IDs `id_nsn`, `nsn_display`, `id_supplier`, and `supplier_display` are referenced by both the modal result wiring and the form — do not rename them without updating the script and modal templates together.
 - JS files in `contracts/static/contracts/js/` are tightly bound to specific template IDs and form names; changing template element IDs or form field names breaks the JS
-- **Tailwind CDN / compat layer:** The site uses Tailwind via CDN without JIT. Do not rely on arbitrary-value classes (`w-[…]`, `h-[…]`, `max-h-[…]`, etc.), `file:` / `hover:file:` variants, gradient arbitrary stops, or slash-opacity `dark:` backgrounds in templates unless you also add real CSS (e.g. inline `style`, a named class in a `<style>` block, or an entry in `static/css/tailwind-compat.css`). Prefer utilities already mirrored in that compat stylesheet.
+- **CSS architecture — no Tailwind:** This project does not use Tailwind in any form. Styling is Bootstrap 5 plus the project's own three-file CSS system. When editing templates:
+  - New component or button styles → `static/css/app-core.css`
+  - New utility/helper classes → `static/css/utilities.css`
+  - New color tokens or dark mode overrides → `static/css/theme-vars.css`
+  - **Do not touch:** `static/css/tailwind-compat.css`, `static/css/base.css`
+  - If you encounter Tailwind utility classes in a template you are already editing, replace them with Bootstrap 5 equivalents or named classes from `app-core.css`. Do not leave Tailwind classes in place.
+  - Inline `style` attributes are acceptable for one-off layout fixes but prefer a named class in `app-core.css` for anything reusable or that requires a hover/focus/pseudo-element state.
 
 ### Before changing exports/reports
 - `contracts/utils/excel_utils.py` — wraps openpyxl with a lazy-import pattern to avoid NumPy conflicts; do not add direct `import openpyxl` elsewhere in the app
@@ -125,6 +131,17 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `suppliers/models.py` (source model — read-only from contracts)
 - `contracts/templates/contracts/supplier_detail.html`, `supplier_list.html`
 - `contracts/static/contracts/js/supplier_modal.js`
+
+### Reminders popup window
+- `contracts/views/reminder_views.py` — `reminders_popup`, `reminders_popup_add`, `reminders_popup_edit` views
+- `contracts/templates/contracts/reminders_popup_base.html` — bare base template (no nav chrome)
+- `contracts/templates/contracts/reminders_popup.html` — popup content template
+- `contracts/urls.py` — `reminders_popup`, `reminders_popup_add`, `reminders_popup_edit` URL patterns
+- `contracts/templates/contracts/contract_base.html` — `openRemindersPopup()` JS function and pop-out button in sidebar header
+
+All popup views redirect back to `contracts:reminders_popup` on success, not to `contracts:reminders_list`.
+The `toggle_reminder` and `delete_reminder` views use `HTTP_REFERER` for redirect — the popup URL will be the referer when those views are called from within the popup.
+This pattern (popup_base + popup view + popup_add + popup_edit) is the approved pattern for future popup windows (e.g. Notes).
 
 ---
 

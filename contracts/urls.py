@@ -89,6 +89,9 @@ from .views import (
     delete_reminder,
     mark_reminder_complete,
     edit_reminder,
+    reminders_popup,
+    reminders_popup_add,
+    reminders_popup_edit,
     # Acknowledgement letter views
     generate_acknowledgement_letter,
     view_acknowledgement_letter,
@@ -364,6 +367,14 @@ urlpatterns = [
         name="mark_reminder_complete",
     ),
     path("reminder/<int:reminder_id>/edit/", edit_reminder, name="edit_reminder"),
+    # Reminders popup window
+    path("reminders/popup/", reminders_popup, name="reminders_popup"),
+    path("reminders/popup/add/", reminders_popup_add, name="reminders_popup_add"),
+    path(
+        "reminders/popup/edit/<int:reminder_id>/",
+        reminders_popup_edit,
+        name="reminders_popup_edit",
+    ),
     # Acknowledgement letter
     path(
         "clin/<int:clin_id>/generate-letter/",

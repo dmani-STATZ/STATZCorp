@@ -227,3 +227,18 @@ This file tells AI coding agents and future developers how to modify `td_now` sa
 - Editing `campaign_builder.js` save logic (duplicate function definition)
 - Editing `builder.html` around save buttons (mismatched `<div>` tags)
 - Calling `update_campaign` or `update_map` with partial payloads (destroys child rows)
+
+
+## CSS / Styling Rules
+
+This project does not use Tailwind in any form. All styling uses Bootstrap 5 plus the project's three-file CSS architecture:
+
+- `static/css/theme-vars.css` — color tokens and dark mode overrides only
+- `static/css/app-core.css` — all component, layout, and button styles
+- `static/css/utilities.css` — utility and helper classes
+
+**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
+
+**When editing templates:** if you encounter Tailwind utility classes, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
+
+**Button pattern:** `.btn-outline-brand` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for pill-style with `#eff6ff` background tint.

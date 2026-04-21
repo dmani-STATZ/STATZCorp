@@ -312,3 +312,18 @@ Boot time on App Service was improved after infrastructure recovery from a platf
 - **Disk hygiene:** when `/home/site/repository/sales/temp` exists (Azure deploy layout), startup **removes contents** of `sales/temp/*` so unbounded import/fetch leftovers cannot fill the site volume (current usage has been healthy at ~511MB, but the guard prevents future storage-related incidents).
 
 After deploy, Azure Log Stream should show `Playwright binaries found. Skipping install.` on warm paths; target healthy availability is **under ~2 minutes** once the build artifact and migrations are warm (verify per environment). Portal setting **`SCM_DO_BUILD_DURING_DEPLOYMENT=true`** is required so Oryx performs the deployment build; see `sales/DIBBS_System_Spec.md` §2.4 for GCC High and build-time notes.
+
+
+## CSS Architecture
+
+This project does not use Tailwind in any form. The CSS refactor replaced all Tailwind with Bootstrap 5 and a custom three-file CSS architecture:
+
+- `static/css/theme-vars.css` — CSS custom properties only (color tokens, brand vars, dark mode overrides via `body.dark`). Hex values live here. Do not put layout or component styles here.
+- `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here.
+- `static/css/utilities.css` — utility and helper classes.
+
+**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
+
+**When encountering Tailwind classes in templates:** replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.
+
+**Button pattern:** `.btn-outline-brand` in `app-core.css` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for a pill-style variant with a light `#eff6ff` background (e.g. the reminders pop-out button in `contract_base.html`).

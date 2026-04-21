@@ -93,6 +93,9 @@ from .reminder_views import (
     mark_reminder_complete,
     edit_reminder,
     create_reminder,
+    reminders_popup,
+    reminders_popup_add,
+    reminders_popup_edit,
 )
 
 from .acknowledgement_letter_views import (

@@ -1,0 +1,220 @@
+{% extends "contracts/reminders_popup_base.html" %}
+{% load humanize %}
+
+{% block title %}My Reminders{% endblock %}
+
+{% block popup_content %}
+<div class="container-fluid px-2 py-2" style="max-width: 540px;">
+    <div class="card shadow-sm mb-2">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <h1 class="h5 mb-0">My Reminders</h1>
+                    <div class="small text-muted mt-1">
+                        <span class="me-2"><span class="badge bg-primary">Due</span> {{ due_count }}</span>
+                        <span class="me-2"><span class="badge bg-danger">Overdue</span> {{ overdue_count }}</span>
+                        <span><span class="badge bg-success">Upcoming</span> {{ upcoming_count }}</span>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newReminderModal">
+                    + New
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-2">
+        <div class="card-body py-2 px-3">
+            <div class="small fw-semibold text-muted mb-1">Status</div>
+            <div class="d-flex flex-wrap gap-1 mb-2">
+                <a class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}{% if due_filter %}?due={{ due_filter }}{% endif %}">All ({{ total_count }})</a>
+                <a class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}?status=pending{% if due_filter %}&due={{ due_filter }}{% endif %}">Pending ({{ pending_count }})</a>
+                <a class="btn btn-sm {% if status_filter == 'completed' %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}?status=completed{% if due_filter %}&due={{ due_filter }}{% endif %}">Completed ({{ completed_count }})</a>
+            </div>
+            <div class="small fw-semibold text-muted mb-1">Time period</div>
+            <div class="d-flex flex-wrap gap-1">
+                <a class="btn btn-sm {% if due_filter == 'upcoming' %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}?due=upcoming{% if status_filter %}&status={{ status_filter }}{% endif %}">Upcoming ({{ upcoming_count }})</a>
+                <a class="btn btn-sm {% if due_filter == 'due' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}?due=due{% if status_filter %}&status={{ status_filter }}{% endif %}">Due ({{ due_count }})</a>
+                <a class="btn btn-sm {% if due_filter == 'overdue' %}btn-danger{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}?due=overdue{% if status_filter %}&status={{ status_filter }}{% endif %}">Overdue ({{ overdue_count }})</a>
+                <a class="btn btn-sm {% if not due_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}{% if status_filter %}?status={{ status_filter }}{% endif %}">All Time</a>
+            </div>
+        </div>
+    </div>
+
+    {% if overdue_count > 0 and status_filter != 'completed' %}
+    <div class="alert alert-danger py-2 px-3 small mb-2" role="alert">
+        You have {{ overdue_count }} overdue reminder{{ overdue_count|pluralize }}.
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="list-group list-group-flush" style="max-height: calc(100vh - 320px); overflow-y: auto;">
+            {% for reminder in reminders %}
+            <div class="list-group-item py-2 px-3
+                {% if reminder.reminder_completed %}bg-light
+                {% elif reminder.is_overdue %}list-group-item-danger
+                {% elif reminder.reminder_date.date <= today %}list-group-item-primary
+                {% else %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-2">
+                    <form method="post" action="{% url 'contracts:toggle_reminder' reminder.id %}" class="m-0 p-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm border rounded-circle p-0 d-flex align-items-center justify-content-center"
+                                style="width: 28px; height: 28px; min-width: 28px;"
+                                title="Toggle complete"
+                                aria-label="Toggle complete">
+                            {% if reminder.reminder_completed %}
+                            <span class="text-success small">&#10003;</span>
+                            {% endif %}
+                        </button>
+                    </form>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex justify-content-between align-items-start gap-1">
+                            <span class="fw-semibold small text-break">{{ reminder.reminder_title }}</span>
+                            <span class="badge {% if reminder.reminder_completed %}bg-success{% elif reminder.is_overdue %}bg-danger{% elif reminder.reminder_date.date <= today %}bg-primary{% else %}bg-success{% endif %} flex-shrink-0">
+                                {% if reminder.reminder_completed %}Completed{% elif reminder.is_overdue %}Overdue{% elif reminder.reminder_date.date <= today %}Due{% else %}Upcoming{% endif %}
+                            </span>
+                        </div>
+                        {% if reminder.reminder_text %}
+                        <p class="small text-muted mb-1 text-break">{{ reminder.reminder_text|linebreaksbr }}</p>
+                        {% endif %}
+                        <div class="small text-muted mb-1">
+                            {{ reminder.reminder_date|date:"M d, Y g:i A" }}
+                            ({{ reminder.reminder_date|naturaltime }})
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            {% if reminder.note and reminder.note.content_type and reminder.note.content_object %}
+                                {% with content_object=reminder.note.content_object content_type=reminder.note.content_type %}
+                                    {% if content_type.model == 'contract' %}
+                                    <a href="{% url 'contracts:contract_management' content_object.id %}" target="_blank" rel="noopener noreferrer" class="small">View Contract: {{ content_object.contract_number }}</a>
+                                    {% elif content_type.model == 'clin' %}
+                                    <a href="{% url 'contracts:clin_detail' content_object.id %}" target="_blank" rel="noopener noreferrer" class="small">View CLIN: {{ content_object.clin_po_num }}</a>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                            <button type="button" class="btn btn-link btn-sm p-0 small edit-reminder-popup-btn"
+                                    data-id="{{ reminder.id }}"
+                                    data-title="{{ reminder.reminder_title|escape }}"
+                                    data-description="{{ reminder.reminder_text|default:''|escape }}"
+                                    data-date="{{ reminder.reminder_date|date:'Y-m-d' }}T{{ reminder.reminder_date|date:'H:i' }}">Edit</button>
+                            <a href="{% url 'contracts:delete_reminder' reminder.id %}?next={% url 'contracts:reminders_popup' %}" class="small text-danger">Delete</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="list-group-item text-center text-muted py-4 small">
+                No reminders found for this view.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newReminderModal" tabindex="-1" aria-labelledby="newReminderModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="newReminderModalLabel">New Reminder</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="newReminderForm" method="post" action="{% url 'contracts:reminders_popup_add' %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label small" for="popupNewTitle">Title</label>
+            <input type="text" class="form-control form-control-sm" id="popupNewTitle" name="reminder_title" required maxlength="50">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small" for="popupReminderDate">Due date</label>
+            <input type="datetime-local" class="form-control form-control-sm" id="popupReminderDate" name="reminder_date" required>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small" for="popupNewDescription">Description</label>
+            <textarea class="form-control form-control-sm" id="popupNewDescription" name="reminder_text" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="newReminderForm" class="btn btn-primary btn-sm">Save Reminder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editReminderModal" tabindex="-1" aria-labelledby="editReminderModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="editReminderModalLabel">Edit Reminder</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editReminderForm" method="post" action="">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label small" for="popupEditTitle">Title</label>
+            <input type="text" class="form-control form-control-sm" id="popupEditTitle" name="reminder_title" required maxlength="50">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small" for="popupEditDate">Due date</label>
+            <input type="datetime-local" class="form-control form-control-sm" id="popupEditDate" name="reminder_date" required>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small" for="popupEditDescription">Description</label>
+            <textarea class="form-control form-control-sm" id="popupEditDescription" name="reminder_text" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="editReminderForm" class="btn btn-primary btn-sm">Update Reminder</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block popup_scripts %}
+<script>
+(function() {
+    var editUrlTemplate = "{% url 'contracts:reminders_popup_edit' 888888888 %}";
+
+    window.openEditModal = function(id, title, description, date) {
+        document.getElementById('popupEditTitle').value = title || '';
+        document.getElementById('popupEditDescription').value = description || '';
+        document.getElementById('popupEditDate').value = date || '';
+        document.getElementById('editReminderForm').action = editUrlTemplate.replace('888888888', String(id));
+        var modal = new bootstrap.Modal(document.getElementById('editReminderModal'));
+        modal.show();
+    };
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.edit-reminder-popup-btn');
+        if (!btn) return;
+        openEditModal(btn.dataset.id, btn.dataset.title, btn.dataset.description, btn.dataset.date);
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var newModalEl = document.getElementById('newReminderModal');
+        if (newModalEl) {
+            newModalEl.addEventListener('show.bs.modal', function() {
+                var inp = document.getElementById('popupReminderDate');
+                if (inp && !inp.value) {
+                    var d = new Date();
+                    d.setHours(d.getHours() + 1);
+                    inp.value = d.toISOString().slice(0, 16);
+                }
+            });
+        }
+    });
+})();
+</script>
+{% endblock %}

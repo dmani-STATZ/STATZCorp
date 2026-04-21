@@ -83,7 +83,7 @@
     </div>
 </div>
 
-<div class="overlay hidden fixed inset-0 bg-black opacity-30 z-40" id="overlay" onclick="toggleReminderbar()"></div>
+<div class="overlay hidden fixed inset-0 z-40" style="background: rgba(0,0,0,0.3);" id="overlay" onclick="toggleReminderbar()"></div>
 
 <!-- Contract Search Modal (header button lives in base_template; modal + script here for all contract app pages) -->
 <div id="contractSearchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
@@ -216,6 +216,19 @@ document.addEventListener('DOMContentLoaded', function() {
             reminderbar.style.transform = 'translateX(100%)';
             overlay.classList.add('hidden');
         }
+    }
+
+    function openRemindersPopup() {
+        const url = "{% url 'contracts:reminders_popup' %}";
+        const width = 560;
+        const height = 750;
+        const left = Math.round((screen.width - width) / 2);
+        const top = Math.round((screen.height - height) / 2);
+        window.open(
+            url,
+            'RemindersPopup',
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
+        );
     }
 
     function showReminderDetails(element) {
@@ -514,6 +527,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             {% endif %}
         </div>
+        <button
+            type="button"
+            onclick="openRemindersPopup()"
+            title="Open Reminders in separate window"
+            class="btn-outline-brand btn-tinted">
+            <svg xmlns="http://www.w3.org/2000/svg" style="width:13px;height:13px;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Pop Out
+        </button>
     </div>
 
     <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 dark:bg-gray-800 dark:border-gray-700 space-y-2">
