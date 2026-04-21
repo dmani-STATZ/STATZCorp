@@ -1,352 +1,367 @@
-# Project Context
+# PROJECT_CONTEXT.md — STATZCorp Cross-App Reference
 
-## 1. Project Overview
-This repository is a multi-app Django monolith for government/defense-style operations workflows centered on contracts, CLIN-level processing, supplier/product data, sales/import pipelines, compliance training, and reporting.
+Read this file first when a task crosses app boundaries. It gives enough context to make confident decisions without reading every app's individual CONTEXT.md. For single-app work, go straight to that app's own CONTEXT.md and AGENTS.md instead.
 
-At a system level, the codebase appears to support:
-- Contract lifecycle and contract-line (CLIN) management (`contracts`)
-- Intake/queue/finalization processing for incoming contract data (`processing`)
-- Sales-side solicitation/RFQ/bid workflows and imports (`sales`)
-- Supplier and NSN capability management (`suppliers`, `products`)
-- User/company context, app-level access control, and portal/calendar features (`users`)
-- Reporting and export surfaces, including SQL-backed reports (`reports`)
-- Transaction/audit-style change logging (`transactions`)
-- Support modules for inventory, visitor logging, tooling, and training.
+---
 
-This is primarily server-rendered Django (views/forms/templates), with targeted AJAX/JSON endpoints and several export/report endpoints.
+## Repository Shape
 
-## 2. Repository Structure
-Top-level layout (verified from repository tree):
-- Django project package: `STATZWeb/`
-  - Core settings and routing: `STATZWeb/settings.py`, `STATZWeb/urls.py`
-  - Global middleware and decorators: `STATZWeb/middleware.py`, `STATZWeb/decorators.py`
-- Feature apps: `users/`, `inventory/`, `contracts/`, `sales/`, `accesslog/`, `td_now/`, `processing/`, `training/`, `reports/`, `suppliers/`, `products/`, `tools/`, `transactions/`
-- Shared UI assets:
-  - Global templates: `templates/` (notably `templates/base_template.html`)
-  - Static assets: `static/` (plus collected `staticfiles/`)
-- Ops/support files:
-  - `manage.py`, `requirements.txt`, `requirements-dev.txt`, `pytest.ini`
-  - Deployment/environment artifacts: `Procfile`, `startup.sh`, `web.config`, `.deployment`
-  - SQL scripts folder: `SQL/`
-  - Existing repo map doc: `PROJECT_STRUCTURE.md`
-- Per-app context docs are present for all listed domain apps (each app has `CONTEXT.md`).
+Multi-app Django monolith. All apps share one process, one database, one auth layer, and one global base template. There is no microservice boundary — cross-app imports are common and intentional. Company-scoped tenancy flows through every request via `request.active_company`.
 
-## 3. Major Apps and Ownership Boundaries
-`STATZWeb` (project package)
-- Owns global configuration: settings, URL composition, login-required and app-permission middleware behavior.
-- Does not own business domain data itself; it orchestrates shared runtime behavior.
-- Type: core platform glue.
+**Entry points:**
+- `STATZWeb/settings.py` + `STATZWeb/urls.py` — global configuration and top-level URL routing
+- `STATZWeb/middleware.py` + `users/middleware.py` — login enforcement, active-company injection
+- `templates/base_template.html` — shared nav, CSS/JS, company selector; treat as a shared contract across all apps
 
-`users`
-- Owns authentication-adjacent behavior, user settings/preferences, app-level permission mapping (`AppRegistry`/`AppPermission`), user-company membership, and portal/calendar-related features.
-- Does not own contracts/supplier/product transactional domain records.
-- Type: core support/security context app.
+---
 
-`inventory`
-- Owns inventory item/category/location records and related CRUD/views.
-- Appears mostly standalone relative to core contract-processing flows.
-- Type: peripheral support app.
+## App Registry
 
-`contracts`
-- Owns major core domain entities (companies, contracts, CLINs, reminders/notes, payment/history-like records, splits, and related admin/support tables).
-- Serves as foundational data for processing, reports, transactions logging, and some sales matching.
-- Type: central core domain app.
+### `contracts` — Core Contract Workspace
+**Purpose:** Full contract lifecycle — headers, CLINs, notes, reminders, payments, shipments, folder tracking, SharePoint links, and exports.
 
-`sales`
-- Owns sales-side workflows: solicitations, RFQ/bids, importer flow, customer/contacts, and supplier capability mapping in sales context.
-- Pulls from or aligns with contract/CLIN and supplier data but keeps much of its own model surface.
-- Type: core workflow app (partially decoupled data model).
+**Owns:** `Contract`, `Clin`, `Company`, `PaymentHistory`, `Note`, `Reminder`, `ClinShipment`, `ContractSplit`, `FolderTracking`, `FolderStack`, `GovAction`, `AcknowledgementLetter`, `IdiqContract`, `IdiqContractDetails`, `Buyer`, `ContractType`, `ClinType`, `SpecialPaymentTerms`, `SalesClass`
 
-`accesslog`
-- Owns visitor logbook/check-in/check-out flows with templates and PDF/report generation.
-- Does not appear deeply coupled to contracts/processing domains.
-- Type: operational support app.
+**Consumes from other apps:**
+- `products.Nsn` — FK on `Clin`
+- `suppliers.Supplier` — FK on `Clin`; supplier CRUD views live here
+- `processing.SequenceNumber` — PO/TAB number defaults on contract create
+- `users.UserCompanyMembership`, `users.UserSettings` — company membership sync, reminder sidebar window
 
-`td_now`
-- Owns TD Now-specific routes, views, context processor, and management commands.
-- Appears as an integration/feature module with limited direct cross-app ownership.
-- Type: specialized integration/support app.
+**Other apps consume from it:**
+- `processing` — writes finalized records into `Contract`/`Clin`
+- `sales` — reads `Clin` data via SQL views for Tier 1 NSN scoring
+- `reports` — reads schema for AI-assisted query generation
+- `transactions` — signal-tracks `Contract`, `Clin`, `ClinShipment` saves
+- `products`, `suppliers` — URL routing forwards to `contracts` views
 
-`processing`
-- Owns processing queue/staging/finalization pipeline for contract/CLIN intake and workflow state.
-- Writes into/finalizes against `contracts` entities and maintains sequencing/queue records.
-- Type: central core workflow app tightly coupled to `contracts`.
+**URL prefix:** `/contracts/`
 
-`training`
-- Owns training/compliance-like entities (requirements, records, assignments, matrix view) and supporting views/forms.
-- Mostly independent from contract-processing data model.
-- Type: support/compliance app.
+**Critical note:** Multi-tenant. Every queryset on company-scoped models must filter by `request.active_company`. Use `ActiveCompanyQuerysetMixin` on CBVs or manually filter in FBVs. Missing this leaks cross-tenant data.
 
-`reports`
-- Owns report request records and a broad report/export/query surface, including SQL-backed report execution helpers and AI-assistant endpoints.
-- Depends on many other apps' data; generally does not own source-of-truth business entities.
-- Type: reporting/export app with high read coupling.
+---
 
-`suppliers`
-- Owns supplier master data, addresses, supplier-user links, uploads, and some settings/config utilities.
-- Shares schema coupling with `contracts` tables and connects to product/NSN capabilities.
-- Type: core reference/master-data app.
+### `processing` — Staging Pipeline
+**Purpose:** Import queue and workflow buffer for contract/CLIN ingestion. PDF award parsing → staging records → finalized canonical contracts/CLINs.
 
-`products`
-- Owns NSN-related product records and supplier capability association (`SupplierNSNCapability`).
-- Depends on suppliers and historically shares table namespace conventions with contracts.
-- Type: core reference-data app.
+**Owns:** `QueueContract`, `QueueClin`, `ProcessContract`, `ProcessClin`, `ProcessContractSplit`, `SequenceNumber`
 
-`tools`
-- Owns utility/tool endpoints and templates for operational helpers.
-- Minimal domain ownership compared with contracts/processing/sales.
-- Type: utility app.
+**Consumes from other apps:**
+- `contracts` — final write target (`Contract`, `Clin`, `ContractSplit`, `PaymentHistory`)
+- `products.Nsn` — NSN matching during ingestion
+- `suppliers.Supplier` — supplier matching during ingestion
 
-`transactions`
-- Owns generic change-log/audit-style transaction records and middleware/signal integration for tracking model changes.
-- Does not own primary business entities; records cross-domain events.
-- Type: cross-cutting audit/support app.
+**Other apps consume from it:**
+- `contracts` — reads `SequenceNumber` for PO/TAB defaults
 
-## 4. High-Level Architecture
-- Multi-app Django monolith with a single project package (`STATZWeb`).
-- Predominantly server-rendered architecture:
-  - URLConfs per app
-  - Function-based and class-based views
-  - Django templates/forms for most workflows
-- Centralized request gating and app-level access:
-  - Login behavior via project middleware (`LoginRequiredMiddleware`)
-  - App-level access control via `users.AppRegistry`/`users.AppPermission` checks in middleware.
-- Company-scoped runtime context:
-  - `users.middleware.ActiveCompanyMiddleware` injects active company behavior used across apps.
-- Reporting/export architecture is mixed:
-  - Template-driven reports
-  - CSV/XLSX/PDF outputs in multiple apps
-  - SQL-backed dynamic report execution in `reports`.
-- Background architecture is light:
-  - No clear Celery/task queue footprint in repository code
-  - Uses signals and management commands for asynchronous/batch-like concerns.
+**URL prefix:** `/processing/`
 
-## 5. Cross-App Relationships
-Most important coupling points (verified via models/imports/URL surfaces):
+**Critical notes:**
+- IDIQ detection: type-code gate (`position[8] == 'D'` on stripped contract number) OR text gate ("Indefinite Delivery Contract"). Metadata packed into `QueueContract.description` as `IDIQ_META|TERM:12|MAX:350000|MIN:19`.
+- `start_processing` routes IDIQ contracts to `idiq_processing_edit` via `redirect_url` in JSON response.
+- Finalization (`finalize_contract`, `finalize_idiq_contract`) is the **only** write path into `contracts`. Runs inside `transaction.atomic`. Never write `Contract`/`Clin` from processing views outside finalization functions.
+- Orphaned `QueueContract` rows (no contract number) can be reconciled via `match_contract_number` — uses `select_for_update()` to prevent race conditions.
 
-- `contracts` is the central data hub.
-  - `processing` imports and updates `contracts` models (`Contract`, `Clin`, related entities) during finalize/update paths.
-  - `transactions` signals track changes on `contracts.Contract` and `contracts.Clin`.
-  - `sales` services include matching/backfill patterns tied to contract/CLIN data.
+---
 
-- `users` depends on `contracts.Company`.
-  - `UserCompanyMembership` and active-company middleware establish a cross-app tenancy/context pattern.
-  - This context affects navigation and request behavior in many pages.
+### `suppliers` — Supplier Domain
+**Purpose:** Supplier profiles, contacts, documents, certifications/classifications, AI enrichment pipeline, global AI model configuration.
 
-- Supplier/product coupling:
-  - `products.Nsn` and `products.SupplierNSNCapability` link with `suppliers.Supplier`.
-  - `contracts` imports product/supplier models in key model definitions.
-  - `suppliers` and `products` use legacy `contracts_*` table naming patterns, increasing schema coupling risk.
+**Owns:** `Supplier`, `Contact`, `SupplierDocument`, `SupplierCertification`, `SupplierClassification`, `SupplierType`, `OpenRouterModelSetting`
 
-- Reporting fan-in:
-  - `reports` and report/export endpoints consume data from contracts, sales, supplier, and user settings contexts.
-  - Report query tooling (`reports/utils.py`, `reports/views.py`) is a high-impact cross-domain read surface.
+**Consumes from other apps:**
+- `contracts.Contract`/`Clin` — metric aggregation on supplier detail dashboards
+- `products.Nsn` — via `SupplierNSNCapability` join
 
-- Shared security and feature gating:
-  - App permissions in `users` are enforced globally in project middleware, so app-level routing and permission records are coupled.
+**Other apps consume from it:**
+- `contracts` — supplier CRUD form and views **live in contracts**, not here; this app owns models only
+- `sales` — RFQ targets, quote records, Tier 1–3 supplier matching
+- `processing` — supplier matching during contract ingestion
+- `reports` — `OpenRouterModelSetting` endpoint for global AI model config
 
-- Audit trail coupling:
-  - `transactions` middleware/signals provide cross-app tracking, creating side effects on save/update for selected models.
+**URL prefix:** `/suppliers/`
 
-## 6. Shared Technical Patterns
-Recurring implementation patterns across repository:
+**Critical note:** `OpenRouterModelSetting` is the global AI model store shared by both `reports` and `suppliers` enrichment. Renaming or restructuring this model requires updates in both apps.
 
-- Heavy use of Django function-based views plus app-specific URL modules.
-- Mixed placement of business logic:
-  - Some logic in model methods/managers
-  - Significant workflow logic in views (notably `processing` and parts of `contracts`/`sales`)
-  - Service modules used selectively (example: `sales/services/*`, report helpers).
-- Forms + templates are primary UI pattern; AJAX JSON endpoints exist for partial interactions.
-- Admin usage is present across apps but operational workflows are often custom views rather than admin-only.
-- Report/export patterns appear in multiple apps rather than a single export layer.
-- Management commands are used in several apps for setup/sync/maintenance tasks.
-- Signals are used for user/profile initialization and transaction logging; signal side effects are part of runtime behavior.
-- Style maturity is mixed: some modernized modules coexist with legacy naming/table conventions and monolithic view files.
+---
 
-## 7. Request, Data, and Workflow Surface
-Main visible workflow categories:
+### `products` — NSN Catalog
+**Purpose:** Canonical NSN metadata catalog and supplier-NSN capability join table.
 
-- Core contract workflows (`contracts`)
-  - Dashboard/search/details/update flows
-  - CLIN-level operations
-  - Notes/reminders and related tracking
-  - Contract log and export endpoints
+**Owns:** `Nsn`, `SupplierNSNCapability`
 
-- Processing pipeline (`processing`)
-  - Queue and batch intake
-  - Start/process/finalize/cancel transitions
-  - Matching/assignment paths
-  - CSV template/download/upload and import utilities
-  - Finalization writes or links into core contract/CLIN data
+**Consumes from other apps:**
+- `suppliers.Supplier` — via `SupplierNSNCapability`
 
-- Sales workflows (`sales`)
-  - Solicitations/RFQ/bid management
-  - Multi-step import workflows
-  - Supplier capability and customer contact operations
-  - Export/report surfaces around bids and imports
+**Other apps consume from it:**
+- `contracts` — `Clin` FK to `Nsn`
+- `processing` — NSN matching
+- `sales` — Tier 1 NSN scoring, approved-source lookup
 
-- Reference/master data workflows (`suppliers`, `products`)
-  - Supplier onboarding/maintenance
-  - NSN and supplier capability management
+**URL prefix:** `/products/nsn/` — routes to `contracts.views.NsnUpdateView`/`NsnSearchView`; no standalone views
 
-- User/security/context workflows (`users`)
-  - Login/logout/register/password reset
-  - Company switching and preferences
-  - App permission/configuration surfaces
-  - Calendar/portal API and event views
+**Critical note:** Migrated table names are `contracts_nsn` and `supplier_nsn_capability`. Raw SQL and management commands must use these legacy names. NSN editing and search views live in `contracts`, not here.
 
-- Reporting/export workflows (`reports`, plus contract/sales exports)
-  - Dynamic report requests
-  - SQL-backed report execution with safety checks
-  - Download endpoints for CSV/XLSX/PDF-style outputs
+---
 
-- Support workflows
-  - Visitor check-in/out and logs (`accesslog`)
-  - Compliance/training records and matrix (`training`)
-  - Utility pages/tools (`tools`)
-  - TD Now-specific operational pages (`td_now`)
+### `transactions` — Field-Level Audit Log
+**Purpose:** Records every field-level change on tracked models via save signals; surfaces a history modal; supports inline editing.
 
-## 8. Security / Permissions Shape
-Visible project-level security posture:
+**Owns:** `Transaction` (generic FK change rows keyed to any model)
 
-- Authentication:
-  - Login enforcement is centralized via middleware (`STATZWeb.middleware.LoginRequiredMiddleware`) and a `REQUIRE_LOGIN` setting.
-  - Additional `conditional_login_required` decorator exists for opt-in behavior.
+**Consumes from other apps:**
+- `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date` only), `suppliers.Supplier` — tracked via signals in `transactions/signals.py`
+- `auth.User` — change attribution
 
-- Authorization:
-  - App-level access appears centrally enforced via `users.AppRegistry` + `users.AppPermission` checks in middleware.
-  - Superusers bypass app permission checks.
-  - Some views remain explicitly `@login_required`; enforcement is a mix of middleware and per-view decorators.
+**Other apps consume from it:**
+- `contracts` templates — `transaction_modal.html` for inline edit + history panel
+- `suppliers` detail — edit UI integration
 
-- Company scoping:
-  - Active company middleware influences request context and data scope behavior in downstream apps.
+**URL prefix:** `/transactions/`
 
-- Sensitive surfaces:
-  - Export/report endpoints (CSV/XLSX/PDF/SQL query) represent data exfiltration risk if permissions are misconfigured.
-  - SQL report tool includes read-only style checks, but still requires careful review when extending.
+**Critical note:** Signal-driven. `QuerySet.update()` bypasses save signals — audit rows will be silently skipped on tracked models. `transaction_modal.html` uses hardcoded `/transactions/...` URLs, not Django URL reversal.
 
-- Auditability:
-  - `transactions` captures selected model changes via middleware/signals.
-  - `accesslog` provides a separate operational visitor trail.
+---
 
-- Notable consistency risk:
-  - There are endpoints in support apps that are less explicit about access restrictions than core app patterns, so permission review should be part of change work.
+### `sales` — DIBBS Procurement Workflow
+**Purpose:** Solicitation triage → RFQ dispatch → quote capture → BQ export; DIBBS award file imports; Tier 1–3 supplier matching; saved filter presets.
 
-## 9. Reporting / Export / Background Processing
-Reporting/export:
-- Dedicated `reports` app includes request objects, report utilities, SQL execution helpers, and admin-assistant-related endpoints.
-- `contracts` and `sales` also include domain-specific exports and report-like responses.
-- Export logic is distributed, not centralized; schema/field changes can break multiple output paths.
+**Owns:** `Solicitation`, `SolicitationLine`, `SupplierRFQ`, `GovernmentBid`, `DibbsAward`, `NsnProcurementHistory`, `SavedFilter`, `MassPassLog`, `SolPackaging`, `SAMEntityCache`
 
-Background/batch processing:
-- No clear Celery infrastructure in the repository.
-- Batch behavior is implemented through:
-  - Management commands in `users`, `contracts`, `STATZWeb`, `td_now`
-  - Stepwise processing views/services in `processing` and `sales` import flows
-  - Signals for automatic side effects (`users`, `transactions`)
+**Consumes from other apps:**
+- `suppliers.Supplier` — RFQ targets, quotes
+- `contracts.Clin` — Tier 1 NSN scoring via SQL view `dibbs_supplier_nsn_scored`
+- `products.Nsn` — NSN matching, approved-source lookup
 
-Why this matters:
-- Long-running or stateful workflows live in request/management-command paths, so race conditions/state transitions deserve extra validation.
-- Distributed export/report code increases blast radius of model changes.
+**Other apps consume from it:** Nothing — terminal system
 
-## 10. Testing Shape
-Project-level testing profile appears uneven:
-- `training` has substantive tests.
-- Many other apps have minimal/placeholder `tests.py` or limited coverage.
-- High-coupling areas (`contracts`, `processing`, `reports`, `sales`) do not appear to have comprehensive visible coverage proportional to complexity.
+**URL prefix:** `/sales/`
 
-Practical implication:
-- Manual verification and targeted test additions are important for cross-app changes, especially around processing finalization, exports, and permission-gated flows.
+**Critical notes:**
+- Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
+- DIBBS PDFs fetched via Playwright in batches of 10 sessions.
+- `NsnProcurementHistory` keyed on `(nsn, contract_number)` — `save_procurement_history` updates `last_seen_sol`/`extracted_at` only for existing keys; never overwrites price/quantity.
+- Background task entry via `core/management/commands/run_background_tasks.py` → `sales/tasks/send_queued_rfqs.py`.
 
-## 11. Main Risk Areas
-Highest project-level footguns:
+---
 
-- Cross-app model/schema changes:
-  - `contracts` field/table changes can affect `processing`, `transactions`, `reports`, and parts of `sales`.
+### `users` — Auth & Access Control
+**Purpose:** Azure AD + password auth; app access registry; user portal; company membership; user settings; calendar sync.
 
-- Legacy table naming and shared DB assumptions:
-  - `suppliers`/`products` models mapped to `contracts_*` table names increase migration/refactor risk.
+**Owns:** `AppRegistry`, `AppPermission`, `UserSettings`, `UserOAuthToken`, `UserCompanyMembership`, `PortalSection`, `WorkCalendarEvent`
 
-- Distributed report/export dependencies:
-  - Renaming fields or queryset shapes can silently break CSV/XLSX/PDF/SQL report endpoints in multiple apps.
+**Consumes from other apps:**
+- `contracts.Company` — company membership and active-company state
 
-- Workflow state transitions in `processing`:
-  - Queue/start/finalize/cancel logic is complex and mostly view/service-driven.
+**Other apps consume from it:**
+- Every app — provides `request.active_company`, `request.user`, `conditional_login_required`, `AppPermission` gates, and context processors
 
-- Middleware-level permission coupling:
-  - App permission records and URL namespaces must stay consistent with `AppRegistry`/middleware expectations.
+**URL prefix:** `/users/`
 
-- Signal side effects:
-  - `transactions` and `users` signals introduce non-local behavior on save/update paths.
+**Shared infrastructure provided to the whole project:**
+- `STATZWeb/middleware.py` `LoginRequiredMiddleware` — enforces auth globally; respects `settings.REQUIRE_LOGIN`
+- `users/middleware.py` — injects `request.active_company` on every request
+- `users/context_processors.py` — injects `user_preferences`, `active_company`, `system_messages`
+- `contracts/context_processors.py` — injects reminder sidebar data (scoped by `active_company`)
+- `STATZWeb.decorators.conditional_login_required` — per-view auth enforcement
 
-- Inconsistent hardening in peripheral endpoints:
-  - Some support app views show weaker explicit auth/error handling patterns than core app flows, raising maintenance risk.
+---
 
-## 12. How to Approach Changes Safely
-Recommended safe-change workflow for this repository:
+### `reports` — Ad-Hoc SQL Reporting
+**Purpose:** User-requested reports; staff-authored SQL queries; CSV exports; AI-assisted schema introspection via OpenRouter.
 
-1. Read this file (`PROJECT_CONTEXT.md`) for system map.
-2. Read target app `CONTEXT.md` and then verify in code (`models.py`, `views.py`, `urls.py`, `forms.py`, `services/`).
-3. Before renaming fields/models/tables, run repo-wide search across coupled apps (`contracts`, `processing`, `reports`, `sales`, `transactions`, templates).
-4. For workflow changes, trace full request path:
-   - URL route -> view -> form/service/model -> templates/export endpoints -> signals/middleware side effects.
-5. For permission-sensitive changes, verify both:
-   - Per-view decorators and checks
-   - Middleware-level app permission behavior.
-6. For reporting/export changes, test at least one representative endpoint in each affected app.
-7. For processing/sales imports, validate state transitions and rollback/error paths with realistic sample data.
-8. Add or extend tests in touched domains; if coverage is thin, document manual verification steps explicitly in PR notes.
+**Owns:** `ReportRequest` (status, SQL draft, execution history, category, last-run audit)
 
-## 13. Recommended Reading Order
-Suggested onboarding order for engineers/AI agents:
+**Consumes from other apps:**
+- `users.UserSettings` — per-user AI model preferences
+- `suppliers.openrouter_config` / `OpenRouterModelSetting` — AI model endpoint
+- Contract/supplier schema — read-only via `run_select`
 
-1. `STATZWeb/settings.py` and `STATZWeb/urls.py`
-2. `STATZWeb/middleware.py` and `STATZWeb/decorators.py`
-3. `templates/base_template.html` (global navigation and cross-app UI assumptions)
-4. `PROJECT_STRUCTURE.md` and target app `CONTEXT.md`
-5. Central domain apps:
-   - `contracts/models.py`, `contracts/urls.py`, key `contracts/views/*`
-   - `processing/models.py`, `processing/urls.py`, key processing views/services
-6. Security/context layer:
-   - `users/models.py`, `users/middleware.py`, `users/urls.py`
-7. Coupled reference data:
-   - `suppliers/models.py`, `products/models.py`
-8. Reporting/export layer:
-   - `reports/views.py`, `reports/utils.py`, export-heavy views in `contracts` and `sales`
-9. Cross-cutting side effects:
-   - `transactions/models.py`, `transactions/signals.py`, `users/signals.py`
-10. Peripheral/support apps as needed (`inventory`, `accesslog`, `training`, `tools`, `td_now`)
+**Other apps consume from it:** Nothing — read-only surface
 
-## 14. Known Gaps / Ambiguities
-- Deployment/runtime topology is not fully explicit from repo alone (multiple deployment artifacts exist, but no single authoritative operations doc in inspected files).
-- Some app `CONTEXT.md` summaries are partially stale relative to code (for example, evolving import/processing/report surfaces), so code remains source of truth.
-- Ownership boundaries between `contracts`, `suppliers`, and `products` are historically intertwined due table naming and cross-import patterns.
-- `td_now` and some utility/support app business criticality is not fully clear from code alone.
-- Test coverage signal is limited by many minimal test modules; risk assessment here is based on visible tests and complexity concentration.
+**URL prefix:** `/reports/`
 
-## 15. Quick Reference
-- Central apps:
-  - `contracts`, `processing`, `users`, `sales`, `suppliers`, `reports`
-- Reporting-heavy apps:
-  - `reports` (primary), plus export surfaces in `contracts` and `sales`
-- Likely support/utility apps:
-  - `inventory`, `accesslog`, `training`, `tools`, `td_now`, `transactions` (cross-cutting support)
-- Most coupled areas:
-  - `contracts` <-> `processing`
-  - `contracts` <-> `suppliers`/`products`
-  - `reports` consuming many apps
-  - `users` middleware/permissions affecting all routed apps
-  - `transactions` signals on core model changes
-- Riskiest edit types:
-  - Cross-app field/table renames on core models
-  - Processing state machine/finalization logic changes
-  - Report/export query/output contract changes
-  - Permission/middleware/app-registry changes
-- First files/docs to read:
-  - `PROJECT_CONTEXT.md`
-  - `STATZWeb/settings.py`
-  - `STATZWeb/urls.py`
-  - `STATZWeb/middleware.py`
-  - target app `CONTEXT.md`
-  - coupled app model/view/service files
+**Critical note:** SQL execution is strictly read-only via `run_select`/`is_safe_select` in `reports/utils.py`. Never bypass. `CORE_TABLES` in `reports/views.py` is a hardcoded schema prompt list — update it when core table names change.
 
+---
+
+### `training` — Compliance Training
+**Purpose:** CMMC course matrix; completion tracking; document uploads; Arctic Wolf security awareness flow; PDF audit exports.
+
+**Owns:** `Course`, `Account`, `Matrix`, `UserAccount`, `Tracker`, `TrainingDoc`, `ArcticWolfCourse`, `CourseReviewClick`
+
+**Consumes from other apps:**
+- `auth.User` — FK throughout
+
+**Other apps consume from it:**
+- `base_template.html` hardcodes `{% url 'training:dashboard' %}` in global nav — renaming this URL name breaks navigation for every app
+
+**URL prefix:** `/training/`
+
+**Critical notes:**
+- `ArcticWolfCourse.slug` is auto-generated from `name` on every `save()` — renaming a live course silently invalidates all distributed completion URLs.
+- `manage_matrix` is `@login_required` only — missing superuser guard (known gap).
+
+---
+
+### `accesslog` — Visitor Access Log ⚠️ Pending Deprecation
+**Purpose:** Facility visitor check-in/check-out; staged visitor records; monthly PDF export.
+
+**Owns:** `Visitor`, `Staged`
+
+**Consumes from other apps:** None
+
+**Other apps consume from it:** None — fully isolated
+
+**URL prefix:** `/accesslog/`
+
+**Deprecation note:** This app is planned for removal. Do not add new features, expand its models, or increase coupling to other apps. Bug fixes only until removal.
+
+---
+
+### `inventory` — Warehouse Stock Ledger
+**Purpose:** Inventory catalog by NSN/description/location/quantity; live value dashboard; AJAX autocomplete.
+
+**Owns:** `InventoryItem`
+
+**Consumes from other apps:** `custom_currency` template filter (shared global)
+
+**Other apps consume from it:** Nothing — standalone
+
+**URL prefix:** `/inventory/`
+
+---
+
+### `tools` — PDF Utilities
+**Purpose:** Staff-facing PDF merge, split, page-delete operations via web UI. No persistent models.
+
+**Owns:** Stateless PDF operations (pypdf)
+
+**Consumes from other apps:** None
+
+**Other apps consume from it:** Nothing
+
+**URL prefix:** `/tools/`
+
+---
+
+### `td_now` — Tower Defense Game
+**Purpose:** Self-contained tower-defense game with map/campaign editors for staff content curation.
+
+**Owns:** `Map`, `TowerType`, `EnemyType`, `Wave`, `Campaign`, `CampaignStage`, `StageWave`
+
+**Consumes from other apps:** Django auth decorators only
+
+**Other apps consume from it:** Nothing — fully isolated
+
+**URL prefix:** `/td-now/`
+
+---
+
+## Cross-App Data Flow
+
+```
+[users] ── auth, active_company, AppPermission ──────────────────────► all apps
+    │
+    ▼
+[contracts] ◄──── finalization ──── [processing] ◄── PDF award parsing
+    │  Company/Contract/Clin            QueueContract/QueueClin
+    │  SequenceNumber (read)            SequenceNumber (owned)
+    │
+    ├──► [transactions]  (signal-tracks Contract/Clin/Supplier saves)
+    │
+    ├──► [products]  Nsn ──────────────────────────────────┐
+    │                                                       │
+    └──► [suppliers]  Supplier ────────────────────────────┤
+                                                           │
+                                                    [sales] (reads Clin/Supplier/Nsn)
+                                                    Solicitation/RFQ/Award → terminal
+
+[reports] ── read-only SQL across contracts/suppliers schema
+[training], [accesslog], [inventory], [tools], [td_now] ── fully isolated
+```
+
+---
+
+## Shared Infrastructure Map
+
+| What | Where it lives | Who uses it |
+|---|---|---|
+| Login enforcement | `STATZWeb/middleware.py` `LoginRequiredMiddleware` | All apps |
+| Active company injection | `users/middleware.py` → `request.active_company` | `contracts`, `processing`, `suppliers`, `sales` |
+| App access gates | `users.AppRegistry` / `AppPermission` | All feature apps |
+| User settings | `users.UserSettings` | `contracts` (reminder window), `reports` (AI model) |
+| Company membership | `users.UserCompanyMembership` | `contracts.CompanyForm` |
+| Global AI model config | `suppliers.OpenRouterModelSetting` | `suppliers` enrichment, `reports` AI stream |
+| Reminder sidebar context | `contracts/context_processors.py` | All templates extending `contract_base.html` |
+| PO/TAB sequence numbers | `processing.SequenceNumber` | `contracts` `ContractCreateView` |
+| Field-change audit | `transactions/signals.py` | `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date`), `suppliers.Supplier` |
+| Background task registry | `core/management/commands/run_background_tasks.py` | `sales/tasks/`, other app task modules |
+| CSS / design system | `static/css/theme-vars.css`, `app-core.css`, `utilities.css` | All templates |
+| Microsoft Graph API token | `users.UserOAuthToken` | `sales` (RFQ mail) |
+
+---
+
+## Key Model Ownership Quick Reference
+
+| Model | Owned by | FK'd / used by |
+|---|---|---|
+| `Company` | `contracts` | `Contract`, `Clin`, `UserCompanyMembership`, all company-scoped models |
+| `Contract` | `contracts` | `Clin`, `ContractSplit`, `Note`, `PaymentHistory`, `FolderTracking` |
+| `Clin` | `contracts` | `ClinShipment`, `Note`, `PaymentHistory`, `ClinAcknowledgment`; read by `sales` via SQL view |
+| `Supplier` | `suppliers` | `Clin` FK, `Contact`, `SupplierDocument`, `SupplierNSNCapability`; tracked by `transactions` |
+| `Nsn` | `products` | `Clin` FK, `SupplierNSNCapability`, `IdiqContractDetails`; table name `contracts_nsn` |
+| `SequenceNumber` | `processing` | Read by `contracts.views.contract_views` for PO/TAB defaults |
+| `Transaction` | `transactions` | Generic FK to any audited model; never written to directly from business logic |
+| `AppPermission` | `users` | Checked in every feature view via middleware |
+| `UserSettings` | `users` | `contracts` reminder window, `reports` AI model selection |
+| `QueueContract` | `processing` | Parent of `QueueClin`; finalized into `Contract` |
+| `Solicitation` | `sales` | `SolicitationLine`, `SupplierRFQ`, `GovernmentBid` |
+| `ReportRequest` | `reports` | Nothing downstream |
+| `OpenRouterModelSetting` | `suppliers` | `suppliers` enrichment views, `reports` AI stream endpoint |
+
+---
+
+## Cross-App Change Rules
+
+### When changing `Contract` or `Clin` fields
+Required updates: `contracts/models.py` + migration + `contracts/forms.py` + affected `contracts/views/*` + templates + `contracts/CONTRACTS_APP_CURRENT_STATE.md`.
+Downstream: `processing/models.py` finalization mapping, `transactions/signals.py` tracked fields, `sales/services/matching.py` if CLIN supplier/NSN fields touched.
+
+### When changing `Supplier` fields
+Required: `suppliers/models.py` + migration + `contracts/forms.py` (`SupplierForm`) + `contracts/views/supplier_views.py` + `templates/suppliers/*` + `transactions/signals.py` + `sales/services/email.py` / matching flows.
+
+### When changing `Nsn` fields
+Required: `products/models.py` + migration + `contracts/forms.py` (`NsnForm`) + `contracts/views/nsn_views.py`/`idiq_views.py` + `processing` matching views + raw SQL in `SQL/migrate_data.sql` if table/column names change.
+
+### When sending data from `processing` → `contracts`
+Finalization is the only write path. Never write `Contract`/`Clin` from processing views outside of the finalization functions (`finalize_contract`, `finalize_idiq_contract`).
+
+### When sending data from `contracts` → `sales`
+`sales` reads via SQL views — it receives no pushed updates. Changes to `Clin` supplier/NSN fields can affect Tier 1 match counts; run `refresh_match_counts` after bulk changes.
+
+### When using `request.active_company`
+Injected by `users/middleware.py`. Every queryset on company-scoped data must filter by it. `ActiveCompanyQuerysetMixin` handles this on CBVs. Never query company-scoped models without this filter.
+
+### When adding a new background task
+Add a callable under the owning app's `tasks/` package, then register it in `core/management/commands/run_background_tasks.py`. Do not add ad-hoc management commands for recurring work.
+
+### When adding a field that needs audit history
+Add the field path to `transactions/signals.py` `TRACKED` dict. Never use `QuerySet.update()` on tracked models — it bypasses save signals.
+
+### When renaming a URL name used outside its app
+Run repo-wide search before changing. `training:dashboard` is hardcoded in `base_template.html`. `transactions` modal uses hardcoded `/transactions/...` paths. `reports` admin JS posts to `suppliers:global_ai_model_config`.
+
+---
+
+## CSS Architecture (All Apps)
+
+No Tailwind. Bootstrap 5 plus three global CSS files:
+
+- `static/css/theme-vars.css` — color tokens, brand vars, dark mode overrides (`body.dark`). Hex values only here.
+- `static/css/app-core.css` — all layout, component, button, and modal styles. New named classes go here.
+- `static/css/utilities.css` — utility and helper classes.
+
+**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
+
+When editing any template: replace Tailwind utility classes with Bootstrap 5 equivalents or named classes from `app-core.css`. Do not leave Tailwind classes in place. Button pattern: `.btn-outline-brand` (standard) and `.btn-outline-brand.btn-tinted` (pill with `#eff6ff` tint).

@@ -1,4 +1,5 @@
 # AGENTS.md — `training` App
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `training/CONTEXT.md` before editing. This file defines safe-edit rules specific to the `training` app as implemented.
 

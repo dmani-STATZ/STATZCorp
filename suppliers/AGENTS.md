@@ -1,4 +1,5 @@
 # AGENTS.md — `suppliers` app
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `suppliers/CONTEXT.md` first. This file adds safe-edit guidance that CONTEXT.md does not cover.
 

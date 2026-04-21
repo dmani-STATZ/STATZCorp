@@ -1,4 +1,10 @@
 # AGENTS.md — accesslog
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
+
+## ⚠️ Deprecation Notice
+This app is **planned for removal**. Do not add new features, expand models, or increase coupling to other apps. Accept bug fixes only until the app is removed.
+
+---
 
 ## 1. Purpose of This File
 This file defines safe-edit guidance for the `accesslog` Django app. It is written for AI coding agents and future developers making changes to this app.

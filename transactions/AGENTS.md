@@ -1,4 +1,5 @@
 # AGENTS.md — `transactions` app
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `transactions/CONTEXT.md` first for domain overview. This file focuses on safe-edit mechanics and failure modes.
 

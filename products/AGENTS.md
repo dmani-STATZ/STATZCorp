@@ -1,4 +1,5 @@
 # AGENTS.md — `products`
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `products/CONTEXT.md` first. This file complements it with concrete safe-edit rules grounded in the actual repository. It does not repeat the context file.
 

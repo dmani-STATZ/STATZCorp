@@ -8,7 +8,7 @@ Before significant edits, read project-level context first (`PROJECT_CONTEXT.md`
 ## 2. How to Start Work in This Repo
 Use this reading order before editing:
 
-- `PROJECT_CONTEXT.md` if it exists. It is currently not present in this repo.
+- `PROJECT_CONTEXT.md` — cross-app master reference; read this first for any task that crosses app boundaries.
 - `PROJECT_STRUCTURE.md` plus `STATZWeb/settings.py` and `STATZWeb/urls.py` for global wiring.
 - Target app `CONTEXT.md`.
 - Target app `AGENTS.md`.
@@ -170,7 +170,7 @@ Slow down and inspect deeply before editing when changes involve:
 
 ## 14. Quick Reference
 - First docs to read:
-- `PROJECT_CONTEXT.md` (not currently present), then `PROJECT_STRUCTURE.md`.
+- `PROJECT_CONTEXT.md` (cross-app master reference), then `PROJECT_STRUCTURE.md`.
 - `STATZWeb/settings.py`, `STATZWeb/urls.py`.
 - Target app `CONTEXT.md` and `AGENTS.md`.
 - Most coupled areas:
@@ -189,7 +189,60 @@ Slow down and inspect deeply before editing when changes involve:
 - Manual cross-app smoke tests for permissions, scoping, transactions history, and exports.
 
 
-## CSS / Styling Rules
+## 15. Key Processing Workflow Notes
+
+### IDIQ Parser Detection and Shadow-Schema Metadata
+
+**Contract number regex:** `_RE_DLA_CONTRACT` uses `[A-Z0-9]{4}` for the trailing segment (was `\d{4}`) so alphanumeric suffixes like `SPE7M5-26-D-60JK` are matched.
+
+**Detection (two independent gates — either triggers IDIQ):**
+1. **Type-code gate:** Strip hyphens from the extracted contract number and check `position[8] == 'D'` (1-based: 9th character). For `SPE7M5-26-D-60JK` → bare `SPE7M526D60JK`[8] = `'D'`.
+2. **Text gate:** Document contains the phrase "Indefinite Delivery Contract" (via `_RE_IDIQ_TEXT_DETECT`).
+
+Both gates set `contract_type = "IDIQ"` after `_apply_contract_number_rules`.
+
+**Metadata extraction (IDIQ only):**
+| Field | Exact source pattern |
+|---|---|
+| `idiq_max_value` | `Contract Maximum Value: $<amount>` |
+| `idiq_min_guarantee` | `Guaranteed Contract Minimum Quantity: <qty>` |
+| `idiq_term_months` | `_RE_IDIQ_TERM` captures `(one\|...\|N) (year\|month)[s] [period]` → `_term_to_months(qty, unit)` |
+
+`_term_to_months(qty_str, unit)` accepts either a word (`"one"`, `"five"`) or digit string. Examples: `"one", "year"` → 12; `"five", "year"` → 60; `"6", "month"` → 6.
+
+Per-CLIN: `_extract_min_order_qty_map` scans up to 800 chars after each CLIN item-number marker for "Minimum Delivery Order Quantity". Result stored in `ClinParseResult.min_order_qty_text`.
+
+**Shadow Schema format** — packed into `QueueContract.description` by `ingest_parsed_award` when `contract_type` is IDIQ:
+```
+IDIQ_META|TERM:12|MAX:350000|MIN:19
+```
+All three segments are optional; only segments with extracted values are appended. `start_processing` copies `queue_item.description` into `ProcessContract.description` so metadata survives into the edit phase.
+
+For IDIQ CLINs, `QueueClin.nsn_description` is set to the min delivery order quantity string (e.g. `"5 EA"`) rather than item nomenclature, so the IDIQ processing page can initialise min-order-qty inputs from parsed data.
+
+**Routing:** `start_processing` checks `queue_item.contract_type == 'IDIQ'` and returns a `redirect_url` pointing to `processing:idiq_processing_edit` instead of the standard `process_contract_edit` view. The queue JS reads `data.redirect_url` (new field) if present before falling back to the default edit URL.
+
+**IDIQ Processing Page (`idiq_processing_edit`):** Unpacks the shadow-schema string from `process_contract.description`, displays Term / Max Value / Min Guarantee editable header fields, and a CLIN table with NSN Match, Supplier Match, and Min Order Qty inputs.
+
+**Finalization (`finalize_idiq_contract`):** Validates all CLINs are matched, creates one `IdiqContract` and one `IdiqContractDetails` per CLIN, then deletes the `ProcessContract` and `QueueContract` records in a single `transaction.atomic` block.
+
+**Schema additions (migrations):**
+- `QueueContract.description` (TextField, null=True) — `processing/0017`
+- `IdiqContract.max_value`, `IdiqContract.min_guarantee` (DecimalField, null=True) — `contracts/0038`
+- `IdiqContractDetails.min_order_qty` (CharField max_length=50, null=True) — same migration
+
+### Queue Merge — Match Orphaned Contract Number
+
+Orphaned `QueueContract` rows (`contract_number` empty) can be reconciled via **Match Contract** (`processing:match_contract_number`, POST `target_contract_number`). Handler runs in `transaction.atomic()` with `select_for_update()` on both rows.
+
+- **Merge into existing queue row:** If another `QueueContract` already has that contract number (same `company`), header fields are coalesced with **orphan wins** when the orphan has a value (`buyer`, `award_date`, `due_date`, `contract_value`, `contract_type`, `idiq_number`, `contractor_name`, `contractor_cage`). All `QueueClin` rows move to the target; on CLIN line-number match, orphan CLIN fields overwrite the target (orphan wins) then the orphan CLIN is deleted; otherwise the CLIN's `contract_queue` FK is repointed. Orphan `QueueContract` is deleted after merge.
+- **No queue duplicate:** The orphan's `contract_number` is set to the entered value and the row is kept.
+
+**Blocked cases:** row already has a contract number, item `is_being_processed`, or a `ProcessContract` still references the queue id.
+
+---
+
+## 16. CSS / Styling Rules
 
 This project does not use Tailwind in any form. All styling uses Bootstrap 5 plus the project's three-file CSS architecture:
 

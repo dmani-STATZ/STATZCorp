@@ -1,4 +1,5 @@
 # AGENTS.md — `contracts` App
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 ## 1. Purpose of This File
 

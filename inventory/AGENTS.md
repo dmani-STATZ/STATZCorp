@@ -1,4 +1,5 @@
 # AGENTS.md — inventory
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `inventory/CONTEXT.md` first. This file does not repeat that content; it defines safe-edit rules grounded in the actual code.
 

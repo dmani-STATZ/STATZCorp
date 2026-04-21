@@ -1,4 +1,5 @@
 # AGENTS.md — `td_now`
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `td_now/CONTEXT.md` first. This file defines safe-edit guidance and does not repeat what is already there.
 

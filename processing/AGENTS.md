@@ -1,4 +1,5 @@
 # AGENTS.md — `processing` App
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 > **Read `processing/CONTEXT.md` first.** This file adds editing-safety rules on top of it; it does not duplicate it.
 

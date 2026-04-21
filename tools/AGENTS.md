@@ -1,4 +1,5 @@
 # AGENTS.md — `tools` App
+> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 Read `tools/CONTEXT.md` first. This file defines safe-edit rules for AI coding agents and developers modifying the `tools` app. It does not duplicate `CONTEXT.md`; it complements it with actionable guidance.
 
