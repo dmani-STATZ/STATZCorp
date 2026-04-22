@@ -28,7 +28,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 | `admin.py` | Registers `Supplier` and `Contact` with tailored `list_display`, search, filters, and grouped `fieldsets` for compliance metadata. |
 | `templates/suppliers/...` | Server-rendered templates for the dashboard, detail page, info-by-type page, enrichment console, edit form (for `contracts` views), list/search screens, and include partials (`address_picker`, `toggle_switch`). |
 | `static/suppliers/js` | `supplier_edit.js` (change-tracking/highlight helpers for the edit form) and `supplier_enrich.js` (AJAX apply-suggestion bindings) that are bundled into the templates. |
-| `migrations/` | Three migrations: `0001_initial` bootstraps the tables with `contracts_*` naming, `0002` adds enrichment-related fields, and `0003` creates `OpenRouterModelSetting`. |
+| `migrations/` | `0001_initial` bootstraps tables with `contracts_*` naming; `0002`–`0003` add enrichment/AI model settings; `0004` adds `Supplier.rfq_email`; `0005` adds `SupplierContactGroup` and the M2M to `Contact`. |
 | `tests.py` | Placeholder file with no tests yet. |
 
 ## 5. Data Model / Domain Objects
@@ -39,6 +39,8 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 `SupplierType`, `CertificationType`, and `ClassificationType` are lookups persisted as `contracts_suppliertype`, `contracts_certificationtype`, and `contracts_classificationtype`. `Supplier` links to `SupplierType`, and the certification/classification models point back to `Supplier` plus the respective type table; each has `__str__` helpers for UI labels.
 
 `Contact` holds the name/title/company/phone/email for a supplier, optionally linked to a `contracts.Address` and back to `Supplier` via `contacts`.
+
+`SupplierContactGroup` maps to `contracts_suppliercontactgroup` and represents a named group of `Contact` records for a single supplier. Groups are supplier-specific (no cross-supplier sharing). Each group carries full `AuditModel` timestamps. The M2M junction table `contracts_suppliercontactgroup_contacts` is auto-managed by Django; removing a `Contact` record automatically removes it from all groups via the junction table. Group CRUD is handled by four dedicated AJAX endpoints (`supplier_group_create`, `supplier_group_edit`, `supplier_group_delete`, `supplier_group_name_suggestions`) mounted under `suppliers/urls.py`.
 
 `SupplierDocument` extends `AuditModel` to store uploaded files (upload path `supplier-docs/`), document `doc_type` (CERT/CLASS/GENERAL), optional links to the associated certification/classification, and a `description`; `SupplierDetailView` selects the latest 25 docs and matches them to certifications/classifications.
 
@@ -107,7 +109,7 @@ No Celery/RQ tasks, cron jobs, or scheduled imports live here—the AI enrichmen
 `tests.py` is still the auto-generated stub with no assertions, so this app has zero automated coverage; the `contracts` app owns most supplier flows and should ideally test the shared templates/static assets as well.
 
 ## 16. Migrations / Schema Notes
-- Only three migrations exist: `0001_initial` (creates the `contracts_*` tables and wires FKs to `contracts.Address`, `SpecialPaymentTerms`, and `User`), `0002` (adds `logo_url`, `website_url`, `primary_email`, `primary_phone`, and `last_enriched_at` to `Supplier`), and `0003` (creates `suppliers.OpenRouterModelSetting` with the `needs_update` flag).
+- Core history: `0001_initial` (creates the `contracts_*` tables and wires FKs to `contracts.Address`, `SpecialPaymentTerms`, and `User`), `0002` (adds `logo_url`, `website_url`, `primary_email`, `primary_phone`, and `last_enriched_at` to `Supplier`), `0003` (creates `suppliers.OpenRouterModelSetting` with the `needs_update` flag), `0004` (adds `Supplier.rfq_email`), `0005` (creates `SupplierContactGroup` + `contracts_suppliercontactgroup_contacts`).
 - The models deliberately set `db_table` to `contracts_*` to align with the legacy schema, so migrating/renaming fields impacts the shared tables that `contracts` also queries.
 - `AuditModel.save` enforces consistent timestamps, and `OpenRouterModelSetting` maintains a single `key="default"` record via `get_or_create`, so manual edits should respect that singleton pattern.
 
@@ -125,7 +127,7 @@ No Celery/RQ tasks, cron jobs, or scheduled imports live here—the AI enrichmen
 - Before renaming templates, search for string-based references in `contracts` URLs/views and the `static` JS files, as everything shares the `suppliers/*` template namespace.
 
 ## 19. Quick Reference
-- Primary models: `Supplier`, `Contact`, `SupplierCertification`, `SupplierClassification`, `SupplierDocument`, `OpenRouterModelSetting`.
+- Primary models: `Supplier`, `Contact`, `SupplierContactGroup`, `SupplierCertification`, `SupplierClassification`, `SupplierDocument`, `OpenRouterModelSetting`.
 - Main URLs: `/suppliers/` (dashboard), `/suppliers/<pk>/detail/`, `/suppliers/<pk>/enrich/` + `/apply-enrichment/`, `/suppliers/info/<type_slug>/`, `/suppliers/search/` & `/autocomplete/`, `/suppliers/ai-model/config/`.
 - Key templates: `templates/suppliers/dashboard.html`, `supplier_detail.html`, `supplier_enrich.html`, `supplier_edit.html`/`supplier_form.html`, `suppliers_by_type.html`.
 - Key dependencies: `contracts` app for models/forms/views, `STATZWeb` login/URL wiring, external OpenRouter API (`requests` + env vars) and `beautifulsoup4` for `utils`.

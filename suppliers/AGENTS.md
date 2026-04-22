@@ -14,7 +14,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 ## 2. App Scope
 
 **Owns:**
-- `Supplier`, `SupplierType`, `Contact`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `OpenRouterModelSetting` models
+- `Supplier`, `SupplierType`, `Contact`, `SupplierContactGroup`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `OpenRouterModelSetting` models
 - Supplier dashboard, per-type lists, and detail/enrichment UI
 - OpenRouter-backed AI enrichment pipeline (`views.py`, `openrouter_config.py`)
 - Templates and static JS for supplier edit, enrichment, and detail views
@@ -34,7 +34,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 - Read `suppliers/models.py` — all models use `db_table = "contracts_*"` (legacy schema). Any field rename directly impacts the shared `contracts_*` tables.
 - Read `contracts/models.py` — `Contract`, `Clin`, and `Address` carry FKs that reference supplier tables.
 - Read `contracts/forms.py` — `SupplierForm` lives here and is used by supplier create/edit templates.
-- Read `migrations/` — three migrations exist; inspect before adding or altering columns.
+- Read `migrations/` — inspect before adding or altering columns.
 
 ### Before changing views
 - Read `suppliers/views.py` — note which views lack `LoginRequiredMixin` (`DashboardView`, `SupplierDetailView`, `supplier_search_api`).
@@ -89,6 +89,12 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 ### AI model config change
 `suppliers/openrouter_config.py` → `GlobalAIModelConfigView` in `views.py` → enrichment page inline JS in `supplier_enrich.html`
 
+### SupplierContactGroup change
+`suppliers/models.py` → `suppliers/migrations/` →
+`suppliers/views.py` (group CRUD views + `SupplierDetailView` context) →
+`suppliers/urls.py` → `suppliers/admin.py` →
+`templates/suppliers/supplier_detail.html` (Contact Groups section)
+
 ---
 
 ## 6. Cross-App Dependency Warnings
@@ -102,7 +108,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 ### Apps that import from `suppliers.models`
 | App | What it imports |
 |-----|----------------|
-| `contracts` | `Supplier`, `SupplierType`, `SupplierCertification`, `SupplierClassification`, `Contact`, `CertificationType`, `ClassificationType` |
+| `contracts` | `Supplier`, `SupplierType`, `SupplierCertification`, `SupplierClassification`, `Contact`, `SupplierContactGroup`, `CertificationType`, `ClassificationType` |
 | `products` | `Supplier` (FK on product model) |
 | `processing` | `Supplier` (matching and processing views) |
 | `sales` | `Supplier` (RFQ, solicitation, supplier service views) |
@@ -194,6 +200,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 9. **`utils.scrape_supplier_site` prints debug output** — if wired into a view, it will leak crawl logs to stdout in production.
 10. **`transactions` signals depend on `Supplier`** — renaming or removing `Supplier` fields without checking `transactions/signals.py` can silently break transaction processing.
 11. **`Supplier.prime` is an IntegerField storing a `SalesClass.id`** — it is rendered in `SupplierForm` as a `ModelChoiceField` with a `clean_prime` override that converts the selected instance back to an integer on save. There is no FK constraint at the database level. Do not change this to a real FK without a coordinated migration.
+12. **`SupplierContactGroup.contacts` M2M only validates that contacts belong to the same supplier at the view layer** — the DB has no constraint preventing a contact from a different supplier being added via ORM directly. Always use the view endpoints or validate supplier ownership before calling `.set()` or `.add()` in any new code path.
 
 ---
 

@@ -128,6 +128,27 @@ class Contact(models.Model):
         return self.name
 
 
+class SupplierContactGroup(AuditModel):
+    supplier = models.ForeignKey(
+        'Supplier',
+        on_delete=models.CASCADE,
+        related_name='contact_groups',
+    )
+    name = models.CharField(max_length=100)
+    contacts = models.ManyToManyField(
+        'Contact',
+        blank=True,
+        related_name='contact_groups',
+    )
+
+    class Meta:
+        db_table = 'contracts_suppliercontactgroup'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.supplier})"
+
+
 class SupplierCertification(models.Model):
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
     certification_type = models.ForeignKey('CertificationType', on_delete=models.CASCADE)

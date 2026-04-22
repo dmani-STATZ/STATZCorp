@@ -352,7 +352,7 @@
                 Path copied to clipboard! Paste in File Explorer address bar.
             </div>
             <!-- System message for additional instructions -->
-            <div id="system-message" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div id="system-message" class="hidden fixed inset-0 modal-backdrop-overlay flex items-center justify-center z-50">
                 <div class="card card-padded max-w-lg mx-4">
                     <div class="flex justify-between items-start mb-4">
                         <h3 class="text-lg font-bold text-gray-800" id="system-message-title">Information</h3>
@@ -608,8 +608,20 @@
                                 <td class="px-2 py-1">{{ ga.date_closed|date:"m/d/Y"|default:"—" }}</td>
                                 <td class="px-2 py-1">{{ ga.get_initiated_display|default:ga.initiated|default:"—" }}</td>
                                 <td class="px-2 py-1">
-                                    <button type="button" onclick="confirmDeleteGovAction({{ ga.id }})" class="btn btn-link p-0 text-danger" title="Delete">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    <button class="btn btn-link btn-sm p-0 text-secondary"
+                                            type="button"
+                                            title="Actions"
+                                            data-gov-action-id="{{ ga.id }}"
+                                            data-gov-action-raw-action="{{ ga.action|default:'' }}"
+                                            data-gov-action-raw-request="{{ ga.request|default:'' }}"
+                                            data-gov-action-raw-initiated="{{ ga.initiated|default:'' }}"
+                                            data-gov-action-number="{{ ga.number|default:'' }}"
+                                            data-gov-action-date-submitted="{% if ga.date_submitted %}{{ ga.date_submitted|date:'Y-m-d' }}{% endif %}"
+                                            data-gov-action-date-closed="{% if ga.date_closed %}{{ ga.date_closed|date:'Y-m-d' }}{% endif %}"
+                                            onclick="openGovActionContextMenu(event, this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                            <circle cx="8" cy="2" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="14" r="1.5"/>
+                                        </svg>
                                     </button>
                                 </td>
                             </tr>
@@ -643,17 +655,26 @@
 {% include "contracts/partials/note_modal.html" %}
 {% include "contracts/includes/cancel_contract_modal.html" %}
 
+<!-- Gov Action Portal Context Menu -->
+<div id="gov-action-context-menu"
+     style="display:none; position:fixed; z-index:99998; min-width:120px;"
+     class="dropdown-menu shadow">
+    <button class="dropdown-item" type="button" id="gov-action-menu-edit">Edit</button>
+    <button class="dropdown-item text-danger" type="button" id="gov-action-menu-delete">Delete</button>
+</div>
+
 <!-- Gov Action Modal -->
-<div id="govActionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeGovActionModal()">
+<div id="gov-action-modal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeGovActionModal()">
     <div class="relative top-16 mx-auto p-6 border shadow-lg rounded-md bg-white" style="width: 480px !important; max-width: 95%;" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold text-gray-800">Add Gov Action</h3>
+            <h3 id="gov-action-modal-title" class="text-xl font-semibold text-gray-800">Add Gov Action</h3>
             <button type="button" onclick="closeGovActionModal()" class="text-gray-400 hover:text-gray-600">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <form id="gov-action-form" onsubmit="submitGovAction(event)">
             {% csrf_token %}
+            <input type="hidden" id="gov-action-edit-id" value="">
             <div class="space-y-3 text-sm">
                 <div>
                     <label class="block font-medium text-gray-700 mb-1">Action</label>
@@ -704,14 +725,14 @@
             </div>
             <div class="mt-6 flex justify-end gap-2">
                 <button type="button" onclick="closeGovActionModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">Add</button>
+                <button type="submit" id="gov-action-submit-btn" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">Add</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Supplier Info Modal -->
-<div id="supplierInfoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeSupplierInfoModal()">
+<div id="supplierInfoModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeSupplierInfoModal()">
     <div class="relative top-10 mx-auto p-6 border shadow-lg rounded-md bg-white max-w-2xl mb-10" onclick="event.stopPropagation()">
         <div id="supplier-info-loading" class="text-center py-8 text-gray-500">Loading...</div>
         <div id="supplier-info-content" class="hidden">
@@ -772,7 +793,7 @@
 </div>
 
 <!-- Acknowledgment Letter Modal -->
-<div id="acknowledgmentLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
+<div id="acknowledgmentLetterModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
     <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 550px !important; max-width: 550px !important;">
         <div class="flex justify-between items-center pb-3">
             <h3 class="text-xl font-semibold">Purchase Order Acknowledge Letter</h3>
@@ -1400,12 +1421,28 @@ function switchGovLogTab(tab) {
 }
 
 function openGovActionModal() {
-    document.getElementById('govActionModal').classList.remove('hidden');
+    document.getElementById('gov-action-modal-title').textContent = 'Add Gov Action';
+    document.getElementById('gov-action-submit-btn').textContent = 'Add';
+    document.getElementById('gov-action-edit-id').value = '';
     document.getElementById('gov-action-form').reset();
+    document.getElementById('gov-action-modal').classList.remove('hidden');
+}
+
+function openEditGovActionModal(id, action, request, initiated, number, dateSubmitted, dateClosed) {
+    document.getElementById('gov-action-modal-title').textContent = 'Edit Gov Action';
+    document.getElementById('gov-action-submit-btn').textContent = 'Save';
+    document.getElementById('gov-action-edit-id').value = id;
+    document.getElementById('gov-action-action').value = action;
+    document.getElementById('gov-action-request').value = request;
+    document.getElementById('gov-action-initiated').value = initiated;
+    document.getElementById('gov-action-number').value = number;
+    document.getElementById('gov-action-date-submitted').value = dateSubmitted;
+    document.getElementById('gov-action-date-closed').value = dateClosed;
+    document.getElementById('gov-action-modal').classList.remove('hidden');
 }
 
 function closeGovActionModal() {
-    document.getElementById('govActionModal').classList.add('hidden');
+    document.getElementById('gov-action-modal').classList.add('hidden');
 }
 
 let currentSupplierInfoData = null;
@@ -1503,8 +1540,17 @@ function submitGovAction(e) {
     e.preventDefault();
     const form = document.getElementById('gov-action-form');
     const formData = new FormData(form);
-    formData.append('csrfmiddlewaretoken', document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value);
-    fetch("{% url 'contracts:gov_action_create' contract.id %}", {
+    const editId = document.getElementById('gov-action-edit-id').value;
+    const isEdit = !!editId;
+
+    const csrfToken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    const url = isEdit
+        ? `/contracts/gov-action/${editId}/update/`
+        : "{% url 'contracts:gov_action_create' contract.id %}";
+
+    fetch(url, {
         method: 'POST',
         body: formData,
         credentials: 'same-origin',
@@ -1515,17 +1561,121 @@ function submitGovAction(e) {
         if (data.success) {
             closeGovActionModal();
             const tbody = document.getElementById('gov-actions-tbody');
-            const emptyRow = tbody.querySelector('tr[data-empty-gov-row]');
-            if (emptyRow) emptyRow.remove();
-            const tr = document.createElement('tr');
-            tr.dataset.govActionId = data.id;
-            tr.innerHTML = `<td class="px-2 py-1">${data.action || '—'}</td><td class="px-2 py-1">${data.number || '—'}</td><td class="px-2 py-1">${data.request || '—'}</td><td class="px-2 py-1">${data.date_submitted ? new Date(data.date_submitted).toLocaleDateString() : '—'}</td><td class="px-2 py-1">${data.date_closed ? new Date(data.date_closed).toLocaleDateString() : '—'}</td><td class="px-2 py-1">${data.initiated || '—'}</td><td class="px-2 py-1"><button type="button" onclick="confirmDeleteGovAction(${data.id})" class="text-red-600 hover:text-red-800" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>`;
-            tbody.appendChild(tr);
+
+            if (isEdit) {
+                const row = tbody.querySelector(`tr[data-gov-action-id="${editId}"]`);
+                if (row) {
+                    const cells = row.querySelectorAll('td');
+                    cells[0].textContent = data.action_display;
+                    cells[1].textContent = data.number || '—';
+                    cells[2].textContent = data.request_display;
+                    cells[3].textContent = data.date_submitted_display;
+                    cells[4].textContent = data.date_closed_display;
+                    cells[5].textContent = data.initiated_display;
+                    const kebabBtn = row.querySelector('[data-gov-action-id]');
+                    if (kebabBtn) {
+                        kebabBtn.dataset.govActionRawAction = data.action;
+                        kebabBtn.dataset.govActionRawRequest = data.request;
+                        kebabBtn.dataset.govActionRawInitiated = data.initiated;
+                        kebabBtn.dataset.govActionNumber = data.number || '';
+                        kebabBtn.dataset.govActionDateSubmitted = data.date_submitted;
+                        kebabBtn.dataset.govActionDateClosed = data.date_closed;
+                    }
+                }
+            } else {
+                const emptyRow = tbody.querySelector('tr[data-empty-gov-row]');
+                if (emptyRow) emptyRow.remove();
+                const tr = document.createElement('tr');
+                tr.dataset.govActionId = data.id;
+                tr.innerHTML = `
+                    <td class="px-2 py-1">${data.action_display}</td>
+                    <td class="px-2 py-1">${data.number || '—'}</td>
+                    <td class="px-2 py-1">${data.request_display}</td>
+                    <td class="px-2 py-1">${data.date_submitted_display}</td>
+                    <td class="px-2 py-1">${data.date_closed_display}</td>
+                    <td class="px-2 py-1">${data.initiated_display}</td>
+                    <td class="px-2 py-1">
+                        <button class="btn btn-link btn-sm p-0 text-secondary"
+                            type="button"
+                            title="Actions"
+                            data-gov-action-id="${data.id}"
+                            data-gov-action-raw-action="${data.action}"
+                            data-gov-action-raw-request="${data.request}"
+                            data-gov-action-raw-initiated="${data.initiated}"
+                            data-gov-action-number="${data.number || ''}"
+                            data-gov-action-date-submitted="${data.date_submitted}"
+                            data-gov-action-date-closed="${data.date_closed}"
+                            onclick="openGovActionContextMenu(event, this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <circle cx="8" cy="2" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="14" r="1.5"/>
+                        </svg>
+                    </button>
+                    </td>`;
+                tbody.appendChild(tr);
+            }
         } else {
-            alert(data.error || data.errors || 'Failed to add Gov Action.');
+            alert(data.error || data.errors || 'Failed to save Gov Action.');
         }
     })
-    .catch(err => { console.error(err); alert('Error adding Gov Action.'); });
+    .catch(err => { console.error(err); alert('Error saving Gov Action.'); });
+}
+
+// Portal context menu for Gov Actions
+(function() {
+    // Close the menu when clicking anywhere else
+    document.addEventListener('click', function(e) {
+        const menu = document.getElementById('gov-action-context-menu');
+        if (menu && !menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+    // Close on scroll inside the gov actions container
+    document.addEventListener('scroll', function() {
+        const menu = document.getElementById('gov-action-context-menu');
+        if (menu) menu.style.display = 'none';
+    }, true);
+})();
+
+function openGovActionContextMenu(event, btn) {
+    event.stopPropagation();
+    const menu = document.getElementById('gov-action-context-menu');
+    if (!menu) return;
+
+    const id = btn.dataset.govActionId;
+    const rawAction = btn.dataset.govActionRawAction || '';
+    const rawRequest = btn.dataset.govActionRawRequest || '';
+    const rawInitiated = btn.dataset.govActionRawInitiated || '';
+    const number = btn.dataset.govActionNumber || '';
+    const dateSubmitted = btn.dataset.govActionDateSubmitted || '';
+    const dateClosed = btn.dataset.govActionDateClosed || '';
+
+    // Wire up Edit
+    document.getElementById('gov-action-menu-edit').onclick = function() {
+        menu.style.display = 'none';
+        openEditGovActionModal(id, rawAction, rawRequest, rawInitiated, number, dateSubmitted, dateClosed);
+    };
+
+    // Wire up Delete
+    document.getElementById('gov-action-menu-delete').onclick = function() {
+        menu.style.display = 'none';
+        confirmDeleteGovAction(id);
+    };
+
+    // Position using fixed coords from the button's bounding rect
+    const rect = btn.getBoundingClientRect();
+    menu.style.display = 'block';
+
+    // Default: open below-left of the button
+    const menuWidth = 130;
+    let left = rect.right - menuWidth;
+    let top = rect.bottom + 4;
+
+    // Clamp to viewport
+    if (left < 4) left = 4;
+    if (top + 80 > window.innerHeight) top = rect.top - 80;
+
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
 }
 
 function confirmDeleteGovAction(id) {

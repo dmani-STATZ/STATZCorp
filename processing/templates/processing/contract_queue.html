@@ -334,7 +334,7 @@
         </div>
     </div>
 
-    <div id="contractNumberModal" class="fixed z-10 inset-0 overflow-y-auto hidden bg-gray-500 bg-opacity-50 transition-opacity">
+    <div id="contractNumberModal" class="fixed z-10 inset-0 overflow-y-auto hidden modal-backdrop-overlay transition-opacity">
         <div class="row justify-center min-h-screen p-4">
             <div class="card card-padded shadow-xl w-full max-w-md">
                 <h2 class="text-lg font-semibold mb-4">Enter Contract Number</h2>
@@ -811,7 +811,7 @@
     // Error modal system
     function showErrorModal(title, details, traceback = null) {
         const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full row justify-center';
+        modal.className = 'fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full row justify-center';
 
         let tracebackHtml = '';
         if (traceback) {

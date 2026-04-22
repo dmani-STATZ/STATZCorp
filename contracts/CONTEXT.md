@@ -100,6 +100,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - Dashboard & exports: `/contracts/`, `/contracts/dashboard/metric-detail/`, `/contracts/dashboard/metric-detail/export/`.
 - Contract CRUD: `/contracts/create/`, `<pk>/`, `<pk>/detail/`, `<pk>/update/`, `/contracts/close/`, `/contracts/cancel/`, `/contracts/review/`, toggles like `mark-reviewed`, `toggle-contract-field`, `toggle-expedite-status`.
 - CLIN flows: `/contracts/clin/new/`, `/contracts/contract/<id>/clin/new/`, `<pk>/`, `<pk>/delete/`, `<pk>/acknowledgment/edit/`, plus supporting APIs for `get_clin_notes`, `get_clin_details`, `toggle_clin_acknowledgment`, `save_clin_log_fields`, and shipping/payment/split endpoints.
+- Gov Action (AJAX): `POST /contracts/contract/<id>/gov-action/create/`, `POST /contracts/gov-action/<pk>/update/`, `POST /contracts/gov-action/<pk>/delete/`.
 - Supplier & NSN: `/contracts/suppliers/`, `/contracts/supplier/<pk>/`, `/contracts/supplier/create/`, autocomplete/search endpoints, update-notes/compliance/address, certification/classification CRUD, `/contracts/addresses/*` and `/contracts/supplier_admin_tools/`.
 - Notes/reminders: `note/add/<ct>/<id>/`, `note/update/<pk>/`, `note/delete/<id>/`, `/contracts/api/add-note/`, `/contracts/api/content-types/`, `/contracts/reminders/`, `/contracts/reminder/<id>/toggle/complete/delete/edit`.
 - Folder tracking/log: `/contracts/folder-tracking/` plus search/add/close/toggle/export, `/contracts/log/`, `/contracts/open-export-folder/`, `/contracts/log/export/`.
@@ -130,6 +131,8 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - `contracts/views/acknowledgement_letter_views.py` references fields such as `recipient_name`/`recipient_address` that are missing from the `AcknowledgementLetter` model, so the view/template pair is likely stale.
 - `contracts/views/note_views.api_add_note` is deprecated (URL retained for bookmarked links only; all creation goes through `add_note`). The endpoint references `request.content_type` (not set), so any legacy calls must pass `content_type_id` and `object_id` explicitly. Planned removal in a future cleanup.
 - No automated tests exist, so assumptions about GovAction/log, reminders, or payment history have not been regression-tested.
+
+**Gov Action AJAX:** Gov Action CRUD is fully AJAX. `gov_action_create` (POST `/contracts/contract/<id>/gov-action/create/`) and `gov_action_update` (POST `/contracts/gov-action/<pk>/update/`) both return a unified JSON payload via `_gov_action_to_json()` including raw field values (`action`, `request`, `initiated`) and display values (`action_display`, `request_display`, `initiated_display`, `date_submitted_display`, `date_closed_display`). The contract management template modal is dual-mode (Add/Edit), toggled by JS. The action column in each row uses a Bootstrap 5 kebab dropdown (`dropdown-menu-end`) containing Edit and Delete.
 - Supplier admin CSV/XLSX import uses fuzzy matching, so renaming suppliers can break bulk updates if matching fails.
 
 ## CSS Architecture
@@ -139,6 +142,8 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 - `static/css/theme-vars.css` — CSS custom properties only (color tokens, brand vars, dark mode overrides via `body.dark`). Hex values live here. Do not put layout or component styles here.
 - `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here.
 - `static/css/utilities.css` — utility and helper classes.
+
+`.modal-backdrop-overlay` in `app-core.css` is the project-wide standard class for all modal backdrop divs (`background: rgba(0,0,0,0.5)`). Do not use Tailwind `bg-gray-*/bg-opacity-*` combos for backdrops anywhere in the project — they are broken since Tailwind removal. This applies to all apps: contracts, processing, transactions, users, and root templates.
 
 **Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
 

@@ -86,7 +86,7 @@
 <div class="overlay hidden fixed inset-0 z-40" style="background: rgba(0,0,0,0.3);" id="overlay" onclick="toggleReminderbar()"></div>
 
 <!-- Contract Search Modal (header button lives in base_template; modal + script here for all contract app pages) -->
-<div id="contractSearchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
+<div id="contractSearchModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
     <div class="relative top-20 mx-auto p-6 border shadow-lg rounded-md bg-white dark:bg-gray-800" style="width: 520px !important; max-width: 95%;" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Jump to Contract</h3>

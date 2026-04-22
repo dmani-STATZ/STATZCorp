@@ -2,8 +2,6 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.utils import timezone
-
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, GovAction, Contract
 from ..forms import GovActionForm
@@ -129,6 +127,28 @@ def save_clin_log_fields(request, clin_id):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+def _gov_action_to_json(gov_action):
+    """Serialize a GovAction instance to a dict for JSON responses."""
+    return {
+        'success': True,
+        'id': gov_action.id,
+        # Raw values (for pre-populating select inputs on edit)
+        'action': gov_action.action or '',
+        'request': gov_action.request or '',
+        'initiated': gov_action.initiated or '',
+        # Display values (for rendering in the table row)
+        'action_display': gov_action.get_action_display() or gov_action.action or '—',
+        'request_display': gov_action.get_request_display() or gov_action.request or '—',
+        'initiated_display': gov_action.get_initiated_display() or gov_action.initiated or '—',
+        # Other fields
+        'number': gov_action.number or '',
+        'date_submitted': gov_action.date_submitted.strftime('%Y-%m-%d') if gov_action.date_submitted else '',
+        'date_submitted_display': gov_action.date_submitted.strftime('%m/%d/%Y') if gov_action.date_submitted else '—',
+        'date_closed': gov_action.date_closed.strftime('%Y-%m-%d') if gov_action.date_closed else '',
+        'date_closed_display': gov_action.date_closed.strftime('%m/%d/%Y') if gov_action.date_closed else '—',
+    }
+
+
 @conditional_login_required
 @require_http_methods(["POST"])
 def gov_action_create(request, contract_id):
@@ -146,16 +166,7 @@ def gov_action_create(request, contract_id):
             gov_action.created_by = request.user
             gov_action.modified_by = request.user
             gov_action.save()
-            return JsonResponse({
-                'success': True,
-                'id': gov_action.id,
-                'action': gov_action.get_action_display() or gov_action.action or '',
-                'number': gov_action.number or '',
-                'request': gov_action.get_request_display() or gov_action.request or '',
-                'date_submitted': gov_action.date_submitted.strftime('%Y-%m-%d') if gov_action.date_submitted else '',
-                'date_closed': gov_action.date_closed.strftime('%Y-%m-%d') if gov_action.date_closed else '',
-                'initiated': gov_action.get_initiated_display() or gov_action.initiated or '',
-            })
+            return JsonResponse(_gov_action_to_json(gov_action))
         return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
@@ -172,5 +183,25 @@ def gov_action_delete(request, pk):
         gov_action = get_object_or_404(GovAction, pk=pk, company=active_company)
         gov_action.delete()
         return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@conditional_login_required
+@require_http_methods(["POST"])
+def gov_action_update(request, pk):
+    """Update an existing Gov Action (AJAX)."""
+    try:
+        active_company = getattr(request, 'active_company', None)
+        if not active_company:
+            return JsonResponse({'success': False, 'error': 'No company selected.'}, status=400)
+        gov_action = get_object_or_404(GovAction, pk=pk, company=active_company)
+        form = GovActionForm(request.POST, instance=gov_action)
+        if form.is_valid():
+            gov_action = form.save(commit=False)
+            gov_action.modified_by = request.user
+            gov_action.save()
+            return JsonResponse(_gov_action_to_json(gov_action))
+        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

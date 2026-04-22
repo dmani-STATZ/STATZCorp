@@ -42,6 +42,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 ### Before changing views
 - `contracts/views/mixins.py` — `ActiveCompanyQuerysetMixin` must remain on every queryset-based view; removing it leaks cross-tenant data
 - `contracts/views/contract_views.py` — central hub; `ContractManagementView` builds a large context (CLINs, notes, splits, GovActions, folder tracking); adding keys here affects the main template
+- `contracts/views/gov_action_views.py` — the helper `_gov_action_to_json()` is the single source of truth for the JSON shape of Gov Action AJAX responses. Both `gov_action_create` and `gov_action_update` must use it. Do not add fields to one endpoint without adding them to the helper.
 - `contracts/urls.py` — ~90 named URL patterns; reversals exist in templates throughout the project
 
 ### Before changing forms

@@ -15,11 +15,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse
 
 from contracts.models import Contract, Clin, Address
 from suppliers.models import (
+    Contact,
     Supplier,
     SupplierDocument,
     SupplierType,
@@ -27,6 +28,7 @@ from suppliers.models import (
     SupplierClassification,
     CertificationType,
     ClassificationType,
+    SupplierContactGroup,
 )
 import requests
 
@@ -499,6 +501,13 @@ class SupplierDetailView(DetailView):
         supplier = self.object
         context['supplier_content_type_id'] = ContentType.objects.get_for_model(Supplier).id
         context['contacts'] = supplier.contacts.all().order_by('name')
+        contact_groups = (
+            SupplierContactGroup.objects
+            .filter(supplier=supplier)
+            .prefetch_related('contacts')
+            .order_by('name')
+        )
+        context['contact_groups'] = contact_groups
         documents = list(
             SupplierDocument.objects.filter(supplier=supplier)
             .select_related('certification', 'classification')
@@ -853,6 +862,184 @@ def supplier_set_rfq_email(request, supplier_id):
     return redirect(
         request.POST.get("next") or reverse("suppliers:supplier_detail", args=[supplier_id])
     )
+
+
+def _parse_contact_ids_post(raw) -> list[int] | None:
+    """Return list of int IDs, or None if the string is not empty but unparsable."""
+    if raw is None:
+        return []
+    s = str(raw).strip()
+    if not s:
+        return []
+    out: list[int] = []
+    for part in s.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            return None
+    return out
+
+
+def _validate_contact_ids_for_supplier(
+    supplier_pk: int, contact_ids: list[int]
+) -> tuple[list[Contact] | None, list[int] | None]:
+    """
+    All IDs must exist and belong to the supplier. Returns (contacts, None) or
+    (None, bad_ids) on failure.
+    """
+    if not contact_ids:
+        return [], None
+    valid_qs = Contact.objects.filter(
+        id__in=contact_ids, supplier_id=supplier_pk
+    )
+    valid_ids = set(valid_qs.values_list("id", flat=True))
+    unique_requested = list(dict.fromkeys(contact_ids))
+    bad = [i for i in unique_requested if i not in valid_ids]
+    if bad:
+        return None, sorted(bad)
+    return list(valid_qs.order_by("id")), None
+
+
+@login_required
+@require_GET
+def supplier_group_name_suggestions(request):
+    q = (request.GET.get("q") or "").strip()
+    qs = SupplierContactGroup.objects.all()
+    if q:
+        qs = qs.filter(name__icontains=q)
+    names = qs.values_list("name", flat=True).distinct().order_by("name")
+    return JsonResponse({"names": list(names)})
+
+
+@login_required
+@require_POST
+def supplier_group_create(request, pk):
+    supplier = get_object_or_404(Supplier, pk=pk)
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required."}, status=400)
+    if len(name) > 100:
+        return JsonResponse({"error": "name must be 100 characters or fewer."}, status=400)
+
+    contact_ids = _parse_contact_ids_post(request.POST.get("contact_ids", ""))
+    if contact_ids is None:
+        return JsonResponse(
+            {"error": "contact_ids must be a comma-separated list of integers."},
+            status=400,
+        )
+    contacts, bad = _validate_contact_ids_for_supplier(pk, contact_ids)
+    if bad is not None:
+        return JsonResponse(
+            {
+                "error": (
+                    f"The following contact id(s) are invalid or do not belong to "
+                    f"this supplier: {', '.join(str(i) for i in bad)}"
+                )
+            },
+            status=400,
+        )
+
+    group = SupplierContactGroup(
+        supplier=supplier,
+        name=name,
+        created_by=request.user,
+        modified_by=request.user,
+    )
+    group.save()
+    group.contacts.set(contacts or [])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "group_id": group.id,
+            "group_name": group.name,
+            "contact_count": group.contacts.count(),
+        }
+    )
+
+
+@login_required
+@require_POST
+def supplier_group_edit(request, pk, group_id):
+    get_object_or_404(Supplier, pk=pk)
+    group = get_object_or_404(
+        SupplierContactGroup, id=group_id, supplier_id=pk
+    )
+
+    name_in_post = "name" in request.POST
+    contact_ids_in_post = "contact_ids" in request.POST
+    if not name_in_post and not contact_ids_in_post:
+        return JsonResponse(
+            {"error": "Provide name and/or contact_ids to update the group."},
+            status=400,
+        )
+
+    if name_in_post:
+        new_name = (request.POST.get("name") or "").strip()
+        if not new_name:
+            return JsonResponse(
+                {"error": "name cannot be empty if provided."},
+                status=400,
+            )
+        if len(new_name) > 100:
+            return JsonResponse(
+                {"error": "name must be 100 characters or fewer."},
+                status=400,
+            )
+        group.name = new_name
+
+    if contact_ids_in_post:
+        contact_ids = _parse_contact_ids_post(request.POST.get("contact_ids", ""))
+        if contact_ids is None:
+            return JsonResponse(
+                {
+                    "error": (
+                        "contact_ids must be a comma-separated list of integers."
+                    )
+                },
+                status=400,
+            )
+        contacts, bad = _validate_contact_ids_for_supplier(pk, contact_ids)
+        if bad is not None:
+            return JsonResponse(
+                {
+                    "error": (
+                        f"The following contact id(s) are invalid or do not belong to "
+                        f"this supplier: {', '.join(str(i) for i in bad)}"
+                    )
+                },
+                status=400,
+            )
+        group.contacts.set(contacts or [])
+
+    group.modified_by = request.user
+    if name_in_post:
+        group.save(update_fields=["name", "modified_by", "modified_on"])
+    elif contact_ids_in_post:
+        group.save(update_fields=["modified_by", "modified_on"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "group_id": group.id,
+            "group_name": group.name,
+            "contact_count": group.contacts.count(),
+        }
+    )
+
+
+@login_required
+@require_POST
+def supplier_group_delete(request, pk, group_id):
+    get_object_or_404(Supplier, pk=pk)
+    group = get_object_or_404(
+        SupplierContactGroup, id=group_id, supplier_id=pk
+    )
+    group.delete()
+    return JsonResponse({"ok": True, "group_id": group_id})
 
 
 class SuppliersInfoByType(LoginRequiredMixin, ListView):

@@ -34,6 +34,7 @@ from .views import (
     save_clin_log_fields,
     gov_action_create,
     gov_action_delete,
+    gov_action_update,
     # NSN and Supplier views
     NsnUpdateView,
     SupplierUpdateView,
@@ -433,6 +434,7 @@ urlpatterns = [
     path("clin/<int:clin_id>/save-log-fields/", save_clin_log_fields, name="save_clin_log_fields"),
     path("contract/<int:contract_id>/gov-action/create/", gov_action_create, name="gov_action_create"),
     path("gov-action/<int:pk>/delete/", gov_action_delete, name="gov_action_delete"),
+    path("gov-action/<int:pk>/update/", gov_action_update, name="gov_action_update"),
     path(
         "clin/<int:clin_id>/toggle-acknowledgment/",
         toggle_clin_acknowledgment,

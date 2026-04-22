@@ -28,6 +28,7 @@ from .gov_action_views import (
     save_clin_log_fields,
     gov_action_create,
     gov_action_delete,
+    gov_action_update,
 )
 
 from .supplier_views import (

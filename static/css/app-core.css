@@ -431,6 +431,11 @@ header {
     text-transform: uppercase !important;
 }
 
+/* Modal backdrop overlay — replaces broken Tailwind bg-gray-* + bg-opacity-50 combos */
+.modal-backdrop-overlay {
+    background: rgba(0, 0, 0, 0.5);
+}
+
 /* ===== Section 6: Dark Mode — Modal Overrides ===== */
 body.dark .modal-base {
     background-color: rgba(0, 0, 0, 0.7);
