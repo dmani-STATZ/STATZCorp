@@ -919,3 +919,65 @@ class ContractSplit(models.Model):
             return True  # Indicate successful deletion
         except cls.DoesNotExist:
             return False # Indicate record not found
+
+
+class TrackerSchema(models.Model):
+    SYSTEM_COLUMN_IDS = ['__contract__', '__po__', '__close__']
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='tracker_schemas')
+    name = models.CharField(max_length=255)
+    columns = models.JSONField(default=list)
+    column_order = models.JSONField(default=list)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def next_column_id(self):
+        import random
+        existing = {col['id'] for col in self.columns}
+        while True:
+            candidate = f"col_{random.randint(100, 9999)}"
+            if candidate not in existing:
+                return candidate
+
+    def resolved_column_order(self):
+        """Return the full display order, healing missing/stale IDs."""
+        user_ids = [c['id'] for c in self.columns]
+        all_ids = self.SYSTEM_COLUMN_IDS + user_ids
+        saved = list(self.column_order or [])
+        kept = [x for x in saved if x in all_ids]
+        missing = [x for x in all_ids if x not in kept]
+        return kept + missing
+
+
+class ContractRecord(models.Model):
+    schema = models.ForeignKey(TrackerSchema, on_delete=models.CASCADE, related_name='records')
+    contract = models.ForeignKey('Contract', null=True, blank=True, on_delete=models.SET_NULL, related_name='tracker_records')
+    data = models.JSONField(default=dict)
+    ui_state = models.JSONField(default=dict)
+    status_sort_index = models.IntegerField(default=0)
+    is_closed = models.BooleanField(default=False)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    date_added = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='tracker_records_added')
+
+    class Meta:
+        ordering = ['status_sort_index', 'date_added']
+        indexes = [
+            models.Index(fields=['schema', 'status_sort_index']),
+            models.Index(fields=['schema', 'is_closed']),
+        ]
+
+    def __str__(self):
+        if self.contract:
+            return f"Record {self.pk} — {self.contract.contract_number}"
+        return f"Record {self.pk}"
+
+    def is_highlighted(self):
+        return self.ui_state.get('is_highlighted', False)

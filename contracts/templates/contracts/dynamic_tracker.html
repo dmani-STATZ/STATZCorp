@@ -1,0 +1,973 @@
+{% extends "base_template.html" %}
+{% load static %}
+
+{% block title %}{{ schema.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .dt-table { border-collapse: collapse; width: 100%; font-size: var(--dt-font-size, 0.875rem); }
+    .dt-table th, .dt-table td { padding: calc(var(--dt-font-size, 0.875rem) * 0.4) calc(var(--dt-font-size, 0.875rem) * 0.6); border: 1px solid rgba(156,163,175,0.3); white-space: nowrap; }
+    .dt-zoom-group { display: inline-flex; align-items: center; gap: 0.25rem; border: 1px solid rgba(156,163,175,0.3); border-radius: 0.375rem; padding: 2px; }
+    .dt-zoom-btn { background: none; border: none; cursor: pointer; padding: 0.125rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; color: inherit; }
+    .dt-zoom-btn:hover { background: rgba(99,102,241,0.1); }
+    .dt-zoom-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .dt-zoom-display { font-size: 0.75rem; color: #6b7280; min-width: 2.5rem; text-align: center; }
+    .dark .dt-zoom-display { color: #9ca3af; }
+    .dt-table th { background: #f3f4f6; font-weight: 600; text-align: left; position: relative; }
+    .dark .dt-table th { background: #1f2937; }
+    .dt-header-inner { display: flex; align-items: center; gap: 0.5rem; }
+    .dt-col-edit { opacity: 0; background: none; border: none; cursor: pointer; color: #6366f1; font-size: 0.85rem; padding: 0 2px; }
+    .dt-table th:hover .dt-col-edit { opacity: 1; }
+    .dt-table tr.highlighted > td { background-color: #fef9c3 !important; color: #000 !important; }
+    .dark .dt-table tr.highlighted > td { background-color: #713f12 !important; color: #fef9c3 !important; }
+    .dt-input { background: transparent; border: none; outline: none; width: 100%; min-width: 80px; }
+    .dt-input:focus { background: rgba(99,102,241,0.08); border-radius: 3px; }
+    .dark .dt-input { color: #e5e7eb; }
+    .dt-select { background: transparent; border: none; outline: none; width: 100%; cursor: pointer; padding: 2px 4px; border-radius: 3px; font-weight: 500; }
+    .dark .dt-select { color: #e5e7eb; }
+    /* Force dropdown list items to plain white/black regardless of pill color */
+    .dt-select option { background-color: #fff !important; color: #000 !important; }
+    .highlight-btn { cursor: pointer; background: none; border: none; font-size: 1.1rem; opacity: 0.4; }
+    .highlight-btn.active { opacity: 1; color: #f59e0b; }
+    .delete-btn { cursor: pointer; background: none; border: none; color: #ef4444; font-size: 1.1rem; opacity: 0.4; }
+    .delete-btn:hover { opacity: 1; }
+    .empty-msg { text-align: center; color: #9ca3af; padding: 2rem; }
+
+    .dt-modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+    .dt-modal.is-open { display: flex; }
+    .dt-modal-panel { background: #fff; border-radius: 0.5rem; box-shadow: 0 20px 40px rgba(0,0,0,0.2); padding: 1.5rem; width: 100%; max-width: 36rem; max-height: 90vh; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; }
+    .dark .dt-modal-panel { background: #1f2937; color: #e5e7eb; }
+    .dt-field { margin-bottom: 0.75rem; }
+    .dt-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
+    .dt-text-input, .dt-select-input {
+        width: 100%; padding: 0.5rem 0.75rem; border: 1px solid rgba(156,163,175,0.4);
+        border-radius: 0.375rem; font-size: 0.875rem; background: #fff; box-sizing: border-box;
+    }
+    .dark .dt-text-input, .dark .dt-select-input { background: #374151; color: #e5e7eb; border-color: rgba(156,163,175,0.3); }
+    #select-options-list { width: 100%; }
+    .dt-option-row { display: grid; grid-template-columns: 1fr 2.5rem 4rem 2rem; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; width: 100%; }
+    .dt-option-value { width: 100%; padding: 0.5rem 0.625rem; border: 1px solid rgba(156,163,175,0.4); border-radius: 0.25rem; font-size: 0.875rem; background: #fff; box-sizing: border-box; min-width: 0; }
+    .dark .dt-option-value { background: #374151; color: #e5e7eb; }
+    .dt-option-color { width: 100%; height: 2.25rem; border: 1px solid rgba(156,163,175,0.4); border-radius: 0.25rem; cursor: pointer; padding: 0; box-sizing: border-box; }
+    .dt-option-priority { width: 100%; padding: 0.5rem 0.5rem; border: 1px solid rgba(156,163,175,0.4); border-radius: 0.25rem; font-size: 0.875rem; background: #fff; box-sizing: border-box; }
+    .dark .dt-option-priority { background: #374151; color: #e5e7eb; }
+    .dt-option-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.4rem; padding: 0; line-height: 1; }
+    .dt-option-remove:hover { color: #dc2626; }
+    .dt-options-header { display: grid; grid-template-columns: 1fr 2.5rem 4rem 2rem; gap: 0.5rem; font-size: 0.7rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; padding: 0 0.125rem; }
+    .dark .dt-options-header { color: #9ca3af; }
+    .dt-add-option-btn { background: none; border: none; color: #6366f1; font-size: 0.875rem; cursor: pointer; margin-top: 0.25rem; }
+    .dt-modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+    .dt-btn-danger { color: #ef4444; background: none; border: 1px solid rgba(239,68,68,0.4); padding: 0.375rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; cursor: pointer; }
+    .dt-btn-danger:hover { background: rgba(239,68,68,0.08); }
+    .dt-modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; gap: 0.5rem; }
+    .contract-search-results { border: 1px solid rgba(156,163,175,0.3); border-radius: 0.375rem; margin-top: 0.25rem; max-height: 10rem; overflow-y: auto; background: #fff; font-size: 0.875rem; }
+    .dark .contract-search-results { background: #374151; color: #e5e7eb; }
+    .contract-search-results li { padding: 0.5rem 0.75rem; cursor: pointer; list-style: none; }
+    .contract-search-results li:hover { background: rgba(99,102,241,0.08); }
+
+    /* Lock / Unlock icon button */
+    .dt-lock-btn { background: none; border: none; cursor: pointer; padding: 0 0.5rem; color: inherit; display: inline-flex; align-items: center; }
+    .dt-lock-btn svg { display: block; }
+    .dt-lock-btn:hover { color: #6366f1; }
+
+    /* Locked-state overrides: hide editing affordances */
+    .dt-locked .dt-admin-btn { display: none !important; }
+    .dt-locked .dt-col-edit { display: none !important; }
+    .dt-locked .delete-btn { display: none !important; }
+    .dt-locked .dt-drag-col { cursor: default !important; }
+
+    /* Unlocked: column header is draggable + shows a subtle grip cue */
+    .dt-unlocked .dt-drag-col { cursor: grab; }
+    .dt-unlocked .dt-drag-col:active { cursor: grabbing; }
+    .dt-drag-col.dragging { opacity: 0.4; }
+    .dt-drag-col.drag-over-left { box-shadow: inset 3px 0 0 #6366f1; }
+    .dt-drag-col.drag-over-right { box-shadow: inset -3px 0 0 #6366f1; }
+
+    .dt-close-btn {
+        background: none; border: 1px solid rgba(156,163,175,0.4); border-radius: 0.25rem;
+        padding: 0.15rem 0.6rem; font-size: 0.75rem; cursor: pointer; color: #6b7280;
+    }
+    .dt-close-btn:hover { border-color: #ef4444; color: #ef4444; }
+    .dark .dt-close-btn { color: #9ca3af; border-color: rgba(156,163,175,0.3); }
+    .dt-system-cell { color: inherit; }
+    .dark #dt-search-input { background:#374151; color:#e5e7eb; border-color:rgba(156,163,175,0.3); }
+
+    /* Scroll-to-row highlight flash */
+    .dt-table tr.dt-flash > td { animation: dt-flash-bg 2s ease-out; }
+    @keyframes dt-flash-bg {
+        0%   { background-color: #fde68a; }
+        60%  { background-color: #fde68a; }
+        100% { background-color: transparent; }
+    }
+    .dark .dt-table tr.dt-flash > td { animation: dt-flash-bg-dark 2s ease-out; }
+    @keyframes dt-flash-bg-dark {
+        0%   { background-color: #78350f; }
+        60%  { background-color: #78350f; }
+        100% { background-color: transparent; }
+    }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+{{ records_data|json_script:"records-data" }}
+{{ columns_data|json_script:"columns-data" }}
+{{ column_order|json_script:"column-order-data" }}
+
+<div id="dt-container" class="dt-locked" style="width: 98%; max-width: none; margin: 0 auto; padding: 1.5rem 1rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 1rem;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+            <a href="{% url 'contracts:tracker_list' %}" style="color:#9ca3af; text-decoration:none;">&larr;</a>
+            <h1 style="font-size:1.5rem; font-weight:700;">{{ schema.name }}</h1>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <button type="button" id="lock-toggle-btn" class="dt-lock-btn" onclick="toggleLock()" aria-label="Toggle lock"></button>
+            <div class="dt-zoom-group" title="Adjust table font size">
+                <button type="button" class="dt-zoom-btn" id="zoom-out-btn" onclick="zoomOut()" aria-label="Decrease font size">&minus;</button>
+                <span class="dt-zoom-display" id="zoom-display">100%</span>
+                <button type="button" class="dt-zoom-btn" id="zoom-in-btn" onclick="zoomIn()" aria-label="Increase font size">+</button>
+                <button type="button" class="dt-zoom-btn" id="zoom-reset-btn" onclick="zoomReset()" title="Reset to default" style="font-size:0.7rem;">Reset</button>
+            </div>
+            <form onsubmit="event.preventDefault(); jumpToContract(document.getElementById('dt-search-input').value);" style="display:flex; gap:0.25rem; align-items:center;">
+                <input type="text" id="dt-search-input" placeholder="Jump to contract #…"
+                       style="padding:0.375rem 0.625rem; border:1px solid rgba(156,163,175,0.4); border-radius:0.375rem; font-size:0.875rem; background:#fff; min-width:13rem;">
+                <button type="submit" class="btn-secondary" style="padding:0.375rem 0.75rem; border-radius:0.375rem; font-size:0.875rem;">Go</button>
+            </form>
+            <button onclick="openAddRecord()" class="btn-primary" style="padding:0.375rem 0.75rem; border-radius:0.375rem; font-size:0.875rem;">+ Add Row</button>
+            <button onclick="openAddColumn()" class="btn-secondary dt-admin-btn" style="padding:0.375rem 0.75rem; border-radius:0.375rem; font-size:0.875rem;">+ Add Column</button>
+        </div>
+    </div>
+
+    <div style="overflow-x:auto; border:1px solid rgba(156,163,175,0.3); border-radius:0.5rem;">
+        <table class="dt-table" id="dt-table">
+            <thead>
+                <tr id="dt-header-row"></tr>
+            </thead>
+            <tbody id="dt-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Row Modal -->
+<div id="modal-add-record" class="dt-modal">
+    <div class="dt-modal-panel">
+        <h2 style="font-size:1.125rem; font-weight:600; margin-bottom:1rem;">Add Row</h2>
+        <div class="dt-field">
+            <label class="dt-label">Link to Contract (optional)</label>
+            <input type="text" id="contract-search-input" placeholder="Search contract # or PO…"
+                   class="dt-text-input" oninput="searchContracts(this.value)">
+            <ul id="contract-search-results" class="contract-search-results" style="display:none;"></ul>
+            <input type="hidden" id="selected-contract-id">
+            <div id="selected-contract-display" style="font-size:0.875rem; color:#6366f1; margin-top:0.25rem; display:none;"></div>
+        </div>
+        <div class="dt-modal-actions">
+            <button onclick="closeModal('modal-add-record')" class="btn-secondary" style="padding:0.5rem 1rem; border-radius:0.375rem; font-size:0.875rem;">Cancel</button>
+            <button onclick="submitAddRecord()" class="btn-primary" style="padding:0.5rem 1rem; border-radius:0.375rem; font-size:0.875rem;">Add Row</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Column Modal -->
+<div id="modal-column" class="dt-modal">
+    <div class="dt-modal-panel">
+        <h2 id="modal-column-title" style="font-size:1.125rem; font-weight:600; margin-bottom:1rem;">Add Column</h2>
+        <div class="dt-field">
+            <label class="dt-label">Label</label>
+            <input type="text" id="col-label" class="dt-text-input" placeholder="e.g. Shipping Status">
+        </div>
+        <div class="dt-field" id="col-type-field">
+            <label class="dt-label">Type</label>
+            <select id="col-type" class="dt-select-input" onchange="toggleSelectOptions(this.value)">
+                <option value="text">Text</option>
+                <option value="date">Date</option>
+                <option value="checkbox">Checkbox</option>
+                <option value="select">Select (Status)</option>
+            </select>
+        </div>
+        <div id="select-options-section" style="display:none;" class="dt-field">
+            <label class="dt-label">Options</label>
+            <div class="dt-options-header">
+                <span>Label</span>
+                <span>Color</span>
+                <span>Sort</span>
+                <span></span>
+            </div>
+            <div id="select-options-list"></div>
+            <button type="button" onclick="addSelectOption()" class="dt-add-option-btn">+ Add option</button>
+        </div>
+        <div class="dt-modal-footer">
+            <button id="col-delete-btn" type="button" onclick="deleteColumn()" class="dt-btn-danger" style="display:none;">Delete Column</button>
+            <div style="display:flex; gap:0.5rem; margin-left:auto;">
+                <button onclick="closeModal('modal-column')" class="btn-secondary" style="padding:0.5rem 1rem; border-radius:0.375rem; font-size:0.875rem;">Cancel</button>
+                <button id="col-submit-btn" onclick="submitColumn()" class="btn-primary" style="padding:0.5rem 1rem; border-radius:0.375rem; font-size:0.875rem;">Add Column</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const SCHEMA_ID = {{ schema.pk }};
+const CSRF = '{{ csrf_token }}';
+let COLS = JSON.parse(document.getElementById('columns-data').textContent);
+let COLUMN_ORDER = JSON.parse(document.getElementById('column-order-data').textContent);
+const INITIAL_RECORDS = JSON.parse(document.getElementById('records-data').textContent);
+
+const SYSTEM_COLS = {
+    '__contract__': { id: '__contract__', label: 'Contract #', system: true, kind: 'contract' },
+    '__po__':       { id: '__po__',       label: 'PO #',       system: true, kind: 'po' },
+    '__close__':    { id: '__close__',    label: 'Close',      system: true, kind: 'close' },
+};
+
+function resolveOrder() {
+    const userIds = COLS.map(c => c.id);
+    const validIds = new Set(['__contract__', '__po__', '__close__', ...userIds]);
+    const kept = (COLUMN_ORDER || []).filter(id => validIds.has(id));
+    for (const id of ['__contract__', '__po__', '__close__', ...userIds]) {
+        if (!kept.includes(id)) kept.push(id);
+    }
+    COLUMN_ORDER = kept;
+    return kept;
+}
+
+function colById(id) {
+    if (SYSTEM_COLS[id]) return SYSTEM_COLS[id];
+    return COLS.find(c => c.id === id);
+}
+
+let columnModalMode = 'add'; // 'add' or 'edit'
+let editingColumnId = null;
+let selectOptionCount = 0;
+let LOCKED = true;
+
+// --- Rendering ---
+function buildCell(recordId, col, value) {
+    const td = document.createElement('td');
+    td.className = 'editable-cell';
+    td.dataset.record = recordId;
+    td.dataset.field = col.id;
+    td.dataset.type = col.type;
+
+    if (col.type === 'checkbox') {
+        const inp = document.createElement('input');
+        inp.type = 'checkbox';
+        inp.className = 'dt-input';
+        inp.checked = !!value;
+        inp.onchange = () => updateField(recordId, col.id, inp.checked);
+        td.appendChild(inp);
+    } else if (col.type === 'select') {
+        const sel = document.createElement('select');
+        sel.className = 'dt-select';
+        const blank = document.createElement('option');
+        blank.value = ''; blank.textContent = '—';
+        sel.appendChild(blank);
+        (col.options || []).forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.value; opt.textContent = o.value;
+            if (o.value === value) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        applyPillColor(sel, col, value);
+        sel.onchange = () => {
+            const newVal = sel.value;
+            updateField(recordId, col.id, newVal);
+            applyPillColor(sel, col, newVal);
+            // Rebuild sorts the table by the primary select column's priority.
+            // Must happen after sel.value is set so snapshotRows captures the new value.
+            rebuildTable();
+            const placed = document.querySelector(`#dt-tbody tr[data-id="${recordId}"]`);
+            if (placed) {
+                placed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                flashRow(placed);
+            }
+        };
+        td.appendChild(sel);
+    } else if (col.type === 'date') {
+        const inp = document.createElement('input');
+        inp.type = 'date'; inp.className = 'dt-input';
+        inp.value = value || '';
+        inp.onblur = () => updateField(recordId, col.id, inp.value);
+        td.appendChild(inp);
+    } else {
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.className = 'dt-input';
+        inp.value = value || '';
+        inp.onblur = () => updateField(recordId, col.id, inp.value);
+        td.appendChild(inp);
+    }
+    return td;
+}
+
+function getContrastColor(hex) {
+    if (!hex) return '';
+    hex = hex.replace('#', '');
+    if (hex.length !== 6) return '#000';
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    // W3C relative luminance
+    const toLin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const lum = 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+    return lum < 0.5 ? '#fff' : '#000';
+}
+
+function applyPillColor(selectEl, col, value) {
+    const opt = (col.options || []).find(o => o.value === value);
+    if (opt && opt.color_hex) {
+        selectEl.style.backgroundColor = opt.color_hex;
+        selectEl.style.color = getContrastColor(opt.color_hex);
+    } else {
+        selectEl.style.backgroundColor = '';
+        selectEl.style.color = '';
+    }
+}
+
+function buildSystemCell(rec, kind) {
+    const td = document.createElement('td');
+    td.className = 'dt-system-cell';
+    td.dataset.system = kind;
+    if (kind === 'contract') {
+        td.textContent = rec.contract_number || '—';
+    } else if (kind === 'po') {
+        td.textContent = rec.po_number || '—';
+    } else if (kind === 'close') {
+        td.style.textAlign = 'center';
+        const btn = document.createElement('button');
+        btn.className = 'dt-close-btn';
+        btn.type = 'button';
+        btn.textContent = 'Close';
+        btn.title = 'Close this record (hide from main list)';
+        btn.onclick = () => closeRecord(rec.id, btn);
+        td.appendChild(btn);
+    }
+    return td;
+}
+
+function slugifyContract(num) {
+    if (!num) return '';
+    return 'row-' + String(num).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+function buildRow(rec) {
+    const tr = document.createElement('tr');
+    tr.dataset.id = rec.id;
+    if (rec.contract_number) tr.id = slugifyContract(rec.contract_number);
+    if (rec.is_highlighted) tr.classList.add('highlighted');
+
+    const tdStar = document.createElement('td');
+    tdStar.style.textAlign = 'center';
+    const starBtn = document.createElement('button');
+    starBtn.className = 'highlight-btn' + (rec.is_highlighted ? ' active' : '');
+    starBtn.title = 'Highlight row';
+    starBtn.innerHTML = '&#9733;';
+    starBtn.onclick = () => toggleHighlight(rec.id, starBtn);
+    tdStar.appendChild(starBtn);
+    tr.appendChild(tdStar);
+
+    resolveOrder().forEach(id => {
+        const col = colById(id);
+        if (!col) return;
+        if (col.system) {
+            tr.appendChild(buildSystemCell(rec, col.kind));
+        } else {
+            tr.appendChild(buildCell(rec.id, col, rec.data ? rec.data[col.id] : undefined));
+        }
+    });
+
+    const tdDel = document.createElement('td');
+    tdDel.style.textAlign = 'center';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delete-btn';
+    delBtn.title = 'Delete row';
+    delBtn.innerHTML = '&times;';
+    delBtn.onclick = () => deleteRecord(rec.id, delBtn);
+    tdDel.appendChild(delBtn);
+    tr.appendChild(tdDel);
+
+    return tr;
+}
+
+function renderHeader() {
+    const headerRow = document.getElementById('dt-header-row');
+    headerRow.innerHTML = '';
+    const thStar = document.createElement('th'); thStar.style.width = '36px'; headerRow.appendChild(thStar);
+
+    resolveOrder().forEach(id => {
+        const col = colById(id);
+        if (!col) return;
+        const th = document.createElement('th');
+        th.className = 'dt-drag-col';
+        th.dataset.colId = col.id;
+        th.draggable = !LOCKED;
+        const inner = document.createElement('div');
+        inner.className = 'dt-header-inner';
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = col.label;
+        inner.appendChild(labelSpan);
+        if (!col.system) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'dt-col-edit';
+            editBtn.title = 'Edit column';
+            editBtn.innerHTML = '&#9998;';
+            editBtn.onclick = (e) => { e.stopPropagation(); openEditColumn(col.id); };
+            inner.appendChild(editBtn);
+        }
+        th.appendChild(inner);
+        attachColumnDragHandlers(th);
+        headerRow.appendChild(th);
+    });
+
+    const thDel = document.createElement('th'); thDel.style.width = '32px'; headerRow.appendChild(thDel);
+}
+
+function attachColumnDragHandlers(th) {
+    th.addEventListener('dragstart', (e) => {
+        if (LOCKED) { e.preventDefault(); return; }
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', th.dataset.colId);
+        th.classList.add('dragging');
+    });
+    th.addEventListener('dragend', () => {
+        th.classList.remove('dragging');
+        document.querySelectorAll('.dt-drag-col').forEach(el => {
+            el.classList.remove('drag-over-left', 'drag-over-right');
+        });
+    });
+    th.addEventListener('dragover', (e) => {
+        if (LOCKED) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = th.getBoundingClientRect();
+        const before = (e.clientX - rect.left) < rect.width / 2;
+        th.classList.toggle('drag-over-left', before);
+        th.classList.toggle('drag-over-right', !before);
+    });
+    th.addEventListener('dragleave', () => {
+        th.classList.remove('drag-over-left', 'drag-over-right');
+    });
+    th.addEventListener('drop', (e) => {
+        if (LOCKED) return;
+        e.preventDefault();
+        const fromId = e.dataTransfer.getData('text/plain');
+        const toId = th.dataset.colId;
+        const rect = th.getBoundingClientRect();
+        const before = (e.clientX - rect.left) < rect.width / 2;
+        th.classList.remove('drag-over-left', 'drag-over-right');
+        if (fromId && fromId !== toId) reorderColumns(fromId, toId, before);
+    });
+}
+
+function renderTable() {
+    renderHeader();
+    const tbody = document.getElementById('dt-tbody');
+    tbody.innerHTML = '';
+    const records = sortRecords(INITIAL_RECORDS);
+    if (!records.length) {
+        showEmpty(tbody);
+        return;
+    }
+    records.forEach(rec => tbody.appendChild(buildRow(rec)));
+}
+
+function showEmpty(tbody) {
+    const tr = document.createElement('tr');
+    tr.id = 'empty-row';
+    const td = document.createElement('td');
+    td.colSpan = COLUMN_ORDER.length + 2;
+    td.className = 'empty-msg';
+    td.textContent = 'No records yet. Click "+ Add Row" to begin.';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+}
+
+function snapshotRows() {
+    const rows = [];
+    document.querySelectorAll('#dt-tbody tr[data-id]').forEach(tr => {
+        const id = tr.dataset.id;
+        const data = {};
+        tr.querySelectorAll('td.editable-cell').forEach(td => {
+            const field = td.dataset.field;
+            const type = td.dataset.type;
+            if (type === 'checkbox') data[field] = td.querySelector('input')?.checked;
+            else if (type === 'select') data[field] = td.querySelector('select')?.value;
+            else data[field] = td.querySelector('input')?.value || '';
+        });
+        const getSys = (kind) => {
+            const el = Array.from(tr.querySelectorAll('td.dt-system-cell'))
+                .find(td => td.dataset.system === kind);
+            if (!el) return '';
+            const t = el.textContent.trim();
+            return t === '—' ? '' : t;
+        };
+        rows.push({
+            id,
+            data,
+            is_highlighted: tr.classList.contains('highlighted'),
+            contract_number: getSys('contract'),
+            po_number: getSys('po'),
+        });
+    });
+    return rows;
+}
+
+function rebuildTable() {
+    const snap = sortRecords(snapshotRows());
+    renderHeader();
+    const tbody = document.getElementById('dt-tbody');
+    tbody.innerHTML = '';
+    if (!snap.length) { showEmpty(tbody); return; }
+    snap.forEach(rec => tbody.appendChild(buildRow(rec)));
+}
+
+// --- Default sort ---
+// Select columns win because they carry an explicit sort_priority; that
+// intent always beats alpha sort on text. First select in layout is the
+// primary key. If no select exists, fall back to the first non-close
+// column in the layout. Tiebreak is always contract #.
+function sortRecords(records) {
+    const order = resolveOrder();
+
+    let primaryCol = null;
+    for (const id of order) {
+        if (id === '__close__') continue;
+        const c = colById(id);
+        if (c && !c.system && c.type === 'select') { primaryCol = c; break; }
+    }
+    if (!primaryCol) {
+        const id = order.find(x => x !== '__close__');
+        primaryCol = id ? colById(id) : null;
+    }
+    const primaryId = primaryCol ? primaryCol.id : null;
+
+    const keyOf = (rec) => {
+        if (!primaryCol) return { type: 'str', val: '' };
+        if (primaryCol.system) {
+            if (primaryCol.kind === 'contract') return { type: 'str', val: rec.contract_number || '' };
+            if (primaryCol.kind === 'po')       return { type: 'str', val: rec.po_number || '' };
+            return { type: 'str', val: '' };
+        }
+        const raw = (rec.data || {})[primaryId];
+        if (primaryCol.type === 'select') {
+            const opt = (primaryCol.options || []).find(o => o.value === raw);
+            const pri = (opt && opt.sort_priority != null) ? Number(opt.sort_priority) : NaN;
+            return { type: 'num', val: isFinite(pri) ? pri : Number.MAX_SAFE_INTEGER };
+        }
+        if (primaryCol.type === 'checkbox') return { type: 'num', val: raw ? 0 : 1 };
+        return { type: 'str', val: (raw == null ? '' : String(raw)) };
+    };
+
+    return records.slice().sort((a, b) => {
+        const ka = keyOf(a), kb = keyOf(b);
+        let cmp;
+        if (ka.type === 'num' && kb.type === 'num') {
+            cmp = ka.val - kb.val;
+        } else {
+            cmp = String(ka.val).localeCompare(String(kb.val));
+        }
+        if (cmp !== 0) return cmp;
+        return (a.contract_number || '').localeCompare(b.contract_number || '');
+    });
+}
+
+// --- Jump-to-contract search + URL hash ---
+function jumpToContract(query) {
+    const q = (query || '').trim();
+    if (!q) return;
+    const rows = Array.from(document.querySelectorAll('#dt-tbody tr[data-id]'));
+    const ql = q.toLowerCase();
+    const match = rows.find(tr => {
+        const td = Array.from(tr.querySelectorAll('td.dt-system-cell'))
+            .find(t => t.dataset.system === 'contract');
+        return td && td.textContent.trim().toLowerCase().includes(ql);
+    });
+    if (!match) {
+        alert(`No contract matching "${q}" on this page.`);
+        return;
+    }
+    // Use hash so the URL is shareable / reusable
+    if (match.id) {
+        history.replaceState(null, '', '#' + match.id);
+    }
+    flashRow(match);
+}
+
+function flashRow(tr) {
+    tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    tr.classList.remove('dt-flash');
+    // Restart animation
+    void tr.offsetWidth;
+    tr.classList.add('dt-flash');
+    setTimeout(() => tr.classList.remove('dt-flash'), 2100);
+}
+
+function handleHashJump() {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (el) flashRow(el);
+}
+
+window.addEventListener('hashchange', handleHashJump);
+
+renderTable();
+
+// Honor ?#row-xxxx hash on initial load (after DOM is populated)
+if (window.location.hash) {
+    setTimeout(handleHashJump, 50);
+}
+
+// --- API helpers ---
+async function updateField(recordId, fieldId, value) {
+    await fetch(`/contracts/api/dynamic-tracker/record/${recordId}/update/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: fieldId, value: value }),
+    });
+}
+
+async function toggleHighlight(recordId, btn) {
+    const row = document.querySelector(`tr[data-id="${recordId}"]`);
+    const current = row.classList.contains('highlighted');
+    const res = await fetch(`/contracts/api/dynamic-tracker/record/${recordId}/update/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'is_highlighted', value: !current }),
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+        row.classList.toggle('highlighted', data.is_highlighted);
+        btn.classList.toggle('active', data.is_highlighted);
+    }
+}
+
+async function deleteRecord(recordId, btn) {
+    if (!confirm('Delete this row?')) return;
+    const res = await fetch(`/contracts/api/dynamic-tracker/record/${recordId}/delete/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+    });
+    if ((await res.json()).status === 'success') {
+        btn.closest('tr').remove();
+        const tbody = document.getElementById('dt-tbody');
+        if (!tbody.querySelector('tr[data-id]')) showEmpty(tbody);
+    }
+}
+
+// --- Add Row ---
+function openAddRecord() {
+    document.getElementById('contract-search-input').value = '';
+    document.getElementById('contract-search-results').innerHTML = '';
+    document.getElementById('contract-search-results').style.display = 'none';
+    document.getElementById('selected-contract-id').value = '';
+    document.getElementById('selected-contract-display').style.display = 'none';
+    openModal('modal-add-record');
+}
+
+let searchTimer = null;
+function searchContracts(q) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+        const ul = document.getElementById('contract-search-results');
+        if (q.length < 2) { ul.style.display = 'none'; return; }
+        const res = await fetch(`/contracts/api/dynamic-tracker/search-contracts/?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        ul.innerHTML = '';
+        if (!data.results.length) {
+            ul.innerHTML = '<li style="color:#9ca3af;">No results</li>';
+        } else {
+            data.results.forEach(c => {
+                const li = document.createElement('li');
+                li.textContent = `${c.contract_number}${c.po_number ? ' / ' + c.po_number : ''}`;
+                li.onclick = () => selectContract(c);
+                ul.appendChild(li);
+            });
+        }
+        ul.style.display = 'block';
+    }, 250);
+}
+
+function selectContract(c) {
+    document.getElementById('selected-contract-id').value = c.id;
+    document.getElementById('contract-search-input').value = '';
+    document.getElementById('contract-search-results').style.display = 'none';
+    const disp = document.getElementById('selected-contract-display');
+    disp.textContent = `Linked: ${c.contract_number}${c.po_number ? ' / ' + c.po_number : ''}`;
+    disp.style.display = 'block';
+}
+
+async function submitAddRecord() {
+    const contractId = document.getElementById('selected-contract-id').value || null;
+    const res = await fetch(`/contracts/api/dynamic-tracker/${SCHEMA_ID}/add-record/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_id: contractId }),
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+        closeModal('modal-add-record');
+        document.getElementById('empty-row')?.remove();
+        const tbody = document.getElementById('dt-tbody');
+        const newRow = buildRow({
+            id: data.record_id,
+            contract_number: data.contract_number,
+            po_number: data.po_number,
+            data: {},
+            is_highlighted: false,
+        });
+        tbody.appendChild(newRow);
+        rebuildTable();
+        // Scroll to the new row so the user sees where it landed
+        const placed = document.querySelector(`#dt-tbody tr[data-id="${data.record_id}"]`);
+        if (placed) flashRow(placed);
+    }
+}
+
+// --- Column Modal (Add + Edit) ---
+function openAddColumn() {
+    columnModalMode = 'add';
+    editingColumnId = null;
+    document.getElementById('modal-column-title').textContent = 'Add Column';
+    document.getElementById('col-submit-btn').textContent = 'Add Column';
+    document.getElementById('col-delete-btn').style.display = 'none';
+    document.getElementById('col-type').disabled = false;
+    document.getElementById('col-label').value = '';
+    document.getElementById('col-type').value = 'text';
+    document.getElementById('select-options-section').style.display = 'none';
+    document.getElementById('select-options-list').innerHTML = '';
+    selectOptionCount = 0;
+    openModal('modal-column');
+}
+
+function openEditColumn(columnId) {
+    const col = COLS.find(c => c.id === columnId);
+    if (!col) return;
+    columnModalMode = 'edit';
+    editingColumnId = columnId;
+    document.getElementById('modal-column-title').textContent = 'Edit Column';
+    document.getElementById('col-submit-btn').textContent = 'Save Changes';
+    document.getElementById('col-delete-btn').style.display = 'inline-block';
+    document.getElementById('col-type').disabled = true; // Can't change type after creation
+    document.getElementById('col-label').value = col.label;
+    document.getElementById('col-type').value = col.type;
+    document.getElementById('select-options-list').innerHTML = '';
+    selectOptionCount = 0;
+    if (col.type === 'select') {
+        (col.options || []).forEach(o => addSelectOption(o));
+        document.getElementById('select-options-section').style.display = 'block';
+    } else {
+        document.getElementById('select-options-section').style.display = 'none';
+    }
+    openModal('modal-column');
+}
+
+function toggleSelectOptions(type) {
+    document.getElementById('select-options-section').style.display = (type === 'select') ? 'block' : 'none';
+}
+
+function addSelectOption(preset) {
+    selectOptionCount++;
+    const div = document.createElement('div');
+    div.className = 'dt-option-row';
+    const valueInp = document.createElement('input');
+    valueInp.type = 'text'; valueInp.placeholder = 'Option label'; valueInp.className = 'dt-option-value';
+    valueInp.value = preset?.value || '';
+
+    const colorInp = document.createElement('input');
+    colorInp.type = 'color'; colorInp.className = 'dt-option-color';
+    colorInp.value = preset?.color_hex || '#a8d5a2';
+
+    const priInp = document.createElement('input');
+    priInp.type = 'number'; priInp.className = 'dt-option-priority'; priInp.title = 'Sort priority';
+    priInp.value = preset?.sort_priority ?? selectOptionCount;
+
+    const rmBtn = document.createElement('button');
+    rmBtn.type = 'button'; rmBtn.className = 'dt-option-remove'; rmBtn.innerHTML = '&times;';
+    rmBtn.onclick = () => div.remove();
+
+    div.appendChild(valueInp);
+    div.appendChild(colorInp);
+    div.appendChild(priInp);
+    div.appendChild(rmBtn);
+    document.getElementById('select-options-list').appendChild(div);
+}
+
+function collectOptions() {
+    const options = [];
+    let priority = 1;
+    document.querySelectorAll('#select-options-list > .dt-option-row').forEach(row => {
+        const val = row.querySelector('.dt-option-value').value.trim();
+        const color = row.querySelector('.dt-option-color').value;
+        const pri = parseInt(row.querySelector('.dt-option-priority').value) || priority;
+        if (val) options.push({ value: val, color_hex: color, sort_priority: pri });
+        priority++;
+    });
+    return options;
+}
+
+async function submitColumn() {
+    const label = document.getElementById('col-label').value.trim();
+    if (!label) { alert('Label is required'); return; }
+
+    if (columnModalMode === 'add') {
+        const type = document.getElementById('col-type').value;
+        const options = type === 'select' ? collectOptions() : [];
+        const res = await fetch(`/contracts/api/dynamic-tracker/${SCHEMA_ID}/add-column/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label, type, options }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            closeModal('modal-column');
+            COLS.push(data.column);
+            if (!COLUMN_ORDER.includes(data.column.id)) COLUMN_ORDER.push(data.column.id);
+            rebuildTable();
+        } else {
+            alert(data.message || 'Failed to add column');
+        }
+    } else {
+        // Edit mode
+        const col = COLS.find(c => c.id === editingColumnId);
+        if (!col) return;
+        const payload = { label };
+        if (col.type === 'select') payload.options = collectOptions();
+
+        const res = await fetch(`/contracts/api/dynamic-tracker/${SCHEMA_ID}/column/${editingColumnId}/update/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            closeModal('modal-column');
+            const idx = COLS.findIndex(c => c.id === editingColumnId);
+            COLS[idx] = data.column;
+            rebuildTable();
+        } else {
+            alert(data.message || 'Failed to update column');
+        }
+    }
+}
+
+async function deleteColumn() {
+    if (!editingColumnId) return;
+    if (!confirm('Delete this column? All data in this column will be lost.')) return;
+    const res = await fetch(`/contracts/api/dynamic-tracker/${SCHEMA_ID}/column/${editingColumnId}/delete/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+        closeModal('modal-column');
+        const idx = COLS.findIndex(c => c.id === editingColumnId);
+        if (idx >= 0) COLS.splice(idx, 1);
+        COLUMN_ORDER = COLUMN_ORDER.filter(id => id !== editingColumnId);
+        rebuildTable();
+        editingColumnId = null;
+    } else {
+        alert(data.message || 'Failed to delete column');
+    }
+}
+
+async function closeRecord(recordId, btn) {
+    if (!confirm('Close this record? It will be hidden from the main list.')) return;
+    const res = await fetch(`/contracts/api/dynamic-tracker/record/${recordId}/close/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+        const row = btn.closest('tr');
+        row.remove();
+        const tbody = document.getElementById('dt-tbody');
+        if (!tbody.querySelector('tr[data-id]')) showEmpty(tbody);
+    } else {
+        alert(data.message || 'Failed to close record');
+    }
+}
+
+function openModal(id) { document.getElementById(id).classList.add('is-open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('is-open'); }
+
+// --- Lock / Unlock ---
+const LOCK_KEY = `dt-locked-${SCHEMA_ID}`;
+const LOCK_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const UNLOCK_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
+
+function applyLockState() {
+    const container = document.getElementById('dt-container');
+    container.classList.toggle('dt-locked', LOCKED);
+    container.classList.toggle('dt-unlocked', !LOCKED);
+    const btn = document.getElementById('lock-toggle-btn');
+    btn.innerHTML = LOCKED ? LOCK_ICON : UNLOCK_ICON;
+    btn.title = LOCKED ? 'Unlock to edit and reorder columns' : 'Lock layout';
+    // Update draggable flag on existing headers without full re-render
+    document.querySelectorAll('#dt-header-row .dt-drag-col').forEach(th => { th.draggable = !LOCKED; });
+}
+
+function toggleLock() {
+    LOCKED = !LOCKED;
+    try { localStorage.setItem(LOCK_KEY, LOCKED ? '1' : '0'); } catch (e) {}
+    applyLockState();
+}
+
+(function initLockState() {
+    try {
+        const stored = localStorage.getItem(LOCK_KEY);
+        if (stored === '0') LOCKED = false;
+    } catch (e) {}
+    applyLockState();
+})();
+
+// --- Column reorder ---
+async function reorderColumns(fromId, toId, before) {
+    resolveOrder();
+    const fromIdx = COLUMN_ORDER.indexOf(fromId);
+    if (fromIdx < 0) return;
+    COLUMN_ORDER.splice(fromIdx, 1);
+    let insertAt = COLUMN_ORDER.indexOf(toId);
+    if (insertAt < 0) insertAt = COLUMN_ORDER.length;
+    if (!before) insertAt += 1;
+    COLUMN_ORDER.splice(insertAt, 0, fromId);
+
+    rebuildTable();
+
+    const res = await fetch(`/contracts/api/dynamic-tracker/${SCHEMA_ID}/reorder-columns/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: COLUMN_ORDER }),
+    });
+    const data = await res.json();
+    if (data.status !== 'success') {
+        alert(data.message || 'Failed to save column order');
+    }
+}
+
+// --- Font size zoom ---
+const ZOOM_MIN = 0.65;
+const ZOOM_MAX = 1.40;
+const ZOOM_STEP = 0.05;
+const ZOOM_DEFAULT = 0.875;
+const ZOOM_KEY = 'dt-font-size';
+
+function applyZoom(size) {
+    size = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, +size.toFixed(3)));
+    document.documentElement.style.setProperty('--dt-font-size', size + 'rem');
+    const pct = Math.round((size / ZOOM_DEFAULT) * 100);
+    document.getElementById('zoom-display').textContent = pct + '%';
+    document.getElementById('zoom-out-btn').disabled = size <= ZOOM_MIN + 0.001;
+    document.getElementById('zoom-in-btn').disabled = size >= ZOOM_MAX - 0.001;
+    try { localStorage.setItem(ZOOM_KEY, String(size)); } catch (e) {}
+    return size;
+}
+
+function currentZoom() {
+    const stored = parseFloat(localStorage.getItem(ZOOM_KEY));
+    return (isFinite(stored) && stored >= ZOOM_MIN && stored <= ZOOM_MAX) ? stored : ZOOM_DEFAULT;
+}
+
+function zoomIn()    { applyZoom(currentZoom() + ZOOM_STEP); }
+function zoomOut()   { applyZoom(currentZoom() - ZOOM_STEP); }
+function zoomReset() { applyZoom(ZOOM_DEFAULT); }
+
+applyZoom(currentZoom());
+</script>
+{% endblock body %}

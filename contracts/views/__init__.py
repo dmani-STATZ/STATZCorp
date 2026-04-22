@@ -179,6 +179,22 @@ from .code_table_views import (
 )
 from .admin_tools import supplier_admin_tools
 
+from .dynamic_tracker_views import (
+    tracker_list,
+    tracker_create,
+    tracker_detail,
+    api_schema,
+    api_add_column,
+    api_add_record,
+    api_update_record,
+    api_search_contracts as tracker_search_contracts,
+    api_delete_record,
+    api_update_column,
+    api_delete_column,
+    api_reorder_columns,
+    api_close_record,
+)
+
 __all__ = [
     'folder_tracking',
     'add_folder_tracking',

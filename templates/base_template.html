@@ -284,8 +284,16 @@
                     <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Inventory</a>
                     </li>
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
                         <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Contracts</a>
+                        <ul class="mt-1 pl-4 space-y-1 submenu">
+                            <li>
+                                <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Dashboard</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'contracts:tracker_list' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Dynamic Tracking</a>
+                            </li>
+                        </ul>
                     </li>
                     <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'sales:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">STATZ Sales</a>

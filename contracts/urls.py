@@ -163,6 +163,21 @@ from .views.folder_tracking_views import (
     folderstack_move,
     folderstack_delete,
 )
+from .views.dynamic_tracker_views import (
+    tracker_list,
+    tracker_create,
+    tracker_detail,
+    api_schema,
+    api_add_column,
+    api_add_record,
+    api_update_record,
+    api_search_contracts,
+    api_delete_record,
+    api_update_column,
+    api_delete_column,
+    api_reorder_columns,
+    api_close_record,
+)
 from .views.company_views import (
     CompanyListView,
     CompanyCreateView,
@@ -569,4 +584,18 @@ urlpatterns = [
     path("code-tables/", code_table_admin, name="code_table_admin"),
     # Admin tools
     path("admin-tools/", supplier_admin_tools, name="admin_tools"),
+    # Dynamic Contract Tracking Module
+    path("dynamic-tracker/", tracker_list, name="tracker_list"),
+    path("dynamic-tracker/create/", tracker_create, name="tracker_create"),
+    path("dynamic-tracker/<int:schema_id>/", tracker_detail, name="tracker_detail"),
+    path("api/dynamic-tracker/<int:schema_id>/schema/", api_schema, name="tracker_api_schema"),
+    path("api/dynamic-tracker/<int:schema_id>/add-column/", api_add_column, name="tracker_add_column"),
+    path("api/dynamic-tracker/<int:schema_id>/column/<str:column_id>/update/", api_update_column, name="tracker_update_column"),
+    path("api/dynamic-tracker/<int:schema_id>/column/<str:column_id>/delete/", api_delete_column, name="tracker_delete_column"),
+    path("api/dynamic-tracker/<int:schema_id>/reorder-columns/", api_reorder_columns, name="tracker_reorder_columns"),
+    path("api/dynamic-tracker/record/<int:record_id>/close/", api_close_record, name="tracker_close_record"),
+    path("api/dynamic-tracker/<int:schema_id>/add-record/", api_add_record, name="tracker_add_record"),
+    path("api/dynamic-tracker/record/<int:record_id>/update/", api_update_record, name="tracker_update_record"),
+    path("api/dynamic-tracker/record/<int:record_id>/delete/", api_delete_record, name="tracker_delete_record"),
+    path("api/dynamic-tracker/search-contracts/", api_search_contracts, name="tracker_search_contracts"),
 ]
