@@ -157,6 +157,7 @@ from .views.acknowledgment_views import (
 )
 
 from .views import payment_history_views
+from .views import note_views
 from .views.folder_tracking_views import (
     folderstack_list,
     folderstack_save,
@@ -362,8 +363,9 @@ urlpatterns = [
     # Note management
     path("note/add/<int:content_type_id>/<int:object_id>/", add_note, name="add_note"),
     path("note/update/<int:pk>/", note_update, name="note_update"),
+    path("note/<int:pk>/detail.json", note_views.note_detail_json, name="note_detail_json"),
     path("note/delete/<int:note_id>/", delete_note, name="delete_note"),
-    path("api/add-note/", api_add_note, name="api_add_note"),
+    path("api/add-note/", api_add_note, name="api_add_note"),  # DEPRECATED — see note_views.api_add_note; no active callers
     path("api/content-types/", list_content_types, name="list_content_types"),
     # Reminder management
     path("reminders/", ReminderListView.as_view(), name="reminders_list"),
@@ -389,6 +391,22 @@ urlpatterns = [
         "reminders/popup/edit/<int:reminder_id>/",
         reminders_popup_edit,
         name="reminders_popup_edit",
+    ),
+    # Notes popup
+    path(
+        "contract/<int:contract_id>/notes/popup/",
+        note_views.notes_popup,
+        name="notes_popup",
+    ),
+    path(
+        "contract/<int:contract_id>/notes/popup/tab/<str:tab_type>/",
+        note_views.notes_popup_tab,
+        name="notes_popup_tab_contract",
+    ),
+    path(
+        "contract/<int:contract_id>/notes/popup/tab/<str:tab_type>/<int:clin_id>/",
+        note_views.notes_popup_tab,
+        name="notes_popup_tab_clin",
     ),
     # Acknowledgement letter
     path(

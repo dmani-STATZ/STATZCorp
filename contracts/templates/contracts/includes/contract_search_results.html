@@ -9,8 +9,8 @@
                 PO: {{ contract.po_number }}
             </div>
         </div>
-        <button onclick="selectContract('{{ contract.id }}', '{{ contract.contract_number }}')"
-                class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+        <button type="button" onclick="selectContract('{{ contract.id }}', '{{ contract.contract_number }}')"
+                class="btn btn-sm btn-primary">
             Select
         </button>
     </div>

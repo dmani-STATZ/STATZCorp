@@ -26,6 +26,8 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **Role:** This is the core domain app of the project. Nearly every other app depends on or integrates with it.
 
+**Deprecation note:** `api_add_note` (in `contracts/views/note_views.py`) is deprecated. It redirects instead of returning JSON, lacks active-company scoping on note creation, and has been superseded by `add_note` for all AJAX flows. Debug `print` statements have been removed; the URL is retained temporarily for bookmarked links only. Do not add new callers. Planned removal: next cleanup pass.
+
 ---
 
 ## 3. Read This Before Editing
@@ -57,6 +59,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
   - New utility/helper classes → `static/css/utilities.css`
   - New color tokens or dark mode overrides → `static/css/theme-vars.css`
   - **Do not touch:** `static/css/tailwind-compat.css`, `static/css/base.css`
+  - **Do not add wildcard `button:not(...)` CSS rules** in `app-core.css` or elsewhere. All buttons must be explicitly styled. Bare `<button>` elements without classes are a bug to be fixed, not caught by a wildcard.
   - If you encounter Tailwind utility classes in a template you are already editing, replace them with Bootstrap 5 equivalents or named classes from `app-core.css`. Do not leave Tailwind classes in place.
   - Inline `style` attributes are acceptable for one-off layout fixes but prefer a named class in `app-core.css` for anything reusable or that requires a hover/focus/pseudo-element state.
 
@@ -144,6 +147,17 @@ All popup views redirect back to `contracts:reminders_popup` on success, not to 
 The `toggle_reminder` and `delete_reminder` views use `HTTP_REFERER` for redirect — the popup URL will be the referer when those views are called from within the popup.
 This pattern (popup_base + popup view + popup_add + popup_edit) is the approved pattern for future popup windows (e.g. Notes).
 
+### Notes popup window
+- `contracts/views/note_views.py` — `notes_popup`, `notes_popup_tab`, `note_detail_json` views
+- `contracts/templates/contracts/notes_popup_base.html` — bare base template (no nav chrome)
+- `contracts/templates/contracts/notes_popup.html` — popup content template
+- `contracts/templates/contracts/partials/notes_popup_tab_panel.html` — tab panel partial
+- `contracts/urls.py` — `notes_popup`, `notes_popup_tab_contract`, `notes_popup_tab_clin`, `note_detail_json` URL patterns
+- `contracts/templates/contracts/contract_management.html` — `openNotesPopup()` JS function, follow-me hook, pop-out button in notes header
+
+All popup CRUD actions refresh the current tab in-place; no cross-window data sync. The popup exposes `window.isPinned` (boolean) read by the main window before pushing a new contract URL to an unpinned popup.
+The Add Note flow uses the same modal as Edit Note and is opened from the notes tab toolbar button instead of an always-visible inline form.
+
 ---
 
 ## 6. Cross-App Dependency Warnings
@@ -170,6 +184,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 ### Template / partial sharing:
 - `notes_list.html` and `note_modal.html` are included in contract management, CLIN detail, and supplier detail templates. Changes to their expected context keys break all three locations.
 - `payment_history_popup.html` is included from multiple views; its context variables (`payment_history`, `entity_type`, `entity_id`) must stay stable.
+- `notes_popup_tab_panel.html` is popup-only and intentionally **not** shared with the main page's `notes_list.html`. The main-page partial uses `note.note_reminders.exists()` (any reminder, any user); the popup partial uses an annotated `note.current_user_has_reminder` flag (this user only). Do not consolidate these templates without addressing the user-scoped reminder badge requirement.
 
 ---
 
@@ -179,6 +194,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 - **`request.active_company` is set by middleware** (`users` app). Do not query `Company`-scoped models without it.
 - Superuser-only views use `@user_passes_test(lambda u: u.is_superuser)`. Do not downgrade to `is_staff` — these views expose company config, logo upload, and bulk SharePoint updates.
 - Note delete/edit requires `request.user == note.created_by or request.user.is_staff`. Do not generalize this to all authenticated users.
+- Reminder creation/edit/delete on a Note requires `request.user == note.created_by or request.user.is_staff`. Enforced in `note_update` and implicit in `add_note`. The badge indicator in the notes popup only renders for reminders where `reminder_user == request.user`.
 - Reminder completion toggle requires ownership check. Same pattern.
 - Exports (contract log, folder tracking) are accessible to any logged-in user in the active company — treat them as sensitive; do not make them publicly accessible.
 - Audit fields (`created_by`, `modified_by`) must be populated by views on create/update. Do not skip them — the contract log and admin both surface these.
@@ -290,7 +306,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 11. **The `AcknowledgementLetter` view references fields that do not exist on the model** (`recipient_name`, `recipient_address` per CONTEXT.md §17). This is a known stale view/template. Do not add logic that depends on these fields without first adding them to the model.
 
-12. **`api_add_note` has debug `print` statements** and reads `request.content_type` (which is not set in AJAX requests). AJAX callers must pass `content_type_id` and `object_id` explicitly. This is a known bug.
+12. **Deprecated `api_add_note`** reads `request.content_type` (which is not set in AJAX requests). Any legacy call must pass `content_type_id` and `object_id` explicitly. No active in-app callers; the route remains for old bookmarks.
 
 13. **There is no longer a standalone CLIN edit page.** CLIN field edits are handled by the Transactions edit modal (`openTransactionsEditModal`). Do not re-add a dedicated CLIN edit view or `/contracts/clin/<pk>/edit/` route without removing the Transaction wiring from `clin_detail.html` first.
 

@@ -1,0 +1,54 @@
+{% if notes %}
+    <div class="d-flex flex-column gap-2">
+        {% for note in notes %}
+            {% with note_type=note.entity_type|default:entity_type|default:'contract' %}
+                <article class="notes-popup-note-row type-{{ note_type|lower }} bg-body rounded-3 shadow-sm p-3">
+                    <div class="notes-popup-note-content text-body-secondary mb-2">
+                        {{ note.note|linebreaksbr }}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="small text-muted">
+                            Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if note.current_user_has_reminder %}
+                                <span class="badge rounded-pill bg-info-subtle text-info-emphasis" title="You have a reminder on this note">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="me-1" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M8 3.5a.5.5 0 0 1 .5.5v4.25l2.5 1.5a.5.5 0 1 1-.5.86l-2.75-1.65A.5.5 0 0 1 7.5 8.5V4a.5.5 0 0 1 .5-.5z"/>
+                                        <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zm0-1A7 7 0 1 0 8 1a7 7 0 0 0 0 14z"/>
+                                    </svg>
+                                    Reminder
+                                </span>
+                            {% endif %}
+                            {% if request.user == note.created_by or request.user.is_staff %}
+                                <button type="button"
+                                        class="btn btn-sm btn-link text-primary p-0 js-popup-edit-note"
+                                        data-note-id="{{ note.id }}"
+                                        title="Edit note"
+                                        aria-label="Edit note">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708L5.207 13.793 2 14l.207-3.207L12.146.854zM11.207 2 3 10.207V13h2.793L14 4.793 11.207 2z"/>
+                                    </svg>
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-link text-danger p-0 js-popup-delete-note"
+                                        data-note-id="{{ note.id }}"
+                                        title="Delete note"
+                                        aria-label="Delete note">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm4 0A.5.5 0 0 1 10 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z"/>
+                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4H4z"/>
+                                    </svg>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+            {% endwith %}
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="h-100 d-flex align-items-center justify-content-center text-muted py-5">
+        {{ note_empty_msg }}
+    </div>
+{% endif %}

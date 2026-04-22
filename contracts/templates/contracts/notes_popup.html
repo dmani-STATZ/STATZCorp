@@ -1,0 +1,576 @@
+{% extends "contracts/notes_popup_base.html" %}
+
+{% block title %}Notes — {{ contract.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="notes-popup-shell d-flex flex-column vh-100">
+    <header class="notes-popup-header">
+        <div class="notes-popup-header-title">
+            <h5>Notes — {{ contract.contract_number }}</h5>
+            <p class="notes-popup-subtitle">Buyer: {{ contract.buyer|default:"—" }}</p>
+        </div>
+        <div class="notes-popup-header-controls">
+            <button type="button"
+                    id="pin-toggle-btn"
+                    class="notes-popup-pin-btn"
+                    title="Unpinned — popup follows active contract"
+                    aria-label="Toggle pin">
+                <span class="pin-icon-unpinned text-secondary" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16">
+                        <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 0 1 .16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.902-1.414.707-.195-.195.512-1.22.707-1.414l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 0 1 1.013.16l3.134-3.133a2.772 2.772 0 0 1-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 0 1 .353-.146z"/>
+                    </svg>
+                </span>
+                <span class="pin-icon-pinned d-none text-danger" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 0 1 .16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.902-1.414.707-.195-.195.512-1.22.707-1.414l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 0 1 1.013.16l3.134-3.133a2.772 2.772 0 0 1-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 0 1 .353-.146z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button"
+                    class="notes-popup-close-btn"
+                    onclick="window.close();"
+                    title="Close"
+                    aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="notes-popup-tabs-wrapper">
+        <button type="button" id="notes-popup-tabs-left" class="notes-popup-tabs-arrow" aria-label="Scroll tabs left">&lsaquo;</button>
+        <div class="notes-popup-tabs-scroll app-tabs" id="notes-popup-tabs-scroll" role="tablist" aria-label="Notes tabs">
+            <button type="button"
+                    role="tab"
+                    class="app-tab-btn type-contract active"
+                    data-tab-type="contract"
+                    data-tab-id=""
+                    data-content-type-id="{{ contract_content_type_id }}"
+                    data-object-id="{{ contract.id }}"
+                    data-tab-url="{% url 'contracts:notes_popup_tab_contract' contract.pk 'contract' %}">
+                Contract
+            </button>
+            {% for clin in clins %}
+            <button type="button"
+                    role="tab"
+                    class="app-tab-btn type-clin"
+                    data-tab-type="clin"
+                    data-tab-id="{{ clin.id }}"
+                    data-content-type-id="{{ clin_content_type_id }}"
+                    data-object-id="{{ clin.id }}"
+                    data-tab-url="{% url 'contracts:notes_popup_tab_clin' contract.pk 'clin' clin.id %}">
+                CLIN {{ clin.item_number|default:clin.id }}
+            </button>
+            {% endfor %}
+        </div>
+        <button type="button" id="notes-popup-tabs-right" class="notes-popup-tabs-arrow" aria-label="Scroll tabs right">&rsaquo;</button>
+    </div>
+
+    <main class="notes-popup-main flex-grow-1 overflow-auto px-3 py-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 notes-popup-tab-toolbar">
+            <h6 class="mb-0 text-muted" id="tab-title-label">Contract Notes</h6>
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    id="add-note-btn"
+                    onclick="openAddNoteModalForCurrentTab()">
+                <i class="bi bi-plus-lg"></i> Add Note
+            </button>
+        </div>
+        <section id="tab-content-panel" class="notes-popup-panel">
+            <div class="text-center text-muted py-4">Loading notes...</div>
+        </section>
+    </main>
+</div>
+
+{% include "contracts/partials/notes_popup_edit_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const ADD_NOTE_URL_TEMPLATE = "{% url 'contracts:add_note' 0 0 %}";
+    const NOTE_DETAIL_URL_TEMPLATE = "{% url 'contracts:note_detail_json' 0 %}";
+    const NOTE_UPDATE_URL_TEMPLATE = "{% url 'contracts:note_update' 0 %}";
+    const NOTE_DELETE_URL_TEMPLATE = "{% url 'contracts:delete_note' 0 %}";
+
+    const tabsContainer = document.getElementById('notes-popup-tabs-scroll');
+    const tabButtons = Array.from(document.querySelectorAll('#notes-popup-tabs-scroll > .app-tab-btn'));
+    const panel = document.getElementById('tab-content-panel');
+    const tabTitleLabel = document.getElementById('tab-title-label');
+    const pinBtn = document.getElementById('pin-toggle-btn');
+    const tabsLeftBtn = document.getElementById('notes-popup-tabs-left');
+    const tabsRightBtn = document.getElementById('notes-popup-tabs-right');
+    const contractTabButton = tabButtons.find(btn => btn.dataset.tabType === 'contract');
+    const clinTabButton = tabButtons.find(btn => btn.dataset.tabType === 'clin');
+
+    const CONTRACT_CT_ID = contractTabButton ? contractTabButton.dataset.contentTypeId : '';
+    const CLIN_CT_ID = clinTabButton ? clinTabButton.dataset.contentTypeId : '';
+    const CONTRACT_ID = contractTabButton ? contractTabButton.dataset.objectId : '';
+
+    const noteModalElement = document.getElementById('noteModal');
+    const noteModalTitle = document.getElementById('noteModalTitle');
+    const noteModalSaveBtn = document.getElementById('noteModalSaveBtn');
+    const noteTextArea = document.getElementById('noteTextArea');
+    const noteModalMeta = document.getElementById('noteModalMeta');
+    const reminderSectionWrap = document.getElementById('reminderSectionWrap');
+    const reminderCheckbox = document.getElementById('reminderCheckbox');
+    const reminderFields = document.getElementById('reminderFields');
+    const reminderTitleInput = document.getElementById('reminderTitle');
+    const reminderDateInput = document.getElementById('reminderDate');
+    const reminderTextInput = document.getElementById('reminderText');
+    const reminderCompletedWrap = document.getElementById('reminderCompletedWrap');
+    const reminderCompletedInput = document.getElementById('reminderCompleted');
+
+    let activeTab = null;
+    let isPinned = false;
+    let _noteModalMode = 'edit';
+    let _noteModalContext = null;
+    window.isPinned = false;
+
+    function getCsrfToken() {
+        const tokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        return tokenEl ? tokenEl.value : '';
+    }
+
+    function urlForAddNote(contentTypeId, objectId) {
+        return ADD_NOTE_URL_TEMPLATE.replace('/0/0/', `/${contentTypeId}/${objectId}/`);
+    }
+
+    function urlForNoteDetail(noteId) {
+        return NOTE_DETAIL_URL_TEMPLATE.replace('/0/', `/${noteId}/`);
+    }
+
+    function urlForNoteUpdate(noteId) {
+        return NOTE_UPDATE_URL_TEMPLATE.replace('/0/', `/${noteId}/`);
+    }
+
+    function urlForNoteDelete(noteId) {
+        return NOTE_DELETE_URL_TEMPLATE.replace('/0/', `/${noteId}/`);
+    }
+
+    function formatDateForInput(isoDate) {
+        if (!isoDate) return '';
+        const parsed = new Date(isoDate);
+        if (Number.isNaN(parsed.getTime())) return '';
+        const year = parsed.getFullYear();
+        const month = String(parsed.getMonth() + 1).padStart(2, '0');
+        const day = String(parsed.getDate()).padStart(2, '0');
+        const hours = String(parsed.getHours()).padStart(2, '0');
+        const minutes = String(parsed.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    function getClinLabel(buttonEl) {
+        const tabText = (buttonEl.textContent || '').trim();
+        return tabText.replace(/^CLIN\s+/i, '').trim() || (buttonEl.dataset.tabId || '');
+    }
+
+    function updateTabTitleLabel(tabType, tabId, clinLabel) {
+        if (!tabTitleLabel) return;
+        if (tabType === 'contract') {
+            tabTitleLabel.textContent = 'Contract Notes';
+            return;
+        }
+        tabTitleLabel.textContent = `CLIN ${clinLabel || tabId} Notes`;
+    }
+
+    function updateTabArrowState() {
+        const maxScroll = tabsContainer.scrollWidth - tabsContainer.clientWidth;
+        const leftDisabled = tabsContainer.scrollLeft <= 1;
+        const rightDisabled = tabsContainer.scrollLeft >= maxScroll - 1;
+        tabsLeftBtn.disabled = leftDisabled;
+        tabsRightBtn.disabled = rightDisabled;
+    }
+
+    function setActiveTab(buttonEl) {
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        buttonEl.classList.add('active');
+        activeTab = {
+            tabType: buttonEl.dataset.tabType,
+            tabId: buttonEl.dataset.tabId || '',
+            contentTypeId: buttonEl.dataset.contentTypeId,
+            objectId: buttonEl.dataset.objectId,
+            tabUrl: buttonEl.dataset.tabUrl,
+            tabLabel: buttonEl.dataset.tabType === 'clin' ? getClinLabel(buttonEl) : 'Contract'
+        };
+        updateTabTitleLabel(activeTab.tabType, activeTab.tabId, activeTab.tabLabel);
+    }
+
+    function getActiveTabInfo() {
+        return activeTab ? { ...activeTab } : null;
+    }
+
+    function toggleReminderFields(showReminderFields) {
+        reminderFields.classList.toggle('d-none', !showReminderFields);
+    }
+
+    function clearReminderFields() {
+        reminderTitleInput.value = '';
+        reminderDateInput.value = '';
+        reminderTextInput.value = '';
+        reminderCompletedInput.checked = false;
+    }
+
+    function showReminderSection(showSection) {
+        reminderSectionWrap.classList.toggle('d-none', !showSection);
+    }
+
+    function showReminderCompletedField(showField) {
+        reminderCompletedWrap.classList.toggle('d-none', !showField);
+    }
+
+    function getReminderSnapshot() {
+        return {
+            title: reminderTitleInput.value || '',
+            text: reminderTextInput.value || '',
+            date: reminderDateInput.value || '',
+            completed: reminderCompletedInput.checked
+        };
+    }
+
+    function reminderFieldsChanged() {
+        const baseline = (_noteModalContext && _noteModalContext.initialReminderSnapshot) || {
+            title: '',
+            text: '',
+            date: '',
+            completed: false
+        };
+        const current = getReminderSnapshot();
+        return (
+            baseline.title !== current.title ||
+            baseline.text !== current.text ||
+            baseline.date !== current.date ||
+            !!baseline.completed !== !!current.completed
+        );
+    }
+
+    function openModal() {
+        bootstrap.Modal.getOrCreateInstance(noteModalElement).show();
+    }
+
+    function closeModal() {
+        bootstrap.Modal.getOrCreateInstance(noteModalElement).hide();
+    }
+
+    function resetModalForNewState() {
+        noteTextArea.value = '';
+        noteModalMeta.textContent = 'Added by —';
+        reminderCheckbox.checked = false;
+        clearReminderFields();
+        toggleReminderFields(false);
+        showReminderSection(true);
+        showReminderCompletedField(true);
+    }
+
+    function openAddNoteModal(tabType, tabId) {
+        const resolvedTabType = tabType === 'clin' ? 'clin' : 'contract';
+        const resolvedContentTypeId = resolvedTabType === 'contract' ? CONTRACT_CT_ID : CLIN_CT_ID;
+        const resolvedObjectId = resolvedTabType === 'contract' ? CONTRACT_ID : tabId;
+
+        _noteModalMode = 'add';
+        _noteModalContext = {
+            tabType: resolvedTabType,
+            tabId: resolvedTabType === 'contract' ? '' : String(tabId || ''),
+            contentTypeId: String(resolvedContentTypeId || ''),
+            objectId: String(resolvedObjectId || ''),
+            noteId: null,
+            canEdit: true,
+            canManageReminder: true,
+            originalHadReminder: false,
+            initialReminderSnapshot: { title: '', text: '', date: '', completed: false }
+        };
+
+        resetModalForNewState();
+        noteModalTitle.textContent = 'Add Note';
+        noteModalSaveBtn.textContent = 'Save Note';
+        noteModalMeta.textContent = 'New note';
+        showReminderSection(true);
+        showReminderCompletedField(false);
+        reminderCheckbox.checked = false;
+        toggleReminderFields(false);
+        clearReminderFields();
+        openModal();
+    }
+
+    function openAddNoteModalForCurrentTab() {
+        const tab = getActiveTabInfo();
+        if (!tab) return;
+        openAddNoteModal(tab.tabType, tab.tabId);
+    }
+
+    function bindTabPanelActions() {
+        panel.querySelectorAll('.js-popup-edit-note').forEach(btn => {
+            btn.addEventListener('click', function() {
+                openEditNoteModal(this.dataset.noteId);
+            });
+        });
+        panel.querySelectorAll('.js-popup-delete-note').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const noteId = this.dataset.noteId;
+                if (!noteId || !confirm('Delete this note?')) return;
+                try {
+                    const resp = await fetch(urlForNoteDelete(noteId), {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data.success) {
+                        throw new Error(data.error || 'Failed to delete note.');
+                    }
+                    refreshCurrentTab();
+                } catch (err) {
+                    alert(err.message || 'Failed to delete note.');
+                }
+            });
+        });
+    }
+
+    async function refreshCurrentTab() {
+        if (!activeTab || !activeTab.tabUrl) return;
+        panel.innerHTML = '<div class="text-center text-muted py-4">Loading notes...</div>';
+        try {
+            const response = await fetch(activeTab.tabUrl, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || `Failed to load ${activeTab.tabType} notes.`);
+            }
+            panel.innerHTML = data.notes_html || '<div class="text-center text-muted py-4">No notes found.</div>';
+            bindTabPanelActions();
+        } catch (error) {
+            panel.innerHTML = `<div class="alert alert-danger mb-0">${error.message || 'Failed to load notes.'}</div>`;
+        }
+    }
+
+    async function openEditNoteModal(noteId) {
+        _noteModalMode = 'edit';
+        _noteModalContext = {
+            tabType: activeTab ? activeTab.tabType : 'contract',
+            tabId: activeTab ? activeTab.tabId : '',
+            contentTypeId: activeTab ? activeTab.contentTypeId : '',
+            objectId: activeTab ? activeTab.objectId : '',
+            noteId: String(noteId || ''),
+            canEdit: false,
+            canManageReminder: false,
+            originalHadReminder: false,
+            initialReminderSnapshot: { title: '', text: '', date: '', completed: false }
+        };
+
+        resetModalForNewState();
+        noteModalTitle.textContent = 'Edit Note';
+        noteModalSaveBtn.textContent = 'Save Changes';
+        noteModalMeta.textContent = 'Loading...';
+        showReminderSection(true);
+        showReminderCompletedField(true);
+        openModal();
+
+        try {
+            const response = await fetch(urlForNoteDetail(noteId), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Unable to load note details.');
+            }
+
+            const noteData = data.note || {};
+            const reminder = data.reminder;
+            const permissions = data.permissions || {};
+
+            noteTextArea.value = noteData.note || '';
+            const createdOn = noteData.created_on ? new Date(noteData.created_on) : null;
+            const displayDate = createdOn && !Number.isNaN(createdOn.getTime()) ? createdOn.toLocaleString() : 'Unknown date';
+            noteModalMeta.textContent = `Added by ${noteData.created_by_username || 'Unknown user'} on ${displayDate}`;
+
+            if (!permissions.can_manage_reminder) {
+                showReminderSection(false);
+            } else {
+                showReminderSection(true);
+                if (reminder) {
+                    reminderCheckbox.checked = true;
+                    toggleReminderFields(true);
+                    reminderTitleInput.value = reminder.reminder_title || '';
+                    reminderDateInput.value = formatDateForInput(reminder.reminder_date);
+                    reminderTextInput.value = reminder.reminder_text || '';
+                    reminderCompletedInput.checked = !!reminder.reminder_completed;
+                }
+            }
+
+            _noteModalContext = {
+                ..._noteModalContext,
+                noteId: String(noteData.id || noteId),
+                canEdit: !!permissions.can_edit,
+                canManageReminder: !!permissions.can_manage_reminder,
+                originalHadReminder: !!reminder,
+                initialReminderSnapshot: reminder ? getReminderSnapshot() : { title: '', text: '', date: '', completed: false }
+            };
+        } catch (err) {
+            closeModal();
+            alert(err.message || 'Unable to load note details.');
+        }
+    }
+
+    async function postAndHandle(url, formData) {
+        const defaultButtonText = _noteModalMode === 'add' ? 'Save Note' : 'Save Changes';
+        noteModalSaveBtn.disabled = true;
+        noteModalSaveBtn.textContent = 'Saving...';
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                if (data.error) throw new Error(data.error);
+                if (data.errors) throw new Error('Validation error: ' + JSON.stringify(data.errors));
+                throw new Error('Unable to save note.');
+            }
+            closeModal();
+            await refreshCurrentTab();
+        } catch (err) {
+            alert(err.message || 'Unable to save note.');
+        } finally {
+            noteModalSaveBtn.disabled = false;
+            noteModalSaveBtn.textContent = defaultButtonText;
+        }
+    }
+
+    async function saveNoteModal() {
+        if (!_noteModalContext) return;
+
+        const noteText = (noteTextArea.value || '').trim();
+        if (!noteText) {
+            alert('Note text is required.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('note', noteText);
+        formData.append('csrfmiddlewaretoken', getCsrfToken());
+
+        const hasReminderNow = reminderCheckbox.checked;
+        const reminderTitle = reminderTitleInput.value || '';
+        const reminderDate = reminderDateInput.value || '';
+        const reminderText = reminderTextInput.value || '';
+        const reminderCompleted = reminderCompletedInput.checked;
+
+        if (_noteModalMode === 'add') {
+            if (hasReminderNow && !reminderTitle.trim()) {
+                alert('Reminder title is required.');
+                return;
+            }
+            if (hasReminderNow && !reminderDate) {
+                alert('Reminder date is required.');
+                return;
+            }
+
+            if (hasReminderNow) {
+                formData.append('create_reminder', 'on');
+                formData.append('reminder_title', reminderTitle);
+                formData.append('reminder_text', reminderText);
+                formData.append('reminder_date', reminderDate);
+            }
+
+            await postAndHandle(urlForAddNote(_noteModalContext.contentTypeId, _noteModalContext.objectId), formData);
+            return;
+        }
+
+        if (_noteModalMode === 'edit') {
+            if (!_noteModalContext.noteId) return;
+            if (!_noteModalContext.canEdit) {
+                alert('You do not have permission to edit this note.');
+                return;
+            }
+
+            let reminderAction = 'none';
+            if (_noteModalContext.canManageReminder) {
+                if (_noteModalContext.originalHadReminder && !hasReminderNow) {
+                    if (!confirm('This will delete the reminder. Are you sure?')) return;
+                    reminderAction = 'delete';
+                } else if (!_noteModalContext.originalHadReminder && hasReminderNow) {
+                    reminderAction = 'create';
+                } else if (_noteModalContext.originalHadReminder && hasReminderNow && reminderFieldsChanged()) {
+                    reminderAction = 'update';
+                }
+            }
+
+            if (_noteModalContext.canManageReminder && hasReminderNow && !reminderTitle.trim()) {
+                alert('Reminder title is required.');
+                return;
+            }
+            if (_noteModalContext.canManageReminder && hasReminderNow && !reminderDate) {
+                alert('Reminder date is required.');
+                return;
+            }
+
+            formData.append('reminder_action', reminderAction);
+            if ((reminderAction === 'create' || reminderAction === 'update') && _noteModalContext.canManageReminder) {
+                formData.append('reminder_title', reminderTitle);
+                formData.append('reminder_text', reminderText);
+                formData.append('reminder_date', reminderDate);
+                if (reminderCompleted) {
+                    formData.append('reminder_completed', 'on');
+                }
+            }
+
+            await postAndHandle(urlForNoteUpdate(_noteModalContext.noteId), formData);
+        }
+    }
+
+    reminderCheckbox.addEventListener('change', function() {
+        toggleReminderFields(this.checked);
+    });
+
+    noteModalSaveBtn.addEventListener('click', saveNoteModal);
+
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            setActiveTab(btn);
+            refreshCurrentTab();
+        });
+    });
+
+    tabsLeftBtn.addEventListener('click', () => {
+        tabsContainer.scrollBy({ left: -200, behavior: 'smooth' });
+    });
+    tabsRightBtn.addEventListener('click', () => {
+        tabsContainer.scrollBy({ left: 200, behavior: 'smooth' });
+    });
+    tabsContainer.addEventListener('scroll', updateTabArrowState);
+    window.addEventListener('resize', updateTabArrowState);
+
+    pinBtn.addEventListener('click', () => {
+        isPinned = !isPinned;
+        window.isPinned = isPinned;
+        const un = pinBtn.querySelector('.pin-icon-unpinned');
+        const pi = pinBtn.querySelector('.pin-icon-pinned');
+        if (un) un.classList.toggle('d-none', isPinned);
+        if (pi) pi.classList.toggle('d-none', !isPinned);
+        pinBtn.setAttribute('title', isPinned
+            ? 'Pinned — locked to this contract'
+            : 'Unpinned — popup follows active contract');
+    });
+
+    window.getActiveTabInfo = getActiveTabInfo;
+    window.openAddNoteModal = openAddNoteModal;
+    window.openAddNoteModalForCurrentTab = openAddNoteModalForCurrentTab;
+    window.openEditNoteModal = openEditNoteModal;
+
+    if (contractTabButton) {
+        setActiveTab(contractTabButton);
+        refreshCurrentTab();
+    }
+    updateTabArrowState();
+})();
+</script>
+{% endblock %}

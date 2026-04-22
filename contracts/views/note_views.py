@@ -29,6 +29,34 @@ def add_note(request, content_type_id, object_id):
             note.object_id = object_id
             note.created_by = request.user
             note.save()
+
+            # Optional reminder creation (mirrors old api_add_note behavior).
+            # On add_note, the current user is always the note creator, so the
+            # creator/staff reminder permission rule is implicitly satisfied.
+            create_reminder = request.POST.get('create_reminder') == 'on'
+            if create_reminder:
+                reminder_title = request.POST.get('reminder_title', '').strip()
+                reminder_text = request.POST.get('reminder_text', '').strip()
+                reminder_date_str = request.POST.get('reminder_date', '').strip()
+
+                if reminder_title and reminder_date_str:
+                    try:
+                        reminder_date = timezone.datetime.fromisoformat(reminder_date_str)
+                        Reminder.objects.create(
+                            reminder_title=reminder_title,
+                            reminder_text=reminder_text,
+                            reminder_date=reminder_date,
+                            reminder_user=request.user,
+                            reminder_completed=False,
+                            note=note,
+                            company=getattr(request, 'active_company', None),
+                        )
+                    except (ValueError, TypeError) as e:
+                        # Don't fail note creation if reminder parsing fails; log and continue.
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "Failed to create reminder for note %s: %s", note.id, e
+                        )
             
             messages.success(request, 'Note added successfully.')
             
@@ -127,14 +155,214 @@ def delete_note(request, note_id):
 @conditional_login_required
 def note_update(request, pk):
     note = get_object_or_404(Note, id=pk)
+
+    # Permission: only creator or staff can edit
+    if note.created_by != request.user and not request.user.is_staff:
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse(
+                {'success': False, 'error': 'You do not have permission to edit this note.'},
+                status=403
+            )
+        messages.error(request, 'You do not have permission to edit this note.')
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+
     if request.method == 'POST':
         form = NoteForm(request.POST, instance=note)
         if form.is_valid():
             form.save()
+
+            # Reminder handling
+            # Business rule: one reminder per note (enforced at UI layer).
+            # The DB allows multiple Reminders per Note via FK with related_name='note_reminders'.
+            reminder_action = request.POST.get('reminder_action', 'none')
+            # reminder_action values: 'none' (no change), 'create', 'update', 'delete'
+            existing_reminder = note.note_reminders.filter(reminder_user=request.user).first()
+
+            if reminder_action == 'delete' and existing_reminder:
+                existing_reminder.delete()
+
+            elif reminder_action in ('create', 'update'):
+                reminder_title = request.POST.get('reminder_title', '').strip()
+                reminder_text = request.POST.get('reminder_text', '').strip()
+                reminder_date_str = request.POST.get('reminder_date', '').strip()
+
+                if reminder_title and reminder_date_str:
+                    try:
+                        reminder_date = timezone.datetime.fromisoformat(reminder_date_str)
+                        reminder_completed = request.POST.get('reminder_completed') == 'on'
+
+                        if existing_reminder:
+                            existing_reminder.reminder_title = reminder_title
+                            existing_reminder.reminder_text = reminder_text
+                            existing_reminder.reminder_date = reminder_date
+                            existing_reminder.reminder_completed = reminder_completed
+                            existing_reminder.save()
+                        else:
+                            Reminder.objects.create(
+                                reminder_title=reminder_title,
+                                reminder_text=reminder_text,
+                                reminder_date=reminder_date,
+                                reminder_user=request.user,
+                                reminder_completed=reminder_completed,
+                                note=note,
+                                company=getattr(request, 'active_company', None),
+                            )
+                    except (ValueError, TypeError) as e:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "Failed to save reminder for note %s: %s", note.id, e
+                        )
+
+            # AJAX response
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'note_id': note.id,
+                })
             return redirect('contracts:contract_management', note.object_id)
+        else:
+            # Invalid form
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse(
+                    {'success': False, 'errors': form.errors},
+                    status=400
+                )
     else:
         form = NoteForm(instance=note)
+
     return render(request, 'contracts/note_form.html', {'form': form})
+
+
+@conditional_login_required
+def note_detail_json(request, pk):
+    """
+    Return JSON with note content and current-user's reminder (if any).
+    Used by the edit-note modal to prefill fields.
+    """
+    note = get_object_or_404(Note, id=pk)
+
+    reminder = note.note_reminders.filter(reminder_user=request.user).first()
+    reminder_data = None
+    if reminder:
+        reminder_data = {
+            'id': reminder.id,
+            'reminder_title': reminder.reminder_title,
+            'reminder_text': reminder.reminder_text or '',
+            'reminder_date': reminder.reminder_date.isoformat() if reminder.reminder_date else '',
+            'reminder_completed': reminder.reminder_completed,
+        }
+
+    can_edit = (note.created_by == request.user or request.user.is_staff)
+    can_manage_reminder = can_edit
+
+    return JsonResponse({
+        'success': True,
+        'note': {
+            'id': note.id,
+            'note': note.note,
+            'created_by_id': note.created_by_id,
+            'created_by_username': note.created_by.username if note.created_by else '',
+            'created_on': note.created_on.isoformat() if note.created_on else '',
+            'content_type_id': note.content_type_id,
+            'object_id': note.object_id,
+        },
+        'reminder': reminder_data,
+        'permissions': {
+            'can_edit': can_edit,
+            'can_manage_reminder': can_manage_reminder,
+        },
+    })
+
+
+@conditional_login_required
+def notes_popup(request, contract_id):
+    """
+    Renders the standalone Notes pop-out window shell for a given contract.
+    Chrome-free; extends notes_popup_base.html.
+    """
+    contract = get_object_or_404(
+        Contract.objects.filter(company=request.active_company)
+                        .select_related('idiq_contract', 'status'),
+        id=contract_id
+    )
+
+    clins = Clin.objects.filter(contract=contract).order_by('item_number', 'id')
+
+    return render(request, 'contracts/notes_popup.html', {
+        'contract': contract,
+        'clins': clins,
+        'contract_content_type_id': ContentType.objects.get_for_model(Contract).id,
+        'clin_content_type_id': ContentType.objects.get_for_model(Clin).id,
+    })
+
+
+@conditional_login_required
+def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
+    """
+    Returns JSON with rendered notes_html for a single tab in the notes popup.
+    tab_type: 'contract' or 'clin'
+    clin_id: required when tab_type == 'clin'
+    """
+    if tab_type not in ('contract', 'clin'):
+        return JsonResponse({'success': False, 'error': 'Invalid tab_type'}, status=400)
+
+    contract = get_object_or_404(
+        Contract.objects.filter(company=request.active_company),
+        id=contract_id
+    )
+
+    if tab_type == 'contract':
+        content_type = ContentType.objects.get_for_model(Contract)
+        object_id = contract.id
+        content_object = contract
+        empty_msg = 'No contract notes'
+    else:
+        if not clin_id:
+            return JsonResponse({'success': False, 'error': 'clin_id required'}, status=400)
+        clin = get_object_or_404(Clin, id=clin_id, contract=contract)
+        content_type = ContentType.objects.get_for_model(Clin)
+        object_id = clin.id
+        content_object = clin
+        empty_msg = 'No CLIN notes'
+
+    notes = list(Note.objects.filter(
+        content_type=content_type, object_id=object_id
+    ).select_related('created_by').order_by('-created_on'))
+
+    # Pre-compute current-user reminder flags for popup badge rendering.
+    note_ids = [n.id for n in notes]
+    user_reminder_note_ids = set(
+        Reminder.objects.filter(
+            note_id__in=note_ids,
+            reminder_user=request.user,
+        ).values_list('note_id', flat=True)
+    )
+    for n in notes:
+        setattr(n, 'current_user_has_reminder', n.id in user_reminder_note_ids)
+        setattr(n, 'entity_type', tab_type)
+        setattr(n, 'content_type_id', content_type.id)
+        setattr(n, 'object_id', object_id)
+
+    notes_html = render_to_string(
+        'contracts/partials/notes_popup_tab_panel.html',
+        {
+            'notes': notes,
+            'content_object': content_object,
+            'entity_type': tab_type,
+            'content_type_id': content_type.id,
+            'object_id': object_id,
+            'note_empty_msg': empty_msg,
+            'request': request,
+        },
+        request=request,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'notes_html': notes_html,
+        'tab_type': tab_type,
+        'clin_id': clin_id,
+    })
 
 
 @conditional_login_required
@@ -143,13 +371,13 @@ def api_add_note(request):
     API endpoint to add a note with an optional reminder.
     This is used by the note modal dialog.
     """
+    # DEPRECATED: This endpoint is no longer called by any template or JS in the app.
+    # All note creation (including reminder attachment) now goes through `add_note`.
+    # This function is retained temporarily to avoid breaking bookmarked URLs.
+    # Planned removal: next cleanup pass.
+
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
-    
-    # Debug information
-    print("API Add Note Request:")
-    print(f"Content Type: {request.content_type}")
-    print(f"POST data: {request.POST}")
     
     # Get form data
     content_type_id = request.POST.get('content_type_id')
@@ -159,13 +387,6 @@ def api_add_note(request):
     
     # Store the referring URL for redirection
     referring_url = request.POST.get('referring_url') or request.META.get('HTTP_REFERER', '/')
-    print(f"Referring URL: {referring_url}")
-    
-    # Debug information
-    print(f"Content Type ID: {content_type_id}")
-    print(f"Object ID: {object_id}")
-    print(f"Note Text: {note_text}")
-    print(f"Create Reminder: {create_reminder}")
     
     # Validate required fields
     missing_fields = []
@@ -178,7 +399,6 @@ def api_add_note(request):
     
     if missing_fields:
         error_msg = f"Missing required fields: {', '.join(missing_fields)}"
-        print(error_msg)
         messages.error(request, error_msg)
         return redirect(referring_url)
     
@@ -186,10 +406,8 @@ def api_add_note(request):
         # Get content type and object
         try:
             content_type = ContentType.objects.get(id=content_type_id)
-            print(f"Found content type: {content_type}")
         except ContentType.DoesNotExist:
             error_msg = f'Content type with id {content_type_id} does not exist'
-            print(error_msg)
             messages.error(request, error_msg)
             return redirect(referring_url)
         
@@ -197,7 +415,6 @@ def api_add_note(request):
         model_class = content_type.model_class()
         if model_class is None:
             error_msg = f'Could not get model class for content type {content_type}'
-            print(error_msg)
             messages.error(request, error_msg)
             return redirect(referring_url)
         
@@ -206,15 +423,12 @@ def api_add_note(request):
             if any(f.name == 'company' for f in model_class._meta.fields):
                 qs = qs.filter(company=request.active_company)
             content_object = qs.get(id=object_id)
-            print(f"Found content object: {content_object}")
             if content_object is None:
                 error_msg = f'Object with id {object_id} does not exist'
-                print(error_msg)
                 messages.error(request, error_msg)
                 return redirect(referring_url)
         except Exception as e:
             error_msg = f'Error retrieving object: {str(e)}'
-            print(error_msg)
             messages.error(request, error_msg)
             return redirect(referring_url)
         
@@ -225,17 +439,12 @@ def api_add_note(request):
             note=note_text,
             created_by=request.user
         )
-        print(f"Created note: {note.id}")
         
         # Create reminder if requested
         if create_reminder:
             reminder_title = request.POST.get('reminder_title')
             reminder_text = request.POST.get('reminder_text')
             reminder_date_str = request.POST.get('reminder_date')
-            
-            print(f"Reminder Title: {reminder_title}")
-            print(f"Reminder Text: {reminder_text}")
-            print(f"Reminder Date: {reminder_date_str}")
             
             if all([reminder_title, reminder_date_str]):
                 try:
@@ -252,10 +461,9 @@ def api_add_note(request):
                         note=note,
                         company=getattr(request, 'active_company', None)
                     )
-                    print(f"Created reminder: {reminder.id}")
-                except Exception as e:
-                    # Log the error but don't fail the note creation
-                    print(f"Error creating reminder: {str(e)}")
+                except Exception:
+                    # Don't fail the note creation if reminder creation errors
+                    pass
         
         # Add success message
         messages.success(request, 'Note added successfully.')
@@ -264,10 +472,6 @@ def api_add_note(request):
         return redirect(referring_url)
         
     except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        print(f"Error in api_add_note: {str(e)}")
-        print(error_trace)
         messages.error(request, f'An error occurred: {str(e)}')
         return redirect(referring_url)
 

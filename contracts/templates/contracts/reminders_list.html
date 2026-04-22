@@ -10,7 +10,7 @@
         <h1 class="text-2xl font-bold text-gray-800">My Reminders</h1>
 
         <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            <button onclick="showNewReminderModal()" class="btn-primary flex items-center justify-center">
+            <button type="button" onclick="showNewReminderModal()" class="btn btn-primary flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
@@ -95,7 +95,7 @@
                                     <form method="post" action="{% url 'contracts:toggle_reminder' reminder.id %}">
                                         {% csrf_token %}
                                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                        <button type="submit" class="h-6 w-6 rounded-full border-2 flex items-center justify-center
+                                        <button type="submit" class="btn btn-link p-0 h-6 w-6 rounded-full border-2 flex items-center justify-center
                                             {% if reminder.reminder_completed %}
                                                 bg-green-500 border-green-500 text-white
                                             {% else %}
@@ -172,7 +172,7 @@
                             </div>
                             <div class="flex space-x-3">
                                 <button type="button"
-                                        class="edit-reminder-btn text-sm text-blue-600 hover:text-blue-800"
+                                        class="edit-reminder-btn btn btn-link p-0 text-sm text-primary"
                                         data-id="{{ reminder.id }}"
                                         data-title="{{ reminder.reminder_title|escapejs }}"
                                         data-description="{{ reminder.reminder_text|escapejs }}"
@@ -204,7 +204,7 @@
                     {% endif %}
                 </p>
                 <div class="mt-6">
-                    <button onclick="showNewReminderModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <button type="button" onclick="showNewReminderModal()" class="btn btn-primary">
                         <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
                         </svg>

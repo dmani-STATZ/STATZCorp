@@ -1,19 +1,16 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.conf import settings
+import io
 import os
-import docx
 from docx import Document
-from docx.shared import Pt, Inches
-import tempfile
 from ..models import AcknowledgementLetter, Clin, Contract
 from ..forms import AcknowledgementLetterForm
 from users.user_settings import UserSettings
 import logging
-from docx2pdf import convert
 
 @login_required
 def get_acknowledgment_letter(request, clin_id):
@@ -141,229 +138,114 @@ def update_acknowledgment_letter(request, letter_id):
 
 @login_required
 def generate_acknowledgment_letter_doc(request, letter_id):
-    """Generate a Word document for an acknowledgment letter"""
+    """Generate and download a Word document for an acknowledgment letter."""
     letter = get_object_or_404(AcknowledgementLetter, id=letter_id)
-    
+
     if request.method == 'POST':
-        # If it's a form submission, update the letter first
-        form = AcknowledgementLetterForm(request.POST, instance=letter)
-        if form.is_valid():
-            letter = form.save()
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid form data',
-                'errors': form.errors
-            })
-    
-    # Get the path to the template document
-    import os
-    from django.conf import settings
-    
+        # If POST includes letter fields, save. CSRF-only POSTs (e.g. browser download
+        # after a separate /update/ save) use the last-saved row from the DB.
+        if any(name in request.POST for name in AcknowledgementLetterForm().fields):
+            form = AcknowledgementLetterForm(request.POST, instance=letter)
+            if form.is_valid():
+                letter = form.save()
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid form data',
+                    'errors': form.errors,
+                })
+
     logger = logging.getLogger('django')
-    
-    # Debug statements to help identify the issue
-    logger.info(f"Generating letter document for letter ID: {letter_id}")
-    
-    # Try both possible template locations
-    template_paths = [
-        os.path.join(settings.BASE_DIR, 'contracts', 'templates', 'contracts', 'includes', 'Purchase_Order_Acknowledge_Letter.docx'),
-        os.path.join(settings.BASE_DIR, 'templates', 'contracts', 'letter_templates', 'Purchase_Order_Acknowledge_Letter.docx')
-    ]
-    
-    template_path = None
-    for path in template_paths:
-        logger.info(f"Checking template path: {path}")
-        if os.path.exists(path):
-            template_path = path
-            logger.info(f"Template found at: {path}")
-            break
-    
-    # Check if template exists
-    if not template_path:
-        error_msg = f"Template file not found in paths: {template_paths}"
-        logger.error(error_msg)
+
+    # Locate the template
+    template_path = os.path.join(
+        settings.BASE_DIR, 'contracts', 'templates', 'contracts', 'includes', 'Purchase_Order_Acknowledge_Letter.docx'
+    )
+    if not os.path.exists(template_path):
+        logger.error(f"Acknowledgment letter template not found at: {template_path}")
         return JsonResponse({
             'success': False,
-            'error': 'Template file not found',
-            'details': error_msg
+            'error': 'Letter template file not found. Contact your system administrator.',
         })
-    
-    # Open the template document
+
+    # Open template
     try:
-        logger.info(f"Attempting to open document at: {template_path}")
         doc = Document(template_path)
-        logger.info("Document opened successfully")
     except Exception as e:
-        error_msg = f"Error opening template: {str(e)}"
-        logger.error(error_msg)
+        logger.error(f"Error opening acknowledgment letter template: {e}")
         return JsonResponse({
             'success': False,
-            'error': 'Error opening template',
-            'details': error_msg
+            'error': 'Could not open letter template.',
         })
-    
-    # Update document properties
-    try:
-        logger.info("Setting document properties")
-        doc.core_properties.author = request.user.get_full_name() or request.user.username
-        doc.core_properties.title = f"Purchase Order Acknowledgment Letter - {letter.po}"
-    except Exception as e:
-        error_msg = f"Error setting document properties: {str(e)}"
-        logger.error(error_msg)
-        return JsonResponse({
-            'success': False,
-            'error': 'Error setting document properties',
-            'details': error_msg
-        })
-    
-    # Function to find and replace text in the document
+
+    # Set document metadata
+    doc.core_properties.author = request.user.get_full_name() or request.user.username
+    doc.core_properties.title = f"Purchase Order Acknowledgment Letter - {letter.po or ''}"
+
+    # Helper: replace a {{PLACEHOLDER}} throughout paragraphs and tables
     def replace_placeholder(doc, placeholder, value):
-        try:
-            placeholder_found = False
-            # Replace in paragraphs
-            for paragraph in doc.paragraphs:
-                if placeholder in paragraph.text:
-                    placeholder_found = True
-                    for run in paragraph.runs:
-                        if placeholder in run.text:
-                            run.text = run.text.replace(placeholder, str(value) if value is not None else '')
-                            logger.info(f"Replaced {placeholder} with {value} in paragraph")
-            
-            # Replace in tables
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        for paragraph in cell.paragraphs:
-                            if placeholder in paragraph.text:
-                                placeholder_found = True
-                                for run in paragraph.runs:
-                                    if placeholder in run.text:
-                                        run.text = run.text.replace(placeholder, str(value) if value is not None else '')
-                                        logger.info(f"Replaced {placeholder} with {value} in table cell")
-            
-            if not placeholder_found:
-                logger.warning(f"Placeholder {placeholder} not found in document")
-            
-            return placeholder_found
-        except Exception as e:
-            logger.error(f"Error replacing placeholder {placeholder}: {str(e)}")
-            return False
-    
+        text = str(value) if value is not None else ''
+        for paragraph in doc.paragraphs:
+            if placeholder in paragraph.text:
+                for run in paragraph.runs:
+                    if placeholder in run.text:
+                        run.text = run.text.replace(placeholder, text)
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        if placeholder in paragraph.text:
+                            for run in paragraph.runs:
+                                if placeholder in run.text:
+                                    run.text = run.text.replace(placeholder, text)
+
+    # Populate placeholders
+    replace_placeholder(doc, '{{LETTER_DATE}}',
+        letter.letter_date.strftime('%B %d, %Y') if letter.letter_date else timezone.now().strftime('%B %d, %Y'))
+
+    full_name = f"{letter.salutation or ''} {letter.addr_fname or ''} {letter.addr_lname or ''}".strip()
+    replace_placeholder(doc, '{{RECIPIENT_NAME}}', full_name)
+    replace_placeholder(doc, '{{SUPPLIER_NAME}}', (letter.supplier or '').replace(' ', '\u00A0'))
+    replace_placeholder(doc, '{{STREET_ADDRESS}}', letter.st_address or '')
+    replace_placeholder(doc, '{{CITY_STATE_ZIP}}',
+        f"{letter.city or ''}, {letter.state or ''} {letter.zip or ''}".strip().strip(','))
+
+    po_number = f"{letter.po or ''}{f' / {letter.po_ext}' if letter.po_ext else ''}"
+    replace_placeholder(doc, '{{PO_NUMBER}}', po_number)
+    replace_placeholder(doc, '{{CONTRACT_NUMBER}}', letter.contract_num or '')
+
+    replace_placeholder(doc, '{{SUPPLIER_DUE_DATE}}',
+        letter.supplier_due_date.strftime('%B %d, %Y') if letter.supplier_due_date else 'N/A')
+    replace_placeholder(doc, '{{FAT_PLT_DUE_DATE}}',
+        letter.fat_plt_due_date.strftime('%B %d, %Y') if letter.fat_plt_due_date else 'N/A')
+    replace_placeholder(doc, '{{DPAS_PRIORITY}}', letter.dpas_priority or '')
+
+    replace_placeholder(doc, '{{STATZ_CONTACT}}',
+        letter.statz_contact or request.user.get_full_name() or request.user.username)
+    replace_placeholder(doc, '{{STATZ_TITLE}}', letter.statz_contact_title or 'Contract Manager')
+    replace_placeholder(doc, '{{STATZ_PHONE}}', letter.statz_contact_phone or '')
+    replace_placeholder(doc, '{{STATZ_EMAIL}}',
+        letter.statz_contact_email or request.user.email)
+
+    # Stream the filled document as a download
     try:
-        logger.info("Replacing placeholders in document")
-        
-        # Replace placeholders with actual values
-        replace_placeholder(doc, '{{LETTER_DATE}}', letter.letter_date.strftime('%B %d, %Y') if letter.letter_date else timezone.now().strftime('%B %d, %Y'))
-        
-        # Recipient information
-        full_name = f"{letter.salutation} {letter.addr_fname or ''} {letter.addr_lname or ''}".strip()
-        replace_placeholder(doc, '{{RECIPIENT_NAME}}', full_name)
-        replace_placeholder(doc, '{{SUPPLIER_NAME}}', (letter.supplier or '').replace(' ', '\u00A0'))
-        replace_placeholder(doc, '{{STREET_ADDRESS}}', letter.st_address or '')
-        
-        address_line = f"{letter.city or ''}, {letter.state or ''} {letter.zip or ''}".strip()
-        replace_placeholder(doc, '{{CITY_STATE_ZIP}}', address_line)
-        
-        # PO information
-        po_number = f"{letter.po or ''}{f' / {letter.po_ext}' if letter.po_ext else ''}"
-        replace_placeholder(doc, '{{PO_NUMBER}}', po_number)
-        replace_placeholder(doc, '{{CONTRACT_NUMBER}}', letter.contract_num or '')
-        
-        # Due dates
-        supplier_due_date = letter.supplier_due_date.strftime("%B %d, %Y") if letter.supplier_due_date else "N/A"
-        fat_plt_due_date = letter.fat_plt_due_date.strftime("%B %d, %Y") if letter.fat_plt_due_date else "N/A"
-        
-        replace_placeholder(doc, '{{SUPPLIER_DUE_DATE}}', supplier_due_date)
-        replace_placeholder(doc, '{{FAT_PLT_DUE_DATE}}', fat_plt_due_date)
-        replace_placeholder(doc, '{{DPAS_PRIORITY}}', letter.dpas_priority or '')
-        
-        # Contact information
-        replace_placeholder(doc, '{{STATZ_CONTACT}}', letter.statz_contact or request.user.get_full_name())
-        replace_placeholder(doc, '{{STATZ_TITLE}}', letter.statz_contact_title or 'Contract Manager')
-        replace_placeholder(doc, '{{STATZ_PHONE}}', letter.statz_contact_phone or '')
-        replace_placeholder(doc, '{{STATZ_EMAIL}}', letter.statz_contact_email or request.user.email)
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        po_slug = (letter.po or 'letter').replace('/', '-').replace(' ', '_')
+        file_name = f"PO_Acknowledgment_{po_slug}_{timezone.now().strftime('%Y%m%d')}.docx"
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        return response
+
     except Exception as e:
-        error_msg = f"Error replacing placeholders: {str(e)}"
-        logger.error(error_msg)
+        logger.error(f"Error generating acknowledgment letter document: {e}")
         return JsonResponse({
             'success': False,
-            'error': 'Error replacing placeholders',
-            'details': error_msg
+            'error': 'Error generating document. Please try again.',
         })
-    
-    try:
-        logger.info("Creating temp file for document")
-        # Create a temp file
-        with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
-            #temp_filename = temp_file.name
-            #doc.save(temp_filename)
-            #logger.info(f"Document saved to temp file: {temp_filename}")
-            temp_docx_filename = temp_file.name
-            doc.save(temp_docx_filename)
-            logger.info(f"Document saved to temp docx file: {temp_docx_filename}")
-
-        
-        # Determine where to save the file
-        media_root = settings.MEDIA_ROOT
-        logger.info(f"Media root: {media_root}")
-        
-        relative_path = f'acknowledgment_letters/{letter.clin.contract.contract_number if letter.clin.contract else "temp"}'
-        target_dir = os.path.join(media_root, relative_path)
-        logger.info(f"Target directory: {target_dir}")
-        
-        # Create directory if it doesn't exist
-        os.makedirs(target_dir, exist_ok=True)
- #--------------------------------------
- # Code for the original save method
- #--------------------------------------
-        # # Save the file with a meaningful name
-        # file_name = f"PO_Acknowledgment_{letter.po}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
-        # target_path = os.path.join(target_dir, file_name)
-        # logger.info(f"Target path: {target_path}")
-        
-        # # Copy from temp file to target path
-        # import shutil
-        # shutil.copy2(temp_filename, target_path)
-        # logger.info(f"File copied from temp to target path")
-        
-        # # Remove the temp file
-        # os.unlink(temp_filename)
-        # logger.info(f"Temp file removed")
-#---------------------------------------
-# Code for the new save method
-#---------------------------------------
-        # Save the file with a meaningful name (PDF)
-        file_name = f"PO_Acknowledgment_{letter.po}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        target_path = os.path.join(target_dir, file_name)
-        logger.info(f"Target path: {target_path}")
-
-        # Convert docx to pdf
-        logger.info("Converting docx to pdf")
-        convert(temp_docx_filename, target_path)
-        logger.info(f"Document converted to pdf at: {target_path}")
-
-        # Remove the temp docx file
-        os.unlink(temp_docx_filename)
-        logger.info(f"Temp docx file removed")
-#---------------------------------------
-
-
-        # Generate URL for the file
-        media_url = settings.MEDIA_URL
-        file_url = f"{media_url}{relative_path}/{file_name}"
-        logger.info(f"File URL: {file_url}")
-        
-        return JsonResponse({
-            'success': True,
-            'file_url': file_url,
-            'file_name': file_name
-        })
-    except Exception as e:
-        error_msg = f"Error saving or processing document: {str(e)}"
-        logger.error(error_msg)
-        return JsonResponse({
-            'success': False,
-            'error': 'Error processing document',
-            'details': error_msg
-        }) 

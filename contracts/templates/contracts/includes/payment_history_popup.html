@@ -13,7 +13,7 @@
                 <p class="text-sm text-gray-500" id="popupSubtitle"></p>
                 <p class="text-sm font-medium text-blue-600 mt-1" id="currentValue"></p>
             </div>
-            <button onclick="closePaymentHistoryPopup()" class="text-gray-500 hover:text-gray-700">
+            <button type="button" onclick="closePaymentHistoryPopup()" class="btn btn-link p-0 text-secondary">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -50,11 +50,11 @@
             </div>
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closePaymentHistoryPopup()"
-                        class="px-4 py-2 border border-gray-300 rounded-md btn btn-caution">
+                        class="btn btn-secondary">
                     Cancel
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 btn btn-save rounded-md">
+                        class="btn btn-primary">
                     Save Entry
                 </button>
             </div>

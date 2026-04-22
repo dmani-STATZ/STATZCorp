@@ -63,6 +63,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelNoteModalBtn = document.getElementById('cancelNoteModal');
     const saveNoteBtn = document.getElementById('saveNoteBtn');
     const noteModalBackdrop = document.getElementById('noteModalBackdrop');
+    const reminderSection = createReminderCheckbox
+        ? createReminderCheckbox.closest('.mt-6')
+        : null;
     
     // Check if buttons exist
     if (!closeNoteModalBtn) console.error('closeNoteModalBtn element not found');
@@ -120,6 +123,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Set form action for add
             noteForm.action = `/contracts/note/add/${contentTypeId}/${objectId}/`;
             noteForm.method = 'POST';
+            noteForm.dataset.isEdit = '0';
+            noteForm.dataset.initialReminderExists = '0';
+            noteForm.dataset.canEdit = '1';
+            noteForm.dataset.canManageReminder = '1';
+            noteForm.dataset.initialReminderSnapshot = '';
             
             // Re-set the hidden fields after form reset
             noteContentTypeId.value = contentTypeId;
@@ -156,6 +164,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const noteText = formData.get('note');
         const contentTypeId = formData.get('content_type_id');
         const objectId = formData.get('object_id');
+        const isEdit = noteForm.dataset.isEdit === '1' || /\/note\/update\/\d+\/$/.test(noteForm.action);
+
+        if (noteForm.dataset.canEdit === '0') {
+            showErrorMessage('This note is read-only.');
+            return;
+        }
         
         // Validate note text
         if (!noteText || noteText.trim() === '') {
@@ -169,9 +183,62 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Missing required fields:', { contentTypeId, objectId });
             return;
         }
+
+        if (!isEdit) {
+            // Force add-note endpoint for add mode.
+            noteForm.action = `/contracts/note/add/${contentTypeId}/${objectId}/`;
+        }
+
+        if (isEdit) {
+            const hadReminderInitially = noteForm.dataset.initialReminderExists === '1';
+            const canManageReminder = noteForm.dataset.canManageReminder !== '0';
+            const reminderChecked = canManageReminder && createReminderCheckbox.checked;
+            let reminderAction = 'none';
+            let initialReminderSnapshot = null;
+
+            if (noteForm.dataset.initialReminderSnapshot) {
+                try {
+                    initialReminderSnapshot = JSON.parse(noteForm.dataset.initialReminderSnapshot);
+                } catch (e) {
+                    initialReminderSnapshot = null;
+                }
+            }
+
+            const currentReminderSnapshot = {
+                reminderTitle: formData.get('reminder_title') || '',
+                reminderText: formData.get('reminder_text') || '',
+                reminderDate: formData.get('reminder_date') || '',
+                reminderCompleted: formData.get('reminder_completed') === 'on'
+            };
+
+            const reminderChanged = initialReminderSnapshot
+                ? (
+                    (initialReminderSnapshot.reminderTitle || '') !== currentReminderSnapshot.reminderTitle ||
+                    (initialReminderSnapshot.reminderText || '') !== currentReminderSnapshot.reminderText ||
+                    (initialReminderSnapshot.reminderDate || '') !== currentReminderSnapshot.reminderDate ||
+                    !!initialReminderSnapshot.reminderCompleted !== currentReminderSnapshot.reminderCompleted
+                )
+                : true;
+
+            if (canManageReminder) {
+                if (hadReminderInitially && !reminderChecked) {
+                    if (!confirm('This will delete the reminder. Are you sure?')) {
+                        return;
+                    }
+                    reminderAction = 'delete';
+                } else if (reminderChecked && !hadReminderInitially) {
+                    reminderAction = 'create';
+                } else if (reminderChecked && hadReminderInitially && reminderChanged) {
+                    reminderAction = 'update';
+                }
+            }
+
+            formData.append('reminder_action', reminderAction);
+        }
         
         // Validate reminder fields if reminder is checked
-        if (createReminderCheckbox.checked) {
+        const canManageReminder = noteForm.dataset.canManageReminder !== '0';
+        if (canManageReminder && createReminderCheckbox.checked) {
             const reminderTitle = formData.get('reminder_title');
             const reminderDate = formData.get('reminder_date');
             
@@ -215,14 +282,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     showSuccessMessage('Note added successfully');
                     closeModal();
-                    window.location.reload();
+                    let refreshed = false;
+
+                    if (data.notes_html) {
+                        const isContract = String(contentTypeId) === String(window.contractContentTypeId);
+                        const notesPanel = isContract
+                            ? document.getElementById('notes-panel-contract')
+                            : document.getElementById('notes-panel-clin');
+                        if (notesPanel) {
+                            notesPanel.innerHTML = data.notes_html;
+                            if (typeof window.setupEditButtons === 'function') {
+                                window.setupEditButtons(notesPanel);
+                            }
+                            refreshed = true;
+                        }
+                    }
+
+                    if (!refreshed && typeof window.refreshCurrentNotesPanel === 'function') {
+                        window.refreshCurrentNotesPanel();
+                        refreshed = true;
+                    }
+
+                    if (!refreshed) {
+                        window.location.reload();
+                    }
                 } else {
                     throw new Error(data.error || 'Failed to add note');
                 }
             } else {
-                // If not JSON, just reload the page
-                showSuccessMessage('Note added successfully');
-                closeModal();
+                // If not JSON, fall back to reload.
                 window.location.reload();
             }
         } catch (error) {
@@ -241,6 +329,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset form state
         saveNoteBtn.disabled = false;
         saveNoteBtn.textContent = 'Save Note';
+        noteForm.dataset.isEdit = '0';
+        noteForm.dataset.initialReminderExists = '0';
+        noteForm.dataset.canEdit = '1';
+        noteForm.dataset.canManageReminder = '1';
+        noteForm.dataset.initialReminderSnapshot = '';
+        const noteTextArea = document.getElementById('id_note');
+        if (noteTextArea) {
+            noteTextArea.readOnly = false;
+        }
+        if (saveNoteBtn) {
+            saveNoteBtn.style.display = '';
+        }
+        if (reminderSection) {
+            reminderSection.classList.remove('hidden');
+        }
     }
     
     // Function to show error message

@@ -1,0 +1,52 @@
+<div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="noteModalTitle">Edit Note</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="noteModalForm" novalidate>
+                    <div class="mb-3">
+                        <label for="noteTextArea" class="form-label">Note</label>
+                        <textarea id="noteTextArea" class="form-control" rows="5" required></textarea>
+                    </div>
+                    <p class="small text-muted mb-3" id="noteModalMeta">Added by —</p>
+
+                    <div id="reminderSectionWrap" class="border rounded-3 p-3">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="reminderCheckbox">
+                            <label class="form-check-label" for="reminderCheckbox">
+                                This note has a reminder
+                            </label>
+                        </div>
+                        <div id="reminderFields" class="d-none">
+                            <div class="mb-3">
+                                <label for="reminderTitle" class="form-label">Reminder title</label>
+                                <input type="text" class="form-control" id="reminderTitle">
+                            </div>
+                            <div class="mb-3">
+                                <label for="reminderDate" class="form-label">Reminder date</label>
+                                <input type="datetime-local" class="form-control" id="reminderDate">
+                            </div>
+                            <div class="mb-3">
+                                <label for="reminderText" class="form-label">Reminder details</label>
+                                <textarea class="form-control" id="reminderText" rows="3"></textarea>
+                            </div>
+                            <div class="form-check" id="reminderCompletedWrap">
+                                <input class="form-check-input" type="checkbox" id="reminderCompleted">
+                                <label class="form-check-label" for="reminderCompleted">
+                                    Reminder completed
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="noteModalSaveBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
