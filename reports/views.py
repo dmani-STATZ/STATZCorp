@@ -1,43 +1,19 @@
 from typing import Optional
+import os
+
+import requests as http_requests
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.utils import timezone
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .models import ReportRequest
 from .forms import ReportRequestForm, SQLUpdateForm
-from .utils import run_select, rows_to_csv, generate_db_schema_snapshot
-from users.user_settings import UserSettings
-from suppliers.openrouter_config import get_model_for_request, get_openrouter_model_info
-from django.http import StreamingHttpResponse
-from django.conf import settings
-from django.db import connection
-import os
-import json
-import requests
-import re
+from .utils import run_select, rows_to_csv
 
-CORE_TABLES = [
-    'contracts_buyer',
-    'contracts_clin',
-    'contracts_clinshipment',
-    'contracts_clintype',
-    'contracts_company',
-    'contracts_contract',
-    'contracts_contractsplit',
-    'contracts_contractstatus',
-    'contracts_contracttype',
-    'contracts_idiqcontract',
-    'contracts_idiqcontractdetails',
-    'contracts_nsn',
-    'contracts_paymenthistory',
-    'contracts_salesclass',
-    'contracts_specialpaymentterms',
-    'contracts_supplier',
-    'contracts_suppliertype',
-]
 
 @login_required
 def user_dashboard(request):
@@ -144,24 +120,15 @@ def _is_admin(user) -> bool:
 @login_required
 @user_passes_test(_is_admin)
 def admin_dashboard(request):
-    pending = ReportRequest.objects.filter(status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE])
+    pending = ReportRequest.objects.filter(
+        status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE]
+    )
     selected_id: Optional[str] = request.GET.get("id")
     selected = None
     sql_form = None
     if selected_id:
         selected = get_object_or_404(ReportRequest, pk=selected_id)
         sql_form = SQLUpdateForm(instance=selected)
-
-    global_model_info = get_openrouter_model_info()
-    ai_model_default = global_model_info["stored_model"] or global_model_info["effective_model"]
-    _fallback_raw = getattr(settings, "OPENROUTER_MODEL_FALLBACKS", os.environ.get("OPENROUTER_MODEL_FALLBACKS", ""))
-    if isinstance(_fallback_raw, (list, tuple)):
-        ai_model_fallbacks = ",".join(_fallback_raw)
-    else:
-        ai_model_fallbacks = _fallback_raw or ""
-    # Load user-specific saved values if present
-    saved_model = UserSettings.get_setting(request.user, "reports_ai_model", ai_model_default)
-    saved_fallbacks = UserSettings.get_setting(request.user, "reports_ai_fallbacks", ai_model_fallbacks)
 
     return render(
         request,
@@ -170,12 +137,110 @@ def admin_dashboard(request):
             "pending": pending,
             "selected": selected,
             "sql_form": sql_form,
-            "ai_model_default": saved_model,
-            "ai_model_fallbacks": saved_fallbacks,
-            "global_ai_model_info": global_model_info,
-            "global_ai_model_info_json": json.dumps(global_model_info),
         },
     )
+
+
+@login_required
+@user_passes_test(_is_admin)
+@require_POST
+def admin_ai_generate(request):
+    """
+    Superuser JSON endpoint: natural-language prompt -> Anthropic -> generated SQL.
+
+    Accepts a POST with ``prompt`` (and CSRF for session auth).
+    Calls the Anthropic Messages API and returns ``{"sql": "..."}`` or ``{"error": "..."}``.
+    """
+    import json
+
+    prompt = request.POST.get("prompt", "").strip()
+    if not prompt:
+        return JsonResponse({"error": "No prompt provided."}, status=400)
+
+    from contracts.utils.contracts_schema import generate_db_schema_snapshot
+
+    schema_text = generate_db_schema_snapshot()
+
+    system_prompt = f"""You are a SQL expert for a Django-based Government Contracts
+Management application running on Microsoft SQL Server.
+
+Your ONLY job is to write a single valid T-SQL SELECT statement that answers the
+user's question.
+
+Rules:
+- Output ONLY the raw SQL. No explanation, no markdown, no code fences, no preamble.
+- Use only SELECT statements. Never use INSERT, UPDATE, DELETE, DROP, ALTER, or any DDL/DML.
+- Do not use subqueries that reference tables not in the schema below.
+- Always use table aliases for readability.
+- If a question cannot be answered from the schema, output exactly:
+  -- Cannot answer: <one sentence reason>
+
+Database schema:
+{schema_text}
+
+Key relationships to remember:
+- contracts_contract -> contracts_clin (one contract has many CLINs via clin.contract_id)
+- contracts_clin -> suppliers_supplier (via clin.supplier_id)
+- contracts_clin -> products_nsn (via clin.nsn_id)
+- contracts_govaction -> contracts_contract (via govaction.contract_id)
+- contracts_contract -> auth_user as buyer (via contract.buyer_id)
+- Status 'Open' means active contracts (contracts_contractstatus.description = 'Open')
+- PAR, QN, NCR, RFV, ECP are GovAction types stored in contracts_govaction.action
+- An 'open' GovAction has date_closed IS NULL
+"""
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return JsonResponse(
+            {"error": "Anthropic API key not configured."}, status=500
+        )
+
+    payload = {
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 1024,
+        "system": system_prompt,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+    }
+
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    try:
+        response = http_requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        blocks = data.get("content") or []
+        sql = ""
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "text" and b.get("text"):
+                sql = b["text"].strip()
+                break
+        if not sql:
+            return JsonResponse(
+                {"error": "Claude API returned no text content."}, status=500
+            )
+        return JsonResponse({"sql": sql})
+    except http_requests.HTTPError as e:
+        detail = str(e)
+        try:
+            err_json = e.response.json() if e.response is not None else {}
+            detail = json.dumps(err_json) if err_json else detail
+        except Exception:
+            if e.response is not None and e.response.text:
+                detail = f"{e}: {e.response.text[:500]}"
+        return JsonResponse({"error": f"Claude API error: {detail}"}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": f"Claude API error: {e!s}"}, status=500)
 
 
 @login_required
@@ -193,7 +258,7 @@ def admin_save_sql(request, pk):
         rr.status = ReportRequest.STATUS_COMPLETED
         rr.save()
         messages.success(request, "SQL saved and request marked Completed.")
-        return redirect(reverse('reports:admin_dashboard'))
+        return redirect(reverse("reports:admin_dashboard"))
     messages.error(request, "Invalid data.")
     return redirect(f"{reverse('reports:admin_dashboard')}?id={rr.id}")
 
@@ -222,7 +287,9 @@ def admin_preview_sql(request, pk):
         return redirect(f"{reverse('reports:admin_dashboard')}?id={rr.id}")
 
     # Re-render dashboard with preview data and keep typed SQL/notes
-    pending = ReportRequest.objects.filter(status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE])
+    pending = ReportRequest.objects.filter(
+        status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE]
+    )
     form = SQLUpdateForm(
         data={
             "sql_query": sql,
@@ -241,195 +308,3 @@ def admin_preview_sql(request, pk):
             "preview_rows": rows,
         },
     )
-
-
-@login_required
-@user_passes_test(_is_admin)
-def admin_ai_stream(request):
-    """Stream AI-generated SQL for a request and category.
-
-    Query params:
-      - prompt: user/admin natural language description
-      - category: contract|supplier|nsn|other
-    """
-    prompt_text = (request.GET.get("prompt") or "").strip()
-    category = (request.GET.get("category") or "other").lower()
-
-    if not prompt_text:
-        return StreamingHttpResponse("data: {\"error\":\"Missing prompt\"}\n\n", content_type="text/event-stream")
-
-    def sse(data: dict) -> bytes:
-        return f"data: {json.dumps(data)}\n\n".encode("utf-8")
-
-    # Build schema context using DB introspection
-    # Default: send a curated allowlist of core tables
-    # If `full=1`, send all tables; if `extra=a,b,c` is provided, include those as well.
-    core_tables = CORE_TABLES.copy()
-    only_tables = None
-    if request.GET.get("full") in {"1", "true", "yes"}:
-        only_tables = None  # all tables
-    else:
-        extras = [s.strip() for s in (request.GET.get("extra") or "").split(",") if s.strip()]
-        only_tables = list({t for t in core_tables + extras}) if core_tables else None
-    schema_text = generate_db_schema_snapshot(None, only_tables=only_tables)
-
-    # SQL dialect guidance based on DB engine
-    engine = connection.settings_dict.get("ENGINE", "")
-    if "mssql" in engine or "sql_server" in engine or connection.vendor == "microsoft":
-        dialect = "SQL Server (T-SQL)"
-        date_rules = "Use YEAR(date_col)=YYYY or DATEFROMPARTS, not EXTRACT; use TOP N, not LIMIT."
-        limit_hint = "Use TOP for limiting rows; do not use LIMIT."
-    elif connection.vendor == "sqlite":
-        dialect = "SQLite"
-        date_rules = "Use strftime('%Y', date_col)='YYYY' style; use LIMIT N."
-        limit_hint = "Use LIMIT for limiting rows."
-    else:
-        dialect = connection.vendor or "SQL (generic)"
-        date_rules = "Prefer ANSI SQL functions and a single SELECT statement."
-        limit_hint = "Use appropriate limit syntax for the dialect."
-
-    sys_prompt = (
-        "You are a helpful SQL assistant. You write safe, read-only SQL for our database. "
-        "Return exactly one SELECT statement; no comments or explanations. Avoid multiple statements. "
-        "Never join by human-readable names; use foreign keys and id columns only.  Avoid using variables in the SQL query. The use of variables is not allowed."
-    )
-    usr_prompt = (
-        f"SQL dialect: {dialect}. {date_rules} {limit_hint}\n\n"
-        f"Database schema (tables and constraints):\n{schema_text}\n\n"
-        f"Category: {category}\n\n"
-        f"User request: {prompt_text}\n"
-    )
-
-    api_key = getattr(settings, "OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY", ""))
-    base_url = getattr(settings, "OPENROUTER_BASE_URL", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")).rstrip("/")
-    override_model = (request.GET.get("model") or "").strip()
-    user_saved_model = UserSettings.get_setting(request.user, "reports_ai_model", "")
-    preferred_model = (override_model or user_saved_model or None)
-    model, _ = get_model_for_request(preferred_model)
-    raw_fallbacks = request.GET.get("fallbacks")
-    if raw_fallbacks is None:
-        raw_fallbacks = UserSettings.get_setting(
-            request.user,
-            "reports_ai_fallbacks",
-            getattr(settings, "OPENROUTER_MODEL_FALLBACKS", os.environ.get("OPENROUTER_MODEL_FALLBACKS", "")),
-        )
-    model_fallbacks = raw_fallbacks
-    http_referer = getattr(settings, "OPENROUTER_HTTP_REFERER", os.environ.get("OPENROUTER_HTTP_REFERER", "")).strip()
-    x_title = getattr(settings, "OPENROUTER_X_TITLE", os.environ.get("OPENROUTER_X_TITLE", "STATZCorp Reports")).strip()
-
-    if not api_key:
-        # Fallback: mock stream so UI still works in dev
-        def fake():
-            yield sse({"type": "status", "message": "Using local mock AI (no API key)."})
-            mock = f"SELECT TOP 100 * FROM contracts_contract; -- mock for {category}"
-            for ch in mock:
-                yield sse({"type": "token", "text": ch})
-            yield sse({"type": "done"})
-        return StreamingHttpResponse(fake(), content_type="text/event-stream")
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream",
-    }
-    # OpenRouter requires these to accept/attribute requests.
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-        headers["Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-    req_payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": usr_prompt},
-        ],
-        "temperature": 0.1,
-        "stream": True,
-    }
-    if model_fallbacks:
-        if isinstance(model_fallbacks, str):
-            fallback_list = [m.strip() for m in model_fallbacks.split(",") if m.strip()]
-        else:
-            fallback_list = list(model_fallbacks)
-        if fallback_list:
-            req_payload["models"] = fallback_list
-
-    ai_url = f"{base_url}/chat/completions"
-
-    def event_stream():
-        try:
-            resp = requests.post(ai_url, headers=headers, json=req_payload, stream=True, timeout=(10, 120))
-        except requests.exceptions.RequestException as e:
-            yield sse({"type": "error", "message": str(e)})
-            return
-
-        if not resp.ok:
-            try:
-                err = resp.json()
-            except Exception:
-                err = {"raw": resp.text}
-            yield sse({"type": "error", "message": f"HTTP {resp.status_code}: {err}"})
-            return
-
-        for raw in resp.iter_lines(decode_unicode=True):
-            if not raw:
-                continue
-            if raw.startswith(":"):
-                continue
-            if raw.startswith("data:"):
-                chunk = raw[5:].strip()
-                if chunk == "[DONE]":
-                    break
-                try:
-                    part = json.loads(chunk)
-                except Exception:
-                    text = chunk
-                else:
-                    chs = part.get("choices") if isinstance(part, dict) else None
-                    if chs:
-                        delta = chs[0].get("delta") or {}
-                        text = delta.get("content") or chs[0].get("message", {}).get("content") or ""
-                    else:
-                        text = ""
-                if text:
-                    yield sse({"type": "token", "text": text})
-        yield sse({"type": "done"})
-
-    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
-
-
-@login_required
-@user_passes_test(_is_admin)
-def admin_save_ai_settings(request):
-    if request.method != "POST":
-        return HttpResponseBadRequest("Invalid method")
-
-    payload = request.POST
-    if request.content_type == "application/json":
-        try:
-            payload = json.loads(request.body or "{}")
-        except Exception:
-            payload = {}
-
-    model = (payload.get("model") or "").strip()
-    fallbacks = (payload.get("fallbacks") or "").strip()
-    if model:
-        UserSettings.save_setting(
-            request.user,
-            "reports_ai_model",
-            model,
-            description="Preferred OpenRouter model for reports admin AI panel",
-        )
-    if fallbacks or fallbacks == "":
-        UserSettings.save_setting(
-            request.user,
-            "reports_ai_fallbacks",
-            fallbacks,
-            description="Comma-separated OpenRouter fallback models for reports admin AI panel",
-        )
-    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
-        return JsonResponse({"ok": True, "model": model, "fallbacks": fallbacks})
-    messages.success(request, "AI model preferences saved.")
-    next_url = payload.get("next") or request.META.get("HTTP_REFERER") or reverse("reports:admin_dashboard")
-    return redirect(next_url)
