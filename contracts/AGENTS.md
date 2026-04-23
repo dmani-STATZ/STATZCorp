@@ -59,7 +59,6 @@ This file defines safe-edit guidance for AI coding agents and future developers 
   - New component or button styles → `static/css/app-core.css`
   - New utility/helper classes → `static/css/utilities.css`
   - New color tokens or dark mode overrides → `static/css/theme-vars.css`
-  - **Do not touch:** `static/css/tailwind-compat.css`, `static/css/base.css`
   - **Do not add wildcard `button:not(...)` CSS rules** in `app-core.css` or elsewhere. All buttons must be explicitly styled. Bare `<button>` elements without classes are a bug to be fixed, not caught by a wildcard.
   - If you encounter Tailwind utility classes in a template you are already editing, replace them with Bootstrap 5 equivalents or named classes from `app-core.css`. Do not leave Tailwind classes in place.
   - Inline `style` attributes are acceptable for one-off layout fixes but prefer a named class in `app-core.css` for anything reusable or that requires a hover/focus/pseudo-element state.

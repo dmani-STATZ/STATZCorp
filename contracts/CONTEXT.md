@@ -145,8 +145,6 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 
 `.modal-backdrop-overlay` in `app-core.css` is the project-wide standard class for all modal backdrop divs (`background: rgba(0,0,0,0.5)`). Do not use Tailwind `bg-gray-*/bg-opacity-*` combos for backdrops anywhere in the project — they are broken since Tailwind removal. This applies to all apps: contracts, processing, transactions, users, and root templates.
 
-**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
-
 **When encountering Tailwind classes in templates:** replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.
 
 **Button pattern:** `.btn-outline-brand` in `app-core.css` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for a pill-style variant with a light `#eff6ff` background (e.g. the reminders pop-out button in `contract_base.html`).

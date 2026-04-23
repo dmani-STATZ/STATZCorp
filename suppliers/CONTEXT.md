@@ -142,8 +142,6 @@ This project does not use Tailwind in any form. The CSS refactor replaced all Ta
 - `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here.
 - `static/css/utilities.css` — utility and helper classes.
 
-**Do not modify:** `static/css/tailwind-compat.css` or `static/css/base.css`.
-
 **When encountering Tailwind classes in templates:** replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.
 
 **Button pattern:** `.btn-outline-brand` in `app-core.css` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for a pill-style variant with a light `#eff6ff` background (e.g. the reminders pop-out button in `contract_base.html`).
