@@ -1,0 +1,214 @@
+{% extends "contracts/contract_base.html" %}
+{% load humanize %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" crossorigin="anonymous">
+{% endblock %}
+
+{% block title %}Close Contract — {{ contract.contract_number|default:"" }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  {% if messages %}
+    <div class="mb-3">
+      {% for message in messages %}
+        <div
+          class="alert alert-{% if message.level_tag == 'error' %}danger{% else %}{{ message.level_tag }}{% endif %}"
+          role="alert"
+        >
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="mb-4">
+    <h1 class="h2 mb-1">Close Contract</h1>
+    <p class="text-muted mb-0">{{ contract.contract_number|default:"—" }}</p>
+  </div>
+
+  {% if contract.status and contract.status.description == 'Closed' %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="alert alert-success mb-4" role="alert">
+          Contract {{ contract.contract_number|default:"" }} has been successfully closed.
+        </div>
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Closed Date</dt>
+          <dd class="col-sm-9">
+            {% if contract.date_closed %}
+              {{ contract.date_closed|date:"M d, Y g:i A" }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+          <dt class="col-sm-3">Closed By</dt>
+          <dd class="col-sm-9">
+            {% if contract.closed_by %}
+              {{ contract.closed_by.get_full_name|default:contract.closed_by.username }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+        </dl>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-primary">Back to Contract</a>
+          <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="bg-body-tertiary rounded-3 p-3 p-md-4 mb-4">
+      <h6 class="text-body-secondary mb-3">Contract summary</h6>
+      <div class="row g-2">
+        <div class="col-6 col-md-2">
+          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Contract number</div>
+          <div class="fs-6 fw-bold">{{ contract.contract_number|default:"—" }}</div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Supplier</div>
+          <div class="fs-6 fw-bold">{% if contract.supplier %}{{ contract.supplier.name }}{% else %}—{% endif %}</div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Contract value</div>
+          <div class="fs-6 fw-bold">
+            {% if contract.contract_value is not None %}
+              ${{ contract.contract_value|floatformat:2|intcomma }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Due date</div>
+          <div class="fs-6 fw-bold">
+            {% if contract.due_date %}
+              {{ contract.due_date|date:"M j, Y" }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">CLIN count</div>
+          <div class="fs-6 fw-bold">{{ clin_count }}</div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Current status</div>
+          <div>
+            {% if contract.status and contract.status.description %}
+              {% with s=contract.status.description %}
+                {% if s == 'Open' %}
+                  <span class="badge bg-success">Open</span>
+                {% elif s == 'Closed' %}
+                  <span class="badge bg-secondary">Closed</span>
+                {% elif s == 'Canceled' %}
+                  <span class="badge bg-danger">Canceled</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ s }}</span>
+                {% endif %}
+              {% endwith %}
+            {% else %}
+              <span class="fs-6 fw-bold">—</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h2 class="h5 card-title mb-0">Contract Line Items</h2>
+          <span class="badge bg-secondary">
+            {{ clin_count }} item{{ clin_count|pluralize }}
+          </span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th class="text-start" scope="col">Item #</th>
+                <th class="text-start" scope="col">Type</th>
+                <th class="text-start" scope="col">Supplier</th>
+                <th class="text-end" scope="col">Order Qty</th>
+                <th class="text-start" scope="col">Due Date</th>
+                <th class="text-end" scope="col">Shipped Qty</th>
+                <th class="text-start" scope="col">Ship Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for clin in clins %}
+                <tr>
+                  <td class="text-start">
+                    {% if clin.item_number %}{{ clin.item_number }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.item_type %}{{ clin.get_item_type_display }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.supplier %}{{ clin.supplier.name }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if clin.order_qty is not None %}
+                      {{ clin.order_qty|floatformat:"-2" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.due_date %}
+                      {{ clin.due_date|date:"M j, Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% with ts=clin.total_shipped %}
+                      {% if ts and ts != 0 %}
+                        <span class="align-middle">{{ ts|floatformat:"-2" }}</span>{% if clin.order_qty and clin.order_qty != 0 and ts >= clin.order_qty %}<span class="ms-1 d-inline-block align-middle" aria-label="Fully shipped"><i class="bi bi-check-circle-fill text-success small" aria-hidden="true"></i></span>{% endif %}
+                      {% else %}
+                        —
+                      {% endif %}
+                    {% endwith %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.ship_date %}
+                      {{ clin.ship_date|date:"M j, Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7" class="text-center text-muted">No CLINs on this contract.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-warning mb-4">
+      <div class="card-body">
+        <h2 class="h6">Confirm close</h2>
+        <p class="text-muted small mb-3">
+          You are about to close this contract. This will set the status to Closed and record today&rsquo;s date as the
+          close date. This action can be reversed by editing the contract.
+        </p>
+        <form action="{{ request.path }}" method="post" class="d-flex flex-wrap align-items-center gap-2">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">Confirm Close</button>
+          <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+
+    <p class="mb-0">
+      <a href="{% url 'contracts:contract_management' contract.pk %}">Back to Contract</a>
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

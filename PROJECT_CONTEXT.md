@@ -358,7 +358,7 @@ Run repo-wide search before changing. `training:dashboard` is hardcoded in `base
 
 No Tailwind. Bootstrap 5 plus three global CSS files:
 
-- `static/css/theme-vars.css` — color tokens, brand vars, dark mode overrides (`body.dark`). Hex values only here.
+- `static/css/theme-vars.css` — brand tokens for header and sidebar only: `--company-primary`, `--company-secondary`, `--header-height`. Spacelab Bootstrap 5.3 handles all other theming. Do not add surface, text, border, or button tokens here.
 - `static/css/app-core.css` — all layout, component, button, and modal styles. New named classes go here.
 - `static/css/utilities.css` — utility and helper classes.
 

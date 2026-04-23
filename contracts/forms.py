@@ -82,7 +82,7 @@ class ActiveUserModelChoiceField(forms.ModelChoiceField):
             kwargs['queryset'] = User.objects.filter(is_active=True).order_by('username')
         if 'widget' not in kwargs:
             kwargs['widget'] = forms.Select(attrs={
-                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 h-[38px] appearance-none'
+                'class': 'form-select'
             })
         super().__init__(*args, **kwargs)
 
@@ -269,12 +269,7 @@ class ContractForm(BaseModelForm):
 class ContractCloseForm(BaseModelForm):
     class Meta:
         model = Contract
-        fields = ['status', 'date_closed']
-        widgets = {
-            'date_closed': forms.DateTimeInput(attrs={
-                'type': 'datetime-local'
-            })
-        }
+        fields = []  # No user-editable fields; all set programmatically in the view
 
 
 class SupplierTypeForm(BaseModelForm):
@@ -332,7 +327,7 @@ class CompanyForm(BaseModelForm):
         # SharePoint documents URL fields
         for fname in ('sharepoint_base_url', 'sharepoint_site_name', 'sharepoint_documents_path'):
             if fname in self.fields:
-                self.fields[fname].widget.attrs.setdefault('class', 'form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100')
+                self.fields[fname].widget.attrs.setdefault('class', 'form-control')
 
         # Members field initial data
         if 'members' in self.fields:

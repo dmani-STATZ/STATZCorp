@@ -246,9 +246,11 @@ Orphaned `QueueContract` rows (`contract_number` empty) can be reconciled via **
 
 This project does not use Tailwind in any form. All styling uses Bootstrap 5 plus the project's three-file CSS architecture:
 
-- `static/css/theme-vars.css` — color tokens and dark mode overrides only
+- `static/css/theme-vars.css` — brand tokens for header and sidebar only: `--company-primary`, `--company-secondary`, `--header-height`. Spacelab Bootstrap 5.3 handles all other theming. Do not add surface, text, border, or button tokens here.
 - `static/css/app-core.css` — all component, layout, and button styles
 - `static/css/utilities.css` — utility and helper classes
+
+**Dark mode selector pattern:** Dark mode overrides use `[data-bs-theme="dark"]` as the selector prefix (e.g. `[data-bs-theme="dark"] .some-class { ... }`). This is Bootstrap 5.3 native dark mode. The `data-bs-theme` attribute is set on the `<html>` element by `theme_toggle.js` and the anti-FOUC inline script in `base_template.html`. Do not use a `dark` class on `body` for theming; that pattern is removed. Do not use a `.dark` class on any element for theme purposes.
 
 **When editing templates:** if you encounter Tailwind utility classes, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
 

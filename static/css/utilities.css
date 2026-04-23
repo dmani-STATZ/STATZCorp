@@ -1006,26 +1006,26 @@
    .active\:scale-95:active      { transform: scale(0.95); }
    
    /* ─────────────────────────────────────────────────────────────────────────
-      16. DARK MODE  (requires .dark on <body> or a parent)
+      16. DARK MODE  (data-bs-theme="dark" on <html>)
       ───────────────────────────────────────────────────────────────────────── */
-   .dark .dark\:bg-gray-700       { background-color: #374151; }
-   .dark .dark\:bg-gray-800       { background-color: #1f2937; }
-   .dark .dark\:bg-gray-900       { background-color: #111827; }
-   .dark .dark\:border-gray-600   { border-color: #4b5563; }
-   .dark .dark\:border-gray-700   { border-color: #374151; }
-   .dark .dark\:text-white        { color: #ffffff; }
-   .dark .dark\:text-gray-100     { color: #f3f4f6; }
-   .dark .dark\:text-gray-200     { color: #e5e7eb; }
-   .dark .dark\:text-gray-300     { color: #d1d5db; }
-   .dark .dark\:text-gray-400     { color: #9ca3af; }
-   .dark .dark\:text-blue-400     { color: #60a5fa; }
-   .dark .dark\:text-green-400    { color: #4ade80; }
-   .dark .dark\:text-red-400      { color: #f87171; }
-   .dark .dark\:hover\:bg-gray-600:hover   { background-color: #4b5563; }
-   .dark .dark\:hover\:bg-gray-700:hover   { background-color: #374151; }
-   .dark .dark\:hover\:text-gray-200:hover { color: #e5e7eb; }
-   .dark .dark\:hover\:text-gray-300:hover { color: #d1d5db; }
-   .dark .dark\:hover\:text-white:hover    { color: #ffffff; }
+   [data-bs-theme="dark"] .dark\:bg-gray-700       { background-color: #374151; }
+   [data-bs-theme="dark"] .dark\:bg-gray-800       { background-color: #1f2937; }
+   [data-bs-theme="dark"] .dark\:bg-gray-900       { background-color: #111827; }
+   [data-bs-theme="dark"] .dark\:border-gray-600   { border-color: #4b5563; }
+   [data-bs-theme="dark"] .dark\:border-gray-700   { border-color: #374151; }
+   [data-bs-theme="dark"] .dark\:text-white        { color: #ffffff; }
+   [data-bs-theme="dark"] .dark\:text-gray-100     { color: #f3f4f6; }
+   [data-bs-theme="dark"] .dark\:text-gray-200     { color: #e5e7eb; }
+   [data-bs-theme="dark"] .dark\:text-gray-300     { color: #d1d5db; }
+   [data-bs-theme="dark"] .dark\:text-gray-400     { color: #9ca3af; }
+   [data-bs-theme="dark"] .dark\:text-blue-400     { color: #60a5fa; }
+   [data-bs-theme="dark"] .dark\:text-green-400    { color: #4ade80; }
+   [data-bs-theme="dark"] .dark\:text-red-400      { color: #f87171; }
+   [data-bs-theme="dark"] .dark\:hover\:bg-gray-600:hover   { background-color: #4b5563; }
+   [data-bs-theme="dark"] .dark\:hover\:bg-gray-700:hover   { background-color: #374151; }
+   [data-bs-theme="dark"] .dark\:hover\:text-gray-200:hover { color: #e5e7eb; }
+   [data-bs-theme="dark"] .dark\:hover\:text-gray-300:hover { color: #d1d5db; }
+   [data-bs-theme="dark"] .dark\:hover\:text-white:hover    { color: #ffffff; }
    
    /* ─────────────────────────────────────────────────────────────────────────
       17. MISC
@@ -1427,14 +1427,14 @@
 .focus\:ring-opacity-50 { --tw-ring-opacity: 0.5; }
 
 /* Missing dark mode */
-.dark\:bg-blue-900:is(.dark *) { background-color: #1e3a5f; }
-.dark\:text-blue-200:is(.dark *) { color: #bfdbfe; }
-.dark\:text-indigo-400:is(.dark *) { color: #818cf8; }
-.dark\:hover\:text-indigo-300:is(.dark *):hover { color: #a5b4fc; }
-.dark\:border-indigo-400:is(.dark *) { border-color: #818cf8; }
-.dark\:divide-gray-600:is(.dark *) > * + * { border-color: #4b5563; }
-.dark\:text-gray-100:is(.dark *) { color: #f3f4f6; }
-.dark\:bg-gray-900:is(.dark *) { background-color: #111827; }
+[data-bs-theme="dark"] .dark\:bg-blue-900 { background-color: #1e3a5f; }
+[data-bs-theme="dark"] .dark\:text-blue-200 { color: #bfdbfe; }
+[data-bs-theme="dark"] .dark\:text-indigo-400 { color: #818cf8; }
+[data-bs-theme="dark"] .dark\:hover\:text-indigo-300:hover { color: #a5b4fc; }
+[data-bs-theme="dark"] .dark\:border-indigo-400 { border-color: #818cf8; }
+[data-bs-theme="dark"] .dark\:divide-gray-600 > * + * { border-color: #4b5563; }
+[data-bs-theme="dark"] .dark\:text-gray-100 { color: #f3f4f6; }
+[data-bs-theme="dark"] .dark\:bg-gray-900 { background-color: #111827; }
 
 /* Misc */
 .bg-gradient-to-r { background-image: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to)); }

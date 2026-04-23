@@ -1,94 +1,12 @@
-/* Theme tokens — CSS custom properties only. Hex colors live here. */
+/**
+ * STATZ Corporation — theme-vars.css
+ * Brand tokens for header and sidebar only.
+ * All other theming is Spacelab Bootstrap 5.3 native.
+ */
 
-/* --- Brand (shared) --- */
 :root {
-    --main-font: "Segoe UI", "Roboto", "Oxygen", sans-serif;
-    --company-primary: #004eb3;
+    --company-primary:   #004eb3;
     --company-secondary: #e5e7eb;
-    --company-danger: #b91c1c;
-    --header-height: 48px;
+    --header-height:     48px;
 }
 
-/* --- Light (default) --- */
-:root, body {
-    --surface-bg: #ffffff;
-    --surface-muted-bg: #f9fafb;
-    --surface-text: #111827;
-
-    --text-muted: #6b7280;
-    --text-strong: #111827;
-
-    --border-muted: #e5e7eb;
-
-    --primary: var(--company-primary);
-    --primary-text: #ffffff;
-    --primary-hover: #2563eb;
-    --primary-text-hover: #ffffff;
-
-    --secondary: #6b7280;
-    --secondary-text: #ffffff;
-    --secondary-hover: #4b5563;
-    --secondary-text-hover: #ffffff;
-
-    --caution: #6b7280;
-    --caution-text: #ffffff;
-    --caution-hover: #4b5563;
-    --caution-text-hover: #ffffff;
-
-    --danger: var(--company-danger);
-    --danger-text: #ffffff;
-    --danger-hover: #991b1b;
-    --danger-text-hover: #ffffff;
-
-    --save: #46ad46;
-    --save-text: #ffffff;
-    --save-hover: #21cc21;
-    --save-text-hover: #ffffff;
-
-    --nav: #6b7280;
-    --nav-text: #ffffff;
-    --nav-hover: #6b7280;
-    --nav-text-hover: #ffffff;
-}
-
-/* --- Dark --- */
-body.dark {
-    --surface-bg: #1f2937;
-    --surface-muted-bg: #374151;
-    --surface-text: #f3f4f6;
-
-    --text-muted: #9ca3af;
-    --text-strong: #f9fafb;
-
-    --border-muted: #374151;
-
-    --primary: var(--company-primary);
-    --primary-text: #0b1221;
-    --primary-hover: #3b82f6;
-    --primary-text-hover: #0b1221;
-
-    --secondary: #6b7280;
-    --secondary-text: #ffffff;
-    --secondary-hover: #6f7d99;
-    --secondary-text-hover: #ffffff;
-
-    --danger: var(--company-danger);
-    --danger-text: #c2bcb5;
-    --danger-hover: #b81a1a;
-    --danger-text-hover: #aca4a4;
-
-    --caution: #aca4a4;
-    --caution-text: #b81a1a;
-    --caution-hover: #4b4742;
-    --caution-text-hover: #ee0808;
-
-    --save: #23e023;
-    --save-text: #ffffff;
-    --save-hover: #2ea02e;
-    --save-text-hover: #ffffff;
-
-    --nav: #6b7280;
-    --nav-text: #ffffff;
-    --nav-hover: #6b7280;
-    --nav-text-hover: #ffffff;
-}

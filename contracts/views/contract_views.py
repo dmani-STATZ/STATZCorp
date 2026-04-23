@@ -18,7 +18,7 @@ from django.dispatch import receiver
 from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus, GovAction
 from processing.models import SequenceNumber
-from ..forms import ContractForm, ContractCloseForm, ContractCancelForm
+from ..forms import ContractForm, ContractCancelForm
 from .mixins import ActiveCompanyQuerysetMixin
 
 logger = logging.getLogger(__name__)
@@ -267,20 +267,43 @@ class ContractUpdateView(ActiveCompanyQuerysetMixin, UpdateView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractCloseView(ActiveCompanyQuerysetMixin, UpdateView):
+class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
     model = Contract
-    form_class = ContractCloseForm
-    template_name = 'contracts/contract_close_form.html'
-    
-    def form_valid(self, form):
-        form.instance.closed_date = timezone.now()
-        form.instance.closed_by = self.request.user
-        form.instance.status = 'Closed'
-        messages.success(self.request, 'Contract closed successfully.')
-        return super().form_valid(form)
-    
-    def get_success_url(self):
-        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
+    template_name = 'contracts/contract_close.html'
+    context_object_name = 'contract'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'idiq_contract', 'status', 'company', 'supplier', 'closed_by'
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.get_object()
+        clins = contract.clin_set.select_related(
+            'supplier', 'clin_type'
+        ).order_by('item_number')
+        context['clins'] = clins
+        context['clin_count'] = clins.count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        contract = self.get_object()
+        try:
+            closed_status = ContractStatus.objects.get(description='Closed')
+            contract.status = closed_status
+            contract.date_closed = timezone.now()
+            contract.closed_by = request.user
+            contract.save()
+            messages.success(request, f'Contract {contract.contract_number} has been closed.')
+            return redirect('contracts:contract_close', pk=contract.pk)
+        except ContractStatus.DoesNotExist:
+            messages.error(request, 'Could not find Closed status. Contact your administrator.')
+            return redirect('contracts:contract_close', pk=contract.pk)
+        except Exception as e:
+            logger.error(f"Error closing contract {contract.pk}: {str(e)}")
+            messages.error(request, f'An error occurred: {str(e)}')
+            return redirect('contracts:contract_close', pk=contract.pk)
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -297,8 +320,8 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, UpdateView):
             reason_id = request.POST.get('cancelReason')
             cancel_reason = CanceledReason.objects.get(id=reason_id)
             
-            # Get the Cancelled status
-            cancelled_status = ContractStatus.objects.get(description='Cancelled')
+            # Get the Canceled status
+            cancelled_status = ContractStatus.objects.get(description='Canceled')
             
             # Update contract
             contract.date_canceled = timezone.now()
@@ -332,7 +355,7 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, UpdateView):
         except ContractStatus.DoesNotExist:
             return JsonResponse({
                 'success': False,
-                'error': 'Could not find Cancelled status.'
+                'error': 'Could not find Canceled status.'
             })
         except Exception as e:
             return JsonResponse({

@@ -18,8 +18,9 @@
                     <div class="text-center w-1/3">
                         <button
                             onclick="openAcknowledgmentLetter('{{ selected_clin.id }}')"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                                {% if not selected_clin %}bg-gray-300 text-gray-500{% else %}bg-blue-500 text-white hover:bg-blue-600{% endif %}">
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
+                                {% if not selected_clin %}btn-secondary{% else %}btn-primary{% endif %}"
+                            {% if not selected_clin %}disabled{% endif %}>
                             {% if acknowledgment_letter %}Edit{% else %}Create{% endif %}
                         </button>
                     </div>
@@ -37,8 +38,8 @@
                         <button
                             onclick="toggleAcknowledgment('po_to_supplier_bool')"
                             id="po_to_supplier_bool_btn"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                            {% if acknowledgment.po_to_supplier_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
+                            {% if acknowledgment.po_to_supplier_bool %}btn-success{% else %}btn-danger{% endif %}">
                             {% if acknowledgment.po_to_supplier_bool %}Sent{% else %}Not Sent{% endif %}
                         </button>
                     </div>
@@ -57,8 +58,8 @@
                         <button
                             onclick="toggleAcknowledgment('clin_reply_bool')"
                             id="clin_reply_bool_btn"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                            {% if acknowledgment.clin_reply_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
+                            {% if acknowledgment.clin_reply_bool %}btn-success{% else %}btn-danger{% endif %}">
                             {% if acknowledgment.clin_reply_bool %}Yes{% else %}No{% endif %}
                         </button>
                     </div>
@@ -77,8 +78,8 @@
                         <button
                             onclick="toggleAcknowledgment('po_to_qar_bool')"
                             id="po_to_qar_bool_btn"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                            {% if acknowledgment.po_to_qar_bool %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
+                            {% if acknowledgment.po_to_qar_bool %}btn-success{% else %}btn-danger{% endif %}">
                             {% if acknowledgment.po_to_qar_bool %}Sent{% else %}Not Sent{% endif %}
                         </button>
                     </div>
@@ -95,14 +96,14 @@
         <!-- Contract Header - Right Columns -->
         <div class="col-span-2 card card-padded !p-2">
             {% if contract.status.description == 'Cancelled' %}
-                <div class="bg-red-100 text-red-800 flex justify-between items-center mb-2 p-1">
+                <div class="contract-status-cancelled d-flex justify-content-between align-items-center mb-2 p-1">
                     <a href="{% url 'contracts:contract_detail' contract.id %}">
-                        <h1 class="text-xl font-bold text-gray-800">
+                        <h1 class="text-xl font-bold mb-0">
                             Contract {{ contract.contract_number }}
                         </h1>
                     </a>
                     <div class="flex items-center space-x-3">
-                        <span class="bg-white text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Cancelled</span>
+                        <span class="badge rounded-pill bg-danger">Cancelled</span>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class="hover:bg-gray-200 text-red px-4 py-2 rounded-lg flex items-center">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -113,13 +114,13 @@
                     </div>
                 </div>
             {% elif not contract.status.description == 'Open' %}
-                <div class="bg-gray-100 text-gray-800 flex justify-between items-center mb-2 p-1">
+                <div class="contract-status-closed d-flex justify-content-between align-items-center mb-2 p-1">
                     <a href="{% url 'contracts:contract_detail' contract.id %}">
-                    <h1 class="text-xl font-bold text-gray-800">
+                    <h1 class="text-xl font-bold mb-0">
                         Contract {{ contract.contract_number }}
                     </h1></a>
                     <div class="flex items-center space-x-3">
-                        <span class="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">Closed</span>
+                        <span class="badge rounded-pill bg-secondary">Closed</span>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class=" hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -130,9 +131,9 @@
                     </div>
                 </div>
             {% else %}
-                <div class="bg-green-100 text-green-800 flex justify-between items-center mb-2 p-1">
+                <div class="contract-status-open d-flex justify-content-between align-items-center mb-2 p-1">
                     <a href="{% url 'contracts:contract_detail' contract.id %}">
-                    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                    <h1 class="text-2xl font-bold mb-0 d-flex align-items-center">
                         Contract {{ contract.contract_number }}
                     </h1></a>
 
@@ -191,7 +192,7 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-3">
-                        <span class="bg-white {% if contract.status.description == 'Open' %}text-green-800{% else %}text-gray-800{% endif %} px-3 py-1 rounded-full text-sm font-semibold">
+                        <span class="badge rounded-pill {% if contract.status.description == 'Open' %}bg-success{% else %}bg-secondary{% endif %}">
                             {% if contract.status.description == 'Open' %}Open{% else %}Closed{% endif %}
                         </span>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
@@ -210,38 +211,38 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-0.5 flex-1 min-w-0">
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'contract_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Contract Number</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'contract_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Contract Number</button>
                         </p>
                         <p id="contract-contract-number-value" class="font-medium text-sm">{{ contract.contract_number|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'po_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">PO Number</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'po_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">PO Number</button>
                         </p>
                         <p id="contract-po-number-value" class="font-medium text-sm">{{ contract.po_number|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'tab_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Tab Number</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'tab_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Tab Number</button>
                         </p>
                         <p id="contract-tab-num-value" class="font-medium text-sm">{{ contract.tab_num|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'buyer')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Buyer</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'buyer')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Buyer</button>
                         </p>
                         <p id="contract-buyer-value" class="font-medium text-sm">{{ contract.buyer.description|default:"N/A" }}</p>
                     </div>
 
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'award_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Award Date</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'award_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Award Date</button>
                         </p>
                         <p id="contract-award-date-value" class="font-medium text-sm">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Due Date</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Due Date</button>
                         </p>
                         <p id="contract-due-date-value" class="font-medium text-sm {% if contract.due_date_late %}text-red-600{% endif %}">
                             {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
@@ -249,13 +250,13 @@
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'sales_class')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sales Class</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'sales_class')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sales Class</button>
                         </p>
                         <p id="contract-sales-class-value" class="font-medium text-sm">{{ contract.sales_class.sales_team|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'solicitation_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Solicitation Type</button>
+                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'solicitation_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Solicitation Type</button>
                         </p>
                         <p id="contract-solicitation-type-value" class="font-medium text-sm">{{ contract.solicitation_type|default:"N/A" }}</p>
                     </div>
@@ -263,42 +264,33 @@
                 <!-- Contract Controls: Expedite (top) + NIST (below) -->
                 <div class="shrink-0 flex flex-col gap-2 border-l border-gray-200 pl-3">
                     <!-- Expedite panel: bordered, title + X top, buttons stacked vertically -->
-                    <div id="expedite_container" class="border rounded p-2
-                    {% if expedite and expedite.used %}bg-pink-subtle{% elif expedite and expedite.successful %}bg-warning-subtle{% else %}bg-light{% endif %}"
-                    style="border-color: #d1d5db;">
+                    <div id="expedite_container" class="border rounded p-2 {% if expedite and expedite.used %}bg-danger-subtle{% elif expedite and expedite.successful %}bg-warning-subtle{% else %}bg-body-secondary{% endif %}">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span style="font-size: 0.875rem; font-weight: 600; color: #1f2937;">Expedite</span>
+                        <span class="small fw-semibold">Expedite</span>
                         <button type="button" onclick="resetExpedite()" title="Reset"
-                            class="btn btn-link p-0 d-flex align-items-center justify-content-center rounded"
-                            style="background-color: #fee2e2; color: #dc2626; border: none;">
-                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            class="btn btn-sm btn-outline-danger p-0 d-flex align-items-center justify-content-center rounded border-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
-                    <div class="d-flex flex-row gap-2">
+                    <div id="expedite_button_row" class="d-flex flex-row gap-2">
                         {% if not expedite or not expedite.successful %}
-                        <button onclick="toggleExpediteStatus('initiate')" id="expedite_initiate_btn"
-                            class="btn rounded"
-                            style="padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 500;
-                                {% if expedite and expedite.initiated %}background-color: #d1d5db; color: #4b5563; cursor: not-allowed;{% else %}background-color: #fecaca; color: #991b1b;{% endif %}"
+                        <button onclick="toggleExpediteStatus('initiate')" type="button" id="expedite_initiate_btn"
+                            class="btn btn-sm {% if expedite and expedite.initiated %}btn-secondary disabled{% else %}btn-outline-danger{% endif %}"
                             {% if expedite and expedite.initiated %}disabled{% endif %}>Initiate</button>
-                        <button onclick="toggleExpediteStatus('successful')" id="expedite_successful_btn"
-                            class="btn rounded"
-                            style="padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 500;
-                                {% if not expedite or not expedite.initiated or expedite.successful %}background-color: #d1d5db; color: #4b5563; cursor: not-allowed;{% else %}background-color: #fecaca; color: #991b1b;{% endif %}"
+                        <button onclick="toggleExpediteStatus('successful')" type="button" id="expedite_successful_btn"
+                            class="btn btn-sm {% if not expedite or not expedite.initiated or expedite.successful %}btn-secondary disabled{% else %}btn-outline-warning{% endif %}"
                             {% if not expedite or not expedite.initiated or expedite.successful %}disabled{% endif %}>Successful</button>
                         {% endif %}
                         {% if expedite and expedite.successful %}
-                        <button onclick="toggleExpediteStatus('use')" id="expedite_use_btn"
-                            class="btn rounded"
-                            style="padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 500;
-                                {% if expedite.used %}background-color: #d1d5db; color: #4b5563; cursor: not-allowed;{% else %}background-color: #fecaca; color: #991b1b;{% endif %}"
+                        <button onclick="toggleExpediteStatus('use')" type="button" id="expedite_use_btn"
+                            class="btn btn-sm {% if expedite.used %}btn-secondary disabled{% else %}btn-outline-primary{% endif %}"
                             {% if expedite.used %}disabled{% endif %}>Use Expedite</button>
                         {% endif %}
                     </div>
                     {% if expedite and expedite.initiated %}
-                    <div class="mt-1" style="font-size: 0.75rem; color: #374151;">
+                    <div class="expedite-status mt-1 small text-body-secondary">
                         {% if expedite.successful %}<span>✓ Successful</span>{% endif %}
                         {% if expedite.used %}<span>Used</span>{% endif %}
                     </div>
@@ -318,8 +310,7 @@
                         {% with sharepoint_url=contract.get_sharepoint_documents_url %}
                         {% if sharepoint_url %}
                         <a href="{{ sharepoint_url }}" target="_blank" rel="noopener noreferrer"
-                        class="d-inline-flex align-items-center justify-content-center gap-1 w-100"
-                            style="font-size: 0.75rem; font-weight: 500; color: #374151;">
+                            class="d-inline-flex align-items-center justify-content-center gap-1 w-100 small fw-medium text-body">
                             <svg xmlns="http://www.w3.org/2000/svg" style="width: 22px; height: 22px; flex-shrink: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <rect x="6" y="5" width="11" height="14" rx="1"/>
                                 <rect x="4" y="3" width="11" height="14" rx="1" fill="white" stroke="currentColor"/>
@@ -334,8 +325,7 @@
                         </a>
                         {% elif contract.files_url %}
                         <button type="button" onclick="copyContractPath('{{ contract.files_url | escapejs }}')"
-                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-1 w-100"
-                            style="font-size: 0.75rem; font-weight: 500; color: #374151;">
+                            class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-1 w-100 small fw-medium">
                             <svg xmlns="http://www.w3.org/2000/svg" style="width: 22px; height: 22px; flex-shrink: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
@@ -379,14 +369,13 @@
     <div class="card card-padded !p-2 mt-2 relative">
         <div class="absolute top-2 right-2 flex gap-2 items-center">
             {% if contract.status.description == 'Open' %}
-            <a href="{% url 'contracts:contract_clin_create' contract.id %}"
-               class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs rounded-md">
+            <a href="{% url 'contracts:contract_clin_create' contract.id %}" class="btn btn-primary btn-sm">
                 Add CLIN
             </a>
             {% endif %}
             <span id="view-full-clin-link">
                 {% if selected_clin %}
-                <a href="{% url 'contracts:clin_detail' selected_clin.id %}" class="text-xs text-blue-600 hover:text-blue-800">View Full</a>
+                <a href="{% url 'contracts:clin_detail' selected_clin.id %}" class="text-xs">View Full</a>
                 {% else %}
                 <span class="text-xs text-gray-400">View Full</span>
                 {% endif %}
@@ -411,7 +400,7 @@
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="divide-y divide-gray-200">
                         {% for clin in clins %}
                         <tr id="clin-row-{{ clin.id }}"
                             data-clin-id="{{ clin.id }}"
@@ -442,28 +431,28 @@
                 <div id="clin-details-content" class="text-sm">
                     {% if selected_clin %}
                     <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Type:</button></span> <span id="cd-type">{{ selected_clin.get_item_type_display|default:"—" }}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('clin_po_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub PO #:</button></span> <span id="cd-po">{{ selected_clin.clin_po_num|default:selected_clin.po_number|default:"—" }}</span></div>
-                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></span>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Type:</button></span> <span id="cd-type">{{ selected_clin.get_item_type_display|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('clin_po_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sub PO #:</button></span> <span id="cd-po">{{ selected_clin.clin_po_num|default:selected_clin.po_number|default:"—" }}</span></div>
+                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></span>
                             {% if selected_clin.supplier %}
-                            <a href="{% url 'suppliers:supplier_detail' selected_clin.supplier.id %}" target="_blank" class="text-blue-600 hover:text-blue-800" id="cd-supplier-name">{{ selected_clin.supplier.name|default:"N/A" }}</a>
+                            <a href="{% url 'suppliers:supplier_detail' selected_clin.supplier.id %}" target="_blank" id="cd-supplier-name">{{ selected_clin.supplier.name|default:"N/A" }}</a>
                             {% else %}<span id="cd-supplier">N/A</span>{% endif %}
                         </div>
-                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('nsn')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">NSN:</button></span>
+                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('nsn')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">NSN:</button></span>
                             {% if selected_clin.nsn %}
-                            <a href="{% url 'contracts:nsn_edit' selected_clin.nsn.id %}" target="_blank" class="text-blue-600 hover:text-blue-800" id="cd-nsn-link">{{ selected_clin.nsn.nsn_code }}{% if selected_clin.nsn.description %} ({{ selected_clin.nsn.description }}){% endif %}</a>
+                            <a href="{% url 'contracts:nsn_edit' selected_clin.nsn.id %}" target="_blank" id="cd-nsn-link">{{ selected_clin.nsn.nsn_code }}{% if selected_clin.nsn.description %} ({{ selected_clin.nsn.description }}){% endif %}</a>
                             {% else %}<span id="cd-nsn">N/A</span>{% endif %}
                         </div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">I&A:</button></span> <span id="cd-ia">{% if selected_clin.ia %}{{ selected_clin.get_ia_display }}{% else %}—{% endif %}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('fob')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">FOB:</button></span> <span id="cd-fob">{% if selected_clin.fob %}{{ selected_clin.get_fob_display }}{% else %}—{% endif %}</span></div>
-                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('special_payment_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Payment Terms:</button></span> <span id="cd-spt">{% if selected_clin.special_payment_terms %}{{ selected_clin.special_payment_terms }}{% else %}—{% endif %}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span id="cd-sub-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span id="cd-quoted-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% elif selected_clin.due_date %}{{ selected_clin.due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span id="cd-order-qty">{{ selected_clin.order_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span id="cd-item-value">{% if selected_clin.item_value %}${% endif %}{{ selected_clin.item_value|floatformat:2|default:"—" }}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span id="cd-ship-date">{% if selected_clin.ship_date %}{{ selected_clin.ship_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span id="cd-uom">{{ selected_clin.uom|default:"EA" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">I&A:</button></span> <span id="cd-ia">{% if selected_clin.ia %}{{ selected_clin.get_ia_display }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('fob')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">FOB:</button></span> <span id="cd-fob">{% if selected_clin.fob %}{{ selected_clin.get_fob_display }}{% else %}—{% endif %}</span></div>
+                        <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('special_payment_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Special Payment Terms:</button></span> <span id="cd-spt">{% if selected_clin.special_payment_terms %}{{ selected_clin.special_payment_terms }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span id="cd-sub-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span id="cd-quoted-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% elif selected_clin.due_date %}{{ selected_clin.due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span id="cd-order-qty">{{ selected_clin.order_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span id="cd-item-value">{% if selected_clin.item_value %}${% endif %}{{ selected_clin.item_value|floatformat:2|default:"—" }}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span id="cd-ship-date">{% if selected_clin.ship_date %}{{ selected_clin.ship_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></div>
+                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span id="cd-uom">{{ selected_clin.uom|default:"EA" }}</span></div>
                         <div class="mt-2">
                             <button type="button"
                                     id="cd-shipments-btn"
@@ -598,7 +587,7 @@
                                 <th class="px-2 py-1 w-8"></th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200" id="gov-actions-tbody">
+                        <tbody class="divide-y divide-gray-200" id="gov-actions-tbody">
                             {% for ga in gov_actions %}
                             <tr data-gov-action-id="{{ ga.id }}">
                                 <td class="px-2 py-1">{{ ga.get_action_display|default:ga.action|default:"—" }}</td>
@@ -786,7 +775,7 @@
                 </div>
             </div>
             <div class="mt-4 flex justify-end">
-                <a id="supplier-info-full-link" href="#" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">View Full Supplier Page →</a>
+                <a id="supplier-info-full-link" href="#" target="_blank" class="text-sm">View Full Supplier Page →</a>
             </div>
         </div>
     </div>
@@ -810,13 +799,6 @@
 </div>
 
 <style>
-    .selected-row {
-        outline: 3px solid #39ff14;  /* Neon green color */
-        outline-offset: -3px;
-        position: relative;
-        z-index: 1 !important;  /* Force lower z-index */
-    }
-
     /* Custom styling for note containers */
     .note-content {
         max-height: 100px !important;
@@ -1730,7 +1712,7 @@ function fetchClinDetails(clinId) {
             const viewUrl = "{% url 'contracts:clin_detail' 0 %}".replace('/0/', `/${d.id}/`);
             const viewFullWrapper = document.getElementById('view-full-clin-link');
             if (viewFullWrapper) {
-                viewFullWrapper.innerHTML = `<a href="${viewUrl}" class="text-xs text-blue-600 hover:text-blue-800">View Full</a>`;
+                viewFullWrapper.innerHTML = `<a href="${viewUrl}" class="text-xs">View Full</a>`;
             }
             const fmt = (v) => (v === null || v === undefined || v === '') ? '—' : String(v);
             const qty = d.order_qty !== '—' ? (Number(d.order_qty) === d.order_qty ? d.order_qty.toFixed(0) : d.order_qty) : '—';
@@ -1738,29 +1720,29 @@ function fetchClinDetails(clinId) {
             const itemVal = d.item_value !== '—' ? '$' + (Number(d.item_value) ? parseFloat(d.item_value).toFixed(2) : d.item_value) : '—';
             const supplierUrl = d.supplier_id ? "{% url 'suppliers:supplier_detail' 0 %}".replace('/0/', `/${d.supplier_id}/`) : null;
             const supplierHtml = supplierUrl
-                ? `<a href="${supplierUrl}" target="_blank" class="text-blue-600 hover:text-blue-800">${fmt(d.supplier_name)}</a>`
+                ? `<a href="${supplierUrl}" target="_blank">${fmt(d.supplier_name)}</a>`
                 : 'N/A';
             const nsnUrl = d.nsn_id ? "{% url 'contracts:nsn_edit' 0 %}".replace('/0/', `/${d.nsn_id}/`) : null;
             const nsnHtml = nsnUrl
-                ? `<a href="${nsnUrl}" target="_blank" class="text-blue-600 hover:text-blue-800">${fmt(d.nsn)}</a>`
+                ? `<a href="${nsnUrl}" target="_blank">${fmt(d.nsn)}</a>`
                 : fmt(d.nsn);
             const lateClass = d.supplier_due_date_late ? 'text-red-600' : '';
             panel.innerHTML = `
                 <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Type:</button></span> <span>${fmt(d.item_type)}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('clin_po_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub PO #:</button></span> <span>${fmt(d.clin_po_num)}</span></div>
-                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></span> ${supplierHtml}</div>
-                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('nsn')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">NSN:</button></span> ${nsnHtml}</div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">I&A:</button></span> <span>${fmt(d.ia)}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('fob')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">FOB:</button></span> <span>${fmt(d.fob)}</span></div>
-                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('special_payment_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Payment Terms:</button></span> <span>${fmt(d.special_payment_terms)}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span class="${lateClass}">${fmt(d.supplier_due_date)}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span class="${lateClass}">${fmt(d.quoted_due_date)}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span>${qty} ${d.uom || 'EA'}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span>${shipQty}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span>${itemVal}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span>${fmt(d.ship_date)}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span>${fmt(d.uom) || 'EA'}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Type:</button></span> <span>${fmt(d.item_type)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('clin_po_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sub PO #:</button></span> <span>${fmt(d.clin_po_num)}</span></div>
+                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></span> ${supplierHtml}</div>
+                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('nsn')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">NSN:</button></span> ${nsnHtml}</div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">I&A:</button></span> <span>${fmt(d.ia)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('fob')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">FOB:</button></span> <span>${fmt(d.fob)}</span></div>
+                    <div class="col-span-2"><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('special_payment_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Special Payment Terms:</button></span> <span>${fmt(d.special_payment_terms)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span class="${lateClass}">${fmt(d.supplier_due_date)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span class="${lateClass}">${fmt(d.quoted_due_date)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span>${qty} ${d.uom || 'EA'}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span>${shipQty}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span>${itemVal}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span>${fmt(d.ship_date)}</span></div>
+                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span>${fmt(d.uom) || 'EA'}</span></div>
                     <div class="mt-2">
                         <button type="button"
                                 onclick="openShipmentsModal(${d.id})"
@@ -1938,7 +1920,7 @@ function toggleAcknowledgment(field) {
 
     // Get the current state before the toggle
     const btn = document.getElementById(`${field}_btn`);
-    const initialState = btn.classList.contains('bg-green-500');
+    const initialState = btn.classList.contains('btn-success');
 
     fetch(`/contracts/clin/${clinId}/toggle-acknowledgment/`, {
         method: 'POST',
@@ -1960,8 +1942,8 @@ function toggleAcknowledgment(field) {
 
         const btn = document.getElementById(`${field}_btn`);
         if (data.status === true) {
-            btn.classList.remove('bg-red-500');
-            btn.classList.add('bg-green-500');
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-success');
 
             // Update button text based on field
             if (field.includes('po_to_supplier')) {
@@ -1995,8 +1977,8 @@ function toggleAcknowledgment(field) {
                 alert(message);
             }
         } else {
-            btn.classList.remove('bg-green-500');
-            btn.classList.add('bg-red-500');
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-danger');
             btn.textContent = field.includes('po_sent') ? 'Not Sent' : 'Not Acknowledged';
 
             // Clear user info
@@ -2036,10 +2018,21 @@ function toggleExpediteStatus(action) {
 
         // Update UI based on current state
         const container = document.getElementById('expedite_container');
-        const buttonContainer = container.querySelector('.space-y-2');
+        const buttonContainer = document.getElementById('expedite_button_row');
+        if (!container || !buttonContainer) return;
 
-        // Reset all background classes first
-        container.classList.remove('bg-gray-50', 'bg-yellow-200', 'bg-fuchsia-200');
+        // Reset all background classes first (match server template)
+        container.classList.remove('bg-body-secondary', 'bg-warning-subtle', 'bg-danger-subtle');
+
+        function getOrCreateExpediteStatusDiv() {
+            let statusDiv = container.querySelector('.expedite-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.className = 'expedite-status mt-1 small text-body-secondary';
+                container.appendChild(statusDiv);
+            }
+            return statusDiv;
+        }
 
         if (action === 'reset') {
             // Handle reset action specifically
@@ -2049,28 +2042,18 @@ function toggleExpediteStatus(action) {
                 return;
             } else if (data.initiated && !data.successful) {
                 // Reset from successful to initiated state
-                container.classList.add('bg-gray-50');
+                container.classList.add('bg-body-secondary');
 
                 // Recreate buttons in the right state
                 buttonContainer.innerHTML = `
-                    <!-- Initiate button -->
-                    <button
+                    <button type="button"
                         onclick="toggleExpediteStatus('initiate')"
                         id="expedite_initiate_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                            bg-gray-300 text-gray-600 cursor-not-allowed"
-                        disabled>
-                        Initiate
-                    </button>
-
-                    <!-- Successful button -->
-                    <button
+                        class="btn btn-sm btn-secondary disabled" disabled>Initiate</button>
+                    <button type="button"
                         onclick="toggleExpediteStatus('successful')"
                         id="expedite_successful_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                            bg-red-200 text-red-800 hover:bg-red-300">
-                        Successful
-                    </button>
+                        class="btn btn-sm btn-outline-warning">Successful</button>
                 `;
 
                 // Update status info
@@ -2079,29 +2062,20 @@ function toggleExpediteStatus(action) {
                     statusHtml += `<p>Initiated: ${data.initiateddate} by ${data.initiatedby}</p>`;
                 }
 
-                // Update or add status div
-                let statusDiv = container.querySelector('.mt-2.text-xs');
-                if (!statusDiv) {
-                    statusDiv = document.createElement('div');
-                    statusDiv.className = 'mt-2 text-xs text-gray-700';
-                    container.appendChild(statusDiv);
-                }
+                const statusDiv = getOrCreateExpediteStatusDiv();
                 statusDiv.innerHTML = statusHtml;
 
                 return;
             } else if (data.initiated && data.successful && !data.used) {
                 // Reset from used to successful state
-                container.classList.add('bg-yellow-200');
+                container.classList.add('bg-warning-subtle');
 
                 // Recreate just the Use Expedite button (active)
                 buttonContainer.innerHTML = `
-                    <button
+                    <button type="button"
                         onclick="toggleExpediteStatus('use')"
                         id="expedite_use_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                            bg-red-200 text-red-800 hover:bg-red-300">
-                        Use Expedite
-                    </button>
+                        class="btn btn-sm btn-outline-primary">Use Expedite</button>
                 `;
 
                 // Update status info
@@ -2113,13 +2087,7 @@ function toggleExpediteStatus(action) {
                     statusHtml += `<p>Successful: ${data.successfuldate} by ${data.successfulby}</p>`;
                 }
 
-                // Update status div
-                let statusDiv = container.querySelector('.mt-2.text-xs');
-                if (!statusDiv) {
-                    statusDiv = document.createElement('div');
-                    statusDiv.className = 'mt-2 text-xs text-gray-700';
-                    container.appendChild(statusDiv);
-                }
+                const statusDiv = getOrCreateExpediteStatusDiv();
                 statusDiv.innerHTML = statusHtml;
 
                 return;
@@ -2132,16 +2100,19 @@ function toggleExpediteStatus(action) {
             const successfulBtn = document.getElementById('expedite_successful_btn');
             const useBtn = document.getElementById('expedite_use_btn');
 
+            if (!data.successful) {
+                container.classList.add('bg-body-secondary');
+            }
+
             // Handle initiate state
             if (initiateBtn) {
-                initiateBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
-                initiateBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                initiateBtn.className = 'btn btn-sm btn-secondary disabled';
                 initiateBtn.disabled = true;
             }
 
             if (data.successful) {
-                // Wild color 1 - Yellow background for successful
-                container.classList.add('bg-yellow-200');
+                container.classList.remove('bg-body-secondary');
+                container.classList.add('bg-warning-subtle');
 
                 // Hide initiate and successful buttons
                 if (initiateBtn) initiateBtn.parentElement.removeChild(initiateBtn);
@@ -2149,30 +2120,24 @@ function toggleExpediteStatus(action) {
 
                 // Add/update Use Expedite button if it doesn't exist
                 if (!useBtn) {
+                    const useCls = data.used ? 'btn btn-sm btn-secondary disabled' : 'btn btn-sm btn-outline-primary';
                     const useBtnHtml = `
-                    <button
-                        onclick="toggleExpediteStatus('use')"
-                        id="expedite_use_btn"
-                        class="w-full px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150
-                        ${data.used ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-red-200 text-red-800 hover:bg-red-300'}"
-                        ${data.used ? 'disabled' : ''}>
+                    <button type="button" onclick="toggleExpediteStatus('use')"
+                        id="expedite_use_btn" class="${useCls}" ${data.used ? 'disabled' : ''}>
                         Use Expedite
                     </button>`;
                     buttonContainer.innerHTML = useBtnHtml;
                 } else if (data.used) {
                     // If already has use button and it's used, disable it
-                    useBtn.classList.remove('bg-red-200', 'text-red-800', 'hover:bg-red-300');
-                    useBtn.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                    useBtn.className = 'btn btn-sm btn-secondary disabled';
                     useBtn.disabled = true;
 
-                    // Wild color 2 - Fuchsia background for used
-                    container.classList.remove('bg-yellow-200');
-                    container.classList.add('bg-fuchsia-200');
+                    container.classList.remove('bg-warning-subtle');
+                    container.classList.add('bg-danger-subtle');
                 }
             } else if (successfulBtn) {
                 // Enable successful button if not already successful
-                successfulBtn.classList.remove('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
-                successfulBtn.classList.add('bg-red-200', 'text-red-800', 'hover:bg-red-300');
+                successfulBtn.className = 'btn btn-sm btn-outline-warning';
                 successfulBtn.disabled = false;
             }
 
@@ -2188,13 +2153,7 @@ function toggleExpediteStatus(action) {
                 statusHtml += `<p>Used: ${data.useddate} by ${data.usedby}</p>`;
             }
 
-            // Add or update status div
-            let statusDiv = container.querySelector('.mt-2.text-xs');
-            if (!statusDiv) {
-                statusDiv = document.createElement('div');
-                statusDiv.className = 'mt-2 text-xs text-gray-700';
-                container.appendChild(statusDiv);
-            }
+            const statusDiv = getOrCreateExpediteStatusDiv();
             statusDiv.innerHTML = statusHtml;
         } else {
             // Reset to initial state - just reload the page

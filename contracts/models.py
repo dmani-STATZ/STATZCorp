@@ -94,6 +94,18 @@ class Contract(AuditModel):
     prime_po_number = models.CharField(max_length=10, null=True, blank=True)
     date_closed = models.DateTimeField(null=True, blank=True)
     date_canceled = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='contract_closed_by',
+    )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='contract_cancelled_by',
+    )
     canceled_reason = models.ForeignKey('CanceledReason', on_delete=models.CASCADE, null=True, blank=True)
     po_number = models.CharField(max_length=10, null=True, blank=True) # maybe part of clin?
     tab_num = models.CharField(max_length=10, null=True, blank=True)  # maybe part of clin?

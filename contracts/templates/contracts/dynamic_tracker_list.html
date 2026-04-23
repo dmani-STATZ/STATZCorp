@@ -16,7 +16,7 @@
         background-color: rgba(99, 102, 241, 0.05);
         border-color: rgba(99, 102, 241, 0.5);
     }
-    .dark .tracker-card:hover { background-color: rgba(99, 102, 241, 0.1); }
+    [data-bs-theme="dark"] .tracker-card:hover { background-color: rgba(99, 102, 241, 0.1); }
     .create-form-inline {
         display: flex;
         gap: 0.5rem;
@@ -31,7 +31,7 @@
         font-size: 0.875rem;
         background: white;
     }
-    .dark .create-form-inline input[type="text"] {
+    [data-bs-theme="dark"] .create-form-inline input[type="text"] {
         background: #1f2937;
         color: #e5e7eb;
         border-color: rgba(156, 163, 175, 0.3);
@@ -48,7 +48,7 @@
 {% block body %}
 <div class="container mx-auto px-4 py-6 max-w-3xl">
     <h1 class="text-2xl font-bold mb-1">Dynamic Trackers</h1>
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+    <p class="text-sm text-gray-500 mb-6">
         {% if active_company %}
             Trackers for <span class="font-medium">{{ active_company.name }}</span>
         {% else %}
@@ -58,12 +58,12 @@
 
     {% if not active_company %}
         <div class="empty-hero">
-            <p class="text-gray-500 dark:text-gray-400">No active company selected. Pick one from the company switcher to view or create trackers.</p>
+            <p class="text-gray-500">No active company selected. Pick one from the company switcher to view or create trackers.</p>
         </div>
     {% elif not schemas %}
         <div class="empty-hero">
             <h2 class="text-lg font-semibold mb-2">No trackers yet for {{ active_company.name }}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Create your first tracker to start building a dynamic, spreadsheet-style workflow.</p>
+            <p class="text-sm text-gray-500 mb-4">Create your first tracker to start building a dynamic, spreadsheet-style workflow.</p>
             <form method="post" action="{% url 'contracts:tracker_create' %}" class="max-w-md mx-auto">
                 {% csrf_token %}
                 <div class="create-form-inline">
@@ -79,7 +79,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <div class="font-medium text-base">{{ schema.name }}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        <div class="text-xs text-gray-500 mt-0.5">
                             {{ schema.columns|length }} column{{ schema.columns|length|pluralize }} ·
                             {{ schema.records.count }} record{{ schema.records.count|pluralize }}
                         </div>
@@ -90,7 +90,7 @@
             {% endfor %}
         </div>
 
-        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div class="border-t border-gray-200 pt-4">
             <h3 class="text-sm font-semibold mb-2">Create another tracker</h3>
             <form method="post" action="{% url 'contracts:tracker_create' %}">
                 {% csrf_token %}

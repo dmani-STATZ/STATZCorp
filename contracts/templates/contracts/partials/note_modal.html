@@ -7,15 +7,11 @@
         <div class="fixed inset-0 bg-black opacity-50" id="noteModalBackdrop"></div>
 
         <!-- Modal content -->
-        <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-auto z-10">
+        <div class="relative bg-body rounded-lg shadow-xl max-w-2xl w-full mx-auto z-10">
             <!-- Modal header -->
             <div class="row-between p-4 border-b">
-                <h3 class="text-xl font-semibold text-gray-800" id="noteModalTitle">Add Note</h3>
-                <button type="button" class="text-gray-400 hover:text-gray-500" id="closeNoteModal">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                <h3 class="text-xl font-semibold" id="noteModalTitle">Add Note</h3>
+                <button type="button" class="btn-close" aria-label="Close" id="closeNoteModal"></button>
             </div>
 
             <!-- Modal body -->
@@ -30,36 +26,36 @@
                     <div class="space-y-4">
                         <div class="form-group">
                             <label for="id_note" class="block text-sm font-medium text-gray-700 mb-1">Note Details</label>
-                            <textarea id="id_note" name="note" rows="4" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter Note"></textarea>
+                            <textarea id="id_note" name="note" rows="4" class="form-control" placeholder="Enter Note"></textarea>
                         </div>
                     </div>
 
                     <!-- Reminder section -->
-                    <div class="mt-6 pt-4 border-t border-gray-200">
+                    <div class="mt-6 pt-4 border-t border">
                         <div class="flex items-center mb-4">
-                            <input type="checkbox" id="createReminder" name="create_reminder" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <input type="checkbox" id="createReminder" name="create_reminder" class="h-4 w-4 text-blue-600 border rounded focus:ring-blue-500">
                             <label for="createReminder" class="ml-2 block text-sm font-medium text-gray-700">Create a reminder for this note</label>
                         </div>
 
                         <div id="reminderFields" class="space-y-4 hidden">
                             <div class="form-group">
                                 <label for="id_reminder_title" class="block text-sm font-medium text-gray-700 mb-1">Reminder Title</label>
-                                <input type="text" id="id_reminder_title" name="reminder_title" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter Reminder Title">
+                                <input type="text" id="id_reminder_title" name="reminder_title" class="form-control" placeholder="Enter Reminder Title">
                             </div>
 
                             <div class="form-group">
                                 <label for="id_reminder_text" class="block text-sm font-medium text-gray-700 mb-1">Reminder Details</label>
-                                <textarea id="id_reminder_text" name="reminder_text" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter Reminder Details"></textarea>
+                                <textarea id="id_reminder_text" name="reminder_text" rows="2" class="form-control" placeholder="Enter Reminder Details"></textarea>
                             </div>
 
                             <div class="form-group">
                                 <label for="id_reminder_date" class="block text-sm font-medium text-gray-700 mb-1">Reminder Date</label>
-                                <input type="datetime-local" id="id_reminder_date" name="reminder_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <input type="datetime-local" id="id_reminder_date" name="reminder_date" class="form-control">
                             </div>
 
                             <div class="form-group">
                                 <div class="flex items-center">
-                                    <input type="checkbox" id="id_reminder_completed" name="reminder_completed" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <input type="checkbox" id="id_reminder_completed" name="reminder_completed" class="h-4 w-4 text-blue-600 border rounded focus:ring-blue-500">
                                     <label for="id_reminder_completed" class="ml-2 block text-sm font-medium text-gray-700">Reminder Completed</label>
                                 </div>
                             </div>
@@ -69,11 +65,11 @@
             </div>
 
             <!-- Modal footer -->
-            <div class="flex justify-end space-x-3 p-4 border-t border-gray-200">
-                <button type="button" style="btn btn-caution; padding: 0.5rem 1rem; border-radius: 0.25rem; display: inline-block; transition: background-color 0.3s;" id="cancelNoteModal">
+            <div class="flex justify-end space-x-3 p-4 border-t border">
+                <button type="button" class="btn btn-secondary" id="cancelNoteModal">
                     Cancel
                 </button>
-                <button type="button" class="px-4 py-2 btn btn-save rounded-md focus:outline-none focus:ring-2" id="saveNoteBtn">
+                <button type="button" class="btn btn-success" id="saveNoteBtn">
                     Save Note
                 </button>
             </div>

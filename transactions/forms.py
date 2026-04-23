@@ -9,7 +9,7 @@ from .field_types import get_field_info, WIDGET_DATE, WIDGET_DATETIME, WIDGET_BO
 
 def _input_attrs(editable=True):
     base = {
-        "class": "form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100",
+        "class": "form-control",
     }
     if not editable:
         base["readonly"] = True
@@ -23,7 +23,7 @@ class TransactionForm(forms.ModelForm):
         model = Transaction
         fields = ("field_name", "old_value", "new_value")
         widgets = {
-            "field_name": forms.TextInput(attrs={"class": "form-input block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600", "readonly": True}),
+            "field_name": forms.TextInput(attrs={"class": "form-control", "readonly": True}),
         }
 
     def __init__(self, content_type_id=None, field_name=None, *args, **kwargs):

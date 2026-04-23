@@ -6,11 +6,11 @@
 
 {% block body %}
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div class="min-h-screen bg-body">
     <!-- Main Content -->
     <main>
         <!-- Default width container that all pages will inherit -->
-        <div class="mx-auto dark:bg-gray-800 dark:text-gray-100" style="width: 75%">
+        <div class="mx-auto" style="width: 75%">
             {% block content %}
                 {% block contract_content %}{% endblock contract_content %}
             {% endblock content %}
@@ -18,7 +18,7 @@
     </main>
 
     <!-- Sticky Footer -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t z-50">
+    <div class="fixed bottom-0 left-0 right-0 bg-body shadow-lg border-t z-50">
         <div class="container mx-auto px-4 py-3">
             <div class="flex justify-between items-center">
                 <!-- Left side: Contract Navigation Menu -->
@@ -31,7 +31,7 @@
                     </button>
 
                     <!-- Menu Panel with updated styling -->
-                    <div class="menu-panel absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200" id="menuPanel">
+                    <div class="menu-panel absolute bottom-full left-0 mb-2 bg-body rounded-lg shadow-xl border border-gray-200" id="menuPanel">
                         <div class="py-2">
                             <a href="{% url 'contracts:contracts_dashboard' %}"
                                class="menu-item {% if request.resolver_match.url_name == 'contracts_dashboard' %}active{% endif %}">
@@ -87,10 +87,10 @@
 
 <!-- Contract Search Modal (header button lives in base_template; modal + script here for all contract app pages) -->
 <div id="contractSearchModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 99999;" onclick="if(event.target===this)closeContractSearchModal()">
-    <div class="relative top-20 mx-auto p-6 border shadow-lg rounded-md bg-white dark:bg-gray-800" style="width: 520px !important; max-width: 95%;" onclick="event.stopPropagation()">
+    <div class="relative top-20 mx-auto p-6 border shadow-lg rounded-md bg-body" style="width: 520px !important; max-width: 95%;" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Jump to Contract</h3>
-            <button type="button" onclick="closeContractSearchModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <h3 class="text-xl font-semibold text-gray-800">Jump to Contract</h3>
+            <button type="button" onclick="closeContractSearchModal()" class="text-gray-400 hover:text-gray-600">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -98,33 +98,33 @@
             <div class="flex items-center gap-4 flex-wrap">
                 <div class="relative flex-1" style="min-width: 200px">
                     <input type="text" id="contract-search-modal-input"
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         placeholder="Search by contract number, last 4 digits, or PO number..."
                         autocomplete="off">
                     <div id="contract-search-modal-results"
-                        class="absolute z-50 w-full card mt-1 border-gray-200 max-h-64 overflow-y-auto hidden dark:bg-gray-700 dark:border-gray-600">
+                        class="absolute z-50 w-full card mt-1 border-gray-200 max-h-64 overflow-y-auto hidden">
                     </div>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</span>
+                    <span class="text-sm font-medium text-gray-700">Status:</span>
                     <label class="inline-flex items-center cursor-pointer">
                         <input type="radio" name="contract-search-status" value="open" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Open</span>
+                        <span class="text-sm text-gray-700">Open</span>
                     </label>
                     <label class="inline-flex items-center cursor-pointer">
                         <input type="radio" name="contract-search-status" value="closed" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Closed</span>
+                        <span class="text-sm text-gray-700">Closed</span>
                     </label>
                     <label class="inline-flex items-center cursor-pointer">
                         <input type="radio" name="contract-search-status" value="both" checked class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Both</span>
+                        <span class="text-sm text-gray-700">Both</span>
                     </label>
                 </div>
             </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Type at least 3 characters (e.g. last 4 digits of contract number). Click a contract to jump to it.</p>
+            <p class="text-sm text-gray-500">Type at least 3 characters (e.g. last 4 digits of contract number). Click a contract to jump to it.</p>
         </div>
         <div class="mt-6 flex justify-end gap-2">
-            <button type="button" onclick="closeContractSearchModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600">
+            <button type="button" onclick="closeContractSearchModal()" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 Cancel
             </button>
         </div>
@@ -171,10 +171,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (results.length > 0) {
                         results.forEach(function(contract) {
                             var div = document.createElement('div');
-                            div.className = 'px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer';
-                            var html = '<div class="text-sm text-blue-600 dark:text-blue-400">' + contract.contract_number + '</div>';
+                            div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                            var html = '<div class="text-sm text-blue-600">' + contract.contract_number + '</div>';
                             if (contract.po_numbers && contract.po_numbers.length > 0) {
-                                html += '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">PO: ' + contract.po_numbers.join(', ') + '</div>';
+                                html += '<div class="text-xs text-gray-500 mt-1">PO: ' + contract.po_numbers.join(', ') + '</div>';
                             }
                             div.innerHTML = html;
                             div.addEventListener('click', function() { window.location.href = contractManagementUrl + contract.id + '/'; });
@@ -510,12 +510,12 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- Reminders Sidebar -->
-<div class="reminderbar bg-white text-gray-800 w-80 fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col dark:bg-gray-900 dark:text-gray-100" id="reminderbar" style="height: calc(100vh - 4rem)">
-    <div class="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0 dark:border-gray-700">
+<div class="reminderbar w-80 fixed top-16 right-0 inactive rounded-tl-lg rounded-bl-lg border-l-2 border-b-2 border-t-2 {% if overdue_count > 0 %}border-red-600{% else %}border-green-600{% endif %} shadow-xl flex flex-col" id="reminderbar" style="height: calc(100vh - 4rem)">
+    <div class="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
         <div>
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">My Reminders</h2>
+            <h2 class="text-lg font-semibold text-gray-800">My Reminders</h2>
             {% if reminders %}
-                <div class="flex flex-wrap text-xs mt-1 text-gray-800 dark:text-gray-200 gap-2">
+                <div class="flex flex-wrap text-xs mt-1 text-gray-800 gap-2">
                     <span class="flex items-center">
                         <span class="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>
                         Due: {{ due_count|default:"0" }}
@@ -539,10 +539,10 @@ document.addEventListener('DOMContentLoaded', function() {
         </button>
     </div>
 
-    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 dark:bg-gray-800 dark:border-gray-700 space-y-2">
+    <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 space-y-2">
         <div class="flex items-center justify-between gap-2">
-            <label for="reminder-upcoming-days" class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Future days:</label>
-            <select id="reminder-upcoming-days" class="text-sm border border-gray-300 rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" title="Show reminders from today (0) up to 7 days ahead">
+            <label for="reminder-upcoming-days" class="text-xs text-gray-600 whitespace-nowrap">Future days:</label>
+            <select id="reminder-upcoming-days" class="text-sm border border-gray-300 rounded px-2 py-1" title="Show reminders from today (0) up to 7 days ahead">
                 {% for n in "01234567" %}
                 <option value="{{ forloop.counter0 }}" {% if reminder_sidebar_upcoming_days|default:0 == forloop.counter0 %}selected{% endif %}>{{ forloop.counter0 }}{% if forloop.counter0 == 0 %} (today only){% endif %}</option>
                 {% endfor %}
@@ -561,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="space-y-3">
                 {% for reminder in reminders %}
                         {% if not reminder.completed %}
-                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200 dark:border-red-800/50{% elif reminder.is_upcoming %}bg-green-50 border border-green-200 dark:border-green-800/50{% else %}bg-blue-50 border border-blue-200 dark:border-blue-800/50{% endif %} shadow-sm cursor-pointer reminder-item"
+                            <div class="p-3 rounded-lg {% if reminder.is_overdue %}bg-red-50 border border-red-200{% elif reminder.is_upcoming %}bg-green-50 border border-green-200{% else %}bg-blue-50 border border-blue-200{% endif %} shadow-sm cursor-pointer reminder-item"
                                  data-reminder-id="{{ reminder.id }}"
                                  data-reminder-title="{{ reminder.title|escapejs }}"
                                  data-reminder-text="{{ reminder.description|escapejs }}"
@@ -570,16 +570,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                  data-reminder-iso-date="{{ reminder.reminder_date|date:'c' }}"
                                  onclick="showReminderDetails(this)">
                                 <div class="flex justify-between">
-                                    <h3 class="font-medium text-gray-800 dark:text-gray-200 mb-1">{{ reminder.title }}</h3>
+                                    <h3 class="font-medium text-gray-800 mb-1">{{ reminder.title }}</h3>
                                     <div class="flex">
-                                        <button type="button" class="text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-500 mr-2"
+                                        <button type="button" class="text-gray-500 hover:text-green-600 mr-2"
                                                 title="Mark Complete"
                                                 onclick="event.stopPropagation(); completeReminder('{{ reminder.id }}')">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                             </svg>
                                         </button>
-                                        <button type="button" class="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-500"
+                                        <button type="button" class="text-gray-500 hover:text-blue-600"
                                                 title="Edit"
                                                 data-reminder-id="{{ reminder.id }}"
                                                 data-reminder-title="{{ reminder.title|escapejs }}"
@@ -592,29 +592,29 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </button>
                                     </div>
                                 </div>
-                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">{{ reminder.description|truncatewords:20 }}</p>
+                                <p class="text-sm text-gray-600 mb-2">{{ reminder.description|truncatewords:20 }}</p>
                                 <div class="flex justify-between items-center text-xs">
                                     <div>
-                                        <span class="text-gray-500 dark:text-gray-400">Due: </span>
-                                        <span class="{% if reminder.is_overdue %}text-red-600 dark:text-red-400 font-semibold{% else %}text-gray-600 dark:text-gray-400{% endif %}">
+                                        <span class="text-gray-500">Due: </span>
+                                        <span class="{% if reminder.is_overdue %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
                                             {{ reminder.reminder_date|date:"F j, Y" }}
                                         </span>
                                     </div>
                                     <div>
                                         {% if reminder.is_overdue %}
-                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 dark:text-red-300 text-xs">Overdue</span>
+                                            <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs">Overdue</span>
                                         {% elif reminder.is_upcoming %}
-                                            <span class="inline-block px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs">Upcoming</span>
+                                            <span class="inline-block px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">Upcoming</span>
                                         {% else %}
-                                            <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 text-xs">Due</span>
+                                            <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">Due</span>
                                         {% endif %}
                                     </div>
                                 </div>
                             </div>
                         {% endif %}
                 {% empty %}
-                    <div class="text-center text-gray-500 py-8 dark:text-gray-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="text-center text-gray-500 py-8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <p>No reminders in this range.</p>
@@ -622,16 +622,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 {% endfor %}
             </div>
         {% else %}
-            <div class="text-center text-gray-500 py-8 dark:text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="text-center text-gray-500 py-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p>No reminders yet.</p>
-                <button type="button" onclick="showNewReminderModal()" class="mt-3 inline-block text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">Add one now</button>
+                <button type="button" onclick="showNewReminderModal()" class="mt-3 inline-block text-blue-600 hover:text-blue-800 font-medium">Add one now</button>
             </div>
         {% endif %}
     </div>
-    <div class="border-t border-gray-200 bg-white p-3 text-center flex-shrink-0 dark:bg-gray-900 dark:border-gray-700">
+    <div class="border-t border-gray-200 bg-body p-3 text-center flex-shrink-0">
         <button type="button" onclick="showNewReminderModal()" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md w-full text-sm flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />

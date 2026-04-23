@@ -37,6 +37,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - `contracts/models.py`, `suppliers/models.py` — confirm field names and types match what signals expect
 
 ### Before changing widget/form behavior
+- `TransactionForm` and `EditFieldForm` widget styling is centralized in `_input_attrs()` in `transactions/forms.py` and uses the Bootstrap 5 `form-control` class.
 - `transactions/field_types.py` — `get_field_info()` and `_fk_choices()`
 - `transactions/forms.py` — `TransactionForm._set_value_widgets()` and `EditFieldForm._set_widget()`
 - `transactions/templates/transactions/partials/transaction_edit.html` — the edit partial is injected via `innerHTML`; its form field names and JS submit handler must stay aligned with `EditFieldForm`

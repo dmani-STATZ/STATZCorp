@@ -5,16 +5,16 @@
 {% block contract_content %}
 <div class="max-w-6xl mx-auto px-4 pt-6 pb-10 space-y-6">
   <!-- Header -->
-  <div class="relative shadow-sm rounded-xl p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if supplier.probation %}bg-red-50 border border-red-200{% elif supplier.conditional %}bg-yellow-50 border border-yellow-200{% else %}bg-white{% endif %}">
+  <div class="card card-padded relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if supplier.probation %}border-danger bg-danger-subtle{% elif supplier.conditional %}border-warning bg-warning-subtle{% endif %}">
     <div class="absolute top-4 right-4 row gap-3">
-      <a href="{% url 'suppliers:supplier_dashboard' %}" class="text-sm text-blue-700 hover:text-blue-900 underline">&larr; Back to Dashboard</a>
+      <a href="{% url 'suppliers:supplier_dashboard' %}" class="text-sm">&larr; Back to Dashboard</a>
       <div class="h-5 w-5 rounded-full border-2 {% if supplier.archived %}bg-red-500 border-red-600{% else %}bg-green-500 border-green-600{% endif %}" title="{% if supplier.archived %}Archived{% else %}Active{% endif %}"></div>
     </div>
     <div class="row gap-4">
       {% if supplier.logo_url %}
-        <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-16 w-16 object-contain rounded-md border border-gray-200 bg-white">
+        <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-16 w-16 object-contain rounded-md border">
       {% else %}
-        <div class="h-16 w-16 rounded-md border border-gray-200 bg-gray-50 row justify-center text-gray-400 text-xl font-semibold">
+        <div class="h-16 w-16 rounded-md border bg-body-secondary row justify-center text-gray-400 text-xl font-semibold">
           {{ supplier.name|default:"S"|slice:":1" }}
         </div>
       {% endif %}
@@ -26,15 +26,15 @@
           <span id="supplier-name-value">{{ supplier.name|default:"Supplier" }}</span>
         </button>
         <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
             <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'cage_code')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">CAGE:</button>
             <span id="supplier-cage-code-value">{{ supplier.cage_code|default:"—" }}</span>
           </span>
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
             <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'dodaac')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">DoDAAC:</button>
             <span id="supplier-dodaac-value">{{ supplier.dodaac|default:"—" }}</span>
           </span>
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border border-gray-200 gap-1">
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
             <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'allows_gsi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">GSI:</button>
             <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
           </span>
@@ -46,12 +46,12 @@
         </div>
         <div class="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
           {% if supplier.primary_phone or supplier.business_phone %}
-            <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="row gap-1 text-blue-600 hover:text-blue-800">
+            <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="row gap-1">
               {{ supplier.primary_phone|default:supplier.business_phone }}
             </a>
           {% endif %}
           {% if supplier.primary_email or supplier.business_email %}
-            <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="row gap-1 text-blue-600 hover:text-blue-800">
+            <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="row gap-1">
               {{ supplier.primary_email|default:supplier.business_email }}
             </a>
           {% endif %}
@@ -59,7 +59,7 @@
       </div>
     </div>
     <div class="flex flex-wrap gap-2 md:pl-6">
-      <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 hover:text-gray-900">
+      <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="btn btn-sm btn-outline-secondary">
         Edit Supplier
       </a>
       {% if supplier.website_url %}
@@ -67,7 +67,7 @@
           id="enrich-from-website-btn"
           data-supplier-id="{{ supplier.id }}"
           href="{% url 'suppliers:supplier_enrich_page' supplier.id %}"
-          class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:text-green-900">
+          class="btn btn-sm btn-outline-success">
           Enrich from website
         </a>
       {% endif %}
@@ -77,7 +77,7 @@
   <!-- Status / Notes -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
     <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Status Flags</h2>
+      <h2 class="text-lg font-semibold mb-3">Status Flags</h2>
       <ul class="space-y-2 text-sm text-gray-800">
         <li>
           <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'probation')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Probation:</button>
@@ -94,7 +94,7 @@
       </ul>
     </div>
     <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Compliance</h2>
+      <h2 class="text-lg font-semibold mb-3">Compliance</h2>
       <ul class="space-y-2 text-sm text-gray-800">
         <li>
           <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'iso')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">ISO:</button>
@@ -129,7 +129,7 @@
       </ul>
     </div>
     <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Notes</h2>
+      <h2 class="text-lg font-semibold mb-3">Notes</h2>
       {% if supplier.notes %}
         <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
       {% else %}
@@ -137,7 +137,7 @@
       {% endif %}
     </div>
     <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Contact &amp; Web</h2>
+      <h2 class="text-lg font-semibold mb-3">Contact &amp; Web</h2>
       <dl class="space-y-2 text-sm text-gray-800">
         <div class="flex items-start justify-between gap-3">
           <dt class="text-gray-600">
@@ -145,7 +145,7 @@
           </dt>
           <dd id="supplier-business-phone-value">
             {% if supplier.business_phone %}
-              <a href="tel:{{ supplier.business_phone }}" class="text-blue-600 hover:text-blue-800">{{ supplier.business_phone }}</a>
+              <a href="tel:{{ supplier.business_phone }}">{{ supplier.business_phone }}</a>
             {% else %}
               <span class="text-gray-400">—</span>
             {% endif %}
@@ -157,7 +157,7 @@
           </dt>
           <dd id="supplier-primary-phone-value">
             {% if supplier.primary_phone %}
-              <a href="tel:{{ supplier.primary_phone }}" class="text-blue-600 hover:text-blue-800">{{ supplier.primary_phone }}</a>
+              <a href="tel:{{ supplier.primary_phone }}">{{ supplier.primary_phone }}</a>
             {% else %}
               <span class="text-gray-400">—</span>
             {% endif %}
@@ -169,7 +169,7 @@
           </dt>
           <dd id="supplier-business-email-value">
             {% if supplier.business_email %}
-              <a href="mailto:{{ supplier.business_email }}" class="text-blue-600 hover:text-blue-800">{{ supplier.business_email }}</a>
+              <a href="mailto:{{ supplier.business_email }}">{{ supplier.business_email }}</a>
             {% else %}
               <span class="text-gray-400">—</span>
             {% endif %}
@@ -181,7 +181,7 @@
           </dt>
           <dd id="supplier-primary-email-value">
             {% if supplier.primary_email %}
-              <a href="mailto:{{ supplier.primary_email }}" class="text-blue-600 hover:text-blue-800">{{ supplier.primary_email }}</a>
+              <a href="mailto:{{ supplier.primary_email }}">{{ supplier.primary_email }}</a>
             {% else %}
               <span class="text-gray-400">—</span>
             {% endif %}
@@ -193,7 +193,7 @@
           </dt>
           <dd id="supplier-website-url-value" class="break-all">
             {% if supplier.website_url %}
-              <a href="{{ supplier.website_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">{{ supplier.website_url }}</a>
+              <a href="{{ supplier.website_url }}" target="_blank" rel="noopener">{{ supplier.website_url }}</a>
             {% else %}
               <span class="text-gray-400">—</span>
             {% endif %}
@@ -202,16 +202,16 @@
       </dl>
     </div>
     <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">RFQ Email</h2>
+      <h2 class="text-lg font-semibold mb-3">RFQ Email</h2>
       <p class="text-sm text-gray-800 mb-2">
         {% if supplier.rfq_email %}
-          <a href="mailto:{{ supplier.rfq_email }}" class="text-blue-600 hover:text-blue-800">{{ supplier.rfq_email }}</a>
+          <a href="mailto:{{ supplier.rfq_email }}">{{ supplier.rfq_email }}</a>
         {% else %}
           <span class="text-amber-700 font-medium">Not set</span>
         {% endif %}
       </p>
-      <button type="button" id="rfq-email-picker-toggle" class="text-sm text-blue-600 hover:text-blue-800">Set RFQ Email</button>
-      <div id="rfq-email-picker" class="hidden mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+      <button type="button" id="rfq-email-picker-toggle" class="btn btn-sm btn-outline-primary">Set RFQ Email</button>
+      <div id="rfq-email-picker" class="hidden mt-3 p-3 border rounded-lg bg-body-secondary space-y-3">
         <p class="text-sm font-medium text-gray-900">Select RFQ email for {{ supplier.name|default:"this supplier" }}:</p>
         <form method="post" action="{% url 'suppliers:supplier_set_rfq_email' supplier_id=supplier.pk %}" id="rfq-email-form">
           {% csrf_token %}
@@ -244,8 +244,8 @@
             {% endif %}
           </div>
           <div class="mt-3 flex gap-2">
-            <button type="submit" class="px-3 py-1 rounded bg-blue-600 text-white text-sm font-medium">Save</button>
-            <button type="button" id="rfq-email-picker-cancel" class="px-3 py-1 rounded border border-gray-300 text-gray-700 text-sm">Cancel</button>
+            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+            <button type="button" id="rfq-email-picker-cancel" class="btn btn-sm btn-secondary">Cancel</button>
           </div>
         </form>
       </div>
@@ -259,7 +259,7 @@
       <h2 class="h5 mb-0">Contact Groups</h2>
       <button type="button"
               id="add-group-btn"
-              class="btn btn-sm btn-save"
+              class="btn btn-sm btn-success"
               {% if not contacts %}disabled title="Add contacts before creating groups"{% endif %}>
         + Add Group
       </button>
@@ -384,16 +384,16 @@
   <!-- Addresses / Contacts -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <div class="card card-padded shadow-sm lg:col-span-2">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Addresses</h2>
+      <h2 class="text-lg font-semibold mb-3">Addresses</h2>
       {{ supplier_address_slots_client|json_script:"supplier-address-slot-meta" }}
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         {% for slot in address_slots %}
-          <div class="border border-gray-200 rounded-lg p-3">
+          <div class="border rounded-lg p-3">
             <div class="row-between gap-2 items-start mb-1">
               <p class="label mb-0">{{ slot.title }} Address</p>
               <button
                 type="button"
-                class="open-supplier-address-modal shrink-0 text-sm font-medium text-blue-600 hover:text-blue-800 px-1"
+                class="open-supplier-address-modal btn btn-sm btn-outline-primary shrink-0 px-1"
                 data-initial-slot="{{ slot.field }}"
                 title="Add new address for this slot"
                 aria-label="Add {{ slot.title }} address"
@@ -417,12 +417,12 @@
 
     <div class="card card-padded shadow-sm" id="contacts-section">
       <div class="row-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
-        <button type="button" id="open-contact-modal" class="text-sm text-blue-600 hover:text-blue-800">Add Contact</button>
+        <h2 class="text-lg font-semibold">Contacts</h2>
+        <button type="button" id="open-contact-modal" class="btn btn-sm btn-outline-primary">Add Contact</button>
       </div>
       <div class="space-y-3">
         {% for contact in contacts %}
-          <div class="border border-gray-200 rounded-lg p-3 contact-card" data-contact-id="{{ contact.id }}">
+          <div class="border rounded-lg p-3 contact-card" data-contact-id="{{ contact.id }}">
             <div class="row-between gap-3">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold">
@@ -433,12 +433,12 @@
                 <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
                 {% if contact.email %}
                   <p class="text-xs text-gray-600">
-                    <a href="mailto:{{ contact.email }}" class="text-blue-600 hover:text-blue-800">{{ contact.email }}</a>
+                    <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
                   </p>
                 {% endif %}
                 {% if contact.phone %}
                   <p class="text-xs text-gray-600">
-                    <a href="tel:{{ contact.phone }}" class="text-blue-600 hover:text-blue-800">{{ contact.phone }}</a>
+                    <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>
                   </p>
                 {% endif %}
               </div>
@@ -446,7 +446,7 @@
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    class="edit-contact-btn text-xs text-blue-600 hover:text-blue-800"
+                    class="edit-contact-btn btn btn-sm btn-outline-primary"
                     data-contact-id="{{ contact.id }}"
                     data-contact-name="{{ contact.name|default_if_none:''|escape }}"
                     data-contact-title="{{ contact.title|default_if_none:''|escape }}"
@@ -455,14 +455,14 @@
                   >
                     Edit
                   </button>
-                  <button type="button" class="delete-contact-btn text-xs text-red-600 hover:text-red-800" data-contact-id="{{ contact.id }}">
+                  <button type="button" class="delete-contact-btn btn btn-sm btn-outline-danger" data-contact-id="{{ contact.id }}">
                     Delete
                   </button>
                 </div>
                 <div class="contact-delete-confirm hidden flex flex-wrap items-center justify-end gap-2 text-xs text-gray-700">
                   <span>Are you sure?</span>
-                  <button type="button" class="contact-delete-yes px-2 py-0.5 rounded border border-red-300 text-red-700 hover:bg-red-50">Yes</button>
-                  <button type="button" class="contact-delete-no px-2 py-0.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+                  <button type="button" class="contact-delete-yes btn btn-sm btn-outline-danger">Yes</button>
+                  <button type="button" class="contact-delete-no btn btn-sm btn-outline-secondary">Cancel</button>
                 </div>
               </div>
             </div>
@@ -478,12 +478,12 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="card card-padded shadow-sm">
       <div class="row-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900">Certifications</h2>
-        <button type="button" id="open-cert-modal" class="text-sm text-blue-600 hover:text-blue-800">Add Certification</button>
+        <h2 class="text-lg font-semibold">Certifications</h2>
+        <button type="button" id="open-cert-modal" class="btn btn-sm btn-outline-primary">Add Certification</button>
       </div>
       <div class="space-y-3">
         {% for cert in certification_rows %}
-          <div class="border border-gray-200 rounded-lg p-3">
+          <div class="border rounded-lg p-3">
             <div class="row-between gap-3">
               <div>
                 <p class="text-sm font-semibold text-gray-900">{{ cert.type_name }}</p>
@@ -496,7 +496,7 @@
               </div>
               <button
                 type="button"
-                class="edit-cert-btn text-xs text-blue-600 hover:text-blue-800"
+                class="edit-cert-btn btn btn-sm btn-outline-primary"
                 data-cert-id="{{ cert.id }}"
                 data-cert-type-id="{{ cert.type_id }}"
                 data-cert-date="{% if cert.date %}{{ cert.date|date:'Y-m-d' }}{% endif %}"
@@ -514,12 +514,12 @@
     </div>
     <div class="card card-padded shadow-sm">
       <div class="row-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900">Classifications</h2>
-        <button type="button" id="open-class-modal" class="text-sm text-blue-600 hover:text-blue-800">Add Classification</button>
+        <h2 class="text-lg font-semibold">Classifications</h2>
+        <button type="button" id="open-class-modal" class="btn btn-sm btn-outline-primary">Add Classification</button>
       </div>
       <div class="space-y-3">
         {% for classification in classification_rows %}
-          <div class="border border-gray-200 rounded-lg p-3">
+          <div class="border rounded-lg p-3">
             <div class="row-between gap-3">
               <div>
                 <p class="text-sm font-semibold text-gray-900">{{ classification.type_name }}</p>
@@ -531,7 +531,7 @@
               </div>
               <button
                 type="button"
-                class="edit-class-btn text-xs text-blue-600 hover:text-blue-800"
+                class="edit-class-btn btn btn-sm btn-outline-primary"
                 data-class-id="{{ classification.id }}"
                 data-class-type-id="{{ classification.type_id }}"
                 data-class-date="{% if classification.date %}{{ classification.date|date:'Y-m-d' }}{% endif %}"
@@ -551,17 +551,17 @@
   <!-- Files -->
   <div class="card card-padded shadow-sm">
     <div class="row-between mb-3">
-      <h2 class="text-lg font-semibold text-gray-900">Files & Documents</h2>
+      <h2 class="text-lg font-semibold">Files & Documents</h2>
     </div>
     <div class="space-y-3">
       {% if supplier.files_url %}
-        <div class="border border-gray-200 rounded-lg p-3">
+        <div class="border rounded-lg p-3">
           <p class="label text-gray-900">Files URL</p>
           <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
         </div>
       {% endif %}
       {% for doc in documents %}
-        <div class="border border-gray-200 rounded-lg p-3">
+        <div class="border rounded-lg p-3">
           <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
           <p class="text-xs text-gray-600">
             {{ doc.description|default:"Document" }}
@@ -578,7 +578,7 @@
 
   <div id="enrichment-panel" class="card card-padded shadow-sm" style="display:none; margin-top:1rem;">
   <div class="row-between mb-3">
-      <h2 class="text-lg font-semibold text-gray-900">Suggested updates from {{ supplier.website_url }}</h2>
+      <h2 class="text-lg font-semibold">Suggested updates from {{ supplier.website_url }}</h2>
     </div>
     <p id="enrichment-empty-msg" class="text-sm text-gray-500" style="display:none;">No suggestions found.</p>
     <div id="enrichment-rows"></div>
@@ -587,7 +587,7 @@
   <!-- Contracts -->
   <div class="card card-padded shadow-sm">
   <div class="row-between mb-3">
-      <h2 class="text-lg font-semibold text-gray-900">Contracts</h2>
+      <h2 class="text-lg font-semibold">Contracts</h2>
       {% if clin_summary.total_clins %}
         <p class="text-sm text-gray-500">CLINs: {{ clin_summary.total_clins }} | Value: ${{ clin_summary.total_value|floatformat:0|intcomma }}</p>
       {% endif %}
@@ -600,8 +600,8 @@
       </div>
     {% endif %}
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+      <table class="min-w-full table table-sm table-hover divide-y">
+        <thead class="table-light">
           <tr>
             <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Contract</th>
             <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Company</th>
@@ -610,9 +610,9 @@
             <th class="px-4 py-2 text-left label text-gray-500 uppercase tracking-wider">Performance</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y">
           {% for contract in contracts %}
-            <tr class="hover:bg-gray-50">
+            <tr>
               <td class="px-4 py-2">
                 {% if contract %}
                   <a href="{% url 'contracts:contract_management' contract.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
@@ -651,19 +651,15 @@
   <div class="card card-padded shadow-2xl w-full max-w-lg">
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h3 id="cert-modal-title" class="text-lg font-semibold text-gray-900">Add Certification</h3>
+        <h3 id="cert-modal-title" class="text-lg font-semibold">Add Certification</h3>
         <p class="text-sm text-gray-500">Create a new supplier certification</p>
       </div>
-      <button type="button" id="cert-modal-close" class="text-gray-500 hover:text-gray-700">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <button type="button" id="cert-modal-close" class="btn-close"></button>
     </div>
     <div class="space-y-3">
       <div>
         <label class="block label mb-1" for="cert-type-input">Type</label>
-        <select id="cert-type-input" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+        <select id="cert-type-input" class="form-select form-select-sm">
           <option value="">Select type</option>
           {% for ct in certification_types %}
             <option value="{{ ct.id }}">{{ ct.name }}</option>
@@ -673,25 +669,25 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block label mb-1" for="cert-date-input">Date</label>
-          <input id="cert-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+          <input id="cert-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="form-control form-control-sm">
         </div>
         <div>
           <label class="block label mb-1" for="cert-exp-input">Expiration</label>
-          <input id="cert-exp-input" type="date" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+          <input id="cert-exp-input" type="date" class="form-control form-control-sm">
         </div>
       </div>
       <div>
         <label class="block label mb-1" for="cert-compliance-input">Compliance Status</label>
-        <input id="cert-compliance-input" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" placeholder="Enter compliance status">
+        <input id="cert-compliance-input" type="text" class="form-control form-control-sm" placeholder="Enter compliance status">
       </div>
       <div>
         <label class="block label mb-1" for="cert-file-input">Attach File (optional)</label>
-        <input id="cert-file-input" type="file" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white">
+        <input id="cert-file-input" type="file" class="form-control form-control-sm">
       </div>
     </div>
     <div class="mt-6 flex justify-end gap-2">
-      <button type="button" id="cert-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
-      <button type="button" id="cert-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+      <button type="button" id="cert-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
+      <button type="button" id="cert-modal-save" class="px-4 py-2 rounded-md btn btn-success text-sm font-semibold">Save</button>
     </div>
   </div>
 </div>
@@ -701,19 +697,15 @@
   <div class="card card-padded shadow-2xl w-full max-w-lg">
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h3 id="class-modal-title" class="text-lg font-semibold text-gray-900">Add Classification</h3>
+        <h3 id="class-modal-title" class="text-lg font-semibold">Add Classification</h3>
         <p class="text-sm text-gray-500">Create a new supplier classification</p>
       </div>
-      <button type="button" id="class-modal-close" class="text-gray-500 hover:text-gray-700">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <button type="button" id="class-modal-close" class="btn-close"></button>
     </div>
     <div class="space-y-3">
       <div>
         <label class="block label mb-1" for="class-type-input">Type</label>
-        <select id="class-type-input" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+        <select id="class-type-input" class="form-select form-select-sm">
           <option value="">Select type</option>
           {% for ct in classification_types %}
             <option value="{{ ct.id }}">{{ ct.name }}</option>
@@ -723,21 +715,21 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block label mb-1" for="class-date-input">Date</label>
-          <input id="class-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+          <input id="class-date-input" type="date" max="{{ today|date:'Y-m-d' }}" class="form-control form-control-sm">
         </div>
         <div>
           <label class="block label mb-1" for="class-exp-input">Expiration</label>
-          <input id="class-exp-input" type="date" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm">
+          <input id="class-exp-input" type="date" class="form-control form-control-sm">
         </div>
       </div>
       <div>
         <label class="block label mb-1" for="class-file-input">Attach File (optional)</label>
-        <input id="class-file-input" type="file" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white">
+        <input id="class-file-input" type="file" class="form-control form-control-sm">
       </div>
     </div>
     <div class="mt-6 flex justify-end gap-2">
-      <button type="button" id="class-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
-      <button type="button" id="class-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+      <button type="button" id="class-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
+      <button type="button" id="class-modal-save" class="px-4 py-2 rounded-md btn btn-success text-sm font-semibold">Save</button>
     </div>
   </div>
 </div>
@@ -748,63 +740,59 @@
     {% csrf_token %}
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h3 class="text-lg font-semibold text-gray-900">Add New Address</h3>
+        <h3 class="text-lg font-semibold">Add New Address</h3>
         <p class="text-sm text-gray-500">Create an address and assign it to one or more slots</p>
       </div>
-      <button type="button" id="supplier-address-modal-close" class="text-gray-500 hover:text-gray-700">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <button type="button" id="supplier-address-modal-close" class="btn-close"></button>
     </div>
     <p id="supplier-address-modal-error" class="hidden text-sm text-red-600 mb-3"></p>
     <div class="space-y-3">
       <div>
         <label class="block label mb-1" for="supplier-address-line1">Street address <span class="text-red-600">*</span></label>
-        <input id="supplier-address-line1" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="street-address">
+        <input id="supplier-address-line1" type="text" class="form-control form-control-sm" autocomplete="street-address">
       </div>
       <div>
         <label class="block label mb-1" for="supplier-address-line2">Address line 2</label>
-        <input id="supplier-address-line2" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="address-line2">
+        <input id="supplier-address-line2" type="text" class="form-control form-control-sm" autocomplete="address-line2">
       </div>
       <div>
         <label class="block label mb-1" for="supplier-address-city">City <span class="text-red-600">*</span></label>
-        <input id="supplier-address-city" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="address-level2">
+        <input id="supplier-address-city" type="text" class="form-control form-control-sm" autocomplete="address-level2">
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block label mb-1" for="supplier-address-state">State <span class="text-red-600">*</span></label>
-          <input id="supplier-address-state" type="text" maxlength="2" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm uppercase" autocomplete="address-level1" placeholder="ST">
+          <input id="supplier-address-state" type="text" maxlength="2" class="form-control form-control-sm text-uppercase" autocomplete="address-level1" placeholder="ST">
         </div>
         <div>
           <label class="block label mb-1" for="supplier-address-zip">ZIP <span class="text-red-600">*</span></label>
-          <input id="supplier-address-zip" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="postal-code">
+          <input id="supplier-address-zip" type="text" class="form-control form-control-sm" autocomplete="postal-code">
         </div>
       </div>
       <div>
         <label class="block label mb-1" for="supplier-address-country">Country</label>
-        <input id="supplier-address-country" type="text" value="USA" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="country-name">
+        <input id="supplier-address-country" type="text" value="USA" class="form-control form-control-sm" autocomplete="country-name">
       </div>
-      <fieldset class="border border-gray-200 rounded-md p-3 space-y-2">
-        <legend class="text-sm font-medium text-gray-800 px-1">Assign to slots</legend>
+      <fieldset class="border rounded-md p-3 space-y-2">
+        <legend class="text-sm font-medium px-1">Assign to slots</legend>
         <p id="supplier-address-slot-error" class="hidden text-sm text-red-600"></p>
         <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
-          <input type="checkbox" id="supplier-address-slot-physical" value="physical" class="mt-1 rounded border-gray-300">
+          <input type="checkbox" id="supplier-address-slot-physical" value="physical" class="form-check-input mt-1">
           <span id="supplier-address-label-physical">Physical (Add)</span>
         </label>
         <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
-          <input type="checkbox" id="supplier-address-slot-billing" value="billing" class="mt-1 rounded border-gray-300">
+          <input type="checkbox" id="supplier-address-slot-billing" value="billing" class="form-check-input mt-1">
           <span id="supplier-address-label-billing">Billing (Add)</span>
         </label>
         <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
-          <input type="checkbox" id="supplier-address-slot-shipping" value="shipping" class="mt-1 rounded border-gray-300">
+          <input type="checkbox" id="supplier-address-slot-shipping" value="shipping" class="form-check-input mt-1">
           <span id="supplier-address-label-shipping">Shipping (Add)</span>
         </label>
       </fieldset>
     </div>
     <div class="mt-6 flex justify-end gap-2">
-      <button type="button" id="supplier-address-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
-      <button type="button" id="supplier-address-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+      <button type="button" id="supplier-address-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
+      <button type="button" id="supplier-address-modal-save" class="px-4 py-2 rounded-md btn btn-success text-sm font-semibold">Save</button>
     </div>
   </div>
 </div>
@@ -815,16 +803,12 @@
     {% csrf_token %}
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h3 id="contact-modal-heading" class="text-lg font-semibold text-gray-900">Add Contact</h3>
+        <h3 id="contact-modal-heading" class="text-lg font-semibold">Add Contact</h3>
         <p id="contact-modal-subtitle" class="text-sm text-gray-500">Create a new contact for this supplier</p>
       </div>
-      <button type="button" id="contact-modal-close" class="text-gray-500 hover:text-gray-700">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <button type="button" id="contact-modal-close" class="btn-close"></button>
     </div>
-    <p id="contact-modal-primary-note" class="hidden text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mb-3">
+    <p id="contact-modal-primary-note" class="hidden text-sm text-body-secondary bg-body-secondary border rounded-md px-3 py-2 mb-3">
       This contact will be set as the primary contact.
     </p>
     <p id="contact-modal-error" class="hidden text-sm text-red-600 mb-3"></p>
@@ -832,24 +816,24 @@
       <input type="hidden" id="contact-modal-id" value="">
       <div>
         <label class="block label mb-1" for="contact-modal-name">Name <span class="text-red-600">*</span></label>
-        <input id="contact-modal-name" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" required autocomplete="name">
+        <input id="contact-modal-name" type="text" class="form-control form-control-sm" required autocomplete="name">
       </div>
       <div>
         <label class="block label mb-1" for="contact-modal-title-input">Title</label>
-        <input id="contact-modal-title-input" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="organization-title">
+        <input id="contact-modal-title-input" type="text" class="form-control form-control-sm" autocomplete="organization-title">
       </div>
       <div>
         <label class="block label mb-1" for="contact-modal-phone">Phone</label>
-        <input id="contact-modal-phone" type="text" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="tel">
+        <input id="contact-modal-phone" type="text" class="form-control form-control-sm" autocomplete="tel">
       </div>
       <div>
         <label class="block label mb-1" for="contact-modal-email">Email</label>
-        <input id="contact-modal-email" type="email" class="w-full rounded-md border border-gray-300 px-2 py-2 bg-white text-sm" autocomplete="email">
+        <input id="contact-modal-email" type="email" class="form-control form-control-sm" autocomplete="email">
       </div>
     </div>
     <div class="mt-6 flex justify-end gap-2">
-      <button type="button" id="contact-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-caution text-sm">Cancel</button>
-      <button type="button" id="contact-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+      <button type="button" id="contact-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
+      <button type="button" id="contact-modal-save" class="px-4 py-2 rounded-md btn btn-success text-sm font-semibold">Save</button>
     </div>
   </div>
 </div>
@@ -912,9 +896,9 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-caution"
+        <button type="button" class="btn btn-secondary"
                 data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-save" id="group-modal-save-btn">
+        <button type="button" class="btn btn-success" id="group-modal-save-btn">
           <span class="btn-text">Save</span>
           <span class="btn-spinner d-none">
             <span class="spinner-border spinner-border-sm"></span>
@@ -939,7 +923,7 @@
         This cannot be undone. Contacts will not be affected.</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-caution"
+        <button type="button" class="btn btn-secondary"
                 data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger"
                 id="group-delete-confirm-btn">Delete</button>
@@ -1015,11 +999,11 @@
         if (!el) return;
         var emptyVal = displayVal === '' || displayVal === null || displayVal === undefined;
         if (fn === 'business_phone' || fn === 'primary_phone') {
-            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="tel:' + displayVal + '" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="tel:' + displayVal + '">' + displayVal + '</a>';
         } else if (fn === 'business_email' || fn === 'primary_email') {
-            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="mailto:' + displayVal + '" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="mailto:' + displayVal + '">' + displayVal + '</a>';
         } else if (fn === 'website_url') {
-            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="' + displayVal + '" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">' + displayVal + '</a>';
+            el.innerHTML = emptyVal ? '<span class="text-gray-400">—</span>' : '<a href="' + displayVal + '" target="_blank" rel="noopener">' + displayVal + '</a>';
         } else if (fn === 'is_packhouse') {
             if (emptyVal) el.textContent = '—';
             else el.textContent = (displayVal === 'True' || displayVal === 'true') ? 'Yes' : 'No';

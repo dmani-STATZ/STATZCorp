@@ -235,6 +235,11 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 - **`BaseFormMixin`** auto-applies CSS classes via widget inspection. If a new widget type is introduced, add it to `BaseFormMixin` to keep styling consistent.
 - **`ActiveUserModelChoiceField`** filters users to `is_active=True`. All user-selection dropdowns in this app must use this field, not bare `ModelChoiceField`.
 
+### Contract status strings and `ContractCloseView`
+- `ContractStatus.description` values in the database must be referenced **exactly** in code: `"Open"`, `"Closed"`, and `"Canceled"` (one L). Do **not** use `"Cancelled"` in lookups, filters, or new logic — it will not match the row in `contracts_contractstatus` (e.g. id=3 is `Canceled`).
+
+- **`ContractCloseView`** is a `DetailView`: `GET` renders the close / confirmation / already-closed page; `POST` applies the close and redirects. It is **not** a form-based `UpdateView` — the empty `ContractCloseForm` is compatibility-only.
+
 ---
 
 ## 11. Background Tasks / Signals / Automation Rules

@@ -1,7 +1,7 @@
 {% extends 'base_template.html' %}
 
 {% block body %}
-<div class="bg-white rounded-lg p-6 dark:bg-gray-800 dark:text-gray-100">
+<div class="bg-body rounded-lg p-6">
     <h1 class="text-2xl font-semibold mb-6">Welcome to STATZ Corporation Portal</h1>
 
     <div class="mb-4 flex justify-between items-center">
@@ -136,7 +136,7 @@
 
     <!-- Add Event Modal -->
     <div id="addEventModal" class="hidden fixed inset-0 bg-black bg-opacity-10 z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-lg">
+        <div class="bg-body rounded-lg shadow-lg w-full max-w-lg">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold">Add Event</h3>
                 <button onclick="closeAddEventModal()" class="text-gray-500 hover:text-gray-700">✕</button>
@@ -224,7 +224,7 @@
 
     <!-- Event Details Modal -->
     <div id="eventDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-10 z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md">
+        <div class="bg-body rounded-lg shadow-lg w-full max-w-md">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold" id="detailTitle">Event</h3>
                 <button onclick="closeEventDetails()" class="text-gray-500 hover:text-gray-700">✕</button>
@@ -265,7 +265,7 @@
 
     <!-- Day Events Modal -->
     <div id="dayEventsModal" class="hidden fixed inset-0 bg-black bg-opacity-10 z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md">
+        <div class="bg-body rounded-lg shadow-lg w-full max-w-md">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold" id="dayEventsDate">Events</h3>
                 <button onclick="closeDayEvents()" class="text-gray-500 hover:text-gray-700">✕</button>
@@ -557,7 +557,7 @@
             if (dateKey === todayKey) {
                 classes += ' bg-blue-600 text-white font-semibold';
             } else {
-                classes += ' bg-white dark:bg-gray-700';
+                classes += ' bg-body';
             }
             cell.className = classes;
             const topRow = document.createElement('div');
@@ -928,12 +928,12 @@
     function styleForEvent(ev) {
         // Map by kind; fallback by title keywords
         const map = {
-            meeting: { bg: 'bg-blue-100 dark:bg-blue-900', fg: 'text-blue-800 dark:text-blue-100', icon: '📅' },
-            training: { bg: 'bg-purple-100 dark:bg-purple-900', fg: 'text-purple-800 dark:text-purple-100', icon: '🎓' },
-            focus: { bg: 'bg-yellow-100 dark:bg-yellow-900', fg: 'text-yellow-800 dark:text-yellow-100', icon: '🎯' },
-            travel: { bg: 'bg-lime-100 dark:bg-lime-900', fg: 'text-lime-800 dark:text-lime-100', icon: '✈️' },
-            personal: { bg: 'bg-pink-100 dark:bg-pink-900', fg: 'text-pink-800 dark:text-pink-100', icon: '🏷️' },
-            break: { bg: 'bg-gray-200 dark:bg-gray-700', fg: 'text-gray-800 dark:text-gray-100', icon: '☕' },
+            meeting: { bg: 'bg-blue-100', fg: 'text-blue-800', icon: '📅' },
+            training: { bg: 'bg-purple-100', fg: 'text-purple-800', icon: '🎓' },
+            focus: { bg: 'bg-yellow-100', fg: 'text-yellow-800', icon: '🎯' },
+            travel: { bg: 'bg-lime-100', fg: 'text-lime-800', icon: '✈️' },
+            personal: { bg: 'bg-pink-100', fg: 'text-pink-800', icon: '🏷️' },
+            break: { bg: 'bg-gray-200', fg: 'text-gray-800', icon: '☕' },
         };
         if (ev.kind && map[ev.kind]) return map[ev.kind];
         const t = (ev.title || '').toLowerCase();
@@ -1261,7 +1261,7 @@
             const attachments = (data.event && data.event.attachments) || [];
             for (const a of attachments) {
                 const row = document.createElement('div');
-                row.className = 'text-xs flex items-center justify-between bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded';
+                row.className = 'text-xs flex items-center justify-between bg-gray-50 px-2 py-1 rounded';
                 const left = document.createElement('a');
                 left.href = a.url; left.target = '_blank';
                 left.textContent = a.title;

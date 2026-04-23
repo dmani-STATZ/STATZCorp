@@ -8,19 +8,19 @@
     <a href="{% url 'contracts:company_create' %}" class="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700">New Company</a>
   </div>
 
-  <div class="card overflow-hidden dark:bg-gray-800 sm:rounded-md">
-    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-      <thead class="bg-gray-50 dark:bg-gray-700">
+  <div class="card overflow-hidden sm:rounded-md">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
         <tr>
-          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Logo</th>
-          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Name</th>
-          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Slug</th>
-          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Active</th>
-          <th class="px-6 py-3 text-left label dark:text-gray-300 tracking-wider">Users</th>
+          <th class="px-6 py-3 text-left label tracking-wider">Logo</th>
+          <th class="px-6 py-3 text-left label tracking-wider">Name</th>
+          <th class="px-6 py-3 text-left label tracking-wider">Slug</th>
+          <th class="px-6 py-3 text-left label tracking-wider">Active</th>
+          <th class="px-6 py-3 text-left label tracking-wider">Users</th>
           <th class="px-6 py-3"></th>
         </tr>
       </thead>
-      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+      <tbody class="bg-body divide-y divide-gray-200">
         {% for company in companies %}
           <tr>
             <td class="px-3 py-2 whitespace-nowrap">

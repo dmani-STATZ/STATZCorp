@@ -2,16 +2,16 @@
 {# Transactions modal: include this where you need the transactions popup. #}
 {# Data attributes: data-content-type-id, data-object-id for loading list. #}
 <div id="transactionsModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 9999;" aria-labelledby="transactionsModalTitle" aria-modal="true">
-  <div class="relative top-10 mx-auto p-6 border shadow-lg rounded-lg bg-white dark:bg-gray-800 w-full max-w-3xl" onclick="event.stopPropagation()">
+  <div class="relative top-10 mx-auto p-6 border shadow-lg rounded-lg bg-body w-full max-w-3xl" onclick="event.stopPropagation()">
     <div class="flex justify-between items-center mb-4">
-      <h2 id="transactionsModalTitle" class="text-xl font-semibold text-gray-800 dark:text-gray-200">Field change history</h2>
-      <button type="button" onclick="closeTransactionsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded">
+      <h2 id="transactionsModalTitle" class="text-xl font-semibold text-gray-800">Field change history</h2>
+      <button type="button" onclick="closeTransactionsModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
     <div id="transactionsModalBody" class="min-h-[200px]">
       {# List or detail partial is loaded here via JS #}
-      <p class="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+      <p class="text-sm text-gray-500">Loading…</p>
     </div>
   </div>
 </div>
