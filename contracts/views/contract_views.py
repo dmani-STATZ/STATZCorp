@@ -18,7 +18,7 @@ from django.dispatch import receiver
 from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, ClinSplit, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus, GovAction
 from processing.models import SequenceNumber
-from ..forms import ContractForm, ContractCancelForm
+from ..forms import ContractForm
 from .mixins import ActiveCompanyQuerysetMixin
 
 logger = logging.getLogger(__name__)
@@ -44,10 +44,6 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             'clin_type', 'supplier', 'nsn'
         ).order_by('item_number')
         context['clins'] = clins
-
-        # Get the CanceledReason model
-        cancel_reason = CanceledReason.objects.all()
-        context['cancel_reasons'] = cancel_reason
 
         # Gov Actions for this contract
         active_company = getattr(self.request, 'active_company', None)
@@ -324,64 +320,73 @@ class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class ContractCancelView(ActiveCompanyQuerysetMixin, UpdateView):
+class ContractCancelView(ActiveCompanyQuerysetMixin, DetailView):
     model = Contract
-    form_class = ContractCancelForm
-    template_name = 'contracts/contract_cancel_form.html'
-    
+    template_name = 'contracts/contract_cancel.html'
+    context_object_name = 'contract'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'idiq_contract', 'status', 'company', 'supplier', 'cancelled_by'
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.get_object()
+        context['cancel_reasons'] = CanceledReason.objects.all().order_by('description')
+        clins = contract.clin_set.select_related(
+            'supplier', 'clin_type'
+        ).order_by('item_number')
+        context['clins'] = clins
+        context['clin_count'] = clins.count()
+        return context
+
     def post(self, request, *args, **kwargs):
         contract = self.get_object()
-        
         try:
-            # Get the cancellation reason
             reason_id = request.POST.get('cancelReason')
+            if not reason_id:
+                messages.error(request, 'A cancellation reason is required.')
+                return redirect('contracts:contract_cancel', pk=contract.pk)
+
             cancel_reason = CanceledReason.objects.get(id=reason_id)
-            
-            # Get the Canceled status
             cancelled_status = ContractStatus.objects.get(description='Canceled')
-            
-            # Update contract
+
+            contract.status = cancelled_status
             contract.date_canceled = timezone.now()
             contract.cancelled_by = request.user
             contract.canceled_reason = cancel_reason
-            contract.status = cancelled_status
             contract.save()
-            
-            # Add note if provided
-            note_text = request.POST.get('cancelNote')
+
+            # Always create an audit note; append optional user note if provided
+            note_text = request.POST.get('cancelNote', '').strip()
+            full_note = f"Contract cancelled — Reason: {cancel_reason.description}"
             if note_text:
-                content_type = ContentType.objects.get_for_model(Contract)
-                Note.objects.create(
-                    content_type=content_type,
-                    object_id=contract.id,
-                    note=f"Contract cancelled - Reason: {cancel_reason.description}\nNote: {note_text}",
-                    created_by=request.user,
-                    modified_by=request.user
-                )
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Contract cancelled successfully.'
-            })
-            
+                full_note += f"\nNote: {note_text}"
+
+            content_type = ContentType.objects.get_for_model(Contract)
+            Note.objects.create(
+                content_type=content_type,
+                object_id=contract.id,
+                note=full_note,
+                created_by=request.user,
+                modified_by=request.user,
+                company=getattr(request, 'active_company', None),
+            )
+
+            messages.success(request, f'Contract {contract.contract_number} has been cancelled.')
+            return redirect('contracts:contract_cancel', pk=contract.pk)
+
         except CanceledReason.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid cancellation reason.'
-            })
+            messages.error(request, 'Invalid cancellation reason.')
+            return redirect('contracts:contract_cancel', pk=contract.pk)
         except ContractStatus.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'Could not find Canceled status.'
-            })
+            messages.error(request, 'Could not find Canceled status. Contact your administrator.')
+            return redirect('contracts:contract_cancel', pk=contract.pk)
         except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            })
-    
-    def get_success_url(self):
-        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
+            logger.error(f"Error cancelling contract {contract.pk}: {str(e)}")
+            messages.error(request, f'An error occurred: {str(e)}')
+            return redirect('contracts:contract_cancel', pk=contract.pk)
 
 
 @conditional_login_required

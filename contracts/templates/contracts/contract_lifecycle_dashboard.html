@@ -339,11 +339,11 @@
                                     </a>
                                     {% endif %}
                                     {% if contract.status.description != 'Cancelled' %}
-                                    <button onclick="showCancelModal('{{ contract.id }}', '{{ contract.contract_number }}')" class="btn btn-caution" title="Cancel">
+                                    <a href="{% url 'contracts:contract_cancel' contract.id %}" class="btn btn-caution" title="Cancel">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
-                                    </button>
+                                    </a>
                                     {% endif %}
                                 </div>
                             </td>
@@ -487,8 +487,6 @@
     </div>
 </div>
 
-{% include "contracts/includes/cancel_contract_modal.html" %}
-
 {% block extra_js %}
 {{ periods|json_script:"period-data" }}
 
@@ -559,45 +557,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
             searchResults.classList.add('hidden');
         }
-    });
-});
-
-// Contract cancellation functions
-function showCancelModal(contractId, contractNumber) {
-    document.getElementById('contractId').value = contractId;
-    document.getElementById('cancelContractNumber').textContent = contractNumber;
-    document.getElementById('cancelContractModal').classList.remove('hidden');
-}
-
-function closeCancelModal() {
-    document.getElementById('cancelContractModal').classList.add('hidden');
-    document.getElementById('cancelContractForm').reset();
-}
-
-document.getElementById('cancelContractForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    const formData = new FormData(this);
-    const contractId = formData.get('contractId');
-
-    fetch(`/contracts/${contractId}/cancel/`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert('Error cancelling contract: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while cancelling the contract.');
     });
 });
 

@@ -95,6 +95,8 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **No background tasks.** There is no Celery integration. `ExportTiming` records timing data during request-time exports; it is not a background job.
 
+**Cancel Contract is a page, not a modal.** `ContractCancelView` at `/<pk>/cancel/` is a `DetailView`-style page (like Close). Do not revert it to a modal or AJAX pattern. The file `contracts/templates/contracts/includes/cancel_contract_modal.html` is dead — do not include it in any template.
+
 ---
 
 ## 5. Files That Commonly Need to Change Together

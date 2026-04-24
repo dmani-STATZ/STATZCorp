@@ -1,0 +1,218 @@
+{% extends "contracts/contract_base.html" %}
+{% load humanize %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" crossorigin="anonymous">
+{% endblock %}
+
+{% block title %}Cancel Contract — {{ contract.contract_number|default:"" }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  {% if messages %}
+    <div class="mb-3">
+      {% for message in messages %}
+        <div
+          class="alert alert-{% if message.level_tag == 'error' %}danger{% else %}{{ message.level_tag }}{% endif %}"
+          role="alert"
+        >
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="mb-4">
+    <h1 class="h2 mb-1">Cancel Contract</h1>
+    <p class="text-muted mb-0">{{ contract.contract_number|default:"—" }}</p>
+  </div>
+
+  <div class="bg-body-tertiary rounded-3 p-3 p-md-4 mb-4">
+    <h6 class="text-body-secondary mb-3">Contract summary</h6>
+    <div class="row g-2">
+      <div class="col-6 col-md">
+        <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Contract number</div>
+        <div class="fs-6 fw-bold">{{ contract.contract_number|default:"—" }}</div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Status</div>
+        <div>
+          {% if contract.status and contract.status.description %}
+            {% with s=contract.status.description %}
+              {% if s == 'Canceled' %}
+                <span class="badge bg-danger">Canceled</span>
+              {% elif s == 'Open' %}
+                <span class="badge bg-success">Open</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ s }}</span>
+              {% endif %}
+            {% endwith %}
+          {% else %}
+            <span class="fs-6 fw-bold">—</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Supplier</div>
+        <div class="fs-6 fw-bold">{% if contract.supplier %}{{ contract.supplier.name }}{% else %}—{% endif %}</div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Contract type</div>
+        <div class="fs-6 fw-bold">{% if contract.contract_type and contract.contract_type.description %}{{ contract.contract_type.description }}{% else %}—{% endif %}</div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Date created</div>
+        <div class="fs-6 fw-bold">
+          {% if contract.created_on %}
+            {{ contract.created_on|date:"N j, Y" }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if contract.status and contract.status.description == 'Canceled' %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 card-title mb-3">Cancellation summary</h2>
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Cancellation reason</dt>
+          <dd class="col-sm-9">
+            {% if contract.canceled_reason %}
+              {{ contract.canceled_reason.description }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+          <dt class="col-sm-3">Cancelled by</dt>
+          <dd class="col-sm-9">
+            {% if contract.cancelled_by %}
+              {{ contract.cancelled_by.get_full_name|default:contract.cancelled_by.username }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+          <dt class="col-sm-3">Date cancelled</dt>
+          <dd class="col-sm-9">
+            {% if contract.date_canceled %}
+              {{ contract.date_canceled|date:"N j, Y" }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+        </dl>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="{% url 'contracts:contracts_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+          <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-primary">Go to Contract</a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h2 class="h5 card-title mb-0">Contract line items</h2>
+          <span class="badge bg-secondary">
+            {{ clin_count }} item{{ clin_count|pluralize }}
+          </span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th class="text-start" scope="col">Item #</th>
+                <th class="text-start" scope="col">Type</th>
+                <th class="text-start" scope="col">Supplier</th>
+                <th class="text-end" scope="col">Order Qty</th>
+                <th class="text-start" scope="col">Due Date</th>
+                <th class="text-end" scope="col">Shipped Qty</th>
+                <th class="text-start" scope="col">Ship Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for clin in clins %}
+                <tr>
+                  <td class="text-start">
+                    {% if clin.item_number %}{{ clin.item_number }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.item_type %}{{ clin.get_item_type_display }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.supplier %}{{ clin.supplier.name }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if clin.order_qty is not None %}
+                      {{ clin.order_qty|floatformat:"-2" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.due_date %}
+                      {{ clin.due_date|date:"M j, Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% with ts=clin.total_shipped %}
+                      {% if ts and ts != 0 %}
+                        <span class="align-middle">{{ ts|floatformat:"-2" }}</span>{% if clin.order_qty and clin.order_qty != 0 and ts >= clin.order_qty %}<span class="ms-1 d-inline-block align-middle" aria-label="Fully shipped"><i class="bi bi-check-circle-fill text-success small" aria-hidden="true"></i></span>{% endif %}
+                      {% else %}
+                        —
+                      {% endif %}
+                    {% endwith %}
+                  </td>
+                  <td class="text-start">
+                    {% if clin.ship_date %}
+                      {{ clin.ship_date|date:"M j, Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7" class="text-center text-muted">No CLINs on this contract.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-danger mb-4">
+      <div class="card-body">
+        <h2 class="h6">Cancel contract</h2>
+        <p class="text-danger small fw-semibold mb-3">
+          You are about to cancel contract {{ contract.contract_number }}. This action cannot be undone.
+        </p>
+        <form action="{% url 'contracts:contract_cancel' contract.pk %}" method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="cancelReason" class="form-label">Cancellation reason <span class="text-danger" aria-hidden="true">*</span></label>
+            <select class="form-select" id="cancelReason" name="cancelReason" required>
+              <option value="" selected disabled>— Select a reason —</option>
+              {% for reason in cancel_reasons %}
+                <option value="{{ reason.id }}">{{ reason.description }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="cancelNote" class="form-label">Additional Notes (Optional)</label>
+            <textarea class="form-control" id="cancelNote" name="cancelNote" rows="3"></textarea>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-danger">Confirm Cancellation</button>
+            <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-secondary">Go Back</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
