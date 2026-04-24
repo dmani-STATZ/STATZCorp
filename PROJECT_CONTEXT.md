@@ -39,6 +39,11 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 
 **Critical note:** Multi-tenant. Every queryset on company-scoped models must filter by `request.active_company`. Use `ActiveCompanyQuerysetMixin` on CBVs or manually filter in FBVs. Missing this leaks cross-tenant data.
 
+#### SharePoint Integration
+
+##### SharePoint Document Browser
+Standalone document browser at `/contracts/documents/` lists and uploads files for a contract's SharePoint folder. It integrates with `contract_management.html` via a "Documents" button. Graph calls use client credentials flow (service principal), folder paths are stored in `Contract.files_url`, and the browser syncs contract context across tabs using `localStorage` plus a named window. It supports fallback to a parent/root folder and legacy path handling.
+
 ---
 
 ### `processing` — Staging Pipeline

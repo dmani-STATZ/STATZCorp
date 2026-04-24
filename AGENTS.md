@@ -75,6 +75,10 @@ Run repo-wide search before any of these changes:
 - Special case: `transactions/templates/transactions/transaction_modal.html` uses hardcoded `/transactions/...` paths.
 - Export flow changes:
 - export view/service + template triggers + downstream consumers of filenames/columns.
+- SharePoint document browser path handling:
+- `Contract.files_url` stores the folder path; update via `contracts/services/sharepoint_service.py` API.
+- Default path logic: `files_url` → pattern-based (regular or IDIQ) → fallback to parent/root.
+- If IDIQ path structure changes, update `contracts/services/sharepoint_service.py` `build_idiq_path()`.
 
 ## 7. App Boundary Rules
 - `contracts` is the canonical source for contract/CLIN/company lifecycle data.
@@ -95,6 +99,7 @@ Run repo-wide search before any of these changes:
 - Maintain CSRF and method restrictions on mutating endpoints (many flows rely on JS `fetch` + CSRF tokens).
 - Do not log or expose token fields (`users.UserOAuthToken`) or sensitive request payloads.
 - Keep restrictive field allowlists on enrichment/update endpoints (`suppliers` apply enrichment, similar write APIs).
+- Document browser (`contracts/views/documents_views.py`) uses service principal credentials (client credentials flow) for SharePoint access. All folder listing and uploads are done on behalf of the service principal, not the logged-in user. User permissions are enforced at the Django level through `request.active_company` contract scoping.
 - Treat uploads/downloads as sensitive:
 - PDF/file handlers in `tools`, `training`, `processing`, `contracts` should keep size/type/permission checks.
 - `parse_procurement_history()` in `sales/services/dibbs_pdf.py` uses `pypdf.PdfReader` to extract text from raw PDF bytes. DIBBS serves `.PDF` files directly — not ZIPs. The old ZIP-based approach was incorrect and has been replaced. The `pypdf` package is a declared dependency in `requirements.txt`.

@@ -426,7 +426,7 @@ def _check_path_exists(token: str, drive_id: str, item_path: str) -> Optional[Di
     GET a drive item by path. Returns the item dict if it exists (HTTP 200), None if not found (HTTP 404).
     Raises RuntimeError for other HTTP errors.
     """
-    enc_drive = quote(drive_id, safe="")
+    enc_drive = quote(drive_id, safe="!_")
     enc_path = quote(item_path, safe="/")
     url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_path}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -446,7 +446,7 @@ def _create_folder(token: str, drive_id: str, parent_path: str, folder_name: str
     Uses conflictBehavior=fail so we only POST when we know the folder doesn't exist.
     Returns the drive item JSON from Graph.
     """
-    enc_drive = quote(drive_id, safe="")
+    enc_drive = quote(drive_id, safe="!_")
     if parent_path:
         enc_parent = quote(parent_path, safe="/")
         url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_parent}:/children"
@@ -566,7 +566,7 @@ def upload_award_pdf_to_sharepoint(pdf_file, queue_contract) -> bool:
         pdf_file.seek(0)
     file_bytes = pdf_file.read()
 
-    enc_drive = quote(drive_id, safe="")
+    enc_drive = quote(drive_id, safe="!_")
     enc_file_path = quote(file_path, safe="/")
     url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_file_path}:/content"
     headers = {

@@ -150,6 +150,7 @@ def list_folder_contents(folder_path: str) -> Dict[str, Any]:
     path = normalize_folder_path(folder_path)
     token = get_graph_access_token()
     url = _children_url(path)
+    logger.warning("DEBUG: list_folder_contents url=%s", url)
     response = requests.get(url, headers=_auth_headers(token), timeout=120)
     if response.status_code == 404:
         raise SharePointNotFound("Folder not found in SharePoint.", status_code=404, details=response.text)
@@ -222,26 +223,26 @@ def _auth_headers(token: str) -> Dict[str, str]:
 
 
 def _children_url(folder_path: str) -> str:
-    drive_id = quote(_get_drive_id(), safe="")
+    drive_id = quote(_get_drive_id(), safe="!_")
     if folder_path:
         return f"{GRAPH_BASE}/drives/{drive_id}/root:/{quote(folder_path, safe='/')}:/children"
     return f"{GRAPH_BASE}/drives/{drive_id}/root/children"
 
 
 def _content_url(file_path: str) -> str:
-    drive_id = quote(_get_drive_id(), safe="")
+    drive_id = quote(_get_drive_id(), safe="!_")
     return f"{GRAPH_BASE}/drives/{drive_id}/root:/{quote(file_path, safe='/')}:/content"
 
 
 def _drive_item_url(item_path: str) -> str:
-    drive_id = quote(_get_drive_id(), safe="")
+    drive_id = quote(_get_drive_id(), safe="!_")
     if item_path:
         return f"{GRAPH_BASE}/drives/{drive_id}/root:/{quote(item_path, safe='/')}"
     return f"{GRAPH_BASE}/drives/{drive_id}/root"
 
 
 def _drive_item_by_id_url(file_id: str) -> str:
-    drive_id = quote(_get_drive_id(), safe="")
+    drive_id = quote(_get_drive_id(), safe="!_")
     return f"{GRAPH_BASE}/drives/{drive_id}/items/{quote(file_id, safe='')}"
 
 
@@ -250,7 +251,7 @@ def _get_drive_item(item_path: str) -> Optional[Dict[str, Any]]:
     response = requests.get(_drive_item_url(normalize_folder_path(item_path)), headers=_auth_headers(token), timeout=60)
     if response.status_code == 200:
         return response.json()
-    if response.status_code == 404:
+    if response.status_code in (400, 404):
         return None
     _raise_for_graph_error(response, "Could not check the SharePoint path.")
     return None

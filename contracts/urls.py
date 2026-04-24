@@ -186,6 +186,12 @@ from .views.company_views import (
     CompanyUpdateView,
     CompanyDeleteView,
 )
+from .views.documents_views import (
+    contract_details_api,
+    documents_browser_view,
+    set_file_path_api,
+    sharepoint_files_api,
+)
 
 app_name = "contracts"
 
@@ -230,6 +236,14 @@ urlpatterns = [
     path("log/export-xlsx/", export_contract_log_xlsx, name="export_contract_log_xlsx"),
     path("log/get-export-estimate/", get_export_estimate, name="get_export_estimate"),
     path("open-export-folder/", open_export_folder, name="open_export_folder"),
+    path("documents/", documents_browser_view, name="documents_browser"),
+    path(
+        "api/contracts/<int:contract_id>/details/",
+        contract_details_api,
+        name="contract_details_api",
+    ),
+    path("api/sharepoint-files/", sharepoint_files_api, name="sharepoint_files_api"),
+    path("api/set-file-path/", set_file_path_api, name="set_file_path_api"),
     # Contract management
     path("create/", ContractCreateView.as_view(), name="contract_create"),
     path("<int:pk>/", ContractManagementView.as_view(), name="contract_management"),

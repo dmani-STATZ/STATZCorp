@@ -17,7 +17,9 @@
       "Bash(.venv/Scripts/python.exe:*)",
       "Bash(.venv/Scripts/pip install:*)",
       "Bash(curl -I http://localhost:8000/admin/)",
-      "Bash(curl -s http://localhost:8000/processing/contract/10002/edit/ -H \"User-Agent: Mozilla\")"
+      "Bash(curl -s http://localhost:8000/processing/contract/10002/edit/ -H \"User-Agent: Mozilla\")",
+      "Bash(git commit *)",
+      "Bash(git add *)"
     ]
   }
 }
