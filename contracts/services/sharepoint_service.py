@@ -150,7 +150,6 @@ def list_folder_contents(folder_path: str) -> Dict[str, Any]:
     path = normalize_folder_path(folder_path)
     token = get_graph_access_token()
     url = _children_url(path)
-    logger.warning("DEBUG: list_folder_contents url=%s", url)
     response = requests.get(url, headers=_auth_headers(token), timeout=120)
     if response.status_code == 404:
         raise SharePointNotFound("Folder not found in SharePoint.", status_code=404, details=response.text)
