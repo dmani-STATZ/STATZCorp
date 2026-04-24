@@ -120,7 +120,7 @@ def generate_contracts_schema_description():
     schema_description += "- contracts_contract.reviewed_by_id (FK) refers to auth_user.id\n"
     schema_description += "- contracts_contract.notes (Generic Relation: use contracts_note.content_type_id and contracts_note.object_id with django_content_type.id)\n"
     schema_description += "- contracts_contract.payment_history (Generic Relation: use contracts_paymenthistory.content_type_id and contracts_paymenthistory.object_id with django_content_type.id)\n"
-    schema_description += "- contracts_contractsplit.contract_id (FK) refers to contracts_contract.id\n"
+    schema_description += "- contracts_clinsplit.clin_id (FK) refers to contracts_clin.id (CASCADE)\n"
 
     schema_description += "- contracts_clin.contract_id (FK) refers to contracts_contract.id\n"
     schema_description += "- contracts_clin.clin_type_id (FK) refers to contracts_clintype.id\n"

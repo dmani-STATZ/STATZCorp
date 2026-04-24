@@ -1131,6 +1131,8 @@ function openContractFiles(path) {
 window.contractContentTypeId = {{ contract_content_type_id }};
 window.clinContentTypeId = {{ clin_content_type_id }};
 window.contractId = {{ contract.id }};
+window.contractNumberForReminders = "{{ contract.contract_number|escapejs }}";
+window.selectedClinItemNumber = "{% if selected_clin %}{{ selected_clin.item_number|default_if_none:''|escapejs }}{% endif %}";
 const noteDetailUrlTemplate = "{% url 'contracts:note_detail_json' 0 %}";
 const contractNotesUrl = "{% url 'contracts:get_combined_notes' contract.id %}";
 
@@ -1238,7 +1240,6 @@ async function openEditNoteModal(button) {
     const reminderFields = document.getElementById('reminderFields');
     const reminderSection = createReminderCheckbox ? createReminderCheckbox.closest('.mt-6') : null;
     const reminderTitle = document.getElementById('id_reminder_title');
-    const reminderText = document.getElementById('id_reminder_text');
     const reminderDate = document.getElementById('id_reminder_date');
     const reminderCompleted = document.getElementById('id_reminder_completed');
     const saveNoteBtn = document.getElementById('saveNoteBtn');
@@ -1261,7 +1262,6 @@ async function openEditNoteModal(button) {
         reminderFields.classList.add('hidden');
     }
     if (reminderTitle) reminderTitle.value = '';
-    if (reminderText) reminderText.value = '';
     if (reminderDate) reminderDate.value = '';
     if (reminderCompleted) reminderCompleted.checked = false;
     if (noteTextArea) noteTextArea.readOnly = false;
@@ -1303,7 +1303,6 @@ async function openEditNoteModal(button) {
                 if (createReminderCheckbox) createReminderCheckbox.checked = true;
                 if (reminderFields) reminderFields.classList.remove('hidden');
                 if (reminderTitle) reminderTitle.value = reminderData.reminder_title || '';
-                if (reminderText) reminderText.value = reminderData.reminder_text || '';
                 if (reminderDate) reminderDate.value = formatReminderDateForInput(reminderData.reminder_date);
                 if (reminderCompleted) reminderCompleted.checked = !!reminderData.reminder_completed;
                 noteForm.dataset.initialReminderExists = '1';
@@ -1312,18 +1311,18 @@ async function openEditNoteModal(button) {
 
         noteForm.dataset.initialReminderSnapshot = JSON.stringify({
             reminderTitle: reminderTitle ? reminderTitle.value : '',
-            reminderText: reminderText ? reminderText.value : '',
             reminderDate: reminderDate ? reminderDate.value : '',
-            reminderCompleted: reminderCompleted ? reminderCompleted.checked : false
+            reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            noteText: (noteData.note || (noteTextArea && noteTextArea.value) || '')
         });
     } catch (error) {
         console.error('Failed to load note detail JSON:', error);
         noteTextArea.value = decodeUnicodeEscapes(button.dataset.noteText || '');
         noteForm.dataset.initialReminderSnapshot = JSON.stringify({
             reminderTitle: reminderTitle ? reminderTitle.value : '',
-            reminderText: reminderText ? reminderText.value : '',
             reminderDate: reminderDate ? reminderDate.value : '',
-            reminderCompleted: reminderCompleted ? reminderCompleted.checked : false
+            reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            noteText: noteTextArea ? noteTextArea.value : ''
         });
     }
 
@@ -1357,6 +1356,11 @@ function selectClin(clinId, clinElement) {
     });
     clinElement.classList.add('selected-row');
 
+    const firstTd = clinElement && clinElement.querySelector('td');
+    if (firstTd) {
+        window.selectedClinItemNumber = (firstTd.textContent || '').trim();
+    }
+
     // Update all CLIN Add Note buttons with the selected CLIN ID and enable them
     document.querySelectorAll('.notes-add-clin-btn, [data-entity-type="CLIN"]').forEach(btn => {
         btn.dataset.objectId = clinId;
@@ -1379,6 +1383,13 @@ function switchToClinTab(clinId) {
         btn.dataset.objectId = clinId;
         btn.removeAttribute('disabled');
     });
+    const row = document.querySelector(`.clin-row[data-clin-id="${clinId}"]`);
+    if (row) {
+        const firstTd = row.querySelector('td');
+        if (firstTd) {
+            window.selectedClinItemNumber = (firstTd.textContent || '').trim();
+        }
+    }
     fetchClinDetails(clinId);
     fetchClinNotes(clinId);
     fetchLogFields(clinId);

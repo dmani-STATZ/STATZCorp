@@ -169,11 +169,17 @@ class Contract(AuditModel):
     
     @property
     def total_split_value(self):
-        return self.splits.aggregate(Sum('split_value'))['split_value__sum'] or 0
-    
+        from django.db.models import Sum
+        return ClinSplit.objects.filter(
+            clin__contract=self
+        ).aggregate(total=Sum('split_value'))['total'] or 0
+
     @property
     def total_split_paid(self):
-        return self.splits.aggregate(Sum('split_paid'))['split_paid__sum'] or 0
+        from django.db.models import Sum
+        return ClinSplit.objects.filter(
+            clin__contract=self
+        ).aggregate(total=Sum('split_paid'))['total'] or 0
 
     def get_sharepoint_documents_url(self):
         """
@@ -335,6 +341,33 @@ class ClinShipment(AuditModel):
 
     def __str__(self):
         return f"Shipment of {self.ship_qty} {self.uom} on {self.ship_date} for CLIN {self.clin.id}"
+
+
+class ClinSplit(models.Model):
+    clin = models.ForeignKey(
+        'Clin',
+        on_delete=models.CASCADE,
+        related_name='splits'
+    )
+    company_name = models.CharField(max_length=100)
+    split_value = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True
+    )
+    split_paid = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['company_name']
+        verbose_name = 'CLIN Split'
+        verbose_name_plural = 'CLIN Splits'
+        db_table = 'contracts_clinsplit'
+
+    def __str__(self):
+        return f"{self.company_name} Split for CLIN {self.clin.id}"
+
 
 class PaymentHistory(AuditModel):
     """
@@ -861,76 +894,6 @@ class ExportTiming(models.Model):
         
         # Ensure minimum of 1 second
         return max(1, estimated_time)
-
-class ContractSplit(models.Model):
-    """Model for storing dynamic contract splits between different companies"""
-    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='splits')
-    company_name = models.CharField(max_length=100)
-    split_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['company_name']
-        verbose_name = 'Contract Split'
-        verbose_name_plural = 'Contract Splits'
-        db_table = 'contracts_contractsplit'
-
-    def __str__(self):
-        return f"{self.company_name} Split for {self.contract.contract_number}"
-    
-   
-    @classmethod
-    def create_split(cls, contract_id, company_name, split_value, split_paid=0.00):
-        """Creates a new ContractSplit record."""
-        try:
-            contract = cls._meta.get_field('contract').related_model.objects.get(pk=contract_id)
-        except cls._meta.get_field('contract').related_model.DoesNotExist:
-            raise ValueError(f"Contract with id '{contract_id}' does not exist.")
-
-        if not company_name:
-            raise ValueError("Company name cannot be empty.")
-        if split_value is None:
-            raise ValueError("Split value cannot be None.")
-
-        contract_split = cls(
-            contract=contract,
-            company_name=company_name,
-            split_value=split_value,
-            split_paid=split_paid,
-        )
-        contract_split.save()
-        return contract_split
-
-    @classmethod
-    def update_split(cls, contract_split_id, company_name=None, split_value=None, split_paid=None):
-        """Updates an existing ContractSplit record."""
-        try:
-            contract_split = cls.objects.get(pk=contract_split_id)
-        except cls.DoesNotExist:
-            raise ValueError(f"ContractSplit with id '{contract_split_id}' does not exist.")
-
-        if company_name is not None:
-            contract_split.company_name = company_name
-        if split_value is not None:
-            contract_split.split_value = split_value
-        if split_paid is not None:
-            contract_split.split_paid = split_paid
-
-        contract_split.modified_at = timezone.now()
-        contract_split.save()
-        return contract_split
-
-    @classmethod
-    def delete_split(cls, contract_split_id):
-        """Deletes a ContractSplit record."""
-        try:
-            contract_split = cls.objects.get(pk=contract_split_id)
-            contract_split.delete()
-            return True  # Indicate successful deletion
-        except cls.DoesNotExist:
-            return False # Indicate record not found
 
 
 class TrackerSchema(models.Model):

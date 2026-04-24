@@ -277,6 +277,24 @@ class ProcessContract(models.Model):
         self.plan_gross = self.calculate_plan_gross()
         self.save()
 
+    @property
+    def total_split_value(self):
+        from django.db.models import Sum
+        return (
+            ProcessClinSplit.objects.filter(
+                clin__process_contract=self
+            ).aggregate(total=Sum('split_value'))['total'] or 0
+        )
+
+    @property
+    def total_split_paid(self):
+        from django.db.models import Sum
+        return (
+            ProcessClinSplit.objects.filter(
+                clin__process_contract=self
+            ).aggregate(total=Sum('split_paid'))['total'] or 0
+        )
+
 class ProcessClin(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
@@ -360,9 +378,10 @@ class ProcessClin(models.Model):
                 self.company = Company.get_default_company()
         super().save(*args, **kwargs)
 
-class ProcessContractSplit(models.Model):
-    """Model for storing dynamic contract splits between different companies"""
-    process_contract = models.ForeignKey(ProcessContract, on_delete=models.CASCADE, related_name='splits')
+
+class ProcessClinSplit(models.Model):
+    """Staging split row for a process CLIN; materialized to contracts.ClinSplit on finalization."""
+    clin = models.ForeignKey(ProcessClin, on_delete=models.CASCADE, related_name='splits')
     company_name = models.CharField(max_length=100)
     split_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     split_paid = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
@@ -371,60 +390,60 @@ class ProcessContractSplit(models.Model):
 
     class Meta:
         ordering = ['company_name']
-        verbose_name = 'Contract Split'
-        verbose_name_plural = 'Contract Splits'
-        db_table = 'processing_contractsplit'
+        verbose_name = 'Process CLIN Split'
+        verbose_name_plural = 'Process CLIN Splits'
+        db_table = 'processing_processclin_split'
 
     def __str__(self):
-        return f"{self.company_name} Split for {self.process_contract.contract_number}"
-    
-    @classmethod
-    def create_split(cls, process_contract_id, company_name, split_value):
-        """Creates a new ContractSplit record."""
-        try:
-            process_contract = cls._meta.get_field('process_contract').related_model.objects.get(pk=process_contract_id)
-        except cls._meta.get_field('process_contract').related_model.DoesNotExist:
-            raise ValueError(f"ProcessContract with id '{process_contract_id}' does not exist.")
+        item = self.clin.item_number or self.clin_id
+        return f"{self.company_name} (CLIN {item})"
 
+    @classmethod
+    def create_split(cls, process_clin_id, company_name, split_value, split_paid=None):
+        """Create a new ProcessClinSplit for the given process CLIN."""
+        ProcessClinModel = cls._meta.get_field('clin').related_model
+        try:
+            process_clin = ProcessClinModel.objects.get(pk=process_clin_id)
+        except ProcessClinModel.DoesNotExist:
+            raise ValueError(f"ProcessClin with id '{process_clin_id}' does not exist.")
         if not company_name:
             raise ValueError("Company name cannot be empty.")
         if split_value is None:
             raise ValueError("Split value cannot be None.")
-
-        contract_split = cls(
-            process_contract=process_contract,
+        paid = split_paid
+        if paid is None:
+            paid = Decimal('0.00')
+        row = cls(
+            clin=process_clin,
             company_name=company_name,
             split_value=split_value,
-            split_paid=0.00,
+            split_paid=paid,
         )
-        contract_split.save()
-        return contract_split
+        row.save()
+        return row
 
     @classmethod
-    def update_split(cls, contract_split_id, company_name=None, split_value=None, split_paid=None):
-        """Updates an existing ContractSplit record."""
+    def update_split(cls, split_id, company_name=None, split_value=None, split_paid=None):
+        """Update an existing ProcessClinSplit row."""
         try:
-            contract_split = cls.objects.get(pk=contract_split_id)
+            row = cls.objects.get(pk=split_id)
         except cls.DoesNotExist:
-            raise ValueError(f"ContractSplit with id '{contract_split_id}' does not exist.")
-
+            raise ValueError(f"ProcessClinSplit with id '{split_id}' does not exist.")
         if company_name is not None:
-            contract_split.company_name = company_name
+            row.company_name = company_name
         if split_value is not None:
-            contract_split.split_value = split_value
+            row.split_value = split_value
         if split_paid is not None:
-            contract_split.split_paid = split_paid
-
-        contract_split.modified_at = timezone.now()
-        contract_split.save()
-        return contract_split
+            row.split_paid = split_paid
+        row.save()
+        return row
 
     @classmethod
-    def delete_split(cls, contract_split_id):
-        """Deletes a ContractSplit record."""
+    def delete_split(cls, split_id):
+        """Delete a ProcessClinSplit by primary key."""
         try:
-            contract_split = cls.objects.get(pk=contract_split_id)
-            contract_split.delete()
-            return True  # Indicate successful deletion
+            row = cls.objects.get(pk=split_id)
+            row.delete()
+            return True
         except cls.DoesNotExist:
-            return False # Indicate record not found
+            return False

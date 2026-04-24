@@ -14,7 +14,7 @@ from decimal import Decimal
 import time
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, ClinAcknowledgment, Supplier, ExportTiming, ContractSplit
+from ..models import Clin, ClinAcknowledgment, ClinSplit, Supplier, ExportTiming
 
 
 class ContractLogView(ListView):
@@ -46,38 +46,20 @@ class ContractLogView(ListView):
             'nsn'
         ).prefetch_related(
             'clinacknowledgment_set',
-            'contract__splits',
         ).annotate(
-            # Aggregated split values via correlated subqueries (SQL Server safe)
-            ppi_split_value=Subquery(
-                ContractSplit.objects
-                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
-                .order_by()
-                .values('contract_id')
-                .annotate(total=Sum('split_value'))
-                .values('total')[:1]
-            ),
             ppi_split_paid=Subquery(
-                ContractSplit.objects
-                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+                ClinSplit.objects
+                .filter(clin__contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
                 .order_by()
-                .values('contract_id')
+                .values('clin__contract_id')
                 .annotate(total=Sum('split_paid'))
                 .values('total')[:1]
             ),
-            statz_split_value=Subquery(
-                ContractSplit.objects
-                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
-                .order_by()
-                .values('contract_id')
-                .annotate(total=Sum('split_value'))
-                .values('total')[:1]
-            ),
             statz_split_paid=Subquery(
-                ContractSplit.objects
-                .filter(contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+                ClinSplit.objects
+                .filter(clin__contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
                 .order_by()
-                .values('contract_id')
+                .values('clin__contract_id')
                 .annotate(total=Sum('split_paid'))
                 .values('total')[:1]
             ),
@@ -224,7 +206,6 @@ def export_contract_log(request):
         'nsn'
     ).prefetch_related(
         'clinacknowledgment_set',  # Use prefetch_related for reverse relation
-        'contract__splits',        # Prefetch splits for computing PPI/STATZ amounts
     ).order_by('contract__award_date', 'contract__po_number', 'item_number')
     
     # Apply filters if provided
@@ -284,7 +265,7 @@ def export_contract_log(request):
         'I&A', 'PO to Sub', 'Sub Reply', 'PO to QAR', 'FOB', 'QDD', 'CDD', 'Order Qty',
         'Ship Date', 'Ship Qty', 'Sub PO $', 'Sub Paid $', 'Terms', 'Contract $',
         'WAWF Payment $', 'Date Pay Recv', 'Plan Gross $', 'Actual Paid PPI $', 'Actual STATZ $',
-        'Plan Split per PPI bid', 'PPI Split $', 'STATZ Split $', 'Notes'
+        'Notes'
     ])
     
     # Get total count before writing rows
@@ -299,21 +280,6 @@ def export_contract_log(request):
             first_for_contract = True
             seen_contracts.add(clin.contract_id)
         
-        # Compute split-related amounts once per row from prefetched splits
-        splits = list(clin.contract.splits.all()) if clin.contract_id else []
-        def _sum_for(name, attr):
-            target = (name or '').strip().upper()
-            total = Decimal('0')
-            for s in splits:
-                if ((s.company_name or '').strip().upper() == target) and getattr(s, attr) is not None:
-                    total += Decimal(str(getattr(s, attr)))
-            return total
-
-        ppi_split_paid = _sum_for('PPI', 'split_paid')
-        statz_split_paid = _sum_for('STATZ', 'split_paid')
-        ppi_split_value = _sum_for('PPI', 'split_value')
-        statz_split_value = _sum_for('STATZ', 'split_value')
-
         # Map first column to single-letter status like Master Log (O/C/X)
         if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Cancelled':
             first_col_status = 'X'
@@ -342,6 +308,22 @@ def export_contract_log(request):
         if not (acknowledgment and acknowledgment.po_to_qar_bool):
             status_parts.append('PO TO QAR NEEDED;')
         contract_status_text = ' '.join(status_parts).strip()
+
+        ppi_split_paid = Decimal('0')
+        statz_split_paid = Decimal('0')
+        if clin.contract_id and first_for_contract:
+            ppi_split_paid = (
+                ClinSplit.objects.filter(
+                    clin__contract_id=clin.contract_id,
+                    company_name__iexact='PPI',
+                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
+            )
+            statz_split_paid = (
+                ClinSplit.objects.filter(
+                    clin__contract_id=clin.contract_id,
+                    company_name__iexact='STATZ',
+                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
+            )
 
         writer.writerow([
             first_col_status,
@@ -377,9 +359,6 @@ def export_contract_log(request):
             f"${clin.contract.plan_gross:,.2f}" if (first_for_contract and clin.contract and clin.contract.plan_gross is not None) else '$0.00',
             f"${ppi_split_paid:,.2f}" if (first_for_contract and ppi_split_paid) else '$0.00',
             f"${statz_split_paid:,.2f}" if (first_for_contract and statz_split_paid) else '$0.00',
-            (clin.contract.planned_split or '') if (first_for_contract and clin.contract) else '',
-            f"${ppi_split_value:,.2f}" if (first_for_contract and ppi_split_value) else '$0.00',
-            f"${statz_split_value:,.2f}" if (first_for_contract and statz_split_value) else '$0.00',
             clin.notes.count()
         ])
     
@@ -423,7 +402,6 @@ def export_contract_log_xlsx(request):
         'nsn'
     ).prefetch_related(
         'clinacknowledgment_set',
-        'contract__splits',
     ).order_by('contract__award_date', 'contract__po_number', 'item_number')
 
     # Filters
@@ -489,7 +467,7 @@ def export_contract_log_xlsx(request):
         'I&A', 'PO to Sub', 'Sub Reply', 'PO to QAR', 'FOB', 'QDD', 'CDD', 'Order Qty',
         'Ship Date', 'Ship Qty', 'Sub PO $', 'Sub Paid $', 'Terms', 'Contract $',
         'WAWF Payment $', 'Date Pay Recv', 'Plan Gross $', 'Actual Paid PPI $', 'Actual STATZ $',
-        'Plan Split per PPI bid', 'PPI Split $', 'STATZ Split $', 'Notes'
+        'Notes'
     ]
     ws.append(headers)
     for col in range(1, len(headers) + 1):
@@ -502,7 +480,7 @@ def export_contract_log_xlsx(request):
     # Data rows
     seen_contracts = set()
     # 1-indexed columns matching currency fields in headers
-    money_cols = {25, 26, 28, 31, 32, 33, 35, 36}
+    money_cols = {25, 26, 28, 31, 32, 33}
     for clin in clins:
         ack = clin.clinacknowledgment_set.first()
         first_for_contract = False
@@ -510,20 +488,21 @@ def export_contract_log_xlsx(request):
             first_for_contract = True
             seen_contracts.add(clin.contract_id)
 
-        # Splits
-        splits = list(clin.contract.splits.all()) if clin.contract_id else []
-        def _sum_for(name, attr):
-            from decimal import Decimal as D
-            target = (name or '').strip().upper()
-            total = D('0')
-            for s in splits:
-                if ((s.company_name or '').strip().upper() == target) and getattr(s, attr) is not None:
-                    total += D(str(getattr(s, attr)))
-            return total
-        ppi_split_paid = _sum_for('PPI', 'split_paid')
-        statz_split_paid = _sum_for('STATZ', 'split_paid')
-        ppi_split_value = _sum_for('PPI', 'split_value')
-        statz_split_value = _sum_for('STATZ', 'split_value')
+        ppi_split_paid = Decimal('0')
+        statz_split_paid = Decimal('0')
+        if clin.contract_id and first_for_contract:
+            ppi_split_paid = (
+                ClinSplit.objects.filter(
+                    clin__contract_id=clin.contract_id,
+                    company_name__iexact='PPI',
+                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
+            )
+            statz_split_paid = (
+                ClinSplit.objects.filter(
+                    clin__contract_id=clin.contract_id,
+                    company_name__iexact='STATZ',
+                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
+            )
 
         # Derived status char
         if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Cancelled':
@@ -585,9 +564,6 @@ def export_contract_log_xlsx(request):
             float(clin.contract.plan_gross) if (first_for_contract and clin.contract and clin.contract.plan_gross is not None) else 0.0,
             float(ppi_split_paid) if (first_for_contract and ppi_split_paid) else 0.0,
             float(statz_split_paid) if (first_for_contract and statz_split_paid) else 0.0,
-            (clin.contract.planned_split or '') if (first_for_contract and clin.contract) else '',
-            float(ppi_split_value) if (first_for_contract and ppi_split_value) else 0.0,
-            float(statz_split_value) if (first_for_contract and statz_split_value) else 0.0,
             int(clin.notes.count())
         ]
         ws.append(row)
@@ -598,7 +574,7 @@ def export_contract_log_xlsx(request):
 
     # Column widths and number formats
     from openpyxl.utils import get_column_letter
-    widths = [6, 8, 10, 18, 18, 14, 12, 8, 24, 10, 12, 26, 12, 24, 8, 10, 10, 10, 8, 10, 10, 10, 10, 10, 12, 12, 12, 12, 14, 14, 14, 14, 14, 14, 30]
+    widths = [6, 8, 10, 18, 18, 14, 12, 8, 24, 10, 12, 26, 12, 24, 8, 10, 10, 10, 8, 10, 10, 10, 10, 10, 12, 12, 12, 12, 14, 14, 14, 14, 30]
     for i in range(1, len(headers) + 1):
         try:
             w = widths[i-1] if i-1 < len(widths) else 12

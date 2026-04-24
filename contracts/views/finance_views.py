@@ -5,11 +5,11 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.views.generic import DetailView, ListView
 from django.utils.decorators import method_decorator
 from django.contrib import messages
-from ..models import Contract, Clin, PaymentHistory, SpecialPaymentTerms
+from ..models import Clin, ClinSplit, Contract, PaymentHistory, SpecialPaymentTerms
 import json
 import logging
 from decimal import Decimal
@@ -61,14 +61,24 @@ class FinanceAuditView(DetailView):
                 # Get Net Terms ID
                 net_terms = payment_terms.filter(terms__icontains='net').first()
                 context['net_terms_id'] = net_terms.id if net_terms else None
-            
+
+                context['clin_split_rollup'] = list(
+                    ClinSplit.objects.filter(clin__contract=self.object).values('company_name').annotate(
+                        total_value=Sum('split_value'),
+                        total_paid=Sum('split_paid'),
+                    ).order_by('company_name')
+                )
+
             # Add search query to context if it exists
             context['search_query'] = self.request.GET.get('q', '')
             
         except Exception as e:
             logger.error(f"Error in FinanceAuditView: {str(e)}")
             messages.error(self.request, 'An error occurred while loading the page.')
-        
+
+        if 'clin_split_rollup' not in context:
+            context['clin_split_rollup'] = []
+
         return context
 
 @method_decorator(login_required, name='dispatch')

@@ -191,6 +191,49 @@
         </div>
 
         <div class="col-span-3 flex flex-col gap-8">
+            <!-- Per-delivery-order split rollup (read-only) -->
+            {% for block in idiq_clin_split_rollup %}
+            <div class="border rounded-lg idiq-details-card">
+                <div class="idiq-section-header p-3 border-b">
+                    <h2 class="text-lg font-medium mb-0">Split summary — <a href="{% url 'contracts:contract_management' block.contract.id %}">{{ block.contract.contract_number }}</a></h2>
+                </div>
+                <div class="p-3">
+                    {% if block.rows %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th class="text-end">Total split value</th>
+                                    <th class="text-end">Total split paid</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in block.rows %}
+                                <tr>
+                                    <td>{{ row.company_name }}</td>
+                                    <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                                    <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary">
+                                    <th scope="row">Total</th>
+                                    <td class="text-end fw-semibold">${{ block.contract.total_split_value|floatformat:2 }}</td>
+                                    <td class="text-end fw-semibold">${{ block.contract.total_split_paid|floatformat:2 }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-body-secondary small mb-0">No splits recorded</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-body-secondary small">No delivery orders under this IDIQ.</p>
+            {% endfor %}
             <!-- NSNs and Supplier -->
             <div class="border rounded-lg">
                 <div class="idiq-section-header p-3 border-b row-between">
@@ -369,6 +412,8 @@
 <script>
 // Get CSRF token once at the start
 const csrftoken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+window.contractNumberForReminders = "{{ idiq_contract.contract_number|escapejs }}";
+window.selectedClinItemNumber = "";
 
 // Helper function to show error notifications
 function showErrorNotification(message) {

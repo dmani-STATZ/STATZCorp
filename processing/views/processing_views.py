@@ -4,11 +4,36 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.forms import inlineformset_factory
-from processing.models import ProcessContract, ProcessClin, QueueContract, QueueClin, SequenceNumber, ProcessContractSplit
+from processing.models import (
+    ProcessContract,
+    ProcessClin,
+    ProcessClinSplit,
+    QueueContract,
+    QueueClin,
+    SequenceNumber,
+)
 from processing.services.pdf_parser import parse_award_pdf, ingest_parsed_award
 from processing.services.contract_utils import detect_contract_type
-from processing.forms import ProcessContractForm, ProcessClinForm, ProcessClinFormSet
-from contracts.models import Contract, Clin, Buyer, IdiqContract, IdiqContractDetails, ClinType, SpecialPaymentTerms, ContractType, SalesClass, PaymentHistory, ContractSplit, ContractStatus
+from processing.forms import (
+    ProcessContractForm,
+    ProcessClinForm,
+    ProcessClinFormSet,
+    persist_clin_splits_for_contract,
+)
+from contracts.models import (
+    Contract,
+    Clin,
+    ClinSplit,
+    Buyer,
+    IdiqContract,
+    IdiqContractDetails,
+    ClinType,
+    SpecialPaymentTerms,
+    ContractType,
+    SalesClass,
+    PaymentHistory,
+    ContractStatus,
+)
 from products.models import Nsn
 from suppliers.models import Supplier
 import csv
@@ -28,7 +53,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 import random
 from datetime import datetime, timedelta
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.utils.decorators import method_decorator
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -309,14 +334,32 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        process_contract = self.object
+        clin_qs = (
+            ProcessClin.objects.filter(process_contract=process_contract)
+            .prefetch_related('splits')
+            .order_by('item_number')
+        )
         if self.request.POST:
             context['clin_formset'] = ProcessClinFormSet(
                 self.request.POST,
-                instance=self.object
+                instance=process_contract,
+                queryset=clin_qs,
             )
         else:
-            context['clin_formset'] = ProcessClinFormSet(instance=self.object)
-            
+            context['clin_formset'] = ProcessClinFormSet(
+                instance=process_contract,
+                queryset=clin_qs,
+            )
+        context['process_clin_split_rollup'] = (
+            ProcessClinSplit.objects.filter(clin__process_contract=process_contract)
+            .values('company_name')
+            .annotate(
+                total_value=Sum('split_value'),
+                total_paid=Sum('split_paid'),
+            )
+            .order_by('company_name')
+        )
         # Add all IDIQ contracts to the context
         context['idiq_contracts'] = IdiqContract.objects.filter(closed=False).order_by('contract_number')
 
@@ -630,7 +673,7 @@ def finalize_contract(request, process_contract_id):
                 sequence.save()
 
         # Create CLINs
-        for process_clin in process_contract.clins.all():
+        for process_clin in process_contract.clins.prefetch_related('splits'):
             if not process_clin.nsn:
                 return JsonResponse({
                     'success': False,
@@ -642,7 +685,7 @@ def finalize_contract(request, process_contract_id):
                     'error': f'Supplier must be matched for CLIN {process_clin.item_number}'
                 })
             
-            Clin.objects.create(
+            clin = Clin.objects.create(
                 contract=contract,
                 item_number=process_clin.item_number,
                 item_type=process_clin.item_type,
@@ -666,6 +709,19 @@ def finalize_contract(request, process_contract_id):
                 created_by=request.user,
                 modified_by=request.user
             )
+            process_clin.final_clin = clin
+            process_clin.save(update_fields=['final_clin'])
+            for proc_split in process_clin.splits.all():
+                ClinSplit.objects.create(
+                    clin=clin,
+                    company_name=proc_split.company_name,
+                    split_value=proc_split.split_value,
+                    split_paid=(
+                        proc_split.split_paid
+                        if proc_split.split_paid is not None
+                        else Decimal('0.00')
+                    ),
+                )
         
         # Update queue item status
         queue_contract = process_contract.queue_contract
@@ -976,18 +1032,27 @@ def process_contract_form(request, pk=None):
     }
     return render(request, 'processing/process_contract_form.html', context)
 
+@login_required
 @require_http_methods(["POST"])
-def create_split_view(request):
+def create_split_view(request, clin_pk):
     try:
         data = json.loads(request.body)
-        split = ProcessContractSplit.create_split(
-            process_contract_id=data['process_contract_id'],
+        get_object_or_404(ProcessClin, pk=clin_pk)
+        paid = data.get('split_paid')
+        if paid is not None:
+            paid = Decimal(str(paid))
+        split = ProcessClinSplit.create_split(
+            process_clin_id=clin_pk,
             company_name=data['company_name'],
-            split_value=data['split_value']
+            split_value=Decimal(str(data['split_value'])),
+            split_paid=paid,
         )
         return JsonResponse({
             'success': True,
-            'split_id': split.id
+            'split_id': split.id,
+            'company_name': split.company_name,
+            'split_value': str(split.split_value) if split.split_value is not None else None,
+            'split_paid': str(split.split_paid) if split.split_paid is not None else None,
         })
     except Exception as e:
         return JsonResponse({
@@ -995,15 +1060,23 @@ def create_split_view(request):
             'error': str(e)
         }, status=400)
 
+
+@login_required
 @require_http_methods(["POST"])
-def update_split_view(request, split_id):
+def update_split_view(request, split_pk):
     try:
         data = json.loads(request.body)
-        split = ProcessContractSplit.update_split(
-            contract_split_id=split_id,
+
+        def ddec(key):
+            if key not in data or data[key] is None or str(data[key]).strip() == '':
+                return None
+            return Decimal(str(data[key]).replace(',', ''))
+
+        ProcessClinSplit.update_split(
+            split_id=split_pk,
             company_name=data.get('company_name'),
-            split_value=data.get('split_value'),
-            split_paid=data.get('split_paid')
+            split_value=ddec('split_value'),
+            split_paid=ddec('split_paid'),
         )
         return JsonResponse({'success': True})
     except Exception as e:
@@ -1012,16 +1085,56 @@ def update_split_view(request, split_id):
             'error': str(e)
         }, status=400)
 
+
+@login_required
 @require_http_methods(["POST"])
-def delete_split_view(request, split_id):
+def delete_split_view(request, split_pk):
     try:
-        success = ProcessContractSplit.delete_split(split_id)
+        success = ProcessClinSplit.delete_split(split_pk)
         return JsonResponse({'success': success})
     except Exception as e:
         return JsonResponse({
             'success': False,
             'error': str(e)
         }, status=400)
+
+
+@login_required
+@require_POST
+def calc_splits_view(request, clin_pk):
+    """Set or create STATZ process split as item_value - quote_value (floored at 0)."""
+    process_clin = get_object_or_404(ProcessClin, pk=clin_pk)
+    try:
+        iv = process_clin.item_value
+        qv = process_clin.quote_value
+        a = iv if iv is not None else Decimal('0')
+        b = qv if qv is not None else Decimal('0')
+        statz = a - b
+        if statz < 0:
+            statz = Decimal('0')
+        row = process_clin.splits.filter(company_name__iexact='STATZ').first()
+        if row:
+            row.split_value = statz
+            row.split_paid = row.split_paid or Decimal('0')
+            row.save()
+        else:
+            row = ProcessClinSplit.objects.create(
+                clin=process_clin,
+                company_name='STATZ',
+                split_value=statz,
+                split_paid=Decimal('0'),
+            )
+        return JsonResponse(
+            {
+                'success': True,
+                'split_id': row.id,
+                'company_name': 'STATZ',
+                'split_value': str(row.split_value),
+                'split_paid': '0',
+            }
+        )
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 @login_required
 @require_POST
@@ -1074,7 +1187,7 @@ def mark_ready_for_review(request, process_contract_id):
 def finalize_and_email_contract(request, process_contract_id):
     try:
         process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
-        process_clins = process_contract.clins.all()
+        process_clins = process_contract.clins.prefetch_related('splits')
         
         # Validate all CLINs before processing
         validation_errors = []
@@ -1199,6 +1312,21 @@ def finalize_and_email_contract(request, process_contract_id):
                 created_by=request.user,
                 modified_by=request.user
             )
+
+            process_clin.final_clin = clin
+            process_clin.save(update_fields=['final_clin'])
+
+            for proc_split in process_clin.splits.all():
+                ClinSplit.objects.create(
+                    clin=clin,
+                    company_name=proc_split.company_name,
+                    split_value=proc_split.split_value,
+                    split_paid=(
+                        proc_split.split_paid
+                        if proc_split.split_paid is not None
+                        else Decimal('0.00')
+                    ),
+                )
             
             # Create payment history records using ContentType framework
             clin_content_type = ContentType.objects.get_for_model(Clin)
@@ -1226,17 +1354,6 @@ def finalize_and_email_contract(request, process_contract_id):
                 created_by=request.user,
                 modified_by=request.user
             )
-            
-        
-        # Create contract splits
-        for process_split in ProcessContractSplit.objects.filter(process_contract=process_contract):
-            ContractSplit.objects.create(
-                contract=contract,
-                company_name=process_split.company_name,
-                split_value=process_split.split_value,
-                split_paid=process_split.split_paid or Decimal('0.00'),
-            )
-            
             
         email_subject = f"New Contract: {contract.contract_number}"
         email_body = (
@@ -1375,21 +1492,24 @@ def save_contract(request):
                     updated_fields[model_field] = str(new_value) if new_value is not None else ''
                     changes_made = True
 
+        splits_changed = persist_clin_splits_for_contract(contract, request.POST)
+
         if changes_made:
             contract.save()
-            #print("Contract saved successfully")
-            #print("Updated fields:", updated_fields)
             return JsonResponse({
                 'success': True,
                 'message': 'Contract saved successfully',
                 'updated_fields': updated_fields
             })
-        else:
-            #print("No changes detected")
+        if splits_changed:
             return JsonResponse({
                 'success': True,
-                'message': 'No changes to save'
+                'message': 'Contract saved successfully',
             })
+        return JsonResponse({
+            'success': True,
+            'message': 'No changes to save'
+        })
 
     except Exception as e:
         import traceback

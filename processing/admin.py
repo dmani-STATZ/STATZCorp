@@ -2,21 +2,35 @@
 from django.contrib import admin
 from django.db import transaction
 from django.contrib import messages
-from .models import QueueContract, QueueClin, ProcessContract, ProcessClin, ProcessContractSplit
+from .models import (
+    QueueContract,
+    QueueClin,
+    ProcessContract,
+    ProcessClin,
+    ProcessClinSplit,
+)
+
+
+@admin.register(ProcessClinSplit)
+class ProcessClinSplitAdmin(admin.ModelAdmin):
+    list_display = ('id', 'clin', 'company_name', 'split_value', 'split_paid')
+    list_filter = ('company_name',)
+    search_fields = ('company_name',)
+    raw_id_fields = ('clin',)
 
 # Action function to perform the force delete
 @admin.action(description='Force delete selected contracts and all related data')
 def force_delete_contracts(modeladmin, request, queryset):
     """
     Admin action to forcefully delete QueueContract and all associated data
-    across QueueClin, ProcessContract, ProcessClin, and ProcessContractSplit.
+    across QueueClin, ProcessContract, ProcessClin, and ProcessClinSplit.
     """
     deleted_count = 0
     related_deleted_counts = {
         'QueueClin': 0,
         'ProcessContract': 0,
         'ProcessClin': 0,
-        'ProcessContractSplit': 0,
+        'ProcessClinSplit': 0,
     }
 
     # We use a transaction to ensure atomicity - either everything gets deleted or nothing does.
@@ -34,15 +48,11 @@ def force_delete_contracts(modeladmin, request, queryset):
                 pc = ProcessContract.objects.filter(queue_id=qc_id).first()
                 if pc:
                     pc_id = pc.id
-                    # 2a. Delete related ProcessClins
+                    related_deleted_counts['ProcessClinSplit'] += ProcessClinSplit.objects.filter(
+                        clin__process_contract_id=pc_id
+                    ).count()
                     pclins_deleted, _ = ProcessClin.objects.filter(process_contract_id=pc_id).delete()
                     related_deleted_counts['ProcessClin'] += pclins_deleted
-
-                    # 2b. Delete related ProcessContractSplits
-                    pcsplits_deleted, _ = ProcessContractSplit.objects.filter(process_contract_id=pc_id).delete()
-                    related_deleted_counts['ProcessContractSplit'] += pcsplits_deleted
-
-                    # 2c. Delete the ProcessContract itself
                     pc.delete()
                     related_deleted_counts['ProcessContract'] += 1
 
@@ -71,7 +81,7 @@ def force_delete_contracts(modeladmin, request, queryset):
                  f"QueueClins({related_deleted_counts['QueueClin']}), "
                  f"ProcessContracts({related_deleted_counts['ProcessContract']}), "
                  f"ProcessClins({related_deleted_counts['ProcessClin']}), "
-                 f"ProcessContractSplits({related_deleted_counts['ProcessContractSplit']}).",
+                 f"ProcessClinSplits({related_deleted_counts['ProcessClinSplit']}).",
                 messages.INFO
              )
 
@@ -99,9 +109,3 @@ class QueueContractAdmin(admin.ModelAdmin):
 
 # Register your models here
 admin.site.register(QueueContract, QueueContractAdmin)
-
-# Optionally register other related models if you want them in admin separately
-# admin.site.register(QueueClin)
-# admin.site.register(ProcessContract)
-# admin.site.register(ProcessClin)
-# admin.site.register(ProcessContractSplit)

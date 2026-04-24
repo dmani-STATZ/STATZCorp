@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from .models import (
     CanceledReason,
+    ClinSplit,
     ClinType,
     Company,
     Contract,
@@ -82,3 +83,10 @@ class SalesClassAdmin(admin.ModelAdmin):
 class SpecialPaymentTermsAdmin(admin.ModelAdmin):
     list_display = ('id', 'code', 'terms')
     search_fields = ('code', 'terms')
+
+
+@admin.register(ClinSplit)
+class ClinSplitAdmin(admin.ModelAdmin):
+    list_display = ('id', 'clin', 'company_name', 'split_value', 'split_paid')
+    list_filter = ('company_name',)
+    search_fields = ('company_name',)

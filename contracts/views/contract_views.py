@@ -16,7 +16,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus, GovAction
+from ..models import Contract, Clin, ClinSplit, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus, GovAction
 from processing.models import SequenceNumber
 from ..forms import ContractForm, ContractCancelForm
 from .mixins import ActiveCompanyQuerysetMixin
@@ -149,7 +149,7 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
                 setattr(note, 'content_type_id', contract_type.id)
                 setattr(note, 'object_id', contract.id)
             context['all_notes'] = contract_notes
-            
+
         return context
 
 
@@ -166,6 +166,12 @@ class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
         context = super().get_context_data(**kwargs)
         contract = self.get_object()
         context['contract'] = contract
+        context['clin_split_rollup'] = list(
+            ClinSplit.objects.filter(clin__contract=contract).values('company_name').annotate(
+                total_value=Sum('split_value'),
+                total_paid=Sum('split_paid'),
+            ).order_by('company_name')
+        )
         return context
 
 
@@ -257,11 +263,22 @@ class ContractUpdateView(ActiveCompanyQuerysetMixin, UpdateView):
     model = Contract
     form_class = ContractForm
     template_name = 'contracts/contract_form.html'
-    
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.get_object()
+        context['clin_split_rollup'] = list(
+            ClinSplit.objects.filter(clin__contract=contract).values('company_name').annotate(
+                total_value=Sum('split_value'),
+                total_paid=Sum('split_paid'),
+            ).order_by('company_name')
+        )
+        return context
+
     def form_valid(self, form):
         messages.success(self.request, 'Contract updated successfully.')
         return super().form_valid(form)
-    
+
     def get_success_url(self):
         return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
@@ -572,14 +589,15 @@ class ContractReviewView(DetailView):
             'nsn'
         ).order_by('clin_type__description')
         
-        # Calculate split totals
-        splits = contract.splits.all()
-        total_split_value = sum(split.split_value or 0 for split in splits)
-        total_split_paid = sum(split.split_paid or 0 for split in splits)
-        
-        context['total_split_value'] = total_split_value
-        context['total_split_paid'] = total_split_paid
-        
+        context['total_split_value'] = contract.total_split_value
+        context['total_split_paid'] = contract.total_split_paid
+        context['clin_split_rollup'] = list(
+            ClinSplit.objects.filter(clin__contract=contract).values('company_name').annotate(
+                total_value=Sum('split_value'),
+                total_paid=Sum('split_paid'),
+            ).order_by('company_name')
+        )
+
         return context
 
 

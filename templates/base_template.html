@@ -347,6 +347,25 @@
             {% endfor %}
         </div>
         {% endif %}
+        <script>
+        (function() {
+            // Auto-dismiss Django message banners after 5 seconds
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('#content > .container-fluid.py-2 .alert').forEach(function(alert) {
+                    setTimeout(function() {
+                        // Use Bootstrap's dismiss if available, otherwise just hide
+                        if (window.bootstrap && bootstrap.Alert) {
+                            var bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+                            bsAlert.close();
+                        } else {
+                            alert.classList.remove('show');
+                            setTimeout(function() { alert.remove(); }, 300);
+                        }
+                    }, 5000);
+                });
+            });
+        })();
+        </script>
         {% block body %}{% endblock body %}
         {% block extra_scripts %}{% endblock extra_scripts %}
     </div>

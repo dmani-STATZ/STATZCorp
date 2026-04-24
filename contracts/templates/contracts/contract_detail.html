@@ -1,5 +1,4 @@
 {% extends "contracts/contract_base.html" %}
-{% load static %}
 {% load humanize %}
 
 {% block title %}
@@ -209,8 +208,41 @@ Contract Details: {{ contract.contract_number }}
             </div>
         </div>
         
-        <!-- Contract Splits -->
-        {% include "contracts/partials/contract_splits.html" with mode="detail" contract=contract %}
+        <!-- Split summary (read-only, all CLINs) -->
+        <div class="border-t border-gray-200 pt-6">
+            <h2 class="section-header">Split summary (all CLINs, by company)</h2>
+            {% if clin_split_rollup %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th class="text-end">Total split value</th>
+                            <th class="text-end">Total split paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in clin_split_rollup %}
+                        <tr>
+                            <td>{{ row.company_name }}</td>
+                            <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-secondary">
+                            <th>Total</th>
+                            <td class="text-end fw-semibold">${{ contract.total_split_value|floatformat:2 }}</td>
+                            <td class="text-end fw-semibold">${{ contract.total_split_paid|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-body-secondary small">No splits recorded</p>
+            {% endif %}
+        </div>
 
         <!-- Management Information -->
         <div class="border-t border-gray-200 pt-6">
@@ -272,6 +304,4 @@ Contract Details: {{ contract.contract_number }}
 
 {% block extra_scripts %}
 {{ block.super }}
-<!-- Add Contract Splits Component JS -->
-<script src="{% static 'contracts/js/contract_splits.js' %}"></script>
-{% endblock %} 
+{% endblock %}

@@ -42,8 +42,8 @@
                    href="{% url 'contracts:reminders_popup' %}?due=due{% if status_filter %}&status={{ status_filter }}{% endif %}">Due ({{ due_count }})</a>
                 <a class="btn btn-sm {% if due_filter == 'overdue' %}btn-danger{% else %}btn-outline-secondary{% endif %}"
                    href="{% url 'contracts:reminders_popup' %}?due=overdue{% if status_filter %}&status={{ status_filter }}{% endif %}">Overdue ({{ overdue_count }})</a>
-                <a class="btn btn-sm {% if not due_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}{% if status_filter %}?status={{ status_filter }}{% endif %}">All Time</a>
+                <a class="btn btn-sm {% if due_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                   href="{% url 'contracts:reminders_popup' %}?due=all{% if status_filter %}&status={{ status_filter }}{% endif %}">All Time</a>
             </div>
         </div>
     </div>

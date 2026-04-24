@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Validate required data attributes
             if (!contentTypeId || !objectId) {
                 console.error('Missing required data attributes: content-type-id or object-id');
-                showErrorMessage('Configuration error. Please contact the administrator.');
+                window.notify('error', 'Configuration error. Please contact the administrator.', 5000);
                 return;
             }
             
@@ -141,10 +141,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Toggle reminder fields visibility
+    // Toggle reminder fields visibility; default Reminder Title when the checkbox is turned on
     createReminderCheckbox.addEventListener('change', function() {
         if (this.checked) {
             reminderFields.classList.remove('hidden');
+            const titleInput = document.getElementById('id_reminder_title');
+            if (titleInput && !titleInput.value.trim()) {
+                const t = (noteModalTitle && noteModalTitle.textContent) || '';
+                const isClinNote = t.toLowerCase().includes('clin');
+                const contractNum = window.contractNumberForReminders || '';
+                const clinNum = (window.selectedClinItemNumber || '').trim();
+                let defaultTitle = contractNum;
+                if (isClinNote && clinNum) {
+                    const parts = [contractNum, clinNum].filter(Boolean);
+                    defaultTitle = parts.join('-');
+                }
+                if (defaultTitle) {
+                    titleInput.value = defaultTitle;
+                }
+            }
         } else {
             reminderFields.classList.add('hidden');
         }
@@ -167,19 +182,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const isEdit = noteForm.dataset.isEdit === '1' || /\/note\/update\/\d+\/$/.test(noteForm.action);
 
         if (noteForm.dataset.canEdit === '0') {
-            showErrorMessage('This note is read-only.');
+            window.notify('error', 'This note is read-only.', 5000);
             return;
         }
         
         // Validate note text
         if (!noteText || noteText.trim() === '') {
-            showErrorMessage('Please enter a note.');
+            window.notify('error', 'Please enter a note.', 5000);
             return;
         }
         
         // Validate required fields
         if (!contentTypeId || !objectId) {
-            showErrorMessage('Missing required fields. Please try again or contact support.');
+            window.notify('error', 'Missing required fields. Please try again or contact support.', 5000);
             console.error('Missing required fields:', { contentTypeId, objectId });
             return;
         }
@@ -206,17 +221,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const currentReminderSnapshot = {
                 reminderTitle: formData.get('reminder_title') || '',
-                reminderText: formData.get('reminder_text') || '',
                 reminderDate: formData.get('reminder_date') || '',
-                reminderCompleted: formData.get('reminder_completed') === 'on'
+                reminderCompleted: formData.get('reminder_completed') === 'on',
+                noteText: (formData.get('note') || '')
             };
 
             const reminderChanged = initialReminderSnapshot
                 ? (
                     (initialReminderSnapshot.reminderTitle || '') !== currentReminderSnapshot.reminderTitle ||
-                    (initialReminderSnapshot.reminderText || '') !== currentReminderSnapshot.reminderText ||
                     (initialReminderSnapshot.reminderDate || '') !== currentReminderSnapshot.reminderDate ||
-                    !!initialReminderSnapshot.reminderCompleted !== currentReminderSnapshot.reminderCompleted
+                    !!initialReminderSnapshot.reminderCompleted !== currentReminderSnapshot.reminderCompleted ||
+                    (initialReminderSnapshot.noteText || '') !== currentReminderSnapshot.noteText
                 )
                 : true;
 
@@ -243,14 +258,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const reminderDate = formData.get('reminder_date');
             
             if (!reminderTitle || reminderTitle.trim() === '') {
-                showErrorMessage('Please enter a reminder title.');
+                window.notify('error', 'Please enter a reminder title.', 5000);
                 return;
             }
             
             if (!reminderDate) {
-                showErrorMessage('Please select a reminder date.');
+                window.notify('error', 'Please select a reminder date.', 5000);
                 return;
             }
+            // Reminder body mirrors note text (separate Reminder Details field removed)
+            const noteTextForReminder = (formData.get('note') || '');
+            formData.set('reminder_text', noteTextForReminder);
         }
         
         // Show loading state
@@ -280,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (contentType && contentType.includes('application/json')) {
                 data = await response.json();
                 if (data.success) {
-                    showSuccessMessage('Note added successfully');
+                    window.notify('success', 'Note added successfully.', 3000);
                     closeModal();
                     let refreshed = false;
 
@@ -315,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error saving note:', error);
-            showErrorMessage(error.message || 'Failed to save note. Please try again.');
+            window.notify('error', error.message || 'Failed to save note. Please try again.', 5000);
         } finally {
             // Reset button state
             saveNoteBtn.disabled = false;
@@ -344,58 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (reminderSection) {
             reminderSection.classList.remove('hidden');
         }
-    }
-    
-    // Function to show error message
-    function showErrorMessage(message) {
-        // Create an error message element
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50 shadow-md';
-        errorMessage.innerHTML = `
-            <div class="flex items-center">
-                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        // Add to the document
-        document.body.appendChild(errorMessage);
-        
-        // Remove after 5 seconds
-        setTimeout(() => {
-            errorMessage.classList.add('opacity-0', 'transition-opacity', 'duration-500');
-            setTimeout(() => {
-                document.body.removeChild(errorMessage);
-            }, 500);
-        }, 5000);
-    }
-    
-    // Function to show success message
-    function showSuccessMessage(message) {
-        // Create a success message element
-        const successMessage = document.createElement('div');
-        successMessage.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50 shadow-md';
-        successMessage.innerHTML = `
-            <div class="flex items-center">
-                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        // Add to the document
-        document.body.appendChild(successMessage);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            successMessage.classList.add('opacity-0', 'transition-opacity', 'duration-500');
-            setTimeout(() => {
-                document.body.removeChild(successMessage);
-            }, 500);
-        }, 3000);
     }
     
     // Close modal when pressing Escape key

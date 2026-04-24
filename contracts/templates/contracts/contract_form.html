@@ -320,8 +320,44 @@
                 </div>
             </div>
 
-            <!-- Contract Splits -->
-            {% include "contracts/partials/contract_splits.html" with mode="form" contract=form.instance %}
+            <!-- Split summary (read-only, update only) -->
+            {% if form.instance.pk %}
+            <div class="border-t border-gray-200 pt-6">
+                <h2 class="section-header">Split summary (all CLINs, by company)</h2>
+                {% if clin_split_rollup %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th class="text-end">Total split value</th>
+                                <th class="text-end">Total split paid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in clin_split_rollup %}
+                            <tr>
+                                <td>{{ row.company_name }}</td>
+                                <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                                <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-secondary">
+                                <th>Total</th>
+                                <td class="text-end fw-semibold">${{ form.instance.total_split_value|floatformat:2 }}</td>
+                                <td class="text-end fw-semibold">${{ form.instance.total_split_paid|floatformat:2 }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="text-body-secondary small mt-2 mb-0">To add or change splits, open each CLIN&rsquo;s detail page.</p>
+                {% else %}
+                <p class="text-body-secondary small">No splits recorded. Use CLIN detail pages to add splits.</p>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <!-- Management Information -->
             <div class="border-t border-gray-200 pt-6">
@@ -415,9 +451,6 @@
 
 {% block extra_scripts %}
 {{ block.super }}
-<!-- Add Contract Splits Component JS -->
-<script src="{% static 'contracts/js/contract_splits.js' %}"></script>
-
 <!-- DD1155 extraction script -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {

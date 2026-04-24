@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load humanize %}
+{% load humanize static %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -315,6 +315,55 @@ window.onTransactionSaved = function(data) {
             {% include "contracts/partials/clin_shipments.html" with mode="form" %}
         </div>
 
+        <div class="mb-8 mt-6" id="clin-splits-section">
+            {% csrf_token %}
+            <div class="section" id="clin-splits-root"
+                 data-clin-id="{{ clin.id }}"
+                 data-add-url="{% url 'contracts:add_clin_split' clin.id %}"
+                 data-update-template="{% url 'contracts:update_clin_split' 12345 %}"
+                 data-delete-template="{% url 'contracts:delete_clin_split' 12345 %}">
+                <h2 class="section-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <span>CLIN splits</span>
+                    <button type="button" id="clin-splits-add" class="btn btn-sm btn-outline-secondary">Add split</button>
+                </h2>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Company</th>
+                                <th scope="col" class="text-end">Split value</th>
+                                <th scope="col" class="text-end">Split paid</th>
+                                <th scope="col" class="text-center" style="width:9rem">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clin-splits-tbody">
+                            {% for s in clin_splits %}
+                            <tr class="clin-split-data-row" data-id="{{ s.id }}"
+                                data-value="{% if s.split_value is not None %}{{ s.split_value }}{% endif %}"
+                                data-paid="{% if s.split_paid is not None %}{{ s.split_paid }}{% endif %}">
+                                <td class="clin-split-cell-company">{{ s.company_name }}</td>
+                                <td class="text-end clin-split-cell-value">{% if s.split_value is not None %}${{ s.split_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                                <td class="text-end clin-split-cell-paid">{% if s.split_paid is not None %}${{ s.split_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                                <td class="text-center text-nowrap">
+                                    <button type="button" class="btn btn-sm btn-outline-primary clin-split-edit">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-1 clin-split-delete" data-id="{{ s.id }}">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-secondary">
+                                <th scope="row">Total</th>
+                                <td class="text-end fw-semibold" id="clin-splits-foot-value">0.00</td>
+                                <td class="text-end fw-semibold" id="clin-splits-foot-paid">0.00</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div>
             <h2 class="section-header cursor-pointer" id="financial-details-toggle">
                 Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
@@ -410,6 +459,7 @@ window.onTransactionSaved = function(data) {
 
 {% block extra_scripts %}
 {{ block.super }}
+<script src="{% static 'contracts/js/contract_splits.js' %}?v={% now 'U' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var financialToggle = document.getElementById('financial-details-toggle');

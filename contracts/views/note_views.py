@@ -58,8 +58,6 @@ def add_note(request, content_type_id, object_id):
                             "Failed to create reminder for note %s: %s", note.id, e
                         )
             
-            messages.success(request, 'Note added successfully.')
-            
             # Determine the redirect URL based on the content object type
             if content_type.model == 'contract':
                 redirect_url = reverse('contracts:contract_management', kwargs={'pk': object_id})
@@ -93,6 +91,7 @@ def add_note(request, content_type_id, object_id):
                     'notes_html': notes_html
                 })
             
+            messages.success(request, 'Note added successfully.')
             return HttpResponseRedirect(redirect_url)
     else:
         form = NoteForm()
@@ -122,8 +121,6 @@ def delete_note(request, note_id):
     # Delete the note
     note.delete()
     
-    messages.success(request, 'Note deleted successfully.')
-    
     # If this is an AJAX request, return the updated notes list
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         notes = Note.objects.filter(
@@ -140,6 +137,8 @@ def delete_note(request, note_id):
             'success': True,
             'notes_html': notes_html
         })
+    
+    messages.success(request, 'Note deleted successfully.')
     
     # Determine the redirect URL based on the content object type
     if content_type.model == 'contract':

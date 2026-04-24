@@ -1,0 +1,213 @@
+/* contracts/static/css/components.css
+ * App-scoped component styles for the contracts app. Loaded from
+ * contract_base.html's extra_head block so it only applies on contracts
+ * pages. Uses Bootstrap 5 CSS custom properties so dark mode flips via
+ * data-bs-theme on <html>. No Tailwind. No wildcard button rules. */
+
+/* ---------- Reminders sidebar (panel) ---------- */
+
+/* The #reminderbar element keeps its .reminderbar class and .active/.inactive
+ * toggle because the slide transition and toggle JS expect them. We use
+ * id+class selectors here for higher specificity than the base .reminderbar
+ * rule in app-core.css without needing !important. */
+#reminderbar.reminderbar {
+    width: 320px;
+    top: 4rem;
+    right: 0;
+    height: calc(100vh - 4rem);
+    margin-bottom: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 0;
+    border-radius: 0.5rem 0 0 0.5rem;
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+}
+
+[data-bs-theme="dark"] #reminderbar.reminderbar {
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.45);
+}
+
+.reminders-panel-accent {
+    height: 3px;
+    flex-shrink: 0;
+    width: 100%;
+}
+.reminders-panel-accent.accent-danger  { background-color: var(--bs-danger); }
+.reminders-panel-accent.accent-warning { background-color: var(--bs-warning); }
+.reminders-panel-accent.accent-success { background-color: var(--bs-success); }
+
+.reminders-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--bs-border-color);
+    min-height: 44px;
+    flex-shrink: 0;
+}
+
+.reminders-panel-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--bs-body-color);
+    flex-grow: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reminders-panel-days {
+    width: auto;
+    max-width: 68px;
+    flex-shrink: 0;
+}
+
+.reminders-panel-iconbtn {
+    background: transparent;
+    border: 0;
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: var(--bs-secondary-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.reminders-panel-iconbtn:hover,
+.reminders-panel-iconbtn:focus-visible {
+    color: var(--bs-body-color);
+    background-color: var(--bs-secondary-bg);
+    outline: none;
+}
+
+.reminders-panel-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+}
+
+/* ---------- Individual reminder card (dense inbox row) ---------- */
+
+.reminder-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 8px 18px; /* left room for 3px strip + 9px gutter */
+    border-bottom: 1px solid var(--bs-border-color);
+    cursor: pointer;
+    background: transparent;
+    transition: background-color 0.1s ease-in-out;
+    min-height: 36px;
+}
+.reminder-card:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+.reminder-card:last-child {
+    border-bottom: 0;
+}
+
+.reminder-card-strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+}
+.reminder-card-strip.strip-danger  { background-color: var(--bs-danger); }
+.reminder-card-strip.strip-warning { background-color: var(--bs-warning); }
+.reminder-card-strip.strip-success { background-color: var(--bs-success); }
+
+.reminder-card-body {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.reminder-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--bs-body-color);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reminder-card-date {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: 1px;
+    line-height: 1.2;
+}
+
+.reminder-card-edit {
+    flex-shrink: 0;
+    background: transparent;
+    border: 0;
+    color: var(--bs-secondary-color);
+    padding: 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.reminder-card-edit:hover,
+.reminder-card-edit:focus-visible {
+    color: var(--bs-body-color);
+    background-color: var(--bs-secondary-bg);
+    outline: none;
+}
+
+/* Desktop (real hover): edit icon appears only on card hover / focus. */
+@media (hover: hover) {
+    .reminder-card-edit {
+        opacity: 0;
+        transition: opacity 0.12s ease-in-out;
+    }
+    .reminder-card:hover .reminder-card-edit,
+    .reminder-card-edit:focus-visible,
+    .reminder-card:focus-within .reminder-card-edit {
+        opacity: 1;
+    }
+}
+
+/* Touch-first devices: always visible. */
+@media (hover: none) {
+    .reminder-card-edit {
+        opacity: 1;
+    }
+}
+
+/* ---------- Empty state ---------- */
+
+.reminders-panel-empty {
+    text-align: center;
+    color: var(--bs-secondary-color);
+    padding: 1.5rem 1rem;
+    font-size: 0.875rem;
+}
+.reminders-panel-empty svg {
+    opacity: 0.55;
+    margin: 0 auto 0.4rem;
+    display: block;
+}
+
+/* ---------- Footer ---------- */
+
+.reminders-panel-footer {
+    border-top: 1px solid var(--bs-border-color);
+    padding: 8px 10px;
+    flex-shrink: 0;
+    background-color: var(--bs-body-bg);
+}

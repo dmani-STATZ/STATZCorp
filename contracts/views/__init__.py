@@ -161,10 +161,10 @@ from .acknowledgment_views import (
 )
 
 from .split_views import (
-    create_split,
-    update_split,
-    delete_split,
-    get_contract_splits,
+    add_clin_split,
+    update_clin_split,
+    delete_clin_split,
+    get_clin_splits,
 )
 
 from .shipment_views import (

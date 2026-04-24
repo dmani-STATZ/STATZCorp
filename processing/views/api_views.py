@@ -3,12 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods, require_POST
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms, ProcessContractSplit
+from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms
 from ..forms import ProcessContractForm, ProcessClinForm
 import json
 from decimal import Decimal
-from django.db.models import Sum
-
 @login_required
 @require_http_methods(["GET"])
 def get_processing_contract(request, id):
@@ -523,36 +521,10 @@ def update_contract_values(request, id):
                     'error': 'Failed to calculate contract values'
                 }, status=400)
             
-            # Get old values for comparison
-            old_contract_value = process_contract.contract_value or Decimal('0.00')
-            old_plan_gross = process_contract.plan_gross or Decimal('0.00')
-            
             # Update contract values
             process_contract.contract_value = new_contract_value
             process_contract.plan_gross = new_plan_gross
             process_contract.save()
-            
-            # Handle splits if there's a difference
-            if old_contract_value != new_contract_value or old_plan_gross != new_plan_gross:
-                # Get total of existing splits
-                total_split = ProcessContractSplit.objects.filter(
-                    process_contract=process_contract
-                ).aggregate(split_value=Sum('split_value'))
-                
-                # Convert total_split to Decimal, default to 0 if None
-                current_total_splits = Decimal(str(total_split['split_value'] or '0.00'))
-                
-                # Calculate the difference between plan_gross and total splits
-                split_difference = new_plan_gross - current_total_splits
-                
-                # Only create a new split if there's a significant difference
-                # Using abs() to check if difference is greater than 0.01
-                if abs(split_difference) > Decimal('0.01'):
-                    split = ProcessContractSplit.objects.create(
-                        process_contract=process_contract,
-                        company_name='STATZ',
-                        split_value=split_difference,  # This can be positive or negative
-                    )
 
             return JsonResponse({
                 'success': True,

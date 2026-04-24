@@ -400,8 +400,45 @@
         </div>
     </div>
 
-    <!-- Include Contract Splits Section -->
-    {% include "contracts/partials/contract_splits.html" %}
+    <!-- Split summary (read-only) -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">Split summary (all CLINs, by company)</div>
+        </div>
+        <div class="section-content">
+            {% if clin_split_rollup %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th class="text-end">Total split value</th>
+                            <th class="text-end">Total split paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in clin_split_rollup %}
+                        <tr>
+                            <td>{{ row.company_name }}</td>
+                            <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-secondary">
+                            <th>Total</th>
+                            <td class="text-end fw-semibold">${{ contract.total_split_value|floatformat:2 }}</td>
+                            <td class="text-end fw-semibold">${{ contract.total_split_paid|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-body-secondary small mb-0">No splits recorded</p>
+            {% endif %}
+        </div>
+    </div>
 
     <!-- Assignment Information -->
     <div class="section">

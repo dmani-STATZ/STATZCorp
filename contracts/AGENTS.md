@@ -10,7 +10,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 ## 2. App Scope
 
 **Owns:**
-- Canonical data for `Contract`, `Clin`, `Company`, `GovAction`, `FolderTracking`, `ContractSplit`, `Expedite`, `Note`, `Reminder`, `PaymentHistory`, `AcknowledgementLetter`, `ClinAcknowledgment`, `ClinShipment`, `IdiqContract`
+- Canonical data for `Contract`, `Clin`, `Company`, `GovAction`, `FolderTracking`, `ClinSplit`, `Expedite`, `Note`, `Reminder`, `PaymentHistory`, `AcknowledgementLetter`, `ClinAcknowledgment`, `ClinShipment`, `IdiqContract`
 - All lookup/code tables: `ContractStatus`, `Buyer`, `ContractType`, `ClinType`, `SalesClass`, `SpecialPaymentTerms`, `CanceledReason`
 - The multi-tenant `Company` model and its branding/SharePoint configuration
 - The full contract lifecycle UI: dashboard, contract management page, CLIN detail, folder tracking, finance audit, contract log, IDIQ pages
@@ -26,7 +26,11 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **Role:** This is the core domain app of the project. Nearly every other app depends on or integrates with it.
 
+**ClinSplit (2026-04):** `ClinSplit` rows cascade-delete with their parent `Clin`. Contract-level split totals are computed aggregates (`Contract.total_split_value` / `total_split_paid`), not stored fields. **Do not** add a stored split total back to the `Contract` model.
+
 **Deprecation note:** `api_add_note` (in `contracts/views/note_views.py`) is deprecated. It redirects instead of returning JSON, lacks active-company scoping on note creation, and has been superseded by `add_note` for all AJAX flows. Debug `print` statements have been removed; the URL is retained temporarily for bookmarked links only. Do not add new callers. Planned removal: next cleanup pass.
+
+**Recent (2026-04-24):** Fixed note modal double-POST (removed duplicate `extra_js` block nesting in `contract_base.html`); removed Reminder Details from the note modal; added default Reminder Title for contract/CLIN notes; `reminder_text` is copied from the note body on save. Toast notifications: replaced `showSuccessMessage`/`showErrorMessage` in `note_modal.js` with `window.notify()`; moved `messages.success()` in `add_note` and `delete_note` to the non-AJAX branch only; static Django message banners now auto-dismiss after 5 seconds.
 
 ---
 
@@ -51,7 +55,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `CompanyForm` — logo validation uses PIL (Pillow); PIL import is guarded, so if Pillow is missing it degrades silently
 
 ### Before changing templates
-- Check for `{% include %}` partials: `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html`, `contract_splits.html` are included in multiple parent templates
+- Check for `{% include %}` partials: `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html` are included in multiple parent templates. The old `partials/contract_splits.html` is a comment-only stub; split UI lives on `clin_detail.html` and read-only rollups on contract pages.
 - **`clin_shipments.html` table layout:** In `mode="form"`, the data columns are Ship Date, Quantity, UOM, Comments, POD Date, then Actions (sixth column). Empty-state and footer `colspan` values must match that column count if the table changes. `ClinShipment.pod_date` is transaction-tracked; POD is edited via `openTransactionsEditModal` on CLIN detail (`window.clinShipmentContentTypeId`). The shipment audit (ⓘ) button is only rendered for server-rendered existing rows; rows injected by `ClinShipments.addNewShipment()` in `clin_shipments.js` intentionally omit it until the row exists in the database. The `#complete-shipping-row` footer action is only for form mode when fully shipped (`total_shipped == order_qty`); its visibility is toggled by `updateTotalShipQty()` in `clin_shipments.js` using `data-order-qty` on the `.section` wrapper (keep that attribute in sync if the partial changes).
 - NSN and Supplier modals for the CLIN form are in `contracts/templates/contracts/modals/supplier_modal.html` and `nsn_modal.html`. The modal JS (`openSupplierModal`, `openNsnModal`, search/pagination helpers, and clear handlers) is defined in `clin_form.html`'s `extra_scripts` block. Element IDs `id_nsn`, `nsn_display`, `id_supplier`, and `supplier_display` are referenced by both the modal result wiring and the form — do not rename them without updating the script and modal templates together.
 - JS files in `contracts/static/contracts/js/` are tightly bound to specific template IDs and form names; changing template element IDs or form field names breaks the JS
@@ -147,6 +151,14 @@ All popup views redirect back to `contracts:reminders_popup` on success, not to 
 The `toggle_reminder` and `delete_reminder` views use `HTTP_REFERER` for redirect — the popup URL will be the referer when those views are called from within the popup.
 This pattern (popup_base + popup view + popup_add + popup_edit) is the approved pattern for future popup windows (e.g. Notes).
 
+**Default time-period filter:** On a fresh visit (no `?due=` and no `?status=` query params) both `reminders_popup` and `ReminderListView.get_queryset` / `get_context_data` default `due_filter` to `'due'`. The `All Time` chip uses the sentinel `?due=all` href; the views treat `due=all` as "no due filter" (the if/elif chain simply doesn't match it). If you add new chips, preserve both behaviors and keep the two views in sync — they share the same filter contract.
+
+### Reminders sidebar
+- `contracts/templates/contracts/contract_base.html` — sidebar markup (id `reminderbar`, classes `.active`/`.inactive` toggled by `toggleReminderbar()`), the `#reminderDetailModal` Bootstrap 5 read-only detail modal, and the Future days AJAX save on `#reminder-upcoming-days` (posts to `users:settings-save` with `setting_name: 'reminder_sidebar_upcoming_days'`). Inline `style.transform = 'translateX(100%)'` on init drives the slide animation; do not replace it with a CSS-only approach without updating the toggle JS.
+- `contracts/static/css/components.css` — sidebar-specific styles: opaque panel surface (`var(--bs-body-bg)`), 3px top accent strip (`.reminders-panel-accent.accent-danger|warning|success`), dense inbox cards with 3px colored left strip (`.reminder-card-strip.strip-danger|warning|success`), and a `@media (hover: hover)` / `@media (hover: none)` pair so the per-card Edit icon is hover-visible on desktop and always visible on touch. Loaded from `contract_base.html`'s `extra_head` block; do not add any wildcard button rules here.
+- `contracts/context_processors.py` — `reminders_processor` provides the sidebar with `reminders`, `overdue_count`, `due_count`, `pending_count`, `total_reminders_count`, and `reminder_sidebar_upcoming_days`. Each sidebar reminder is annotated with `is_overdue`, `is_upcoming`, `title`, `description`, and `completed` (do not rename these in the processor without updating the template).
+- `contracts/views/reminder_views.py` — the Edit / Complete endpoints used by the sidebar card icons (`editReminder()` posts to `reminder/<id>/edit/`, `completeReminder()` posts to `reminder/<id>/complete/`). Card click opens `#reminderDetailModal`; its Mark Complete button calls `completeReminder(id)` (same endpoint).
+
 ### Notes popup window
 - `contracts/views/note_views.py` — `notes_popup`, `notes_popup_tab`, `note_detail_json` views
 - `contracts/templates/contracts/notes_popup_base.html` — bare base template (no nav chrome)
@@ -222,6 +234,9 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 - **HTMX partial views** (notes, shipments, splits, payment history) return HTML fragments. These views have an implicit contract with the frontend: the element IDs and `hx-target` selectors in templates must match. Changing response structure without updating `hx-target` references breaks the UI silently.
 - **`contract_base.html`** (inferred from `contracts/templates/contracts/`) may serve as a base template for other templates in this app. Changing its block structure requires updating all child templates.
 - **`clin_shipments.js`, `contract_splits.js`, `note_modal.js`, `supplier_modal.js`** reference DOM element IDs and form field `name` attributes. If you rename form fields or template element IDs, update these JS files.
+- **`note_modal.js`:** The save handler is bound once on `DOMContentLoaded`. If duplicate POSTs to `note/add/` or `note/update/` reappear, check `base_template.html` and especially `contract_base.html` for duplicated `{% block %}` names in the inheritance chain (nested `{% block extra_js %}`) before assuming a bug in the JavaScript.
+- **Note views and Django messages:** Do not call `messages.success()` before the AJAX branch check in note views. AJAX callers never consume Django messages (no redirect), so they persist as sticky banners on the next full page load. Pattern: check the `X-Requested-With: XMLHttpRequest` header first, return `JsonResponse` for AJAX; only call `messages.success()` in the non-AJAX `else` branch before `HttpResponseRedirect` / `redirect`.
+- **Note modal reminders:** `reminder_text` is derived from the note body in JavaScript (`formData.set('reminder_text', noteText)`). The note modal no longer has a separate “Reminder Details” field. Do not reintroduce a second textarea for reminder body without also removing that `formData` line, or users would have redundant inputs and risk inconsistent POST data.
 - **Supplier detail templates** (`contracts/templates/contracts/supplier_*`) are rendered by `contracts/views/supplier_views.py` but read from `suppliers` models. Template changes here do not affect `suppliers` app templates.
 
 ---

@@ -97,11 +97,42 @@
         </div>
     </div>
 
-    <!-- Add Splits Table-->
+    <!-- Split summary (read-only) -->
      <div class="w-full px-4 py-4">
         <div class="flex flex-col items-center mb-6">
-            <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
-                {% include 'contracts/partials/contract_splits.html' with mode="detail" contract=contract %}
+            <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;" class="p-4">
+                <h2 class="h6 fw-semibold mb-3">Split summary (all CLINs, by company)</h2>
+                {% if clin_split_rollup %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th class="text-end">Total split value</th>
+                                <th class="text-end">Total split paid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in clin_split_rollup %}
+                            <tr>
+                                <td>{{ row.company_name }}</td>
+                                <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                                <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-secondary">
+                                <th>Total</th>
+                                <td class="text-end fw-semibold">${{ contract.total_split_value|floatformat:2 }}</td>
+                                <td class="text-end fw-semibold">${{ contract.total_split_paid|floatformat:2 }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-body-secondary small mb-0">No splits recorded</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -291,9 +322,6 @@
 </div>
 
 {% block extra_js %}
-<!-- Add Contract Splits Component JS -->
-<script src="{% static 'contracts/js/contract_splits.js' %}"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const notifyToast = (msg, type = 'info', duration = 3000) => {

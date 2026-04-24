@@ -16,6 +16,7 @@ from .views.processing_views import (
     create_split_view,
     update_split_view,
     delete_split_view,
+    calc_splits_view,
     cancel_processing,
     mark_ready_for_review,
     start_new_contract,
@@ -96,9 +97,11 @@ urlpatterns = [
     path('upload/', upload_csv, name='upload_csv'),
     path('upload-award-pdf/', upload_award_pdf, name='upload_award_pdf'),
 
-    path('contract/split/create/', create_split_view, name='create_split'),
-    path('contract/split/<int:split_id>/update/', update_split_view, name='update_split'),
-    path('contract/split/<int:split_id>/delete/', delete_split_view, name='delete_split'),
+    # CLIN Splits (per process CLIN)
+    path('clin/<int:clin_pk>/splits/add/', create_split_view, name='create_clin_split'),
+    path('clin/splits/<int:split_pk>/update/', update_split_view, name='update_clin_split'),
+    path('clin/splits/<int:split_pk>/delete/', delete_split_view, name='delete_clin_split'),
+    path('clin/<int:clin_pk>/splits/calc/', calc_splits_view, name='calc_clin_splits'),
 
     path('process-contract/<int:process_contract_id>/cancel/', cancel_process_contract, name='cancel_processing'),
     path('process-contract/<int:process_contract_id>/mark-ready/', mark_ready_for_review, name='mark_ready_for_review'),

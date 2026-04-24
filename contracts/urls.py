@@ -119,11 +119,11 @@ from .views import (
     export_folder_tracking,
     search_contracts,
     update_folder_field,
-    # Split views
-    create_split,
-    update_split,
-    delete_split,
-    get_contract_splits,
+    # CLIN Splits
+    add_clin_split,
+    update_clin_split,
+    delete_clin_split,
+    get_clin_splits,
     # Shipment views
     create_shipment,
     update_shipment,
@@ -579,13 +579,11 @@ urlpatterns = [
         generate_acknowledgment_letter_doc,
         name="generate_acknowledgment_letter_doc",
     ),
-    # Split URLs
-    path("api/splits/create/", create_split, name="create_split"),
-    path("api/splits/update/<int:split_id>/", update_split, name="update_split"),
-    path("api/splits/delete/<int:split_id>/", delete_split, name="delete_split"),
-    path(
-        "api/splits/<int:contract_id>/", get_contract_splits, name="get_contract_splits"
-    ),
+    # CLIN Splits
+    path("clin/<int:clin_pk>/splits/add/", add_clin_split, name="add_clin_split"),
+    path("clin/splits/<int:split_pk>/update/", update_clin_split, name="update_clin_split"),
+    path("clin/splits/<int:split_pk>/delete/", delete_clin_split, name="delete_clin_split"),
+    path("clin/<int:clin_pk>/splits/", get_clin_splits, name="get_clin_splits"),
     # FolderStack AJAX endpoints
     path("folder-stack/list/", folderstack_list, name="folderstack_list"),
     path("folder-stack/save/", folderstack_save, name="folderstack_save"),

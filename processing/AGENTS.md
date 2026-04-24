@@ -15,13 +15,13 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 **Owns:**
 - Queue tables (`QueueContract`, `QueueClin`) — staging area for incoming contract data
-- Processing tables (`ProcessContract`, `ProcessClin`, `ProcessContractSplit`) — editable workflow state
+- Processing tables (`ProcessContract`, `ProcessClin`, `ProcessClinSplit`) — editable workflow state
 - Sequence counters (`SequenceNumber`) — PO/Tab number generation
 - All HTTP endpoints for the queue dashboard, contract editing, matching, CSV import, finalization, and split management
 - All JS assets that drive the AJAX save loop and match modals
 
 **Does not own:**
-- Canonical domain records: `Contract`, `Clin`, `ContractSplit`, `PaymentHistory` — these live in `contracts`
+- Canonical domain records: `Contract`, `Clin`, `ClinSplit`, `PaymentHistory` — these live in `contracts`
 - NSN master data — lives in `products`
 - Supplier master data — lives in `suppliers`
 - Authentication/permissions infrastructure — provided by Django and the `users` app
@@ -44,7 +44,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - Read `processing/views/api_views.py` and `processing/views/matching_views.py` together with `processing_views.py` — they form a single logical surface
 
 ### Before changing forms
-- Read `ProcessContractForm.save()` carefully — it processes raw POST keys with the pattern `splits-<id>-<field>` and `splits-new-<n>-<field>`; the JS must produce these exact keys
+- Read `ProcessContractForm.save()` and `persist_clin_splits_for_contract` — POST keys are `clin-<clin_id>-splits-<split_id|new n>-<field>`; the template/JS must match
 - Read `ProcessClinForm.clean()` — it auto-calculates `item_value` and `quote_value`; removing these calculations breaks finalization validation
 - Read the corresponding JS in `process_contract.js` and `clin_handling.js` — form field names must match what JS sends
 
@@ -56,7 +56,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 ### Before changing the finalization flow
 - Read `finalize_and_email_contract` in full (it is ~200 lines)
 - Read `finalize_contract` as well — it is a simpler variant but both paths share validation logic
-- Any change to finalization must keep `PaymentHistory` creation, `ContractSplit` creation, `SequenceNumber` advancement, and queue record deletion all in sync
+- Any change to finalization must keep `PaymentHistory` creation, `ClinSplit` creation (per finalized CLIN from `ProcessClinSplit` rows), `SequenceNumber` advancement, and queue record deletion all in sync
 
 ### Before changing CSV import
 - Read `upload_csv` — it validates exact column names; changing expected headers breaks silent import failures
@@ -90,7 +90,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 `views/matching_views.py` (search endpoint) → `urls.py` (new route) → `templates/processing/modals/<new>_modal.html` → `static/processing/js/<new>_modal.js` → `process_contract_form.html` (include modal + wire button)
 
 ### Split management change
-`models.py` `ProcessContractSplit` → `forms.py` `ProcessContractForm.save()` (POST key parsing) → `views/processing_views.py` (`create_split_view`, `update_split_view`, `delete_split_view`) → `views/api_views.py` `update_contract_values` → `templates/processing/process_contract_form.html` → `static/processing/js/process_contract.js`
+`models.py` `ProcessClinSplit` → `forms.py` `persist_clin_splits_for_contract` / `ProcessContractForm.save` → `views/processing_views.py` (`create_split_view`, `update_split_view`, `delete_split_view`, `calc_splits_view`, `save_contract`) → `views/api_views.py` `update_contract_values` (no auto-STATZ) → `templates/processing/process_contract_form.html` → `static/processing/js/process_contract.js`
 
 ### Finalization change
 `views/processing_views.py` `finalize_contract` + `finalize_and_email_contract` → `contracts/models.py` (target model fields) → test by completing a full queue-to-finalize flow manually
@@ -105,7 +105,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 ### This app depends on:
 | App | What is used |
 |---|---|
-| `contracts` | `Contract`, `Clin`, `Buyer`, `IdiqContract`, `ContractType`, `SalesClass`, `ClinType`, `SpecialPaymentTerms`, `PaymentHistory`, `ContractSplit`, `ContractStatus`, `AuditModel`, `Company` |
+| `contracts` | `Contract`, `Clin`, `ClinSplit`, `Buyer`, `IdiqContract`, `ContractType`, `SalesClass`, `ClinType`, `SpecialPaymentTerms`, `PaymentHistory`, `ContractStatus`, `AuditModel`, `Company` |
 | `products` | `Nsn` — FK target for `ProcessClin.nsn` and `QueueClin.matched_nsn` |
 | `suppliers` | `Supplier` — FK target for `ProcessClin.supplier` and `QueueClin.matched_supplier` |
 | `users` / `auth` | `User` — FK for `processed_by`, `created_by`, `modified_by` |
@@ -115,7 +115,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - `processing` is a terminal workflow app; output lands in `contracts`
 
 ### Finalization coupling:
-`finalize_and_email_contract` writes to `contracts.Contract`, `contracts.Clin`, `contracts.ContractSplit`, and `contracts.PaymentHistory`. Any schema change in those models must be reflected in the finalization mapping in `processing_views.py`.
+`finalize_and_email_contract` writes to `contracts.Contract`, `contracts.Clin`, `contracts.ClinSplit` (from each `ProcessClinSplit` on the matching `ProcessClin`), and `contracts.PaymentHistory`. Any schema change in those models must be reflected in the finalization mapping in `processing_views.py`.
 
 ### Sequence numbers:
 `SequenceNumber` is local to `processing` but the PO/Tab numbers it generates are stored permanently in `contracts.Contract` and `contracts.Clin`. Resetting or corrupting `SequenceNumber` will cause duplicate PO/Tab assignments.
@@ -138,7 +138,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - **Before renaming any field**, run `grep -r "<field_name>" processing/ contracts/ products/ suppliers/ templates/ static/` — field names appear in JS fetch payloads, template variable lookups, and view-level mappings.
 - **`ProcessContract.status` choices** (`draft`, `in_progress`, `ready_for_review`, `completed`, `cancelled`) are referenced by string in views and templates. Changing choice values requires updating all string comparisons.
 - **`SequenceNumber`** has only one row. Do not add unique constraints or change the auto-increment behavior without understanding that `get_po_number()` / `get_tab_number()` are called inside finalization transactions. Schema changes here can cause deadlocks.
-- **`ProcessContractSplit` was renamed from `ContractSplit`** (migration `0011`). If you search migrations for `ContractSplit`, you will find both names — do not confuse them with `contracts.ContractSplit`.
+- Staging `ProcessClinSplit` (processing) vs `contracts.ClinSplit` (finalized) — different tables. Migration history still mentions older `ProcessContractSplit`; `0019` moved splits onto `ProcessClin`.
 - When adding a new FK to `ProcessClin` or `ProcessContract`, decide whether it should be nullable (staging data is often incomplete) and whether it must be mapped to the canonical model during finalization.
 - `QueueContract` and `QueueClin` use `AuditModel` from `contracts`. If `AuditModel` changes, these models are affected.
 
@@ -156,7 +156,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 ## 10. Forms / Serializers / Input Validation Rules
 
-- **`ProcessContractForm.save()`** parses split POST keys manually using `startswith('splits-')`. If the JS changes the key format, the form will silently stop creating/updating splits.
+- **`ProcessContractForm.save()`** and **`persist_clin_splits_for_contract`** parse `clin-*-splits-*` keys. If the JS changes the key format, splits will not persist.
 - **`ProcessClinForm.clean()`** auto-calculates `item_value = order_qty * unit_price` and `quote_value = order_qty * price_per_unit / price_per_unit_divisor`. Do not remove or restructure this without updating the API endpoints that also perform these calculations (`update_clin_field`, `save_clin`).
 - **Decimal parsing in `upload_csv`** strips `$` and `,` before converting. If you add new decimal fields to the CSV, follow the same stripping pattern.
 - **Date parsing in `upload_csv`** expects `YYYY-MM-DD` format. The CSV template and test data must match this format — update `download_csv_template` if column names or date format assumptions change.
@@ -184,7 +184,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
   5. Finalize via `/processing/contract/<id>/finalize-and-email/` — confirm `Contract` and `Clin` records appear in the `contracts` app
   6. Confirm `QueueContract` and `ProcessContract` are deleted after finalization
   7. Confirm `SequenceNumber` advanced correctly
-- After form changes: test the `splits-new-<n>-<field>` POST flow by adding a new split row in the UI
+- After form changes: test the `clin-<id>-splits-new-<n>-<field>` POST flow by adding a new split row in a CLIN block
 - After URL changes: confirm JS fetch calls still resolve (check browser network tab)
 - After model changes: run `python manage.py makemigrations --check` to confirm no missing migrations
 
@@ -198,11 +198,11 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 3. **`SequenceNumber` has one row.** Code calls `SequenceNumber.objects.first()` without a guard in some paths. If the table is empty (e.g., fresh database), this returns `None` and crashes at attribute access. Do not delete the single `SequenceNumber` row.
 
-4. **`ProcessContractSplit` vs `contracts.ContractSplit`** — both exist. `processing` creates `ProcessContractSplit` rows during editing. `finalize_and_email_contract` creates `contracts.ContractSplit` rows from them. They are separate tables. Confusion between them causes finalization to silently skip split creation.
+4. **`ProcessClinSplit` vs `contracts.ClinSplit`** — both exist. `processing` creates `ProcessClinSplit` rows per CLIN during editing. `finalize_and_email_contract` creates `contracts.ClinSplit` rows from them. They are separate tables. Confusion between them causes finalization to silently skip split creation.
 
 5. **Protected fields are enforced only in two API endpoints.** If you add a new endpoint that writes to `ProcessClin.nsn` or `ProcessClin.supplier` directly, you bypass the match workflow and leave `nsn_text`/`supplier_text` out of sync.
 
-6. **`update_contract_values` auto-creates a STATZ split.** If `plan_gross` differs from the sum of existing splits by more than `0.01`, it creates a new `ProcessContractSplit` with `company_name='STATZ'`. This behavior is silent and will surprise anyone who does not read the view code.
+6. **The auto-STATZ split creation in `update_contract_values` has been removed.** STATZ splits are created explicitly via the per-CLIN **Calc Splits** button, which calls `calc_splits_view`. Do not re-add auto-creation logic to `update_contract_values`.
 
 7. **`print` / `logger.debug` statements are active in `processing_views.py` and `api_views.py`.** These log partial contract data to console. In production this is noise; do not add more print statements and consider removing existing ones when touching those functions.
 
@@ -238,13 +238,13 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 
 | Category | Files |
 |---|---|
-| Primary models | `processing/models.py` — `QueueContract`, `QueueClin`, `ProcessContract`, `ProcessClin`, `ProcessContractSplit`, `SequenceNumber` |
+| Primary models | `processing/models.py` — `QueueContract`, `QueueClin`, `ProcessContract`, `ProcessClin`, `ProcessClinSplit`, `SequenceNumber` |
 | Core workflow | `processing/views/processing_views.py` — `start_processing`, `finalize_contract`, `finalize_and_email_contract`, `upload_csv`, `upload_award_pdf`, `save_to_sharepoint` (stub) |
 | API layer | `processing/views/api_views.py`, `processing/views/matching_views.py` |
 | Form logic | `processing/forms.py` — `ProcessContractForm.save()`, `ProcessClinForm.clean()` |
 | UI state machine | `processing/static/processing/js/process_contract.js` |
 | Match modals | `processing/static/processing/js/*_modal.js` + `processing/templates/processing/modals/` |
-| Coupled cross-app writes | `contracts.Contract`, `contracts.Clin`, `contracts.ContractSplit`, `contracts.PaymentHistory` |
+| Coupled cross-app writes | `contracts.Contract`, `contracts.Clin`, `contracts.ClinSplit`, `contracts.PaymentHistory` |
 | Sequence integrity | `SequenceNumber` — one row, do not delete |
 | Riskiest edits | Finalization flow, field renames, URL renames, split key format in forms/JS |
 | Security-sensitive | `@login_required` on all views, `is_superuser` on delete, `DEBUG` guard on test data download |

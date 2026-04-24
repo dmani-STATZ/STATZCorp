@@ -1,10 +1,94 @@
+import re
+from decimal import Decimal, InvalidOperation
 from django import forms
 from django.forms import inlineformset_factory
-from .models import ProcessContract, ProcessClin, ProcessContractSplit
+from .models import ProcessContract, ProcessClin, ProcessClinSplit
 
-class ContractSplitForm(forms.ModelForm):
+_CLIN_SPLIT_KEY = re.compile(
+    r"^clin-(?P<clin_id>\d+)-splits-(?:(?P<split_id>\d+)|new-(?P<new_idx>\d+))-"
+    r"(?P<field>company_name|split_value|split_paid)$"
+)
+
+
+def parse_clin_split_keys(post_data):
+    """Parse POST data into (clin_id) -> (ref_key) -> {field: value} where ref is split pk or 'new-idx'."""
+    out = {}
+    for key, raw in post_data.items():
+        m = _CLIN_SPLIT_KEY.match(key)
+        if not m:
+            continue
+        clin_id = m.group("clin_id")
+        if m.group("split_id"):
+            ref = m.group("split_id")
+        else:
+            ref = f"new-{m.group('new_idx')}"
+        field = m.group("field")
+        d = out.setdefault(clin_id, {})
+        d.setdefault(ref, {})[field] = raw
+    return out
+
+
+def persist_clin_splits_for_contract(process_contract, post_data):
+    """
+    Create/update/delete ProcessClinSplit rows from clin-<id>-splits-... keys.
+    Returns True if any DB write occurred.
+    """
+    groups = parse_clin_split_keys(post_data)
+    if not groups:
+        return False
+
+    changed = False
+    for clin_id, refs in groups.items():
+        try:
+            clin = ProcessClin.objects.get(pk=clin_id, process_contract=process_contract)
+        except ProcessClin.DoesNotExist:
+            continue
+
+        kept_ids = [int(r) for r in refs if not r.startswith("new-")]
+        dcount, _ = clin.splits.exclude(pk__in=kept_ids).delete()
+        if dcount:
+            changed = True
+
+        for ref, fields in refs.items():
+            if ref.startswith("new-"):
+                company = (fields.get("company_name") or "").strip()
+                if not company:
+                    continue
+                try:
+                    sv = fields.get("split_value", "") or "0"
+                    sp = fields.get("split_paid", "") or "0"
+                    split_value = Decimal(str(sv).replace(",", "")) if str(sv).strip() else Decimal("0")
+                    split_paid = Decimal(str(sp).replace(",", "")) if str(sp).strip() else Decimal("0")
+                except (InvalidOperation, ValueError):
+                    continue
+                ProcessClinSplit.objects.create(
+                    clin=clin,
+                    company_name=company,
+                    split_value=split_value,
+                    split_paid=split_paid,
+                )
+                changed = True
+            else:
+                try:
+                    row = clin.splits.get(pk=ref)
+                except ProcessClinSplit.DoesNotExist:
+                    continue
+                if "company_name" in fields:
+                    row.company_name = (fields["company_name"] or "").strip()
+                for pkey in ("split_value", "split_paid"):
+                    if pkey in fields and fields[pkey] is not None and str(fields[pkey]).strip() != "":
+                        try:
+                            setattr(row, pkey, Decimal(str(fields[pkey]).replace(",", "")))
+                        except (InvalidOperation, ValueError):
+                            pass
+                row.save()
+                changed = True
+    return changed
+
+
+class ProcessClinSplitForm(forms.ModelForm):
     class Meta:
-        model = ProcessContractSplit
+        model = ProcessClinSplit
         fields = ['company_name', 'split_value', 'split_paid']
 
 class ProcessContractForm(forms.ModelForm):
@@ -46,65 +130,20 @@ class ProcessContractForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.splits_data = []
-        
-        if self.data:
-            # Extract splits data from POST
-            for key in self.data:
-                if key.startswith('splits-'):
-                    parts = key.split('-')
-                    if len(parts) == 3:  # splits-[id/new]-[field]
-                        split_id = parts[1]
-                        field = parts[2]
-                        
-                        # Find or create split data dict
-                        split_data = next((s for s in self.splits_data if s['id'] == split_id), None)
-                        if not split_data:
-                            split_data = {'id': split_id}
-                            self.splits_data.append(split_data)
-                        
-                        # Add field value
-                        split_data[field] = self.data[key]
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        
-        # Update text fields for foreign key relationships
+
         if instance.contract_type:
             instance.contract_type_text = instance.contract_type.description
-            
         if instance.sales_class:
             instance.sales_class_text = instance.sales_class.sales_team
-        
+
         if commit:
             instance.save()
-            
-            # Handle splits
-            if self.splits_data:
-                # Delete removed splits
-                existing_split_ids = [s['id'] for s in self.splits_data if not s['id'].startswith('new')]
-                instance.splits.exclude(id__in=existing_split_ids).delete()
-                
-                # Update/create splits
-                for split_data in self.splits_data:
-                    split_id = split_data['id']
-                    
-                    if split_id.startswith('new'):
-                        # Create new split
-                        ProcessContractSplit.objects.create(
-                            process_contract=instance,
-                            company_name=split_data['company'],
-                            split_value=split_data.get('value') or 0,
-                            split_paid=split_data.get('paid') or 0
-                        )
-                    else:
-                        # Update existing split
-                        split = instance.splits.get(id=split_id)
-                        split.company_name = split_data['company']
-                        split.split_value = split_data.get('value') or 0
-                        split.split_paid = split_data.get('paid') or 0
-                        split.save()
-        
+            if self.data:
+                persist_clin_splits_for_contract(instance, self.data)
+
         return instance
 
 class ProcessClinForm(forms.ModelForm):
@@ -154,21 +193,21 @@ class ProcessClinForm(forms.ModelForm):
         order_qty = cleaned_data.get('order_qty')
         unit_price = cleaned_data.get('unit_price')
         price_per_unit = cleaned_data.get('price_per_unit')
-        
+
         if order_qty and unit_price:
             cleaned_data['item_value'] = order_qty * unit_price
-            
+
         if order_qty and price_per_unit:
             cleaned_data['quote_value'] = order_qty * price_per_unit
-        
+
         return cleaned_data
 
 ProcessClinFormSet = inlineformset_factory(
     ProcessContract,
     ProcessClin,
-    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value', 
-            'status', 'due_date', 'supplier_due_date', 'price_per_unit', 'quote_value', 'clin_po_num', 
+    fields=('item_number', 'item_type', 'nsn', 'supplier', 'order_qty', 'unit_price', 'item_value',
+            'status', 'due_date', 'supplier_due_date', 'price_per_unit', 'quote_value', 'clin_po_num',
             'tab_num', 'uom', 'ia', 'fob'),
     extra=0,
     can_delete=True
-) 
+)

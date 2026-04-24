@@ -131,82 +131,8 @@ function clearValidationErrors() {
     });
 }
 
-async function finalizeContract() {
-    try {
-        if (!confirm('Are you sure you want to finalize this contract? This action cannot be undone.')) {
-            return;
-        }
-
-        // Clear any existing validation errors
-        clearValidationErrors();
-        
-        // Show saving indicator
-        showMessage('Saving final changes...', 'info');
-        
-        // Get the form and its data
-        const form = document.querySelector('form');
-        const formData = new FormData(form);
-        
-        // Save any pending changes first
-        const saveResponse = await fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        });
-
-        if (!saveResponse.ok) {
-            const saveData = await saveResponse.json();
-            if (saveData.validation_errors) {
-                showValidationErrors(saveData.validation_errors);
-                return;
-            }
-            throw new Error(saveData.error || 'Failed to save changes');
-        }
-
-        // Now finalize the contract
-        showMessage('Finalizing contract...', 'info');
-        
-        const processContractId = document.getElementById('process_contract_id').value;
-        const response = await fetch(`/processing/contract/${processContractId}/finalize-and-email/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            if (data.validation_errors) {
-                showValidationErrors(data.validation_errors);
-                return;
-            }
-            throw new Error(data.error || 'Failed to finalize contract');
-        }
-
-        if (data.success) {
-            showMessage('Contract finalized successfully', 'success');
-            
-            // Open email client with pre-populated email
-            if (data.mailto_url) {
-                window.location.href = data.mailto_url;
-            }
-            
-            // Redirect to queue after a short delay
-            setTimeout(() => {
-                window.location.href = "/processing/queue/";
-            }, 2000);
-        } else {
-            throw new Error(data.error || 'Failed to finalize contract');
-        }
-    } catch (error) {
-        console.error('Error finalizing contract:', error);
-        showMessage(`Error finalizing contract: ${error.message}`, 'error');
-    }
-}
+// Finalize flow is defined in `process_contract_form.html` (inline) so the correct form action and
+// field ids stay in one place. Shared helpers: showMessage, showValidationErrors, clearValidationErrors.
 
 // Update CSS for alerts
 const style = document.createElement('style');
@@ -371,4 +297,257 @@ style.textContent = `
         opacity: .75;
     }
 `;
-document.head.appendChild(style); 
+document.head.appendChild(style);
+
+/**
+ * Per-CLIN process splits: add row, calc STATZ, delete, footer totals.
+ * Contract-level split table was removed; splits live under each CLIN block in the form.
+ */
+(function () {
+    function getCookie(name) {
+        const m = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+        return m ? decodeURIComponent(m[2]) : null;
+    }
+
+    function csrf() {
+        const el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : getCookie('csrftoken');
+    }
+
+    function updateClinSplitTotals(table) {
+        if (!table) {
+            return;
+        }
+        const clinId = table.getAttribute('data-clin-id');
+        let v = 0;
+        let p = 0;
+        table.querySelectorAll('tbody .clin-split-value-input').forEach((inp) => {
+            v += parseFloat(inp.value || 0) || 0;
+        });
+        table.querySelectorAll('tbody .clin-split-paid-input').forEach((inp) => {
+            p += parseFloat(inp.value || 0) || 0;
+        });
+        const tv = document.querySelector(
+            '.clin-splits-total-value[data-clin-id="' + clinId + '"]'
+        );
+        const tp = document.querySelector(
+            '.clin-splits-total-paid[data-clin-id="' + clinId + '"]'
+        );
+        if (tv) {
+            tv.textContent = v.toFixed(2);
+        }
+        if (tp) {
+            tp.textContent = p.toFixed(2);
+        }
+    }
+
+    function nextNewIndex(clinId) {
+        if (!window._clinSplitNewSeq) {
+            window._clinSplitNewSeq = {};
+        }
+        if (window._clinSplitNewSeq[clinId] == null) {
+            window._clinSplitNewSeq[clinId] = 0;
+        }
+        window._clinSplitNewSeq[clinId] += 1;
+        return window._clinSplitNewSeq[clinId];
+    }
+
+    function addBlankClinSplitRow(clinId) {
+        const table = document.getElementById('clin-splits-table-' + clinId);
+        if (!table) {
+            return;
+        }
+        const n = nextNewIndex(clinId);
+        const tbody = table.querySelector('tbody');
+        if (!tbody) {
+            return;
+        }
+        const tr = document.createElement('tr');
+        tr.className = 'clin-split-row';
+        tr.setAttribute('data-clin-id', clinId);
+        tr.setAttribute('data-new', '1');
+        tr.innerHTML =
+            '<td><input type="text" class="form-control form-control-sm" name="clin-' +
+            clinId +
+            '-splits-new-' +
+            n +
+            '-company_name" value=""></td>' +
+            '<td><input type="number" step="0.01" class="form-control form-control-sm text-end clin-split-value-input" name="clin-' +
+            clinId +
+            '-splits-new-' +
+            n +
+            '-split_value" value="0.00"></td>' +
+            '<td><input type="number" step="0.01" class="form-control form-control-sm text-end clin-split-paid-input" name="clin-' +
+            clinId +
+            '-splits-new-' +
+            n +
+            '-split_paid" value="0.00"></td>' +
+            '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger delete-clin-split" data-clin-id="' +
+            clinId +
+            '">Delete</button></td>';
+        tbody.appendChild(tr);
+        updateClinSplitTotals(table);
+    }
+
+    function findStatzRow(table) {
+        if (!table) {
+            return null;
+        }
+        return Array.from(table.querySelectorAll('tbody tr')).find((tr) => {
+            const c = tr.querySelector('input[name$="-company_name"]');
+            return c && c.value && String(c.value).trim().toLowerCase() === 'statz';
+        });
+    }
+
+    function appendClinSplitRowFromServer(clinId, data) {
+        const table = document.getElementById('clin-splits-table-' + clinId);
+        if (!table || !data || !data.split_id) {
+            return;
+        }
+        const sid = data.split_id;
+        const v = data.split_value != null ? data.split_value : '0.00';
+        const tbody = table.querySelector('tbody');
+        const tr = document.createElement('tr');
+        tr.className = 'clin-split-row';
+        tr.setAttribute('data-split-id', String(sid));
+        tr.setAttribute('data-clin-id', String(clinId));
+        tr.innerHTML =
+            '<td><input type="text" class="form-control form-control-sm" name="clin-' +
+            clinId +
+            '-splits-' +
+            sid +
+            '-company_name" value="STATZ"></td>' +
+            '<td><input type="number" step="0.01" class="form-control form-control-sm text-end clin-split-value-input" name="clin-' +
+            clinId +
+            '-splits-' +
+            sid +
+            '-split_value" value="' +
+            v +
+            '"></td>' +
+            '<td><input type="number" step="0.01" class="form-control form-control-sm text-end clin-split-paid-input" name="clin-' +
+            clinId +
+            '-splits-' +
+            sid +
+            '-split_paid" value="0.00"></td>' +
+            '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger delete-clin-split" data-split-id="' +
+            sid +
+            '" data-clin-id="' +
+            clinId +
+            '">Delete</button></td>';
+        tbody.appendChild(tr);
+        updateClinSplitTotals(table);
+    }
+
+    document.addEventListener('click', (e) => {
+        const addBtn = e.target.closest('.add-clin-split');
+        if (addBtn) {
+            e.preventDefault();
+            addBlankClinSplitRow(addBtn.getAttribute('data-clin-id'));
+            return;
+        }
+
+        const calcBtn = e.target.closest('.calc-clin-splits');
+        if (calcBtn) {
+            e.preventDefault();
+            const url = calcBtn.getAttribute('data-calc-url');
+            const clinId = calcBtn.getAttribute('data-clin-id');
+            if (!url) {
+                return;
+            }
+            const table = document.getElementById('clin-splits-table-' + clinId);
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf(),
+                    Accept: 'application/json',
+                },
+            })
+                .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+                .then(({ ok, j }) => {
+                    if (!ok || !j.success) {
+                        throw new Error((j && j.error) || 'Calc failed');
+                    }
+                    if (!table) {
+                        return;
+                    }
+                    const row = findStatzRow(table);
+                    if (row) {
+                        const vIn = row.querySelector('.clin-split-value-input');
+                        if (vIn) {
+                            vIn.value = parseFloat(j.split_value).toFixed(2);
+                        }
+                    } else {
+                        appendClinSplitRowFromServer(clinId, j);
+                    }
+                    updateClinSplitTotals(table);
+                })
+                .catch((err) => {
+                    if (typeof console !== 'undefined') {
+                        console.error(err);
+                    }
+                    if (typeof showMessage === 'function') {
+                        showMessage(String(err), 'error');
+                    }
+                });
+            return;
+        }
+
+        const delBtn = e.target.closest('.delete-clin-split');
+        if (delBtn) {
+            e.preventDefault();
+            const splitId = delBtn.getAttribute('data-split-id');
+            const clinId = delBtn.getAttribute('data-clin-id');
+            const row = delBtn.closest('tr');
+            const table = document.getElementById('clin-splits-table-' + clinId);
+            if (!splitId) {
+                if (row) {
+                    row.remove();
+                }
+                updateClinSplitTotals(table);
+                return;
+            }
+            fetch('/processing/clin/splits/' + splitId + '/delete/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf(),
+                    Accept: 'application/json',
+                },
+            })
+                .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+                .then(({ ok, j }) => {
+                    if (!ok || !j.success) {
+                        throw new Error((j && j.error) || 'Delete failed');
+                    }
+                    if (row) {
+                        row.remove();
+                    }
+                    updateClinSplitTotals(table);
+                })
+                .catch((err) => {
+                    if (typeof console !== 'undefined') {
+                        console.error(err);
+                    }
+                    if (typeof showMessage === 'function') {
+                        showMessage(String(err), 'error');
+                    }
+                });
+        }
+    });
+
+    document.addEventListener('input', (e) => {
+        if (
+            e.target.classList &&
+            (e.target.classList.contains('clin-split-value-input') ||
+                e.target.classList.contains('clin-split-paid-input'))
+        ) {
+            const table = e.target.closest('table');
+            updateClinSplitTotals(table);
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[id^="clin-splits-table-"]').forEach((t) => {
+            updateClinSplitTotals(t);
+        });
+    });
+})();

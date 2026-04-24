@@ -88,15 +88,18 @@ class ReminderListView(ListView):
         elif status_filter == 'pending':
             queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
         
-        # Filter by due date if specified
+        # Filter by due date. Default to 'due' on a fresh visit (no due and no
+        # status params). 'all' is the sentinel value that means "no due filter".
         due_filter = self.request.GET.get('due')
+        if due_filter is None and status_filter is None:
+            due_filter = 'due'
         today = timezone.now().date()
         seven_days_ago = today - timedelta(days=7)
-        
+
         if due_filter == 'overdue':
             # Overdue: reminder_date <= today-7days
             queryset = queryset.filter(
-                reminder_date__date__lte=seven_days_ago, 
+                reminder_date__date__lte=seven_days_ago,
                 reminder_completed=False
             )
         elif due_filter == 'due':
@@ -112,7 +115,7 @@ class ReminderListView(ListView):
                 reminder_date__date__gt=today,
                 reminder_completed=False
             )
-        
+
         return queryset
     
     def get_context_data(self, **kwargs):
@@ -121,9 +124,14 @@ class ReminderListView(ListView):
         today = timezone.now().date()
         seven_days_ago = today - timedelta(days=7)
         
-        # Add filter parameters to context
-        context['status_filter'] = self.request.GET.get('status', '')
-        context['due_filter'] = self.request.GET.get('due', '')
+        # Add filter parameters to context, applying the same default-to-'due'
+        # logic as get_queryset so the template's active chip state matches.
+        status_param = self.request.GET.get('status')
+        due_param = self.request.GET.get('due')
+        if due_param is None and status_param is None:
+            due_param = 'due'
+        context['status_filter'] = status_param or ''
+        context['due_filter'] = due_param or ''
         
         # Add counts for different reminder categories
         all_reminders = Reminder.objects.filter(reminder_user=user)
@@ -186,8 +194,14 @@ def reminders_popup(request):
     if getattr(request, 'active_company', None):
         queryset = queryset.filter(company=request.active_company)
 
-    status_filter = request.GET.get('status', '')
-    due_filter = request.GET.get('due', '')
+    status_param = request.GET.get('status')
+    due_param = request.GET.get('due')
+    # Default to the 'due' filter on a fresh visit (no due and no status params).
+    # 'all' is the sentinel meaning "no due filter".
+    if due_param is None and status_param is None:
+        due_param = 'due'
+    status_filter = status_param or ''
+    due_filter = due_param or ''
 
     if status_filter == 'completed':
         queryset = queryset.filter(reminder_completed=True)

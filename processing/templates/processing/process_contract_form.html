@@ -319,86 +319,43 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 </div>
             </div>
 
-            <!-- Split Information Card -->
+            <!-- Split summary (all CLINs) — read-only -->
             <div class="lg:col-span-3">
                 <div class="card card-padded shadow-md mb-6">
-                    <div class="row-between mb-4">
-                        <h2 class="text-xl font-semibold">Splits Information</h2>
-                        <button type="button"
-                                onclick="addNewSplit()"
-                                class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
-                            Add New Split
-                        </button>
-                    </div>
-
-                    <!-- Dynamic Splits Table -->
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200" id="splitsTable">
-                            <thead class="bg-gray-50">
+                    <h2 class="text-xl font-semibold mb-3">Split Summary (all CLINs)</h2>
+                    <p class="text-muted small mb-3">Rollup of per-CLIN splits. Edit splits inside each CLIN block below.</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
                                 <tr>
-                                    <th class="px-4 py-3 text-left tracking-wider label">Company</th>
-                                    <th class="px-4 py-3 text-right tracking-wider label">Split Value</th>
-                                    <th class="px-4 py-3 text-right tracking-wider label">Split Paid</th>
-                                    <th class="px-4 py-3 text-center tracking-wider label">Actions</th>
+                                    <th>Company</th>
+                                    <th class="text-end">Total Split Value</th>
+                                    <th class="text-end">Total Split Paid</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% for split in process_contract.splits.all %}
-                                <tr class="split-row" data-id="{{ split.id }}">
-                                    <td class="px-4 py-3">
-                                        <input type="text"
-                                               name="splits-{{ split.id }}-company"
-                                               value="{{ split.company_name }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <input type="hidden" name="splits-{{ split.id }}-id" value="{{ split.id }}">
-                            </td>
-                            <td class="px-4 py-3">
-                                <input type="number"
-                                       step="0.01"
-                                       name="splits-{{ split.id }}-value"
-                                       value="{{ split.split_value|floatformat:2 }}"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </td>
-                            <td class="px-4 py-3">
-                                <input type="number"
-                                       step="0.01"
-                                       name="splits-{{ split.id }}-paid"
-                                       value="{{ split.split_paid }}"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <div class="flex justify-center space-x-2">
-                                    <button type="button"
-                                            onclick="saveSplit(this)"
-                                            class="btn btn-save"
-                                            title="Save Split">
-                                        <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
-                                            <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
-                                        </svg>
-                                    </button>
-                                    <button type="button"
-                                            onclick="removeSplit(this)"
-                                            class="text-red-600 hover:text-red-900"
-                                            title="Delete Split">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            <tbody>
+                                {% for row in process_clin_split_rollup %}
+                                <tr>
+                                    <td>{{ row.company_name|default:"—" }}</td>
+                                    <td class="text-end">{{ row.total_value|default_if_none:0|floatformat:2 }}</td>
+                                    <td class="text-end">{{ row.total_paid|default_if_none:0|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-muted">No splits entered yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-group-divider">
+                                <tr>
+                                    <th>Contract totals</th>
+                                    <th class="text-end">{{ process_contract.total_split_value|floatformat:2 }}</th>
+                                    <th class="text-end">{{ process_contract.total_split_paid|floatformat:2 }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2 mb-0">Contract value: {{ process_contract.contract_value|default:"0.00" }}</p>
+                </div>
             </div>
-
-            <!-- Total Split Value Display -->
-            <div class="mt-4 text-right">
-                <p class="text-sm text-gray-600">Total Split Value: <span id="totalSplitValue">0.00</span></p>
-                <p class="text-sm text-gray-600">Contract Value: {{ process_contract.contract_value|default:"0.00" }}</p>
-            </div>
-        </div>
-    </div>
 
     <!-- CLIN Items Card -->
     <div class="lg:col-span-3">
@@ -743,6 +700,70 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                         </div>
                                     </div>
                                 </div>
+                                <div class="mt-3">
+                                    <h3 class="h6 mb-2">CLIN splits</h3>
+                                    <div class="d-flex flex-wrap gap-2 mb-2">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-brand add-clin-split"
+                                                data-clin-id="{{ clin_form.instance.pk }}">
+                                            Add Split
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary calc-clin-splits"
+                                                data-clin-id="{{ clin_form.instance.pk }}"
+                                                data-calc-url="{% url 'processing:calc_clin_splits' clin_form.instance.pk %}">
+                                            Calc Splits
+                                        </button>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle"
+                                               id="clin-splits-table-{{ clin_form.instance.pk }}"
+                                               data-clin-id="{{ clin_form.instance.pk }}">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Company</th>
+                                                    <th class="text-end" style="min-width:7rem">Split Value</th>
+                                                    <th class="text-end" style="min-width:7rem">Split Paid</th>
+                                                    <th class="text-center" style="width:5rem">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for split in clin_form.instance.splits.all %}
+                                                <tr class="clin-split-row" data-split-id="{{ split.pk }}" data-clin-id="{{ clin_form.instance.pk }}">
+                                                    <td>
+                                                        <input type="text" class="form-control form-control-sm"
+                                                               name="clin-{{ clin_form.instance.pk }}-splits-{{ split.pk }}-company_name"
+                                                               value="{{ split.company_name }}">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" step="0.01" class="form-control form-control-sm text-end clin-split-value-input"
+                                                               name="clin-{{ clin_form.instance.pk }}-splits-{{ split.pk }}-split_value"
+                                                               value="{{ split.split_value|default_if_none:0|floatformat:2 }}">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" step="0.01" class="form-control form-control-sm text-end clin-split-paid-input"
+                                                               name="clin-{{ clin_form.instance.pk }}-splits-{{ split.pk }}-split_paid"
+                                                               value="{{ split.split_paid|default_if_none:0|floatformat:2 }}">
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger delete-clin-split"
+                                                                data-split-id="{{ split.pk }}"
+                                                                data-clin-id="{{ clin_form.instance.pk }}">Delete</button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot class="table-group-divider">
+                                                <tr>
+                                                    <th>Totals</th>
+                                                    <th class="text-end"><span class="clin-splits-total-value" data-clin-id="{{ clin_form.instance.pk }}">0.00</span></th>
+                                                    <th class="text-end"><span class="clin-splits-total-paid" data-clin-id="{{ clin_form.instance.pk }}">0.00</span></th>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
                                 <div class="grid grid-cols-8 gap-4 mb-2">
 
                                 <div class="mt-2 flex justify-start space-x-4">
@@ -840,6 +861,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <script src="{% static 'processing/js/buyer_modal.js' %}"></script>
 <script src="{% static 'processing/js/nsn_modal.js' %}"></script>
 <script src="{% static 'processing/js/supplier_modal.js' %}"></script>
+<script src="{% static 'processing/js/process_contract.js' %}"></script>
 
 <!-- JavaScript for form functionality -->
 <script>
@@ -963,157 +985,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         }
     });
 
-    // Function to update Contract Value and Plan Gross
-    async function updateContractCalculations() {
+    // Recalculate contract value / plan gross from CLIN line totals, then save via the main contract save.
+    function updateContractCalculations() {
         let totalItemValue = 0;
         let totalQuoteValue = 0;
-
-        // Get all CLIN item values from expanded sections only
         document.querySelectorAll('[class^="clin-details-"] input[id^="item_value_"]').forEach(input => {
             totalItemValue += parseFloat(input.value || 0);
         });
-        console.log('Total Item Value:', totalItemValue);
-
-        // Get all quote values from expanded sections only
         document.querySelectorAll('[class^="clin-details-"] input[id^="quote_value_"]').forEach(input => {
             totalQuoteValue += parseFloat(input.value || 0);
         });
-        console.log('Total Quote Value:', totalQuoteValue);
-
-        // Update Contract Value field (total of item values)
-        const contractValueInput = document.querySelector('input[name="contract_value"]');
+        const contractValueInput = document.querySelector('input[name="cont_contract_value"]');
+        const planGrossInput = document.querySelector('input[name="cont_plan_gross"]');
         if (contractValueInput) {
             contractValueInput.value = totalItemValue.toFixed(2);
-            // Save contract value to database
-            saveField(contractValueInput);
         }
-
-        // Update Plan Gross field (item values minus quote values)
-        const planGrossInput = document.querySelector('input[name="plan_gross"]');
         if (planGrossInput) {
-            const planGrossValue = totalItemValue - totalQuoteValue;
-            planGrossInput.value = planGrossValue.toFixed(2);
-            // Save plan gross to database
-            saveField(planGrossInput);
-
-            // Calculate total of existing splits
-            let totalSplitValue = 0;
-            document.querySelectorAll('input[name$="-value"]').forEach(input => {
-                if (!input.name.includes('new-calculation-difference')) {
-                    totalSplitValue += parseFloat(input.value || 0);
-                }
-            });
-
-            // Find difference between Plan Gross and total splits
-            const splitDifference = planGrossValue - totalSplitValue;
-
-            // Remove any existing calculation difference split
-            document.querySelectorAll('.split-row').forEach(row => {
-                if (row.querySelector('input[name*="new-calculation-difference"]')) {
-                    row.remove();
-                }
-            });
-
-            // If there's a difference, add a new split
-            if (Math.abs(splitDifference) > 0.01) { // Using 0.01 to account for floating point precision
-                const processContractId = parseInt("{{ process_contract.id }}");
-
-                // First save the split to the database
-                try {
-                    const splitData = {
-                        process_contract_id: processContractId,
-                        company_name: "Calculation Difference",
-                        split_value: splitDifference
-                    };
-
-                    const response = await fetch('/processing/contract/split/create/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                        },
-                        body: JSON.stringify(splitData)
-                    });
-
-                    // Log the raw response for debugging
-                    console.log('Response status:', response.status);
-                    const responseText = await response.text();
-                    console.log('Response text:', responseText);
-
-                    // Try to parse the response as JSON
-                    let data;
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (e) {
-                        console.error('Failed to parse JSON response:', e);
-                        throw new Error('Invalid server response format');
-                    }
-
-                    if (data.success && data.split_id) {
-                        // Now add the row to the UI with the saved ID
-                        const table = document.querySelector('#splitsTable tbody');
-                        const newRow = document.createElement('tr');
-                        newRow.className = 'split-row';
-                        newRow.innerHTML = `
-                            <td class="px-4 py-3">
-                                <input type="text"
-                                       name="splits-${data.split_id}-company"
-                                       value="Calculation Difference"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <input type="hidden" name="splits-${data.split_id}-id" value="${data.split_id}">
-                            </td>
-                            <td class="px-4 py-3">
-                                <input type="number"
-                                       step="0.01"
-                                       name="splits-${data.split_id}-value"
-                                       value="${splitDifference.toFixed(2)}"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </td>
-                            <td class="px-4 py-3">
-                                <input type="number"
-                                       step="0.01"
-                                       name="splits-${data.split_id}-paid"
-                                       value="0.00"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <div class="flex justify-center space-x-2">
-                                    <button type="button"
-                                            onclick="saveSplit(this)"
-                                            class="btn btn-save"
-                                            title="Save Split">
-                                        <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
-                                            <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
-                                        </svg>
-                                    </button>
-                                    <button type="button"
-                                            onclick="removeSplit(this)"
-                                            class="text-red-600 hover:text-red-900"
-                                            title="Delete Split">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </td>
-                        `;
-                        table.appendChild(newRow);
-                        showMessage('Calculation difference split created and saved', 'success');
-                    } else {
-                        throw new Error(data.error || 'Failed to save calculation difference split');
-                    }
-                } catch (error) {
-                    console.error('Error saving calculation difference split:', error);
-                    showMessage('Error saving calculation difference split: ' + error.message, 'error');
-                }
-            }
-
-            // Update the total split value display
-            updateTotalSplitValue();
+            planGrossInput.value = (totalItemValue - totalQuoteValue).toFixed(2);
         }
-
-        // Show success message
+        if (typeof saveContract === 'function') {
+            saveContract();
+        }
         showMessage('Contract calculations updated and saved', 'success');
     }
 
@@ -1256,198 +1148,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             localStorage.removeItem('expandedClinIndex');
         }
     }
-
-    function addNewSplit() {
-        const table = document.querySelector('#splitsTable tbody');
-        const newRow = document.createElement('tr');
-        const timestamp = new Date().getTime(); // Use timestamp as temporary ID
-
-        newRow.className = 'split-row unsaved-split';
-        newRow.innerHTML = `
-            <td class="px-4 py-3 relative">
-                <div class="flex items-center gap-2">
-                    <input type="text"
-                           name="splits-new-${timestamp}-company"
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
-                    <span class="bg-yellow-200 text-yellow-800 text-xs font-medium px-2 py-1 rounded whitespace-nowrap">
-                        Unsaved
-                    </span>
-                </div>
-                <input type="hidden" name="splits-new-${timestamp}-id" value="">
-            </td>
-            <td class="px-4 py-3">
-                <input type="number"
-                       step="0.01"
-                       name="splits-new-${timestamp}-value"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
-            </td>
-            <td class="px-4 py-3">
-                <input type="number"
-                       step="0.01"
-                       name="splits-new-${timestamp}-paid"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
-            </td>
-            <td class="px-4 py-3 text-center">
-                <div class="flex justify-center space-x-2">
-                    <button type="button"
-                            onclick="saveSplit(this)"
-                            class="btn btn-save animate-pulse"
-                            title="Save Split">
-                        <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
-                            <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
-                        </svg>
-                    </button>
-                    <button type="button"
-                            onclick="removeSplit(this)"
-                            class="text-red-600 hover:text-red-900"
-                            title="Delete Split">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                    </button>
-                </div>
-            </td>
-        `;
-
-        table.appendChild(newRow);
-        updateTotalSplitValue();
-    }
-
-    async function saveSplit(button) {
-        const row = button.closest('tr');
-        const processContractId = parseInt("{{ process_contract.id }}");
-        const splitId = row.querySelector('input[name$="-id"]').value;
-        const companyInput = row.querySelector('input[name$="-company"]');
-        const valueInput = row.querySelector('input[name$="-value"]');
-        const paidInput = row.querySelector('input[name$="-paid"]');
-
-        // Format the data according to the model fields
-        const splitData = {
-            company_name: companyInput.value.trim(),
-            split_value: parseFloat(valueInput.value) || 0.00,
-            split_paid: parseFloat(paidInput.value) || 0.00
-        };
-
-        try {
-            const url = splitId ?
-                `/processing/contract/split/${splitId}/update/` :
-                `/processing/contract/split/create/`;
-
-            // If creating new split, include process_contract_id
-            if (!splitId) {
-                splitData.process_contract_id = processContractId;
-            }
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify(splitData)
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showMessage('Split saved successfully', 'success');
-                if (!splitId && data.split_id) {
-                    // Update the row with the new split ID
-                    const idInput = row.querySelector('input[name$="-id"]');
-                    idInput.value = data.split_id;
-                    // Update the input names to use the new ID
-                    companyInput.name = `splits-${data.split_id}-company`;
-                    valueInput.name = `splits-${data.split_id}-value`;
-                    paidInput.name = `splits-${data.split_id}-paid`;
-
-                    // Remove unsaved styling
-                    row.classList.remove('unsaved-split');
-                    const inputs = row.querySelectorAll('.bg-yellow-50');
-                    inputs.forEach(input => input.classList.remove('bg-yellow-50'));
-                    row.querySelector('.bg-yellow-200')?.closest('.flex')?.querySelector('span')?.remove();
-                    button.classList.remove('animate-pulse');
-                }
-                // Update total split value display
-                updateTotalSplitValue();
-            } else {
-                throw new Error(data.error || 'Failed to save split');
-            }
-        } catch (error) {
-            console.error('Save split error:', error);
-            showMessage('Error saving split: ' + error.message, 'error');
-        }
-    }
-
-    async function removeSplit(button) {
-        const row = button.closest('tr');
-        const splitId = row.querySelector('input[name$="-id"]').value;
-
-        if (!splitId) {
-            // If it's a new unsaved split, just remove from UI
-            row.remove();
-            updateTotalSplitValue();
-            return;
-        }
-
-        try {
-            const response = await fetch(`/processing/contract/split/${splitId}/delete/`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                }
-            });
-
-            // Log the raw response for debugging
-            console.log('Response status:', response.status);
-            const responseText = await response.text();
-            console.log('Response text:', responseText);
-
-            // Try to parse the response as JSON
-            let data;
-            try {
-                data = JSON.parse(responseText);
-            } catch (e) {
-                console.error('Failed to parse JSON response:', e);
-                throw new Error('Invalid server response format');
-            }
-
-            if (data.success) {
-                row.remove();
-                updateTotalSplitValue();
-                showMessage('Split deleted successfully', 'success');
-            } else {
-                throw new Error(data.error || 'Failed to delete split');
-            }
-        } catch (error) {
-            console.error('Delete split error:', error);
-            showMessage('Error deleting split: ' + error.message, 'error');
-        }
-    }
-
-    function updateTotalSplitValue() {
-        const splitValues = document.querySelectorAll('input[name$="-value"]');
-        let total = 0;
-
-        splitValues.forEach(input => {
-            total += parseFloat(input.value || 0);
-        });
-
-        document.getElementById('totalSplitValue').textContent = total.toFixed(2);
-    }
-
-    // Add event listeners for split value changes
-    document.addEventListener('input', function(e) {
-        if (e.target.name && e.target.name.endsWith('-value')) {
-            updateTotalSplitValue();
-        }
-    });
-
-    // Initial calculation
-    document.addEventListener('DOMContentLoaded', function() {
-        updateTotalSplitValue();
-    });
 
     // Add these new functions for price handling
     function handlePriceChange(input) {
@@ -2189,8 +1889,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
                 // Update the form values if they were returned
                 if (data.data) {
-                    const contractValueInput = document.querySelector('input[name="contract_value"]');
-                    const planGrossInput = document.querySelector('input[name="plan_gross"]');
+                    const contractValueInput = document.querySelector('input[name="cont_contract_value"]');
+                    const planGrossInput = document.querySelector('input[name="cont_plan_gross"]');
 
                     if (contractValueInput && data.data.contract_value) {
                         contractValueInput.value = data.data.contract_value;
