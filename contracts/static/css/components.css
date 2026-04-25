@@ -211,3 +211,275 @@
     flex-shrink: 0;
     background-color: var(--bs-body-bg);
 }
+
+/* === CLIN Detail Page === */
+
+/* Full-width layout override — applied when .clin-detail-page is on the
+ * outer wrapper from contract_base.html. The actual width constraint lives
+ * on the inner .mx-auto div (style="width: 75%"), so we have to target it
+ * directly with !important to beat the inline style. */
+.clin-detail-page main > div.mx-auto {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Fixed left sidebar — pinned below the top header, runs to just above the
+ * sticky footer in contract_base.html. Width matches .clin-detail-content
+ * margin-left below; keep the two in sync if changed. */
+.clin-detail-sidebar {
+    position: fixed;
+    top: 4rem;
+    left: 0;
+    width: 200px;
+    height: calc(100vh - 4rem - 3.5rem);
+    overflow-y: auto;
+    background-color: var(--bs-body-bg);
+    border-right: 1px solid var(--bs-border-color);
+    padding: 1rem 0;
+    z-index: 100;
+}
+
+.clin-detail-content {
+    margin-left: 200px;
+    padding: 1.5rem 2rem 5rem 2rem;
+    min-height: 100vh;
+}
+
+.clin-sidebar-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07rem;
+    color: var(--bs-secondary-color);
+    padding: 0 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.clin-detail-sidebar .nav-link {
+    color: var(--bs-body-color);
+    border-left: 3px solid transparent;
+    border-radius: 0;
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.clin-detail-sidebar .nav-link:hover {
+    color: var(--bs-primary);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.clin-detail-sidebar .nav-link.active {
+    color: var(--bs-primary);
+    border-left-color: var(--bs-primary);
+    background-color: var(--bs-primary-bg-subtle);
+    font-weight: 600;
+}
+
+.clin-section-card {
+    border: none;
+    border-left-width: 5px;
+    border-left-style: solid;
+    background-color: var(--bs-body-bg);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+[data-bs-theme="dark"] .clin-section-card {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.clin-card-identification { border-left-color: var(--bs-primary)   !important; }
+.clin-card-item-details   { border-left-color: var(--bs-info)      !important; }
+.clin-card-supplier       { border-left-color: var(--bs-warning)   !important; }
+.clin-card-shipping       { border-left-color: var(--bs-success)   !important; }
+.clin-card-splits         { border-left-color: #6f42c1             !important; }
+.clin-card-financials     { border-left-color: var(--bs-danger)    !important; }
+.clin-card-history        { border-left-color: var(--bs-secondary) !important; }
+
+.clin-section-header {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.07rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.5rem 1rem;
+}
+
+.clin-field-label {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    display: block;
+    letter-spacing: 0.04rem;
+    margin-bottom: 2px;
+}
+
+.clin-field-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* === Contract Review Page === */
+
+/* Fixed left sidebar — mirrors .clin-detail-sidebar exactly */
+.review-detail-sidebar {
+    position: fixed;
+    top: 4rem;
+    left: 0;
+    width: 200px;
+    height: calc(100vh - 4rem - 3.5rem);
+    overflow-y: auto;
+    background-color: var(--bs-body-bg);
+    border-right: 1px solid var(--bs-border-color);
+    padding: 1rem 0;
+    z-index: 100;
+}
+
+/* Scrollable content area offset */
+.review-detail-content {
+    margin-left: 200px;
+    padding: 1.5rem 2rem 5rem 2rem;
+    min-height: 100vh;
+}
+
+/* Sidebar nav links */
+.review-detail-sidebar .nav-link {
+    color: var(--bs-body-color);
+    border-left: 3px solid transparent;
+    border-radius: 0;
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.review-detail-sidebar .nav-link:hover {
+    color: var(--bs-primary);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.review-detail-sidebar .nav-link.active {
+    color: var(--bs-primary);
+    border-left-color: var(--bs-primary);
+    background-color: var(--bs-primary-bg-subtle);
+    font-weight: 600;
+}
+
+/* Section cards */
+.review-section-card {
+    border: none;
+    border-left-width: 5px;
+    border-left-style: solid;
+    background-color: var(--bs-body-bg);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+[data-bs-theme="dark"] .review-section-card {
+    box-shadow: 0 1px 6px rgba(0,0,0,0.35);
+}
+
+/* Section accent colors */
+.review-card-idiq        { border-left-color: var(--bs-secondary) !important; }
+.review-card-contract    { border-left-color: var(--bs-primary) !important; }
+.review-card-financials  { border-left-color: var(--bs-success) !important; }
+.review-card-misc        { border-left-color: var(--bs-warning) !important; }
+.review-card-splits      { border-left-color: #6f42c1 !important; }
+.review-card-assignment  { border-left-color: var(--bs-info) !important; }
+.review-card-clins       { border-left-color: var(--bs-danger) !important; }
+
+/* Card header */
+.review-section-header {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.07rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.5rem 1rem;
+}
+
+/* Label-over-value field pattern */
+.review-field-label {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    display: block;
+    letter-spacing: 0.04rem;
+    margin-bottom: 2px;
+}
+
+.review-field-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+/* Editable field label button — same pattern as clin_detail */
+.review-field-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04rem;
+    color: var(--bs-secondary-color);
+    cursor: pointer;
+    display: block;
+    margin-bottom: 2px;
+    transition: color 0.15s ease;
+}
+
+.review-field-btn:hover {
+    color: var(--bs-primary);
+    text-decoration: underline;
+}
+
+/* Reviewed status badge */
+.review-status-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+}
+
+/* CLIN summary table */
+.review-clin-table th {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04rem;
+    border-bottom: 2px solid var(--bs-border-color);
+    padding: 0.5rem 0.75rem;
+}
+
+.review-clin-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.875rem;
+    color: var(--bs-body-color);
+    vertical-align: middle;
+}
+
+.review-clin-table tr:hover td {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.review-late {
+    color: var(--bs-danger);
+    font-weight: 600;
+}

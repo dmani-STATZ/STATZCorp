@@ -1,715 +1,444 @@
 {% extends "contracts/contract_base.html" %}
-{% load static %}
+{% load humanize static %}
 
 {% block title %}Review Contract {{ contract.contract_number }}{% endblock %}
 
+{% block body_attrs %}data-bs-spy="scroll" data-bs-target="#review-page-nav" data-bs-offset="80"{% endblock %}
+{% block body_class %}clin-detail-page{% endblock %}
+
 {% block extra_head %}
 {{ block.super }}
-<style>
-    body {
-        background-color: #f8f9fa;
-    }
-    
-    .review-page {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-    
-    .review-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #dee2e6;
-    }
-    
-    .review-title {
-        font-size: 24px;
-        font-weight: bold;
-        color: #212529;
-        display: flex;
-        align-items: center;
-    }
-    
-    .review-status {
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 14px;
-        font-weight: 500;
-        margin-left: 10px;
-    }
-    
-    .status-not-reviewed {
-        background-color: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-reviewed {
-        background-color: #d4edda;
-        color: #155724;
-    }
-    
-    .section {
-        background-color: white;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        margin-bottom: 20px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    
-    .section-header {
-        padding: 15px;
-        background-color: #f8f9fa;
-        border-bottom: 1px solid #dee2e6;
-        font-weight: 600;
-        font-size: 18px;
-        color: #343a40;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    
-    .section-title {
-        display: flex;
-        align-items: center;
-    }
-    
-    .section-content {
-        padding: 15px;
-    }
-    
-    .data-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0 8px;
-    }
-    
-    .data-table td {
-        padding: 8px 12px;
-
-    }
-    
-    .data-label {
-        width: 25%;
-        text-align: left;
-        font-weight: 500;
-        color: #495057;
-        background-color: #f8f9fa;
-        border-radius: 6px 0 0 6px;
-        border: 1px solid #dee2e6;
-        border-right: none;
-    }
-    
-    .data-value {
-        width: 25%;
-        color: #212529;
-        background-color: #ffffff;
-        border: 1px solid #013368;
-        border-radius: 0 6px 6px 0;
-        padding: 8px 12px;
-        margin-right: 15px;
-    }
-    
-    .clin-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    
-    .clin-table th {
-        background-color: #f8f9fa;
-        padding: 10px;
-        text-align: left;
-        font-weight: 600;
-        color: #495057;
-        border-bottom: 2px solid #dee2e6;
-    }
-    
-    .clin-table td {
-        padding: 10px;
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .clin-table tr:hover {
-        background-color: #f8f9fa;
-    }
-    
-    .clin-details {
-        display: none;
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-top: 1px solid #dee2e6;
-    }
-    
-    .clin-row.expanded .clin-details {
-        display: table-row;
-    }
-    
-    .edit-icon {
-        color: #007bff;
-        cursor: pointer;
-        margin-left: 8px;
-    }
-    
-    .review-button {
-        background-color: #28a745;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .review-button:hover {
-        background-color: #218838;
-    }
-    
-    .review-button svg {
-        margin-right: 8px;
-    }
-    
-    .back-link {
-        color: #007bff;
-        text-decoration: none;
-    }
-    
-    .back-link:hover {
-        text-decoration: underline;
-    }
-    
-    .value-late {
-        color: #dc3545;
-    }
-    
-    .toggle-details {
-        cursor: pointer;
-        color: #007bff;
-        font-size: 14px;
-        margin-left: 10px;
-    }
-
-    .actions-container {
-        display: flex;
-        align-items: center;
-    }
-
-    /* Specific styles for CLIN details table */
-    .clin-details-content .data-table {
-        border-collapse: separate;
-        border-spacing: 0 8px;
-    }
-
-    .clin-details-content .data-label {
-        border-radius: 4px 0 0 4px;
-        border: 1px solid #dee2e6;
-        border-right: none;
-    }
-
-    .clin-details-content .data-value {
-        border-radius: 0 4px 4px 0;
-        border: 1px solid #007bff;
-    }
-    
-    .toggle-section {
-        cursor: pointer;
-        color: #007bff;
-        font-size: 14px;
-        margin-left: auto;
-        display: flex;
-        align-items: center;
-    }
-    
-    .toggle-section svg {
-        margin-right: 5px;
-    }
-    
-    .section-content.collapsed {
-        display: none;
-    }
-
-</style>
-{% endblock %}
+{# All styles live in components.css — no inline style block #}
+{% endblock extra_head %}
 
 {% block content %}
-<div class="review-page">
-    <!-- Header -->
-    <div class="review-header">
-        <div class="review-title">
-            Contract Review: {{ contract.contract_number }}
-            <span class="review-status {% if contract.reviewed %}status-reviewed{% else %}status-not-reviewed{% endif %}">
-                {% if contract.reviewed %}
-                    Reviewed by {{ contract.reviewed_by }} on {{ contract.reviewed_on|date:"M d, Y" }}
-                {% else %}
-                    Not Reviewed
-                {% endif %}
-            </span>
-        </div>
-        <a href="{% url 'contracts:contract_management' contract.id %}" class="back-link">
-            Back to Contract
-        </a>
-    </div>
-
-    {% if contract.idiq_contract %}
-    <!-- IDIQ Contract Information -->
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">
-                IDIQ Contract Information
-                <a href="#" title="Edit Contract"> <!-- TODO: Add link to IDIQ Contract -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="edit-icon" viewBox="0 0 16 16">
-                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-        <div class="section-content">
-            <table class="data-table">
-                <tr>
-                    <td class="data-label">IDIQ Contract Number</td>
-                    <td class="data-value">{{ contract.idiq_contract.contract_number|default:"N/A" }}</td>
-                    <td class="data-label">IDIQ TAB Number</td>
-                    <td class="data-value">{{ contract.idiq_contract.tab_num|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">IDIQ Buyer</td>
-                    <td class="data-value">{{ contract.idiq_contract.buyer.description|default:"N/A" }}</td>
-                    <td class="data-label">IDIQ Award Date</td>
-                    <td class="data-value">{{ contract.idiq_contract.award_date|date:"M d, Y"|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Term Length</td>
-                    <td class="data-value">{{ contract.idiq_contract.term_length|default:"N/A" }} months</td>
-                    <td class="data-label">Option Length</td>
-                    <td class="data-value">{{ contract.idiq_contract.option_length|default:"N/A" }} months</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Closed</td>
-                    <td class="data-value">{{ contract.idiq_contract.closed|yesno:"Yes,No,Unknown" }}</td>
-                    <td class="data-label"></td>
-                    <td class="data-value"></td>
-                </tr>
-            </table>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Contract Information -->
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">
-                Contract Information
-                <a href="{% url 'contracts:contract_update' contract.id %}" title="Edit Contract">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="edit-icon" viewBox="0 0 16 16">
-                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-        <div class="section-content">
-            <table class="data-table">
-                <tr>
-                    <td class="data-label">Contract Number</td>
-                    <td class="data-value">{{ contract.contract_number|default:"N/A" }}</td>
-                    <td class="data-label">Status</td>
-                    <td class="data-value">{{ contract.status.description|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">PO Number</td>
-                    <td class="data-value">{{ contract.po_number|default:"N/A" }}</td>
-                    <td class="data-label">TAB Number</td>
-                    <td class="data-value">{{ contract.tab_num|default:"N/A" }}</td>
-
-                </tr>
-                <tr>
-                    <td class="data-label">Buyer</td>
-                    <td class="data-value">{{ contract.buyer.description|default:"N/A" }}</td>
-                    <td class="data-label">Contract Type</td>
-                    <td class="data-value">{{ contract.contract_type.description|default:"N/A" }}</td>
-
-                </tr>
-                <tr>
-                    <td class="data-label">Contract Value</td>
-                    <td class="data-value">${{ contract.contract_value|floatformat:2|default:"0.00" }}</td>
-                    <td class="data-label"></td>
-                    <td class="data-value"></td>
-                </tr>
-                <tr>
-                    <td class="data-label">Plan Gross</td>
-                    <td class="data-value">${{ contract.plan_gross|default:"0.00"|floatformat:2 }}</td>
-                    <td class="data-label">Planned Split</td>
-                    <td class="data-value">{{ contract.planned_split|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Sales Class</td>
-                    <td class="data-value">{{ contract.sales_class.sales_team|default:"N/A" }}</td>
-                    <td class="data-label">Solicitation Type</td>
-                    <td class="data-value">{{ contract.solicitation_type|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Award Date</td>
-                    <td class="data-value">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</td>
-                    <td class="data-label">Due Date</td>
-                    <td class="data-value {% if contract.due_date_late %}value-late{% endif %}">
-                        {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
-                        {% if contract.due_date_late %} (LATE){% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="data-label">NIST</td>
-                    <td class="data-value">{{ contract.nist|yesno:"Yes,No,Unknown" }}</td>
-                    <td class="data-label">Date Closed</td>
-                    <td class="data-value">{{ contract.date_closed|date:"M d, Y"|default:"N/A" }}</td>
-                </tr>
-
-                <tr>
-                    <td class="data-label">Cancellation Reason</td>
-                    <td class="data-value">{{ contract.canceled_reason|default:"N/A" }}</td>
-                    <td class="data-label">Date Cancelled</td>
-                    <td class="data-value">{{ contract.date_canceled|date:"M d, Y"|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Survey Date</td>
-                    <td class="data-value">{{ contract.survey_date|date:"M d, Y"|default:"N/A" }}</td>
-                    <td class="data-label">Survey Type</td>
-                    <td class="data-value">{{ contract.survey_type|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label" colspan="1">Files URL</td>
-                    <td class="data-value" colspan="3">{{ contract.files_url|default:"N/A" }}</td>
-                </tr>
-
-                <tr>
-                    <td class="data-label">Created On</td>
-                    <td class="data-value">{{ contract.created_on|date:"M d, Y H:i"|default:"N/A" }}</td>
-                    <td class="data-label">Created By</td>
-                    <td class="data-value">{{ contract.created_by|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Modified On</td>
-                    <td class="data-value">{{ contract.modified_on|date:"M d, Y H:i"|default:"N/A" }}</td>
-                    <td class="data-label">Modified By</td>
-                    <td class="data-value">{{ contract.modified_by|default:"N/A" }}</td>
-                </tr>
-
-            </table>
-        </div>
-    </div>
-
-    <!-- Split summary (read-only) -->
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">Split summary (all CLINs, by company)</div>
-        </div>
-        <div class="section-content">
-            {% if clin_split_rollup %}
-            <div class="table-responsive">
-                <table class="table table-sm table-striped">
-                    <thead>
-                        <tr>
-                            <th>Company</th>
-                            <th class="text-end">Total split value</th>
-                            <th class="text-end">Total split paid</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in clin_split_rollup %}
-                        <tr>
-                            <td>{{ row.company_name }}</td>
-                            <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
-                            <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot>
-                        <tr class="table-secondary">
-                            <th>Total</th>
-                            <td class="text-end fw-semibold">${{ contract.total_split_value|floatformat:2 }}</td>
-                            <td class="text-end fw-semibold">${{ contract.total_split_paid|floatformat:2 }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-body-secondary small mb-0">No splits recorded</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Assignment Information -->
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">
-                Assignment Information
-            </div>
-            <div class="toggle-section" data-target="assignment-info">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M1.646 11.354a.5.5 0 0 1 0-.708L7.293 5 1.646 10.646a.5.5 0 1 1 .708.708l6 6a.5.5 0 0 0 .708 0l6-6a.5.5 0 0 1 .708-.708L8.707 5l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0l-6 6z"/>
-                </svg>
-                <span>Show</span>
-            </div>
-        </div>
-        <div class="section-content collapsed" id="assignment-info">
-            <table class="data-table">
-                <tr>
-                    <td class="data-label">Assigned User</td>
-                    <td class="data-value">{{ contract.assigned_user|default:"N/A" }}</td>
-                    <td class="data-label">Assigned Date</td>
-                    <td class="data-value">{{ contract.assigned_date|date:"M d, Y"|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Reviewed</td>
-                    <td class="data-value">{{ contract.reviewed|yesno:"Yes,No,Unknown" }}</td>
-                    <td class="data-label">Reviewed By</td>
-                    <td class="data-value">{{ contract.reviewed_by|default:"N/A" }}</td>
-                </tr>
-                <tr>
-                    <td class="data-label">Reviewed On</td>
-                    <td class="data-value">{{ contract.reviewed_on|date:"M d, Y H:i"|default:"N/A" }}</td>
-                    <td class="data-label"></td>
-                    <td class="data-value"></td>
-                </tr>
-            </table>
-        </div>
-    </div>
-
-
-    <!-- CLINs Information -->
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">
-                Contract Line Items (CLINs)
-            </div>
-        </div>
-        <div class="section-content">
-            <table class="clin-table">
-                <thead>
-                    <tr>
-                        <th>Item No</th>
-                        <th>Supplier</th>
-                        <th>NSN</th>
-                        <th>Order Qty</th>
-                        <th>Due Date</th>
-                        <th>Value</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for clin in clins %}
-                    <tr class="clin-row" data-clin-id="{{ clin.id }}">
-                        <td>{{ clin.item_number|default:"0000" }}</td>
-                        <td>{{ clin.supplier.name|default:"N/A" }}</td>
-                        <td>{{ clin.nsn.nsn_code|default:"N/A" }}</td>
-                        <td class="{% if clin.due_date_late %}value-late{% endif %}">
-                            {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
-                            {% if clin.due_date_late %} (LATE){% endif %}
-                        </td>
-                        <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
-                        <td>${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
-                        <td>
-                            <div class="actions-container">
-                                <a href="{% url 'contracts:clin_detail' clin.id %}" title="View CLIN">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="edit-icon" viewBox="0 0 16 16">
-                                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                                    </svg>
-                                </a>
-                                <span class="toggle-details" data-clin-id="{{ clin.id }}">Show Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr class="clin-details" id="clin-details-{{ clin.id }}">
-                        <td colspan="7">
-                            <div class="clin-details-content">
-                                <h4>CLIN Details</h4>
-                                <table class="data-table">
-                                    <tr>
-                                        <td class="data-label">Item Type</td>
-                                        <td class="data-value">{{ clin.item_type.description|default:"N/A" }}</td>
-                                        <td class="data-label">Item Number</td>
-                                        <td class="data-value">{{ clin.item_number|default:"0000" }}</td>
-                               
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Order Quantity</td>
-                                        <td class="data-value">{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
-                                        <td class="data-label"></td>
-                                        <td class="data-value"></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Supplier</td>
-                                        <td class="data-value" colspan="3">{{ clin.supplier.name|default:"N/A" }} - {{ clin.supplier.cage_code|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Quote Price</td>
-                                        <td class="data-value">${{ clin.price_per_unit|default:"0.00"|floatformat:2 }}</td>
-                                        <td class="data-label">Quote Value</td>
-                                        <td class="data-value">${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">NSN</td>
-                                        <td class="data-value">{{ clin.nsn.nsn_code|default:"N/A" }}</td>
-                                        <td class="data-label">NSN Description</td>
-                                        <td class="data-value">{{ clin.nsn.description|default:"N/A" }}</td>
-                                    </tr>
-                                    <TR>
-                                        <td class="data-label">Bid Price</td>
-                                        <td class="data-value">${{ clin.unit_price|default:"0.00"|floatformat:2 }}</td>
-                                        <td class="data-label">Bid Value</td>
-                                        <td class="data-value">${{ clin.item_value|default:"0.00"|floatformat:2 }}</td>
-                                    </TR>
-                                    <tr>
-                                        <td class="data-label">PO Number</td>
-                                        <td class="data-value">{{ clin.po_number|default:"N/A" }}</td>
-
-                                        <td class="data-label">PO Number Extension</td>
-                                        <td class="data-value">{{ clin.po_num_ext|default:"" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">TAB Number</td>
-                                        <td class="data-value">{{ clin.tab_num|default:"N/A" }}</td>
-                                        <td class="data-label">CLIN PO Number</td>
-                                        <td class="data-value">{{ clin.clin_po_num|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">FOB</td>
-                                        <td class="data-value">{{ clin.get_fob_display|default:"N/A" }}</td>
-                                        
-                                        <td class="data-label">IA</td>
-                                        <td class="data-value">{{ clin.get_ia_display|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Due Date</td>
-                                        <td class="data-value {% if clin.due_date_late %}value-late{% endif %}">
-                                            {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
-                                            {% if clin.due_date_late %} (LATE){% endif %}
-                                        </td>
-  
-                                        <td class="data-label">Supplier Due Date</td>
-                                        <td class="data-value {% if clin.supplier_due_date_late %}value-late{% endif %}">
-                                            {{ clin.supplier_due_date|date:"M d, Y"|default:"N/A" }}
-                                            {% if clin.supplier_due_date_late %} (LATE){% endif %}
-                                        </td>
-                                 
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Ship Quantity</td>
-                                        <td class="data-value">{{ clin.ship_qty|floatformat:'0'|default:"N/A" }}</td>
-                                        <td class="data-label">Ship Date</td>
-                                        <td class="data-value {% if clin.ship_date_late %}value-late{% endif %}">
-                                            {{ clin.ship_date|date:"M d, Y"|default:"N/A" }}
-                                            {% if clin.ship_date_late %} (LATE){% endif %}
-                                        </td>
-                                    </tr>
- 
-                                    <tr>
-                                        <td class="data-label">Special Payment Terms</td>
-                                        <td class="data-value">{{ clin.special_payment_terms|default:"N/A" }}</td>
-                                        <td class="data-label">Special Payment Terms Paid</td>
-                                        <td class="data-value">{{ clin.special_payment_terms_paid|yesno:"Yes,No,Unknown" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Paid Amount (Sub Paid)</td>
-                                        <td class="data-value">${{ clin.paid_amount|default:"0.00"|floatformat:2 }}</td>
-                                        <td class="data-label">Paid Date</td>
-                                        <td class="data-value">{{ clin.paid_date|date:"M d, Y"|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">WAWF Payment</td>
-                                        <td class="data-value">${{ clin.wawf_payment|default:"0.00"|floatformat:2 }}</td>
-                                        <td class="data-label">WAWF Received</td>
-                                        <td class="data-value">{{ clin.wawf_recieved|date:"M d, Y"|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label"></td>
-                                        <td class="data-value"></td>
-                                        <td class="data-label">WAWF Invoice Date</td>
-                                        <td class="data-value">{{ clin.wawf_invoice_date|date:"M d, Y"|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Created By</td>
-                                        <td class="data-value">{{ clin.created_by|default:"N/A" }}</td>
-                                        <td class="data-label">Created On</td>
-                                        <td class="data-value">{{ clin.created_on|date:"M d, Y H:i"|default:"N/A" }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="data-label">Modified By</td>
-                                        <td class="data-value">{{ clin.modified_by|default:"N/A" }}</td>
-                                        <td class="data-label">Modified On</td>
-                                        <td class="data-value">{{ clin.modified_on|date:"M d, Y H:i"|default:"N/A" }}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center" style="padding: 20px; color: #6c757d;">
-                            No CLINs found for this contract
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Review Button -->
-    {% if not contract.reviewed %}
-    <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-        <form method="post" action="{% url 'contracts:mark_contract_reviewed' contract.id %}">
-            {% csrf_token %}
-            <button type="submit" class="review-button">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
-                </svg>
-                Mark as Reviewed
-            </button>
-        </form>
-    </div>
-    {% endif %}
-</div>
+{% include "transactions/transaction_modal.html" %}
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toggle CLIN details
-        document.querySelectorAll('.toggle-details').forEach(function(element) {
-            element.addEventListener('click', function() {
-                const clinId = this.getAttribute('data-clin-id');
-                const detailsRow = document.getElementById('clin-details-' + clinId);
-                
-                if (detailsRow.style.display === 'table-row') {
-                    detailsRow.style.display = 'none';
-                    this.textContent = 'Show Details';
-                } else {
-                    detailsRow.style.display = 'table-row';
-                    this.textContent = 'Hide Details';
-                }
-            });
-        });
-        
-        // Toggle section visibility
-        document.querySelectorAll('.toggle-section').forEach(function(element) {
-            element.addEventListener('click', function() {
-                const targetId = this.getAttribute('data-target');
-                const targetSection = document.getElementById(targetId);
-                const toggleText = this.querySelector('span');
-                const toggleIcon = this.querySelector('svg');
-                
-                if (targetSection.classList.contains('collapsed')) {
-                    targetSection.classList.remove('collapsed');
-                    toggleText.textContent = 'Hide';
-                    toggleIcon.innerHTML = '<path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>';
-                } else {
-                    targetSection.classList.add('collapsed');
-                    toggleText.textContent = 'Show';
-                    toggleIcon.innerHTML = '<path d="M1.646 11.354a.5.5 0 0 1 0-.708L7.293 5 1.646 10.646a.5.5 0 1 1 .708.708l6 6a.5.5 0 0 0 .708 0l6-6a.5.5 0 0 1 .708-.708L8.707 5l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0l-6 6z"/>';
-                }
-            });
-        });
-    });
+window.contractContentTypeId = {{ contract_content_type_id }};
+window.contractId = {{ contract.id }};
+
+window.onTransactionSaved = function(data) {
+    if (!data || !data.success) return;
+    if (data.content_type_id == window.contractContentTypeId && data.object_id == window.contractId) {
+        var fieldHyphen = data.field_name.replace(/_/g, '-');
+        var el = document.getElementById('contract-' + fieldHyphen + '-value');
+        if (el) el.textContent = data.display_value || 'N/A';
+    }
+};
 </script>
-{% endblock %} 
+
+<div class="clin-detail-layout">
+
+  {# Fixed Sidebar #}
+  <nav id="review-page-nav" class="review-detail-sidebar">
+    <p class="clin-sidebar-label">Quick Jump</p>
+    <div class="nav flex-column nav-pills">
+      {% if contract.idiq_contract %}
+      <a class="nav-link" href="#review-idiq">IDIQ Info</a>
+      {% endif %}
+      <a class="nav-link active" href="#review-contract">Contract Info</a>
+      <a class="nav-link" href="#review-financials">Financials</a>
+      <a class="nav-link" href="#review-misc">Misc</a>
+      <a class="nav-link" href="#review-splits">Split Summary</a>
+      <a class="nav-link" href="#review-assignment">Assignment</a>
+      <a class="nav-link" href="#review-clins">CLINs</a>
+    </div>
+  </nav>
+
+  {# Scrollable Content #}
+  <div class="review-detail-content">
+
+    {# Page heading #}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div class="d-flex align-items-center gap-3">
+        <h1 class="h4 fw-bold mb-0">Contract Review: {{ contract.contract_number }}</h1>
+        {% if contract.reviewed %}
+          <span class="review-status-badge bg-success-subtle text-success">
+            Reviewed by {{ contract.reviewed_by }} on {{ contract.reviewed_on|date:"M d, Y" }}
+          </span>
+        {% else %}
+          <span class="review-status-badge bg-warning-subtle text-warning-emphasis">Not Reviewed</span>
+        {% endif %}
+      </div>
+      <a href="{% url 'contracts:contract_management' contract.id %}" class="btn btn-sm btn-outline-secondary">
+        ← Back to Contract
+      </a>
+    </div>
+
+    {# SECTION: IDIQ Info — conditional #}
+    {% if contract.idiq_contract %}
+    <section id="review-idiq" class="mb-4">
+      <div class="card review-section-card review-card-idiq">
+        <div class="card-header review-section-header d-flex justify-content-between align-items-center">
+          <span>IDIQ Contract Info</span>
+          <a href="{% url 'contracts:idiq_contract_detail' contract.idiq_contract.id %}"
+             class="btn btn-sm btn-outline-secondary" target="_blank">
+            View IDIQ Details →
+          </a>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <span class="review-field-label">IDIQ Contract Number</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.contract_number|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">TAB Number</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.tab_num|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Buyer</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.buyer.description|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Award Date</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.award_date|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Term Length</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.term_length|default:"N/A" }} months</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Option Length</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.option_length|default:"N/A" }} months</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Closed</span>
+              <span class="review-field-value d-block">{{ contract.idiq_contract.closed|yesno:"Yes,No,Unknown" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {# SECTION: Contract Info #}
+    <section id="review-contract" class="mb-4">
+      <div class="card review-section-card review-card-contract">
+        <div class="card-header review-section-header">Contract Information</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'contract_number')">
+                Contract Number
+              </button>
+              <span class="review-field-value d-block" id="contract-contract-number-value">{{ contract.contract_number|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'award_date')">
+                Award Date
+              </button>
+              <span class="review-field-value d-block" id="contract-award-date-value">{{ contract.award_date|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'due_date')">
+                Due Date
+              </button>
+              <span class="review-field-value d-block" id="contract-due-date-value">{{ contract.due_date|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'po_number')">
+                PO Number
+              </button>
+              <span class="review-field-value d-block" id="contract-po-number-value">{{ contract.po_number|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'tab_num')">
+                TAB Number
+              </button>
+              <span class="review-field-value d-block" id="contract-tab-num-value">{{ contract.tab_num|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'buyer')">
+                Buyer
+              </button>
+              <span class="review-field-value d-block" id="contract-buyer-value">{{ contract.buyer.description|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'contract_type')">
+                Contract Type
+              </button>
+              <span class="review-field-value d-block" id="contract-contract-type-value">{{ contract.contract_type.description|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'sales_class')">
+                Sales Class
+              </button>
+              <span class="review-field-value d-block" id="contract-sales-class-value">{{ contract.sales_class|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'solicitation_type')">
+                Solicitation Type
+              </button>
+              <span class="review-field-value d-block" id="contract-solicitation-type-value">{{ contract.solicitation_type.description|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'nist')">
+                NIST
+              </button>
+              <span class="review-field-value d-block" id="contract-nist-value">{{ contract.nist|yesno:"Yes,No,Unknown" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'status')">
+                Status
+              </button>
+              <span class="review-field-value d-block" id="contract-status-value">{{ contract.status.description|default:"N/A" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# SECTION: Financials #}
+    <section id="review-financials" class="mb-4">
+      <div class="card review-section-card review-card-financials">
+        <div class="card-header review-section-header">Financials</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'contract_value')">
+                Contract Value
+              </button>
+              <span class="review-field-value d-block" id="contract-contract-value-value">${{ contract.contract_value|floatformat:2|intcomma|default:"0.00" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'plan_gross')">
+                Plan Gross
+              </button>
+              <span class="review-field-value d-block" id="contract-plan-gross-value">${{ contract.plan_gross|floatformat:2|default:"0.00" }}</span>
+            </div>
+            <div class="col-md-3">
+              <button type="button" class="review-field-btn"
+                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'planned_split')">
+                Planned Split
+              </button>
+              <span class="review-field-value d-block" id="contract-planned-split-value">{{ contract.planned_split|default:"N/A" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# SECTION: Misc #}
+    <section id="review-misc" class="mb-4">
+      <div class="card review-section-card review-card-misc">
+        <div class="card-header review-section-header">Misc / Lifecycle</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <span class="review-field-label">Date Closed</span>
+              <span class="review-field-value d-block">{{ contract.date_closed|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Date Cancelled</span>
+              <span class="review-field-value d-block">{{ contract.date_canceled|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Cancellation Reason</span>
+              <span class="review-field-value d-block">{{ contract.canceled_reason|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Survey Date</span>
+              <span class="review-field-value d-block">{{ contract.survey_date|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Survey Type</span>
+              <span class="review-field-value d-block">{{ contract.survey_type|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-6">
+              <span class="review-field-label">Files URL</span>
+              <span class="review-field-value d-block">
+                {% if contract.files_url %}
+                  <a href="{{ contract.files_url }}" class="text-primary" target="_blank">{{ contract.files_url }}</a>
+                {% else %}
+                  N/A
+                {% endif %}
+              </span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Created By</span>
+              <span class="review-field-value d-block">{{ contract.created_by|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Created On</span>
+              <span class="review-field-value d-block">{{ contract.created_on|date:"M d, Y H:i"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Modified By</span>
+              <span class="review-field-value d-block">{{ contract.modified_by|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Modified On</span>
+              <span class="review-field-value d-block">{{ contract.modified_on|date:"M d, Y H:i"|default:"N/A" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# SECTION: Split Summary #}
+    <section id="review-splits" class="mb-4">
+      <div class="card review-section-card review-card-splits">
+        <div class="card-header review-section-header">Split Summary (All CLINs by Company)</div>
+        <div class="card-body p-0">
+          {% if clin_split_rollup %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th class="text-end">Total Split Value</th>
+                  <th class="text-end">Total Split Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in clin_split_rollup %}
+                <tr>
+                  <td>{{ row.company_name }}</td>
+                  <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="table-secondary">
+                  <th>Total</th>
+                  <td class="text-end fw-semibold">${{ contract.total_split_value|floatformat:2 }}</td>
+                  <td class="text-end fw-semibold">${{ contract.total_split_paid|floatformat:2 }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {% else %}
+          <div class="p-3">
+            <p class="text-body-secondary small mb-0">No splits recorded for this contract.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# SECTION: Assignment #}
+    <section id="review-assignment" class="mb-4">
+      <div class="card review-section-card review-card-assignment">
+        <div class="card-header review-section-header">Assignment &amp; Review Status</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <span class="review-field-label">Assigned User</span>
+              <span class="review-field-value d-block">{{ contract.assigned_user|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-3">
+              <span class="review-field-label">Assigned Date</span>
+              <span class="review-field-value d-block">{{ contract.assigned_date|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-2">
+              <span class="review-field-label">Reviewed</span>
+              <span class="review-field-value d-block">{{ contract.reviewed|yesno:"Yes,No,Unknown" }}</span>
+            </div>
+            <div class="col-md-2">
+              <span class="review-field-label">Reviewed By</span>
+              <span class="review-field-value d-block">{{ contract.reviewed_by|default:"N/A" }}</span>
+            </div>
+            <div class="col-md-2">
+              <span class="review-field-label">Reviewed On</span>
+              <span class="review-field-value d-block">{{ contract.reviewed_on|date:"M d, Y"|default:"N/A" }}</span>
+            </div>
+          </div>
+          {% if not contract.reviewed %}
+          <div class="mt-3 pt-3 border-top">
+            <form method="post" action="{% url 'contracts:mark_contract_reviewed' contract.id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm d-flex align-items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+                </svg>
+                Mark as Reviewed
+              </button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# SECTION: CLINs #}
+    <section id="review-clins" class="mb-4">
+      <div class="card review-section-card review-card-clins">
+        <div class="card-header review-section-header">Contract Line Items (CLINs)</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table review-clin-table mb-0">
+              <thead>
+                <tr>
+                  <th>Item No</th>
+                  <th>Supplier</th>
+                  <th>NSN</th>
+                  <th>Order Qty</th>
+                  <th>Due Date</th>
+                  <th class="text-end">Value</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for clin in clins %}
+                <tr>
+                  <td>{{ clin.item_number|default:"0000" }}</td>
+                  <td>{{ clin.supplier.name|default:"N/A" }}</td>
+                  <td>{{ clin.nsn.nsn_code|default:"N/A" }}</td>
+                  <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
+                  <td class="{% if clin.due_date_late %}review-late{% endif %}">
+                    {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
+                    {% if clin.due_date_late %}<span class="ms-1 small">(LATE)</span>{% endif %}
+                  </td>
+                  <td class="text-end">${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
+                  <td>
+                    <a href="{% url 'contracts:clin_detail' clin.id %}"
+                       class="btn btn-sm btn-outline-primary" target="_blank">
+                      View CLIN ↗
+                    </a>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="7" class="text-center text-body-secondary py-4">No CLINs found for this contract.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>{# end .review-detail-content #}
+</div>{# end .clin-detail-layout #}
+
+{% endblock content %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    new bootstrap.ScrollSpy(document.body, {
+        target: '#review-page-nav',
+        smoothScroll: true,
+        offset: 80
+    });
+});
+</script>
+{% endblock extra_scripts %}

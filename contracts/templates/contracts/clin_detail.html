@@ -1,31 +1,7 @@
 {% extends "contracts/contract_base.html" %}
 {% load humanize static %}
 
-{% block extra_head %}
-{{ block.super }}
-<style>
-    .section-header {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #0f1216;
-        background-color: #f8f9fa;
-        margin-bottom: 1rem;
-        padding: 0.5rem 0.75rem;
-        border-left: 3px solid #004eb3;
-        border-bottom: 1px solid #e5e7eb;
-        font-family: inherit;
-    }
-
-    .form-label {
-        text-transform: capitalize;
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #4b5563;
-        display: block;
-        font-family: inherit;
-    }
-</style>
-{% endblock extra_head %}
+{% block body_class %}clin-detail-page{% endblock %}
 
 {% block content %}
 {% include "transactions/transaction_modal.html" %}
@@ -56,405 +32,440 @@ window.onTransactionSaved = function(data) {
 };
 </script>
 
-<div class="container mx-auto px-4 py-8">
-    <div class="row-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">
-            CLIN {{ clin.clin_po_num }} — Contract #{{ clin.contract.contract_number }}
-        </h1>
-        <div class="row">
-            <a href="{% url 'contracts:contract_management' clin.contract.id %}"
-               class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg row">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                </svg>
-                Back to Contract
+<div class="clin-detail-layout">
+
+    {# Fixed Sidebar #}
+    <nav id="clin-page-nav" class="clin-detail-sidebar">
+        <p class="clin-sidebar-label">Quick Jump</p>
+        <div class="nav flex-column nav-pills">
+            <a class="nav-link active" href="#clin-identification">Identification</a>
+            <a class="nav-link" href="#clin-item-details">Item Details</a>
+            <a class="nav-link" href="#clin-supplier">Supplier</a>
+            <a class="nav-link" href="#shipping-information">Shipping</a>
+            <a class="nav-link" href="#clin-splits">CLIN Splits</a>
+            <a class="nav-link" href="#clin-financials">Financials</a>
+            <a class="nav-link" href="#clin-history">Change History</a>
+        </div>
+    </nav>
+
+    {# Scrollable Content #}
+    <div class="clin-detail-content">
+
+        {# Page heading #}
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h4 fw-bold mb-0">
+                CLIN {{ clin.clin_po_num }} — Contract #{{ clin.contract.contract_number }}
+            </h1>
+            <a href="{% url 'contracts:contract_management' clin.contract.id %}" class="btn btn-sm btn-outline-secondary">
+                ← Back to Contract
             </a>
         </div>
-    </div>
 
-    <div class="card card-padded">
-
-        {# Section 1 — CLIN Identification #}
-        <div>
-            <h2 class="section-header">CLIN IDENTIFICATION</h2>
-
-            <div class="d-flex flex-nowrap gap-3 mb-3">
-                <div style="width:15%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'item_number')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            ITEM NUMBER
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-item-number-value">{{ clin.item_number|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:15%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'item_type')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            ITEM TYPE
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-item-type-value">{{ clin.get_item_type_display|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:35%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'clin_po_num')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            CLIN PO NUMBER
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-clin-po-num-value">{{ clin.clin_po_num|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:35%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'tab_num')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            TAB NUMBER
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-tab-num-value">{{ clin.tab_num|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="d-flex flex-nowrap gap-3 mb-3">
-                <div style="width:25%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'ia')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            IA
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-ia-value">{{ clin.get_ia_display|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:25%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'fob')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            FOB
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-fob-value">{{ clin.get_fob_display|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {# Section 2 — Item Details (CLIN / Gov Side) #}
-        <div class="mt-4">
-            <h2 class="section-header">ITEM DETAILS (CLIN)</h2>
-
-            <div class="d-flex flex-nowrap gap-3 mb-3">
-                <div style="width:66%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'nsn')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            NSN
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-nsn-value">{% if clin.nsn %}{{ clin.nsn.nsn_code }} — {{ clin.nsn.description }}{% else %}N/A{% endif %}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:34%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'due_date')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            CLIN DUE DATE
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-due-date-value" class="{% if clin.due_date_late %}text-red-600{% endif %}">{{ clin.due_date|date:"m/d/Y"|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="d-flex flex-nowrap gap-3 mb-3">
-                <div style="width:15%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'order_qty')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            Quantity
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-order-qty-value">{{ clin.order_qty|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:10%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'uom')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            UOM
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-uom-value">{{ clin.uom|default:"EA" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:35%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'unit_price')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            Unit Price
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-unit-price-value">${{ clin.unit_price|floatformat:4|default:"0.0000" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:40%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'item_value')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            Total Value
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-item-value-value">${{ clin.item_value|floatformat:4|intcomma|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {# Section 3 — Order Information (Supplier Side) #}
-        <div class="mt-4">
-            <h2 class="section-header">ORDER INFORMATION (SUPPLIER)</h2>
-
-            <div class="d-flex flex-nowrap gap-3 mb-3">
-                <div style="width:66%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'supplier')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            SUPPLIER
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-supplier-value">{% if clin.supplier %}<a href="{% url 'contracts:supplier_detail' clin.supplier.id %}" class="text-blue-600 hover:text-blue-800">{{ clin.supplier.name }}</a> <span class="text-gray-500 text-sm">({{ clin.supplier.cage_code|default:"" }})</span>{% else %}N/A{% endif %}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:34%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'supplier_due_date')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            SUPPLIER DUE DATE
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-supplier-due-date-value" class="{% if clin.supplier_due_date_late %}text-red-600{% endif %}">{{ clin.supplier_due_date|date:"m/d/Y"|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="d-flex flex-nowrap gap-3 mb-3">
-                <div style="width:33%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'special_payment_terms')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            Special Payment Terms
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-special-payment-terms-value">{{ clin.special_payment_terms|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:33%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'price_per_unit')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            Price Per Unit
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-price-per-unit-value">${{ clin.price_per_unit|floatformat:2|default:"0.00" }}</span>
-                        </p>
-                    </div>
-                </div>
-                <div style="width:34%">
-                    <div class="form-group">
-                        <button type="button"
-                            onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'quote_value')"
-                            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                            Quote Total
-                        </button>
-                        <p class="font-medium text-sm mt-1">
-                            <span id="clin-quote-value-value">${{ clin.quote_value|floatformat:2|intcomma|default:"N/A" }}</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="mb-8 mt-6" id="shipping-information">
-            {% include "contracts/partials/clin_shipments.html" with mode="form" %}
-        </div>
-
-        <div class="mb-8 mt-6" id="clin-splits-section">
-            {% csrf_token %}
-            <div class="section" id="clin-splits-root"
-                 data-clin-id="{{ clin.id }}"
-                 data-add-url="{% url 'contracts:add_clin_split' clin.id %}"
-                 data-update-template="{% url 'contracts:update_clin_split' 12345 %}"
-                 data-delete-template="{% url 'contracts:delete_clin_split' 12345 %}">
-                <h2 class="section-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <span>CLIN splits</span>
-                    <button type="button" id="clin-splits-add" class="btn btn-sm btn-outline-secondary">Add split</button>
-                </h2>
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped mb-0">
-                        <thead>
-                            <tr>
-                                <th scope="col">Company</th>
-                                <th scope="col" class="text-end">Split value</th>
-                                <th scope="col" class="text-end">Split paid</th>
-                                <th scope="col" class="text-center" style="width:9rem">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clin-splits-tbody">
-                            {% for s in clin_splits %}
-                            <tr class="clin-split-data-row" data-id="{{ s.id }}"
-                                data-value="{% if s.split_value is not None %}{{ s.split_value }}{% endif %}"
-                                data-paid="{% if s.split_paid is not None %}{{ s.split_paid }}{% endif %}">
-                                <td class="clin-split-cell-company">{{ s.company_name }}</td>
-                                <td class="text-end clin-split-cell-value">{% if s.split_value is not None %}${{ s.split_value|floatformat:2 }}{% else %}—{% endif %}</td>
-                                <td class="text-end clin-split-cell-paid">{% if s.split_paid is not None %}${{ s.split_paid|floatformat:2 }}{% else %}—{% endif %}</td>
-                                <td class="text-center text-nowrap">
-                                    <button type="button" class="btn btn-sm btn-outline-primary clin-split-edit">Edit</button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger ms-1 clin-split-delete" data-id="{{ s.id }}">Delete</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot>
-                            <tr class="table-secondary">
-                                <th scope="row">Total</th>
-                                <td class="text-end fw-semibold" id="clin-splits-foot-value">0.00</td>
-                                <td class="text-end fw-semibold" id="clin-splits-foot-paid">0.00</td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div>
-            <h2 class="section-header cursor-pointer" id="financial-details-toggle">
-                Financial Details <span class="text-sm text-gray-500">(Click to expand)</span>
-            </h2>
-            <div class="hidden" id="financial-details-section">
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'paid_amount')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                Paid Amount
-                            </button>
-                            <p class="font-medium text-sm mt-1">
-                                <span id="clin-paid-amount-value">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</span>
-                            </p>
+        {# SECTION: Identification #}
+        <section id="clin-identification" class="mb-4">
+            <div class="card clin-section-card clin-card-identification">
+                <div class="card-header clin-section-header">CLIN Identification</div>
+                <div class="card-body">
+                    <div class="d-flex flex-nowrap gap-3 mb-3">
+                        <div style="width:15%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'item_number')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    ITEM NUMBER
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-item-number-value">{{ clin.item_number|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:15%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'item_type')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    ITEM TYPE
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-item-type-value">{{ clin.get_item_type_display|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:35%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'clin_po_num')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    CLIN PO NUMBER
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-clin-po-num-value">{{ clin.clin_po_num|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:35%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'tab_num')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    TAB NUMBER
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-tab-num-value">{{ clin.tab_num|default:"N/A" }}</span>
+                                </p>
+                            </div>
                         </div>
                     </div>
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'paid_date')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                Paid Date
-                            </button>
-                            <p class="font-medium text-sm mt-1">
-                                <span id="clin-paid-date-value">{{ clin.paid_date|date:"m/d/Y"|default:"N/A" }}</span>
-                            </p>
+
+                    <div class="d-flex flex-nowrap gap-3 mb-3">
+                        <div style="width:25%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'ia')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    IA
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-ia-value">{{ clin.get_ia_display|default:"N/A" }}</span>
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_payment')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                <span class="text-uppercase">WAWF</span> Payment
-                            </button>
-                            <p class="font-medium text-sm mt-1">
-                                <span id="clin-wawf-payment-value">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_recieved')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                <span class="text-uppercase">WAWF</span> Received
-                            </button>
-                            <p class="font-medium text-sm mt-1">
-                                <span id="clin-wawf-recieved-value">{{ clin.wawf_recieved|date:"m/d/Y"|default:"N/A" }}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_invoice')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                <span class="text-uppercase">WAWF</span> Invoice
-                            </button>
-                            <p class="font-medium text-sm mt-1">
-                                <span id="clin-wawf-invoice-value">{{ clin.wawf_invoice|default:"N/A" }}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="md:col-span-4">
-                        <div class="form-group">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'special_payment_terms_paid')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                Special Payment Terms Paid
-                            </button>
-                            <p class="font-medium text-sm mt-1">
-                                <span id="clin-special-payment-terms-paid-value">{% if clin.special_payment_terms_paid %}Paid{% else %}Unpaid{% endif %}</span>
-                            </p>
+                        <div style="width:25%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'fob')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    FOB
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-fob-value">{{ clin.get_fob_display|default:"N/A" }}</span>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="mt-6">
-            <h2 class="section-header">
-                Change History
-            </h2>
-            <div id="clin-transaction-history">
+        {# SECTION: Item Details (CLIN / Gov Side) #}
+        <section id="clin-item-details" class="mb-4">
+            <div class="card clin-section-card clin-card-item-details">
+                <div class="card-header clin-section-header">Item Details (CLIN)</div>
+                <div class="card-body">
+                    <div class="d-flex flex-nowrap gap-3 mb-3">
+                        <div style="width:66%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'nsn')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    NSN
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-nsn-value">{% if clin.nsn %}{{ clin.nsn.nsn_code }} — {{ clin.nsn.description }}{% else %}N/A{% endif %}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:34%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'due_date')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    CLIN DUE DATE
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-due-date-value" class="{% if clin.due_date_late %}text-red-600{% endif %}">{{ clin.due_date|date:"m/d/Y"|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-nowrap gap-3 mb-3">
+                        <div style="width:15%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'order_qty')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Quantity
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-order-qty-value">{{ clin.order_qty|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:10%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'uom')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    UOM
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-uom-value">{{ clin.uom|default:"EA" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:35%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'unit_price')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Unit Price
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-unit-price-value">${{ clin.unit_price|floatformat:4|default:"0.0000" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:40%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'item_value')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Total Value
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-item-value-value">${{ clin.item_value|floatformat:4|intcomma|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
+        </section>
+
+        {# SECTION: Order Information (Supplier Side) #}
+        <section id="clin-supplier" class="mb-4">
+            <div class="card clin-section-card clin-card-supplier">
+                <div class="card-header clin-section-header">Order Information (Supplier)</div>
+                <div class="card-body">
+                    <div class="d-flex flex-nowrap gap-3 mb-3">
+                        <div style="width:66%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'supplier')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    SUPPLIER
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-supplier-value">{% if clin.supplier %}<a href="{% url 'contracts:supplier_detail' clin.supplier.id %}" class="text-blue-600 hover:text-blue-800">{{ clin.supplier.name }}</a> <span class="text-gray-500 text-sm">({{ clin.supplier.cage_code|default:"" }})</span>{% else %}N/A{% endif %}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:34%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'supplier_due_date')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    SUPPLIER DUE DATE
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-supplier-due-date-value" class="{% if clin.supplier_due_date_late %}text-red-600{% endif %}">{{ clin.supplier_due_date|date:"m/d/Y"|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-nowrap gap-3 mb-3">
+                        <div style="width:33%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'special_payment_terms')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Special Payment Terms
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-special-payment-terms-value">{{ clin.special_payment_terms|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:33%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'price_per_unit')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Price Per Unit
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-price-per-unit-value">${{ clin.price_per_unit|floatformat:2|default:"0.00" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="width:34%">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'quote_value')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Quote Total
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-quote-value-value">${{ clin.quote_value|floatformat:2|intcomma|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {# SECTION: Shipping — id="shipping-information" preserved for the contract management page modal "View Full Detail" link #}
+        <section id="shipping-information" class="mb-4">
+            <div class="card clin-section-card clin-card-shipping">
+                <div class="card-header clin-section-header">Shipping</div>
+                <div class="card-body p-0">
+                    {% include "contracts/partials/clin_shipments.html" with mode="form" %}
+                </div>
+            </div>
+        </section>
+
+        {# SECTION: CLIN Splits #}
+        <section id="clin-splits" class="mb-4">
+            <div class="card clin-section-card clin-card-splits">
+                <div class="card-header clin-section-header d-flex justify-content-between align-items-center">
+                    <span>CLIN Splits</span>
+                    <button type="button" id="clin-splits-add" class="btn btn-sm btn-outline-secondary">Add Split</button>
+                </div>
+                <div class="card-body p-0">
+                    {% csrf_token %}
+                    <div id="clin-splits-root"
+                         data-clin-id="{{ clin.id }}"
+                         data-add-url="{% url 'contracts:add_clin_split' clin.id %}"
+                         data-update-template="{% url 'contracts:update_clin_split' 12345 %}"
+                         data-delete-template="{% url 'contracts:delete_clin_split' 12345 %}">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Company</th>
+                                        <th scope="col" class="text-end">Split value</th>
+                                        <th scope="col" class="text-end">Split paid</th>
+                                        <th scope="col" class="text-center" style="width:9rem">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="clin-splits-tbody">
+                                    {% for s in clin_splits %}
+                                    <tr class="clin-split-data-row" data-id="{{ s.id }}"
+                                        data-value="{% if s.split_value is not None %}{{ s.split_value }}{% endif %}"
+                                        data-paid="{% if s.split_paid is not None %}{{ s.split_paid }}{% endif %}">
+                                        <td class="clin-split-cell-company">{{ s.company_name }}</td>
+                                        <td class="text-end clin-split-cell-value">{% if s.split_value is not None %}${{ s.split_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                                        <td class="text-end clin-split-cell-paid">{% if s.split_paid is not None %}${{ s.split_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                                        <td class="text-center text-nowrap">
+                                            <button type="button" class="btn btn-sm btn-outline-primary clin-split-edit">Edit</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger ms-1 clin-split-delete" data-id="{{ s.id }}">Delete</button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary">
+                                        <th scope="row">Total</th>
+                                        <td class="text-end fw-semibold" id="clin-splits-foot-value">0.00</td>
+                                        <td class="text-end fw-semibold" id="clin-splits-foot-paid">0.00</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {# SECTION: Financials — always visible (former collapsible toggle removed) #}
+        <section id="clin-financials" class="mb-4">
+            <div class="card clin-section-card clin-card-financials">
+                <div class="card-header clin-section-header">Financial Details</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'paid_amount')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Paid Amount
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-paid-amount-value">${{ clin.paid_amount|floatformat:2|intcomma|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'paid_date')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Paid Date
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-paid-date-value">{{ clin.paid_date|date:"m/d/Y"|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_payment')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    <span class="text-uppercase">WAWF</span> Payment
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-wawf-payment-value">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_recieved')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    <span class="text-uppercase">WAWF</span> Received
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-wawf-recieved-value">{{ clin.wawf_recieved|date:"m/d/Y"|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_invoice')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    <span class="text-uppercase">WAWF</span> Invoice
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-wawf-invoice-value">{{ clin.wawf_invoice|default:"N/A" }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <button type="button"
+                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'special_payment_terms_paid')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                    Special Payment Terms Paid
+                                </button>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-special-payment-terms-paid-value">{% if clin.special_payment_terms_paid %}Paid{% else %}Unpaid{% endif %}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {# SECTION: Change History #}
+        <section id="clin-history" class="mb-4">
+            <div class="card clin-section-card clin-card-history">
+                <div class="card-header clin-section-header">Change History</div>
+                <div class="card-body p-0">
+                    <div id="clin-transaction-history"></div>
+                </div>
+            </div>
+        </section>
+
+    </div>{# end .clin-detail-content #}
+</div>{# end .clin-detail-layout #}
 {% endblock content %}
 
 {% block extra_scripts %}
@@ -462,36 +473,24 @@ window.onTransactionSaved = function(data) {
 <script src="{% static 'contracts/js/contract_splits.js' %}?v={% now 'U' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var financialToggle = document.getElementById('financial-details-toggle');
-    var financialSection = document.getElementById('financial-details-section');
-    if (financialToggle && financialSection) {
-        financialToggle.addEventListener('click', function() {
-            financialSection.classList.toggle('hidden');
-            var isHidden = financialSection.classList.contains('hidden');
-            var span = financialToggle.querySelector('span');
-            if (span) {
-                span.textContent = isHidden ? '(Click to expand)' : '(Click to collapse)';
-            }
-        });
-    }
-
-    document.querySelectorAll('.toggle-shipments').forEach(function(button) {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            var shipmentsTable = button.closest('.section') && button.closest('.section').querySelector('#shipments-table');
-            if (shipmentsTable) {
-                shipmentsTable.classList.toggle('hidden');
-                button.textContent = shipmentsTable.classList.contains('hidden') ? 'Show Shipments' : 'Hide Shipments';
-            }
-        });
-    });
-
     fetch('/transactions/list/' + window.clinContentTypeId + '/' + window.clinId + '/')
         .then(function(r) { return r.text(); })
         .then(function(html) {
             var el = document.getElementById('clin-transaction-history');
             if (el) el.innerHTML = html;
         });
+
+    var scrollSpy = new bootstrap.ScrollSpy(document.body, {
+        target: '#clin-page-nav',
+        smoothScroll: true,
+        rootMargin: '0px 0px -70%'
+    });
+
+    var historyEl = document.getElementById('clin-transaction-history');
+    if (historyEl && 'MutationObserver' in window) {
+        new MutationObserver(function() { scrollSpy.refresh(); })
+            .observe(historyEl, { childList: true, subtree: true });
+    }
 });
 </script>
 {% endblock extra_scripts %}

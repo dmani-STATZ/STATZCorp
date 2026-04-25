@@ -586,14 +586,18 @@ class ContractReviewView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contract = self.get_object()
-        
+
+        from django.contrib.contenttypes.models import ContentType as DjangoContentType
+        contract_ct = DjangoContentType.objects.get_for_model(Contract)
+        context['contract_content_type_id'] = contract_ct.id
+
         # Get all CLINs for this contract with related data
         context['clins'] = contract.clin_set.all().select_related(
             'clin_type',
             'supplier',
             'nsn'
         ).order_by('clin_type__description')
-        
+
         context['total_split_value'] = contract.total_split_value
         context['total_split_paid'] = contract.total_split_paid
         context['clin_split_rollup'] = list(
