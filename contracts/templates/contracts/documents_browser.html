@@ -2,6 +2,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        })();
+        document.documentElement.className = 'no-fouc';
+        window.onload = function() { document.documentElement.className = ''; }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
@@ -20,7 +28,6 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #fff;
             font-size: 14px;
         }
 
@@ -28,6 +35,37 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+        }
+
+        /* ── Theme overrides ── */
+        [data-bs-theme="light"] .docs-header { background: #ffffff; border-color: #e9ecef; }
+        [data-bs-theme="light"] .docs-breadcrumb { background: #f8f9fa; border-color: #e9ecef; }
+        [data-bs-theme="light"] .docs-toolbar { background: #ffffff; border-color: #e9ecef; }
+        [data-bs-theme="light"] .docs-list-header { background: #f8f9fa; border-color: #e9ecef; }
+        [data-bs-theme="light"] .docs-file-list li { border-color: #f1f3f5; }
+        [data-bs-theme="light"] .docs-file-list li:hover { background: #f8f9fa; }
+
+        [data-bs-theme="dark"] body { background: #212529; color: #dee2e6; }
+        [data-bs-theme="dark"] .docs-header { background: #212529; border-color: #373b3e; }
+        [data-bs-theme="dark"] .docs-breadcrumb { background: #2b2f33; border-color: #373b3e; }
+        [data-bs-theme="dark"] .docs-toolbar { background: #212529; border-color: #373b3e; }
+        [data-bs-theme="dark"] .docs-toolbar .docs-search {
+            background: #2b2f33; border-color: #495057; color: #dee2e6;
+        }
+        [data-bs-theme="dark"] .docs-toolbar .docs-search::placeholder { color: #6c757d; }
+        [data-bs-theme="dark"] .docs-list-header { background: #2b2f33; border-color: #373b3e; color: #adb5bd; }
+        [data-bs-theme="dark"] .docs-file-list li { border-color: #2b2f33; color: #dee2e6; }
+        [data-bs-theme="dark"] .docs-file-list li:hover { background: #2b2f33; }
+        [data-bs-theme="dark"] .docs-file-list li.folder { color: var(--company-primary, #6ea8fe); }
+        [data-bs-theme="dark"] .docs-file-area { background: #212529; }
+        [data-bs-theme="dark"] .docs-banner.warning {
+            background: #332d00; color: #ffc107; border-color: #665800;
+        }
+        [data-bs-theme="dark"] .docs-banner.error {
+            background: #2c0b0e; color: #ea868f; border-color: #842029;
+        }
+        [data-bs-theme="dark"] .docs-upload-progress {
+            background: #2b2f33; border-color: #373b3e;
         }
 
         /* ── Header ── */
@@ -90,13 +128,13 @@
             border-bottom: 1px solid transparent;
         }
 
-        .docs-banner.warning {
+        [data-bs-theme="light"] .docs-banner.warning {
             background: #fff3cd;
             color: #856404;
             border-bottom-color: #ffeaa7;
         }
 
-        .docs-banner.error {
+        [data-bs-theme="light"] .docs-banner.error {
             background: #f8d7da;
             color: #721c24;
             border-bottom-color: #f5c6cb;
@@ -126,7 +164,6 @@
         /* ── Breadcrumb ── */
         .docs-breadcrumb {
             padding: 8px 16px;
-            background: #f8f9fa;
             border-bottom: 1px solid #e9ecef;
             flex-shrink: 0;
             overflow: hidden;
@@ -183,7 +220,6 @@
             padding: 8px 16px;
             border-bottom: 1px solid #e9ecef;
             flex-shrink: 0;
-            background: #fff;
             align-items: center;
         }
 
@@ -225,7 +261,6 @@
         /* ── Upload progress ── */
         .docs-upload-progress {
             padding: 8px 16px;
-            background: #f8f9fa;
             border-bottom: 1px solid #e9ecef;
             flex-shrink: 0;
         }
@@ -263,7 +298,6 @@
             display: grid;
             grid-template-columns: 1fr 80px 100px 140px;
             padding: 6px 16px;
-            background: #f8f9fa;
             font-size: 11px;
             text-transform: uppercase;
             color: #6c757d;
@@ -296,10 +330,6 @@
             cursor: pointer;
             border-bottom: 1px solid #f1f3f5;
             align-items: center;
-        }
-
-        .docs-file-list li:hover {
-            background: #f8f9fa;
         }
 
         .docs-file-list li.folder .col-name {

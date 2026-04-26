@@ -1451,8 +1451,9 @@ main {
     box-shadow: 0 2px 5px hsla(0, 0%, 0%, 0.1);
     color: rgb(255, 255, 255);
     padding: 2rem;
-    height: 430px;
-    width: 675px;
+    height: auto;        /* was 430px — kills the clipping too */
+    width: 100%;         /* was 675px — let the parent control width */
+    max-width: 100%;     /* insurance */
     border-radius: 0.5rem;
     border: 2px solid rgb(46, 46, 46);
 }
@@ -1466,7 +1467,6 @@ main {
     justify-content: center;
     padding: 0.5rem 1rem;
     margin: 1rem auto;
-    width: 50%;
     border-radius: 0.375rem;
     font-weight: 500;
     transition: background-color 0.2s;
