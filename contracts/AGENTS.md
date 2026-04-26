@@ -169,6 +169,14 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - The Financials section is always visible. Do not reintroduce `#financial-details-toggle` / `#financial-details-section` collapse logic. The Tailwind responsive grid (`md:grid-cols-12` / `md:col-span-4`) is replaced with Bootstrap `row g-3` / `col-md-4`.
 - Bootstrap ScrollSpy is initialised in JS (`new bootstrap.ScrollSpy(document.body, { target: '#clin-page-nav', smoothScroll: true })`), not via `data-bs-spy` attributes. A `MutationObserver` on `#clin-transaction-history` calls `scrollSpy.refresh()` after the AJAX history fetch so newly inserted content is tracked.
 
+### SharePoint path resolution
+- `contracts/services/sharepoint_paths.py` — strict validation (`is_modern_sharepoint_path`), pattern construction (`build_pattern_path` handles regular vs IDIQ delivery orders via `contract.idiq_contract_id`), and structured resolution (`resolve_contract_folder_path` returns `{path, source, legacy_detected}`). Always use `join_path()` for path concatenation; never glue paths with `+` or f-strings.
+- `contracts/services/sharepoint_service.py` — Graph wrappers (`list_folder_contents`, `fallback_to_root`, `normalize_legacy_path`). `list_folder_contents` raises `SharePointNotFound` on 404; the views catch it and walk up parents, ultimately falling through to `get_root_fallback_path(contract)`.
+- `contracts/views/documents_views.py` — `contract_details_api` and `_list_sharepoint_files` both surface `legacy_detected`; `_list_sharepoint_files` also surfaces `fell_back_to_root` when the resolved path 404s.
+- `contracts/templates/contracts/documents_browser.html` — `legacyPathDetected` JS flag persists across the two-API-call init flow; both warning banners (`legacy_detected`, `fell_back_to_root`) are appended to `#alert-banner`. Saving the path via `setCurrentPath()` clears the legacy flag.
+- `SHAREPOINT_PATH_PREFIX` setting (read via `getattr(settings, ..., DEFAULT_DOCUMENTS_PATH)`) defines the global canonical root. Per-company override is `Company.sharepoint_documents_path` and takes precedence in `get_contract_documents_root()`.
+- When the path naming convention changes, update `build_pattern_path()` only — validation is prefix-based and stays the same.
+
 ### Notes popup window
 - `contracts/views/note_views.py` — `notes_popup`, `notes_popup_tab`, `note_detail_json` views
 - `contracts/templates/contracts/notes_popup_base.html` — bare base template (no nav chrome)

@@ -8,5 +8,11 @@
     --company-primary:   #004eb3;
     --company-secondary: #e5e7eb;
     --header-height:     48px;
+
+    /* Monospace stack for codes, identifiers, and numeric data on the NSN
+       detail page. Falls back through common system mono fonts before
+       Bootstrap's generic monospace. Defined here so other code-heavy pages
+       can adopt the same font without re-rolling the stack. */
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 

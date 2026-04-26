@@ -14,6 +14,10 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 from STATZWeb.decorators import conditional_login_required
 from contracts.models import Contract
 from contracts.services import sharepoint_service
+from contracts.services.sharepoint_paths import (
+    get_root_fallback_path,
+    resolve_contract_folder_path,
+)
 from contracts.services.sharepoint_service import SharePointError, SharePointNotFound
 
 logger = logging.getLogger("contracts.documents_views")
@@ -58,10 +62,8 @@ def documents_browser_view(request):
         )
 
     contract = _contract_for_request(request, contract_pk)
-    initial_path = sharepoint_service.build_default_path(
-        contract,
-        do_number=request.GET.get("do_number"),
-    )
+    resolution = resolve_contract_folder_path(contract)
+    initial_path = resolution["path"]
     browser_config = {
         "contractId": contract.id,
         "contractNumber": contract.contract_number or "",
@@ -95,16 +97,15 @@ def documents_browser_view(request):
 def contract_details_api(request, contract_id):
     """Return contract details for the standalone documents browser."""
     contract = _contract_for_request(request, contract_id)
-    default_path = sharepoint_service.build_default_path(
-        contract,
-        do_number=request.GET.get("do_number"),
-    )
+    resolution = resolve_contract_folder_path(contract)
     return JsonResponse(
         {
             "success": True,
             "contract_id": contract.id,
             "contract_number": contract.contract_number or "",
-            "default_folder_path": default_path,
+            "default_folder_path": resolution["path"],
+            "path_source": resolution["source"],
+            "legacy_detected": resolution["legacy_detected"],
         }
     )
 
@@ -124,20 +125,35 @@ def _list_sharepoint_files(request) -> JsonResponse:
         return JsonResponse({"success": False, "error": "contract_id is required."}, status=400)
 
     contract = _contract_for_request(request, contract_pk)
-    requested_path = sharepoint_service.normalize_legacy_path(
-        request.GET.get("folder_path") or sharepoint_service.build_default_path(contract),
-        contract=contract,
-    )
+    raw_folder_path = (request.GET.get("folder_path") or "").strip()
+
+    legacy_detected = False
+    if raw_folder_path:
+        # Caller-supplied path (breadcrumb navigation, search, etc.) — translate
+        # any pasted SharePoint URL/UNC into a drive-relative form, but trust it.
+        requested_path = sharepoint_service.normalize_legacy_path(
+            raw_folder_path, contract=contract
+        )
+    else:
+        # No path supplied — resolve from the contract using strict validation.
+        resolution = resolve_contract_folder_path(contract)
+        requested_path = resolution["path"]
+        legacy_detected = resolution["legacy_detected"]
 
     try:
         data = sharepoint_service.list_folder_contents(requested_path)
         data["success"] = True
         data["requestedPath"] = requested_path
+        data["legacy_detected"] = legacy_detected
+        data["fell_back_to_root"] = False
         return JsonResponse(data)
     except (SharePointNotFound, SharePointError) as error:
         # If the path doesn't exist or is invalid (400/404), try to find a valid parent
         if isinstance(error, SharePointNotFound) or (isinstance(error, SharePointError) and error.status_code in (400, 404)):
-            fallback_path = sharepoint_service.fallback_to_root(requested_path)
+            fallback_path = (
+                sharepoint_service.fallback_to_root(requested_path)
+                or get_root_fallback_path(contract)
+            )
             try:
                 data = sharepoint_service.list_folder_contents(fallback_path)
             except SharePointError as fallback_error:
@@ -147,6 +163,8 @@ def _list_sharepoint_files(request) -> JsonResponse:
                     "success": True,
                     "requestedPath": requested_path,
                     "fallbackPath": fallback_path,
+                    "legacy_detected": legacy_detected,
+                    "fell_back_to_root": True,
                     "error": (
                         "The requested SharePoint folder was not found. "
                         "Showing the nearest available parent folder."

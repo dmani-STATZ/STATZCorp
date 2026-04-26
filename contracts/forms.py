@@ -89,7 +89,11 @@ class ActiveUserModelChoiceField(forms.ModelChoiceField):
 class NsnForm(BaseModelForm):
     class Meta:
         model = Nsn
-        fields = ['nsn_code', 'description', 'part_number', 'revision', 'notes', 'directory_url']
+        fields = [
+            'nsn_code', 'description', 'part_number', 'revision', 'notes',
+            'unit_weight', 'unit_length', 'unit_width', 'unit_height',
+            'packaging_notes', 'directory_url',
+        ]
         widgets = {
             'nsn_code': forms.TextInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
@@ -111,6 +115,31 @@ class NsnForm(BaseModelForm):
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
                 'rows': 4,
                 'placeholder': 'Enter Notes'
+            }),
+            'unit_weight': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Unit Weight (lb)',
+                'step': '0.001',
+            }),
+            'unit_length': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Unit Length (in)',
+                'step': '0.01',
+            }),
+            'unit_width': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Unit Width (in)',
+                'step': '0.01',
+            }),
+            'unit_height': forms.NumberInput(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'placeholder': 'Enter Unit Height (in)',
+                'step': '0.01',
+            }),
+            'packaging_notes': forms.Textarea(attrs={
+                'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
+                'rows': 4,
+                'placeholder': 'Hazmat, crating, ORM-D, or other special handling notes',
             }),
             'directory_url': forms.URLInput(attrs={
                 'class': 'w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',

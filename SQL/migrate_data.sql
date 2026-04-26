@@ -419,14 +419,19 @@ BEGIN TRY
     EXEC #EnsureIdentityInsertOff;  -- Ensure IDENTITY_INSERT is OFF before setting it ON
     SET IDENTITY_INSERT [dbo].[contracts_nsn] ON;
     
-    INSERT INTO contracts_nsn (id, nsn_code, description, part_number, revision, notes, directory_url, created_on, modified_on, created_by_id, modified_by_id)
-    SELECT 
+    INSERT INTO contracts_nsn (id, nsn_code, description, part_number, revision, notes, unit_weight, unit_length, unit_width, unit_height, packaging_notes, directory_url, created_on, modified_on, created_by_id, modified_by_id)
+    SELECT
         ID AS id,
         NSN AS nsn_code,
         [Item Description] AS description,
         NULL AS part_number,
         NULL AS revision,
         Note AS notes,
+        NULL AS unit_weight,
+        NULL AS unit_length,
+        NULL AS unit_width,
+        NULL AS unit_height,
+        '' AS packaging_notes,
         Directory AS directory_url,
         ISNULL(CreatedOn, SYSDATETIME()) AS created_on,  -- Set to current datetime if null
         ISNULL(ModifiedOn, SYSDATETIME()) AS modified_on,  -- Set to current datetime if null

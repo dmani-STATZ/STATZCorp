@@ -37,6 +37,26 @@ class Nsn(AuditModel):
     part_number = models.CharField(max_length=25, null=True, blank=True)
     revision = models.CharField(max_length=25, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
+    unit_weight = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True,
+        help_text="Unit weight in pounds."
+    )
+    unit_length = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Unit length in inches."
+    )
+    unit_width = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Unit width in inches."
+    )
+    unit_height = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Unit height in inches."
+    )
+    packaging_notes = models.TextField(
+        blank=True, default="",
+        help_text="Hazmat, crating, ORM-D, or other special handling notes."
+    )
     directory_url = models.CharField(max_length=200, null=True, blank=True)
     suppliers = models.ManyToManyField(
         Supplier,

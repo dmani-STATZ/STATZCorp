@@ -98,6 +98,14 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 ### New QueueClin field from PDF/CSV ingestion
 `pdf_parser.py` or `upload_csv` → `QueueClin` model/migration → `start_processing` `ProcessClin.objects.create()` call — field must be explicitly copied or it is silently lost at queue-to-processing transition.
 
+### New QueueContract field from PDF ingestion
+`pdf_parser.py` (regex constants + `_extract_*` function + `AwardParseResult`
+dataclass field + `ingest_parsed_award` `common_contract` dict) → `QueueContract`
+model/migration → `start_processing` in `processing_views.py` (must explicitly
+copy the field to `ProcessContract.objects.create(...)` or it is silently lost
+at queue-to-processing transition) → `ProcessContract` model/migration if the
+field does not already exist there.
+
 ---
 
 ## 6. Cross-App Dependency Warnings
@@ -217,6 +225,8 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 12. **`match_nsn` and `match_supplier` are dual-purpose.** Same URL accepts **GET** with `action=search` and `q` (min length 3 on the client) for JSON `results`, and **POST** JSON for either `{id}` / `{supplier_id}` match-by-ID or `{action: 'create', ...}` to create and link. The standard contract form modals continue to use **POST** with `{ id: … }` (NSN) or `{ supplier_id: … }` (supplier) for matching; only the IDIQ inline page relies on GET search and POST create on these endpoints.
 
 13. **`_normalize_nsn` in `pdf_parser.py` is a thin wrapper around `contract_utils.normalize_nsn`.** Do not add NSN normalization logic to `pdf_parser.py` directly — update `contract_utils.py` instead. **`detect_contract_type`** reads position 9 (the character between the 2nd and 3rd hyphens in a dashed DLA number). The `_RE_IDIQ_TEXT_DETECT` regex phrase detection in `parse_award_pdf` is a **fallback only** — position-9 detection takes priority when the contract number yields a mapped type. **`_apply_contract_number_rules`** in `pdf_parser.py` still returns `"Delivery Order"` / `"Purchase Order"` strings as initial values that get overridden by `detect_contract_type`. Do not remove `_apply_contract_number_rules` — it also handles the delivery-order/base-contract swap logic.
+
+14. **`solicitation_type` is regex-extracted with `SDVOSB` as the default.** `_extract_solicitation_type` in `pdf_parser.py` uses FAR-clause references (52.219-27/-29/-30/-3/-4/-18/-6) as the primary path and narrative phrases as fallback; when neither matches, the value defaults to `SDVOSB` and a parse note is appended. There is no Claude API fallback for this field. The parser previously hardcoded `STATZ` (a sales-class value) into `solicitation_type` at five sites — fixed in the same change that introduced extraction. Do not reintroduce `STATZ` as a solicitation_type value.
 
 ---
 

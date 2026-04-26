@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Bootstrap 5 -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/5.3.8/spacelab/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/spacelab.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-core.css' %}">
     <link rel="stylesheet" href="{% static 'css/utilities.css' %}">
@@ -72,6 +72,9 @@
         background-position: center;
         background-repeat: no-repeat;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
     </style>
 

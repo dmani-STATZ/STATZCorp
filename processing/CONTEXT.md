@@ -77,6 +77,47 @@
 - `ProcessClinSplit` classmethods are used for AJAX; form persistence is centralized in `persist_clin_splits_for_contract`.
 - API helpers (`api_views`) support adding CLIN clones (copying CLIN `0001`), updating individual fields with conversions, deleting CLINs, saving entire CLIN payloads in `save_clin`, and `update_contract_values` to refresh contract / plan gross from CLINs.
 
+### Solicitation Type Extraction
+
+`solicitation_type` on both `QueueContract` and `ProcessContract` represents the
+set-aside / acquisition method designation (not the contract type, and not the
+sales class). Recognized values:
+
+- `SDVOSB` — Service-Disabled Veteran-Owned Small Business set-aside (default)
+- `WOSB` — Women-Owned Small Business set-aside (includes EDWOSB)
+- `HUBZONE` — HUBZone set-aside
+- `8A` — 8(a) set-aside
+- `SB` — Total Small Business set-aside (generic)
+- `UNRESTRICTED` — Full and open / unrestricted competition
+
+The PDF parser (`processing/services/pdf_parser.py`) extracts this value via
+`_extract_solicitation_type(text)`, using a two-tier strategy:
+
+1. **FAR clause references** (primary): 52.219-27, -29, -30, -3, -4, -18, -6.
+2. **Narrative phrases** (fallback): e.g., "service-disabled veteran-owned",
+   "women-owned small business", "HUBZone", "8(a)", "small business set-aside",
+   "unrestricted" / "full and open".
+
+When neither tier matches, the parser defaults to `SDVOSB` and emits a parse
+note instructing the analyst to verify on the form. There is no Claude API
+fallback for this field — regex coverage plus the SDVOSB default is the full
+strategy.
+
+Field length: `ProcessContract.solicitation_type` is `max_length=50` (was 10
+prior to migration #20) to accommodate `UNRESTRICTED` and other long values.
+`QueueContract.solicitation_type` has always been 50.
+
+### Sales Class Default
+
+`ProcessContract.sales_class` defaults to the `SalesClass` row where
+`sales_team='STATZ'` at creation time. The default is applied in
+`processing_views.start_processing` (queue→process promotion) and in the
+manual blank-contract creation path in the same module, via the helper
+`_get_default_sales_class()`. If the STATZ row is missing from the database
+(e.g., fresh dev environment), the field is left blank and a warning is
+logged via `logger.warning(...)`. The default is not enforced at the model
+or form layer.
+
 ## 11. Integrations and Cross-App Dependencies
 - Imports from `contracts.models` (`Contract`, `Clin`, `ClinSplit`, `Buyer`, `IdiqContract`, `ClinType`, `SpecialPaymentTerms`, `ContractType`, `SalesClass`, `PaymentHistory`, `ContractStatus`) show that `processing` writes the final authoritative records back into the `contracts` app and references the same lookup tables.
 - `products.models.Nsn` and `suppliers.models.Supplier` supply NSN and supplier FK targets for `ProcessClin`.

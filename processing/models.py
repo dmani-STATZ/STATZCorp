@@ -213,7 +213,7 @@ class ProcessContract(models.Model):
     company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='processing_contracts', null=False, blank=True)
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE, null=True, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
-    solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
+    solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
     po_number = models.CharField(max_length=10, null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     buyer = models.ForeignKey(Buyer, on_delete=models.CASCADE, null=True, blank=True)

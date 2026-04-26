@@ -170,6 +170,41 @@ _RE_MIN_ORDER_QTY = re.compile(
     re.IGNORECASE,
 )
 
+# Solicitation / set-aside type detection.
+# Primary path: FAR clause references in the contract text.
+# 52.219-27  -> SDVOSB (Service-Disabled Veteran-Owned Small Business set-aside)
+# 52.219-29  -> WOSB   (Women-Owned Small Business set-aside)
+# 52.219-30  -> WOSB   (Economically Disadvantaged WOSB; rolled into WOSB bucket)
+# 52.219-3   -> HUBZone
+# 52.219-4   -> HUBZone (price evaluation preference; rolled into HUBZone bucket)
+# 52.219-18  -> 8A     (8(a) set-aside)
+# 52.219-6   -> SB     (Total Small Business set-aside, generic)
+_RE_FAR_SDVOSB = re.compile(r"52\.219-27\b", re.IGNORECASE)
+_RE_FAR_WOSB = re.compile(r"52\.219-(?:29|30)\b", re.IGNORECASE)
+_RE_FAR_HUBZONE = re.compile(r"52\.219-(?:3|4)\b(?!\d)", re.IGNORECASE)
+_RE_FAR_8A = re.compile(r"52\.219-18\b", re.IGNORECASE)
+_RE_FAR_SB = re.compile(r"52\.219-6\b(?!\d)", re.IGNORECASE)
+
+# Fallback path: narrative phrases. Used only when no FAR clause matched.
+_RE_NARR_SDVOSB = re.compile(
+    r"service[\s-]*disabled\s+veteran[\s-]*owned\s+small\s+business",
+    re.IGNORECASE,
+)
+_RE_NARR_WOSB = re.compile(
+    r"(?:economically\s+disadvantaged\s+)?women[\s-]*owned\s+small\s+business",
+    re.IGNORECASE,
+)
+_RE_NARR_HUBZONE = re.compile(r"\bHUB[\s-]*Zone\b", re.IGNORECASE)
+_RE_NARR_8A = re.compile(r"\b8\s*\(\s*a\s*\)\b", re.IGNORECASE)
+_RE_NARR_SB_SETASIDE = re.compile(
+    r"(?:total\s+)?small\s+business\s+set[\s-]*aside",
+    re.IGNORECASE,
+)
+_RE_NARR_UNRESTRICTED = re.compile(
+    r"\bunrestricted\b|\bfull[\s-]*and[\s-]*open\b",
+    re.IGNORECASE,
+)
+
 _WORD_TO_NUM = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
     "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
@@ -481,6 +516,61 @@ def _extract_contract_value(
                 if v is not None:
                     return v
     return _largest_page_one_dollar_amount(page_one_text or "")
+
+
+def _extract_solicitation_type(text: str) -> tuple[str, Optional[str]]:
+    """
+    Detect the solicitation / set-aside type from award PDF text.
+
+    Returns a tuple of (value, parse_note).
+    - value is one of: SDVOSB, WOSB, HUBZONE, 8A, SB, UNRESTRICTED, OTHER.
+      Defaults to "SDVOSB" when no match is found.
+    - parse_note is None on a confident match, or a string describing the
+      fallback when the default was used. Caller should append this to the
+      parse-notes list.
+
+    Detection order:
+      1. FAR clause references (most reliable): 52.219-27, -29, -30, -3, -4, -18, -6.
+      2. Narrative phrases (fallback): "service-disabled veteran-owned...", etc.
+      3. Default to "SDVOSB" with a parse note.
+
+    The first matching tier wins. Within a tier, more specific values beat
+    generic ones (e.g., SDVOSB beats SB if both clauses appear).
+    """
+    if not text:
+        return ("SDVOSB", "Solicitation type defaulted to SDVOSB (empty PDF text); please verify.")
+
+    # Tier 1: FAR clause references. Order matters — most specific first.
+    if _RE_FAR_SDVOSB.search(text):
+        return ("SDVOSB", None)
+    if _RE_FAR_WOSB.search(text):
+        return ("WOSB", None)
+    if _RE_FAR_HUBZONE.search(text):
+        return ("HUBZONE", None)
+    if _RE_FAR_8A.search(text):
+        return ("8A", None)
+    if _RE_FAR_SB.search(text):
+        return ("SB", None)
+
+    # Tier 2: Narrative fallback.
+    if _RE_NARR_SDVOSB.search(text):
+        return ("SDVOSB", None)
+    if _RE_NARR_WOSB.search(text):
+        return ("WOSB", None)
+    if _RE_NARR_HUBZONE.search(text):
+        return ("HUBZONE", None)
+    if _RE_NARR_8A.search(text):
+        return ("8A", None)
+    if _RE_NARR_SB_SETASIDE.search(text):
+        return ("SB", None)
+    if _RE_NARR_UNRESTRICTED.search(text):
+        return ("UNRESTRICTED", None)
+
+    # Tier 3: Default.
+    return (
+        "SDVOSB",
+        "Solicitation type defaulted to SDVOSB (no FAR clause or set-aside language detected); please verify.",
+    )
 
 
 def _is_block9_contractor_name_line(s: str) -> bool:
@@ -1322,9 +1412,12 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contractor_cage=None,
             contract_value=None,
             contract_type=None,
-            solicitation_type="STATZ",
+            solicitation_type="SDVOSB",
             pdf_parse_status="partial",
-            pdf_parse_notes=f"Failed to open or read PDF: {exc}",
+            pdf_parse_notes=(
+                f"Failed to open or read PDF: {exc}\n"
+                "Solicitation type defaulted to SDVOSB (PDF text unavailable for parsing)."
+            ),
             clins=[],
         )
 
@@ -1338,9 +1431,12 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contractor_cage=None,
             contract_value=None,
             contract_type=None,
-            solicitation_type="STATZ",
+            solicitation_type="SDVOSB",
             pdf_parse_status="partial",
-            pdf_parse_notes="No text could be extracted from the PDF",
+            pdf_parse_notes=(
+                "No text could be extracted from the PDF\n"
+                "Solicitation type defaulted to SDVOSB (PDF text unavailable for parsing)."
+            ),
             clins=[],
         )
 
@@ -1372,6 +1468,10 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             notes.append("Could not extract total contract value (Block 25)")
         contractor_name, contractor_cage = _extract_contractor(text)
         ado_days = _extract_ado_days(page_one_text)
+
+        solicitation_type, soli_note = _extract_solicitation_type(text)
+        if soli_note:
+            notes.append(soli_note)
 
         clins: List[ClinParseResult] = []
         try:
@@ -1424,7 +1524,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contractor_cage=contractor_cage,
             contract_value=contract_value,
             contract_type=contract_type,
-            solicitation_type="STATZ",
+            solicitation_type=solicitation_type,
             pdf_parse_status=status,
             pdf_parse_notes=merged_notes,
             ado_days=ado_days,
@@ -1443,9 +1543,12 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contractor_cage=None,
             contract_value=None,
             contract_type=None,
-            solicitation_type="STATZ",
+            solicitation_type="SDVOSB",
             pdf_parse_status="partial",
-            pdf_parse_notes=f"Unexpected parse error: {exc}",
+            pdf_parse_notes=(
+                f"Unexpected parse error: {exc}\n"
+                "Solicitation type defaulted to SDVOSB (PDF text unavailable for parsing)."
+            ),
             clins=[],
         )
 
@@ -1512,7 +1615,7 @@ def ingest_parsed_award(
             "award_date": award_dt,
             "contract_value": parse_result.contract_value,
             "contract_type": parse_result.contract_type,
-            "solicitation_type": parse_result.solicitation_type or "STATZ",
+            "solicitation_type": parse_result.solicitation_type,
             "pdf_parse_status": status_val,
             "pdf_parsed_at": now,
             "pdf_parse_notes": notes_val or "",

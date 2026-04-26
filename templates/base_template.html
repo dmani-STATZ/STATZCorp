@@ -56,18 +56,20 @@
     {% is_development as dev_mode %}
 
     <!-- Bootstrap 5 -->
-    <!-- <link href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/5.3.8/spacelab/bootstrap.min.css" rel="stylesheet"> -->
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
 
     {% if dev_mode %}
         <!-- Development: Force reload CSS -->
+        <link rel="stylesheet" href="{% static 'css/spacelab.min.css' %}?v={{ cache_version }}-{{ request.id }}">
         <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}?v={{ cache_version }}-{{ request.id }}">
         <link rel="stylesheet" href="{% static 'css/app-core.css' %}?v={{ cache_version }}-{{ request.id }}">
         <link rel="stylesheet" href="{% static 'css/utilities.css' %}?v={{ cache_version }}-{{ request.id }}">
     {% else %}
         <!-- Production: Normal caching -->
+        <link rel="stylesheet" href="{% static 'css/spacelab.min.css' %}?v={{ cache_version }}">
         <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}?v={{ cache_version }}">
         <link rel="stylesheet" href="{% static 'css/app-core.css' %}?v={{ cache_version }}">
         <link rel="stylesheet" href="{% static 'css/utilities.css' %}?v={{ cache_version }}">

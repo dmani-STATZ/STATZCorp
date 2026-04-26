@@ -1,0 +1,475 @@
+{% extends "contracts/contract_base.html" %}
+{% load humanize static %}
+
+{% block contract_content %}
+<div class="nsn-detail-page">
+
+    {# ============ HEADER ============ #}
+    <header class="nsn-detail-header">
+        <div>
+            <h1 class="nsn-detail-header__title">
+                {% if nsn.nsn_code %}{{ nsn.nsn_code }}{% else %}<span class="text-muted">No NSN code</span>{% endif %}
+            </h1>
+            <p class="nsn-detail-header__desc">
+                {{ nsn.description|default:"No description on file." }}
+            </p>
+        </div>
+        <div class="nsn-detail-header__meta">
+            {% if nsn.modified_on %}
+            <span class="nsn-detail-audit"
+                  title="Last modified {{ nsn.modified_on|date:'Y-m-d H:i' }}">
+                Modified
+                {% if nsn.modified_by %}
+                <span class="nsn-detail-audit__user">{{ nsn.modified_by.get_full_name|default:nsn.modified_by.username }}</span>
+                {% endif %}
+                · {{ nsn.modified_on|naturaltime }}
+            </span>
+            {% endif %}
+            <a href="{% url 'products:nsn_edit' nsn.pk %}"
+               class="btn btn-outline-brand btn-sm">
+                Edit NSN
+            </a>
+        </div>
+    </header>
+
+    <div class="row g-3">
+
+        {# ============ LEFT COLUMN: Packout + Suppliers ============ #}
+        <div class="col-lg-7">
+
+            {# ---- Panel 1: Packout ---- #}
+            <section class="nsn-detail-panel"
+                     id="nsn-packout"
+                     data-update-url="{% url 'products:nsn_packout_update' nsn.pk %}"
+                     data-has-packout="{{ has_packout_data|yesno:'1,0' }}">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">Packout</h2>
+                    <span class="text-muted small">Auto-saves on change</span>
+                </header>
+                <div class="nsn-detail-panel__body">
+                    {% csrf_token %}
+
+                    {% if not has_packout_data %}
+                    <div class="nsn-detail-empty" id="nsn-packout-empty">
+                        <span class="nsn-detail-empty__title">No packout data yet.</span>
+                        Add it below to make this NSN quoteable — sales pulls weight and dimensions straight from here.
+                    </div>
+                    {% endif %}
+
+                    <div class="nsn-detail-grid-packout">
+                        {# weight #}
+                        <div class="nsn-detail-field" data-field="unit_weight">
+                            <label class="nsn-detail-field__label" for="nsn-f-unit_weight">
+                                Unit weight <span class="nsn-detail-field__unit">lbs</span>
+                                <span class="nsn-detail-field__status" aria-live="polite"></span>
+                            </label>
+                            <input class="nsn-detail-input nsn-detail-packout-input"
+                                   type="number" inputmode="decimal" step="0.001" min="0"
+                                   id="nsn-f-unit_weight" name="unit_weight"
+                                   value="{% if nsn.unit_weight is not None %}{{ nsn.unit_weight|floatformat:3 }}{% endif %}"
+                                   aria-describedby="nsn-e-unit_weight">
+                            <div class="nsn-detail-field__error" id="nsn-e-unit_weight" role="alert"></div>
+                        </div>
+                        {# length #}
+                        <div class="nsn-detail-field" data-field="unit_length">
+                            <label class="nsn-detail-field__label" for="nsn-f-unit_length">
+                                Length <span class="nsn-detail-field__unit">in</span>
+                                <span class="nsn-detail-field__status" aria-live="polite"></span>
+                            </label>
+                            <input class="nsn-detail-input nsn-detail-packout-input"
+                                   type="number" inputmode="decimal" step="0.01" min="0"
+                                   id="nsn-f-unit_length" name="unit_length"
+                                   value="{% if nsn.unit_length is not None %}{{ nsn.unit_length|floatformat:2 }}{% endif %}"
+                                   aria-describedby="nsn-e-unit_length">
+                            <div class="nsn-detail-field__error" id="nsn-e-unit_length" role="alert"></div>
+                        </div>
+                        {# width #}
+                        <div class="nsn-detail-field" data-field="unit_width">
+                            <label class="nsn-detail-field__label" for="nsn-f-unit_width">
+                                Width <span class="nsn-detail-field__unit">in</span>
+                                <span class="nsn-detail-field__status" aria-live="polite"></span>
+                            </label>
+                            <input class="nsn-detail-input nsn-detail-packout-input"
+                                   type="number" inputmode="decimal" step="0.01" min="0"
+                                   id="nsn-f-unit_width" name="unit_width"
+                                   value="{% if nsn.unit_width is not None %}{{ nsn.unit_width|floatformat:2 }}{% endif %}"
+                                   aria-describedby="nsn-e-unit_width">
+                            <div class="nsn-detail-field__error" id="nsn-e-unit_width" role="alert"></div>
+                        </div>
+                        {# height #}
+                        <div class="nsn-detail-field" data-field="unit_height">
+                            <label class="nsn-detail-field__label" for="nsn-f-unit_height">
+                                Height <span class="nsn-detail-field__unit">in</span>
+                                <span class="nsn-detail-field__status" aria-live="polite"></span>
+                            </label>
+                            <input class="nsn-detail-input nsn-detail-packout-input"
+                                   type="number" inputmode="decimal" step="0.01" min="0"
+                                   id="nsn-f-unit_height" name="unit_height"
+                                   value="{% if nsn.unit_height is not None %}{{ nsn.unit_height|floatformat:2 }}{% endif %}"
+                                   aria-describedby="nsn-e-unit_height">
+                            <div class="nsn-detail-field__error" id="nsn-e-unit_height" role="alert"></div>
+                        </div>
+                    </div>
+
+                    <div class="nsn-detail-field mt-3" data-field="packaging_notes" style="display:block;">
+                        <label class="nsn-detail-field__label" for="nsn-f-packaging_notes">
+                            Packaging notes
+                            <span class="nsn-detail-field__status" aria-live="polite"></span>
+                        </label>
+                        <textarea class="nsn-detail-input nsn-detail-input--textarea nsn-detail-packout-input"
+                                  id="nsn-f-packaging_notes" name="packaging_notes"
+                                  rows="3"
+                                  placeholder="Hazmat class, crating, ORM-D, special handling…"
+                                  aria-describedby="nsn-e-packaging_notes">{{ nsn.packaging_notes }}</textarea>
+                        <div class="nsn-detail-field__error" id="nsn-e-packaging_notes" role="alert"></div>
+                    </div>
+
+                    {# ---- live calculator ---- #}
+                    <div class="nsn-detail-calc"
+                         id="nsn-packout-calc"
+                         {% if not has_packout_data %}hidden{% endif %}>
+                        <div class="nsn-detail-field" style="margin: 0;">
+                            <label class="nsn-detail-field__label" for="nsn-calc-qty">Quantity</label>
+                            <input class="nsn-detail-input"
+                                   type="number" inputmode="numeric" step="1" min="0"
+                                   id="nsn-calc-qty" value="1">
+                        </div>
+                        <div class="nsn-detail-calc__output" id="nsn-calc-output">
+                            <span><strong id="nsn-calc-weight">—</strong><small>Total weight (lbs)</small></span>
+                            <span><strong id="nsn-calc-vol-in">—</strong><small>Volume (cu in)</small></span>
+                            <span><strong id="nsn-calc-vol-ft">—</strong><small>Volume (cu ft)</small></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {# ---- Panel 2: Approved sources ---- #}
+            <section class="nsn-detail-panel">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">Approved sources</h2>
+                    {% if approved_sources.total_count > 0 %}
+                    <span class="text-muted small">
+                        {{ approved_sources.resolved_count }} of {{ approved_sources.total_count }} matched
+                    </span>
+                    {% endif %}
+                </header>
+                <div class="nsn-detail-panel__body">
+                    {% if approved_sources.total_count == 0 %}
+                        <p class="nsn-detail-empty nsn-detail-empty--quiet m-0">
+                            No approved sources on file for this NSN yet. Daily imports may add them later.
+                        </p>
+                    {% else %}
+                        <p class="nsn-detail-source-meta">
+                            {{ approved_sources.resolved_count }} of {{ approved_sources.total_count }} matched to suppliers in our database.
+                        </p>
+                        <ul class="nsn-detail-source-list">
+                            {% for row in approved_sources.rows %}
+                            <li class="nsn-detail-source-row {% if row.is_resolved %}nsn-detail-source-row--resolved{% else %}nsn-detail-source-row--unresolved{% endif %}">
+                                <span class="nsn-detail-source-cage" title="CAGE {{ row.cage_code|default:'—' }}">
+                                    {{ row.cage_code|default:"—" }}
+                                </span>
+                                {% if row.is_resolved and row.supplier %}
+                                <a class="nsn-detail-source-name"
+                                   href="{% url 'suppliers:supplier_detail' row.supplier.pk %}"
+                                   title="{{ row.company_name }}">{{ row.company_name }}</a>
+                                {% else %}
+                                <span class="nsn-detail-source-name" title="{{ row.company_name }}">{{ row.company_name }}</span>
+                                {% endif %}
+                                <span class="nsn-detail-source-pn"
+                                      title="{% if row.part_number %}Supplier part {{ row.part_number }}{% else %}No supplier part on file{% endif %}">
+                                    {{ row.part_number|default:"—" }}
+                                </span>
+                                {% if row.is_resolved %}
+                                <span class="nsn-detail-source-chip nsn-detail-source-chip--resolved" title="CAGE matched to a Supplier record">
+                                    <span class="nsn-detail-source-chip__dot" aria-hidden="true"></span>
+                                    in our system
+                                </span>
+                                {% else %}
+                                <span class="nsn-detail-source-chip nsn-detail-source-chip--unresolved" title="CAGE not found in supplier database">
+                                    <span class="nsn-detail-source-chip__dot" aria-hidden="true"></span>
+                                    not in DB
+                                </span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if approved_sources.orphaned_count > 0 %}
+                    <p class="nsn-detail-source-foot">
+                        {{ approved_sources.orphaned_count }} orphaned row{{ approved_sources.orphaned_count|pluralize }} hidden — provenance unclear.
+                    </p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        {# ============ RIGHT COLUMN: Identity + Usage ============ #}
+        <div class="col-lg-5">
+
+            {# ---- Panel 3: Identity ---- #}
+            <section class="nsn-detail-panel">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">Identity</h2>
+                    <a href="{% url 'products:nsn_edit' nsn.pk %}" class="text-muted small text-decoration-none">Edit</a>
+                </header>
+                <div class="nsn-detail-panel__body">
+                    <dl class="nsn-detail-defs">
+                        <div>
+                            <dt>Part number</dt>
+                            <dd class="is-mono">{{ nsn.part_number|default:"—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Revision</dt>
+                            <dd class="is-mono">{{ nsn.revision|default:"—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Directory</dt>
+                            <dd>
+                                {% if nsn.directory_url %}
+                                    <a href="{{ nsn.directory_url }}" target="_blank" rel="noopener noreferrer">Open ↗</a>
+                                {% else %}—{% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Notes</dt>
+                            <dd>{{ nsn.notes|default:"—"|linebreaksbr }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </section>
+
+            {# ---- Panel 4: Usage ---- #}
+            <section class="nsn-detail-panel">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">
+                        Used by ({{ referencing_clins|length }} CLIN{{ referencing_clins|length|pluralize }},
+                        {{ referencing_idiq_details|length }} IDIQ)
+                    </h2>
+                </header>
+                <div class="nsn-detail-panel__body">
+                    {% if not referencing_clins and not referencing_idiq_details %}
+                        <p class="nsn-detail-empty nsn-detail-empty--quiet">
+                            Not currently referenced by any contract.
+                        </p>
+                    {% else %}
+
+                        {% if referencing_clins %}
+                        <div class="nsn-detail-usage-section">
+                            <div class="nsn-detail-field__label" style="margin-bottom: 0.4rem;">Referenced by CLINs</div>
+                            <ul class="nsn-detail-usage-list">
+                                {% for clin in referencing_clins %}
+                                <li>
+                                    <a href="{% url 'contracts:clin_detail' clin.pk %}">
+                                        {% if clin.contract %}<span class="is-mono">{{ clin.contract.contract_number|default:clin.contract_id }}</span>{% else %}<span class="text-muted">(no contract)</span>{% endif %}
+                                        <span class="text-muted">·</span>
+                                        CLIN <span class="is-mono">{{ clin.item_number|default:clin.pk }}</span>
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% if referencing_clins|length == 50 %}
+                            <p class="nsn-detail-usage-cap">Showing first 50.</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if referencing_idiq_details %}
+                        <div class="nsn-detail-usage-section">
+                            <div class="nsn-detail-field__label" style="margin-bottom: 0.4rem;">Referenced by IDIQ details</div>
+                            <ul class="nsn-detail-usage-list">
+                                {% for d in referencing_idiq_details %}
+                                <li>
+                                    {% if d.idiq_contract_id %}
+                                    <a href="{% url 'contracts:idiq_contract_detail' d.idiq_contract_id %}">
+                                        IDIQ <span class="is-mono">{{ d.idiq_contract.contract_number|default:d.idiq_contract_id }}</span>
+                                        <span class="text-muted">·</span>
+                                        {{ d.supplier.name|default:d.supplier_id }}
+                                    </a>
+                                    {% else %}
+                                    <span>{{ d.supplier.name|default:d.supplier_id }}</span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% if referencing_idiq_details|length == 50 %}
+                            <p class="nsn-detail-usage-cap">Showing first 50.</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    var packoutPanel = document.getElementById("nsn-packout");
+    if (!packoutPanel) return;
+
+    var endpoint = packoutPanel.dataset.updateUrl;
+    var csrfInput = packoutPanel.querySelector("input[name=csrfmiddlewaretoken]");
+    var csrf = csrfInput ? csrfInput.value : "";
+
+    var DECIMAL_FIELDS = {
+        unit_weight: 3,
+        unit_length: 2,
+        unit_width: 2,
+        unit_height: 2
+    };
+    var DEBOUNCE_MS = 400;
+    var SAVED_FLASH_MS = 1500;
+
+    var fieldNodes = packoutPanel.querySelectorAll(".nsn-detail-field[data-field]");
+    var emptyBanner = document.getElementById("nsn-packout-empty");
+    var calc = document.getElementById("nsn-packout-calc");
+
+    // Per-field debounce + last-saved-value memory so we don't POST identical
+    // values on every blur.
+    var timers = {};
+    var lastSent = {};
+    fieldNodes.forEach(function (node) {
+        var name = node.dataset.field;
+        var input = node.querySelector("input, textarea");
+        if (input) lastSent[name] = input.value;
+    });
+
+    function setState(fieldNode, state, message) {
+        if (state) {
+            fieldNode.dataset.state = state;
+        } else {
+            delete fieldNode.dataset.state;
+        }
+        var statusEl = fieldNode.querySelector(".nsn-detail-field__status");
+        if (statusEl) {
+            if (state === "saving") statusEl.textContent = "Saving";
+            else if (state === "saved") statusEl.textContent = "Saved";
+            else if (state === "error") statusEl.textContent = "Error";
+            else statusEl.textContent = "";
+        }
+        var errEl = fieldNode.querySelector(".nsn-detail-field__error");
+        if (errEl) errEl.textContent = state === "error" ? (message || "Save failed.") : "";
+    }
+
+    function flashSaved(fieldNode) {
+        setState(fieldNode, "saved");
+        setTimeout(function () {
+            // Only clear if still in 'saved' state — don't clobber a newer save.
+            if (fieldNode.dataset.state === "saved") setState(fieldNode, "");
+        }, SAVED_FLASH_MS);
+    }
+
+    function postField(fieldNode, name, value) {
+        var payload = {};
+        payload[name] = value;
+        setState(fieldNode, "saving");
+        fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrf,
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify(payload),
+            credentials: "same-origin"
+        }).then(function (resp) {
+            return resp.json().then(function (data) { return { status: resp.status, body: data }; });
+        }).then(function (res) {
+            if (res.status === 200 && res.body && res.body.ok) {
+                lastSent[name] = value;
+                flashSaved(fieldNode);
+                onPacked();
+            } else {
+                var msg = (res.body && res.body.errors && res.body.errors[name])
+                          || (res.body && res.body.errors && res.body.errors.__all__)
+                          || "Save failed (HTTP " + res.status + ").";
+                setState(fieldNode, "error", msg);
+            }
+        }).catch(function (err) {
+            setState(fieldNode, "error", "Network error.");
+        });
+    }
+
+    function scheduleSave(fieldNode, name, value) {
+        if (lastSent[name] === value) return;  // no-op duplicate
+        clearTimeout(timers[name]);
+        timers[name] = setTimeout(function () {
+            postField(fieldNode, name, value);
+        }, DEBOUNCE_MS);
+    }
+
+    function flushSave(fieldNode, name, value) {
+        if (lastSent[name] === value) return;
+        clearTimeout(timers[name]);
+        postField(fieldNode, name, value);
+    }
+
+    fieldNodes.forEach(function (node) {
+        var name = node.dataset.field;
+        var input = node.querySelector("input, textarea");
+        if (!input) return;
+
+        input.addEventListener("input", function () {
+            scheduleSave(node, name, input.value);
+        });
+        input.addEventListener("blur", function () {
+            flushSave(node, name, input.value);
+        });
+        // Enter on number inputs commits + blurs; Cmd/Ctrl+Enter does the same in textarea.
+        input.addEventListener("keydown", function (ev) {
+            if (ev.key !== "Enter") return;
+            if (input.tagName === "TEXTAREA" && !(ev.metaKey || ev.ctrlKey)) return;
+            ev.preventDefault();
+            input.blur();
+        });
+    });
+
+    // ---- Calculator ----
+    function num(id) {
+        var el = document.getElementById(id);
+        var v = el ? parseFloat(el.value) : NaN;
+        return isFinite(v) ? v : NaN;
+    }
+    function fmt(v, dp) {
+        if (!isFinite(v)) return "—";
+        return v.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    }
+    function recalc() {
+        var qty = num("nsn-calc-qty");
+        var w = num("nsn-f-unit_weight");
+        var L = num("nsn-f-unit_length");
+        var W = num("nsn-f-unit_width");
+        var H = num("nsn-f-unit_height");
+        var totalW = qty * w;
+        var volIn = qty * L * W * H;
+        var volFt = volIn / 1728;
+        document.getElementById("nsn-calc-weight").textContent = fmt(totalW, 3);
+        document.getElementById("nsn-calc-vol-in").textContent = fmt(volIn, 2);
+        document.getElementById("nsn-calc-vol-ft").textContent = fmt(volFt, 3);
+    }
+    var qtyInput = document.getElementById("nsn-calc-qty");
+    if (qtyInput) qtyInput.addEventListener("input", recalc);
+    fieldNodes.forEach(function (node) {
+        var input = node.querySelector("input.nsn-detail-packout-input");
+        if (input) input.addEventListener("input", recalc);
+    });
+
+    // ---- Reveal calc + dismiss empty banner once weight is filled ----
+    function onPacked() {
+        var hasWeight = num("nsn-f-unit_weight");
+        if (isFinite(hasWeight) && calc && calc.hasAttribute("hidden")) {
+            calc.removeAttribute("hidden");
+        }
+        if (isFinite(hasWeight) && emptyBanner) {
+            emptyBanner.style.display = "none";
+        }
+        recalc();
+    }
+    onPacked();
+})();
+</script>
+{% endblock contract_content %}

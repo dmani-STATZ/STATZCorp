@@ -19,7 +19,11 @@
       "Bash(curl -I http://localhost:8000/admin/)",
       "Bash(curl -s http://localhost:8000/processing/contract/10002/edit/ -H \"User-Agent: Mozilla\")",
       "Bash(git commit *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(awk 'NR>=1795 && NR<=2101' \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\")",
+      "Bash(awk *)",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\" | Select-Object -Skip 1794 -First 308; $opens = \\($content | Select-String -Pattern '\\\\{' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; $closes = \\($content | Select-String -Pattern '\\\\}' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; Write-Output \\(\"opens=$opens closes=$closes\"\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\" | Select-Object -Skip 2102; $opens = \\($content | Select-String -Pattern '\\\\{' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; $closes = \\($content | Select-String -Pattern '\\\\}' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; Write-Output \\(\"opens=$opens closes=$closes lines=$\\($content.Count\\)\"\\))"
     ]
   }
 }

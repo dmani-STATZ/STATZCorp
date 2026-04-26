@@ -14,37 +14,41 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 ## 2. App Scope
 
 **Owns:**
-- `Nsn` model (stored in legacy table `contracts_nsn`)
+- `Nsn` model (stored in legacy table `contracts_nsn`), including the packout fields `unit_weight`, `unit_length`, `unit_width`, `unit_height`, and `packaging_notes` introduced in migration `0002_nsn_packout_fields`
 - `SupplierNSNCapability` through-model (table `supplier_nsn_capability`)
 - `AuditModel` abstract base
-- URL namespace `products` with two shim routes: `nsn_edit` and `nsn_search`
+- URL namespace `products` with four routes: `nsn_edit` and `nsn_search` (shims into `contracts/views`) plus `nsn_detail` and `nsn_packout_update` (local to this app)
 - Admin registrations for both models
-- `templates/products/nsn_edit.html`
+- `templates/products/nsn_edit.html` and `templates/products/nsn_detail.html`
+- Local views in `products/views.py`: `NsnDetailView` (DetailView for the read-focused detail page) and `nsn_packout_update` (POST-only JSON endpoint for inline packout editing)
 
 **Does NOT own:**
-- NSN editing or search view logic — lives in `contracts/views/nsn_views.py` and `contracts/views/idiq_views.py`
-- NSN form definition — lives in `contracts/forms.py`
-- NSN API endpoint — lives in `contracts/views/api_views.py`
-- Any business logic beyond audit timestamps
+- NSN edit/update form rendering — lives in `contracts/views/nsn_views.py` (`NsnUpdateView`)
+- NSN search view logic — lives in `contracts/views/idiq_views.py` (`NsnSearchView`)
+- NSN form definition — lives in `contracts/forms.py` (`NsnForm`); when packout fields change, both this form and `nsn_packout_update` validation must move together
+- NSN API endpoint for select widgets — lives in `contracts/views/api_views.py`
+- `sales.ApprovedSource` data — `products` reads this model from the NSN detail view (`get_approved_sources_data`) but does not own its schema, import logic, or admin. Any schema change to `ApprovedSource` (especially renaming `nsn`, `approved_cage`, `part_number`, `company_name`, or `import_batch`) is the sales app's responsibility, but it silently breaks the NSN detail page if the read site here is not updated in the same change.
 - No services, signals, tasks, or management commands
 
-This app is **glue/domain infrastructure**. Treat `models.py` and `migrations/` as the blast radius for most change types.
+This app started as **glue/domain infrastructure** but now also owns a real read-focused detail page and a small JSON packout endpoint. Treat `models.py`, `views.py`, `urls.py`, and `migrations/` as the blast radius for most change types.
 
 ---
 
 ## 3. Read This Before Editing
 
 ### Before changing `models.py` fields
-- `contracts/forms.py` — `NsnForm` lists every editable field explicitly
+- `contracts/forms.py` — `NsnForm` lists every editable field explicitly (including the packout fields `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes`)
+- `products/views.py` — `nsn_packout_update` enumerates the packout fields for inline JSON validation; adding/renaming a packout field requires editing the `_DECIMAL_FIELDS` tuple (or the `packaging_notes` branch) here
+- `templates/products/nsn_detail.html` — the packout form posts the field names verbatim and the readout sections reference field attributes by name
 - `contracts/views/nsn_views.py` — `NsnUpdateView` context keys
 - `contracts/views/idiq_views.py` — `NsnSearchView` queryset filter fields (`nsn_code`, `description`)
 - `contracts/views/api_views.py` — `get_select_options` response shape for NSN autocomplete
 - `contracts/views/dd1155_views.py` — imports and uses `Nsn` fields directly
 - `contracts/models.py` — `Clin` and `IdiqContractDetails` have FKs to `Nsn`
 - `contracts/management/commands/refresh_nsn_view.py` — references table/column names
-- `contracts/utils/contracts_schema.py` — hardcodes `contracts_nsn` column references in schema descriptions
+- `contracts/utils/contracts_schema.py` — auto-generates column descriptions from `concrete_fields`; hand-curated relationships still reference `contracts_nsn` FKs by name
 - `reports/views.py` line 34 — includes `'contracts_nsn'` in a table list
-- `SQL/migrate_data.sql` — raw SQL inserts/reseeds against `contracts_nsn` by column name
+- `SQL/migrate_data.sql` — raw SQL inserts/reseeds against `contracts_nsn` by column name (the column list now includes the packout columns)
 - `contracts/migrations/0001_initial.py` and `.bak` — raw SQL views reference `contracts_nsn` columns
 - `processing/views/processing_views.py` and `processing/views/matching_views.py` — both import and query `Nsn`
 
@@ -76,17 +80,20 @@ This app is **glue/domain infrastructure**. Treat `models.py` and `migrations/` 
 
 | Change | Files that move together |
 |---|---|
-| Add/rename a field on `Nsn` | `products/models.py`, `products/migrations/`, `contracts/forms.py`, `contracts/views/nsn_views.py`, `contracts/views/idiq_views.py`, `contracts/views/api_views.py`, `contracts/utils/contracts_schema.py`, `templates/products/nsn_edit.html`, any affected `contracts/templates/` |
+| Add/rename a field on `Nsn` | `products/models.py`, `products/migrations/`, `contracts/forms.py`, `contracts/views/nsn_views.py`, `contracts/views/idiq_views.py`, `contracts/views/api_views.py`, `contracts/utils/contracts_schema.py`, `templates/products/nsn_edit.html`, `templates/products/nsn_detail.html`, any affected `contracts/templates/` |
 | Add/rename a field on `SupplierNSNCapability` | `products/models.py`, `products/migrations/`, `products/admin.py` |
 | Change `nsn_code` or `description` specifically | All of the above + `contracts/views/idiq_views.py` (search filter), `contracts/views/api_views.py` (select options), `SQL/migrate_data.sql` |
-| Add a new NSN URL | `products/urls.py` + the view file in `contracts/views/` it points to |
+| Add/rename a packout field on `Nsn` | `products/models.py`, `products/migrations/`, `products/views.py` (`_DECIMAL_FIELDS` tuple or `packaging_notes` branch in `nsn_packout_update`), `contracts/forms.py` (`NsnForm.Meta.fields` and `widgets`), `templates/products/nsn_detail.html` (form input + readout), `templates/products/nsn_edit.html` if it lists fields explicitly, `SQL/migrate_data.sql` (column list + SELECT clause) |
+| Add a new NSN URL | `products/urls.py` + the view file in `products/views.py` (or `contracts/views/`) it points to |
+| Change to `ApprovedSource` fields used in detail page | `sales/models/approved_sources.py`, `products/views.py` (`get_approved_sources_data`), `templates/products/nsn_detail.html` (the approved-sources panel block) |
 
 ---
 
 ## 6. Cross-App Dependency Warnings
 
 ### This app depends on:
-- `suppliers.models.Supplier` — FK target for `SupplierNSNCapability` and the M2M on `Nsn`. Supplier deletions cascade to `SupplierNSNCapability` rows via `CASCADE`.
+- `suppliers.models.Supplier` — FK target for `SupplierNSNCapability` and the M2M on `Nsn`. Supplier deletions cascade to `SupplierNSNCapability` rows via `CASCADE`. Also read by `NsnDetailView.get_approved_sources_data` via a single batched `Supplier.objects.filter(cage_code__in=...)` query to resolve approved-source CAGEs.
+- `sales.models.ApprovedSource` — read by `NsnDetailView.get_approved_sources_data` via a lazy import. Joined to `Nsn` by string match on `nsn` ↔ `nsn_code` and to `Supplier` by string match on `approved_cage` ↔ `cage_code`. **No FKs in either direction.** Field name changes on `ApprovedSource` (especially `nsn`, `approved_cage`, `part_number`, `company_name`, `import_batch`) will silently break the NSN detail page.
 - `django.contrib.auth.models.User` — FK target for `AuditModel` audit fields (SET_NULL on delete).
 
 ### Apps that depend on this app:
@@ -95,6 +102,9 @@ This app is **glue/domain infrastructure**. Treat `models.py` and `migrations/` 
 | `contracts` | `Nsn` in `models.py`, `forms.py`, `nsn_views.py`, `idiq_views.py`, `dd1155_views.py`, `api_views.py`, management command, schema util, and multiple templates |
 | `processing` | `Nsn` in `processing_views.py` and `matching_views.py` — used in CLIN matching logic |
 | `reports` | References `'contracts_nsn'` table name directly in `views.py` |
+
+### This app depends on (cross-cutting, beyond the rows above):
+- `contracts.models.Clin` and `contracts.models.IdiqContractDetails` — lazy-imported inside `NsnDetailView.get_context_data` (not at module top-level) to avoid the circular `products → contracts → products` import chain. Any future view that needs `contracts` models must follow the same lazy-import pattern.
 
 ### Legacy table name coupling:
 - `contracts_nsn` and `supplier_nsn_capability` are hardcoded in `db_table`. These names appear in:
@@ -140,13 +150,35 @@ This app is **glue/domain infrastructure**. Treat `models.py` and `migrations/` 
 
 ## 9. View / URL / Template Change Rules
 
-- `products/views.py` is intentionally empty. Do not add views here without a clear reason — existing patterns put NSN views in `contracts`.
-- The two URL names (`products:nsn_edit`, `products:nsn_search`) are confirmed not reversed in templates currently, but search before renaming.
+- `products/views.py` now owns `NsnDetailView` and `nsn_packout_update`. NSN edit/search still lives in `contracts/views`. Before adding new views to this app, read `AGENTS.md` § 13 footgun about lazy imports — `contracts.models` cannot be imported at module top-level.
+- The four URL names (`products:nsn_edit`, `products:nsn_search`, `products:nsn_detail`, `products:nsn_packout_update`) are reversed in `templates/products/nsn_detail.html`. Search before renaming any of them.
 - `templates/products/nsn_edit.html` depends on:
   - `contracts/contract_base.html` (extends)
   - `contracts/includes/simple_field.html` (include — used for every form field)
   - `NsnForm` field names as context keys
-- If a new NSN template is needed, follow the same pattern: extend `contracts/contract_base.html` and use `simple_field.html` for field rendering.
+- `templates/products/nsn_detail.html` depends on:
+  - `contracts/contract_base.html` (extends)
+  - All `.nsn-detail-*` component classes in `static/css/app-core.css` and `--font-mono` in `static/css/theme-vars.css`
+  - The context keys supplied by `NsnDetailView.get_context_data` (`nsn`, `supplier_capabilities`, `referencing_clins`, `referencing_idiq_details`, `has_packout_data`)
+  - The reverse URLs `products:nsn_edit`, `products:nsn_packout_update`, `suppliers:supplier_detail`, `contracts:clin_detail`, `contracts:idiq_contract_detail` — if any of these get renamed the detail template breaks
+- If a new NSN edit-style template is needed, follow `nsn_edit.html`: extend `contracts/contract_base.html` and use `simple_field.html`. If a new NSN read/scan template is needed, follow `nsn_detail.html`: extend the same base, but use the `.nsn-detail-*` prefix convention for new component classes and rely on Bootstrap CSS variables for colors so dark mode works without extra rules.
+
+### Inline editing JS contract on `nsn_detail.html`
+
+The packout panel ships its own inline `<script>` block (no separate JS module — vanilla, ~120 lines, lives at the bottom of the template). When changing the packout fields or the JSON endpoint, keep this contract intact:
+
+- Each editable field is a real `<input>` or `<textarea>` wrapped in `<div class="nsn-detail-field" data-field="<field_name>">`. The wrapper's `data-state` attribute (`saving` / `saved` / `error`, or absent for idle) drives the per-field visual state via attribute selectors in `app-core.css`. **Don't replace the wrapper with a Bootstrap `.input-group` or similar — the attribute-selector CSS won't reach inside.**
+- The script reads the panel's `data-update-url` and the `{% csrf_token %}` hidden input from the panel itself, then POSTs `{<field_name>: <value>}` JSON per field with `X-CSRFToken` and `X-Requested-With: XMLHttpRequest`. Adding a new packout field requires adding it to the `DECIMAL_FIELDS` map in the script (or to the textarea-style branch) AND adding it to `_DECIMAL_FIELDS` / the `packaging_notes` branch in `products/views.py` `nsn_packout_update`.
+- Numeric fields debounce 400ms on `input` and flush on `blur`; Enter on a number input commits and blurs (Cmd/Ctrl+Enter for textarea). Empty input is sent as the empty string and clears the field server-side. The endpoint's `{ok, errors}` JSON shape is what drives the `saved` flash vs the inline error text — keep the response shape stable.
+- The live calculator at the bottom of the panel is JS-only (no backend call). It reads from the same `<input>` IDs as the saved fields, so any rename of `nsn-f-unit_weight` / `nsn-f-unit_length` / `nsn-f-unit_width` / `nsn-f-unit_height` / `nsn-calc-qty` breaks the calculator silently.
+
+### CSS prefix convention
+
+All component classes for `nsn_detail.html` are prefixed `.nsn-detail-*` and live in `static/css/app-core.css`. New NSN-detail component classes must follow this prefix to stay scoped. Sub-features within the page get a sub-prefix: the approved-sources panel uses `.nsn-detail-source-*` (e.g., `.nsn-detail-source-row`, `.nsn-detail-source-chip`). Color values must come from existing tokens (Bootstrap `--bs-*` variables or `--company-primary` / `--company-secondary`); new hex values must be added to `static/css/theme-vars.css` first with a justifying comment.
+
+### Resolution-chip pattern (approved-sources panel)
+
+The "in our system" / "not in DB" indicators on the approved-sources panel are rendered as `.nsn-detail-source-chip` pills with `--resolved` / `--unresolved` modifiers. Both states pull their colors from Bootstrap 5.3's subtle palette in `spacelab.min.css` — `--bs-success-bg-subtle` / `--bs-success-text-emphasis` / `--bs-success-border-subtle` for resolved, `--bs-secondary-bg-subtle` / `--bs-secondary-color` / `--bs-secondary-border-subtle` for unresolved. **The chip color tokens are not duplicated into `theme-vars.css`** — relying on Bootstrap's subtle system means dark mode flips correctly under `[data-bs-theme="dark"]` without any per-mode rules. If you add a new resolution-state (e.g., "stale" or "needs review"), follow the same pattern: pick a Bootstrap subtle bucket (`info`, `warning`, `danger`) and create a new `--<bucket>` modifier; do not introduce custom hex values for the chip palette.
 
 ---
 
@@ -198,7 +230,17 @@ After editing, verify manually:
 
 - **`SupplierNSNCapability` has no documented creation path.** The admin is the only confirmed way to create rows. Do not assume they exist when writing logic that reads `lead_time_days` or `price_reference`.
 
-- **Circular import risk:** `products.models` imports `suppliers.models.Supplier`. Any attempt to import `contracts` models from `products` would likely create a circular import chain (`products → contracts → products`). Do not add such imports.
+- **Circular import risk:** `products.models` imports `suppliers.models.Supplier`. Any attempt to import `contracts` models from `products` at module top-level would likely create a circular import chain (`products → contracts → products`). `NsnDetailView` already needs `contracts.models.Clin` and `contracts.models.IdiqContractDetails`; it imports them lazily inside `get_context_data`. Follow the same pattern for any new view in this app that needs `contracts` models.
+
+- **`nsn_packout_update` does not use a Django form — validation is inline.** Adding a new packout field requires updating the validation block in `products/views.py` (the `_DECIMAL_FIELDS` tuple for numeric fields, or the `packaging_notes` branch for string fields) AND the `fields`/`widgets` in `contracts/forms.py` `NsnForm`. Forgetting either side leaves the field savable in one path but silently dropped in the other.
+
+- **`ApprovedSource.nsn` is a string field, not an FK to `Nsn`.** NSN codes that appear in `ApprovedSource` may not exist in `Nsn`. NSN codes in `Nsn` may have zero matches in `ApprovedSource`. Both are normal states. The detail page renders an empty-state message when there are no matches; do not treat zero matches as an error condition.
+
+- **`ApprovedSource.approved_cage` is a string field, not an FK to `Supplier`.** CAGE codes that don't resolve to a `Supplier` row are normal — the template renders them with a "not in supplier database" indicator. Do not filter unresolved rows out of the panel; the data-quality signal is intentional.
+
+- **CAGE-to-Supplier resolution in `NsnDetailView.get_approved_sources_data` uses a single batched query** (`Supplier.objects.filter(cage_code__in=cage_set)`) producing a `{cage: supplier}` dict. Do NOT refactor this into per-row queries — at scale (an NSN with 50 approved sources) that becomes a 50-query page load that bypasses the existing `select_related` optimisations elsewhere on the page.
+
+- **`SupplierNSNCapability` is deprecated in practice as of 2026-04-26.** It is no longer surfaced anywhere in the v1 NSN detail UI. Do NOT add new code that reads from it. Do NOT delete the model or its admin registration without a migration plan — the through-table is still wired into `Nsn.suppliers` (M2M `through=`), so removal is a coordinated schema change.
 
 ---
 
@@ -227,7 +269,7 @@ After editing, verify manually:
 | Cross-app dependents | `contracts` (heavy), `processing` (Nsn import), `reports` (table name), `SQL/migrate_data.sql` (column-level raw SQL) |
 | Security-sensitive | `NsnUpdateView` login decorator, `NsnSearchView` login + query-length guard, `AuditModel` audit trail |
 | Riskiest edits | Renaming any `Nsn` field, changing `db_table` values, adding NOT NULL fields without defaults, removing `AuditModel.save()` |
-| App character | Thin model/URL carrier. Logic lives in `contracts`. Treat as infrastructure. |
+| App character | Mostly domain infrastructure. Now also owns `NsnDetailView` and the `nsn_packout_update` JSON endpoint, plus the packout fields on `Nsn`. NSN editing/searching still lives in `contracts/views`. |
 
 
 ## CSS / Styling Rules

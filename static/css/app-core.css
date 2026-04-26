@@ -1791,3 +1791,434 @@ main {
 .card-padded {
     padding: 1rem
 }
+
+/* =========================================================================
+   NSN Detail page (`products/templates/products/nsn_detail.html`)
+   All component classes are prefixed `.nsn-detail-*` so they stay scoped.
+   Colors come from Bootstrap CSS variables so dark mode flips automatically
+   under [data-bs-theme="dark"]. Mono stack lives in --font-mono (theme-vars.css).
+   ========================================================================= */
+
+.nsn-detail-page { padding-top: 1.25rem; padding-bottom: 4rem; }
+
+.nsn-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+.nsn-detail-header__title {
+    font-family: var(--font-mono);
+    font-size: 1.875rem;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--bs-body-color);
+    word-break: break-all;
+}
+.nsn-detail-header__desc {
+    margin: 0.25rem 0 0;
+    font-size: 0.95rem;
+    color: var(--bs-secondary-color);
+    max-width: 60ch;
+}
+.nsn-detail-header__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.nsn-detail-audit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    line-height: 1;
+    border: 1px solid var(--bs-border-color);
+}
+.nsn-detail-audit__user { color: var(--bs-body-color); font-weight: 500; }
+
+.nsn-detail-panel {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg);
+    margin-bottom: 1.25rem;
+}
+.nsn-detail-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+.nsn-detail-panel__title {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+}
+.nsn-detail-panel__body { padding: 1rem 1.25rem; }
+.nsn-detail-panel__body--flush { padding: 0; }
+
+.nsn-detail-empty {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    background: var(--bs-tertiary-bg);
+    border: 1px dashed var(--bs-border-color);
+    color: var(--bs-body-color);
+    font-size: 0.875rem;
+}
+.nsn-detail-empty__title { font-weight: 600; margin-right: 0.4rem; }
+.nsn-detail-empty--quiet {
+    color: var(--bs-secondary-color);
+    background: transparent;
+    border-style: solid;
+    text-align: center;
+}
+
+.nsn-detail-grid-packout {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+}
+@media (max-width: 575.98px) {
+    .nsn-detail-grid-packout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.nsn-detail-field { position: relative; display: flex; flex-direction: column; }
+.nsn-detail-field__label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.nsn-detail-field__unit { color: var(--bs-tertiary-color, var(--bs-secondary-color)); font-weight: 500; }
+
+.nsn-detail-input {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    padding: 0.45rem 0.6rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    width: 100%;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.nsn-detail-input:focus {
+    outline: none;
+    border-color: var(--company-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--company-primary) 25%, transparent);
+}
+.nsn-detail-input--textarea {
+    font-family: inherit;
+    font-size: 0.9rem;
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.nsn-detail-field[data-state="saving"] .nsn-detail-input {
+    border-color: color-mix(in srgb, var(--bs-primary) 50%, var(--bs-border-color));
+}
+.nsn-detail-field[data-state="saved"] .nsn-detail-input {
+    border-color: var(--bs-success);
+}
+.nsn-detail-field[data-state="error"] .nsn-detail-input {
+    border-color: var(--bs-danger);
+}
+
+.nsn-detail-field__status {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: var(--bs-secondary-color);
+    opacity: 0;
+    transition: opacity 150ms ease;
+    pointer-events: none;
+}
+.nsn-detail-field[data-state="saving"] .nsn-detail-field__status,
+.nsn-detail-field[data-state="saved"] .nsn-detail-field__status,
+.nsn-detail-field[data-state="error"] .nsn-detail-field__status { opacity: 1; }
+.nsn-detail-field[data-state="saving"] .nsn-detail-field__status { color: var(--bs-secondary-color); }
+.nsn-detail-field[data-state="saved"] .nsn-detail-field__status { color: var(--bs-success); }
+.nsn-detail-field[data-state="error"] .nsn-detail-field__status { color: var(--bs-danger); }
+
+.nsn-detail-field__error {
+    display: none;
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--bs-danger);
+}
+.nsn-detail-field[data-state="error"] .nsn-detail-field__error { display: block; }
+
+@keyframes nsn-detail-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.nsn-detail-field[data-state="saving"] .nsn-detail-field__status::before {
+    content: "";
+    display: inline-block;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-right: 0.3rem;
+    border-radius: 50%;
+    background: currentColor;
+    animation: nsn-detail-pulse 900ms ease-in-out infinite;
+    vertical-align: middle;
+}
+
+.nsn-detail-calc {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--bs-border-color);
+    display: grid;
+    grid-template-columns: minmax(140px, 200px) 1fr;
+    gap: 1rem;
+    align-items: center;
+}
+@media (max-width: 575.98px) {
+    .nsn-detail-calc { grid-template-columns: 1fr; }
+}
+.nsn-detail-calc__output {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--bs-body-color);
+}
+.nsn-detail-calc__output span small {
+    display: block;
+    font-family: var(--bs-body-font-family);
+    color: var(--bs-secondary-color);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.nsn-detail-suppliers { width: 100%; border-collapse: separate; border-spacing: 0; }
+.nsn-detail-suppliers th,
+.nsn-detail-suppliers td { padding: 0.6rem 1rem; text-align: left; }
+.nsn-detail-suppliers thead th {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    border-bottom: 1px solid var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+}
+.nsn-detail-suppliers tbody tr {
+    border-top: 1px solid var(--bs-border-color);
+    transition: background 120ms ease, box-shadow 120ms ease;
+}
+.nsn-detail-suppliers tbody tr:first-child { border-top: 0; }
+.nsn-detail-suppliers tbody tr:hover {
+    background: var(--bs-tertiary-bg);
+    box-shadow: inset 3px 0 0 var(--company-primary);
+}
+.nsn-detail-suppliers td.is-numeric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-body-color);
+}
+.nsn-detail-suppliers a { color: var(--bs-body-color); text-decoration: none; }
+.nsn-detail-suppliers a:hover { color: var(--company-primary); text-decoration: underline; }
+
+.nsn-detail-defs { margin: 0; }
+.nsn-detail-defs > div {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: 0.5rem 1rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px dashed var(--bs-border-color);
+}
+.nsn-detail-defs > div:last-child { border-bottom: 0; }
+.nsn-detail-defs dt {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin: 0;
+    line-height: 1.5;
+}
+.nsn-detail-defs dd { margin: 0; color: var(--bs-body-color); word-break: break-word; }
+.nsn-detail-defs .is-mono { font-family: var(--font-mono); }
+
+.nsn-detail-usage-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-height: 18rem;
+    overflow-y: auto;
+}
+.nsn-detail-usage-list li {
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+.nsn-detail-usage-list a {
+    display: block;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.25rem;
+    color: var(--bs-body-color);
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+.nsn-detail-usage-list a:hover {
+    background: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+    color: var(--company-primary);
+}
+.nsn-detail-usage-list .is-mono { font-family: var(--font-mono); }
+.nsn-detail-usage-section + .nsn-detail-usage-section { margin-top: 1rem; }
+.nsn-detail-usage-cap {
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--bs-secondary-color);
+    font-style: italic;
+}
+
+/* ----- Approved Sources panel (replaces the legacy supplier-capabilities
+   table). Resolved rows render in normal contrast; unresolved rows are
+   visually de-emphasized so the eye lands on familiar suppliers first.
+   Chip colors come from Bootstrap 5.3's --bs-*-bg-subtle / -text-emphasis
+   tokens, which auto-flip under [data-bs-theme="dark"] — no new theme
+   tokens are needed. ----- */
+.nsn-detail-source-meta {
+    margin: 0 0 0.6rem;
+    font-size: 0.78rem;
+    color: var(--bs-secondary-color);
+}
+.nsn-detail-source-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--bs-border-color);
+    max-height: 22rem;
+    overflow-y: auto;
+}
+.nsn-detail-source-row {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 12rem) auto;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.55rem 0.25rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.875rem;
+    line-height: 1.35;
+}
+.nsn-detail-source-row:last-child { border-bottom: 0; }
+.nsn-detail-source-row--unresolved {
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+}
+.nsn-detail-source-row--unresolved .nsn-detail-source-name { color: var(--bs-secondary-color); }
+.nsn-detail-source-row--resolved a.nsn-detail-source-name:hover {
+    color: var(--company-primary);
+    text-decoration: underline;
+}
+
+.nsn-detail-source-cage {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    color: var(--bs-body-color);
+    text-align: left;
+    white-space: nowrap;
+}
+.nsn-detail-source-row--unresolved .nsn-detail-source-cage { color: var(--bs-secondary-color); }
+
+.nsn-detail-source-name {
+    color: var(--bs-body-color);
+    text-decoration: none;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+.nsn-detail-source-pn {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nsn-detail-source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+.nsn-detail-source-chip--resolved {
+    background: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text-emphasis);
+    border-color: var(--bs-success-border-subtle);
+}
+.nsn-detail-source-chip--unresolved {
+    background: var(--bs-secondary-bg-subtle);
+    color: var(--bs-secondary-color);
+    border-color: var(--bs-secondary-border-subtle);
+}
+.nsn-detail-source-chip__dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.nsn-detail-source-foot {
+    margin: 0.6rem 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--bs-border-color);
+    font-size: 0.72rem;
+    font-style: italic;
+    color: var(--bs-secondary-color);
+}
+
+@media (max-width: 767.98px) {
+    .nsn-detail-source-row {
+        grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+        grid-template-areas: "cage name name" "pn pn chip";
+        row-gap: 0.2rem;
+    }
+    .nsn-detail-source-cage { grid-area: cage; }
+    .nsn-detail-source-name { grid-area: name; }
+    .nsn-detail-source-pn   { grid-area: pn; padding-left: 5.35rem; }
+    .nsn-detail-source-chip { grid-area: chip; justify-self: end; }
+}

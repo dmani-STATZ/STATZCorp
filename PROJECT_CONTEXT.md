@@ -44,6 +44,29 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 ##### SharePoint Document Browser
 Standalone document browser at `/contracts/documents/` lists and uploads files for a contract's SharePoint folder. It integrates with `contract_management.html` via a "Documents" button. Graph calls use client credentials flow (service principal), folder paths are stored in `Contract.files_url`, and the browser syncs contract context across tabs using `localStorage` plus a named window. It supports fallback to a parent/root folder and legacy path handling.
 
+###### Layout (Popup-Optimized)
+
+The documents browser is a popup-optimized layout: edge-to-edge, no max-width,
+flex-column structure where only the file list scrolls. Header (with Save Path
++ Close Window), banner, horizontal breadcrumb, and toolbar (search + upload
+button) are all flex-shrink: 0. The file list area has flex: 1 and is the drag-
+drop target for uploads. No dedicated upload zone wastes vertical space.
+
+##### SharePoint Path Resolution
+The documents browser uses a smart path resolver in `contracts/services/sharepoint_paths.py` that validates `Contract.files_url` against modern SharePoint conventions before using it.
+
+- **Modern path:** starts with `SHAREPOINT_PATH_PREFIX` (defaults to `Statz-Public/data/V87/aFed-DOD`) or with the contract's per-company `Company.sharepoint_documents_path`.
+- **Legacy / invalid:** UNC paths (`\\server\path`), Windows drive letters (`C:\...`), backslashes, HTTP/HTTPS URLs, or anything outside the canonical prefix. These are rejected by `is_modern_sharepoint_path()` and trigger pattern fallback.
+
+**Resolution order** (`resolve_contract_folder_path`):
+1. `files_url` if it passes strict validation (`source='files_url'`)
+2. Pattern path (`source='pattern'`):
+   - Regular: `{ROOT}/Contract {contract_number}`
+   - IDIQ delivery order: `{ROOT}/Contract {idiq.contract_number}/Delivery Order {contract_number}`
+3. Root prefix folder fallback when the resolved path 404s in Graph
+
+`legacy_detected` is surfaced on both `contract_details_api` and `sharepoint_files_api` GET responses; the browser shows a warning banner prompting the user to click **Save Path to Contract** to update `files_url` to the modern format. `fell_back_to_root` is surfaced on the files API when the resolved path 404s, prompting a separate banner.
+
 ---
 
 ### `processing` — Staging Pipeline

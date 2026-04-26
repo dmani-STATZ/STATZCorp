@@ -76,9 +76,16 @@ Run repo-wide search before any of these changes:
 - Export flow changes:
 - export view/service + template triggers + downstream consumers of filenames/columns.
 - SharePoint document browser path handling:
-- `Contract.files_url` stores the folder path; update via `contracts/services/sharepoint_service.py` API.
-- Default path logic: `files_url` → pattern-based (regular or IDIQ) → fallback to parent/root.
-- If IDIQ path structure changes, update `contracts/services/sharepoint_service.py` `build_idiq_path()`.
+- `Contract.files_url` stores the folder path; update via `contracts/services/sharepoint_service.py` (Graph wrappers) and `contracts/services/sharepoint_paths.py` (validation + pattern construction).
+- Default path logic: strict validation of `files_url` (`is_modern_sharepoint_path`) → pattern-based (`build_pattern_path` for regular vs IDIQ) → fallback to parent/root via `fallback_to_root` / `get_root_fallback_path`.
+- If IDIQ path structure changes, update `build_pattern_path()` in `contracts/services/sharepoint_paths.py`. Validation is prefix-based and stays the same.
+- API responses (`contract_details_api`, `sharepoint_files_api`) surface `legacy_detected` and `fell_back_to_root` flags; the documents browser shows warning banners based on these.
+- Popup-window pages (like the documents browser) use a different layout paradigm than main app routes:
+  - `body` has `overflow: hidden`, `height: 100vh`; outer wrapper is flex column with `height: 100vh`
+  - Only the primary content area (e.g., file list) scrolls (`flex: 1; overflow-y: auto`); chrome is fixed (`flex-shrink: 0`)
+  - No max-width on containers; use full popup width
+  - Action buttons (Save Path, Close) live in the header, not at the bottom
+  - Compact spacing throughout: 8–12px padding, 13–14px font sizes
 
 ## 7. App Boundary Rules
 - `contracts` is the canonical source for contract/CLIN/company lifecycle data.

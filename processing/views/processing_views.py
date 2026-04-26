@@ -70,6 +70,21 @@ def get_default_contract_status():
     return status
 
 
+def _get_default_sales_class():
+    """
+    Return the SalesClass row representing STATZ, or None if not seeded.
+
+    Silent on missing — callers should treat None as "leave field blank".
+    Logs a warning so the missing-seed condition is visible in logs.
+    """
+    sc = SalesClass.objects.filter(sales_team='STATZ').first()
+    if sc is None:
+        logger.warning(
+            "Default SalesClass 'STATZ' not found; ProcessContract.sales_class will be left blank."
+        )
+    return sc
+
+
 @login_required
 @require_POST
 def start_new_contract(request):
@@ -142,6 +157,7 @@ def start_new_contract(request):
             tab_num=new_tab_number,
             status='in_progress',
             files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + contract_number,
+            sales_class=_get_default_sales_class(),
             created_by=request.user,
             modified_by=request.user
         )
@@ -219,6 +235,7 @@ def start_processing(request, queue_id):
             queue_id=queue_id,
             description=queue_item.description,
             files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number,
+            sales_class=_get_default_sales_class(),
             created_by=request.user,
             modified_by=request.user
         )
