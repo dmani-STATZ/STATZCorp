@@ -6,7 +6,8 @@ from datetime import timedelta
 from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Value, CharField
+from django.db.models.functions import Replace
 from django.http import JsonResponse
 import json
 import logging
@@ -396,9 +397,16 @@ def contract_search(request):
     if len(query) < 3:
         return JsonResponse([], safe=False)
 
+    query_nodash = query.replace('-', '')
+
     # Search by contract number, last 6 characters, or contract's PO number
-    contracts = Contract.objects.filter(
+    contracts = Contract.objects.annotate(
+        contract_number_nodash=Replace(
+            'contract_number', Value('-'), Value(''), output_field=CharField()
+        )
+    ).filter(
         Q(contract_number__icontains=query) |
+        Q(contract_number_nodash__icontains=query_nodash) |
         (Q(contract_number__iendswith=query[-6:]) if len(query) >= 6 else Q()) |
         Q(po_number__icontains=query)  # Search Contract's po_number field
     )

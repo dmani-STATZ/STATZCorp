@@ -200,6 +200,8 @@ The Add Note flow uses the same modal as Edit Note and is opened from the notes 
 | `processing` | `SequenceNumber` for PO/TAB number defaults |
 | `users` | `User`, `UserCompanyMembership`, `UserSettings`, `conditional_login_required` decorator, `request.active_company` middleware |
 
+NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.py` normalizes the search term using `normalize_nsn` from `processing.services.contract_utils`. Do not replace this with raw `icontains` on `nsn_code` alone — that will break dashless search again.
+
 ### Apps that depend on this app:
 | App | How it depends |
 |-----|---------------|

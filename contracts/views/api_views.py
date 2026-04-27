@@ -6,6 +6,8 @@ from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 import json
 
+from processing.services.contract_utils import normalize_nsn
+
 from ..models import (
     Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, Buyer, IdiqContract
 )
@@ -198,8 +200,19 @@ def get_select_options(request, field_name):
             
             # Apply search if provided
             if search_term:
+                # Normalize the search term so users can search with or without dashes.
+                # normalize_nsn converts a 13-digit dashless string to hyphenated format
+                # (e.g. "4730001256889" -> "4730-00-125-6889") and returns dashed input
+                # unchanged. We also build a dashless version of the term so that if the
+                # user types with dashes we can still match records that may be stored
+                # without them (defensive, since current data is stored dashed).
+                normalized_term = normalize_nsn(search_term) or search_term
+                dashless_term = search_term.replace('-', '')
+
                 queryset = queryset.filter(
-                    Q(nsn_code__icontains=search_term) | 
+                    Q(nsn_code__icontains=search_term) |
+                    Q(nsn_code__icontains=normalized_term) |
+                    Q(nsn_code__icontains=dashless_term) |
                     Q(description__icontains=search_term)
                 )
             
