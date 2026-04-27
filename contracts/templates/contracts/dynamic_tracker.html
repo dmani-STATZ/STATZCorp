@@ -105,6 +105,14 @@
         60%  { background-color: #78350f; }
         100% { background-color: transparent; }
     }
+
+    .dark #dt-toolbar { background: var(--bs-body-bg, #111827); }
+
+    #dt-table thead tr th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+    }
 </style>
 {% endblock extra_head %}
 
@@ -114,7 +122,7 @@
 {{ column_order|json_script:"column-order-data" }}
 
 <div id="dt-container" class="dt-locked" style="width: 98%; max-width: none; margin: 0 auto; padding: 1.5rem 1rem;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 1rem;">
+    <div id="dt-toolbar" style="position: sticky; top: 0; z-index: 10; background: var(--bs-body-bg, #fff); display:flex; align-items:center; justify-content:space-between; margin-bottom: 0; padding-bottom: 0.75rem;">
         <div style="display:flex; align-items:center; gap:0.75rem;">
             <a href="{% url 'contracts:tracker_list' %}" style="color:#9ca3af; text-decoration:none;">&larr;</a>
             <h1 style="font-size:1.5rem; font-weight:700;">{{ schema.name }}</h1>
@@ -137,7 +145,7 @@
         </div>
     </div>
 
-    <div style="overflow-x:auto; border:1px solid rgba(156,163,175,0.3); border-radius:0.5rem;">
+    <div style="overflow-x:auto; overflow-y:auto; max-height: calc(100vh - 8rem); border:1px solid rgba(156,163,175,0.3); border-radius:0.5rem;">
         <table class="dt-table" id="dt-table">
             <thead>
                 <tr id="dt-header-row"></tr>
