@@ -58,6 +58,7 @@
         [data-bs-theme="dark"] .docs-file-list li:hover { background: #2b2f33; }
         [data-bs-theme="dark"] .docs-file-list li.folder { color: var(--company-primary, #6ea8fe); }
         [data-bs-theme="dark"] .docs-file-area { background: #212529; }
+        [data-bs-theme="dark"] .docs-file-area.dragover::after { color: var(--company-primary, #6ea8fe); }
         [data-bs-theme="dark"] .docs-banner.warning {
             background: #332d00; color: #ffc107; border-color: #665800;
         }
@@ -163,7 +164,7 @@
 
         /* ── Breadcrumb ── */
         .docs-breadcrumb {
-            padding: 8px 16px;
+            padding: 30px 16px 8px 16px;
             border-bottom: 1px solid #e9ecef;
             flex-shrink: 0;
             overflow: hidden;
@@ -258,6 +259,26 @@
             outline-offset: -6px;
         }
 
+        .docs-file-area::after {
+            content: '↓  Drop files here';
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            min-height: 80px;
+            align-items: center;
+            justify-content: center;
+            color: var(--company-primary, #0066cc);
+            font-size: 13px;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .docs-file-area.dragover::after {
+            display: flex;
+        }
+
         /* ── Upload progress ── */
         .docs-upload-progress {
             padding: 8px 16px;
@@ -321,6 +342,7 @@
             margin: 0;
             padding: 0;
             flex: 1;
+            min-height: 80px;
         }
 
         .docs-file-list li {
