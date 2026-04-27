@@ -6,43 +6,46 @@
 
 {% block content %}
 {% csrf_token %}
-<div class="container mx-auto px-4 py-4">
+<div class="container-fluid px-3 py-3">
     <!-- Combined Header Section -->
     <div class="card card-padded mb-4">
-        <div class="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
-            <h1 class="text-2xl font-bold text-gray-800">Contract Dashboard</h1>
+        <div class="d-flex flex-column flex-lg-row flex-wrap align-items-lg-center justify-content-lg-between gap-3">
+            <div class="flex-shrink-0">
+                <h1 class="fs-4 fw-bold text-body mb-0">Contract Dashboard</h1>
+            </div>
 
-            <div class="w-full lg:w-1/2 px-2 flex items-center gap-4">
-                <div class="relative flex-1">
+            <div class="w-100 px-2 d-flex flex-wrap align-items-center gap-3" style="flex: 1 1 20rem; min-width: 0; max-width: 100%;">
+                <div class="position-relative flex-grow-1" style="min-width: 0;">
                     <input type="text"
                            id="contract-search"
-                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           class="form-control form-control-sm"
                            placeholder="Search by contract number, last 4 digits, or PO number..."
                            autocomplete="off">
                     <div id="search-results"
-                         class="absolute z-50 w-full card mt-1 border-gray-200 max-h-96 overflow-y-auto hidden">
+                         class="position-absolute w-100 card mt-1 border overflow-y-auto d-none"
+                         style="max-height: 24rem; z-index: 1050;">
                     </div>
                 </div>
-                <div class="flex items-center gap-3 shrink-0">
-                    <span class="text-sm font-medium text-gray-700">Status:</span>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="radio" name="contract-status" value="open" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700">Open</span>
-                    </label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="radio" name="contract-status" value="closed" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700">Closed</span>
-                    </label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="radio" name="contract-status" value="both" checked class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500 mr-1.5">
-                        <span class="text-sm text-gray-700">Both</span>
-                    </label>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0 flex-wrap">
+                    <span class="form-label mb-0 me-2 small">Status:</span>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="contract-status" value="open" id="contract-status-open">
+                        <label class="form-check-label small" for="contract-status-open">Open</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="contract-status" value="closed" id="contract-status-closed">
+                        <label class="form-check-label small" for="contract-status-closed">Closed</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="contract-status" value="both" checked id="contract-status-both">
+                        <label class="form-check-label small" for="contract-status-both">Both</label>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex space-x-2">
-                <a href="{% url 'processing:queue' %}" class="btn-primary text-white justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="d-flex justify-content-start justify-content-lg-end flex-shrink-0">
+                <a href="{% url 'processing:queue' %}" class="btn-primary text-white d-inline-flex align-items-center justify-content-center text-decoration-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="me-1 flex-shrink-0" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     New Contract Queue
@@ -87,52 +90,62 @@
         <!-- Stats Views Container -->
         <div id="stats-container">
             <!-- Card View -->
-            <div id="card-view" class="{% if dashboard_view == 'card' or not dashboard_view %}block{% else %}hidden{% endif %}">
-                <div class="flex gap-4 p-4">
+            <div id="card-view" class="{% if not dashboard_view or dashboard_view == 'card' %}{% else %}d-none{% endif %}">
+                <div class="d-flex flex-column flex-xl-row gap-3 p-3">
                     <!-- Main Stats Section -->
-                    <div class="flex-1">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex flex-wrap gap-3 w-100">
                             <!-- Contracts Due Card -->
-                            <div class="card card-padded border-4 border-blue-400 stat-card-hover text-center">
-                                <h3 class="text-lg font-semibold text-gray-600 mb-2">Due</h3>
-                                <p class="text-4xl font-bold text-blue-600" id="contracts-due" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due }}</p>
+                            <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
+                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                    <h3 class="fs-6 fw-semibold text-body-secondary mb-2">Due</h3>
+                                    <p class="display-6 fw-bold text-primary" id="contracts-due" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due }}</p>
+                                </div>
                             </div>
 
                             <!-- Contracts Due Late Card -->
-                            <div class="card card-padded border-4 border-blue-500 stat-card-hover text-center">
-                                <h3 class="text-lg font-semibold text-gray-600 mb-2">Due Late</h3>
-                                <p class="text-4xl font-bold text-red-600" id="contracts-due-late" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due_late }}</p>
+                            <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
+                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                    <h3 class="fs-6 fw-semibold text-body-secondary mb-2">Due Late</h3>
+                                    <p class="display-6 fw-bold text-danger" id="contracts-due-late" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due_late }}</p>
+                                </div>
                             </div>
 
                             <!-- Contracts Due OnTime Card -->
-                            <div class="card card-padded border-4 border-blue-600 stat-card-hover text-center">
-                                <h3 class="text-lg font-semibold text-gray-600 mb-2">Due OnTime</h3>
-                                <p class="text-4xl font-bold text-green-600" id="contracts-due-ontime" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due_ontime }}</p>
+                            <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
+                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                    <h3 class="fs-6 fw-semibold text-body-secondary mb-2">Due OnTime</h3>
+                                    <p class="display-6 fw-bold text-success" id="contracts-due-ontime" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due_ontime }}</p>
+                                </div>
                             </div>
 
                             <!-- New Contracts Card -->
-                            <div class="card card-padded border-4 border-blue-700 stat-card-hover text-center">
-                                <h3 class="text-lg font-semibold text-gray-600 mb-2">New Contracts</h3>
-                                <p class="text-4xl font-bold text-blue-600" id="new-contracts" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.new_contracts }}</p>
+                            <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
+                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                    <h3 class="fs-6 fw-semibold text-body-secondary mb-2">New Contracts</h3>
+                                    <p class="display-6 fw-bold text-primary" id="new-contracts" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.new_contracts }}</p>
+                                </div>
                             </div>
 
                             <!-- New Contract Value Card -->
-                            <div class="card card-padded border-4 border-blue-800 stat-card-hover text-center">
-                                <h3 class="text-lg font-semibold text-gray-600 mb-2">New Contracts Value</h3>
-                                <p class="font-bold text-blue-600" id="new-contract-value" style="font-size: clamp(1rem, 1.5vw, 1.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</p>
+                            <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
+                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                    <h3 class="fs-6 fw-semibold text-body-secondary mb-2">New Contracts Value</h3>
+                                    <p class="fw-bold text-primary" id="new-contract-value" style="font-size: clamp(1rem, 1.5vw, 1.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</p>
+                                </div>
                             </div>
                         </div>
 
                         <!-- Time Span Navigation -->
-                        <div class="flex justify-center items-center space-x-4 py-6">
-                            <button id="prev-period" class="period-nav-btn">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="d-flex justify-content-center align-items-center gap-3 py-4">
+                            <button type="button" id="prev-period" class="period-nav-btn" aria-label="Previous period">
+                                <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                                 </svg>
                             </button>
-                            <h2 id="current-period" class="text-2xl font-bold text-gray-700 text-center" style="min-width: 200px;">THIS WEEK</h2>
-                            <button id="next-period" class="period-nav-btn">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <h2 id="current-period" class="fs-4 fw-bold text-body text-center mb-0" style="min-width: 200px;">THIS WEEK</h2>
+                            <button type="button" id="next-period" class="period-nav-btn" aria-label="Next period">
+                                <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
@@ -140,85 +153,85 @@
                     </div>
 
                     <!-- Total Contracts Card -->
-                    <div class="card card-padded border-4 border-blue-800 stat-card-hover w-64 flex flex-col justify-center">
-                        <h3 class="text-xl font-semibold text-gray-600 mb-4 text-center">Total Contracts</h3>
-                        <p class="text-5xl font-bold text-blue-600 text-center" id="total-contracts">{{ total_contracts }}</p>
+                    <div class="card card-padded border border-primary border-3 stat-card-hover d-flex flex-column justify-content-center flex-shrink-0" style="width: 16rem; max-width: 100%;">
+                        <h3 class="fs-5 fw-semibold text-body-secondary mb-3 text-center">Total Contracts</h3>
+                        <p class="display-5 fw-bold text-primary text-center mb-0" id="total-contracts">{{ total_contracts }}</p>
                     </div>
                 </div>
             </div>
 
             <!-- Table View -->
-            <div id="table-view" class="{% if dashboard_view == 'table' %}block{% else %}hidden{% endif %}">
-                <div class="overflow-x-auto p-4">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+            <div id="table-view" class="{% if dashboard_view == 'table' %}{% else %}d-none{% endif %}">
+                <div class="table-responsive p-3">
+                    <table class="table table-sm table-hover table-bordered align-middle mb-0 w-100">
+                        <thead class="table-dark">
                             <tr>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider bg-gray-100">Category</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Week</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Week</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Month</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Month</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Quarter</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Quarter</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">This Year</th>
-                                <th scope="col" class="px-4 py-2 text-left label tracking-wider">Last Year</th>
+                                <th scope="col" class="text-start label">Category</th>
+                                <th scope="col" class="text-start label">This Week</th>
+                                <th scope="col" class="text-start label">Last Week</th>
+                                <th scope="col" class="text-start label">This Month</th>
+                                <th scope="col" class="text-start label">Last Month</th>
+                                <th scope="col" class="text-start label">This Quarter</th>
+                                <th scope="col" class="text-start label">Last Quarter</th>
+                                <th scope="col" class="text-start label">This Year</th>
+                                <th scope="col" class="text-start label">Last Year</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due</td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_week">{{ periods.this_week.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_week">{{ periods.last_week.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_month">{{ periods.this_month.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_month">{{ periods.last_month.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_quarter">{{ periods.this_quarter.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_quarter">{{ periods.last_quarter.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_year">{{ periods.this_year.contracts_due }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_year">{{ periods.last_year.contracts_due }}</a></td>
+                        <tbody>
+                            <tr>
+                                <td class="table-secondary fw-medium text-nowrap small">Contracts Due</td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_week">{{ periods.this_week.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_week">{{ periods.last_week.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_month">{{ periods.this_month.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_month">{{ periods.last_month.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_quarter">{{ periods.this_quarter.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_quarter">{{ periods.last_quarter.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=this_year">{{ periods.this_year.contracts_due }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due&period=last_year">{{ periods.last_year.contracts_due }}</a></td>
                             </tr>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due Late</td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_week">{{ periods.this_week.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_week">{{ periods.last_week.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_month">{{ periods.this_month.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_month">{{ periods.last_month.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_quarter">{{ periods.this_quarter.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_quarter">{{ periods.last_quarter.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_year">{{ periods.this_year.contracts_due_late }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-red-600"><a class="text-red-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_year">{{ periods.last_year.contracts_due_late }}</a></td>
+                            <tr>
+                                <td class="table-secondary fw-medium text-nowrap small">Contracts Due Late</td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_week">{{ periods.this_week.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_week">{{ periods.last_week.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_month">{{ periods.this_month.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_month">{{ periods.last_month.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_quarter">{{ periods.this_quarter.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_quarter">{{ periods.last_quarter.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=this_year">{{ periods.this_year.contracts_due_late }}</a></td>
+                                <td class="text-nowrap small"><a class="text-danger" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_late&period=last_year">{{ periods.last_year.contracts_due_late }}</a></td>
                             </tr>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">Contracts Due OnTime</td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_week">{{ periods.this_week.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_week">{{ periods.last_week.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_month">{{ periods.this_month.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_month">{{ periods.last_month.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_quarter">{{ periods.this_quarter.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_quarter">{{ periods.last_quarter.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_year">{{ periods.this_year.contracts_due_ontime }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-green-600"><a class="text-green-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_year">{{ periods.last_year.contracts_due_ontime }}</a></td>
+                            <tr>
+                                <td class="table-secondary fw-medium text-nowrap small">Contracts Due OnTime</td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_week">{{ periods.this_week.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_week">{{ periods.last_week.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_month">{{ periods.this_month.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_month">{{ periods.last_month.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_quarter">{{ periods.this_quarter.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_quarter">{{ periods.last_quarter.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=this_year">{{ periods.this_year.contracts_due_ontime }}</a></td>
+                                <td class="text-nowrap small"><a class="text-success" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=contracts_due_ontime&period=last_year">{{ periods.last_year.contracts_due_ontime }}</a></td>
                             </tr>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contract Value</td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_week">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_week">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_month">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_month">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_quarter">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_quarter">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_year">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_year">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</a></td>
+                            <tr>
+                                <td class="table-secondary fw-medium text-nowrap small">New Contract Value</td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_week">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_week">${{ periods.last_week.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_month">${{ periods.this_month.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_month">${{ periods.last_month.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_quarter">${{ periods.this_quarter.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_quarter">${{ periods.last_quarter.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=this_year">${{ periods.this_year.new_contract_value|floatformat:2|intcomma }}</a></td>
+                                <td class="text-nowrap small"><a class="text-primary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contract_value&period=last_year">${{ periods.last_year.new_contract_value|floatformat:2|intcomma }}</a></td>
                             </tr>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">New Contracts</td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_week">{{ periods.this_week.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_week">{{ periods.last_week.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_month">{{ periods.this_month.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_month">{{ periods.last_month.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_quarter">{{ periods.this_quarter.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_quarter">{{ periods.last_quarter.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_year">{{ periods.this_year.new_contracts }}</a></td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600"><a class="text-gray-600 hover:underline" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_year">{{ periods.last_year.new_contracts }}</a></td>
+                            <tr>
+                                <td class="table-secondary fw-medium text-nowrap small">New Contracts</td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_week">{{ periods.this_week.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_week">{{ periods.last_week.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_month">{{ periods.this_month.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_month">{{ periods.last_month.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_quarter">{{ periods.this_quarter.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_quarter">{{ periods.last_quarter.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=this_year">{{ periods.this_year.new_contracts }}</a></td>
+                                <td class="text-nowrap small text-body"><a class="text-body-secondary" target="_blank" rel="noopener" href="{% url 'contracts:dashboard_metric_detail' %}?metric=new_contracts&period=last_year">{{ periods.last_year.new_contracts }}</a></td>
                             </tr>
                         </tbody>
                     </table>
@@ -227,71 +240,71 @@
         </div>
 
         <!-- Contract List -->
-        <div class="card overflow-hidden mb-6">
+        <div class="card overflow-hidden mb-4">
             <div class="section-header-gradient">
-                <h2 class="text-lg font-semibold text-white">Recent Contracts</h2>
-                <a href="{% url 'contracts:contract_log_view' %}" class="text-white hover:text-blue-100 text-sm font-medium">
+                <h2 class="fs-6 fw-semibold text-white mb-0">Recent Contracts</h2>
+                <a href="{% url 'contracts:contract_log_view' %}" class="text-white small fw-medium link-light text-decoration-none">
                     Master Log
                 </a>
             </div>
-            <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto;">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50 sticky top-0">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover table-bordered align-middle mb-0 w-100">
+                    <thead class="table-dark position-sticky top-0">
                         <tr>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
+                            <th scope="col" class="text-start label">
                                 Status
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
-                                <span class="text-green-600 font-medium">TAB #</span> / <span class="text-yellow-600 font-medium">PO #</span>
+                            <th scope="col" class="text-start label">
+                                <span class="text-success fw-medium">TAB #</span> / <span class="text-warning fw-medium">PO #</span>
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
+                            <th scope="col" class="text-start label">
                                 IDIQ #
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
+                            <th scope="col" class="text-start label">
                                 Contract
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
+                            <th scope="col" class="text-start label">
                                 Supplier
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
+                            <th scope="col" class="text-start label">
                                 <span title="Award Date">Awarded</span>
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider">
+                            <th scope="col" class="text-start label">
                                 Due Date
                             </th>
-                            <th scope="col" class="px-3 py-2 text-left label tracking-wider" style="width: 90px;">
+                            <th scope="col" class="text-start label" style="width: 90px;">
                                 Actions
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody>
                         {% for contract in contracts %}
-                        <tr class="contract-table-row {% if contract.status.description == 'Cancelled' %}bg-red-50{% elif contract.status.description == 'Open' %}bg-gray-50{% endif %}">
-                            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <tr class="contract-table-row {% if contract.status.description == 'Cancelled' %}table-danger{% endif %}">
+                            <td class="text-nowrap small fw-medium text-body">
                                 <span class="status-badge {% if contract.status.description == 'Cancelled' %}cancelled{% elif contract.status.description == 'Open' %}open{% else %}closed{% endif %}">
                                     {{ contract.status.description }}
                                 </span>
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                                <span class="text-green-600 font-medium">{{ contract.tab_num }}</span> / <span class="text-yellow-600 font-medium">{{ contract.po_number }}</span>
+                            <td class="text-nowrap small fw-medium text-body">
+                                <span class="text-success fw-medium">{{ contract.tab_num }}</span> / <span class="text-warning fw-medium">{{ contract.po_number }}</span>
                             </td>
-                            <td class="idiq-cell px-3 py-2 text-sm font-medium text-gray-900">
+                            <td class="idiq-cell small fw-medium text-body">
                                 {% if contract.idiq_contract and contract.idiq_contract.id %}
-                                    <a href="{% url 'contracts:idiq_contract_detail' contract.idiq_contract.id %}" class="hover:text-blue-800" title="{{ contract.idiq_contract.contract_number|default:'-' }}">
+                                    <a href="{% url 'contracts:idiq_contract_detail' contract.idiq_contract.id %}" class="text-primary" title="{{ contract.idiq_contract.contract_number|default:'-' }}">
                                         {{ contract.idiq_contract.contract_number|default:"-" }}
                                     </a>
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-sm text-blue-600">
-                                <a href="{% url 'contracts:contract_management' contract.id %}" class="hover:text-blue-800">
+                            <td class="text-nowrap small text-primary">
+                                <a href="{% url 'contracts:contract_management' contract.id %}" class="text-primary text-decoration-none">
                                     {{ contract.contract_number }}{% if contract.is_idiq %}*{% endif %}
                                 </a>
                             </td>
-                            <td class="px-3 py-2 text-sm">
+                            <td class="small text-body">
                                 {% if contract.supplier_id %}
-                                    <a class="text-blue-600 hover:text-blue-800 supplier-name-cell"
+                                    <a class="text-primary supplier-name-cell text-decoration-none"
                                        href="{% url 'suppliers:supplier_detail' contract.supplier_id %}"
                                        title="{{ contract.supplier_name|upper }}">
                                         {{ contract.supplier_name|upper }}
@@ -300,47 +313,47 @@
                                     <span class="supplier-name-cell" title="{{ contract.supplier_name|upper }}">{{ contract.supplier_name|upper }}</span>
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                            <td class="text-nowrap small text-body-tertiary">
                                 {{ contract.award_date|date:"M d, Y" }}
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                            <td class="text-nowrap small text-body-tertiary">
                                 {% if contract.due_date %}
                                     {{ contract.due_date|date:"M d, Y" }}
                                     {% if contract.status.description == 'Open' and contract.due_date < today %}
-                                        <span class="text-red-600 font-medium">(Overdue)</span>
+                                        <span class="text-danger fw-medium">(Overdue)</span>
                                     {% endif %}
                                 {% else %}
                                     --
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500" style="width: 90px;">
-                                <div class="flex space-x-2">
-                                    <a href="{% url 'contracts:finance_audit_detail' contract.id %}" class="text-blue-600 hover:text-blue-900" title="Finance Audit">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <td class="text-nowrap small text-body-tertiary" style="width: 90px;">
+                                <div class="d-flex gap-2">
+                                    <a href="{% url 'contracts:finance_audit_detail' contract.id %}" class="text-primary" title="Finance Audit">
+                                        <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                     </a>
-                                    <a href="{% url 'contracts:contract_management' contract.id %}" class="text-blue-600 hover:text-blue-900" title="View">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <a href="{% url 'contracts:contract_management' contract.id %}" class="text-primary" title="View">
+                                        <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </a>
-                                    <a href="{% url 'contracts:contract_update' contract.id %}" class="text-indigo-600 hover:text-indigo-900" title="Edit">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <a href="{% url 'contracts:contract_update' contract.id %}" class="text-primary" title="Edit">
+                                        <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
                                     {% if contract.status.description == 'Open' %}
-                                    <a href="{% url 'contracts:contract_close' contract.id %}" class="text-yellow-600 hover:text-yellow-900" title="Close">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <a href="{% url 'contracts:contract_close' contract.id %}" class="text-warning" title="Close">
+                                        <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                         </svg>
                                     </a>
                                     {% endif %}
                                     {% if contract.status.description != 'Cancelled' %}
                                     <a href="{% url 'contracts:contract_cancel' contract.id %}" class="btn btn-caution" title="Cancel">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </a>
@@ -350,9 +363,9 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="px-6 py-10 text-center text-gray-500">
-                                <p class="text-base">No contracts found matching your criteria.</p>
-                                <p class="text-sm mt-2">Try adjusting your search or filter settings.</p>
+                            <td colspan="8" class="px-4 py-5 text-center text-body-secondary">
+                                <p class="mb-2">No contracts found matching your criteria.</p>
+                                <p class="small mb-0">Try adjusting your search or filter settings.</p>
                             </td>
                         </tr>
                         {% endfor %}
@@ -362,126 +375,135 @@
         </div>
 
         <!-- Dashboard Metrics -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="d-flex flex-wrap gap-3 mb-3 px-3">
+            <div class="flex-fill" style="min-width: min(100%, 16rem); max-width: 100%; flex: 1 1 16rem;">
             <!-- Open Contracts -->
-            <div class="card card-padded">
+            <div class="card card-padded h-100">
                 <div class="row">
-                    <div class="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                        <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex-shrink-0 bg-primary bg-opacity-10 rounded p-3">
+                        <svg class="text-primary" style="width:1.5rem;height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="label truncate">Open Contracts</dt>
-                            <dd>
-                                <div class="text-lg font-medium text-gray-900">{{ metrics.open_contracts }}</div>
+                    <div class="ms-3 min-w-0 flex-grow-1">
+                        <dl class="mb-0">
+                            <dt class="label text-truncate">Open Contracts</dt>
+                            <dd class="mb-0">
+                                <div class="fs-6 fw-medium text-body">{{ metrics.open_contracts }}</div>
                             </dd>
                         </dl>
                     </div>
                 </div>
-                <div class="mt-4">
+                <div class="mt-3">
                     <div class="row-between">
-                        <span class="text-sm font-medium text-red-600">Overdue: {{ metrics.overdue_contracts }}</span>
-                        <span class="text-sm font-medium text-green-600">On Time: {{ metrics.on_time_contracts }}</span>
+                        <span class="small fw-medium text-danger">Overdue: {{ metrics.overdue_contracts }}</span>
+                        <span class="small fw-medium text-success">On Time: {{ metrics.on_time_contracts }}</span>
                     </div>
-                    <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
+                    <div class="mt-1 w-100">
                         {% if metrics.open_contracts > 0 %}
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: '{{ metrics.on_time_percentage }}%'">
-                            </div>
-                            <div class="text-xs text-center mt-1">{{ metrics.on_time_percentage }}%</div>
+                        <div class="progress" style="height: 0.5rem;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ metrics.on_time_percentage }}">
+                            <div class="progress-bar bg-primary" style="width: {{ metrics.on_time_percentage }}%"></div>
+                        </div>
+                        <div class="text-center mt-1" style="font-size: 0.75rem;">{{ metrics.on_time_percentage }}%</div>
                         {% endif %}
                     </div>
                 </div>
             </div>
+            </div>
 
             <!-- Contracts by Type -->
-            <div class="card card-padded">
+            <div class="flex-fill" style="min-width: min(100%, 16rem); max-width: 100%; flex: 1 1 16rem;">
+            <div class="card card-padded h-100">
                 <div class="row">
-                    <div class="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                        <svg class="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex-shrink-0 bg-secondary bg-opacity-10 rounded p-3">
+                        <svg class="text-body-secondary" style="width:1.5rem;height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                         </svg>
                     </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Contracts by Buyer</dt>
-                            <dd>
-                                <div class="text-lg font-medium text-gray-900">---</div>
+                    <div class="ms-3 min-w-0 flex-grow-1">
+                        <dl class="mb-0">
+                            <dt class="label text-truncate">Contracts by Buyer</dt>
+                            <dd class="mb-0">
+                                <div class="fs-6 fw-medium text-body">---</div>
                             </dd>
                         </dl>
                     </div>
                 </div>
-                <div class="mt-4 space-y-2">
+                <div class="mt-3">
                     {% for type, count in metrics.contract_types.items %}
-                    <div class="row-between text-sm">
-                        <span class="text-gray-600">{{ type }}</span>
-                        <span class="font-medium text-gray-900">{{ count }}</span>
+                    <div class="row-between small mb-2">
+                        <span class="text-body-secondary">{{ type }}</span>
+                        <span class="fw-medium text-body">{{ count }}</span>
                     </div>
                     {% endfor %}
                 </div>
+            </div>
             </div>
 
             <!-- Upcoming Due Dates -->
-            <div class="card card-padded">
+            <div class="flex-fill" style="min-width: min(100%, 16rem); max-width: 100%; flex: 1 1 16rem;">
+            <div class="card card-padded h-100">
                 <div class="row">
-                    <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                        <svg class="h-6 w-6 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex-shrink-0 bg-warning bg-opacity-10 rounded p-3">
+                        <svg class="text-warning" style="width:1.5rem;height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                     </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Upcoming Due Dates</dt>
-                            <dd>
-                                <div class="text-lg font-medium text-gray-900">{{ metrics.upcoming_due_dates }}</div>
+                    <div class="ms-3 min-w-0 flex-grow-1">
+                        <dl class="mb-0">
+                            <dt class="label text-truncate">Upcoming Due Dates</dt>
+                            <dd class="mb-0">
+                                <div class="fs-6 fw-medium text-body">{{ metrics.upcoming_due_dates }}</div>
                             </dd>
                         </dl>
                     </div>
                 </div>
-                <div class="mt-4 space-y-2">
+                <div class="mt-3">
                     {% for contract in metrics.upcoming_contracts|slice:":3" %}
-                    <div class="row-between text-sm">
-                        <a href="{% url 'contracts:contract_management' contract.id %}" class="text-blue-600 hover:text-blue-800 truncate" style="max-width: 180px;">
+                    <div class="row-between small mb-2">
+                        <a href="{% url 'contracts:contract_management' contract.id %}" class="text-primary text-truncate text-decoration-none" style="max-width: 180px;">
                             {{ contract.contract_number }}
                         </a>
-                        <span class="font-medium text-gray-900">{{ contract.due_date|date:"M d" }}</span>
+                        <span class="fw-medium text-body">{{ contract.due_date|date:"M d" }}</span>
                     </div>
                     {% empty %}
-                    <div class="text-sm text-gray-500">No upcoming due dates</div>
+                    <div class="small text-body-secondary">No upcoming due dates</div>
                     {% endfor %}
                 </div>
             </div>
+            </div>
 
             <!-- Active Suppliers -->
-            <div class="card card-padded">
+            <div class="flex-fill" style="min-width: min(100%, 16rem); max-width: 100%; flex: 1 1 16rem;">
+            <div class="card card-padded h-100">
                 <div class="row">
-                    <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
-                        <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex-shrink-0 bg-success bg-opacity-10 rounded p-3">
+                        <svg class="text-success" style="width:1.5rem;height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                     </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Active Suppliers</dt>
-                            <dd>
-                                <div class="text-lg font-medium text-gray-900">{{ metrics.active_supplier_count }}</div>
+                    <div class="ms-3 min-w-0 flex-grow-1">
+                        <dl class="mb-0">
+                            <dt class="label text-truncate">Active Suppliers</dt>
+                            <dd class="mb-0">
+                                <div class="fs-6 fw-medium text-body">{{ metrics.active_supplier_count }}</div>
                             </dd>
                         </dl>
                     </div>
                 </div>
-                <div class="mt-4 space-y-2">
+                <div class="mt-3">
                     {% for supplier in metrics.top_suppliers %}
-                    <div class="row-between text-sm">
-                        <a class="text-blue-600 hover:text-blue-800 truncate" style="max-width: 180px;" href="{% url 'suppliers:supplier_list' %}?supplier_id={{ supplier.supplier_id }}&tab=info">
+                    <div class="row-between small mb-2">
+                        <a class="text-primary text-truncate text-decoration-none" style="max-width: 180px;" href="{% url 'suppliers:supplier_list' %}?supplier_id={{ supplier.supplier_id }}&tab=info">
                             {{ supplier.supplier__name }}
                         </a>
-                        <span class="font-medium text-blue-600">{{ supplier.contract_count }} contracts</span>
+                        <span class="fw-medium text-primary">{{ supplier.contract_count }} contracts</span>
                     </div>
                     {% empty %}
-                    <div class="text-sm text-gray-500">No active suppliers</div>
+                    <div class="small text-body-secondary">No active suppliers</div>
                     {% endfor %}
                 </div>
+            </div>
             </div>
         </div>
     </div>
@@ -501,7 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const query = this.value;
 
         if (query.length < 3) {
-            searchResults.classList.add('hidden');
+            searchResults.classList.add('d-none');
             return;
         }
 
@@ -517,27 +539,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     if (results.length > 0) {
                         results.forEach(contract => {
-                            const div = document.createElement('div');
-                            div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                            const a = document.createElement('a');
+                            a.className = 'dropdown-item text-primary';
+                            a.href = `/contracts/${contract.id}/`;
 
-                            let html = `
-                                <a href="/contracts/${contract.id}/" class="block">
-                                    <div class="text-sm text-blue-600">${contract.contract_number}</div>
-                            `;
+                            let inner = '<div class="small fw-medium">' + contract.contract_number + '</div>';
 
                             // Add PO numbers if available
                             if (contract.po_numbers && contract.po_numbers.length > 0) {
-                                html += `<div class="text-xs text-gray-500 mt-1">PO: ${contract.po_numbers.join(', ')}</div>`;
+                                inner += '<div class="text-body-tertiary mt-1" style="font-size:0.75rem">PO: ' + contract.po_numbers.join(', ') + '</div>';
                             }
 
-                            html += `</a>`;
-                            div.innerHTML = html;
-
-                            searchResults.appendChild(div);
+                            a.innerHTML = inner;
+                            searchResults.appendChild(a);
                         });
-                        searchResults.classList.remove('hidden');
+                        searchResults.classList.remove('d-none');
                     } else {
-                        searchResults.classList.add('hidden');
+                        searchResults.classList.add('d-none');
                     }
                 });
         }, 300);
@@ -555,7 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Hide search results when clicking outside
     document.addEventListener('click', function(e) {
         if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
+            searchResults.classList.add('d-none');
         }
     });
 });
@@ -637,8 +655,8 @@ function toggleView(view) {
     tableBtn.setAttribute('aria-pressed', view === 'table');
 
     // Show/hide panels
-    document.getElementById('card-view').classList.toggle('hidden', view !== 'card');
-    document.getElementById('table-view').classList.toggle('hidden', view !== 'table');
+    document.getElementById('card-view').classList.toggle('d-none', view !== 'card');
+    document.getElementById('table-view').classList.toggle('d-none', view !== 'table');
 
     // DO NOT TOUCH ANYTHING BELOW — UserSettings save
     fetch(dashboardSettingUrl, {
