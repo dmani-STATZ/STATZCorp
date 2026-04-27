@@ -548,7 +548,7 @@ function sortRecords(records) {
         if (primaryCol.type === 'select') {
             const opt = (primaryCol.options || []).find(o => o.value === raw);
             const pri = (opt && opt.sort_priority != null) ? Number(opt.sort_priority) : NaN;
-            return { type: 'num', val: isFinite(pri) ? pri : Number.MAX_SAFE_INTEGER };
+            return { type: 'num', val: isFinite(pri) ? pri : -1 };
         }
         if (primaryCol.type === 'checkbox') return { type: 'num', val: raw ? 0 : 1 };
         return { type: 'str', val: (raw == null ? '' : String(raw)) };
