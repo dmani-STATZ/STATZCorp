@@ -505,22 +505,28 @@
     </div>
 
     <script>
-        let currentContractId = {{ contract_id|default:"null" }};
+        const IS_IDIQ = {{ is_idiq|yesno:"true,false" }};
+        const ENTITY_ID = {{ contract_id|default:"null" }};
+        let currentContractId = ENTITY_ID;
         let currentFolderPath = "{{ initial_folder_path|default:''|escapejs }}";
         let currentFiles = [];
         let currentFolders = [];
         let legacyPathDetected = false;
         const LEGACY_BANNER_MESSAGE = "Legacy folder path detected. Showing default contract folder. Click 'Save Path' to update.";
 
-        const STORAGE_KEY = 'statz_documents_contract_id';
-        const CONTRACT_DETAILS_URL_TEMPLATE = "{% url 'contracts:contract_details_api' 0 %}";
-        const SHAREPOINT_FILES_URL = "{% url 'contracts:sharepoint_files_api' %}";
-        const SET_FILE_PATH_URL = "{% url 'contracts:set_file_path_api' %}";
+        const STORAGE_KEY = IS_IDIQ ? 'statz_documents_idiq_id' : 'statz_documents_contract_id';
+        const ENTITY_QUERY_PARAM = IS_IDIQ ? 'idiq_id' : 'contract_id';
+        const DOCUMENTS_BROWSER_BASE_URL = IS_IDIQ
+            ? "{% url 'contracts:idiq_documents_browser' %}"
+            : "{% url 'contracts:documents_browser' %}";
+        const CONTRACT_DETAILS_URL = "{{ contract_details_url|default:''|escapejs }}";
+        const SHAREPOINT_FILES_URL = "{{ sharepoint_files_url|default:''|escapejs }}";
+        const SET_FILE_PATH_URL = "{{ set_file_path_url|default:''|escapejs }}";
         const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
-            const contractIdParam = params.get('contract_id');
+            const contractIdParam = params.get(ENTITY_QUERY_PARAM);
 
             if (contractIdParam) {
                 currentContractId = parseInt(contractIdParam, 10);
@@ -539,18 +545,14 @@
                 if (e.key === STORAGE_KEY && e.newValue) {
                     const newContractId = parseInt(e.newValue, 10);
                     if (newContractId !== currentContractId) {
-                        window.location.href = `/contracts/documents/?contract_id=${encodeURIComponent(newContractId)}`;
+                        window.location.href = `${DOCUMENTS_BROWSER_BASE_URL}?${ENTITY_QUERY_PARAM}=${encodeURIComponent(newContractId)}`;
                     }
                 }
             });
         });
 
-        function contractDetailsUrl(contractId) {
-            return CONTRACT_DETAILS_URL_TEMPLATE.replace('/0/', `/${contractId}/`);
-        }
-
         function loadContractAndFolder() {
-            fetch(contractDetailsUrl(currentContractId), {
+            fetch(CONTRACT_DETAILS_URL, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' }
             })
@@ -857,10 +859,11 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({
-                    contract_id: currentContractId,
-                    file_path: currentFolderPath
-                })
+                body: JSON.stringify(
+                    IS_IDIQ
+                        ? { idiq_id: ENTITY_ID, file_path: currentFolderPath }
+                        : { contract_id: ENTITY_ID, file_path: currentFolderPath }
+                )
             })
                 .then(function(r) {
                     return r.json().then(function(data) {

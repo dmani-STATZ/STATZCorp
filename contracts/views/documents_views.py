@@ -15,7 +15,9 @@ from STATZWeb.decorators import conditional_login_required
 from contracts.models import Contract
 from contracts.services import sharepoint_service
 from contracts.services.sharepoint_paths import (
+    get_idiq_root_fallback_path,
     get_root_fallback_path,
+    resolve_idiq_folder_path,
     resolve_contract_folder_path,
 )
 from contracts.services.sharepoint_service import SharePointError, SharePointNotFound
@@ -32,6 +34,12 @@ def _contract_for_request(request, contract_id: int) -> Contract:
         pk=contract_id,
         company=active_company,
     )
+
+
+def _idiq_for_request(request, idiq_id: int):
+    """Fetch an IdiqContract, enforcing login but no company filter (IdiqContract has no company FK)."""
+    from contracts.models import IdiqContract
+    return get_object_or_404(IdiqContract, pk=idiq_id)
 
 
 def _parse_contract_id(value) -> Optional[int]:
@@ -87,6 +95,7 @@ def documents_browser_view(request):
             ),
             "sharepoint_files_url": reverse("contracts:sharepoint_files_api"),
             "set_file_path_url": reverse("contracts:set_file_path_api"),
+            "is_idiq": False,
             "browser_config": browser_config,
         },
     )
@@ -103,6 +112,54 @@ def contract_details_api(request, contract_id):
             "success": True,
             "contract_id": contract.id,
             "contract_number": contract.contract_number or "",
+            "default_folder_path": resolution["path"],
+            "path_source": resolution["source"],
+            "legacy_detected": resolution["legacy_detected"],
+        }
+    )
+
+
+@conditional_login_required
+@require_GET
+def idiq_documents_browser_view(request):
+    idiq_id = request.GET.get("idiq_id")
+    idiq_pk = _parse_contract_id(idiq_id)
+    if idiq_pk is None:
+        return render(
+            request,
+            "contracts/documents_browser.html",
+            {"error": "No IDIQ ID provided"},
+        )
+
+    idiq = _idiq_for_request(request, idiq_pk)
+    resolution = resolve_idiq_folder_path(idiq)
+    initial_path = resolution["path"]
+    return render(
+        request,
+        "contracts/documents_browser.html",
+        {
+            "contract_id": idiq.id,
+            "contract_number": idiq.contract_number or "",
+            "initial_folder_path": initial_path,
+            "contract_details_url": reverse("contracts:idiq_details_api", kwargs={"idiq_id": idiq.id}),
+            "sharepoint_files_url": reverse("contracts:sharepoint_files_api"),
+            "set_file_path_url": reverse("contracts:set_idiq_file_path_api"),
+            "is_idiq": True,
+            "documents_root": get_idiq_root_fallback_path(idiq),
+        },
+    )
+
+
+@conditional_login_required
+@require_GET
+def idiq_contract_details_api(request, idiq_id):
+    idiq = _idiq_for_request(request, idiq_id)
+    resolution = resolve_idiq_folder_path(idiq)
+    return JsonResponse(
+        {
+            "success": True,
+            "contract_id": idiq.id,
+            "contract_number": idiq.contract_number or "",
             "default_folder_path": resolution["path"],
             "path_source": resolution["source"],
             "legacy_detected": resolution["legacy_detected"],
@@ -228,4 +285,35 @@ def set_file_path_api(request):
     contract.files_url = file_path
     contract.modified_by = request.user
     contract.save()
+    return JsonResponse({"success": True, "message": "Path saved successfully"})
+
+
+@conditional_login_required
+@require_POST
+def set_idiq_file_path_api(request):
+    from contracts.models import IdiqContract
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON body."}, status=400)
+
+    idiq_id = payload.get("idiq_id")
+    file_path = sharepoint_service.normalize_folder_path(payload.get("file_path") or "")
+    idiq_pk = _parse_contract_id(idiq_id)
+    if idiq_pk is None or not file_path:
+        return JsonResponse(
+            {"success": False, "error": "idiq_id and file_path are required."},
+            status=400,
+        )
+    if len(file_path) > IdiqContract._meta.get_field("files_url").max_length:
+        return JsonResponse(
+            {"success": False, "error": "The selected SharePoint path is too long to save."},
+            status=400,
+        )
+
+    idiq = _idiq_for_request(request, idiq_pk)
+    idiq.files_url = file_path
+    idiq.modified_by = request.user
+    idiq.save()
     return JsonResponse({"success": True, "message": "Path saved successfully"})

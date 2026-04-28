@@ -79,6 +79,11 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - **Contract log:** `/contracts/log/` shows CLIN-centric grid with filters and exports (`contracts/views/contract_log_views.py`).
 - **Finance audit & payment:** `/contracts/finance-audit/` renders `finance_audit.html`; `api/payment-history/<entity_type>/<entity_id>/<payment_type>/` handles payment-entry persistence (updates totals on CLIN records).
 - **IDIQ data:** `/contracts/idiq/<pk>/`, update, IDIQ detail creation/deletion, and search endpoints for NSN/suppliers (`contracts/views/idiq_views.py`).
+  - `IdiqContract` is now a first-class entity in the standalone Documents Browser flow; `IdiqContract.files_url` stores the saved SharePoint folder path with the same purpose as `Contract.files_url`.
+  - New IDIQ Documents Browser endpoints: `idiq_documents_browser` (GET), `idiq_details_api` (GET), and `set_idiq_file_path_api` (POST).
+  - `contracts/services/sharepoint_paths.py` now includes IDIQ-specific path helpers: `build_idiq_pattern_path`, `resolve_idiq_folder_path`, and `get_idiq_root_fallback_path`.
+  - IDIQ path resolution has no company override branch because `IdiqContract` has no company FK; it always uses `get_sharepoint_prefix()` directly.
+  - The split summary rollup (`idiq_clin_split_rollup`) remains removed from `IdiqContractDetailView` and `idiq_contract_detail.html`; it was never referenced in user meetings and added no value to the page.
 - **Superuser admin:** `/contracts/companies/`, `/contracts/code-tables/`, `/contracts/admin-tools/` for bulk supplier SharePoint URLs.
 - **Supporting APIs:** `/contracts/search/`, `/contracts/clin/<id>/notes/`, `/contracts/clin/<id>/details/`, `/contracts/supplier/<id>/info/`, `/contracts/api/options/<field>/`, `/contracts/api/clin/<id>/update-field/`, `/contracts/clin/<clin_pk>/splits/`, `/contracts/api/shipments/*`, `/contracts/api/nsn/create`, `/contracts/api/buyers/create`, `/contracts/api/suppliers/create`, `/contracts/api/day-counts/`, `/contracts/api/payment-history/*`.
   - `contract_search` (`/contracts/search/`) supports dash-free contract-number input by normalizing dashes at query time with a `Replace` annotation on `contract_number`; this is runtime-only behavior and does not require model or migration changes.

@@ -189,6 +189,9 @@ from .views.company_views import (
 from .views.documents_views import (
     contract_details_api,
     documents_browser_view,
+    idiq_contract_details_api,
+    idiq_documents_browser_view,
+    set_idiq_file_path_api,
     set_file_path_api,
     sharepoint_files_api,
 )
@@ -550,6 +553,21 @@ urlpatterns = [
         "idiq/<int:pk>/details/<int:detail_id>/delete/",
         IdiqContractDetailsDeleteView.as_view(),
         name="idiq_contract_detail_delete",
+    ),
+    path(
+        "documents/idiq/",
+        idiq_documents_browser_view,
+        name="idiq_documents_browser",
+    ),
+    path(
+        "api/idiq/<int:idiq_id>/details/",
+        idiq_contract_details_api,
+        name="idiq_details_api",
+    ),
+    path(
+        "api/idiq/set-file-path/",
+        set_idiq_file_path_api,
+        name="set_idiq_file_path_api",
     ),
     path("nsn/search/", NsnSearchView.as_view(), name="nsn_search"),
     path("supplier/search/", SupplierSearchView.as_view(), name="supplier_search"),

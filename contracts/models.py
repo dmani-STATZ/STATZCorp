@@ -463,6 +463,7 @@ class IdiqContract(AuditModel):
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     max_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     min_guarantee = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    files_url = models.CharField(max_length=200, null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='idiq_contract')
 
     class Meta:
@@ -479,6 +480,46 @@ class IdiqContract(AuditModel):
 
     def __str__(self):
         return f"IDIQ Contract {self.contract_number}"
+
+    def get_sharepoint_documents_url(self):
+        """
+        Build a SharePoint folder URL for this IDIQ contract's documents.
+        Uses Company-level SharePoint settings from the active company when available;
+        otherwise falls back to STATZ defaults.
+        Closed IDIQs (self.closed == True) use the 'Closed Contracts' subfolder.
+        Returns None if contract_number is blank.
+
+        NOTE: IdiqContract has no company FK. Resolve the active company using
+        the same pattern as the rest of the app: import Company and call
+        Company.get_default_company() as the fallback. However, since IdiqContract
+        does not have a company FK, always use Company.get_default_company() here.
+        """
+        from urllib.parse import quote
+        from contracts.models import Company
+
+        if not self.contract_number:
+            return None
+
+        company = Company.get_default_company()
+        base_url = (company.sharepoint_base_url or '').strip().rstrip('/') if company else ''
+        site_name = (company.sharepoint_site_name or '').strip() if company else ''
+        docs_path = (company.sharepoint_documents_path or '').strip().rstrip('/') if company else ''
+
+        if not base_url or not site_name or not docs_path:
+            base_url = 'https://statzcorpgcch.sharepoint.us/sites'
+            site_name = 'Statz'
+            docs_path = 'Statz-Public/data/V87/aFed-DOD'
+
+        base = f'{base_url}/{site_name}/Shared%20Documents/Forms/AllItems.aspx'
+        root = f'/sites/{site_name}/Shared Documents/{docs_path}'
+
+        if self.closed:
+            folder_path = f'{root}/Closed Contracts/Contract {self.contract_number}'
+        else:
+            folder_path = f'{root}/Contract {self.contract_number}'
+
+        viewid = 'd4837fde%2D32f5%2D41cc%2Db723%2D09d5f692b2ea'
+        return f'{base}?id={quote(folder_path)}&viewid={viewid}'
 
 
 class IdiqContractDetails(models.Model):
@@ -630,6 +671,7 @@ class GovAction(AuditModel):
         ('ECP', 'ECP'),
         ('QN', 'QN'),
         ('NCR', 'NCR'),
+        ('SOW', 'SOW'),
     ]
     REQUEST_CHOICES = [
         ('Admin', 'Admin'),

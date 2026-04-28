@@ -170,6 +170,7 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - Bootstrap ScrollSpy is initialised in JS (`new bootstrap.ScrollSpy(document.body, { target: '#clin-page-nav', smoothScroll: true })`), not via `data-bs-spy` attributes. A `MutationObserver` on `#clin-transaction-history` calls `scrollSpy.refresh()` after the AJAX history fetch so newly inserted content is tracked.
 
 ### SharePoint path resolution
+- `IdiqContract.get_sharepoint_documents_url()` follows the same SharePoint URL construction pattern as `Contract.get_sharepoint_documents_url()`, but uses `self.closed` (boolean) instead of `status.description`, and always resolves company via `Company.get_default_company()` because `IdiqContract` has no company FK.
 - `contracts/services/sharepoint_paths.py` — strict validation (`is_modern_sharepoint_path`), pattern construction (`build_pattern_path` handles regular vs IDIQ delivery orders via `contract.idiq_contract_id`), and structured resolution (`resolve_contract_folder_path` returns `{path, source, legacy_detected}`). Always use `join_path()` for path concatenation; never glue paths with `+` or f-strings.
 - `contracts/services/sharepoint_service.py` — Graph wrappers (`list_folder_contents`, `fallback_to_root`, `normalize_legacy_path`). `list_folder_contents` raises `SharePointNotFound` on 404; the views catch it and walk up parents, ultimately falling through to `get_root_fallback_path(contract)`.
 - `contracts/views/documents_views.py` — `contract_details_api` and `_list_sharepoint_files` both surface `legacy_detected`; `_list_sharepoint_files` also surfaces `fell_back_to_root` when the resolved path 404s.
@@ -349,6 +350,10 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 12. **Deprecated `api_add_note`** reads `request.content_type` (which is not set in AJAX requests). Any legacy call must pass `content_type_id` and `object_id` explicitly. No active in-app callers; the route remains for old bookmarks.
 
 13. **There is no longer a standalone CLIN edit page.** CLIN field edits are handled by the Transactions edit modal (`openTransactionsEditModal`). Do not re-add a dedicated CLIN edit view or `/contracts/clin/<pk>/edit/` route without removing the Transaction wiring from `clin_detail.html` first.
+
+14. **`IdiqContract` has no `company` FK.** Do not try to apply company-level SharePoint root overrides to IDIQ path resolution. Use `get_sharepoint_prefix()` directly for IDIQ folder patterns and root fallbacks.
+
+15. **`documents_browser.html` payload key switches by mode.** The template uses `IS_IDIQ` to choose between posting `{contract_id, file_path}` and `{idiq_id, file_path}` for Save Path. If you change the browser payload shape, update both branches together.
 
 ---
 

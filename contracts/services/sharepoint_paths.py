@@ -140,10 +140,55 @@ def resolve_contract_folder_path(contract) -> Dict[str, Any]:
     }
 
 
+def build_idiq_pattern_path(idiq) -> str:
+    """Build the canonical SharePoint folder path for an IDIQ contract."""
+    # IdiqContract has no company FK, so IDIQ paths always use the global prefix.
+    root = get_sharepoint_prefix()
+    contract_number = (idiq.contract_number or "").strip()
+    if getattr(idiq, "closed", False):
+        return join_path(root, "Closed Contracts", f"Contract {contract_number}")
+    return join_path(root, f"Contract {contract_number}")
+
+
+def resolve_idiq_folder_path(idiq) -> Dict[str, Any]:
+    """Determine the correct SharePoint folder path for an IDIQ contract."""
+    files_url = getattr(idiq, "files_url", "") or ""
+
+    if files_url:
+        if is_modern_sharepoint_path(files_url, contract=None):
+            return {
+                "path": normalize_folder_path(files_url),
+                "source": "files_url",
+                "legacy_detected": False,
+            }
+        logger.info(
+            "Legacy files_url detected for IDIQ %s (%s): %r",
+            getattr(idiq, "id", "?"),
+            getattr(idiq, "contract_number", ""),
+            files_url,
+        )
+        return {
+            "path": build_idiq_pattern_path(idiq),
+            "source": "pattern",
+            "legacy_detected": True,
+        }
+
+    return {
+        "path": build_idiq_pattern_path(idiq),
+        "source": "pattern",
+        "legacy_detected": False,
+    }
+
+
 def get_root_fallback_path(contract=None) -> str:
     """Return the SharePoint root folder used when the resolved path 404s."""
     if contract is not None:
         root = get_contract_documents_root(contract).strip("/")
         if root:
             return root
+    return get_sharepoint_prefix()
+
+
+def get_idiq_root_fallback_path(idiq=None) -> str:
+    """Return the SharePoint root folder used when an IDIQ path 404s."""
     return get_sharepoint_prefix()

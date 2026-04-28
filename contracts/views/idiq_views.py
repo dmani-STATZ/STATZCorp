@@ -6,12 +6,12 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views import View
 from django.views.generic.edit import UpdateView
-from django.db.models import Q, Sum
+from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import IdiqContract, IdiqContractDetails, Contract, ClinSplit, Note
+from contracts.models import IdiqContract, IdiqContractDetails, Contract, Note
 from products.models import Nsn
 from suppliers.models import Supplier
 
@@ -26,20 +26,6 @@ class IdiqContractDetailView(LoginRequiredMixin, DetailView):
         # Get associated contracts
         contracts_qs = Contract.objects.filter(idiq_contract=self.object).select_related('idiq_contract', 'status').order_by('-award_date')
         context['contracts'] = contracts_qs
-
-        idiq_clin_split_rollup = [
-            {
-                'contract': c,
-                'rows': list(
-                    ClinSplit.objects.filter(clin__contract=c).values('company_name').annotate(
-                        total_value=Sum('split_value'),
-                        total_paid=Sum('split_paid'),
-                    ).order_by('company_name')
-                ),
-            }
-            for c in contracts_qs
-        ]
-        context['idiq_clin_split_rollup'] = idiq_clin_split_rollup
 
         # Get IDIQ contract details
         context['idiq_details'] = IdiqContractDetails.objects.filter(
