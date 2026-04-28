@@ -306,9 +306,9 @@
                     <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'suppliers:supplier_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Suppliers</a>
                     </li>
-                    {% if user.is_authenticated and user.is_superuser %}
+                    {% if user.is_authenticated %}
                     <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'contracts:company_list' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Companies</a>
+                        <a href="{% url 'reports:hub' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Reports</a>
                     </li>
                     {% endif %}
                     <li class="py-2 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
@@ -318,14 +318,16 @@
                                 <a href="{% url 'tools:index' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">PDF Merger</a>
                             </li>
                             <li>
-                                <a href="{% url 'reports:my_requests' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Reports</a>
-                            </li>
-                            <li>
                                 <a href="{% url 'inventory:dashboard' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Inventory</a>
                             </li>
                             <li>
                                 <a href="{% url 'contracts:folder_tracking' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Folder Tracking</a>
                             </li>
+                            {% if user.is_authenticated and user.is_superuser %}
+                            <li>
+                                <a href="{% url 'contracts:company_list' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Companies</a>
+                            </li>
+                            {% endif %}
                         </ul>
                     </li>
                 </ul>

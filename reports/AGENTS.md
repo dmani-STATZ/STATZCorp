@@ -1,210 +1,193 @@
 # AGENTS.md — `reports` app
-> **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
-
-Read `reports/CONTEXT.md` first. This file adds safe-edit guidance for AI coding agents; it does not repeat the context file.
-
----
+> Read `reports/CONTEXT.md` first.
 
 ## 1. Purpose of This File
-
-Defines how to safely modify the `reports` app. Every rule here is grounded in the actual code. This app is a **feature app** (reporting help-desk + admin SQL workspace with optional Anthropic-powered SQL generation), not a core domain app.
-
----
+Safe-edit guidance for the rebuilt reports backend (ticket flow + report library + versioning + sharing + staff prototype builder).
 
 ## 2. App Scope
-
 **Owns:**
-- `ReportRequest` lifecycle: user submits → admin writes SQL → user runs/exports
-- SQL safety enforcement (`utils.py`)
-- Synchronous **Anthropic Claude** SQL generation for superusers (`admin_ai_generate` → `ANTHROPIC_API_KEY`, model `claude-haiku-4-5-20251001`)
-- Table-filtered schema context in `contracts.utils.contracts_schema.generate_db_schema_snapshot()` (replaces the old `CORE_TABLES` + streaming flow)
+- `ReportDraft`, `ReportRequest`, `Report`, `ReportVersion`, `ReportShare`
+- SQL safety execution (`reports/utils.py`)
+- Superuser AI generation endpoint (`admin_ai_generate`)
+- Staff builder flow (`draft_builder`, `draft_iterate`, `draft_promote`, `draft_discard`)
 
 **Does not own:**
-- The `contracts_*` tables it queries — those belong to the `contracts` app (and related models)
-- OpenRouter / global shared model UI — that remains in the `suppliers` app for other features; the `reports` admin no longer calls `suppliers:global_ai_model_config` or `openrouter_config` from this app
-- The global “Reports AI” settings form in `base_template.html` (removed; `users:settings-*` and other context processor keys may still exist for unrelated UI)
-
----
+- Underlying `contracts_*`, `suppliers_*`, `products_*` schema
+- Global project routing mount (`STATZWeb/urls.py`)
 
 ## 3. Read This Before Editing
-
 ### Before changing models
-- `reports/models.py` — single model, UUID PK, status/category choices as string constants
-- `reports/migrations/0001_initial.py` — only migration; no subsequent schema changes
-- `reports/admin.py` — uses `status`, `category`, `created_at`, `last_run_at` directly
-- `reports/forms.py` — `SQLUpdateForm` exposes `sql_query` and `context_notes` to admins (no AI fields)
+- `reports/models.py`
+- `reports/migrations/0001_initial.py` (historical, keep)
+- `reports/migrations/0002_rebuild.py` (active architecture reset)
+- `reports/admin.py`
+- `reports/forms.py`
 
-### Before changing views
-- `reports/views.py` — user + admin + `admin_ai_generate` (no OpenRouter imports)
-- `reports/utils.py` — `is_safe_select`, `apply_limit`, `run_select` are called by multiple views
-- `contracts/utils/contracts_schema.py` — `generate_db_schema_snapshot()` for AI table selection + introspected text
+### Before changing AI behavior
+- `reports/views.py` (`admin_ai_generate` + draft AI calls)
+- `contracts/utils/contracts_schema.py`
+- `reports/utils.py`
+
+### Before changing URLs
+- `reports/urls.py`
+- `templates/base_template.html` (`reports:hub` top-level nav link)
+- `reports/templates/reports/*.html`
 
 ### Before changing templates
-- `reports/templates/reports/admin_dashboard.html` — inline `fetch` to `reports:admin_ai_generate`, `#id_sql_query`, preview/save wiring; no `EventSource`
-- `templates/base_template.html` — `reports:my_requests` only for this app’s global nav (no `reports:admin_save_ai_settings`)
-
-### Before changing URL names
-- Search `templates/base_template.html`, `reports/templates/reports/*.html`, and `reports/views.py` for any `reverse(...)` or `{% url '...' %}` referencing `reports:` names
-
-### Before changing SQL safety logic
-- `reports/utils.py` — `is_safe_select`, `apply_limit`, `run_select` are the only guard between user-visible SQL and the database; used by `run_report`, `export_report`, and `admin_preview_sql`
-
----
+All seven templates are production-built Bootstrap 5 UIs. Current template files:
+- `reports/templates/reports/hub.html`
+- `reports/templates/reports/run_results.html`
+- `reports/templates/reports/admin_queue.html`
+- `reports/templates/reports/draft_builder.html`
+- `reports/templates/reports/draft_iterate.html`
+- `reports/templates/reports/share_report.html`
 
 ## 4. Local Architecture / Change Patterns
-
-- All business logic for this app lives in `reports/views.py`. The `reports/services/` directory is empty; there are no service modules, selectors, or tasks.
-- `reports/utils.py` handles SQL validation and CSV serialization only — it is stateless and has no side effects (except the shared `generate_db_schema_snapshot` used by the contracts schema helper).
-- The admin template contains JavaScript for `admin_ai_generate`, preview `context_notes` copy, and save SQL hidden field; no SSE.
-- No signals, no Celery tasks, no management commands in this app.
-- The `_is_admin` guard function in `views.py` (checks `user.is_superuser`) is the only permission helper; it is not shared with other apps.
-
----
+- `Report` is the library item.
+- `ReportVersion` is immutable history; `Report.active_version` points to current.
+- `ReportRequest` is workflow/ticket metadata and can link to existing or newly spawned reports.
+- `ReportDraft` is temporary builder state for `is_staff`.
+- `ReportShare` controls user-level sharing and branch permission.
 
 ## 5. Files That Commonly Need to Change Together
-
 | Change | Files that must move together |
 |---|---|
-| Add a field to `ReportRequest` | `models.py` + new migration + `admin.py` (readonly_fields) + `forms.py` if admin-editable + relevant templates |
-| Change status values (`pending`/`completed`/`change`) | `models.py` constants + all `views.py` references + templates that branch on status + `admin.py` list_filter |
-| Change a URL name | `urls.py` + every `{% url 'reports:...' %}` in templates + any `reverse('reports:...')` in `views.py` |
-| Add a new admin view | `views.py` + `urls.py` + `admin_dashboard.html` (or new template) |
-| Change AI schema or Anthropic behavior | `views.py` (`admin_ai_generate`) + `contracts.utils.contracts_schema` + `admin_dashboard.html` fetch body / IDs |
-
----
+| Add/edit report request status values (`pending`, `in_progress`, `completed`, `change_requested`) | `models.py` + `views.py` queue filters/forms + `admin.py` |
+| Change report lifecycle fields (`active_version`, branching fields) | `models.py` + migration + `views.py` (`admin_save_version`) |
+| Change sharing behavior | `models.py` (`ReportShare`) + `forms.py` (`ReportShareForm`) + `views.py` (`share_report`) |
+| Change builder behavior | `models.py` (`ReportDraft`) + `forms.py` + `views.py` + draft templates |
+| Change URL names | `urls.py` + template `{% url %}` usage + `reverse(...)` call sites |
 
 ## 6. Cross-App Dependency Warnings
-
-### This app depends on:
-
-- **`users` app** — `ReportRequest.user` FK to `AUTH_USER_MODEL` (no `UserSettings` keys in `reports` views for AI)
-- **`contracts` app** — `contracts.utils.contracts_schema.generate_db_schema_snapshot` composes the introspected schema; introspection is implemented in `reports.utils.generate_db_schema_snapshot`
-- **`requests` + Anthropic** — `admin_ai_generate` POSTs to `https://api.anthropic.com/v1/messages`
-
-### Other apps that depend on this app:
-
-- **`templates/base_template.html`** — `reports:my_requests` in the user menu
-- No other app imports from `reports` in Python in typical setups (search before assuming)
-
----
+- Depends on `AUTH_USER_MODEL` for all ownership/share relations.
+- Depends on `contracts.utils.contracts_schema.generate_db_schema_snapshot` for AI context.
+- `templates/base_template.html` links to `reports:hub`; keep this URL stable or update both sides.
 
 ## 7. Security / Permissions Rules
-
-- **All views** are decorated with `@login_required`. Do not remove this.
-- **Admin views** (`admin_dashboard`, `admin_save_sql`, `admin_delete_request`, `admin_preview_sql`, `admin_ai_generate`) add `@user_passes_test(_is_admin)` which checks `user.is_superuser`. Do not weaken this to group-based checks without a security review.
-- **Object-level ownership**: `run_report`, `export_report`, and `request_change` manually verify `rr.user_id == request.user.id or request.user.is_superuser`. If you add new views that access `ReportRequest` by PK, replicate this check.
-- **SQL safety**: `is_safe_select` in `utils.py` is the only barrier between stored SQL and the database. Do not bypass it with direct `connection.cursor().execute()` calls in new views.
-- **CSV export**: `export_report` streams up to 50,000 rows without pagination. Treat it as a sensitive download path; preserve the ownership check and the `run_select` call.
-- **`admin_ai_generate`**: Superuser-only, POST-only, returns generated text only; still validate prompts are non-empty. Do not auto-run returned SQL.
-
----
+- Keep `@login_required` on all views.
+- Keep `_is_admin` (`is_superuser`) on admin queue + AI + admin mutating endpoints.
+- Keep `_is_staff_builder` (`is_staff`) on all draft builder endpoints.
+- `draft_promote` and `draft_discard` must enforce `draft.owner == request.user`.
+- Do not bypass `run_select` SQL safety for run/preview/export.
+- Preserve object-level access checks for owner/company/shared report visibility.
 
 ## 8. Model and Schema Change Rules
+- All report models use UUID PKs; keep UUID unless explicit migration strategy says otherwise.
+- `ReportVersion` is immutable: never edit existing rows in-place to represent new SQL.
+- New SQL must create a new `ReportVersion`, then repoint `Report.active_version`.
+- Keep `ReportVersion` unique per (`report`, `version_number`).
+- Keep branch metadata semantics (`branched_from`, `branch_count`, `keep_original`, `is_branch_request`) coherent across request and save-version flows.
 
-- `ReportRequest` is the only model. It has a UUID PK — do not change to integer without a data migration.
-- Status values are string constants defined on the model class and referenced by string in `views.py` filter calls. If you add or rename a status, update: `models.py` choices, all `views.py` filter/branch logic, and any template `{% if rr.status == "..." %}` checks.
-- `ai_prompt` and `ai_result` fields exist on the model but are never populated by any current view. Do not remove them without checking for future use or data already stored.
-- Only one migration exists (`0001_initial.py`). New field additions require a new migration. Coordinate with `startup.sh` if `RESET_REPORTS=1` is used in staging — that fake-resets migrations.
-- `last_run_at` and `last_run_rowcount` are updated via `update_fields` in `run_report`. If you add audit fields, follow the same targeted-save pattern.
+## 9. View / URL / Template Rules
+- Primary user landing URL is `reports:hub` (not `reports:my_requests`).
+- Keep admin queue URL names stable:
+  - `reports:admin_queue`
+  - `reports:admin_save_version`
+  - `reports:admin_preview_sql`
+  - `reports:admin_update_request`
+  - `reports:admin_delete_request`
+  - `reports:admin_ai_generate`
+- Keep builder URL names stable:
+  - `reports:draft_builder`
+  - `reports:draft_iterate`
+  - `reports:draft_promote`
+  - `reports:draft_discard`
+- `reports:revoke_share` does not yet exist — the Revoke button in `share_report.html` is rendered disabled with a TODO comment.
 
----
+### Critical DOM IDs (JS depends on these in admin_queue.html)
+The admin queue is a 4-step wizard. All logic is in `window._w` (an object exposing wizard functions). Do not rename IDs without updating both the HTML and the script block:
 
-## 9. View / URL / Template Change Rules
+**Wizard chrome**
+- `#queue-main` — scrollable right panel; `scrollTop` reset on step transition
+- `#wizard-nav` — sticky bottom nav bar; innerHTML set by `updateNav(n)`
+- `#si-1` … `#si-4` — step indicator items (classes: `active`, `done`)
+- `#sc-1` … `#sc-3` — step connector bars (class: `done`)
 
-- URL name `reports:my_requests` is used in `base_template.html`. Renaming it breaks the global menu — search globally before touching.
-- `admin_preview_sql` re-renders `reports/admin_dashboard.html` with `preview_columns` / `preview_rows`. If you refactor the admin template, preserve these keys.
-- `admin_dashboard` passes `pending` as a queryset of `ReportRequest` objects filtered to `status__in=[STATUS_PENDING, STATUS_CHANGE]`. Templates iterate this directly.
-- The JS in `admin_dashboard.html` must keep DOM IDs: `id_sql_query`, `id_context_notes` (Django form defaults), and `btn-generate-sql` / `ai-prompt` / `ai-error` for the new AI flow.
+**Step 1 — Review**
+- `#notes-textarea` — admin notes; value read by `step1Next()`
 
----
+**Step 2 — Generate**
+- `#ai-prompt` — editable AI prompt textarea
+- `#gen-error` — inline error alert for AI failures
+- `#generate-btn` — Generate SQL button (created dynamically in nav by `updateNav`)
+- `#generate-spinner` — spinner inside generate button
 
-## 10. Forms / Serializers / Input Validation Rules
+**Step 3 — Refine**
+- `#sql-editor` — editable SQL textarea; value synced into state on `acceptSQL()`
+- `#title-input` — editable suggested title; synced into state on `acceptSQL()`
+- `#tags-display` — tag badge container; rendered by `renderTags()`
+- `#iter-badge` — iteration counter badge
+- `#preview-spinner` — spinner while preview is fetching
+- `#preview-error` — warning alert for preview failures
+- `#preview-empty` — shown when query returns no rows
+- `#preview-wrap` — scrollable table wrapper
+- `#preview-table` — the `<table>` element; thead/tbody populated by JS
+- `#feedback-textarea` — revision feedback input
+- `#revise-btn` — triggers `reviseSQL()` (also wired via `addEventListener`)
+- `#revise-spinner` — spinner inside revise button
+- `#revise-error` — inline error for revision failures
 
-- `ReportRequestForm` intentionally exposes only `title`, `description`, `category` — never `sql_query`, `status`, or `user`. Do not add fields that let users set their own status or inject SQL.
-- `SQLUpdateForm` exposes `sql_query` and `context_notes` for admins only. If you add fields here, confirm the view passes the right `instance` and that `admin_save_sql` saves them correctly.
-- All SQL execution goes through `utils.run_select` → `utils.is_safe_select` → `utils.apply_limit`. Do not accept raw SQL from user-facing forms or views.
-- `request_change` appends a timestamped string to `context_notes` using string concatenation. If you change this format, existing notes remain in the old format — handle gracefully.
+**Step 4 — Save**
+- `#save-title` — report title input (`name=title form=save-form`)
+- `#save-tags-display` — tag badge display in step 4
+- `#save-sql-preview` — readonly SQL display textarea
+- `#save-context` — context notes (`name=context_notes form=save-form`)
+- `#save-change` — change notes (`name=change_notes form=save-form`)
 
----
+**Hidden form**
+- `#save-form` — invisible `<form>` element; submit triggered by `type="submit" form="save-form"`
+- `#save-sql-hidden` — hidden `name=sql_query` field; set by `acceptSQL()`
+- `#save-tags-hidden` — hidden `name=tags` field; set by `acceptSQL()`
+- `req-desc-data` — `<script type="application/json">` (via `json_script`) holding description text
 
-## 11. Background Tasks / Signals / Automation Rules
+**Sidebar**
+- `#filter-pills` — container for filter pill badges; pills have `data-filter` attribute
 
-**None.** There are no signals, no Celery tasks, no cron jobs, and no management commands in this app. `admin_ai_generate` is a synchronous HTTP round-trip to Anthropic (no WebSockets, no Channels).
+### CSS Scope Classes
+- `.reports-hub` — scoped styles on the reports hub page (`hub.html`)
+- `.reports-admin-queue` — scoped styles on the admin queue page (`admin_queue.html`)
+- Bootstrap 5 Spacelab is the primary styling tool; custom classes supplement only where Bootstrap utilities fall short.
 
----
+## 10. Forms / Validation Rules
+- User request form only accepts plain-language description.
+- Admin status form must not allow reverting status to `pending`.
+- Share form `shared_with` queryset must be set in view and exclude current user.
+- Keep AI tags normalized to lowercase and max 6 server-side.
 
-## 12. Testing and Verification Expectations
+## 11. Background Tasks / Automation
+No Celery/tasks in this app. AI calls are synchronous HTTP requests.
 
-**There are no real tests.** `reports/tests.py` contains only the autogenerated `TestCase` stub.
-
-After making changes, manually verify:
-
-1. **User flow**: log in as a non-superuser → visit `/reports/` → submit a new request → confirm it appears as pending
-2. **Admin flow**: log in as superuser → `/reports/admin/` → select a pending request → paste SQL → Preview → Save → confirm status becomes Completed
-3. **Run/Export**: as the owning user → click Run on a completed report → confirm results render → click Export CSV → confirm file downloads
-4. **Change request**: as owner → click Request Changes on a completed report → confirm status flips to `change`
-5. **AI generate**: in admin, enter a prompt (with `ANTHROPIC_API_KEY` set) → Generate SQL → confirm the SQL text appears in the editor; confirm errors show in `#ai-error`
-6. **Permission wall**: log in as non-superuser → attempt `/reports/admin/` and POST to `/reports/admin/ai/generate/` → not allowed
-7. **Base template**: confirm `{% url 'reports:my_requests' %}` still resolves
-
----
+## 12. Testing Expectations
+Manual verification after changes:
+1. Submit request from hub.
+2. Admin queue triage + SQL preview + save version.
+3. Run and export a report from hub.
+4. Submit change request (owner and non-owner/shared/company contexts).
+5. Share flow (`can_branch` on/off).
+6. Staff builder flow: create draft, iterate, promote, discard.
+7. Permission checks: non-superuser blocked from admin queue; non-staff blocked from builder routes.
 
 ## 13. Known Footguns
-
-- **Schema table filter** lives in `contracts.utils.contracts_schema`—if the DB gains new `contracts_*` / `auth_user` / content-type needs, update `_is_report_ai_schema_table` / `generate_db_schema_snapshot` rather than duplicating lists in `views.py`.
-- **JS form ID coupling**: `admin_dashboard.html` uses `document.getElementById('id_sql_query')`. If `SQLUpdateForm` field names change, the AI fill flow breaks silently.
-- **Status string constants**: Views filter by `status__in=[ReportRequest.STATUS_PENDING, ReportRequest.STATUS_CHANGE]`. Adding a new status without updating every queryset filter will cause requests to disappear from the admin list.
-- **`ai_prompt` / `ai_result` fields are never written**: they exist in the model/DB but no view populates them.
-- **`export_report` does not stream**: it calls `run_select(limit=50000)` and holds the full result in memory before writing CSV. Very large result sets will cause memory pressure.
-- **No test coverage**: any refactor of `utils.py` SQL safety logic carries silent regression risk.
-
----
+- Breaking `reports:hub` in `base_template.html` removes global Reports navigation.
+- Skipping version creation and writing directly to active SQL breaks immutability guarantees.
+- Queryset access checks must include shared/company visibility, not just ownership.
+- SQL preview/run/export must always pass through `run_select`.
 
 ## 14. Safe Change Workflow
-
-1. Read `reports/CONTEXT.md` for the big picture
-2. Read the specific files involved (model, view, template, form as appropriate)
-3. Search `templates/base_template.html` and all `reports/templates/` for URL name and context key references
-4. If touching AI schema or the Anthropic call, read `contracts.utils.contracts_schema` and `reports/views.py` `admin_ai_generate` together
-5. If touching the admin template JS, trace the DOM IDs and the `admin_ai_generate` endpoint
-6. Make minimal, scoped changes
-7. Manually run the user flow, admin flow, and permission wall checks described in Section 12
-
----
+1. Read `reports/CONTEXT.md`.
+2. Trace model + form + view + URL + template coupling before edits.
+3. Search for URL references before renaming.
+4. Keep changes scoped and migration-backed.
+5. Run checks and manual flow validation.
 
 ## 15. Quick Reference
-
 | Area | Primary files |
 |---|---|
-| Model | `reports/models.py` |
-| All logic | `reports/views.py` |
-| SQL safety | `reports/utils.py` |
-| AI schema helper | `contracts/utils/contracts_schema.py` |
+| Models | `reports/models.py` |
+| Migration baseline | `reports/migrations/0001_initial.py`, `reports/migrations/0002_rebuild.py` |
+| Views | `reports/views.py` |
+| SQL safety/version helper | `reports/utils.py` |
 | Forms | `reports/forms.py` |
-| URLs | `reports/urls.py` |
-| Admin registration | `reports/admin.py` |
-| Admin workspace UI | `reports/templates/reports/admin_dashboard.html` |
-| User dashboard | `reports/templates/reports/user_dashboard.html` |
-| Global nav coupling | `templates/base_template.html` (`reports:my_requests` only) |
-
-**Main cross-app dependencies:** `contracts.utils.contracts_schema` (table filter + snapshot), `ANTHROPIC_API_KEY` env, `users` (auth / FK)
-
-**Security-sensitive areas:** `is_safe_select` / `run_select` in `utils.py`; ownership check in `run_report` / `export_report` / `request_change`; `@user_passes_test(_is_admin)` on all admin views
-
-**Riskiest edits:**
-- Renaming `reports:my_requests` (breaks global menu)
-- Changing `SQLUpdateForm` field names (breaks admin JS)
-- Weakening the `_is_admin` / `is_superuser` check on admin views
-- Bypassing `utils.run_select` for any SQL execution path
-
-## CSS / Styling Rules
-
-This project does not use Tailwind in any form. All styling uses Bootstrap 5 plus the project's three-file CSS architecture:
-
-- `static/css/theme-vars.css` — color tokens and dark mode overrides only
-- `static/css/app-core.css` — all component, layout, and button styles
-- `static/css/utilities.css` — utility and helper classes
-
-**When editing templates:** if you encounter Tailwind utility classes, replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.
-
-**Button pattern:** `.btn-outline-brand` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for pill-style with `#eff6ff` background tint.
+| URL routing | `reports/urls.py` |
+| Admin registry | `reports/admin.py` |
+| User nav coupling | `templates/base_template.html` (`reports:hub`) |

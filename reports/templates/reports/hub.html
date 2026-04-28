@@ -1,0 +1,437 @@
+{% extends "base_template.html" %}
+
+{% block extra_head %}
+<style>
+.reports-hub .reports-view-container[data-view="grid"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+.reports-hub .reports-view-container[data-view="list"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card {
+    flex-direction: row;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card .card-body {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    flex-wrap: wrap;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card .report-title-area {
+    min-width: 200px;
+    flex: 1;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card .report-tags {
+    flex: 1;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card .report-meta {
+    display: none;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card .report-actions {
+    margin-top: 0;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.reports-hub .reports-view-container[data-view="list"] .report-card {
+    height: auto !important;
+}
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="reports-hub px-3 px-lg-4 py-3">
+
+  <!-- TOP BAR -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <h4 class="mb-0 fw-bold">Reports Hub</h4>
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <button class="btn btn-outline-brand btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#requestOffcanvas" aria-controls="requestOffcanvas">
+        + New Report Request
+      </button>
+      {% if user.is_staff %}
+      <a href="{% url 'reports:draft_builder' %}" class="btn btn-outline-secondary btn-sm">Build a Report</a>
+      {% endif %}
+      {% if user.is_superuser %}
+      <a href="{% url 'reports:admin_queue' %}" class="btn btn-outline-secondary btn-sm">Admin Queue</a>
+      {% endif %}
+      <div class="btn-group btn-group-sm ms-1" role="group" aria-label="View toggle">
+        <button type="button" class="btn btn-secondary" id="gridViewBtn" onclick="setReportView('grid')" title="Grid view">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3A1.5 1.5 0 0 1 15 10.5v3A1.5 1.5 0 0 1 13.5 15h-3A1.5 1.5 0 0 1 9 13.5v-3z"/>
+          </svg>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="listViewBtn" onclick="setReportView('list')" title="List view">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <ul class="nav nav-tabs mb-3" id="reportsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="my-reports-tab" data-bs-toggle="tab" data-bs-target="#myReportsPane" type="button" role="tab" aria-controls="myReportsPane" aria-selected="true">
+        My Reports
+        <span class="badge bg-secondary ms-1">{{ my_reports|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="company-reports-tab" data-bs-toggle="tab" data-bs-target="#companyReportsPane" type="button" role="tab" aria-controls="companyReportsPane" aria-selected="false">
+        Company Reports
+        <span class="badge bg-secondary ms-1">{{ company_reports|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="shared-reports-tab" data-bs-toggle="tab" data-bs-target="#sharedReportsPane" type="button" role="tab" aria-controls="sharedReportsPane" aria-selected="false">
+        Shared With Me
+        <span class="badge bg-secondary ms-1">{{ shared_with_me|length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="reportsTabContent">
+
+    <!-- MY REPORTS TAB -->
+    <div class="tab-pane fade show active" id="myReportsPane" role="tabpanel" aria-labelledby="my-reports-tab">
+      {% if my_reports %}
+      <div class="reports-view-container" id="myReportsContainer" data-view="grid">
+        {% for report in my_reports %}
+        <div class="card report-card h-100 shadow-sm">
+          <div class="card-body d-flex flex-column gap-2">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+              <div class="report-title-area">
+                <h6 class="fw-bold mb-0">{{ report.title }}</h6>
+              </div>
+              <div class="report-pills d-flex gap-1 flex-wrap">
+                {% if report.source == 'requested' %}
+                <span class="badge bg-info text-dark">Requested</span>
+                {% else %}
+                <span class="badge bg-primary">Prototyped</span>
+                {% endif %}
+                {% if report.visibility == 'personal' %}
+                <span class="badge bg-warning text-dark">Personal</span>
+                {% else %}
+                <span class="badge bg-success">Company</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="report-tags d-flex flex-wrap gap-1">
+              {% for tag in report.tags %}
+              <span class="badge bg-secondary small">{{ tag }}</span>
+              {% endfor %}
+            </div>
+            <div class="report-meta text-muted small">
+              {% if report.last_run_at %}
+              Last run: {{ report.last_run_at|date:"N j, Y" }}
+              {% else %}
+              Last run: never
+              {% endif %}
+              {% if report.branch_count > 0 %}
+              &nbsp;&middot;&nbsp;Branched {{ report.branch_count }} time{{ report.branch_count|pluralize }}
+              {% endif %}
+            </div>
+            <div class="report-actions d-flex flex-wrap gap-1 mt-auto">
+              <a href="{% url 'reports:run_report' report.id %}" class="btn btn-success btn-sm">Run</a>
+              <a href="{% url 'reports:export_report' report.id %}" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+              <a href="{% url 'reports:share_report' report.id %}" class="btn btn-outline-brand btn-sm">Share</a>
+              {% if report.visibility == 'personal' %}
+              <form method="post" action="{% url 'reports:promote_to_company' report.id %}" class="d-inline" onsubmit="return confirm('Promote this report to the company library? This cannot be undone.')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-warning btn-sm">Promote to Company</button>
+              </form>
+              {% endif %}
+              {% if report.source == 'requested' %}
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      data-action="change-request"
+                      data-url="{% url 'reports:request_change' report.id %}"
+                      data-title="{{ report.title|escapejs }}">Request Change</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="mb-3 opacity-50" viewBox="0 0 16 16">
+          <path d="M4 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm-2-4a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm8 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7 5a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2H7z"/>
+          <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4.414a1 1 0 0 0-.707.293L1.5 14.5A1 1 0 0 1 0 13.793V2zm14 0H2a.5.5 0 0 0-.5.5V13l2-2H14a.5.5 0 0 0 .5-.5V2.5A.5.5 0 0 0 14 2z"/>
+        </svg>
+        <p class="mb-0">You don't have any reports yet. Request one and we'll build it for you.</p>
+        <button class="btn btn-outline-brand btn-sm mt-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#requestOffcanvas">
+          + New Report Request
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- COMPANY REPORTS TAB -->
+    <div class="tab-pane fade" id="companyReportsPane" role="tabpanel" aria-labelledby="company-reports-tab">
+      {% if company_reports %}
+      <div class="reports-view-container" id="companyReportsContainer" data-view="grid">
+        {% for report in company_reports %}
+        <div class="card report-card h-100 shadow-sm">
+          <div class="card-body d-flex flex-column gap-2">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+              <div class="report-title-area">
+                <h6 class="fw-bold mb-0">{{ report.title }}</h6>
+                <small class="text-muted">by {{ report.owner.get_full_name|default:report.owner.username }}</small>
+              </div>
+              <div class="report-pills d-flex gap-1 flex-wrap">
+                {% if report.source == 'requested' %}
+                <span class="badge bg-info text-dark">Requested</span>
+                {% else %}
+                <span class="badge bg-primary">Prototyped</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="report-tags d-flex flex-wrap gap-1">
+              {% for tag in report.tags %}
+              <span class="badge bg-secondary small">{{ tag }}</span>
+              {% endfor %}
+            </div>
+            <div class="report-meta text-muted small">
+              {% if report.last_run_at %}
+              Last run: {{ report.last_run_at|date:"N j, Y" }}
+              {% else %}
+              Last run: never
+              {% endif %}
+              {% if report.branch_count > 0 %}
+              &nbsp;&middot;&nbsp;Branched {{ report.branch_count }} time{{ report.branch_count|pluralize }}
+              {% endif %}
+            </div>
+            <div class="report-actions d-flex flex-wrap gap-1 mt-auto">
+              <a href="{% url 'reports:run_report' report.id %}" class="btn btn-success btn-sm">Run</a>
+              <a href="{% url 'reports:export_report' report.id %}" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+              {% if report.owner == user %}
+              <a href="{% url 'reports:share_report' report.id %}" class="btn btn-outline-brand btn-sm">Share</a>
+              {% endif %}
+              {% if report.source == 'requested' %}
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      data-action="change-request"
+                      data-url="{% url 'reports:request_change' report.id %}"
+                      data-title="{{ report.title|escapejs }}">Request Change</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="mb-3 opacity-50" viewBox="0 0 16 16">
+          <path d="M2.5 3A1.5 1.5 0 0 0 1 4.5v.793c.026.009.051.02.076.032L7.674 8.51c.206.1.446.1.652 0l6.598-3.185A.755.755 0 0 1 15 5.293V4.5A1.5 1.5 0 0 0 13.5 3h-11Z"/>
+          <path d="M15 6.954 8.978 9.86a2.25 2.25 0 0 1-1.956 0L1 6.954V11.5A1.5 1.5 0 0 0 2.5 13h11a1.5 1.5 0 0 0 1.5-1.5V6.954Z"/>
+        </svg>
+        <p class="mb-0">No company-wide reports yet. Be the first to promote one.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- SHARED WITH ME TAB -->
+    <div class="tab-pane fade" id="sharedReportsPane" role="tabpanel" aria-labelledby="shared-reports-tab">
+      {% if shared_with_me %}
+      <div class="reports-view-container" id="sharedReportsContainer" data-view="grid">
+        {% for share in shared_with_me %}
+        <div class="card report-card h-100 shadow-sm">
+          <div class="card-body d-flex flex-column gap-2">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+              <div class="report-title-area">
+                <h6 class="fw-bold mb-0">{{ share.report.title }}</h6>
+                <small class="text-muted">from {{ share.shared_by.get_full_name|default:share.shared_by.username }}</small>
+              </div>
+              <div class="report-pills d-flex gap-1 flex-wrap">
+                {% if share.report.source == 'requested' %}
+                <span class="badge bg-info text-dark">Requested</span>
+                {% else %}
+                <span class="badge bg-primary">Prototyped</span>
+                {% endif %}
+                {% if share.can_branch %}
+                <span class="badge bg-light text-dark border">Can Branch</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="report-tags d-flex flex-wrap gap-1">
+              {% for tag in share.report.tags %}
+              <span class="badge bg-secondary small">{{ tag }}</span>
+              {% endfor %}
+            </div>
+            <div class="report-meta text-muted small">
+              {% if share.report.last_run_at %}
+              Last run: {{ share.report.last_run_at|date:"N j, Y" }}
+              {% else %}
+              Last run: never
+              {% endif %}
+            </div>
+            <div class="report-actions d-flex flex-wrap gap-1 mt-auto">
+              <a href="{% url 'reports:run_report' share.report.id %}" class="btn btn-success btn-sm">Run</a>
+              <a href="{% url 'reports:export_report' share.report.id %}" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+              {% if share.report.source == 'requested' and share.can_branch %}
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      data-action="change-request"
+                      data-url="{% url 'reports:request_change' share.report.id %}"
+                      data-title="{{ share.report.title|escapejs }}">Request Change</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="mb-3 opacity-50" viewBox="0 0 16 16">
+          <path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/>
+        </svg>
+        <p class="mb-0">Nobody has shared a report with you yet. Maybe they're shy.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /tab-content -->
+
+  <!-- PENDING REQUESTS ACCORDION -->
+  {% if my_pending_requests %}
+  <div class="accordion mt-4" id="pendingAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="pendingHeading">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pendingCollapse" aria-expanded="false" aria-controls="pendingCollapse">
+          My Pending Requests
+          <span class="badge bg-warning text-dark ms-2">{{ my_pending_requests|length }}</span>
+        </button>
+      </h2>
+      <div id="pendingCollapse" class="accordion-collapse collapse" aria-labelledby="pendingHeading">
+        <div class="accordion-body p-0">
+          <div class="list-group list-group-flush">
+            {% for req in my_pending_requests %}
+            <div class="list-group-item px-4 py-3">
+              <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div>
+                  <p class="mb-1 text-truncate" style="max-width:600px;">{{ req.description }}</p>
+                  <small class="text-muted">Submitted {{ req.created_at|date:"N j, Y" }}</small>
+                </div>
+                <span class="badge {% if req.status == 'pending' %}bg-secondary{% elif req.status == 'in_progress' %}bg-primary{% elif req.status == 'change_requested' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                  {{ req.get_status_display }}
+                </span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div><!-- /reports-hub -->
+
+<!-- OFFCANVAS: NEW REPORT REQUEST -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="requestOffcanvas" aria-labelledby="requestOffcanvasLabel" style="width:420px;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title fw-bold" id="requestOffcanvasLabel">Request a Report</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <p class="text-muted small mb-4">Describe what you need. An admin will build it and it'll appear in My Reports when ready.</p>
+    <form method="post" action="{% url 'reports:submit_request' %}">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="{{ request_form.description.id_for_label }}" class="form-label fw-semibold">
+          {{ request_form.description.label }}
+        </label>
+        <textarea name="{{ request_form.description.html_name }}"
+                  id="{{ request_form.description.id_for_label }}"
+                  class="form-control{% if request_form.description.errors %} is-invalid{% endif %}"
+                  rows="6"
+                  placeholder="E.g. I need a report showing all contracts expiring in the next 90 days, grouped by supplier...">{{ request_form.description.value|default:'' }}</textarea>
+        {% if request_form.description.errors %}
+        <div class="invalid-feedback">{{ request_form.description.errors.0 }}</div>
+        {% endif %}
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Submit Request</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: REQUEST CHANGE (shared, populated by JS) -->
+<div class="modal fade" id="changeRequestModal" tabindex="-1" aria-labelledby="changeRequestModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="changeRequestModalLabel">Request Change</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="changeRequestForm" method="post" action="">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="changeDescription" class="form-label fw-semibold">Describe what needs to change</label>
+            <textarea id="changeDescription" name="description" class="form-control" rows="4" required placeholder="What should be different about this report?"></textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="keep_original" id="keepOriginalCheck">
+            <label class="form-check-label" for="keepOriginalCheck">
+              Keep original report unchanged <span class="text-muted">(creates a new branch)</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit Change Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock body %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  // View toggle
+  function setReportView(view) {
+    document.querySelectorAll('.reports-view-container').forEach(c => c.setAttribute('data-view', view));
+    const gridBtn = document.getElementById('gridViewBtn');
+    const listBtn = document.getElementById('listViewBtn');
+    if (view === 'grid') {
+      gridBtn.classList.replace('btn-outline-secondary', 'btn-secondary');
+      listBtn.classList.replace('btn-secondary', 'btn-outline-secondary');
+    } else {
+      listBtn.classList.replace('btn-outline-secondary', 'btn-secondary');
+      gridBtn.classList.replace('btn-secondary', 'btn-outline-secondary');
+    }
+    try { localStorage.setItem('reports_view', view); } catch(e) {}
+  }
+  window.setReportView = setReportView;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    let savedView = 'grid';
+    try { savedView = localStorage.getItem('reports_view') || 'grid'; } catch(e) {}
+    setReportView(savedView);
+
+    // Change request modal: set form action from data-url on button
+    document.querySelectorAll('[data-action="change-request"]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const url = this.dataset.url;
+        const title = this.dataset.title;
+        document.getElementById('changeRequestModalLabel').textContent = 'Request Change: ' + title;
+        document.getElementById('changeRequestForm').action = url;
+        document.getElementById('changeDescription').value = '';
+        document.getElementById('keepOriginalCheck').checked = false;
+        new bootstrap.Modal(document.getElementById('changeRequestModal')).show();
+      });
+    });
+  });
+})();
+</script>
+{% endblock extra_scripts %}

@@ -1,0 +1,47 @@
+{% extends "base_template.html" %}
+
+{% block body %}
+<div class="container-fluid px-3 px-lg-4 py-3">
+  <div class="row justify-content-center">
+    <div class="col-lg-7 col-xl-6">
+
+      <div class="mb-4">
+        <a href="{% url 'reports:hub' %}" class="text-muted small text-decoration-none">&larr; Back to Hub</a>
+        <h4 class="fw-bold mt-2 mb-1">Build a Report</h4>
+        <p class="text-muted mb-0">Describe what you want. AI will generate the SQL and you can refine it before saving.</p>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+              <label for="{{ form.original_prompt.id_for_label }}" class="form-label fw-semibold fs-6">
+                {{ form.original_prompt.label }}
+              </label>
+              <textarea name="{{ form.original_prompt.html_name }}"
+                        id="{{ form.original_prompt.id_for_label }}"
+                        class="form-control{% if form.original_prompt.errors %} is-invalid{% endif %}"
+                        rows="7"
+                        placeholder="E.g. Show me all active contracts with suppliers where the total value exceeds $500k, grouped by category and sorted by expiration date...">{{ form.original_prompt.value|default:'' }}</textarea>
+              {% if form.original_prompt.errors %}
+              <div class="invalid-feedback">{{ form.original_prompt.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <button type="submit" class="btn btn-primary btn-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="me-2" viewBox="0 0 16 16">
+                  <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
+                </svg>
+                Generate Report
+              </button>
+              <small class="text-muted">Your draft saves automatically. You can iterate before committing it to your library.</small>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock body %}

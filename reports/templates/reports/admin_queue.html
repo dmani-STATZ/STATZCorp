@@ -1,0 +1,690 @@
+{% extends "base_template.html" %}
+
+{% block extra_head %}
+<style>
+/* ── Layout ─────────────────────────────────────────── */
+.reports-admin-queue {
+    display: flex;
+    height: calc(100vh - 48px);
+    overflow: hidden;
+}
+.queue-sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--bs-border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.queue-sidebar-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    flex-shrink: 0;
+}
+.queue-sidebar-list { overflow-y: auto; flex: 1; }
+
+.queue-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* ── Wizard chrome ──────────────────────────────────── */
+.wizard-step-bar {
+    flex-shrink: 0;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+.wizard-step-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+.wizard-step-item.active  { color: var(--bs-primary); font-weight: 600; }
+.wizard-step-item.done    { color: var(--bs-success); }
+.wizard-step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.68rem; font-weight: 700; flex-shrink: 0;
+}
+.wizard-step-item.active .wizard-step-num { background: var(--bs-primary); color:#fff; border-color:var(--bs-primary); }
+.wizard-step-item.done   .wizard-step-num { background: var(--bs-success); color:#fff; border-color:var(--bs-success); }
+.step-connector { flex:1; max-width:40px; height:2px; background:var(--bs-border-color); margin:0 0.35rem; }
+.step-connector.done { background: var(--bs-success); }
+
+.wizard-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.75rem 1.75rem 0;
+}
+.wizard-nav {
+    flex-shrink: 0;
+    padding: 0.85rem 1.75rem;
+    border-top: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+/* ── Step panes ─────────────────────────────────────── */
+.wizard-pane { display: none; }
+.wizard-pane.active { display: block; }
+
+/* ── Sidebar items ──────────────────────────────────── */
+.queue-request-item {
+    cursor: pointer;
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.65rem 1rem;
+    text-decoration: none; color: inherit; display: block;
+    transition: background 0.1s;
+}
+.queue-request-item:hover { background: var(--bs-tertiary-bg, #f8f9fa); color: inherit; }
+.queue-request-item.active {
+    background: var(--bs-secondary-bg, #e9ecef);
+    border-left: 3px solid var(--bs-primary);
+    padding-left: calc(1rem - 3px); color: inherit;
+}
+.requester-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--bs-secondary); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700; flex-shrink: 0;
+}
+
+/* ── SQL / preview ──────────────────────────────────── */
+.sql-editor {
+    font-family: ui-monospace,'Cascadia Code','Source Code Pro',Menlo,Consolas,monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+}
+.preview-wrap {
+    overflow-x: auto;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 4px;
+}
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+{% if selected %}{{ selected.description|json_script:"req-desc-data" }}{% endif %}
+
+<div class="reports-admin-queue">
+
+  <!-- ══ SIDEBAR ═══════════════════════════════════════ -->
+  <div class="queue-sidebar">
+    <div class="queue-sidebar-header">
+      <h6 class="fw-bold mb-2">Request Queue</h6>
+      <div class="d-flex flex-wrap gap-1" id="filter-pills">
+        <span class="badge filter-pill bg-primary" data-filter="all" style="cursor:pointer;">All <span>{{ queue|length }}</span></span>
+        <span class="badge filter-pill text-body border" data-filter="pending" style="cursor:pointer;">Pending</span>
+        <span class="badge filter-pill text-body border" data-filter="in_progress" style="cursor:pointer;">In Progress</span>
+        <span class="badge filter-pill text-body border" data-filter="change_requested" style="cursor:pointer;">Change Req.</span>
+      </div>
+    </div>
+    <div class="queue-sidebar-list">
+      {% for item in queue %}
+      <a href="?id={{ item.id }}"
+         class="queue-request-item{% if selected and item.id == selected.id %} active{% endif %}"
+         data-status="{{ item.status }}">
+        <div class="d-flex align-items-start gap-2">
+          <div class="requester-avatar">{{ item.requester.first_name|slice:":1" }}{{ item.requester.last_name|slice:":1" }}</div>
+          <div style="min-width:0;">
+            <span class="small fw-semibold d-block text-truncate">
+              {% if item.is_branch_request %}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="me-1 text-info" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25z"/></svg>{% endif %}
+              {{ item.requester.get_full_name|default:item.requester.username }}
+            </span>
+            <p class="small text-muted mb-1 text-truncate">{{ item.description|truncatechars:55 }}</p>
+            <div class="d-flex justify-content-between gap-1">
+              <span class="badge small {% if item.status == 'pending' %}bg-secondary{% elif item.status == 'in_progress' %}bg-primary{% elif item.status == 'change_requested' %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ item.get_status_display }}</span>
+              <small class="text-muted">{{ item.created_at|timesince }} ago</small>
+            </div>
+          </div>
+        </div>
+      </a>
+      {% empty %}
+      <div class="text-center text-muted py-5 px-3">
+        <p class="small mb-0">No open requests.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div><!-- /sidebar -->
+
+  <!-- ══ MAIN WIZARD ═══════════════════════════════════ -->
+  <div class="queue-main" id="queue-main">
+
+    {% if not selected %}
+    <!-- Empty state -->
+    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+      <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" fill="currentColor" class="mb-3 opacity-25" viewBox="0 0 16 16">
+        <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+      </svg>
+      <p class="fw-semibold mb-0">Select a request from the queue to begin.</p>
+    </div>
+
+    {% else %}
+
+    <!-- ── Step indicator ──────────────────────────────── -->
+    <div class="wizard-step-bar">
+      <div class="wizard-step-item" id="si-1">
+        <div class="wizard-step-num">1</div><span>Review</span>
+      </div>
+      <div class="step-connector" id="sc-1"></div>
+      <div class="wizard-step-item" id="si-2">
+        <div class="wizard-step-num">2</div><span>Generate</span>
+      </div>
+      <div class="step-connector" id="sc-2"></div>
+      <div class="wizard-step-item" id="si-3">
+        <div class="wizard-step-num">3</div><span>Refine SQL</span>
+      </div>
+      <div class="step-connector" id="sc-3"></div>
+      <div class="wizard-step-item" id="si-4">
+        <div class="wizard-step-num">4</div><span>Save</span>
+      </div>
+
+      <!-- Requester pill — always visible in header -->
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <span class="badge {% if selected.status == 'pending' %}bg-secondary{% elif selected.status == 'in_progress' %}bg-primary{% elif selected.status == 'change_requested' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+          {{ selected.get_status_display }}
+        </span>
+        <span class="text-muted small">{{ selected.requester.get_full_name|default:selected.requester.username }}</span>
+      </div>
+    </div>
+
+    <!-- ── Wizard content ─────────────────────────────── -->
+    <div class="wizard-content">
+
+      <!-- ════ STEP 1: Review & Notes ════════════════════ -->
+      <div id="step-1" class="wizard-pane">
+        <p class="text-muted small mb-3">Review the user's request and add any context that will help the AI generate accurate SQL.</p>
+
+        {% if selected.is_branch_request %}
+        <div class="alert alert-info py-2 mb-3 small">
+          <strong>Branch Request</strong> — The original report will not be modified. A new branch will be created for this requester.
+        </div>
+        {% endif %}
+
+        <div class="p-3 rounded mb-4" style="background:var(--bs-tertiary-bg,#f8f9fa);border:1px solid var(--bs-border-color);">
+          <p class="small fw-semibold text-muted text-uppercase mb-1">User's Request</p>
+          <p class="mb-0">{{ selected.description }}</p>
+        </div>
+
+        <div class="mb-4">
+          <label for="notes-textarea" class="form-label fw-semibold">Admin Notes</label>
+          <div class="form-text mb-1">Optional — these are injected into the AI prompt alongside the request.</div>
+          <textarea id="notes-textarea" class="form-control" rows="4"
+                    placeholder="E.g. Use the supplier_contracts table. Filter by active status only.">{{ selected.admin_notes }}</textarea>
+        </div>
+      </div><!-- /step-1 -->
+
+      <!-- ════ STEP 2: Generate SQL ═══════════════════════ -->
+      <div id="step-2" class="wizard-pane">
+        <p class="text-muted small mb-3">The prompt below is pre-filled from the request and your notes. Edit it if needed, then generate.</p>
+
+        <div id="gen-error" class="alert alert-danger d-none mb-3" role="alert"></div>
+
+        <div class="mb-3">
+          <label for="ai-prompt" class="form-label fw-semibold">Prompt</label>
+          <textarea id="ai-prompt" class="form-control" rows="8"
+                    placeholder="Describe the report you want the AI to build..."></textarea>
+        </div>
+      </div><!-- /step-2 -->
+
+      <!-- ════ STEP 3: Refine SQL ══════════════════════════ -->
+      <div id="step-3" class="wizard-pane">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <p class="text-muted small mb-0">Review the SQL, title, and sample data. Revise if needed, or accept and continue.</p>
+          <span id="iter-badge" class="badge bg-secondary ms-3 flex-shrink-0">Iteration 1</span>
+        </div>
+
+        <div class="mb-3">
+          <label for="sql-editor" class="form-label fw-semibold">SQL Query</label>
+          <textarea id="sql-editor" class="form-control sql-editor" rows="10" spellcheck="false"
+                    placeholder="-- SQL will appear here after generation"></textarea>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-7">
+            <label for="title-input" class="form-label fw-semibold">Suggested Title</label>
+            <input type="text" id="title-input" class="form-control" placeholder="Report title...">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label fw-semibold">Tags</label>
+            <div id="tags-display" class="d-flex flex-wrap gap-1 align-items-center pt-1 min-h-sm"></div>
+          </div>
+        </div>
+
+        <!-- Preview results -->
+        <div class="mb-4">
+          <label class="form-label fw-semibold d-flex align-items-center gap-2">
+            Sample Data
+            <small class="text-muted fw-normal">(first 50 rows)</small>
+            <div id="preview-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status"></div>
+          </label>
+          <div id="preview-error" class="alert alert-warning small d-none" role="alert"></div>
+          <div id="preview-empty" class="text-muted small d-none">Query returned no rows.</div>
+          <div id="preview-wrap" class="preview-wrap d-none">
+            <table class="table table-sm table-bordered table-hover mb-0" id="preview-table">
+              <thead class="table-light" style="position:sticky;top:0;"></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Revise section -->
+        <div class="border-top pt-3 mb-3">
+          <p class="fw-semibold mb-2 small">Need Changes?</p>
+          <div id="revise-error" class="alert alert-danger small d-none" role="alert"></div>
+          <textarea id="feedback-textarea" class="form-control mb-2" rows="3"
+                    placeholder="Describe what to change — e.g. 'Also include the contract value. Filter to active contracts only.'"></textarea>
+          <button type="button" id="revise-btn" class="btn btn-outline-secondary btn-sm">
+            <span id="revise-spinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            Revise SQL
+          </button>
+        </div>
+      </div><!-- /step-3 -->
+
+      <!-- ════ STEP 4: Save ════════════════════════════════ -->
+      <!-- The actual <form> is invisible; inputs are linked via form="save-form" -->
+      <div id="step-4" class="wizard-pane">
+        <p class="text-muted small mb-3">Confirm the title and add any notes before saving. This creates the report in the requester's library.</p>
+
+        <div class="mb-3">
+          <label for="save-title" class="form-label fw-semibold">Report Title <span class="text-danger">*</span></label>
+          <input type="text" id="save-title" name="title" form="save-form"
+                 class="form-control" required
+                 placeholder="Enter the report title..."
+                 value="{{ selected.linked_report.title|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Tags</label>
+          <div id="save-tags-display" class="d-flex flex-wrap gap-1 align-items-center"></div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold d-flex align-items-center justify-content-between">
+            SQL Query
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
+                    onclick="goToStep(3)">← Edit SQL</button>
+          </label>
+          <textarea id="save-sql-preview" class="form-control sql-editor" rows="8" readonly
+                    placeholder="No SQL loaded."></textarea>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="save-context" class="form-label fw-semibold">Context Notes <small class="text-muted fw-normal">(optional)</small></label>
+            <textarea id="save-context" name="context_notes" form="save-form" class="form-control" rows="3"
+                      placeholder="Notes about data sources, filters, joins..."></textarea>
+          </div>
+          <div class="col-md-6">
+            <label for="save-change" class="form-label fw-semibold">Change Notes <small class="text-muted fw-normal">(optional)</small></label>
+            <textarea id="save-change" name="change_notes" form="save-form" class="form-control" rows="3"
+                      placeholder="What does this version do?"></textarea>
+          </div>
+        </div>
+      </div><!-- /step-4 -->
+
+    </div><!-- /wizard-content -->
+
+    <!-- ── Wizard nav (sticky bottom) ────────────────── -->
+    <div class="wizard-nav" id="wizard-nav">
+      <!-- Populated by JS -->
+    </div>
+
+    {% endif %}
+
+  </div><!-- /queue-main -->
+</div><!-- /reports-admin-queue -->
+
+<!-- Hidden save form (fields linked via form="save-form") -->
+{% if selected %}
+<form id="save-form" method="post" action="{% url 'reports:admin_save_version' selected.pk %}" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="sql_query" id="save-sql-hidden">
+  <input type="hidden" name="tags"      id="save-tags-hidden">
+</form>
+{% endif %}
+
+{% endblock body %}
+
+{% block extra_scripts %}
+{% if selected %}
+<script>
+(function() {
+  'use strict';
+
+  /* ── Server-rendered constants ─────────────────────── */
+  const CSRF          = '{{ csrf_token }}';
+  const SEL_PK        = '{{ selected.pk }}';
+  const AI_URL        = '{% url "reports:admin_ai_generate" %}';
+  const UPDATE_URL    = '{% url "reports:admin_update_request" selected.pk %}';
+  const PREVIEW_URL   = '{% url "reports:admin_preview_sql_json" selected.pk %}';
+  const DELETE_URL    = '{% url "reports:admin_delete_request" selected.pk %}';
+  const LINKED_TITLE  = '{{ selected.linked_report.title|default:""|escapejs }}';
+
+  /* ── Description (XSS-safe via json_script) ─────────── */
+  const descEl = document.getElementById('req-desc-data');
+  const DESCRIPTION = descEl ? JSON.parse(descEl.textContent) : '';
+
+  /* ── Wizard state ──────────────────────────────────── */
+  const S = {
+    step: 1,
+    sql: '',
+    title: LINKED_TITLE,
+    tags: [],
+    iteration: 0,
+    adminNotes: document.getElementById('notes-textarea')?.value || ''
+  };
+
+  /* ── Element refs ──────────────────────────────────── */
+  const $  = id => document.getElementById(id);
+  const notesEl        = $('notes-textarea');
+  const aiPromptEl     = $('ai-prompt');
+  const genErrorEl     = $('gen-error');
+  const sqlEditorEl    = $('sql-editor');
+  const titleInputEl   = $('title-input');
+  const tagsDisplayEl  = $('tags-display');
+  const iterBadgeEl    = $('iter-badge');
+  const feedbackEl     = $('feedback-textarea');
+  const reviseBtn      = $('revise-btn');
+  const reviseSpinner  = $('revise-spinner');
+  const reviseErrorEl  = $('revise-error');
+  const saveTitleEl    = $('save-title');
+  const saveTagsDispEl = $('save-tags-display');
+  const saveSqlPrevEl  = $('save-sql-preview');
+  const saveSqlHidEl   = $('save-sql-hidden');
+  const saveTagsHidEl  = $('save-tags-hidden');
+  const navEl          = $('wizard-nav');
+
+  /* ── Step indicator ───────────────────────────────── */
+  function updateStepIndicator(n) {
+    [1,2,3,4].forEach(i => {
+      const si = $('si-' + i);
+      if (!si) return;
+      si.classList.remove('active', 'done');
+      if (i === n)      si.classList.add('active');
+      else if (i < n)   si.classList.add('done');
+      if (i < 4) {
+        const sc = $('sc-' + i);
+        if (sc) sc.classList.toggle('done', i < n);
+      }
+    });
+  }
+
+  /* ── Navigation bar ───────────────────────────────── */
+  function updateNav(n) {
+    let html = '';
+    if (n === 1) {
+      html = `<div class="d-flex align-items-center justify-content-between">
+        <a href="${DELETE_URL}" class="btn btn-outline-danger btn-sm"
+           onclick="return confirm('Delete this request? This cannot be undone.')">Delete Request</a>
+        <button type="button" class="btn btn-primary" onclick="window._w.step1Next()">Start Working →</button>
+      </div>`;
+    } else if (n === 2) {
+      html = `<div class="d-flex align-items-center justify-content-between">
+        <button type="button" class="btn btn-outline-secondary" onclick="window._w.goToStep(1)">← Back</button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window._w.skipToManual()">Write SQL manually</button>
+          <button type="button" id="generate-btn" class="btn btn-primary" onclick="window._w.generateSQL()">
+            <span id="generate-spinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            ⚡ Generate SQL
+          </button>
+        </div>
+      </div>`;
+    } else if (n === 3) {
+      html = `<div class="d-flex align-items-center justify-content-between">
+        <button type="button" class="btn btn-outline-secondary" onclick="window._w.goToStep(2)">← Back to Prompt</button>
+        <button type="button" class="btn btn-primary" onclick="window._w.acceptSQL()">Accept SQL &amp; Continue →</button>
+      </div>`;
+    } else if (n === 4) {
+      html = `<div class="d-flex align-items-center justify-content-between">
+        <button type="button" class="btn btn-outline-secondary" onclick="window._w.goToStep(3)">← Back to Refine</button>
+        <button type="submit" form="save-form" class="btn btn-success fw-semibold px-4">✓ Save &amp; Complete</button>
+      </div>`;
+    }
+    if (navEl) navEl.innerHTML = html;
+  }
+
+  /* ── Core transition ──────────────────────────────── */
+  function goToStep(n) {
+    document.querySelectorAll('.wizard-pane').forEach(p => p.classList.remove('active'));
+    const pane = $('step-' + n);
+    if (pane) pane.classList.add('active');
+    S.step = n;
+    updateStepIndicator(n);
+    updateNav(n);
+    const main = $('queue-main');
+    if (main) main.scrollTop = 0;
+  }
+
+  /* ── Helpers ──────────────────────────────────────── */
+  function renderTags(tags, container) {
+    if (!container) return;
+    if (!tags || !tags.length) {
+      container.innerHTML = '<span class="text-muted small">No tags</span>';
+      return;
+    }
+    container.innerHTML = tags.map(t =>
+      `<span class="badge bg-secondary">${t}</span>`
+    ).join(' ');
+  }
+
+  function post(url, data) {
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', CSRF);
+    Object.entries(data).forEach(([k,v]) => fd.append(k, v));
+    return fetch(url, { method: 'POST', body: fd });
+  }
+
+  /* ── Preview table ────────────────────────────────── */
+  async function fetchPreview(sql) {
+    const spinner  = $('preview-spinner');
+    const errorEl  = $('preview-error');
+    const emptyEl  = $('preview-empty');
+    const wrapEl   = $('preview-wrap');
+    [errorEl, emptyEl, wrapEl].forEach(el => el && el.classList.add('d-none'));
+    if (spinner) spinner.classList.remove('d-none');
+    try {
+      const resp = await post(PREVIEW_URL, { sql_query: sql });
+      const data = await resp.json();
+      if (spinner) spinner.classList.add('d-none');
+      if (data.error) {
+        if (errorEl) { errorEl.textContent = 'Preview error: ' + data.error; errorEl.classList.remove('d-none'); }
+        return;
+      }
+      if (!data.rows || data.rows.length === 0) {
+        if (emptyEl) emptyEl.classList.remove('d-none');
+        return;
+      }
+      const thead = document.querySelector('#preview-table thead');
+      const tbody = document.querySelector('#preview-table tbody');
+      if (thead) thead.innerHTML = '<tr>' + data.columns.map(c => `<th class="small text-nowrap">${c}</th>`).join('') + '</tr>';
+      if (tbody) tbody.innerHTML = data.rows.map(r =>
+        '<tr>' + r.map(c => `<td class="small">${c != null ? c : ''}</td>`).join('') + '</tr>'
+      ).join('');
+      if (wrapEl) wrapEl.classList.remove('d-none');
+    } catch(e) {
+      if (spinner) spinner.classList.add('d-none');
+      if (errorEl) { errorEl.textContent = 'Preview unavailable.'; errorEl.classList.remove('d-none'); }
+    }
+  }
+
+  /* ── Step 1 → 2 ──────────────────────────────────── */
+  function step1Next() {
+    const notes = notesEl ? notesEl.value : '';
+    S.adminNotes = notes;
+
+    // Fire-and-forget: save notes + set in_progress
+    post(UPDATE_URL, { admin_notes: notes, status: 'in_progress' }).catch(() => {});
+
+    // Pre-fill AI prompt
+    let prompt = DESCRIPTION;
+    if (notes.trim()) prompt += '\n\nAdmin notes: ' + notes.trim();
+    if (aiPromptEl) aiPromptEl.value = prompt;
+
+    goToStep(2);
+  }
+
+  /* ── Step 2 → 3 (AI generate) ────────────────────── */
+  async function generateSQL() {
+    if (genErrorEl) genErrorEl.classList.add('d-none');
+    const btn     = $('generate-btn');
+    const spinner = $('generate-spinner');
+    if (btn)     btn.disabled = true;
+    if (spinner) spinner.classList.remove('d-none');
+
+    const prompt = aiPromptEl ? aiPromptEl.value.trim() : '';
+    if (!prompt) {
+      if (genErrorEl) { genErrorEl.textContent = 'Prompt is required.'; genErrorEl.classList.remove('d-none'); }
+      if (btn)     btn.disabled = false;
+      if (spinner) spinner.classList.add('d-none');
+      return;
+    }
+
+    try {
+      const resp = await post(AI_URL, { prompt, admin_notes: S.adminNotes || '' });
+      const data = await resp.json();
+      if (data.error) {
+        if (genErrorEl) { genErrorEl.textContent = data.error; genErrorEl.classList.remove('d-none'); }
+        return;
+      }
+      S.sql   = data.sql   || '';
+      S.title = data.title || S.title;
+      S.tags  = data.tags  || [];
+      S.iteration++;
+
+      if (sqlEditorEl) sqlEditorEl.value = S.sql;
+      if (titleInputEl) titleInputEl.value = S.title;
+      renderTags(S.tags, tagsDisplayEl);
+      if (iterBadgeEl) iterBadgeEl.textContent = 'Iteration ' + S.iteration;
+      // Clear old feedback
+      if (feedbackEl) feedbackEl.value = '';
+
+      goToStep(3);
+      if (S.sql) fetchPreview(S.sql);
+    } catch(e) {
+      if (genErrorEl) { genErrorEl.textContent = 'Request failed: ' + e.message; genErrorEl.classList.remove('d-none'); }
+    } finally {
+      if (btn)     btn.disabled = false;
+      if (spinner) spinner.classList.add('d-none');
+    }
+  }
+
+  /* ── Skip to manual SQL entry ─────────────────────── */
+  function skipToManual() {
+    S.sql       = '';
+    S.title     = LINKED_TITLE;
+    S.tags      = [];
+    S.iteration = 0;
+    if (sqlEditorEl)  sqlEditorEl.value  = '';
+    if (titleInputEl) titleInputEl.value = S.title;
+    renderTags([], tagsDisplayEl);
+    if (iterBadgeEl)  iterBadgeEl.textContent = 'Manual';
+    // Clear preview
+    ['preview-error','preview-empty','preview-wrap'].forEach(id => {
+      const el = $(id); if (el) el.classList.add('d-none');
+    });
+    goToStep(3);
+  }
+
+  /* ── Revise SQL (loop on step 3) ─────────────────── */
+  async function reviseSQL() {
+    if (reviseErrorEl) reviseErrorEl.classList.add('d-none');
+    const feedback = feedbackEl ? feedbackEl.value.trim() : '';
+    if (!feedback) {
+      if (reviseErrorEl) { reviseErrorEl.textContent = 'Describe what to change.'; reviseErrorEl.classList.remove('d-none'); }
+      return;
+    }
+    if (reviseBtn)    reviseBtn.disabled = true;
+    if (reviseSpinner) reviseSpinner.classList.remove('d-none');
+
+    // Sync state from any manual edits the admin made
+    const currentSQL   = sqlEditorEl  ? sqlEditorEl.value  : S.sql;
+    const currentTitle = titleInputEl ? titleInputEl.value : S.title;
+
+    const revisedPrompt =
+      (aiPromptEl ? aiPromptEl.value : DESCRIPTION)
+      + '\n\nPrevious SQL:\n' + currentSQL
+      + '\n\nFeedback: ' + feedback;
+
+    try {
+      const resp = await post(AI_URL, { prompt: revisedPrompt, admin_notes: S.adminNotes || '' });
+      const data = await resp.json();
+      if (data.error) {
+        if (reviseErrorEl) { reviseErrorEl.textContent = data.error; reviseErrorEl.classList.remove('d-none'); }
+        return;
+      }
+      S.sql   = data.sql   || currentSQL;
+      S.title = data.title || currentTitle;
+      S.tags  = data.tags  || S.tags;
+      S.iteration++;
+
+      if (sqlEditorEl)  sqlEditorEl.value  = S.sql;
+      if (titleInputEl) titleInputEl.value = S.title;
+      renderTags(S.tags, tagsDisplayEl);
+      if (iterBadgeEl)  iterBadgeEl.textContent = 'Iteration ' + S.iteration;
+      if (feedbackEl)   feedbackEl.value = '';
+
+      // Refresh preview with new SQL
+      if (S.sql) fetchPreview(S.sql);
+    } catch(e) {
+      if (reviseErrorEl) { reviseErrorEl.textContent = 'Revision failed: ' + e.message; reviseErrorEl.classList.remove('d-none'); }
+    } finally {
+      if (reviseBtn)    reviseBtn.disabled = false;
+      if (reviseSpinner) reviseSpinner.classList.add('d-none');
+    }
+  }
+
+  /* ── Step 3 → 4 (accept SQL) ─────────────────────── */
+  function acceptSQL() {
+    // Read current values (admin may have typed directly in Step 3)
+    S.sql   = sqlEditorEl  ? sqlEditorEl.value  : S.sql;
+    S.title = titleInputEl ? titleInputEl.value : S.title;
+
+    // Wire up save form hidden fields
+    if (saveSqlHidEl)  saveSqlHidEl.value  = S.sql;
+    if (saveTagsHidEl) saveTagsHidEl.value = JSON.stringify(S.tags);
+    if (saveTitleEl)   saveTitleEl.value   = S.title;
+    if (saveSqlPrevEl) saveSqlPrevEl.value = S.sql;
+    renderTags(S.tags, saveTagsDispEl);
+
+    goToStep(4);
+  }
+
+  /* ── Sidebar filter pills ─────────────────────────── */
+  document.querySelectorAll('#filter-pills .filter-pill').forEach(pill => {
+    pill.addEventListener('click', function() {
+      document.querySelectorAll('#filter-pills .filter-pill').forEach(p => p.classList.remove('bg-primary'));
+      this.classList.add('bg-primary');
+      const filter = this.dataset.filter;
+      document.querySelectorAll('.queue-request-item').forEach(item => {
+        item.style.display = (filter === 'all' || item.dataset.status === filter) ? '' : 'none';
+      });
+    });
+  });
+
+  /* ── Revise button ────────────────────────────────── */
+  if (reviseBtn) reviseBtn.addEventListener('click', reviseSQL);
+
+  /* ── Expose to nav onclick handlers ──────────────── */
+  window._w = { goToStep, step1Next, generateSQL, skipToManual, acceptSQL };
+
+  /* ── Init ─────────────────────────────────────────── */
+  goToStep(1);
+
+})();
+</script>
+{% endif %}
+{% endblock extra_scripts %}

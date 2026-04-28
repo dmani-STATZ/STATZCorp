@@ -164,3 +164,12 @@ def generate_db_schema_snapshot(prefixes: Optional[Iterable[str]] = None, *, onl
                     lines.append(f"- FK {cname}: {cols} -> {to_table}({to_col})")
             lines.append("")
     return "\n".join(lines)
+
+
+def get_next_version_number(report) -> int:
+    """Return the next sequential version number for a given Report."""
+    from django.db.models import Max
+
+    result = report.versions.aggregate(Max("version_number"))
+    current_max = result["version_number__max"]
+    return (current_max or 0) + 1

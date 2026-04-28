@@ -11,7 +11,7 @@ body {
     margin-bottom: 5px;
     display: flex;
     flex-direction: column;
-    min-height: 94vh;
+    min-height: calc(100vh - 48px);
     padding: 0;
 }
 
