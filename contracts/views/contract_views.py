@@ -288,7 +288,7 @@ class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related(
-            'idiq_contract', 'status', 'company', 'supplier', 'closed_by'
+            'idiq_contract', 'status', 'company', 'closed_by'
         )
 
     def get_context_data(self, **kwargs):
@@ -328,7 +328,7 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related(
-            'idiq_contract', 'status', 'company', 'supplier', 'cancelled_by'
+            'idiq_contract', 'status', 'company', 'cancelled_by'
         )
 
     def get_context_data(self, **kwargs):

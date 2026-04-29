@@ -16,6 +16,7 @@ from django.db.models import (
     ExpressionWrapper,
     DecimalField,
     DurationField,
+    Prefetch,
 )
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
@@ -498,13 +499,27 @@ class DashboardView(TemplateView):
         # Recently active suppliers based on contract activity
         recently_active = []
         seen = set()
-        for contract in contracts_qs.order_by('-modified_on', '-created_on')[:50]:
-            if contract.supplier_id and contract.supplier_id not in seen:
-                recently_active.append({
-                    'supplier': contract.supplier,
-                    'last_activity': contract.modified_on,
-                })
-                seen.add(contract.supplier_id)
+        clin_supplier_prefetch = Prefetch(
+            'clin_set',
+            queryset=Clin.objects.filter(supplier__isnull=False)
+            .select_related('supplier')
+            .order_by('item_number', 'id'),
+        )
+        for contract in contracts_qs.order_by('-modified_on', '-created_on').prefetch_related(
+            clin_supplier_prefetch
+        )[:50]:
+            clins = list(contract.clin_set.all())
+            if not clins:
+                continue
+            clin = clins[0]
+            sid = clin.supplier_id
+            if sid in seen:
+                continue
+            recently_active.append({
+                'supplier': clin.supplier,
+                'last_activity': contract.modified_on,
+            })
+            seen.add(sid)
             if len(recently_active) >= 10:
                 break
         context['recently_active_suppliers'] = recently_active

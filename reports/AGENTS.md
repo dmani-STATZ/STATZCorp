@@ -56,6 +56,7 @@ All seven templates are production-built Bootstrap 5 UIs. Current template files
 | Change report lifecycle fields (`active_version`, branching fields) | `models.py` + migration + `views.py` (`admin_save_version`) |
 | Change sharing behavior | `models.py` (`ReportShare`) + `forms.py` (`ReportShareForm`) + `views.py` (`share_report`) |
 | Change builder behavior | `models.py` (`ReportDraft`) + `forms.py` + `views.py` + draft templates |
+| Change request flow modification | `models.py` + migration + `views.py` (`request_change`) + `admin_queue.html` (parent version context card) + `admin_ai_generate` (`existing_sql` parameter) |
 | Change URL names | `urls.py` + template `{% url %}` usage + `reverse(...)` call sites |
 
 ## 6. Cross-App Dependency Warnings
@@ -77,6 +78,7 @@ All seven templates are production-built Bootstrap 5 UIs. Current template files
 - New SQL must create a new `ReportVersion`, then repoint `Report.active_version`.
 - Keep `ReportVersion` unique per (`report`, `version_number`).
 - Keep branch metadata semantics (`branched_from`, `branch_count`, `keep_original`, `is_branch_request`) coherent across request and save-version flows.
+- **`ReportRequest.parent_version`** is intentionally a snapshot FK, not a live reference. It should never be updated after the request is created. If the linked report's `active_version` changes, `parent_version` stays pointing at the original.
 
 ## 9. View / URL / Template Rules
 - Primary user landing URL is `reports:hub` (not `reports:my_requests`).
@@ -105,6 +107,7 @@ The admin queue is a 4-step wizard. All logic is in `window._w` (an object expos
 
 **Step 1 — Review**
 - `#notes-textarea` — admin notes; value read by `step1Next()`
+- `#parent-sql-display` — readonly textarea (change requests only); parent SQL snapshot; value appended as `existing_sql` on AI generate when non-empty
 
 **Step 2 — Generate**
 - `#ai-prompt` — editable AI prompt textarea

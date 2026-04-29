@@ -64,6 +64,17 @@ class ReportRequest(models.Model):
     admin_notes = models.TextField(blank=True)
     keep_original = models.BooleanField(default=False)
     is_branch_request = models.BooleanField(default=False)
+    parent_version = models.ForeignKey(
+        "ReportVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="change_requests",
+        help_text=(
+            "The specific ReportVersion that was active when this change request was submitted. "
+            "Captured at submission time so the admin sees exactly what the user was looking at."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

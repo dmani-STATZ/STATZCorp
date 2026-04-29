@@ -66,10 +66,6 @@
           <div class="fs-6 fw-bold">{{ contract.contract_number|default:"—" }}</div>
         </div>
         <div class="col-6 col-md-2">
-          <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Supplier</div>
-          <div class="fs-6 fw-bold">{% if contract.supplier %}{{ contract.supplier.name }}{% else %}—{% endif %}</div>
-        </div>
-        <div class="col-6 col-md-2">
           <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Contract value</div>
           <div class="fs-6 fw-bold">
             {% if contract.contract_value is not None %}

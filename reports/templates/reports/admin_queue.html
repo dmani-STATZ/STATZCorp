@@ -219,6 +219,42 @@
           <p class="mb-0">{{ selected.description }}</p>
         </div>
 
+        {% if selected.parent_version %}
+        <div class="card mb-4 border-start border-5 border-warning shadow-sm">
+          <div class="card-header fw-semibold bg-body-secondary">
+            ⚠ Change Request — Existing Report Context
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <span class="text-muted small">Modifying:</span>
+                <strong>{{ selected.linked_report.title }}</strong>
+                <span class="badge bg-warning text-dark">v{{ selected.parent_version.version_number }}</span>
+              </div>
+              <p class="small text-muted mb-0">
+                Saved by: {{ selected.parent_version.created_by }}
+                on {{ selected.parent_version.created_at|date:'Y-m-d' }}
+              </p>
+            </div>
+            <div class="mb-3">
+              <label for="parent-sql-display" class="form-label fw-semibold small">Current SQL (what the user is asking you to change)</label>
+              <textarea id="parent-sql-display" class="form-control font-monospace bg-dark text-light small" rows="8" readonly
+                        style="max-height:200px;overflow-y:auto;resize:none;">{{ selected.parent_version.sql_query }}</textarea>
+              <button type="button" class="btn btn-outline-warning btn-sm mt-2"
+                      onclick="document.getElementById('sql-editor').value = document.getElementById('parent-sql-display').value;">
+                Load into Editor
+              </button>
+            </div>
+            {% if selected.parent_version.context_notes %}
+            <div>
+              <p class="small fw-semibold text-muted mb-1">Prior Admin Notes</p>
+              <div class="small text-muted border rounded p-2 bg-body-tertiary" style="white-space:pre-wrap;">{{ selected.parent_version.context_notes }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
         <div class="mb-4">
           <label for="notes-textarea" class="form-label fw-semibold">Admin Notes</label>
           <div class="form-text mb-1">Optional — these are injected into the AI prompt alongside the request.</div>
@@ -554,7 +590,12 @@
     }
 
     try {
-      const resp = await post(AI_URL, { prompt, admin_notes: S.adminNotes || '' });
+      const aiPayload = { prompt, admin_notes: S.adminNotes || '' };
+      const parentSqlEl = document.getElementById('parent-sql-display');
+      if (parentSqlEl && parentSqlEl.value.trim()) {
+        aiPayload.existing_sql = parentSqlEl.value.trim();
+      }
+      const resp = await post(AI_URL, aiPayload);
       const data = await resp.json();
       if (data.error) {
         if (genErrorEl) { genErrorEl.textContent = data.error; genErrorEl.classList.remove('d-none'); }

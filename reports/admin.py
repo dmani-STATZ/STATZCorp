@@ -8,7 +8,7 @@ class ReportRequestAdmin(admin.ModelAdmin):
     list_display = ("requester", "status", "is_branch_request", "keep_original", "created_at")
     list_filter = ("status", "is_branch_request")
     search_fields = ("requester__username", "description")
-    readonly_fields = ("created_at", "updated_at", "is_branch_request")
+    readonly_fields = ("created_at", "updated_at", "is_branch_request", "parent_version")
 
 
 @admin.register(Report)

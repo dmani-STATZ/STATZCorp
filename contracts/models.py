@@ -88,7 +88,6 @@ class Contract(AuditModel):
     idiq_contract = models.ForeignKey('IdiqContract', on_delete=models.CASCADE, null=True, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     status = models.ForeignKey('ContractStatus', on_delete=models.CASCADE, null=True, blank=True)
-    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, null=True, blank=True)
     solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
     prime = models.CharField(max_length=25, null=True, blank=True)
     prime_po_number = models.CharField(max_length=10, null=True, blank=True)

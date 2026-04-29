@@ -25,8 +25,8 @@ def generate_acknowledgement_letter(request, clin_id):
         
         # Set default values
         letter.letter_date = timezone.now().date()
-        letter.recipient_name = clin.contract.supplier.name if clin.contract.supplier else ''
-        letter.recipient_address = clin.contract.supplier.address if clin.contract.supplier else ''
+        letter.recipient_name = clin.supplier.name if clin.supplier else ''
+        letter.recipient_address = clin.supplier.address if clin.supplier else ''
         letter.contract_number = clin.contract.contract_num
         letter.clin_number = clin.clin_num
         letter.item_description = clin.description

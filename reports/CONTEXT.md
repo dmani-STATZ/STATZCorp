@@ -38,7 +38,7 @@ The app stores report library items, immutable versions, sharing state, and requ
 
 ## 5. Data Model / Domain Objects
 - `ReportDraft`: temporary prompt + iterative SQL/title/tags for `is_staff` builder users; mutable and disposable.
-- `ReportRequest`: user ticket lifecycle (`pending`, `in_progress`, `completed`, `change_requested`) with branching hints (`keep_original`, `is_branch_request`) and optional `linked_report`.
+- `ReportRequest`: user ticket lifecycle (`pending`, `in_progress`, `completed`, `change_requested`) with branching hints (`keep_original`, `is_branch_request`) and optional `linked_report`. **`parent_version`** — FK to `ReportVersion`, nullable. Captured at change request submission time. Records the exact SQL version the user was viewing when they requested the change. Null for new report requests.
 - `Report`: runnable report entity in personal/company library; tracks `active_version`, source lineage (`source_request`, `source_draft`, `branched_from`), branching stats (`branch_count`), and run audit (`last_run_at`, `last_run_rowcount`).
 - `ReportVersion`: immutable report SQL snapshot with sequential `version_number` scoped per report and optional change/context notes.
 - `ReportShare`: per-user share mapping (`report`, `shared_by`, `shared_with`, `can_branch`) with uniqueness per report-recipient pair.
@@ -47,6 +47,8 @@ The app stores report library items, immutable versions, sharing state, and requ
 ### Requested path
 1. Authenticated user submits a request from `reports:hub` (`description`).
 2. Superuser processes the request in `reports:admin_queue`.
+
+**Change requests:** When a user submits a change request against an existing report (`reports:request_change`), **`parent_version`** is set to `report.active_version` at that moment. This snapshot is preserved even if the report is subsequently updated before the admin works the request.
 3. Superuser previews SQL, saves a new `ReportVersion`, and completes the request.
 4. If request has `linked_report`, save may update in place or branch depending on `keep_original` / `is_branch_request`.
 5. User runs/exports completed reports from hub.
@@ -146,7 +148,11 @@ Automated coverage is minimal; manual verification required for:
 ## 16. Migrations / Schema Notes
 - `0001_initial.py` is retained for migration history consistency.
 - `0002_rebuild.py` deletes legacy `ReportRequest` table and creates the new architecture.
+- `0003_reportrequest_parent_version.py` adds nullable `ReportRequest.parent_version` for change-request SQL snapshot context.
 
 ## 17. Known Gaps / Ambiguities
 - TODO: ReportStar junction table for user favorites/pinning.
 - TODO: Embed reports in contextual pages (e.g. supplier detail page passing `supplier_id` as SQL parameter).
+
+## 18. Safe Modification Guidance
+When working change requests in the admin queue, the **`parent_version`** field is the source of truth for what SQL is being modified. Never use `report.active_version` as the starting point for a change — use **`request.parent_version.sql_query`**. By the time the admin sees the request, `active_version` may have already moved forward.

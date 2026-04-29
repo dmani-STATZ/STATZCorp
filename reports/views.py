@@ -59,13 +59,24 @@ def _request_title_fallback(description):
     return text[:100]
 
 
-def _call_ai_sql_builder(prompt, admin_notes=""):
+def _call_ai_sql_builder(prompt, admin_notes="", existing_sql=""):
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise RuntimeError("Anthropic API key not configured.")
 
     schema_text = generate_db_schema_snapshot()
     notes_block = f"\nAdmin notes:\n{admin_notes}\n" if admin_notes else ""
+    existing_sql = (existing_sql or "").strip()
+    if existing_sql:
+        task_block = (
+            f"\nExisting SQL to modify:\n{existing_sql}\n\n"
+            f"The user wants the following change made to the above SQL:\n{prompt}\n\n"
+            "Your job is to produce a modified version of the existing SQL that incorporates the requested change.\n"
+            "Do not rewrite from scratch unless the change requires it.\n"
+            "Preserve table aliases, existing joins, and formatting style where possible.\n"
+        )
+    else:
+        task_block = ""
     system_prompt = (
         "You are a SQL generation assistant for a Django app using SQL Server.\n"
         "Return only valid JSON with no markdown, no code fences, and no preamble.\n"
@@ -75,7 +86,7 @@ def _call_ai_sql_builder(prompt, admin_notes=""):
         "- sql must be a single read-only SELECT query\n"
         "- tags must be short and relevant\n"
         "- title should be concise and clear\n"
-        f"\nDatabase schema:\n{schema_text}{notes_block}"
+        f"{task_block}\nDatabase schema:\n{schema_text}{notes_block}"
     )
 
     payload = {
@@ -213,7 +224,7 @@ def export_report(request, pk):
 @login_required
 @require_POST
 def request_change(request, pk):
-    report = get_object_or_404(Report, pk=pk)
+    report = get_object_or_404(Report.objects.select_related("active_version"), pk=pk)
     if not _can_access_report(request.user, report):
         return HttpResponseForbidden("Not allowed")
 
@@ -230,6 +241,7 @@ def request_change(request, pk):
 
     keep_original = bool(form.cleaned_data["keep_original"]) if is_owner else True
     is_branch_request = not is_owner
+    parent_version = report.active_version if report.active_version else None
 
     ReportRequest.objects.create(
         requester=request.user,
@@ -238,6 +250,7 @@ def request_change(request, pk):
         description=form.cleaned_data["description"],
         keep_original=keep_original,
         is_branch_request=is_branch_request,
+        parent_version=parent_version,
     )
     messages.success(request, "Change request submitted.")
     return redirect("reports:hub")
@@ -293,13 +306,21 @@ def admin_queue(request):
                 ReportRequest.STATUS_CHANGE_REQUESTED,
             ]
         )
-        .select_related("requester", "linked_report")
+        .select_related("requester", "linked_report", "parent_version", "parent_version__created_by")
         .order_by("created_at")
     )
     selected = None
     selected_id = request.GET.get("id")
     if selected_id:
-        selected = get_object_or_404(ReportRequest.objects.select_related("requester", "linked_report"), pk=selected_id)
+        selected = get_object_or_404(
+            ReportRequest.objects.select_related(
+                "requester",
+                "linked_report",
+                "parent_version",
+                "parent_version__created_by",
+            ),
+            pk=selected_id,
+        )
     return render(
         request,
         "reports/admin_queue.html",
@@ -468,10 +489,15 @@ def admin_delete_request(request, pk):
 def admin_ai_generate(request):
     prompt = (request.POST.get("prompt") or "").strip()
     admin_notes = (request.POST.get("admin_notes") or "").strip()
+    existing_sql = (request.POST.get("existing_sql") or "").strip()
     if not prompt:
         return JsonResponse({"error": "Prompt is required."}, status=400)
     try:
-        sql, title, tags = _call_ai_sql_builder(prompt=prompt, admin_notes=admin_notes)
+        sql, title, tags = _call_ai_sql_builder(
+            prompt=prompt,
+            admin_notes=admin_notes,
+            existing_sql=existing_sql,
+        )
         return JsonResponse({"sql": sql, "title": title, "tags": tags})
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=500)

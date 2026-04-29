@@ -53,10 +53,6 @@
         </div>
       </div>
       <div class="col-6 col-md">
-        <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Supplier</div>
-        <div class="fs-6 fw-bold">{% if contract.supplier %}{{ contract.supplier.name }}{% else %}—{% endif %}</div>
-      </div>
-      <div class="col-6 col-md">
         <div class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Contract type</div>
         <div class="fs-6 fw-bold">{% if contract.contract_type and contract.contract_type.description %}{{ contract.contract_type.description }}{% else %}—{% endif %}</div>
       </div>
