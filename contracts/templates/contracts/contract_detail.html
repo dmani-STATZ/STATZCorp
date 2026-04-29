@@ -44,9 +44,6 @@ Contract Details: {{ contract.contract_number }}
             Contract Details: {{ contract.contract_number }}
         </h1>
         <div class="flex space-x-4">
-            <a href="{% url 'contracts:contract_update' contract.id %}" class="bg-gray-400 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center">
-                Edit Contract
-            </a>
             <a href="{% url 'contracts:contract_management' contract.id %}" 
                class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -109,15 +106,6 @@ Contract Details: {{ contract.contract_number }}
                             <span class="text-uppercase">PO</span> Number
                         </label>
                         <p class="font-medium">{{ contract.po_number|default:"N/A" }}</p>
-                    </div>
-                </div>
-                
-                <div class="md:col-span-3">
-                    <div class="form-group">
-                        <label class="form-label">
-                            <span class="text-uppercase">TAB</span> Number
-                        </label>
-                        <p class="font-medium">{{ contract.tab_num|default:"N/A" }}</p>
                     </div>
                 </div>
 

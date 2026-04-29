@@ -156,14 +156,6 @@
                                         {% if contract.reviewed %}Reviewed{% else %}Review Contract{% endif %}
                                     </a>
 
-                                    <a href="{% url 'contracts:contract_update' contract.id %}"
-                                       class="flex items-center w-full px-4 py-2 text-sm text-blue-700 hover:bg-blue-50">
-                                        <svg class="mr-3 h-5 w-5 text-blue-700 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-5.414V14h1.414l3.293-3.293-1.414-1.414L10 11.172V9H8v3.586zM13.707 7.707a1 1 0 00-1.414-1.414L11 7.586l1.414 1.414 1.293-1.293z" clip-rule="evenodd" />
-                                        </svg>
-                                        Edit Contract
-                                    </a>
-
                                     <a href="{% url 'contracts:finance_audit_detail' contract.id %}"
                                        class="flex items-center w-full px-4 py-2 text-sm text-green-700 hover:bg-green-50">
                                         <svg class="mr-3 h-5 w-5 text-green-700 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -224,12 +216,6 @@
                             <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'po_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">PO Number</button>
                         </p>
                         <p id="contract-po-number-value" class="font-medium text-sm">{{ contract.po_number|default:"N/A" }}</p>
-                    </div>
-                    <div class="field-group">
-                        <p class="text-xs text-gray-600">
-                            <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'tab_num')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Tab Number</button>
-                        </p>
-                        <p id="contract-tab-num-value" class="font-medium text-sm">{{ contract.tab_num|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
                         <p class="text-xs text-gray-600">

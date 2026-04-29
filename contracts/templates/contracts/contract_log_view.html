@@ -101,9 +101,6 @@
                     <tr class="label text-left">
                         <th class="px-1.5 py-1">Status</th>
                         <th class="px-2 py-1 text-left label whitespace-nowrap">
-                            Tab #
-                        </th>
-                        <th class="px-2 py-1 text-left label whitespace-nowrap">
                             PO #
                         </th>
                         <th class="px-2 py-1 text-left label whitespace-nowrap">
@@ -156,9 +153,6 @@
                                             {% else %}Open{% endif %}
                                 </span>
                             </td>
-                        <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                            {{ clin.contract.tab_num }}
-                        </td>
                         <td class="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
                             {{ clin.contract.po_number }}
                         </td>
@@ -231,7 +225,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                        <td colspan="31" class="px-1.5 py-1 text-center text-gray-500">
+                        <td colspan="33" class="px-1.5 py-1 text-center text-gray-500">
                             No records found
                             </td>
                         </tr>

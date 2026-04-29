@@ -84,10 +84,6 @@ window.onTransactionSaved = function(data) {
               <span class="review-field-value d-block">{{ contract.idiq_contract.contract_number|default:"N/A" }}</span>
             </div>
             <div class="col-md-3">
-              <span class="review-field-label">TAB Number</span>
-              <span class="review-field-value d-block">{{ contract.idiq_contract.tab_num|default:"N/A" }}</span>
-            </div>
-            <div class="col-md-3">
               <span class="review-field-label">Buyer</span>
               <span class="review-field-value d-block">{{ contract.idiq_contract.buyer.description|default:"N/A" }}</span>
             </div>
@@ -146,13 +142,6 @@ window.onTransactionSaved = function(data) {
                 PO Number
               </button>
               <span class="review-field-value d-block" id="contract-po-number-value">{{ contract.po_number|default:"N/A" }}</span>
-            </div>
-            <div class="col-md-3">
-              <button type="button" class="review-field-btn"
-                onclick="openTransactionsEditModal(window.contractContentTypeId, window.contractId, 'tab_num')">
-                TAB Number
-              </button>
-              <span class="review-field-value d-block" id="contract-tab-num-value">{{ contract.tab_num|default:"N/A" }}</span>
             </div>
             <div class="col-md-3">
               <button type="button" class="review-field-btn"

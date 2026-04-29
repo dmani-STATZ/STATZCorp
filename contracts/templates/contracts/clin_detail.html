@@ -103,18 +103,6 @@ window.onTransactionSaved = function(data) {
                                 </p>
                             </div>
                         </div>
-                        <div style="width:35%">
-                            <div class="form-group">
-                                <button type="button"
-                                    onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'tab_num')"
-                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                    TAB NUMBER
-                                </button>
-                                <p class="font-medium text-sm mt-1">
-                                    <span id="clin-tab-num-value">{{ clin.tab_num|default:"N/A" }}</span>
-                                </p>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="d-flex flex-nowrap gap-3 mb-3">
