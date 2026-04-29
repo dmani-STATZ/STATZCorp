@@ -62,6 +62,7 @@
             {% if supplier.primary_phone or supplier.business_phone %}
               <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="row gap-1">{{ supplier.primary_phone|default:supplier.business_phone }}</a>
             {% endif %}
+            <br>
             {% if supplier.primary_email or supplier.business_email %}
               <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="row gap-1">{{ supplier.primary_email|default:supplier.business_email }}</a>
             {% endif %}

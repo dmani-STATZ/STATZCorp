@@ -383,7 +383,7 @@ class PaymentHistory(AuditModel):
         ('item_value', 'Item Value'),
         ('quote_value', 'Quote Value'),
         ('paid_amount', 'Paid Amount'),
-        ('wawf_payment', 'WAWF Payment'),
+        ('wawf_payment', 'Customer Payment'),  # display label; DB value remains wawf_payment
     ]
 
     # Generic relation fields

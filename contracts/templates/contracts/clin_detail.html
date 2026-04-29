@@ -406,7 +406,7 @@ window.onTransactionSaved = function(data) {
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_payment')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                    <span class="text-uppercase">WAWF</span> Payment
+                                    Customer Payment
                                 </button>
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-wawf-payment-value">${{ clin.wawf_payment|floatformat:2|intcomma|default:"N/A" }}</span>
@@ -418,7 +418,7 @@ window.onTransactionSaved = function(data) {
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_recieved')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                    <span class="text-uppercase">WAWF</span> Received
+                                    Customer Received
                                 </button>
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-wawf-recieved-value">{{ clin.wawf_recieved|date:"m/d/Y"|default:"N/A" }}</span>
@@ -430,7 +430,7 @@ window.onTransactionSaved = function(data) {
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_invoice')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                    <span class="text-uppercase">WAWF</span> Invoice
+                                    Customer Invoice
                                 </button>
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-wawf-invoice-value">{{ clin.wawf_invoice|default:"N/A" }}</span>

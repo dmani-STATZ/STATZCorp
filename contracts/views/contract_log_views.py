@@ -264,7 +264,7 @@ def export_contract_log(request):
         'Supplier', 'Cage Code', 'Award Date', 'Contract Status', 'NSN', 'Item Description',
         'I&A', 'PO to Sub', 'Sub Reply', 'PO to QAR', 'FOB', 'QDD', 'CDD', 'Order Qty',
         'Ship Date', 'Ship Qty', 'Sub PO $', 'Sub Paid $', 'Terms', 'Contract $',
-        'WAWF Payment $', 'Date Pay Recv', 'Plan Gross $', 'Actual Paid PPI $', 'Actual STATZ $',
+        'Customer Payment $', 'Date Pay Recv', 'Plan Gross $', 'Actual Paid PPI $', 'Actual STATZ $',
         'Notes'
     ])
     
@@ -466,7 +466,7 @@ def export_contract_log_xlsx(request):
         'Supplier', 'Cage Code', 'Award Date', 'Contract Status', 'NSN', 'Item Description',
         'I&A', 'PO to Sub', 'Sub Reply', 'PO to QAR', 'FOB', 'QDD', 'CDD', 'Order Qty',
         'Ship Date', 'Ship Qty', 'Sub PO $', 'Sub Paid $', 'Terms', 'Contract $',
-        'WAWF Payment $', 'Date Pay Recv', 'Plan Gross $', 'Actual Paid PPI $', 'Actual STATZ $',
+        'Customer Payment $', 'Date Pay Recv', 'Plan Gross $', 'Actual Paid PPI $', 'Actual STATZ $',
         'Notes'
     ]
     ws.append(headers)

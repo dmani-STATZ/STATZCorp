@@ -184,7 +184,7 @@ def export_contract_log(request):
         'Supplier', 'Award Date', 'Contract Status', 'NSN', 'NSN Description',
         'IA', 'PO to Sub', 'Sub Reply', 'PO to QAR', 'FOB', 'QDD', 'CDD',
         'Order Qty', 'Ship Date', 'Ship Qty', 'Sub PO $', 'Sub Paid $', 'X',
-        'Contract $', 'WAWF Payment $', 'Date Pay Recv', 'Plan Gross $',
+        'Contract $', 'Customer Payment $', 'Date Pay Recv', 'Plan Gross $',
         'Actual Paid PPI $', 'Actual STATZ $', 'Plan Split per PPI bid',
         'PPI Split $', 'STATZ Split $', 'Notes'
     ])
