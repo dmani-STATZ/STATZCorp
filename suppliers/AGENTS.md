@@ -59,6 +59,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 
 ## 4. Local Architecture / Change Patterns
 
+- **Supplier Health Score:** Logic lives in `compute_health_data()` and two module-level dicts (`HEALTH_WEIGHTS`, `HEALTH_THRESHOLDS`) in `suppliers/views.py`. These are pure constants with no side effects. Weights and thresholds are intentionally hardcoded with TODO comments for future configurability. Do not move this logic into models or signals. The function accepts a supplier and a queryset and returns a plain dict — it is safe to call from tests or management commands.
 - **Business logic is in `views.py`** — enrichment helpers, normalization functions, and OpenRouter calls all live in `views.py`. There are no separate `services.py` or `selectors.py` files.
 - **`openrouter_config.py`** is a standalone config/serialization module; keep `OpenRouterModelSetting` access through `get_default()` and `get_openrouter_model_info()` rather than direct ORM queries.
 - **Templates are not thin** — `supplier_enrich.html` and `supplier_detail.html` contain substantial inline JS and logic. Be especially careful with inline JS in `supplier_enrich.html`.

@@ -1,10 +1,22 @@
 import json
 import os
 import re
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Q, Count, Sum, Case, When, Value
+from django.db.models import (
+    Q,
+    Count,
+    Sum,
+    Case,
+    When,
+    Value,
+    F,
+    ExpressionWrapper,
+    DecimalField,
+    DurationField,
+)
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.utils import timezone
@@ -18,7 +30,15 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse
 
-from contracts.models import Contract, Clin, Address
+from contracts.models import (
+    Contract,
+    Clin,
+    Address,
+    Note,
+    GovAction,
+    ClinShipment,
+    PaymentHistory,
+)
 from suppliers.models import (
     Contact,
     Supplier,
@@ -491,6 +511,140 @@ class DashboardView(TemplateView):
         return context
 
 
+# ---------------------------------------------------------------------------
+# Supplier Health Score
+# Computes a friction-vs-margin health score for a supplier over a given
+# contract queryset. No model changes — pure aggregation of existing data.
+# TODO: Weights and thresholds are hardcoded — make configurable per company
+#       in a future sprint.
+# ---------------------------------------------------------------------------
+
+HEALTH_WEIGHTS = {
+    'note': 1,
+    'gov_action': 3,
+    'shipment_correction': 2,
+    'payment_history': 1,
+}
+
+# Ratio thresholds: avg_margin_per_contract / avg_friction_per_contract
+# Higher ratio = more margin per unit of friction = healthier
+HEALTH_THRESHOLDS = {
+    'green': 50,   # ratio >= 50 → green
+    'amber': 15,   # ratio >= 15 → amber, else red
+}
+
+
+def compute_health_data(supplier, contracts_qs):
+    """
+    Given a Supplier and a filtered Contract queryset, compute health score data.
+    Returns a dict suitable for passing to the template.
+    """
+    contract_ids = list(contracts_qs.values_list('id', flat=True))
+    contract_count = len(contract_ids)
+
+    if contract_count == 0:
+        return {
+            'contract_count': 0,
+            'gross_margin': 0,
+            'avg_margin_per_contract': 0,
+            'friction_score': 0,
+            'avg_friction_per_contract': 0,
+            'note_count': 0,
+            'gov_action_count': 0,
+            'shipment_correction_count': 0,
+            'payment_history_count': 0,
+            'ratio': None,
+            'band': None,
+            'window_label': '',
+            'using_fallback': False,
+        }
+
+    clin_ids = list(
+        Clin.objects.filter(
+            supplier=supplier,
+            contract__in=contracts_qs
+        ).values_list('id', flat=True)
+    )
+
+    contract_ct = ContentType.objects.get_for_model(Contract)
+    clin_ct = ContentType.objects.get_for_model(Clin)
+
+    note_count = (
+        Note.objects.filter(content_type=contract_ct, object_id__in=contract_ids).count()
+        + Note.objects.filter(content_type=clin_ct, object_id__in=clin_ids).count()
+    )
+
+    gov_action_count = GovAction.objects.filter(contract_id__in=contract_ids).count()
+
+    # Shipment correction = a ClinShipment edited more than 60 seconds after creation
+    shipment_correction_count = (
+        ClinShipment.objects.filter(clin_id__in=clin_ids)
+        .annotate(
+            edit_gap=ExpressionWrapper(
+                F('modified_on') - F('created_on'),
+                output_field=DurationField()
+            )
+        )
+        .filter(edit_gap__gt=timedelta(seconds=60))
+        .count()
+    )
+
+    payment_history_count = (
+        PaymentHistory.objects.filter(content_type=contract_ct, object_id__in=contract_ids).count()
+        + PaymentHistory.objects.filter(content_type=clin_ct, object_id__in=clin_ids).count()
+    )
+
+    friction_score = (
+        note_count * HEALTH_WEIGHTS['note']
+        + gov_action_count * HEALTH_WEIGHTS['gov_action']
+        + shipment_correction_count * HEALTH_WEIGHTS['shipment_correction']
+        + payment_history_count * HEALTH_WEIGHTS['payment_history']
+    )
+
+    totals = Clin.objects.filter(
+        supplier=supplier,
+        contract__in=contracts_qs
+    ).aggregate(
+        total_item_value=Sum('item_value', output_field=DecimalField()),
+        total_quote_value=Sum('quote_value', output_field=DecimalField()),
+    )
+    total_item_value = totals['total_item_value'] or 0
+    total_quote_value = totals['total_quote_value'] or 0
+    gross_margin = total_item_value - total_quote_value
+
+    avg_margin = float(gross_margin) / contract_count if contract_count > 0 else 0.0
+    avg_friction = friction_score / contract_count if contract_count > 0 else 0.0
+
+    if avg_friction == 0:
+        ratio = None
+        band = 'green'
+    elif avg_margin <= 0:
+        ratio = 0.0
+        band = 'red'
+    else:
+        ratio = avg_margin / avg_friction
+        if ratio >= HEALTH_THRESHOLDS['green']:
+            band = 'green'
+        elif ratio >= HEALTH_THRESHOLDS['amber']:
+            band = 'amber'
+        else:
+            band = 'red'
+
+    return {
+        'contract_count': contract_count,
+        'gross_margin': float(gross_margin),
+        'avg_margin_per_contract': float(avg_margin),
+        'friction_score': friction_score,
+        'avg_friction_per_contract': float(avg_friction),
+        'note_count': note_count,
+        'gov_action_count': gov_action_count,
+        'shipment_correction_count': shipment_correction_count,
+        'payment_history_count': payment_history_count,
+        'ratio': ratio,
+        'band': band,
+    }
+
+
 class SupplierDetailView(DetailView):
     model = Supplier
     template_name = 'suppliers/supplier_detail.html'
@@ -615,6 +769,42 @@ class SupplierDetailView(DetailView):
             total_clins=Count('id'),
             total_value=Coalesce(Sum('quote_value'), 0.0, output_field=models.FloatField()),
         )
+
+        # --- Supplier Health Score ---
+        now_hs = timezone.now()
+        window_start = now_hs - timedelta(days=730)  # 24 months
+
+        all_contracts_qs = Contract.objects.filter(
+            clin__supplier=supplier, id__isnull=False
+        ).distinct()
+
+        windowed_contracts_qs = all_contracts_qs.filter(created_on__gte=window_start)
+        contracts_in_window = windowed_contracts_qs.count()
+
+        if contracts_in_window >= 5:
+            primary_qs = windowed_contracts_qs
+            window_label = "Last 24 Months"
+            using_fallback = False
+        else:
+            primary_qs = all_contracts_qs
+            window_label = "All Time"
+            using_fallback = True
+
+        health_score = compute_health_data(supplier, primary_qs)
+        health_score['window_label'] = window_label
+        health_score['using_fallback'] = using_fallback
+
+        alternate_qs = all_contracts_qs if not using_fallback else windowed_contracts_qs
+        alternate_label = "All Time" if not using_fallback else "Last 24 Months"
+        health_score_alternate = compute_health_data(supplier, alternate_qs)
+        health_score_alternate['window_label'] = alternate_label
+        health_score_alternate['using_fallback'] = not using_fallback
+
+        context['health_score'] = health_score
+        context['health_score_alternate'] = health_score_alternate
+        context['health_score_windowed_contract_count'] = contracts_in_window
+        # --- End Supplier Health Score ---
+
         return context
 
 

@@ -2,75 +2,141 @@
 {% load humanize %}
 {% block title %}Supplier Detail{% endblock %}
 
+{% block extra_head %}
+<style>
+#hs-needle {
+    transition: transform 0.6s ease;
+}
+.hs-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.05rem 1rem;
+    font-size: 0.73rem;
+}
+.supplier-header-divider {
+    width: 1px;
+    background: var(--bs-border-color, #dee2e6);
+    align-self: stretch;
+    flex-shrink: 0;
+}
+</style>
+{% endblock extra_head %}
+
 {% block contract_content %}
-<div class="max-w-6xl mx-auto px-4 pt-6 pb-10 space-y-6">
-  <!-- Header -->
-  <div class="card card-padded relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if supplier.probation %}border-danger bg-danger-subtle{% elif supplier.conditional %}border-warning bg-warning-subtle{% endif %}">
-    <div class="absolute top-4 right-4 row gap-3">
-      <a href="{% url 'suppliers:supplier_dashboard' %}" class="text-sm">&larr; Back to Dashboard</a>
-      <div class="h-5 w-5 rounded-full border-2 {% if supplier.archived %}bg-red-500 border-red-600{% else %}bg-green-500 border-green-600{% endif %}" title="{% if supplier.archived %}Archived{% else %}Active{% endif %}"></div>
-    </div>
-    <div class="row gap-4">
-      {% if supplier.logo_url %}
-        <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-16 w-16 object-contain rounded-md border">
-      {% else %}
-        <div class="h-16 w-16 rounded-md border bg-body-secondary row justify-center text-gray-400 text-xl font-semibold">
-          {{ supplier.name|default:"S"|slice:":1" }}
-        </div>
-      {% endif %}
-      <div>
-        <p class="text-sm text-gray-500 uppercase tracking-wide">Supplier</p>
-        <button type="button"
-          onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'name')"
-          class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none text-3xl font-semibold text-gray-900 dark:text-gray-100 max-w-full">
-          <span id="supplier-name-value">{{ supplier.name|default:"Supplier" }}</span>
-        </button>
-        <div class="flex flex-wrap gap-2 mt-2 text-sm text-gray-700">
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
-            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'cage_code')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">CAGE:</button>
-            <span id="supplier-cage-code-value">{{ supplier.cage_code|default:"—" }}</span>
-          </span>
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
-            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'dodaac')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">DoDAAC:</button>
-            <span id="supplier-dodaac-value">{{ supplier.dodaac|default:"—" }}</span>
-          </span>
-          <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
-            <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'allows_gsi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">GSI:</button>
-            <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
-          </span>
-          {% if supplier.website_url %}
-            <a href="{{ supplier.website_url }}" target="_blank" rel="noopener" class="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 hover:text-blue-900">
-              {{ supplier.website_url }}
-            </a>
-          {% endif %}
-        </div>
-        <div class="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
-          {% if supplier.primary_phone or supplier.business_phone %}
-            <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="row gap-1">
-              {{ supplier.primary_phone|default:supplier.business_phone }}
-            </a>
-          {% endif %}
-          {% if supplier.primary_email or supplier.business_email %}
-            <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="row gap-1">
-              {{ supplier.primary_email|default:supplier.business_email }}
-            </a>
-          {% endif %}
+<div class="max-w-screen-xl mx-auto px-4 pt-6 pb-10 space-y-6">
+  <!-- Supplier header: identity | health | actions (md+ horizontal) -->
+  <div class="card card-padded {% if supplier.probation %}border-danger bg-danger-subtle{% elif supplier.conditional %}border-warning bg-warning-subtle{% endif %}">
+    <div class="d-flex flex-column flex-md-row gap-3 gap-md-4 align-items-stretch">
+
+      <!-- Column 1 — Supplier identity -->
+      <div class="d-flex gap-3 align-items-start flex-shrink-0">
+        {% if supplier.logo_url %}
+          <img src="{{ supplier.logo_url }}" alt="{{ supplier.name }} logo" class="supplier-logo h-14 w-14 object-contain rounded-md border flex-shrink-0">
+        {% else %}
+          <div class="h-14 w-14 rounded-md border bg-body-secondary row justify-center text-gray-400 text-xl font-semibold flex-shrink-0">
+            {{ supplier.name|default:"S"|slice:":1" }}
+          </div>
+        {% endif %}
+        <div>
+          <p class="text-sm text-gray-500 uppercase tracking-wide mb-0">Supplier</p>
+          <button type="button"
+            onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'name')"
+            class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            <span id="supplier-name-value">{{ supplier.name|default:"Supplier" }}</span>
+          </button>
+          <div class="flex flex-wrap gap-2 mt-1 text-sm text-gray-700">
+            <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
+              <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'cage_code')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">CAGE:</button>
+              <span id="supplier-cage-code-value">{{ supplier.cage_code|default:"—" }}</span>
+            </span>
+            <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
+              <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'dodaac')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">DoDAAC:</button>
+              <span id="supplier-dodaac-value">{{ supplier.dodaac|default:"—" }}</span>
+            </span>
+            <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
+              <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'allows_gsi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">GSI:</button>
+              <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
+            </span>
+          </div>
+          <div class="flex flex-wrap gap-3 mt-1 text-sm text-gray-700">
+            {% if supplier.primary_phone or supplier.business_phone %}
+              <a href="tel:{{ supplier.primary_phone|default:supplier.business_phone }}" class="row gap-1">{{ supplier.primary_phone|default:supplier.business_phone }}</a>
+            {% endif %}
+            {% if supplier.primary_email or supplier.business_email %}
+              <a href="mailto:{{ supplier.primary_email|default:supplier.business_email }}" class="row gap-1">{{ supplier.primary_email|default:supplier.business_email }}</a>
+            {% endif %}
+          </div>
         </div>
       </div>
-    </div>
-    <div class="flex flex-wrap gap-2 md:pl-6">
-      <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="btn btn-sm btn-outline-secondary">
-        Edit Supplier
-      </a>
-      {% if supplier.website_url %}
-        <a
-          id="enrich-from-website-btn"
-          data-supplier-id="{{ supplier.id }}"
-          href="{% url 'suppliers:supplier_enrich_page' supplier.id %}"
-          class="btn btn-sm btn-outline-success">
-          Enrich from website
-        </a>
+
+      <div class="supplier-header-divider d-none d-md-block align-self-stretch flex-shrink-0"></div>
+
+      <!-- Column 2 — Health gauge + stats + toggle -->
+      <div class="flex-grow-1 d-flex flex-wrap align-items-start gap-3 justify-content-md-center" style="min-width: 0;">
+      {% if health_score.contract_count > 0 %}
+      <div class="d-flex flex-row flex-nowrap align-items-start gap-4">
+      <!-- Mini gauge (left) -->
+      <div class="text-center flex-shrink-0" style="width: 200px;">
+        <svg viewBox="0 0 200 110" width="200" height="110" aria-hidden="true">
+          <path d="M 20,100 A 80,80 0 0,1 60.36,26.36" fill="none" stroke="#198754" stroke-width="18" stroke-linecap="butt"/>
+          <path d="M 60.36,26.36 A 80,80 0 0,1 139.64,26.36" fill="none" stroke="#ffc107" stroke-width="18" stroke-linecap="butt"/>
+          <path d="M 139.64,26.36 A 80,80 0 0,1 180,100" fill="none" stroke="#dc3545" stroke-width="18" stroke-linecap="butt"/>
+          {% if health_score.band %}
+          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round"
+            transform="rotate({% if health_score.band == 'green' %}-60{% elif health_score.band == 'amber' %}0{% else %}60{% endif %}, 100, 100)"/>
+          {% else %}
+          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round" style="display:none"/>
+          {% endif %}
+          <circle cx="100" cy="100" r="5" fill="#333"/>
+        </svg>
+        <div id="hs-band-label" class="fw-bold small {% if health_score.band == 'green' %}text-success{% elif health_score.band == 'amber' %}text-warning{% elif health_score.band == 'red' %}text-danger{% else %}text-muted{% endif %}">
+          {% if health_score.band %}{{ health_score.band|capfirst }}{% else %}No Data{% endif %}
+        </div>
+      </div>
+
+      <!-- Stats breakdown + warning + toggle (right) -->
+      <div class="d-flex flex-column flex-grow-1 min-w-0" style="min-height: 110px;">
+        <div class="hs-stats-grid text-muted mb-2">
+          <div>Contracts: <span id="hs-contract-count" class="text-body fw-medium">{{ health_score.contract_count }}</span> <span style="font-size:0.65rem;">({{ health_score.window_label }})</span></div>
+          <div>Notes: <span id="hs-note-count" class="text-body fw-medium">{{ health_score.note_count }}</span></div>
+          <div>Avg margin: <span id="hs-avg-margin" class="text-body fw-medium">${{ health_score.avg_margin_per_contract|floatformat:2 }}</span></div>
+          <div>Gov actions: <span id="hs-gov-count" class="text-body fw-medium">{{ health_score.gov_action_count }}</span></div>
+          <div>Avg friction: <span id="hs-avg-friction" class="text-body fw-medium">{{ health_score.avg_friction_per_contract|floatformat:1 }}</span> pts</div>
+          <div>Ship. corrns: <span id="hs-ship-count" class="text-body fw-medium">{{ health_score.shipment_correction_count }}</span></div>
+          <div></div>
+          <div>Payments: <span id="hs-pay-count" class="text-body fw-medium">{{ health_score.payment_history_count }}</span></div>
+        </div>
+        <div class="flex-shrink-0" style="min-height: 1.5rem;">
+          <div id="hs-fallback-warning" class="text-warning mb-1" style="font-size:0.7rem;{% if not health_score.using_fallback %}display:none;{% endif %}">
+            &#9888; &lt;5 contracts in 24 months — all-time data
+          </div>
+        </div>
+        <button id="hs-toggle-btn" type="button" class="btn btn-outline-secondary align-self-start" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
+          Switch to {{ health_score_alternate.window_label }}
+        </button>
+      </div>
+      </div>
+      {% else %}
+      <div class="text-muted small flex-shrink-0 align-self-center">No contract history.</div>
       {% endif %}
+      </div>
+
+      <div class="supplier-header-divider d-none d-md-block align-self-stretch flex-shrink-0"></div>
+
+      <!-- Column 3 — Back, status, Edit (md+ right-aligned) -->
+      <div class="d-flex flex-column gap-2 flex-shrink-0 align-items-start align-items-md-end text-md-end">
+        <div class="d-flex align-items-center gap-3 flex-wrap justify-content-md-end">
+          <a href="{% url 'suppliers:supplier_dashboard' %}" class="text-sm">&larr; Back to Dashboard</a>
+          <div class="h-5 w-5 rounded-full border-2 {% if supplier.archived %}bg-red-500 border-red-600{% else %}bg-green-500 border-green-600{% endif %}" title="{% if supplier.archived %}Archived{% else %}Active{% endif %}"></div>
+        </div>
+        <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="btn btn-sm btn-outline-secondary">Edit Supplier</a>
+        {% if supplier.website_url %}
+          <a id="enrich-from-website-btn" data-supplier-id="{{ supplier.id }}"
+             href="{% url 'suppliers:supplier_enrich_page' supplier.id %}"
+             class="btn btn-sm btn-outline-success">Enrich from website</a>
+        {% endif %}
+      </div>
+
     </div>
   </div>
 
@@ -936,6 +1002,83 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+{{ health_score|json_script:"health-score-primary" }}
+{{ health_score_alternate|json_script:"health-score-alternate" }}
+<script>
+(function () {
+    var primaryEl = document.getElementById('health-score-primary');
+    var alternateEl = document.getElementById('health-score-alternate');
+    if (!primaryEl || !alternateEl) return;
+
+    var primaryData = JSON.parse(primaryEl.textContent);
+    var alternateData = JSON.parse(alternateEl.textContent);
+    var current = 'primary';
+
+    var NEEDLE_ANGLES = { green: -60, amber: 0, red: 60 };
+    var CX = 100, CY = 100;
+
+    function applyData(data) {
+        var ccEl = document.getElementById('hs-contract-count');
+        if (ccEl) ccEl.textContent = data.contract_count + ' (' + data.window_label + ')';
+
+        var amEl = document.getElementById('hs-avg-margin');
+        if (amEl) amEl.textContent = '$' + parseFloat(data.avg_margin_per_contract).toFixed(2);
+
+        var afEl = document.getElementById('hs-avg-friction');
+        if (afEl) afEl.textContent = parseFloat(data.avg_friction_per_contract).toFixed(1) + ' pts';
+
+        var ncEl = document.getElementById('hs-note-count');
+        if (ncEl) ncEl.textContent = data.note_count;
+
+        var gcEl = document.getElementById('hs-gov-count');
+        if (gcEl) gcEl.textContent = data.gov_action_count;
+
+        var scEl = document.getElementById('hs-ship-count');
+        if (scEl) scEl.textContent = data.shipment_correction_count;
+
+        var pcEl = document.getElementById('hs-pay-count');
+        if (pcEl) pcEl.textContent = data.payment_history_count;
+
+        var needle = document.getElementById('hs-needle');
+        var bandLabel = document.getElementById('hs-band-label');
+        var fallbackWarning = document.getElementById('hs-fallback-warning');
+        var toggleBtn = document.getElementById('hs-toggle-btn');
+
+        if (data.contract_count === 0 || !data.band) {
+            if (needle) needle.style.display = 'none';
+            if (bandLabel) { bandLabel.textContent = 'No Data'; bandLabel.className = 'fw-bold text-muted'; }
+        } else {
+            if (needle) {
+                needle.style.display = '';
+                var angle = NEEDLE_ANGLES[data.band] !== undefined ? NEEDLE_ANGLES[data.band] : 0;
+                needle.setAttribute('transform', 'rotate(' + angle + ', ' + CX + ', ' + CY + ')');
+            }
+            var colorMap = { green: 'text-success', amber: 'text-warning', red: 'text-danger' };
+            if (bandLabel) {
+                bandLabel.textContent = data.band.charAt(0).toUpperCase() + data.band.slice(1);
+                bandLabel.className = 'fw-bold ' + (colorMap[data.band] || 'text-muted');
+            }
+        }
+
+        if (fallbackWarning) {
+            fallbackWarning.style.display = data.using_fallback ? '' : 'none';
+        }
+
+        if (toggleBtn) {
+            var altLabel = current === 'primary' ? alternateData.window_label : primaryData.window_label;
+            toggleBtn.textContent = 'Switch to ' + altLabel;
+        }
+    }
+
+    var toggleBtn = document.getElementById('hs-toggle-btn');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function () {
+            current = current === 'primary' ? 'alternate' : 'primary';
+            applyData(current === 'primary' ? primaryData : alternateData);
+        });
+    }
+})();
+</script>
 <script>
     (function() {
         var pickerToggle = document.getElementById('rfq-email-picker-toggle');
@@ -1931,4 +2074,5 @@
     });
 })();
 </script>
+
 {% endblock %}
