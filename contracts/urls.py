@@ -173,6 +173,7 @@ from .views.dynamic_tracker_views import (
     api_delete_column,
     api_reorder_columns,
     api_close_record,
+    api_update_column_width,
 )
 from .views.company_views import (
     CompanyListView,
@@ -628,6 +629,11 @@ urlpatterns = [
     path("api/dynamic-tracker/<int:schema_id>/column/<str:column_id>/update/", api_update_column, name="tracker_update_column"),
     path("api/dynamic-tracker/<int:schema_id>/column/<str:column_id>/delete/", api_delete_column, name="tracker_delete_column"),
     path("api/dynamic-tracker/<int:schema_id>/reorder-columns/", api_reorder_columns, name="tracker_reorder_columns"),
+    path(
+        "api/dynamic-tracker/<int:schema_id>/column-width/",
+        api_update_column_width,
+        name="api_update_column_width",
+    ),
     path("api/dynamic-tracker/record/<int:record_id>/close/", api_close_record, name="tracker_close_record"),
     path("api/dynamic-tracker/<int:schema_id>/add-record/", api_add_record, name="tracker_add_record"),
     path("api/dynamic-tracker/record/<int:record_id>/update/", api_update_record, name="tracker_update_record"),

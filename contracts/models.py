@@ -1009,6 +1009,7 @@ class TrackerSchema(models.Model):
     name = models.CharField(max_length=255)
     columns = models.JSONField(default=list)
     column_order = models.JSONField(default=list)
+    system_col_widths = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)

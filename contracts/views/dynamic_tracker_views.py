@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
 from ..models import TrackerSchema, ContractRecord, Contract
@@ -91,19 +92,70 @@ def tracker_detail(request, schema_id):
         for r in records_qs
     ]
 
+    system_col_widths_json = mark_safe(json.dumps(schema.system_col_widths or {}))
+
     return render(request, 'contracts/dynamic_tracker.html', {
         'schema': schema,
         'columns': columns,
         'columns_data': columns,
         'records_data': records_data,
         'column_order': schema.resolved_column_order(),
+        'system_col_widths_json': system_col_widths_json,
     })
+
+
+def _tracker_schema_for_request(request, schema_id):
+    schema = get_object_or_404(TrackerSchema, pk=schema_id)
+    if getattr(request, 'active_company', None) and schema.company != request.active_company:
+        return None
+    return schema
 
 
 @login_required
 def api_schema(request, schema_id):
     schema = get_object_or_404(TrackerSchema, pk=schema_id)
     return JsonResponse({'columns': schema.columns})
+
+
+@login_required
+@require_POST
+def api_update_column_width(request, schema_id):
+    schema = _tracker_schema_for_request(request, schema_id)
+    if schema is None:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+
+    column_id = body.get('column_id')
+    if not isinstance(column_id, str) or not column_id.strip():
+        return JsonResponse({'status': 'error', 'message': 'column_id is required'}, status=400)
+    column_id = column_id.strip()
+
+    try:
+        width_px = int(body.get('width_px'))
+    except (TypeError, ValueError):
+        return JsonResponse({'status': 'error', 'message': 'width_px must be an integer'}, status=400)
+    if width_px < 40 or width_px > 800:
+        return JsonResponse({'status': 'error', 'message': 'width_px must be between 40 and 800'}, status=400)
+
+    if column_id in TrackerSchema.SYSTEM_COLUMN_IDS:
+        widths = dict(schema.system_col_widths or {})
+        widths[column_id] = width_px
+        schema.system_col_widths = widths
+        schema.save(update_fields=['system_col_widths', 'modified_at'])
+        return JsonResponse({'status': 'success'})
+
+    cols = list(schema.columns)
+    target = next((c for c in cols if c.get('id') == column_id), None)
+    if not target:
+        return JsonResponse({'status': 'error', 'message': 'Column not found'}, status=404)
+
+    target['width_px'] = width_px
+    schema.columns = cols
+    schema.save(update_fields=['columns', 'modified_at'])
+    return JsonResponse({'status': 'success'})
 
 
 @login_required

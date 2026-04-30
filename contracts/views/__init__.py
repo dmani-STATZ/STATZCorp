@@ -186,6 +186,7 @@ from .dynamic_tracker_views import (
     api_delete_column,
     api_reorder_columns,
     api_close_record,
+    api_update_column_width,
 )
 
 __all__ = [

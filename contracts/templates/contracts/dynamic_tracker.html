@@ -92,6 +92,19 @@
     .dt-system-cell { color: inherit; }
     .dark #dt-search-input { background:#374151; color:#e5e7eb; border-color:rgba(156,163,175,0.3); }
 
+    .dt-resize-handle {
+        position: absolute;
+        right: 0; top: 0; bottom: 0;
+        width: 6px;
+        cursor: col-resize;
+        z-index: 1;
+        user-select: none;
+    }
+    .dt-resize-handle:hover, .dt-resize-handle.resizing {
+        background: rgba(99,102,241,0.5);
+    }
+    .dt-locked .dt-resize-handle { display: none; }
+
     /* Scroll-to-row highlight flash */
     .dt-table tr.dt-flash > td { animation: dt-flash-bg 2s ease-out; }
     @keyframes dt-flash-bg {
@@ -136,9 +149,13 @@
                 <button type="button" class="dt-zoom-btn" id="zoom-reset-btn" onclick="zoomReset()" title="Reset to default" style="font-size:0.7rem;">Reset</button>
             </div>
             <form onsubmit="event.preventDefault(); jumpToContract(document.getElementById('dt-search-input').value);" style="display:flex; gap:0.25rem; align-items:center;">
-                <input type="text" id="dt-search-input" placeholder="Jump to contract #…"
-                       style="padding:0.375rem 0.625rem; border:1px solid rgba(156,163,175,0.4); border-radius:0.375rem; font-size:0.875rem; background:#fff; min-width:13rem;">
+                <input type="text" id="dt-search-input" placeholder="Jump to contract # or PO…"
+                       style="padding:0.375rem 0.625rem; border:1px solid rgba(156,163,175,0.4); border-radius:0.375rem; font-size:0.875rem; background:#fff; min-width:13rem;"
+                       oninput="if (!this.value.trim()) clearMatchState();">
                 <button type="submit" class="btn-secondary" style="padding:0.375rem 0.75rem; border-radius:0.375rem; font-size:0.875rem;">Go</button>
+                <button type="button" id="dt-match-prev" onclick="cycleMatch(-1)" style="display:none; padding:0.375rem 0.5rem; border-radius:0.375rem; font-size:0.875rem;" class="btn-secondary">◀</button>
+                <button type="button" id="dt-match-next" onclick="cycleMatch(1)" style="display:none; padding:0.375rem 0.5rem; border-radius:0.375rem; font-size:0.875rem;" class="btn-secondary">▶</button>
+                <span id="dt-match-counter" style="display:none; font-size:0.8rem; color:#6b7280; min-width:3.5rem; text-align:center;"></span>
             </form>
             <button onclick="openAddRecord()" class="btn-primary" style="padding:0.375rem 0.75rem; border-radius:0.375rem; font-size:0.875rem;">+ Add Row</button>
             <button onclick="openAddColumn()" class="btn-secondary dt-admin-btn" style="padding:0.375rem 0.75rem; border-radius:0.375rem; font-size:0.875rem;">+ Add Column</button>
@@ -215,6 +232,7 @@
 <script>
 const SCHEMA_ID = {{ schema.pk }};
 const CSRF = '{{ csrf_token }}';
+let SYSTEM_COL_WIDTHS = {{ system_col_widths_json }};
 let COLS = JSON.parse(document.getElementById('columns-data').textContent);
 let COLUMN_ORDER = JSON.parse(document.getElementById('column-order-data').textContent);
 const INITIAL_RECORDS = JSON.parse(document.getElementById('records-data').textContent);
@@ -253,6 +271,7 @@ function buildCell(recordId, col, value) {
     td.dataset.record = recordId;
     td.dataset.field = col.id;
     td.dataset.type = col.type;
+    if (col.width_px) td.style.width = col.width_px + 'px';
 
     if (col.type === 'checkbox') {
         const inp = document.createElement('input');
@@ -328,10 +347,13 @@ function applyPillColor(selectEl, col, value) {
     }
 }
 
-function buildSystemCell(rec, kind) {
+function buildSystemCell(rec, col) {
     const td = document.createElement('td');
     td.className = 'dt-system-cell';
+    const kind = col.kind;
     td.dataset.system = kind;
+    const sw = SYSTEM_COL_WIDTHS[col.id];
+    if (sw) td.style.width = sw + 'px';
     if (kind === 'contract') {
         td.textContent = rec.contract_number || '—';
     } else if (kind === 'po') {
@@ -374,7 +396,7 @@ function buildRow(rec) {
         const col = colById(id);
         if (!col) return;
         if (col.system) {
-            tr.appendChild(buildSystemCell(rec, col.kind));
+            tr.appendChild(buildSystemCell(rec, col));
         } else {
             tr.appendChild(buildCell(rec.id, col, rec.data ? rec.data[col.id] : undefined));
         }
@@ -419,6 +441,16 @@ function renderHeader() {
             inner.appendChild(editBtn);
         }
         th.appendChild(inner);
+        if (col.system) {
+            const sw = SYSTEM_COL_WIDTHS[col.id];
+            if (sw) th.style.width = sw + 'px';
+        } else if (col.width_px) {
+            th.style.width = col.width_px + 'px';
+        }
+        const handle = document.createElement('div');
+        handle.className = 'dt-resize-handle';
+        attachResizeHandler(handle, th, col.id);
+        th.appendChild(handle);
         attachColumnDragHandlers(th);
         headerRow.appendChild(th);
     });
@@ -460,6 +492,57 @@ function attachColumnDragHandlers(th) {
         const before = (e.clientX - rect.left) < rect.width / 2;
         th.classList.remove('drag-over-left', 'drag-over-right');
         if (fromId && fromId !== toId) reorderColumns(fromId, toId, before);
+    });
+}
+
+function attachResizeHandler(handle, th, colId) {
+    let startX, startWidth;
+    let saveTimer = null;
+
+    handle.addEventListener('mousedown', (e) => {
+        if (LOCKED) return;
+        e.preventDefault();
+        e.stopPropagation();
+        startX = e.clientX;
+        startWidth = th.offsetWidth;
+        handle.classList.add('resizing');
+
+        function onMouseMove(e) {
+            const delta = e.clientX - startX;
+            const newWidth = Math.max(40, Math.min(800, startWidth + delta));
+            th.style.width = newWidth + 'px';
+            const colIndex = Array.from(th.parentNode.children).indexOf(th);
+            document.querySelectorAll('#dt-tbody tr').forEach(tr => {
+                const td = tr.children[colIndex];
+                if (td) td.style.width = newWidth + 'px';
+            });
+        }
+
+        function onMouseUp(e) {
+            handle.classList.remove('resizing');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            const finalWidth = Math.max(40, Math.min(800, startWidth + (e.clientX - startX)));
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => saveColumnWidth(colId, finalWidth), 400);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+}
+
+async function saveColumnWidth(colId, widthPx) {
+    const userCol = COLS.find(c => c.id === colId);
+    if (userCol) {
+        userCol.width_px = widthPx;
+    } else {
+        SYSTEM_COL_WIDTHS[colId] = widthPx;
+    }
+    await fetch(`/contracts/api/dynamic-tracker/${SCHEMA_ID}/column-width/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column_id: colId, width_px: widthPx }),
     });
 }
 
@@ -575,25 +658,85 @@ function sortRecords(records) {
     });
 }
 
-// --- Jump-to-contract search + URL hash ---
+// --- Jump-to-contract / PO search + URL hash ---
+function normalizeForSearch(str) {
+    return String(str || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
+let matchList = [];
+let matchIndex = -1;
+
 function jumpToContract(query) {
     const q = (query || '').trim();
-    if (!q) return;
-    const rows = Array.from(document.querySelectorAll('#dt-tbody tr[data-id]'));
-    const ql = q.toLowerCase();
-    const match = rows.find(tr => {
-        const td = Array.from(tr.querySelectorAll('td.dt-system-cell'))
-            .find(t => t.dataset.system === 'contract');
-        return td && td.textContent.trim().toLowerCase().includes(ql);
-    });
-    if (!match) {
-        alert(`No contract matching "${q}" on this page.`);
+    if (!q) {
+        clearMatchState();
         return;
     }
-    // Use hash so the URL is shareable / reusable
-    if (match.id) {
-        history.replaceState(null, '', '#' + match.id);
+    const qNorm = normalizeForSearch(q);
+    const rows = Array.from(document.querySelectorAll('#dt-tbody tr[data-id]'));
+
+    const newMatches = rows.filter(tr => {
+        const contractTd = Array.from(tr.querySelectorAll('td.dt-system-cell'))
+            .find(t => t.dataset.system === 'contract');
+        const poTd = Array.from(tr.querySelectorAll('td.dt-system-cell'))
+            .find(t => t.dataset.system === 'po');
+        const contractText = normalizeForSearch(contractTd ? contractTd.textContent.trim() : '');
+        const poText = normalizeForSearch(poTd ? poTd.textContent.trim() : '');
+        return contractText.includes(qNorm) || poText.includes(qNorm);
+    });
+
+    if (!newMatches.length) {
+        clearMatchState();
+        alert(`No contract or PO matching "${q}" found.`);
+        return;
     }
+
+    const lastQuery = document.getElementById('dt-search-input').dataset.lastQuery || '';
+    if (normalizeForSearch(lastQuery) !== qNorm || JSON.stringify(newMatches.map(r => r.dataset.id)) !== JSON.stringify(matchList.map(r => r.dataset.id))) {
+        matchList = newMatches;
+        matchIndex = 0;
+    } else {
+        matchIndex = (matchIndex + 1) % matchList.length;
+    }
+    document.getElementById('dt-search-input').dataset.lastQuery = q;
+
+    updateMatchCounter();
+    const match = matchList[matchIndex];
+    if (match.id) history.replaceState(null, '', '#' + match.id);
+    flashRow(match);
+}
+
+function clearMatchState() {
+    matchList = [];
+    matchIndex = -1;
+    const inp = document.getElementById('dt-search-input');
+    if (inp) inp.dataset.lastQuery = '';
+    updateMatchCounter();
+}
+
+function updateMatchCounter() {
+    const counter = document.getElementById('dt-match-counter');
+    const prevBtn = document.getElementById('dt-match-prev');
+    const nextBtn = document.getElementById('dt-match-next');
+    if (!counter || !prevBtn || !nextBtn) return;
+    if (matchList.length > 1) {
+        counter.textContent = `${matchIndex + 1} of ${matchList.length}`;
+        counter.style.display = 'inline';
+        prevBtn.style.display = 'inline-flex';
+        nextBtn.style.display = 'inline-flex';
+    } else {
+        counter.style.display = 'none';
+        prevBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+    }
+}
+
+function cycleMatch(direction) {
+    if (!matchList.length) return;
+    matchIndex = (matchIndex + direction + matchList.length) % matchList.length;
+    updateMatchCounter();
+    const match = matchList[matchIndex];
+    if (match.id) history.replaceState(null, '', '#' + match.id);
     flashRow(match);
 }
 

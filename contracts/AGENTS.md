@@ -144,6 +144,26 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `contracts/templates/contracts/supplier_detail.html`, `supplier_list.html`
 - `contracts/static/contracts/js/supplier_modal.js`
 
+### Dynamic Contract Tracker — API inventory (`contracts/views/dynamic_tracker_views.py`, `contracts/urls.py`)
+Authenticated, company-scoped (match `TrackerSchema.company` to `request.active_company` when set). Main UI: `contracts/templates/contracts/dynamic_tracker.html`.
+
+| Method | Path | URL name | Purpose |
+|--------|------|----------|---------|
+| GET | `/contracts/dynamic-tracker/` | `tracker_list` | List trackers |
+| POST | `/contracts/dynamic-tracker/create/` | `tracker_create` | Create tracker |
+| GET | `/contracts/dynamic-tracker/<schema_id>/` | `tracker_detail` | Grid page |
+| GET | `/contracts/api/dynamic-tracker/<schema_id>/schema/` | `tracker_api_schema` | JSON columns |
+| POST | `/contracts/api/dynamic-tracker/<schema_id>/add-column/` | `tracker_add_column` | Add column |
+| POST | `/contracts/api/dynamic-tracker/<schema_id>/column/<column_id>/update/` | `tracker_update_column` | Edit column |
+| POST | `/contracts/api/dynamic-tracker/<schema_id>/column/<column_id>/delete/` | `tracker_delete_column` | Delete column |
+| POST | `/contracts/api/dynamic-tracker/<schema_id>/reorder-columns/` | `tracker_reorder_columns` | Reorder |
+| POST | `/contracts/api/dynamic-tracker/<schema_id>/column-width/` | `api_update_column_width` | Persist `width_px` on user column or width in `system_col_widths` for `__contract__` / `__po__` / `__close__` |
+| POST | `/contracts/api/dynamic-tracker/<schema_id>/add-record/` | `tracker_add_record` | Add row |
+| POST | `/contracts/api/dynamic-tracker/record/<record_id>/update/` | `tracker_update_record` | Cell / highlight |
+| POST | `/contracts/api/dynamic-tracker/record/<record_id>/delete/` | `tracker_delete_record` | Delete row |
+| POST | `/contracts/api/dynamic-tracker/record/<record_id>/close/` | `tracker_close_record` | Soft-close row |
+| GET | `/contracts/api/dynamic-tracker/search-contracts/` | `tracker_search_contracts` | Contract/PO typeahead (`q`) |
+
 ### Reminders popup window
 - `contracts/views/reminder_views.py` — `reminders_popup`, `reminders_popup_add`, `reminders_popup_edit` views
 - `contracts/templates/contracts/reminders_popup_base.html` — bare base template (no nav chrome)
