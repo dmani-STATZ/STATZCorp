@@ -1,12 +1,30 @@
 from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
+from django.db.models import Max, Sum
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
 from ..models import Clin, ClinShipment
 
 logger = logging.getLogger(__name__)
+
+
+def _sync_clin_ship_fields(clin, user):
+    """
+    Recalculate clin.ship_qty and clin.ship_date from all ClinShipment rows.
+    - ship_qty = SUM of all shipment ship_qty values (None shipments excluded)
+    - ship_date = MAX ship_date across all shipments that have a non-null ship_date
+    Saves only the two fields. Transactions signals fire automatically on save.
+    """
+    agg = clin.shipments.aggregate(
+        total_qty=Sum('ship_qty'),
+        latest_date=Max('ship_date'),
+    )
+    clin.ship_qty = agg['total_qty'] or 0
+    clin.ship_date = agg['latest_date']
+    clin.modified_by = user
+    clin.save(update_fields=['ship_qty', 'ship_date', 'modified_by', 'modified_on'])
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -27,32 +45,31 @@ def create_shipment(request):
         clin = get_object_or_404(Clin, id=clin_id)
         logger.debug(f"Found CLIN: {clin.id}")
         
-        # Validate required fields
-        if not data.get('ship_date'):
-            logger.error("No ship date provided")
-            raise ValueError('Ship date is required')
-        
         if not data.get('ship_qty'):
             logger.error("No ship quantity provided")
             raise ValueError('Ship quantity is required')
             
+        raw_ship_date = data.get('ship_date')
+        ship_date = raw_ship_date if raw_ship_date not in (None, '') else None
+
         # Create new shipment
         shipment = ClinShipment.objects.create(
             clin=clin,
             ship_qty=float(data.get('ship_qty', 0.00)),
             uom=data.get('uom', clin.uom),  # Get UOM from data or default to what is in the CLIN
-            ship_date=data.get('ship_date'),
+            ship_date=ship_date,
             comments=data.get('comments', ''),
             created_by=request.user,
             modified_by=request.user,
         )
-        
+
+        _sync_clin_ship_fields(clin, request.user)
+
         logger.info(f"Successfully created shipment {shipment.id}")
-        # Just return the ship_date as it was received since it's already in YYYY-MM-DD format
         return JsonResponse({
             'success': True,
             'shipment_id': shipment.id,
-            'ship_date': data.get('ship_date')
+            'ship_date': shipment.ship_date.isoformat() if shipment.ship_date else None,
         })
         
     except ValueError as e:
@@ -90,7 +107,8 @@ def update_shipment(request, shipment_id):
         if 'uom' in data:
             shipment.uom = data['uom']
         if 'ship_date' in data:
-            shipment.ship_date = data['ship_date']
+            sd = data['ship_date']
+            shipment.ship_date = sd if sd not in (None, '') else None
         if 'comments' in data:
             shipment.comments = data['comments']
         if 'pod_date' in data:
@@ -98,7 +116,9 @@ def update_shipment(request, shipment_id):
         
         shipment.modified_by = request.user
         shipment.save()
-        
+
+        _sync_clin_ship_fields(shipment.clin, request.user)
+
         return JsonResponse({
             'success': True
         })
@@ -115,8 +135,10 @@ def delete_shipment(request, shipment_id):
     """Delete a shipment."""
     try:
         shipment = get_object_or_404(ClinShipment, id=shipment_id)
+        clin = shipment.clin
         shipment.delete()
-        
+        _sync_clin_ship_fields(clin, request.user)
+
         return JsonResponse({
             'success': True
         })

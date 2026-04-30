@@ -40,6 +40,11 @@ def get_clin_details(request, clin_id):
             'due_date': clin.due_date.strftime('%m/%d/%Y') if clin.due_date else 'N/A',
             'ship_date': clin.ship_date.strftime('%m/%d/%Y') if clin.ship_date else '—',
             'ship_qty': clin.ship_qty if clin.ship_qty is not None else '—',
+            'total_shipped': float(clin.ship_qty) if clin.ship_qty is not None else 0,
+            'is_partial': (
+                (clin.ship_qty or 0) > 0
+                and (clin.order_qty is None or (clin.ship_qty or 0) < clin.order_qty)
+            ),
             'item_value': str(clin.item_value) if clin.item_value is not None else '—',
             'unit_price': str(clin.unit_price) if clin.unit_price is not None else '—',
         })

@@ -78,10 +78,7 @@ const ClinShipments = {
         }
         
         const timestamp = new Date().getTime(); // Use timestamp as temporary ID
-        
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date().toISOString().split('T')[0];
-        
+
         // Get the CLIN's UOM from the shipping_uom_display field
         const uomEl = document.getElementById('shipping_uom_display');
         const clinUom = (uomEl ? uomEl.value : null) || section.dataset.uom || 'EA';
@@ -92,17 +89,23 @@ const ClinShipments = {
             <td class="px-4 py-3 relative">
                 <div class="flex items-center gap-2">
                     <label for="ship-date-new-${timestamp}" class="sr-only">Ship Date</label>
-                    <input type="date" 
+                    <input type="date"
                            id="ship-date-new-${timestamp}"
-                           name="shipments-new-${timestamp}-date" 
-                           value="${today}"
+                           name="shipments-new-${timestamp}-date"
+                           value=""
                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-yellow-50">
+                    <button type="button"
+                            onclick="this.previousElementSibling.value = new Date().toISOString().split('T')[0]"
+                            class="btn btn-sm btn-outline-secondary"
+                            title="Set to today">
+                        Today
+                    </button>
                     <span class="bg-yellow-200 text-yellow-800 text-xs font-medium px-2 py-1 rounded whitespace-nowrap">
                         Unsaved
                     </span>
-                    <input type="hidden" 
+                    <input type="hidden"
                            id="shipment-id-new-${timestamp}"
-                           name="shipments-new-${timestamp}-id" 
+                           name="shipments-new-${timestamp}-id"
                            value="">
                 </div>
             </td>
@@ -174,13 +177,6 @@ const ClinShipments = {
         const uomInput = row.querySelector('input[name$="-uom"]');
         const commentsInput = row.querySelector('input[name$="-comments"]');
 
-        // Validate required fields
-        if (!dateInput.value) {
-            this.showMessage('Ship date is required', 'error');
-            dateInput.focus();
-            return;
-        }
-
         if (!qtyInput.value || parseFloat(qtyInput.value) <= 0) {
             this.showMessage('Valid quantity is required', 'error');
             qtyInput.focus();
@@ -189,7 +185,7 @@ const ClinShipments = {
 
         const shipmentData = {
             clin_id: clinId,
-            ship_date: dateInput.value,
+            ship_date: dateInput.value || null,
             ship_qty: parseFloat(qtyInput.value) || 0.00,
             uom: uomInput.value.trim() || (document.getElementById('shipping_uom_display') ? document.getElementById('shipping_uom_display').value : null) || section.dataset.uom || 'EA',
             comments: commentsInput.value.trim()
@@ -243,14 +239,7 @@ const ClinShipments = {
                     uomInput.name = `shipments-${data.shipment_id}-uom`;
                     commentsInput.name = `shipments-${data.shipment_id}-comments`;
                     
-                    // Ensure the date is properly displayed
-                    if (data.ship_date) {
-                        dateInput.value = data.ship_date;
-                    } else {
-                        const savedDate = new Date(dateInput.value);
-                        const formattedDate = savedDate.toISOString().split('T')[0];
-                        dateInput.value = formattedDate;
-                    }
+                    dateInput.value = data.ship_date || '';
                     
                     // Remove yellow background from all inputs
                     [dateInput, qtyInput, uomInput, commentsInput].forEach(input => {

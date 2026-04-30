@@ -49,7 +49,13 @@
                                        id="ship-date-{{ shipment.id }}"
                                        name="shipments-{{ shipment.id }}-date"
                                        value="{{ shipment.ship_date|date:'Y-m-d' }}"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                       class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <button type="button"
+                                        onclick="this.previousElementSibling.value = new Date().toISOString().split('T')[0]"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        title="Set to today">
+                                    Today
+                                </button>
                                 <input type="hidden"
                                        id="shipment-id-{{ shipment.id }}"
                                        name="shipments-{{ shipment.id }}-id"

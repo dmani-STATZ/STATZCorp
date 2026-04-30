@@ -428,7 +428,22 @@
                         <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span id="cd-sub-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
                         <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span id="cd-quoted-due" class="{% if selected_clin.supplier_due_date_late %}text-red-600{% endif %}">{% if selected_clin.supplier_due_date %}{{ selected_clin.supplier_due_date|date:"m/d/Y" }}{% elif selected_clin.due_date %}{{ selected_clin.due_date|date:"m/d/Y" }}{% else %}N/A{% endif %}</span></div>
                         <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span id="cd-order-qty">{{ selected_clin.order_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span></div>
-                        <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span></div>
+                        <div>
+                            <span class="text-gray-600">
+                                <button type="button" onclick="openTransactionsEditModalForClin('ship_qty')"
+                                        class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">
+                                    Ship Qty:
+                                </button>
+                            </span>
+                            <span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }}</span>
+                            {% if selected_clin and selected_clin.ship_qty and selected_clin.ship_qty > 0 and selected_clin.order_qty and selected_clin.ship_qty < selected_clin.order_qty %}
+                                <span id="cd-partial-pill" class="badge ms-1" style="background-color: #fd7e14; color: #fff; font-size: 0.7rem;">Partial</span>
+                            {% elif selected_clin and selected_clin.ship_qty and selected_clin.ship_qty > 0 and selected_clin.order_qty == None %}
+                                <span id="cd-partial-pill" class="badge ms-1" style="background-color: #fd7e14; color: #fff; font-size: 0.7rem;">Partial</span>
+                            {% else %}
+                                <span id="cd-partial-pill" class="badge ms-1" style="display:none; background-color: #fd7e14; color: #fff; font-size: 0.7rem;">Partial</span>
+                            {% endif %}
+                        </div>
                         <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span id="cd-item-value">{% if selected_clin.item_value %}${% endif %}{{ selected_clin.item_value|floatformat:2|default:"—" }}</span></div>
                         <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span id="cd-ship-date">{% if selected_clin.ship_date %}{{ selected_clin.ship_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></div>
                         <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span id="cd-uom">{{ selected_clin.uom|default:"EA" }}</span></div>
@@ -1707,6 +1722,10 @@ function fetchClinDetails(clinId) {
             const qty = d.order_qty !== '—' ? (Number(d.order_qty) === d.order_qty ? d.order_qty.toFixed(0) : d.order_qty) : '—';
             const shipQty = d.ship_qty !== '—' ? (Number(d.ship_qty) === d.ship_qty ? d.ship_qty.toFixed(0) : d.ship_qty) : '—';
             const itemVal = d.item_value !== '—' ? '$' + (Number(d.item_value) ? parseFloat(d.item_value).toFixed(2) : d.item_value) : '—';
+            const isPartial = d.is_partial === true;
+            const partialPillHtml = isPartial
+                ? '<span id="cd-partial-pill" class="badge ms-1" style="background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>'
+                : '<span id="cd-partial-pill" class="badge ms-1" style="display:none;background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>';
             const supplierUrl = d.supplier_id ? "{% url 'suppliers:supplier_detail' 0 %}".replace('/0/', `/${d.supplier_id}/`) : null;
             const supplierHtml = supplierUrl
                 ? `<a href="${supplierUrl}" target="_blank">${fmt(d.supplier_name)}</a>`
@@ -1728,7 +1747,15 @@ function fetchClinDetails(clinId) {
                     <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Sub Due Date:</button></span> <span class="${lateClass}">${fmt(d.supplier_due_date)}</span></div>
                     <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Quoted Due Date:</button></span> <span class="${lateClass}">${fmt(d.quoted_due_date)}</span></div>
                     <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('order_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Order Qty:</button></span> <span>${qty} ${d.uom || 'EA'}</span></div>
-                    <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_qty')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button></span> <span>${shipQty}</span></div>
+                    <div>
+                        <span class="text-gray-600">
+                            <button type="button" onclick="openTransactionsEditModalForClin('ship_qty')"
+                                    class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">
+                                Ship Qty:
+                            </button>
+                        </span>
+                        <span id="cd-ship-qty">${shipQty}</span>${partialPillHtml}
+                    </div>
                     <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('item_value')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Item Value:</button></span> <span>${itemVal}</span></div>
                     <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('ship_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Date:</button></span> <span>${fmt(d.ship_date)}</span></div>
                     <div><span class="text-gray-600"><button type="button" onclick="openTransactionsEditModalForClin('uom')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">UOM:</button></span> <span>${fmt(d.uom) || 'EA'}</span></div>
