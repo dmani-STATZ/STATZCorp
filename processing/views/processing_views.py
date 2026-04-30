@@ -156,7 +156,7 @@ def start_new_contract(request):
             po_number=new_po_number,
             tab_num=new_tab_number,
             status='in_progress',
-            files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + contract_number,
+            files_url=r'\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + contract_number,
             sales_class=_get_default_sales_class(),
             created_by=request.user,
             modified_by=request.user
@@ -220,11 +220,19 @@ def start_processing(request, queue_id):
         SequenceNumber.advance_po_number()
         SequenceNumber.advance_tab_number()
 
+        # Attempt to auto-match IDIQ from queue hint
+        matched_idiq = None
+        if queue_item.idiq_number:
+            matched_idiq = IdiqContract.objects.filter(
+                contract_number__iexact=queue_item.idiq_number
+            ).first()
+
         # Create ProcessContract from queue item
         process_contract = ProcessContract.objects.create(
             contract_number=queue_item.contract_number,
             buyer_text=queue_item.buyer,
             solicitation_type=queue_item.solicitation_type,
+            pr_number=queue_item.pr_number,
             contract_type_text=queue_item.matched_contract_type,
             award_date=queue_item.award_date,
             due_date=queue_item.due_date,
@@ -234,8 +242,9 @@ def start_processing(request, queue_id):
             status='in_progress',
             queue_id=queue_id,
             description=queue_item.description,
-            files_url='\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number,
+            files_url=r'\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number,
             sales_class=_get_default_sales_class(),
+            idiq_contract=matched_idiq,
             created_by=request.user,
             modified_by=request.user
         )
@@ -651,6 +660,7 @@ def finalize_contract(request, process_contract_id):
             contract_number=process_contract.contract_number,
             idiq_contract=process_contract.idiq_contract,
             solicitation_type=process_contract.solicitation_type,
+            pr_number=process_contract.pr_number,
             po_number=process_contract.po_number,
             tab_num=process_contract.tab_num,
             buyer=process_contract.buyer,
@@ -813,6 +823,44 @@ def match_idiq(request, process_contract_id):
         return JsonResponse({
             'error': str(e)
         }, status=500)
+
+
+@login_required
+@require_POST
+def create_idiq(request):
+    """Create a minimal stub IdiqContract from the IDIQ match modal."""
+    try:
+        data = json.loads(request.body)
+        contract_number = (data.get('contract_number') or '').strip()
+        if not contract_number:
+            return JsonResponse({'success': False, 'error': 'Contract number is required'}, status=400)
+
+        # Return existing record if already in DB (case-insensitive)
+        existing = IdiqContract.objects.filter(
+            contract_number__iexact=contract_number
+        ).first()
+        if existing:
+            return JsonResponse({
+                'success': True,
+                'id': existing.id,
+                'contract_number': existing.contract_number
+            })
+
+        idiq = IdiqContract.objects.create(
+            contract_number=contract_number,
+            closed=False,
+            created_by=request.user,
+            modified_by=request.user,
+        )
+        return JsonResponse({
+            'success': True,
+            'id': idiq.id,
+            'contract_number': idiq.contract_number
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @login_required
@@ -1261,6 +1309,7 @@ def finalize_and_email_contract(request, process_contract_id):
             contract_number=process_contract.contract_number,
             idiq_contract=process_contract.idiq_contract,
             solicitation_type=process_contract.solicitation_type,
+            pr_number=process_contract.pr_number,
             po_number=process_contract.po_number,
             tab_num=process_contract.tab_num,
             buyer=process_contract.buyer,
@@ -1441,6 +1490,7 @@ def save_contract(request):
         contract_field_types = {
             'contract_number': str,
             'solicitation_type': str,
+            'pr_number': str,
             'po_number': str,
             'tab_num': str,
             'files_url': str,

@@ -82,6 +82,18 @@ _RE_BLOCK3 = re.compile(
     r"(?:^|\n)\s*(?:3\.|BLOCK\s*3|DATE\s*OF\s*ORDER|AWARD\s*DATE)[^\n]*\n?\s*([^\n]+)",
     re.IGNORECASE | re.MULTILINE,
 )
+# Section B PR label: "PR: 7015991525" (most reliable source)
+_RE_PR_SECTION_B = re.compile(
+    r"(?:^|\n)\s*PR:\s*(\d{6,15})\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+# Page 1 inline fallback: value sits between the date and priority code on the
+# merged header data row: "...2026 APR 01  7015991525  DO-C9"
+_RE_PR_PAGE1_INLINE = re.compile(
+    r"20\d{2}\s+[A-Z]{3}\s+\d{1,2}\s+(\d{7,15})\s+DO-",
+    re.IGNORECASE,
+)
 _RE_BLOCK6 = re.compile(
     r"(?:^|\n)\s*(?:6\.|BLOCK\s*6|ISSUING\s*OFFICE)[^\n]*\n?\s*([^\n]+(?:\n(?!\s*(?:7\.|BLOCK\s*7|8\.|9\.))[^\n]+)*)",
     re.IGNORECASE | re.MULTILINE,
@@ -264,6 +276,7 @@ class AwardParseResult:
     idiq_max_value: Optional[Decimal] = None
     idiq_min_guarantee: Optional[Decimal] = None
     idiq_term_months: Optional[int] = None
+    pr_number: Optional[str] = None
 
 
 def _strip_money(value: Optional[str]) -> Optional[str]:
@@ -484,6 +497,23 @@ def _extract_award_date(
         d = _parse_yyyymmmdd_date(m2.group(1).strip())
         if d:
             return d
+    return None
+
+
+def _extract_pr_number(text: str) -> Optional[str]:
+    """
+    Extract PR/Purchase Request number from DD Form 1155.
+
+    Primary: Section B label 'PR: <number>' (page 2+).
+    Fallback: inline position on the page 1 header data row between the
+    award date and the priority code (e.g. '2026 APR 01  7015991525  DO-C9').
+    """
+    m = _RE_PR_SECTION_B.search(text)
+    if m:
+        return m.group(1).strip()[:50]
+    m = _RE_PR_PAGE1_INLINE.search(text)
+    if m:
+        return m.group(1).strip()[:50]
     return None
 
 
@@ -1413,6 +1443,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_value=None,
             contract_type=None,
             solicitation_type="SDVOSB",
+            pr_number=None,
             pdf_parse_status="partial",
             pdf_parse_notes=(
                 f"Failed to open or read PDF: {exc}\n"
@@ -1432,6 +1463,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_value=None,
             contract_type=None,
             solicitation_type="SDVOSB",
+            pr_number=None,
             pdf_parse_status="partial",
             pdf_parse_notes=(
                 "No text could be extracted from the PDF\n"
@@ -1472,6 +1504,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
         solicitation_type, soli_note = _extract_solicitation_type(text)
         if soli_note:
             notes.append(soli_note)
+        pr_number = _extract_pr_number(text)
 
         clins: List[ClinParseResult] = []
         try:
@@ -1525,6 +1558,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_value=contract_value,
             contract_type=contract_type,
             solicitation_type=solicitation_type,
+            pr_number=pr_number,
             pdf_parse_status=status,
             pdf_parse_notes=merged_notes,
             ado_days=ado_days,
@@ -1544,6 +1578,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_value=None,
             contract_type=None,
             solicitation_type="SDVOSB",
+            pr_number=None,
             pdf_parse_status="partial",
             pdf_parse_notes=(
                 f"Unexpected parse error: {exc}\n"
@@ -1616,6 +1651,7 @@ def ingest_parsed_award(
             "contract_value": parse_result.contract_value,
             "contract_type": parse_result.contract_type,
             "solicitation_type": parse_result.solicitation_type,
+            "pr_number": parse_result.pr_number,
             "pdf_parse_status": status_val,
             "pdf_parsed_at": now,
             "pdf_parse_notes": notes_val or "",

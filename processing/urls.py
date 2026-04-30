@@ -11,6 +11,7 @@ from .views.processing_views import (
     match_nsn,
     match_supplier,
     match_idiq,
+    create_idiq,
     cancel_process_contract,
     save_and_return_to_queue,
     create_split_view,
@@ -74,7 +75,8 @@ urlpatterns = [
     path('match-nsn/<int:process_clin_id>/', match_nsn, name='match_nsn'),
     path('match-supplier/<int:process_clin_id>/', match_supplier, name='match_supplier'),
     path('match-idiq/<int:process_contract_id>/', match_idiq, name='match_idiq'),
-    
+    path('api/idiq/create/', create_idiq, name='create_idiq'),
+
     # API Endpoints
     path('api/processing/<int:id>/', get_processing_contract, name='api_get_processing_contract'),
     path('api/processing/<int:id>/update/', update_processing_contract, name='api_update_processing_contract'),

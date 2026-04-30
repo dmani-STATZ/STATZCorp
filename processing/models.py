@@ -31,6 +31,7 @@ class QueueContract(AuditModel):
     contract_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     contract_type = models.CharField(max_length=50, null=True, blank=True)  # Unilateral, Bilateral, IDIQ
     solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
+    pr_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="PR Number")
     
     # Status tracking
     is_being_processed = models.BooleanField(default=False)
@@ -214,6 +215,7 @@ class ProcessContract(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE, null=True, blank=True)
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
+    pr_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="PR Number")
     po_number = models.CharField(max_length=10, null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     buyer = models.ForeignKey(Buyer, on_delete=models.CASCADE, null=True, blank=True)

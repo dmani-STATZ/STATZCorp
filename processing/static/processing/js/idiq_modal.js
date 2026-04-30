@@ -3,12 +3,14 @@ function openIdiqModal(idiqText) {
     const modal = document.getElementById('idiq_modal');
     const searchInput = document.getElementById('idiq_search');
     const originalDisplay = document.getElementById('original_idiq_display');
-    
+
     originalDisplay.textContent = `IDIQ Contract: ${idiqText || 'Not specified'}`;
     searchInput.value = idiqText || '';
     modal.classList.remove('hidden');
+    document.getElementById('add_idiq_form').classList.add('hidden');
+    document.getElementById('new_idiq_contract_number').value = '';
     searchInput.focus();
-    
+
     if (idiqText) {
         searchIdiq();
     }
@@ -16,6 +18,42 @@ function openIdiqModal(idiqText) {
 
 function closeIdiqModal() {
     document.getElementById('idiq_modal').classList.add('hidden');
+}
+
+function showAddIdiqForm() {
+    const form = document.getElementById('add_idiq_form');
+    const input = document.getElementById('new_idiq_contract_number');
+    const originalText = document.getElementById('original_idiq_display')
+        .textContent.replace('IDIQ Contract: ', '').trim();
+    form.classList.remove('hidden');
+    input.value = originalText;
+}
+
+async function createNewIdiq() {
+    const contractNumber = document.getElementById('new_idiq_contract_number').value.trim();
+    if (!contractNumber) {
+        alert('Contract number is required');
+        return;
+    }
+    try {
+        const response = await fetch('/processing/api/idiq/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ contract_number: contractNumber })
+        });
+        const data = await response.json();
+        if (data.success) {
+            selectIdiq(data.id, data.contract_number);
+        } else {
+            alert(data.error || 'Failed to create IDIQ contract');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error creating IDIQ contract');
+    }
 }
 
 function searchIdiq() {

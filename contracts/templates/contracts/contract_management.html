@@ -212,6 +212,10 @@
                         <p id="contract-contract-number-value" class="font-medium text-sm">{{ contract.contract_number|default:"N/A" }}</p>
                     </div>
                     <div class="field-group">
+                        <p class="text-xs text-gray-600">PR Number</p>
+                        <p id="contract-pr-number-value" class="font-medium text-sm">{{ contract.pr_number|default:"—" }}</p>
+                    </div>
+                    <div class="field-group">
                         <p class="text-xs text-gray-600">
                             <button type="button" onclick="openTransactionsEditModal({{ contract_content_type_id }}, {{ contract.id }}, 'po_number')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">PO Number</button>
                         </p>
