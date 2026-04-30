@@ -475,6 +475,12 @@
                     onclick="document.getElementById('file-input').click()">
                 ⬆ Upload Files
             </button>
+            {% if not is_idiq %}
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="openNewFolderModal()">
+                📁 New Folder
+            </button>
+            {% endif %}
             <input type="file" id="file-input" class="docs-hidden-input" multiple
                    onchange="handleFileSelect(event)">
         </div>
@@ -504,6 +510,39 @@
         </div>
     </div>
 
+    {% if not is_idiq %}
+    <!-- New Folder Modal -->
+    <div id="new-folder-modal"
+         style="display:none; position:fixed; inset:0; z-index:9999;
+                background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div style="background:var(--bs-body-bg, #fff); border-radius:8px;
+                    padding:24px; width:380px; max-width:90vw;
+                    box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+            <h6 style="margin:0 0 16px 0; font-weight:600;">New Folder</h6>
+            <p style="margin:0 0 12px 0; font-size:13px; color:var(--bs-secondary-color, #6c757d);">
+                Creating inside:
+                <strong id="new-folder-parent-label" style="word-break:break-all;"></strong>
+            </p>
+            <input type="text" id="new-folder-name-input"
+                   placeholder="Folder name"
+                   style="width:100%; padding:8px 12px; font-size:14px;
+                          border:1px solid var(--bs-border-color, #ced4da);
+                          border-radius:4px; background:var(--bs-body-bg);
+                          color:var(--bs-body-color); box-sizing:border-box;"
+                   onkeydown="handleNewFolderKeydown(event)">
+            <div id="new-folder-error"
+                 style="display:none; margin-top:8px; font-size:12px;
+                        color:var(--bs-danger, #dc3545);"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="closeNewFolderModal()">Cancel</button>
+                <button type="button" class="btn btn-sm btn-success" id="new-folder-confirm-btn"
+                        onclick="confirmNewFolder()">Create Folder</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script>
         const IS_IDIQ = {{ is_idiq|yesno:"true,false" }};
         const ENTITY_ID = {{ contract_id|default:"null" }};
@@ -522,6 +561,7 @@
         const CONTRACT_DETAILS_URL = "{{ contract_details_url|default:''|escapejs }}";
         const SHAREPOINT_FILES_URL = "{{ sharepoint_files_url|default:''|escapejs }}";
         const SET_FILE_PATH_URL = "{{ set_file_path_url|default:''|escapejs }}";
+        const CREATE_FOLDER_URL = {% if not is_idiq %}"{% url 'contracts:create_folder_api' %}"{% else %}null{% endif %};
         const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -549,6 +589,15 @@
                     }
                 }
             });
+
+            const newFolderModal = document.getElementById('new-folder-modal');
+            if (newFolderModal) {
+                newFolderModal.addEventListener('click', function(e) {
+                    if (e.target === newFolderModal) {
+                        closeNewFolderModal();
+                    }
+                });
+            }
         });
 
         function loadContractAndFolder() {
@@ -917,6 +966,111 @@
                 toast.style.animation = 'slideIn 0.3s ease reverse';
                 setTimeout(function() { toast.remove(); }, 300);
             }, 3000);
+        }
+
+        function openNewFolderModal() {
+            if (!CREATE_FOLDER_URL) {
+                return;
+            }
+            const modal = document.getElementById('new-folder-modal');
+            const input = document.getElementById('new-folder-name-input');
+            const errorEl = document.getElementById('new-folder-error');
+            const parentLabel = document.getElementById('new-folder-parent-label');
+            if (!modal || !input || !errorEl || !parentLabel) {
+                return;
+            }
+
+            parentLabel.textContent = currentFolderPath || 'Root';
+
+            input.value = '';
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
+            modal.style.display = 'flex';
+
+            setTimeout(function() { input.focus(); }, 50);
+        }
+
+        function closeNewFolderModal() {
+            const modal = document.getElementById('new-folder-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function handleNewFolderKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmNewFolder();
+            }
+            if (event.key === 'Escape') {
+                closeNewFolderModal();
+            }
+        }
+
+        function confirmNewFolder() {
+            if (!CREATE_FOLDER_URL) {
+                return;
+            }
+            const input = document.getElementById('new-folder-name-input');
+            const errorEl = document.getElementById('new-folder-error');
+            const confirmBtn = document.getElementById('new-folder-confirm-btn');
+            if (!input || !errorEl || !confirmBtn) {
+                return;
+            }
+
+            const folderName = input.value.trim();
+
+            if (!folderName) {
+                errorEl.textContent = 'Please enter a folder name.';
+                errorEl.style.display = 'block';
+                input.focus();
+                return;
+            }
+
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Creating...';
+            errorEl.style.display = 'none';
+
+            fetch(CREATE_FOLDER_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({
+                    contract_id: currentContractId,
+                    parent_path: currentFolderPath,
+                    folder_name: folderName,
+                }),
+            })
+                .then(function(r) {
+                    return r.json().then(function(data) {
+                        return { ok: r.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.data && result.data.success) {
+                        closeNewFolderModal();
+                        showToast('Folder "' + folderName + '" created', 'success');
+                        loadFolderContents();
+                    } else {
+                        errorEl.textContent = (result.data && result.data.error) || 'Could not create folder.';
+                        errorEl.style.display = 'block';
+                        input.focus();
+                    }
+                })
+                .catch(function() {
+                    errorEl.textContent = 'Network error. Please try again.';
+                    errorEl.style.display = 'block';
+                })
+                .finally(function() {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Create Folder';
+                });
         }
 
         function formatFileSize(bytes) {

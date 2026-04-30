@@ -86,7 +86,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - **IDIQ data:** `/contracts/idiq/<pk>/`, update, IDIQ detail creation/deletion, and search endpoints for NSN/suppliers (`contracts/views/idiq_views.py`).
   - `IdiqContract` is now a first-class entity in the standalone Documents Browser flow; `IdiqContract.files_url` stores the saved SharePoint folder path with the same purpose as `Contract.files_url`.
   - New IDIQ Documents Browser endpoints: `idiq_documents_browser` (GET), `idiq_details_api` (GET), and `set_idiq_file_path_api` (POST).
-  - `contracts/services/sharepoint_paths.py` now includes IDIQ-specific path helpers: `build_idiq_pattern_path`, `resolve_idiq_folder_path`, and `get_idiq_root_fallback_path`.
+  - Contract folder patterns are built by `Contract.get_sharepoint_relative_path()`; `sharepoint_paths.resolve_contract_folder_path` validates `files_url` and delegates to that method. IDIQ-specific helpers remain: `build_idiq_pattern_path`, `resolve_idiq_folder_path`, and `get_idiq_root_fallback_path`.
   - IDIQ path resolution has no company override branch because `IdiqContract` has no company FK; it always uses `get_sharepoint_prefix()` directly.
   - The split summary rollup (`idiq_clin_split_rollup`) remains removed from `IdiqContractDetailView` and `idiq_contract_detail.html`; it was never referenced in user meetings and added no value to the page.
 - **Superuser admin:** `/contracts/companies/`, `/contracts/code-tables/`, `/contracts/admin-tools/` for bulk supplier SharePoint URLs.

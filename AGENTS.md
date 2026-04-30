@@ -76,10 +76,17 @@ Run repo-wide search before any of these changes:
 - Export flow changes:
 - export view/service + template triggers + downstream consumers of filenames/columns.
 - SharePoint document browser path handling:
-- `Contract.files_url` stores the folder path; update via `contracts/services/sharepoint_service.py` (Graph wrappers) and `contracts/services/sharepoint_paths.py` (validation + pattern construction).
-- Default path logic: strict validation of `files_url` (`is_modern_sharepoint_path`) → pattern-based (`build_pattern_path` for regular vs IDIQ) → fallback to parent/root via `fallback_to_root` / `get_root_fallback_path`.
-- If IDIQ path structure changes, update `build_pattern_path()` in `contracts/services/sharepoint_paths.py`. Validation is prefix-based and stays the same.
+- `Contract.files_url` stores the folder path; update via `contracts/services/sharepoint_service.py` (Graph wrappers) and `contracts/services/sharepoint_paths.py` (validation + `resolve_contract_folder_path`).
+- SharePoint folder path logic lives in ONE place: `Contract.get_sharepoint_relative_path()`
+  - Do NOT build contract folder paths in `sharepoint_paths.py` or views
+  - If path structure changes, update the model method only
+  - Status values that trigger Closed Contracts prefix: `Closed`, `Cancelled` (double-L)
+  - `Company.sharepoint_documents_path` overrides settings for the path prefix when set
+- Contract field for stored folder path is `files_url` (NOT `file_url`)
+- All `Contract` fetches in `documents_views.py` must include `select_related('idiq_contract', 'status', 'company')`
+- Default path logic: strict validation of `files_url` (`is_modern_sharepoint_path`) → pattern via `get_sharepoint_relative_path()` → fallback to parent/root via `fallback_to_root` / `get_root_fallback_path`.
 - API responses (`contract_details_api`, `sharepoint_files_api`) surface `legacy_detected` and `fell_back_to_root` flags; the documents browser shows warning banners based on these.
+- New folder creation requires the parent folder's item ID (not just path). `create_folder()` in `sharepoint_service.py` calls `_get_drive_item(parent_path)` to resolve the ID before POSTing to `/drives/{id}/items/{parent_id}/children`. If parent path resolution ever changes, update `create_folder()` accordingly.
 - Popup-window pages (like the documents browser) use a different layout paradigm than main app routes:
   - `body` has `overflow: hidden`, `height: 100vh`; outer wrapper is flex column with `height: 100vh`
   - Only the primary content area (e.g., file list) scrolls (`flex: 1; overflow-y: auto`); chrome is fixed (`flex-shrink: 0`)

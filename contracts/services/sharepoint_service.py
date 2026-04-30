@@ -146,26 +146,140 @@ def fallback_to_root(folder_path: str) -> str:
 
 
 def list_folder_contents(folder_path: str) -> Dict[str, Any]:
-    """List SharePoint folders/files for a drive-relative folder path."""
+    """
+    List ALL SharePoint folders/files for a drive-relative folder path.
+
+    Follows @odata.nextLink pagination tokens until all pages are exhausted,
+    ensuring the full folder contents are returned regardless of item count.
+    Graph API returns a maximum of 200 items per page by default.
+    """
     path = normalize_folder_path(folder_path)
     token = get_graph_access_token()
+    headers = _auth_headers(token)
+
+    # First request — use the children URL for the given path
     url = _children_url(path)
-    response = requests.get(url, headers=_auth_headers(token), timeout=120)
+    response = requests.get(url, headers=headers, timeout=120)
+
     if response.status_code == 404:
-        raise SharePointNotFound("Folder not found in SharePoint.", status_code=404, details=response.text)
+        raise SharePointNotFound(
+            "Folder not found in SharePoint.", status_code=404, details=response.text
+        )
     _raise_for_graph_error(response, "Could not load the SharePoint folder.")
 
     folders = []
     files = []
-    for item in response.json().get("value", []):
+    page_count = 1
+
+    # Process first page
+    data = response.json()
+    for item in data.get("value", []):
         if "folder" in item:
             folders.append(_folder_payload(item, path))
         elif "file" in item:
             files.append(_file_payload(item))
 
+    # Follow pagination links until exhausted
+    while "@odata.nextLink" in data:
+        next_url = data["@odata.nextLink"]
+        page_count += 1
+        logger.debug(
+            "list_folder_contents: fetching page %d for path %r", page_count, path
+        )
+        response = requests.get(next_url, headers=headers, timeout=120)
+        _raise_for_graph_error(
+            response, "Could not load the SharePoint folder (page %d)." % page_count
+        )
+        data = response.json()
+        for item in data.get("value", []):
+            if "folder" in item:
+                folders.append(_folder_payload(item, path))
+            elif "file" in item:
+                files.append(_file_payload(item))
+
+    if page_count > 1:
+        logger.info(
+            "list_folder_contents: fetched %d pages for path %r (%d folders, %d files)",
+            page_count,
+            path,
+            len(folders),
+            len(files),
+        )
+
     folders.sort(key=lambda row: row["name"].lower())
     files.sort(key=lambda row: row["name"].lower())
     return {"folders": folders, "files": files, "currentPath": path, "error": None}
+
+
+def create_folder(parent_path: str, folder_name: str) -> Dict[str, Any]:
+    """
+    Create a new folder inside the given SharePoint parent path.
+
+    Args:
+        parent_path: Drive-relative path to the parent folder
+                     e.g. 'Statz-Public/data/V87/aFed-DOD/Contract ABC/'
+        folder_name: Name for the new folder e.g. 'Invoices'
+
+    Returns:
+        dict with the created folder's metadata
+
+    Raises:
+        SharePointError: If creation fails (including name conflict)
+        SharePointNotFound: If parent_path does not exist
+    """
+    parent_path = normalize_folder_path(parent_path)
+    folder_name = folder_name.strip()
+
+    if not folder_name:
+        raise SharePointError("Folder name cannot be empty.", status_code=400)
+
+    # Reject invalid characters (SharePoint folder name rules)
+    invalid_chars = set(r'~"#%&*:<>?/\{|}')
+    if any(c in invalid_chars for c in folder_name):
+        raise SharePointError(
+            'Folder name contains invalid characters. Avoid: ~ " # % & * : < > ? / \\ { | }',
+            status_code=400,
+        )
+
+    token = get_graph_access_token()
+
+    # Get the parent folder's item ID so we can POST to its children
+    parent_item = _get_drive_item(parent_path)
+    if parent_item is None:
+        raise SharePointNotFound(
+            f"Parent folder not found: {parent_path}", status_code=404
+        )
+
+    parent_id = parent_item.get("id")
+    if not parent_id:
+        raise SharePointError("Could not resolve parent folder ID.", status_code=500)
+
+    drive_id = quote(_get_drive_id(), safe="!_")
+    parent_id_enc = quote(str(parent_id), safe="")
+    url = f"{GRAPH_BASE}/drives/{drive_id}/items/{parent_id_enc}/children"
+
+    payload = {
+        "name": folder_name,
+        "folder": {},
+        "@microsoft.graph.conflictBehavior": "fail",
+    }
+
+    response = requests.post(
+        url,
+        headers={**_auth_headers(token), "Content-Type": "application/json"},
+        json=payload,
+        timeout=60,
+    )
+
+    if response.status_code == 409:
+        raise SharePointError(
+            f'A folder named "{folder_name}" already exists here. Please choose a different name.',
+            status_code=409,
+        )
+
+    _raise_for_graph_error(response, "Could not create the folder in SharePoint.")
+    logger.info("Created SharePoint folder %r inside %r", folder_name, parent_path)
+    return _folder_payload(response.json(), parent_path)
 
 
 def open_file_in_browser(file_id: str) -> str:

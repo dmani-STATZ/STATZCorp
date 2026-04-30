@@ -52,18 +52,34 @@ flex-column structure where only the file list scrolls. Header (with Save Path
 button) are all flex-shrink: 0. The file list area has flex: 1 and is the drag-
 drop target for uploads. No dedicated upload zone wastes vertical space.
 
+###### New Folder
+
+Users can create SharePoint folders from the toolbar via a modal (contract documents browser only; not shown for IDIQ-only browser). The folder is created at the current navigation path. Conflicts surface inline in the modal (not as page alerts). Backend: `create_folder()` in `contracts/services/sharepoint_service.py` uses `@microsoft.graph.conflictBehavior: "fail"` to detect duplicates cleanly. API: `POST /contracts/api/create-folder/` (`create_folder_api`).
+
 ##### SharePoint Path Resolution
-The documents browser uses a smart path resolver in `contracts/services/sharepoint_paths.py` that validates `Contract.files_url` against modern SharePoint conventions before using it.
 
-- **Modern path:** starts with `SHAREPOINT_PATH_PREFIX` (defaults to `Statz-Public/data/V87/aFed-DOD`) or with the contract's per-company `Company.sharepoint_documents_path`.
-- **Legacy / invalid:** UNC paths (`\\server\path`), Windows drive letters (`C:\...`), backslashes, HTTP/HTTPS URLs, or anything outside the canonical prefix. These are rejected by `is_modern_sharepoint_path()` and trigger pattern fallback.
+Single source of truth: `Contract.get_sharepoint_relative_path()` in `contracts/models.py`.
 
-**Resolution order** (`resolve_contract_folder_path`):
-1. `files_url` if it passes strict validation (`source='files_url'`)
-2. Pattern path (`source='pattern'`):
-   - Regular: `{ROOT}/Contract {contract_number}`
-   - IDIQ delivery order: `{ROOT}/Contract {idiq.contract_number}/Delivery Order {contract_number}`
-3. Root prefix folder fallback when the resolved path 404s in Graph
+Path priority (company config > settings > hardcoded default):
+
+- Prefix: `company.sharepoint_documents_path` → `settings.SHAREPOINT_PATH_PREFIX` → `Statz-Public/data/V87/aFed-DOD`
+
+Path patterns:
+
+- Open regular: `{prefix}/Contract {number}/`
+- Closed/Cancelled: `{prefix}/Closed Contracts/Contract {number}/`
+- Open IDIQ DO: `{prefix}/Contract {idiq}/Delivery Order {number}/`
+- Closed IDIQ DO: `{prefix}/Closed Contracts/Contract {idiq}/Delivery Order {number}/`
+
+Status check uses `ContractStatus.description` in `('Closed', 'Cancelled')`.
+
+`contracts/services/sharepoint_paths.py` validates `Contract.files_url` and delegates pattern paths to the model. **`resolve_contract_folder_path`** order: use `files_url` when modern (`source='files_url'`); otherwise `get_sharepoint_relative_path()` (`source='pattern'`); root prefix when the resolved path 404s in Graph.
+
+Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()`:
+
+- Rejects UNC paths, drive letters, backslashes, URLs, non-prefix paths
+- Falls through to pattern path when legacy detected
+- Returns `legacy_detected` flag for frontend banner display
 
 `legacy_detected` is surfaced on both `contract_details_api` and `sharepoint_files_api` GET responses; the browser shows a warning banner prompting the user to click **Save Path to Contract** to update `files_url` to the modern format. `fell_back_to_root` is surfaced on the files API when the resolved path 404s, prompting a separate banner.
 

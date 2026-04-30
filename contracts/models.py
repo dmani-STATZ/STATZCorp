@@ -212,6 +212,70 @@ class Contract(AuditModel):
         viewid = 'd4837fde%2D32f5%2D41cc%2Db723%2D09d5f692b2ea'
         return f'{base}?id={quote(path)}&viewid={viewid}'
 
+    def get_sharepoint_relative_path(self):
+        """
+        Returns the relative SharePoint folder path for this contract,
+        suitable for use with the Graph API (relative to the drive root).
+
+        Path is built from Company.sharepoint_documents_path if configured,
+        otherwise falls back to settings.SHAREPOINT_PATH_PREFIX, then
+        to the hardcoded default 'Statz-Public/data/V87/aFed-DOD'.
+
+        Examples:
+            Regular contract:
+                'Statz-Public/data/V87/aFed-DOD/Contract SPE3SE-26-V-0530/'
+
+            Closed/Cancelled contract:
+                'Statz-Public/data/V87/aFed-DOD/Closed Contracts/Contract SPE3SE-26-V-0530/'
+
+            IDIQ Delivery Order (open):
+                'Statz-Public/data/V87/aFed-DOD/Contract SPE3SE-26-V-0530/Delivery Order SPE7L0-26-F-3034/'
+
+            IDIQ Delivery Order (closed/cancelled):
+                'Statz-Public/data/V87/aFed-DOD/Closed Contracts/Contract SPE3SE-26-V-0530/Delivery Order SPE7L0-26-F-3034/'
+
+        Returns:
+            str: Relative path with trailing slash, or None if contract_number is missing.
+        """
+        from django.conf import settings
+
+        if not self.contract_number:
+            return None
+
+        # Resolve the documents path prefix (company > settings > hardcoded default)
+        company = getattr(self, 'company', None)
+        docs_path = None
+        if company:
+            cp = (company.sharepoint_documents_path or '').strip().rstrip('/')
+            if cp:
+                docs_path = cp
+
+        if not docs_path:
+            docs_path = getattr(settings, 'SHAREPOINT_PATH_PREFIX', '').strip().rstrip('/')
+
+        if not docs_path:
+            docs_path = 'Statz-Public/data/V87/aFed-DOD'
+
+        # Determine if this contract is closed or cancelled
+        status_desc = (self.status.description or '').strip() if self.status else ''
+        is_closed = status_desc in ('Closed', 'Cancelled')
+
+        # Build path segments
+        if is_closed:
+            base = f'{docs_path}/Closed Contracts'
+        else:
+            base = docs_path
+
+        # IDIQ Delivery Order
+        if self.idiq_contract and getattr(self.idiq_contract, 'contract_number', None):
+            idiq_number = self.idiq_contract.contract_number
+            path = f'{base}/Contract {idiq_number}/Delivery Order {self.contract_number}/'
+        else:
+            # Regular contract or IDIQ parent
+            path = f'{base}/Contract {self.contract_number}/'
+
+        return path
+
 
 class ContractStatus(models.Model):
     description = models.TextField(null=True, blank=True)

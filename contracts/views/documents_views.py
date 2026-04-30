@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from django.core.exceptions import PermissionDenied
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -30,7 +30,7 @@ def _contract_for_request(request, contract_id: int) -> Contract:
     if active_company is None:
         raise PermissionDenied("An active company is required.")
     return get_object_or_404(
-        Contract.objects.select_related("company", "idiq_contract"),
+        Contract.objects.select_related("company", "idiq_contract", "status"),
         pk=contract_id,
         company=active_company,
     )
@@ -257,6 +257,62 @@ def _upload_sharepoint_file(request) -> JsonResponse:
             "file": file_payload,
         }
     )
+
+
+@conditional_login_required
+@require_POST
+def create_folder_api(request):
+    """
+    Create a new SharePoint folder inside the current folder path.
+
+    Request body (JSON):
+        contract_id, parent_path, folder_name
+
+    Response:
+        {"success": true, "folder": {"name": "...", "path": "..."}}
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid request body."}, status=400)
+
+    contract_id = payload.get("contract_id")
+    parent_path = (payload.get("parent_path") or "").strip()
+    folder_name = (payload.get("folder_name") or "").strip()
+
+    contract_pk = _parse_contract_id(contract_id)
+    if contract_pk is None or not parent_path or not folder_name:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "contract_id, parent_path, and folder_name are required.",
+            },
+            status=400,
+        )
+
+    try:
+        _contract_for_request(request, contract_pk)
+    except Http404:
+        return JsonResponse({"success": False, "error": "Contract not found."}, status=404)
+    except PermissionDenied:
+        return JsonResponse(
+            {"success": False, "error": "An active company is required."},
+            status=403,
+        )
+
+    try:
+        folder = sharepoint_service.create_folder(parent_path, folder_name)
+        return JsonResponse({"success": True, "folder": folder})
+    except SharePointNotFound as exc:
+        return JsonResponse({"success": False, "error": exc.message}, status=exc.status_code)
+    except SharePointError as exc:
+        return JsonResponse({"success": False, "error": exc.message}, status=exc.status_code)
+    except Exception:
+        logger.exception("Unexpected error creating SharePoint folder")
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred."},
+            status=500,
+        )
 
 
 @conditional_login_required
