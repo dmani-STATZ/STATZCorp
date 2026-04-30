@@ -134,11 +134,7 @@ from .idiq_views import (
     IdiqContractDetailsDeleteView,
 )
 
-from .finance_views import (
-    FinanceAuditView,
-    PaymentHistoryView,
-    payment_history_api,
-)
+from .finance_views import FinanceAuditView
 
 from .api_views import (
     get_select_options,
@@ -198,7 +194,6 @@ __all__ = [
     'update_folder_field',
     'search_contracts',
     'FinanceAuditView',
-    'PaymentHistoryView',
     'get_acknowledgment_letter',
     'update_acknowledgment_letter',
     'code_table_admin',

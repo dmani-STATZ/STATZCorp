@@ -1,6 +1,11 @@
 {% extends "contracts/notes_popup_base.html" %}
+{% load static %}
 
 {% block title %}Notes — {{ contract.contract_number }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'contracts/css/components.css' %}?v={{ cache_version }}">
+{% endblock %}
 
 {% block content %}
 <div class="notes-popup-shell d-flex flex-column vh-100">
@@ -43,7 +48,7 @@
         <div class="notes-popup-tabs-scroll app-tabs" id="notes-popup-tabs-scroll" role="tablist" aria-label="Notes tabs">
             <button type="button"
                     role="tab"
-                    class="app-tab-btn type-contract active"
+                    class="app-tab-btn type-contract{% if request.GET.tab != 'finance' %} active{% endif %}"
                     data-tab-type="contract"
                     data-tab-id=""
                     data-content-type-id="{{ contract_content_type_id }}"
@@ -63,6 +68,16 @@
                 CLIN {{ clin.item_number|default:clin.id }}
             </button>
             {% endfor %}
+            <button type="button"
+                    role="tab"
+                    class="app-tab-btn type-finance{% if request.GET.tab == 'finance' %} active{% endif %}"
+                    data-tab-type="finance"
+                    data-tab-id=""
+                    data-content-type-id="{{ contract_content_type_id }}"
+                    data-object-id="{{ contract.id }}"
+                    data-tab-url="{% url 'contracts:notes_popup_tab_finance' contract.pk %}">
+                Finance
+            </button>
         </div>
         <button type="button" id="notes-popup-tabs-right" class="notes-popup-tabs-arrow" aria-label="Scroll tabs right">&rsaquo;</button>
     </div>
@@ -172,6 +187,10 @@
             tabTitleLabel.textContent = 'Contract Notes';
             return;
         }
+        if (tabType === 'finance') {
+            tabTitleLabel.textContent = 'Finance Notes';
+            return;
+        }
         tabTitleLabel.textContent = `CLIN ${clinLabel || tabId} Notes`;
     }
 
@@ -192,7 +211,7 @@
             contentTypeId: buttonEl.dataset.contentTypeId,
             objectId: buttonEl.dataset.objectId,
             tabUrl: buttonEl.dataset.tabUrl,
-            tabLabel: buttonEl.dataset.tabType === 'clin' ? getClinLabel(buttonEl) : 'Contract'
+            tabLabel: buttonEl.dataset.tabType === 'clin' ? getClinLabel(buttonEl) : (buttonEl.dataset.tabType === 'finance' ? 'Finance' : 'Contract')
         };
         updateTabTitleLabel(activeTab.tabType, activeTab.tabId, activeTab.tabLabel);
     }
@@ -264,14 +283,27 @@
     }
 
     function openAddNoteModal(tabType, tabId) {
-        const resolvedTabType = tabType === 'clin' ? 'clin' : 'contract';
-        const resolvedContentTypeId = resolvedTabType === 'contract' ? CONTRACT_CT_ID : CLIN_CT_ID;
-        const resolvedObjectId = resolvedTabType === 'contract' ? CONTRACT_ID : tabId;
+        let resolvedTabType;
+        let resolvedContentTypeId;
+        let resolvedObjectId;
+        if (tabType === 'clin') {
+            resolvedTabType = 'clin';
+            resolvedContentTypeId = CLIN_CT_ID;
+            resolvedObjectId = tabId;
+        } else if (tabType === 'finance') {
+            resolvedTabType = 'finance';
+            resolvedContentTypeId = CONTRACT_CT_ID;
+            resolvedObjectId = CONTRACT_ID;
+        } else {
+            resolvedTabType = 'contract';
+            resolvedContentTypeId = CONTRACT_CT_ID;
+            resolvedObjectId = CONTRACT_ID;
+        }
 
         _noteModalMode = 'add';
         _noteModalContext = {
             tabType: resolvedTabType,
-            tabId: resolvedTabType === 'contract' ? '' : String(tabId || ''),
+            tabId: resolvedTabType === 'clin' ? String(tabId || '') : '',
             contentTypeId: String(resolvedContentTypeId || ''),
             objectId: String(resolvedObjectId || ''),
             noteId: null,
@@ -481,6 +513,10 @@
                 formData.append('reminder_date', reminderDate);
             }
 
+            if (_noteModalContext.tabType === 'finance') {
+                formData.append('note_tag', 'finance');
+            }
+
             await postAndHandle(urlForAddNote(_noteModalContext.contentTypeId, _noteModalContext.objectId), formData);
             return;
         }
@@ -566,7 +602,14 @@
     window.openAddNoteModalForCurrentTab = openAddNoteModalForCurrentTab;
     window.openEditNoteModal = openEditNoteModal;
 
-    if (contractTabButton) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('tab') === 'finance') {
+        const financeTab = tabButtons.find(btn => btn.dataset.tabType === 'finance');
+        if (financeTab) {
+            setActiveTab(financeTab);
+            refreshCurrentTab();
+        }
+    } else if (contractTabButton) {
         setActiveTab(contractTabButton);
         refreshCurrentTab();
     }

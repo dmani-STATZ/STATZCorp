@@ -6,8 +6,11 @@ from .models import (
     ClinType,
     Company,
     Contract,
+    ContractFinanceLine,
     ContractStatus,
     ContractType,
+    FinanceLinePayment,
+    FinanceLineType,
     Reminder,
     SalesClass,
     SpecialPaymentTerms,
@@ -90,3 +93,18 @@ class ClinSplitAdmin(admin.ModelAdmin):
     list_display = ('id', 'clin', 'company_name', 'split_value', 'split_paid')
     list_filter = ('company_name',)
     search_fields = ('company_name',)
+
+
+@admin.register(FinanceLineType)
+class FinanceLineTypeAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(ContractFinanceLine)
+class ContractFinanceLineAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(FinanceLinePayment)
+class FinanceLinePaymentAdmin(admin.ModelAdmin):
+    pass

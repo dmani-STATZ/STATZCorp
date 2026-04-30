@@ -57,6 +57,8 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `CompanyForm` — logo validation uses PIL (Pillow); PIL import is guarded, so if Pillow is missing it degrades silently
 
 ### Before changing templates
+- **Finance lines visibility:** `ContractFinanceLine`, `FinanceLinePayment`, and `Clin` finance-line aggregates (`finance_lines`, `adjusted_gross`, etc.) must **never** be surfaced in contract management templates, CLIN detail templates, **processing** app templates, or any template outside `contracts/templates/contracts/finance_audit.html` and templates it `{% include %}s`. Admin and backend-only use are fine.
+- **Finance line API endpoints** (add, list-by-CLIN, log-payment, list-payments) live in `contracts/views/finance_line_views.py`. They only accept CLIN-scoped and finance-line–scoped identifiers; there is no contract-level finance-line aggregate endpoint. Do not expose finance line JSON or UI outside the finance audit page.
 - Check for `{% include %}` partials: `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html` are included in multiple parent templates. The old `partials/contract_splits.html` is a comment-only stub; split UI lives on `clin_detail.html` and read-only rollups on contract pages.
 - **`clin_shipments.html` table layout:** In `mode="form"`, the data columns are Ship Date, Quantity, UOM, Comments, POD Date, then Actions (sixth column). Empty-state and footer `colspan` values must match that column count if the table changes. `ClinShipment.pod_date` is transaction-tracked; POD is edited via `openTransactionsEditModal` on CLIN detail (`window.clinShipmentContentTypeId`). The shipment audit (ⓘ) button is only rendered for server-rendered existing rows; rows injected by `ClinShipments.addNewShipment()` in `clin_shipments.js` intentionally omit it until the row exists in the database. The `#complete-shipping-row` footer action is only for form mode when fully shipped (`total_shipped == order_qty`); its visibility is toggled by `updateTotalShipQty()` in `clin_shipments.js` using `data-order-qty` on the `.section` wrapper (keep that attribute in sync if the partial changes).
 - NSN and Supplier modals for the CLIN form are in `contracts/templates/contracts/modals/supplier_modal.html` and `nsn_modal.html`. The modal JS (`openSupplierModal`, `openNsnModal`, search/pagination helpers, and clear handlers) is defined in `clin_form.html`'s `extra_scripts` block. Element IDs `id_nsn`, `nsn_display`, `id_supplier`, and `supplier_display` are referenced by both the modal result wiring and the form — do not rename them without updating the script and modal templates together.
@@ -207,10 +209,12 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - `contracts/templates/contracts/notes_popup_base.html` — bare base template (no nav chrome)
 - `contracts/templates/contracts/notes_popup.html` — popup content template
 - `contracts/templates/contracts/partials/notes_popup_tab_panel.html` — tab panel partial
-- `contracts/urls.py` — `notes_popup`, `notes_popup_tab_contract`, `notes_popup_tab_clin`, `note_detail_json` URL patterns
+- `contracts/urls.py` — `notes_popup`, `notes_popup_tab_finance`, `notes_popup_tab_contract`, `notes_popup_tab_clin`, `note_detail_json` URL patterns
 - `contracts/templates/contracts/contract_management.html` — `openNotesPopup()` JS function, follow-me hook, pop-out button in notes header
 
 All popup CRUD actions refresh the current tab in-place; no cross-window data sync. The popup exposes `window.isPinned` (boolean) read by the main window before pushing a new contract URL to an unpinned popup.
+
+**Finance notes:** When creating or filtering `Note` records in the context of the Finance tab, always use `note_tag='finance'`. Never display finance-tagged notes on the contract management page or in the contract notes tab (contract-level queryset excludes them; the contract tab in the popup excludes `note_tag='finance'`).
 The Add Note flow uses the same modal as Edit Note and is opened from the notes tab toolbar button instead of an always-visible inline form.
 
 ---

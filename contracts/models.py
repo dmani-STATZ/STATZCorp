@@ -382,6 +382,15 @@ class Clin(AuditModel):
     def total_shipped(self):
         return self.shipments.aggregate(Sum('ship_qty'))['ship_qty__sum'] or 0
 
+    @property
+    def adjusted_gross(self):
+        """Gross profit minus all finance line costs for this CLIN."""
+        item_val = Decimal(str(self.item_value or 0))
+        quote_val = Decimal(str(self.quote_value or 0))
+        gross = item_val - quote_val
+        finance_costs = self.finance_lines.aggregate(total=Sum('amount_billed'))['total'] or Decimal('0.00')
+        return gross - finance_costs
+
 class ClinShipment(AuditModel):
     """
     Model for tracking individual shipments for a CLIN.
@@ -517,6 +526,74 @@ class PaymentHistory(AuditModel):
         self.clean()
         super().save(*args, **kwargs)
 
+
+class FinanceLineType(models.Model):
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'contracts_financelinetype'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class ContractFinanceLine(AuditModel):
+    clin = models.ForeignKey('Clin', on_delete=models.CASCADE, related_name='finance_lines')
+    line_type = models.CharField(max_length=100)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    amount_billed = models.DecimalField(max_digits=15, decimal_places=2)
+
+    class Meta:
+        db_table = 'contracts_contractfinanceline'
+        ordering = ['clin', 'created_on']
+
+    def __str__(self):
+        return f"{self.line_type} — {self.clin} — ${self.amount_billed}"
+
+    @property
+    def amount_paid(self):
+        return self.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+    @property
+    def amount_remaining(self):
+        return self.amount_billed - self.amount_paid
+
+    @property
+    def payment_status(self):
+        paid = self.amount_paid
+        if paid <= 0:
+            return 'UNPAID'
+        elif paid >= self.amount_billed:
+            return 'PAID'
+        else:
+            return 'PARTIAL'
+
+
+class FinanceLinePayment(AuditModel):
+    finance_line = models.ForeignKey(
+        'ContractFinanceLine',
+        on_delete=models.CASCADE,
+        related_name='payments',
+    )
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+    )
+    payment_date = models.DateField()
+    note = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        db_table = 'contracts_financelinepayment'
+        ordering = ['payment_date', 'created_on']
+
+    def __str__(self):
+        return f"Payment ${self.amount} on {self.payment_date} for {self.finance_line}"
+
+
 class IdiqContract(AuditModel):
     contract_number = models.CharField(max_length=50, null=True, blank=True)
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
@@ -651,6 +728,7 @@ class Note(AuditModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
     note = models.TextField(null=True, blank=True)
+    note_tag = models.CharField(max_length=20, blank=True, null=True, default='')
     company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='notes')
 
     class Meta:

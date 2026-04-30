@@ -2,10 +2,12 @@ from django.urls import path, re_path
 from django.views.generic import TemplateView
 from users.views import test_app_name
 from . import views
-from .views.finance_views import (
-    FinanceAuditView,
-    PaymentHistoryView,
-    payment_history_api,
+from .views.finance_views import FinanceAuditView
+from .views.finance_line_views import (
+    add_finance_line,
+    get_finance_lines,
+    log_finance_line_payment,
+    get_finance_line_payments,
 )
 
 # Import views from the modular structure
@@ -403,6 +405,12 @@ urlpatterns = [
         name="notes_popup",
     ),
     path(
+        "contract/<int:contract_id>/notes/popup/tab/finance/",
+        note_views.notes_popup_tab,
+        {"tab_type": "finance"},
+        name="notes_popup_tab_finance",
+    ),
+    path(
         "contract/<int:contract_id>/notes/popup/tab/<str:tab_type>/",
         note_views.notes_popup_tab,
         name="notes_popup_tab_contract",
@@ -563,6 +571,22 @@ urlpatterns = [
         "finance-audit/<int:pk>/",
         FinanceAuditView.as_view(),
         name="finance_audit_detail",
+    ),
+    path("api/finance-lines/add/", add_finance_line, name="finance_line_add"),
+    path(
+        "api/finance-lines/clin/<int:clin_id>/",
+        get_finance_lines,
+        name="finance_lines_for_clin",
+    ),
+    path(
+        "api/finance-lines/<int:finance_line_id>/log-payment/",
+        log_finance_line_payment,
+        name="finance_line_log_payment",
+    ),
+    path(
+        "api/finance-lines/<int:finance_line_id>/payments/",
+        get_finance_line_payments,
+        name="finance_line_payments",
     ),
     # Payment History API
     path(

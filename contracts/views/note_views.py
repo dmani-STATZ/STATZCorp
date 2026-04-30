@@ -28,6 +28,8 @@ def add_note(request, content_type_id, object_id):
             note.content_type = content_type
             note.object_id = object_id
             note.created_by = request.user
+            if request.POST.get('note_tag') == 'finance':
+                note.note_tag = 'finance'
             note.save()
 
             # Optional reminder creation (mirrors old api_add_note behavior).
@@ -68,10 +70,13 @@ def add_note(request, content_type_id, object_id):
             
             # If this is an AJAX request, return the updated notes list
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                notes = list(Note.objects.filter(
+                notes_qs = Note.objects.filter(
                     content_type=content_type,
-                    object_id=object_id
-                ).order_by('-created_on'))
+                    object_id=object_id,
+                ).order_by('-created_on')
+                if content_type.model == 'contract':
+                    notes_qs = notes_qs.exclude(note_tag='finance')
+                notes = list(notes_qs)
                 for note in notes:
                     setattr(note, 'entity_type', content_type.model)
                     setattr(note, 'content_type_id', content_type.id)
@@ -123,11 +128,14 @@ def delete_note(request, note_id):
     
     # If this is an AJAX request, return the updated notes list
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        notes = Note.objects.filter(
+        notes_qs = Note.objects.filter(
             content_type=content_type,
-            object_id=object_id
+            object_id=object_id,
         ).order_by('-created_on')
-        
+        if content_type.model == 'contract':
+            notes_qs = notes_qs.exclude(note_tag='finance')
+        notes = notes_qs
+
         notes_html = render_to_string('contracts/partials/notes_list.html', {
             'notes': notes,
             'content_object': content_object
@@ -299,10 +307,10 @@ def notes_popup(request, contract_id):
 def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
     """
     Returns JSON with rendered notes_html for a single tab in the notes popup.
-    tab_type: 'contract' or 'clin'
+    tab_type: 'contract', 'clin', or 'finance'
     clin_id: required when tab_type == 'clin'
     """
-    if tab_type not in ('contract', 'clin'):
+    if tab_type not in ('contract', 'clin', 'finance'):
         return JsonResponse({'success': False, 'error': 'Invalid tab_type'}, status=400)
 
     contract = get_object_or_404(
@@ -315,6 +323,17 @@ def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
         object_id = contract.id
         content_object = contract
         empty_msg = 'No contract notes'
+        notes_qs = Note.objects.filter(
+            content_type=content_type, object_id=object_id
+        ).exclude(note_tag='finance')
+    elif tab_type == 'finance':
+        content_type = ContentType.objects.get_for_model(Contract)
+        object_id = contract.id
+        content_object = contract
+        empty_msg = 'No finance notes'
+        notes_qs = Note.objects.filter(
+            content_type=content_type, object_id=object_id, note_tag='finance'
+        )
     else:
         if not clin_id:
             return JsonResponse({'success': False, 'error': 'clin_id required'}, status=400)
@@ -323,10 +342,11 @@ def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
         object_id = clin.id
         content_object = clin
         empty_msg = 'No CLIN notes'
+        notes_qs = Note.objects.filter(content_type=content_type, object_id=object_id)
 
-    notes = list(Note.objects.filter(
-        content_type=content_type, object_id=object_id
-    ).select_related('created_by').order_by('-created_on'))
+    notes = list(
+        notes_qs.select_related('created_by').order_by('-created_on')
+    )
 
     # Pre-compute current-user reminder flags for popup badge rendering.
     note_ids = [n.id for n in notes]
@@ -508,8 +528,8 @@ def get_combined_notes(request, contract_id, clin_id=None):
         # Get contract notes
         contract_notes = Note.objects.filter(
             content_type=contract_type,
-            object_id=contract_id
-        ).order_by('-created_on')
+            object_id=contract_id,
+        ).exclude(note_tag='finance').order_by('-created_on')
         
         # Add entity type to contract notes for visual distinction
         for note in contract_notes:

@@ -51,7 +51,7 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         # Get contract notes with entity_type for template
         contract_type = ContentType.objects.get_for_model(Contract)
         clin_type = ContentType.objects.get_for_model(Clin)
-        contract_notes_qs = contract.notes.all().order_by('-created_on')
+        contract_notes_qs = contract.notes.exclude(note_tag='finance').order_by('-created_on')
         for note in contract_notes_qs:
             setattr(note, 'entity_type', 'contract')
             setattr(note, 'content_type_id', contract_type.id)

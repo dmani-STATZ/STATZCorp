@@ -4,108 +4,88 @@
 
 {% block title %}Finance Audit{% endblock %}
 
+{% block body_class %}finance-audit-page{% endblock %}
+
 {% block extra_head %}
 {{ block.super }}
+<link rel="stylesheet" href="{% static 'contracts/css/components.css' %}?v={{ cache_version }}">
 {% endblock %}
 
 {% block content %}
-<div class="w-full px-4 py-4">
-    <div class="flex flex-col items-center mb-6">
-        <!-- Search Section with inline styling to override any other styles -->
-        <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); padding: 1rem; margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
-            <input type="text"
-                   id="contract-search"
-                   style="width: 100%; height: 50px; padding: 0.75rem 1rem; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); outline: none;"
-                   placeholder="Search by contract number, last 4 digits, or PO..."
-                   autocomplete="off"
-                   value="{{ search_query }}">
-            <div id="search-results"
-                 class="absolute z-50 w-full bg-white mt-1 rounded-md shadow-xl border border-gray-200 max-h-96 overflow-y-auto hidden">
-            </div>
-        </div>
-
-        {% if contract %}
-        <!-- Contract Details Section - 50% width (960px) -->
-        <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;">
-            <!-- Contract Header -->
-            <div class="bg-green-100 px-4 py-2 row-between border-b border-green-200">
-                <h2 class="text-lg font-semibold text-gray-800">Contract {{ contract.contract_number }}</h2>
-                <a href="{% url 'contracts:contracts_dashboard' %}"
-                class="hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex items-center">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                     <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-                 </svg>
-                 Back to Dashboard
-                </a>
-            </div>
-
-            <!-- Contract Info -->
-            <div class="p-4 space-y-2 bg-white">
-                <div class="grid grid-cols-2 gap-x-8 text-sm p-2">
-                    <div class="flex p-2">
-                        <span class="font-medium w-32">PO #</span>
-                        <span>{{ contract.po_number|default:"-" }}</span>
-                    </div>
-                    <div class="flex p-2">
-                        <span class="font-medium w-32">Buyer</span>
-                        <span>{{ contract.buyer }}</span>
-                    </div>
-                    <div class="flex p-2">
-                        <span class="font-medium w-32">Contract Type</span>
-                        <span>{{ contract.contract_type }}</span>
-                    </div>
-                    <div class="flex p-2">
-                        <span class="font-medium w-32">Award Date</span>
-                        <span>{{ contract.award_date|date:"m/d/Y" }}</span>
-                    </div>
-                    <div class="flex p-2">
-                        <span class="font-medium w-32">Due Date</span>
-                        <span>{{ contract.due_date|date:"m/d/Y" }}</span>
-                    </div>
-                    <div class="flex p-2 items-center">
-                        <span class="font-medium w-32">Contract Value:</span>
-                        <!-- Hidden input for actual value -->
-                        <input type="hidden" name="contract_value" id="id_contract_value" value="{{ contract.contract_value|default:'0.00' }}">
-                        <!-- Display input -->
-                        <input type="text"
-                               id="contract_value_display"
-                               class="form-input text-sm ml-2 w-auto border-none bg-transparent p-0 cursor-pointer"
-                               readonly
-                               onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'contract_value', 'finance_audit', document.getElementById('id_contract_value').value)"
-                               value="${{ contract.contract_value|floatformat:2|intcomma|default:'0.00' }}"
-                               data-current-value="{{ contract.contract_value|default:'0.00' }}">
-                    </div>
-                    <div class="flex p-2 items-center">
-                        <span class="font-medium w-32">Plan Gross:</span>
-                        <!-- Hidden input for actual value -->
-                        <input type="hidden" name="plan_gross" id="id_plan_gross" value="{{ contract.plan_gross|default:'0.00' }}">
-                        <!-- Display input -->
-                        <input type="text"
-                               id="plan_gross_display"
-                               class="form-input text-sm ml-2 w-auto border-none bg-transparent p-0 cursor-pointer"
-                               readonly
-                               onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'plan_gross', 'finance_audit', document.getElementById('id_plan_gross').value)"
-                               value="${{ contract.plan_gross|floatformat:2|intcomma|default:'0.00' }}"
-                               data-current-value="{{ contract.plan_gross|default:'0.00' }}">
-                    </div>
+<div class="container-fluid px-4 py-3">
+    {% if contract %}
+    {# Section A — Contract header bar #}
+    <div class="finance-audit-header-bar rounded-top px-3 py-3 mb-3">
+        <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
+            <div class="flex-grow-1 min-w-0">
+                <div class="fs-4 fw-bold text-body">{{ contract.contract_number }}</div>
+                <div class="small text-body-secondary text-truncate">
+                    PO {{ contract.po_number|default:"—" }}
+                    <span class="text-body-secondary">·</span>
+                    {{ contract.buyer|default:"—" }}
+                    <span class="text-body-secondary">·</span>
+                    Award {{ contract.award_date|date:"m/d/Y"|default:"—" }}
+                    <span class="text-body-secondary">·</span>
+                    Due {{ contract.due_date|date:"m/d/Y"|default:"—" }}
+                    <span class="text-body-secondary">·</span>
+                    {{ contract.contract_type|default:"—" }}
                 </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+                <button type="button" class="action-btn" onclick="openDocumentsBrowser({{ contract.id }})">Documents</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-open-notes">Notes</button>
+                <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-sm btn-primary">Back to Contract</a>
             </div>
         </div>
     </div>
 
-    <!-- Split summary (read-only) -->
-     <div class="w-full px-4 py-4">
-        <div class="flex flex-col items-center mb-6">
-            <div style="width: 960px; max-width: 100%; background-color: white; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1rem; border: 1px solid #e5e7eb; box-sizing: border-box;" class="p-4">
-                <h2 class="h6 fw-semibold mb-3">Split summary (all CLINs, by company)</h2>
+    {# Section B — Three-panel summary #}
+    <div class="d-flex gap-3 align-items-stretch">
+        <div class="card finance-audit-stat-card shadow-sm" style="flex: 0 0 calc(33.333% - 0.75rem); max-width: calc(33.333% - 0.75rem);">
+            <div class="card-header py-2 small fw-semibold">Contract summary</div>
+            <div class="card-body py-2">
+                <div class="row g-2 small">
+                    <div class="col-6">
+                        <div class="text-body-secondary">Contract Value</div>
+                        <input type="hidden" name="contract_value" id="id_contract_value" value="{{ contract.contract_value|default:'0.00' }}">
+                        <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none" id="contract_value_display"
+                                data-current-value="{{ contract.contract_value|default:'0.00' }}"
+                                onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'contract_value', 'finance_audit', document.getElementById('id_contract_value').value)">
+                            ${{ contract.contract_value|floatformat:2|intcomma|default:'0.00' }}
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-body-secondary">Plan Gross</div>
+                        <input type="hidden" name="plan_gross" id="id_plan_gross" value="{{ contract.plan_gross|default:'0.00' }}">
+                        <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none" id="plan_gross_display"
+                                data-current-value="{{ contract.plan_gross|default:'0.00' }}"
+                                onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'plan_gross', 'finance_audit', document.getElementById('id_plan_gross').value)">
+                            ${{ contract.plan_gross|floatformat:2|intcomma|default:'0.00' }}
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-body-secondary">Finance Costs</div>
+                        <div class="fw-semibold text-danger">${{ finance_costs_total|floatformat:2|intcomma }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-body-secondary">Adj Gross</div>
+                        <div class="fw-semibold text-success">${{ adj_gross_contract|floatformat:2|intcomma }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card finance-audit-split-card shadow-sm" style="flex: 0 0 calc(33.333% - 0.75rem); max-width: calc(33.333% - 0.75rem);">
+            <div class="card-header py-2 small fw-semibold">Split summary</div>
+            <div class="card-body py-2">
                 {% if clin_split_rollup %}
                 <div class="table-responsive">
                     <table class="table table-sm table-striped mb-0">
                         <thead>
                             <tr>
                                 <th>Company</th>
-                                <th class="text-end">Total split value</th>
-                                <th class="text-end">Total split paid</th>
+                                <th class="text-end">Split Value</th>
+                                <th class="text-end">Split Paid</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -131,171 +111,167 @@
                 {% endif %}
             </div>
         </div>
+
+        <div class="card finance-audit-notes-card shadow-sm" style="flex: 0 0 calc(33.333% - 0.75rem); max-width: calc(33.333% - 0.75rem);">
+            <div class="card-header py-2 small fw-semibold">Payment notes</div>
+            <div class="card-body" style="max-height: 220px; overflow-y: auto; padding: 10px 12px;">
+                {% if payment_notes_rollup %}
+                    {% for row in payment_notes_rollup %}
+                    <div class="finance-audit-payment-note">
+                        <span class="text-body-secondary">{{ row.entity_label }}</span>
+                        <span class="text-body-secondary">·</span>
+                        {{ row.field_label }}
+                        <span class="text-body-secondary">·</span>
+                        <span class="fw-semibold">${{ row.amount|floatformat:2 }}</span>
+                        <div class="text-body-secondary mt-1">{{ row.note_text }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-body-secondary small mb-0">No payment notes recorded.</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
-    <!-- CLIN Table Section - 95% width -->
-    <div class="flex justify-center w-full">
-        <div class="card overflow-hidden w-[95%]">
-            <div class="overflow-x-auto relative">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+    {# Section C — CLIN table + Section D accordions #}
+    <div class="card shadow-sm mt-4">
+        <div class="card-header py-2 small fw-semibold">CLINs</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Item #</span>
-                                    <div class="tooltip-text">
-                                        Item # From contract
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Item Type</span>
-                                    <div class="tooltip-text">
-                                        Item Type From contract
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Supplier</span>
-                                    <div class="tooltip-text">
-                                        Supplier
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Due Date</span>
-                                    <div class="tooltip-text">
-                                        Due Date for this clin
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Supplier Due Date</span>
-                                    <div class="tooltip-text">
-                                        Due Date the supplier quotedfor this clin
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Order Qty</span>
-                                    <div class="tooltip-text">
-                                        The amount we ordered for this clin
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Ship Qty</span>
-                                    <div class="tooltip-text">
-                                        The amount we've shipped for this clin
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-right label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Item Value</span>
-                                    <div class="tooltip-text">
-                                        Previously SubPO Value, Item Value from the contract
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-right label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Quote Value</span>
-                                    <div class="tooltip-text">
-                                        The amount the supplier quoted for this item
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-right label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Paid</span>
-                                    <div class="tooltip-text">
-                                        Previously SubPaid, The amount we've paid out for this item so far
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-right label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Customer Pay</span>
-                                    <div class="tooltip-text">
-                                        The amount we've been paid for this item from the customer (DFAS, EDP, or other pay source)
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Terms</span>
-                                    <div class="tooltip-text">
-                                        The terms we've negotiated with this supplier
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-right label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Terms Int</span>
-                                    <div class="tooltip-text tooltip-text-right">
-                                        The amount of interest we've paid on the terms
-                                    </div>
-                                </div>
-                            </th>
-                            <th class="px-4 py-2 text-left label tracking-wider">
-                                <div class="tooltip-container">
-                                    <span>Terms Party</span>
-                                    <div class="tooltip-text tooltip-text-right">
-                                        The party that has paid the terms
-                                    </div>
-                                </div>
-                            </th>
+                            <th>Item #</th>
+                            <th>Item Type</th>
+                            <th>Supplier</th>
+                            <th class="text-end">Order Qty</th>
+                            <th class="text-end">Ship Qty</th>
+                            <th class="text-end">Item Value</th>
+                            <th class="text-end">Quote Value</th>
+                            <th class="text-end">Paid</th>
+                            <th class="text-end">Customer Pay</th>
+                            <th class="text-end">Adj Gross</th>
+                            <th>Finance</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody>
                         {% for clin in clins %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.item_number }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.get_item_type_display }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.supplier.name }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.due_date|date:"m/d/Y" }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.supplier_due_date|date:"m/d/Y" }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.order_qty }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ clin.ship_qty }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="item_value" data-value="{{ clin.item_value|floatformat:2|intcomma|default:"0.00" }}">${{ clin.item_value|floatformat:2|intcomma|default:"0.00" }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}">${{ clin.quote_value|floatformat:2|intcomma|default:"0.00" }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}">${{ clin.paid_amount|floatformat:2|intcomma|default:"0.00" }}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="wawf_payment" data-value="{{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}">${{ clin.wawf_payment|floatformat:2|intcomma|default:"0.00" }}</td>
-                            <td class="px-4 py-2 text-sm text-left">
-                                <div class="relative inline-block">
-                                    <select class="w-30 appearance-none rounded border-gray-300 pr-8 pl-2 py-1 text-sm focus:border-blue-500 focus:ring-blue-500"
-                                            data-clin="{{ clin.id }}"
-                                            data-field="special_payment_terms">
-                                        {% for term in payment_terms %}
-                                        <option value="{{ term.id }}"
-                                                {% if clin.special_payment_terms.id == term.id or not clin.special_payment_terms and term.id == net_terms_id %}selected{% endif %}>
-                                            {{ term.terms }}
-                                        </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
+                        <tr>
+                            <td>{{ clin.item_number }}</td>
+                            <td>{{ clin.get_item_type_display }}</td>
+                            <td>{{ clin.supplier.name|default:"—" }}</td>
+                            <td class="text-end">{{ clin.order_qty|default:"—" }}</td>
+                            <td class="text-end">{{ clin.ship_qty|default:"—" }}</td>
+                            <td class="text-end text-decoration-none">
+                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
+                                      data-clin="{{ clin.id }}" data-type="item_value" data-value="{{ clin.item_value|floatformat:2 }}">${{ clin.item_value|floatformat:2|intcomma }}</span>
                             </td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900 cursor-pointer" data-clin="{{ clin.id }}" data-type="special_payment_terms_interest" data-value="{{ clin.special_payment_terms_interest|floatformat:2|default:"0.00" }}">${{ clin.special_payment_terms_interest|floatformat:2|default:"0.00"|intcomma }}</td>
-                            <td class="px-4 py-2 text-sm">
-                                <input type="text"
-                                       class="w-24 rounded border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                                       value="{{ clin.special_payment_terms_party|default:'PPI' }}"
-                                       data-clin="{{ clin.id }}"
-                                       data-field="special_payment_terms_party">
+                            <td class="text-end">
+                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
+                                      data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2 }}">${{ clin.quote_value|floatformat:2|intcomma }}</span>
+                            </td>
+                            <td class="text-end">
+                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
+                                      data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2 }}">${{ clin.paid_amount|floatformat:2|intcomma }}</span>
+                            </td>
+                            <td class="text-end">
+                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
+                                      data-clin="{{ clin.id }}" data-type="wawf_payment" data-value="{{ clin.wawf_payment|floatformat:2 }}">${{ clin.wawf_payment|floatformat:2|intcomma }}</span>
+                            </td>
+                            <td class="text-end fw-semibold {% if clin.adjusted_gross > 0 %}text-success{% elif clin.adjusted_gross < 0 %}text-danger{% endif %}" data-adj-gross-clin="{{ clin.id }}">
+                                ${{ clin.adjusted_gross|floatformat:2|intcomma }}
+                            </td>
+                            <td>
+                                {% with flist=clin.finance_lines_for_audit %}
+                                {% if flist %}
+                                <button type="button" class="pill pill-finance finance-pill" data-clin-id="{{ clin.id }}">
+                                    {{ flist|length }} line{% if flist|length != 1 %}s{% endif %} · ${{ clin.finance_billed_sum|floatformat:2 }}
+                                </button>
+                                {% else %}
+                                <button type="button" class="pill pill-add finance-pill" data-clin-id="{{ clin.id }}">+ add</button>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
+                        </tr>
+                        <tr id="accordion-{{ clin.id }}" data-accordion-for="{{ clin.id }}" style="display:none;">
+                            <td colspan="11" style="padding: 0; border-top: none;">
+                                <div style="display: flex; justify-content: flex-end;">
+                                    <div style="width: 55%; padding: 8px 12px 8px 0;">
+                                {% with flist=clin.finance_lines_for_audit %}
+                                <div class="finance-lines-container px-2 pt-2">
+                                    {% if flist %}
+                                        {% for line in flist %}
+                                        <div class="fl-row" data-finance-line-id="{{ line.id }}">
+                                            <div class="fl-col-type">{{ line.line_type }}</div>
+                                            <div class="fl-col-desc" title="{{ line.description|default:'' }}">{{ line.description|default:"—" }}</div>
+                                            <div class="fl-col-val">Billed: $<span>{{ line.amount_billed|floatformat:2 }}</span></div>
+                                            <div class="fl-col-val">Paid: $<span>{{ line.amount_paid_sum|default:0|floatformat:2 }}</span></div>
+                                            <div class="fl-col-val">Remaining: $<span>{{ line.display_remaining|floatformat:2 }}</span></div>
+                                            <div class="fl-col-status">
+                                                {% with paid=line.amount_paid_sum|default:0 %}
+                                                    {% if paid <= 0 %}
+                                                        <span class="badge-sm b-unpaid">UNPAID</span>
+                                                    {% elif paid >= line.amount_billed %}
+                                                        <span class="badge-sm b-paid">PAID</span>
+                                                    {% else %}
+                                                        <span class="badge-sm b-partial">PARTIAL</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </div>
+                                            <div class="fl-col-action">
+                                                <button type="button" class="fl-btn js-log-payment"
+                                                    data-finance-line-id="{{ line.id }}"
+                                                    data-line-type="{{ line.line_type|escapejs }}"
+                                                    data-amount-billed="{{ line.amount_billed }}">
+                                                    log payment
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="text-muted small py-2">No finance lines recorded.</div>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 px-2 py-2 border-top small text-body-secondary">
+                                    <div>
+                                        Finance costs: <span class="fl-footer-costs">${{ clin.finance_billed_sum|floatformat:2 }}</span>
+                                        <span class="text-body-secondary">·</span>
+                                        Gross: <span class="fl-footer-gross">${{ clin.item_value|floatformat:2 }}</span>
+                                        <span class="text-body-secondary">·</span>
+                                        Adj gross: <span class="fl-footer-adj">${{ clin.adjusted_gross|floatformat:2 }}</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                                        <button type="button" class="fl-btn js-toggle-add-finance-form" data-clin-id="{{ clin.id }}">+ add finance line</button>
+                                    </div>
+                                </div>
+                                <form action="#" method="post" class="finance-line-add-form px-2 pb-3" data-clin-id="{{ clin.id }}" style="display: none;">
+                                    {% csrf_token %}
+                                    <div class="row g-2 small align-items-end">
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label mb-0">Type</label>
+                                            <input type="text" class="form-control form-control-sm" name="line_type" list="finance-line-type-suggestions" autocomplete="off">
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label mb-0">Description</label>
+                                            <input type="text" class="form-control form-control-sm" name="description">
+                                        </div>
+                                        <div class="col-12 col-md-2">
+                                            <label class="form-label mb-0">Amount Billed</label>
+                                            <input type="number" class="form-control form-control-sm" name="amount_billed" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-12 col-md-3 d-flex gap-2">
+                                            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                        </div>
+                                    </div>
+                                </form>
+                                {% endwith %}
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="15" class="px-4 py-8 text-center text-gray-500">
-                                No CLINs found for this contract
-                            </td>
+                            <td colspan="11" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -303,246 +279,385 @@
             </div>
         </div>
     </div>
+    <datalist id="finance-line-type-suggestions">
+        <option value="Trucking"></option>
+        <option value="Freight"></option>
+        <option value="Labels"></option>
+        <option value="Miscellaneous"></option>
+    </datalist>
     {% endif %}
-
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 modal-backdrop-overlay hidden flex items-center justify-center z-50">
-        <div class="card card-padded">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p class="mt-2 text-gray-600">Loading...</p>
-        </div>
-    </div>
-
-    <!-- Include Payment History Popup -->
-    {% include 'contracts/includes/payment_history_popup.html' %}
 </div>
 
+{% if contract %}
+{% include 'contracts/includes/payment_history_popup.html' %}
+{% endif %}
+{% endblock %}
+
 {% block extra_js %}
+{% if contract %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const notifyToast = (msg, type = 'info', duration = 3000) => {
+function openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled) {
+    fetch(`/contracts/api/finance-lines/${financeLineId}/payments/`)
+        .then(r => r.json())
+        .then(data => {
+            const popup = document.getElementById('paymentHistoryPopup');
+            popup.dataset.entityType = 'finance_line';
+            popup.dataset.entityId = financeLineId;
+            popup.dataset.fieldType = 'finance_line_payment';
+            popup.dataset.sourcePage = 'finance_audit';
+
+            document.getElementById('popupTitle').textContent = `Payment History — ${lineType}`;
+            document.getElementById('popupSubtitle').textContent = `Billed: $${parseFloat(amountBilled).toFixed(2)}`;
+            document.getElementById('currentValue').textContent = `Total Paid: $${parseFloat(data.total_paid).toFixed(2)} · Remaining: $${parseFloat(data.amount_remaining).toFixed(2)}`;
+
+            const historyContent = document.getElementById('historyContent');
+            if (data.payments && data.payments.length > 0) {
+                let html = `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 payment-history-table">
+                    <thead class="bg-gray-50"><tr>
+                        <th class="px-4 py-2 text-left label">Date</th>
+                        <th class="px-4 py-2 text-right label">Amount</th>
+                        <th class="px-4 py-2 text-left label">Note</th>
+                        <th class="px-4 py-2 text-left label">By</th>
+                    </tr></thead><tbody>`;
+                data.payments.forEach(p => {
+                    html += `<tr>
+                        <td class="px-4 py-2 text-sm">${new Date(p.payment_date).toLocaleDateString('en-US')}</td>
+                        <td class="px-4 py-2 text-sm text-right">$${parseFloat(p.amount).toFixed(2)}</td>
+                        <td class="px-4 py-2 text-sm">${p.note || '—'}</td>
+                        <td class="px-4 py-2 text-sm">${p.created_by}</td>
+                    </tr>`;
+                });
+                html += `</tbody><tfoot class="bg-gray-50"><tr>
+                    <td class="px-4 py-2 text-sm font-medium">Total</td>
+                    <td class="px-4 py-2 text-sm text-right font-medium">$${parseFloat(data.total_paid).toFixed(2)}</td>
+                    <td colspan="2"></td>
+                </tr></tfoot></table></div>`;
+                historyContent.innerHTML = html;
+            } else {
+                historyContent.innerHTML = '<p class="text-gray-500 text-center py-3">No payments logged yet</p>';
+            }
+
+            popup.classList.remove('hidden');
+        });
+}
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.js-log-payment');
+    if (!btn) return;
+    const financeLineId = btn.dataset.financeLineId;
+    const lineType = btn.dataset.lineType;
+    const amountBilled = btn.dataset.amountBilled;
+    if (financeLineId && lineType && amountBilled) {
+        openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled);
+    }
+});
+
+function openDocumentsBrowser(contractId) {
+    const url = `/contracts/documents/?contract_id=${encodeURIComponent(contractId)}`;
+    const width = 1200;
+    const height = 800;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    const windowFeatures = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+    const win = window.open(url, 'statz_documents', windowFeatures);
+    if (win) win.focus();
+    localStorage.setItem('statz_documents_contract_id', String(contractId));
+}
+
+function refreshFinanceLinesForClin(clinId) {
+    if (!clinId) return;
+    fetch(`/contracts/api/finance-lines/clin/${clinId}/`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+
+            const pill = document.querySelector(`.finance-pill[data-clin-id="${clinId}"]`);
+            if (pill) {
+                const count = data.finance_lines.length;
+                const total = data.totals.total_billed;
+                if (count > 0) {
+                    pill.textContent = `${count} line${count > 1 ? 's' : ''} · $${total.toFixed(2)}`;
+                    pill.className = 'pill pill-finance finance-pill';
+                } else {
+                    pill.textContent = '+ add';
+                    pill.className = 'pill pill-add finance-pill';
+                }
+                pill.dataset.clinId = clinId;
+            }
+
+            const adjGrossCell = document.querySelector(`[data-adj-gross-clin="${clinId}"]`);
+            if (adjGrossCell) {
+                const adj = data.totals.adj_gross;
+                adjGrossCell.textContent = `$${adj.toFixed(2)}`;
+                adjGrossCell.className = adj > 0
+                    ? 'text-end fw-semibold text-success'
+                    : adj < 0 ? 'text-end fw-semibold text-danger'
+                    : 'text-end fw-semibold';
+            }
+
+            const linesContainer = document.querySelector(`#accordion-${clinId} .finance-lines-container`);
+            if (!linesContainer) return;
+
+            if (data.finance_lines.length === 0) {
+                linesContainer.innerHTML = '<div class="text-muted small py-2">No finance lines recorded.</div>';
+                return;
+            }
+
+            let html = '';
+            data.finance_lines.forEach(line => {
+                const remaining = (line.amount_billed - line.amount_paid).toFixed(2);
+                const statusMap = {
+                    'PAID': 'badge-sm b-paid',
+                    'PARTIAL': 'badge-sm b-partial',
+                    'UNPAID': 'badge-sm b-unpaid'
+                };
+                html += `<div class="fl-row" data-finance-line-id="${line.id}">
+                    <div class="fl-col-type">${line.line_type}</div>
+                    <div class="fl-col-desc" title="${line.description || ''}">${line.description || '—'}</div>
+                    <div class="fl-col-val">Billed: $${line.amount_billed.toFixed(2)}</div>
+                    <div class="fl-col-val">Paid: $${line.amount_paid.toFixed(2)}</div>
+                    <div class="fl-col-val">Remaining: $${remaining}</div>
+                    <div class="fl-col-status"><span class="${statusMap[line.payment_status] || ''}">${line.payment_status}</span></div>
+                    <div class="fl-col-action">
+                        <button type="button" class="fl-btn js-log-payment"
+                            data-finance-line-id="${line.id}"
+                            data-line-type="${line.line_type}"
+                            data-amount-billed="${line.amount_billed}">
+                            log payment
+                        </button>
+                    </div>
+                </div>`;
+            });
+
+            linesContainer.innerHTML = html;
+
+            const footerCosts = document.querySelector(`#accordion-${clinId} .fl-footer-costs`);
+            const footerGross = document.querySelector(`#accordion-${clinId} .fl-footer-gross`);
+            const footerAdj = document.querySelector(`#accordion-${clinId} .fl-footer-adj`);
+            if (footerCosts) footerCosts.textContent = `$${data.totals.total_billed.toFixed(2)}`;
+            if (footerGross) footerGross.textContent = `$${data.totals.gross.toFixed(2)}`;
+            if (footerAdj) footerAdj.textContent = `$${data.totals.adj_gross.toFixed(2)}`;
+        });
+}
+
+(function() {
+    const notifyToast = (msg, type, duration) => {
         if (window.notify) {
-            window.notify(type, msg, duration);
+            window.notify(type || 'info', msg, duration || 3000);
         }
     };
-    const searchInput = document.getElementById('contract-search');
-    const searchResults = document.getElementById('search-results');
-    let debounceTimer;
 
-    // Add click handlers for monetary fields
-    document.querySelectorAll('[data-type]').forEach(cell => {
+    function financeLineStatusLabel(paid, billed) {
+        const p = parseFloat(paid) || 0;
+        const b = parseFloat(billed) || 0;
+        if (p <= 0) return { text: 'UNPAID', cls: 'bg-danger' };
+        if (p >= b) return { text: 'PAID', cls: 'bg-success' };
+        return { text: 'PARTIAL', cls: 'bg-warning text-dark' };
+    }
+
+    function updateFinanceLineRow(lineId, newPaidTotal) {
+        const billedEl = document.querySelector('[data-finance-line-id="' + lineId + '"][data-finance-billed]');
+        if (!billedEl) return;
+        const billed = parseFloat(billedEl.getAttribute('data-finance-billed')) || 0;
+        const paid = parseFloat(newPaidTotal) || 0;
+        const remaining = Math.max(0, billed - paid);
+        const paidSpan = document.querySelector('[data-finance-line-id="' + lineId + '"][data-finance-field="paid"]');
+        const remSpan = document.querySelector('[data-finance-line-id="' + lineId + '"][data-finance-field="remaining"]');
+        const badge = document.querySelector('[data-finance-line-id="' + lineId + '"][data-finance-field="badge"]');
+        const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
+        if (paidSpan) paidSpan.textContent = fmt(paid);
+        if (remSpan) remSpan.textContent = fmt(remaining);
+        if (badge) {
+            const st = financeLineStatusLabel(paid, billed);
+            badge.textContent = st.text;
+            badge.className = 'badge ' + st.cls + ' rounded-pill';
+            badge.setAttribute('data-finance-field', 'badge');
+        }
+    }
+
+    function financeAuditUpdateCellValue(entityType, entityId, fieldType, newValue) {
+        const formattedValue = parseFloat(newValue).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        const fmtMoney = '$' + formattedValue;
+
+        if (entityType === 'finance_line') {
+            updateFinanceLineRow(String(entityId), newValue);
+            notifyToast('Finance line payments updated to ' + fmtMoney, 'success');
+            return true;
+        }
+
+        if (entityType === 'contract') {
+            const targetElement = document.getElementById(fieldType + '_display');
+            const hiddenInput = document.getElementById('id_' + fieldType);
+            if (targetElement && hiddenInput) {
+                if (targetElement.tagName === 'BUTTON') {
+                    targetElement.textContent = fmtMoney;
+                } else {
+                    targetElement.value = fmtMoney;
+                }
+                targetElement.dataset.currentValue = newValue;
+                hiddenInput.value = newValue;
+                notifyToast('Contract ' + fieldType.replace(/_/g, ' ') + ' updated to ' + fmtMoney, 'success');
+                return true;
+            }
+            notifyToast('Could not update contract display', 'error');
+            return false;
+        }
+
+        const targetElement = document.querySelector('[data-clin="' + entityId + '"][data-type="' + fieldType + '"]');
+        if (targetElement) {
+            targetElement.textContent = fmtMoney;
+            targetElement.dataset.value = newValue;
+            notifyToast('CLIN ' + fieldType.replace(/_/g, ' ') + ' updated to ' + fmtMoney, 'success');
+            return true;
+        }
+        notifyToast('Could not update CLIN display', 'error');
+        return false;
+    }
+
+    window.updateCellValue = function(arg0, arg1, arg2, arg3) {
+        const popup = document.getElementById('paymentHistoryPopup');
+        if (arg3 === undefined && arg2 !== undefined && popup && popup.dataset.entityType) {
+            return financeAuditUpdateCellValue(
+                popup.dataset.entityType,
+                arg0,
+                arg1,
+                arg2
+            );
+        }
+        return financeAuditUpdateCellValue(arg0, arg1, arg2, arg3);
+    };
+
+    document.querySelectorAll('[data-clin][data-type]').forEach(function(cell) {
         cell.addEventListener('click', function() {
             const clinId = this.dataset.clin;
             const fieldType = this.dataset.type;
             const currentValue = this.dataset.value || '0.00';
-            const popup = document.getElementById('paymentHistoryPopup');
-
-            // Set the data attributes directly on the popup
-            popup.dataset.entityType = 'clin';
-            popup.dataset.entityId = clinId;
-            popup.dataset.fieldType = fieldType;
-            popup.dataset.sourcePage = 'finance_audit';
-
-            // Call the popup's open function
             if (typeof openPaymentHistoryPopup === 'function') {
-                // Pass 'clin' as entityType for CLIN rows
                 openPaymentHistoryPopup('clin', clinId, fieldType, 'finance_audit', currentValue);
             }
         });
     });
 
-    // Function to update cell display value - make it globally available
-    // Modified to handle both Contract and CLIN level updates
-    window.updateCellValue = function(entityType, entityId, fieldType, newValue) {
-        console.log('Updating value:', { entityType, entityId, fieldType, newValue });
-        let targetElement;
-        let hiddenInput;
-        let isContractField = (entityType === 'contract');
-
-        // Format the value for display
-        const formattedValue = parseFloat(newValue).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-
-        if (isContractField) {
-            // Handle Contract fields (Contract Value, Plan Gross)
-            targetElement = document.getElementById(`${fieldType}_display`);
-            hiddenInput = document.getElementById(`id_${fieldType}`);
-
-            if (targetElement && hiddenInput) {
-                targetElement.value = `$${formattedValue}`; // Input field uses .value
-                targetElement.dataset.currentValue = newValue;
-                hiddenInput.value = newValue;
-            } else {
-                console.error(`Could not find contract display or hidden field for type ${fieldType}`);
-                targetElement = null; // Ensure no update happens if elements aren't found
-            }
-        } else {
-            // Handle CLIN fields (existing logic)
-            targetElement = document.querySelector(`[data-clin="${entityId}"][data-type="${fieldType}"]`);
-            if (targetElement) {
-                targetElement.textContent = `$${formattedValue}`; // Table cell uses .textContent
-                targetElement.dataset.value = newValue;
-            } else {
-                console.error(`Could not find CLIN cell for ID ${entityId} and type ${fieldType}`);
-            }
-        }
-
-        // Common logic for feedback and notification if an element was updated
-        if (targetElement) {
-            // Add a brief highlight effect to show the update
-            targetElement.style.transition = 'background-color 0.5s ease';
-            targetElement.style.backgroundColor = '#e6ffe6';  // Light green
-            setTimeout(() => {
-                targetElement.style.backgroundColor = '';
-            }, 1000);
-
-            // Show a success notification
-            notifyToast(`${entityType.charAt(0).toUpperCase() + entityType.slice(1)} ${fieldType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} updated to $${formattedValue}`, 'success');
-            return true;
-        } else {
-            // Show error notification only if an update was attempted but failed
-            notifyToast("Error: Could not update display value", 'error');
-            return false;
-        }
-    };
-
-    // Handle special payment terms changes
-    document.querySelectorAll('select[data-field="special_payment_terms"]').forEach(select => {
-        select.addEventListener('change', function() {
-            const clinId = this.dataset.clin;
-            const value = this.value;
-            updateClinField(clinId, 'special_payment_terms', value);
+    document.querySelectorAll('.finance-pill').forEach(pill => {
+        pill.addEventListener('click', function() {
+            const clinId = this.dataset.clinId;
+            const accordion = document.getElementById(`accordion-${clinId}`);
+            if (!accordion) return;
+            const isVisible = accordion.style.display !== 'none';
+            accordion.style.display = isVisible ? 'none' : 'table-row';
+            this.classList.toggle('pill-active', !isVisible);
         });
     });
 
-    // Handle special payment terms party changes
-    document.querySelectorAll('input[data-field="special_payment_terms_party"]').forEach(input => {
-        input.addEventListener('change', function() {
-            const clinId = this.dataset.clin;
-            const value = this.value;
-            updateClinField(clinId, 'special_payment_terms_party', value);
-        });
-    });
+    document.querySelectorAll('.finance-line-add-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const clinId = this.dataset.clinId;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    // Handle planned split changes
-    document.querySelectorAll('input[data-field="planned_split"]').forEach(input => {
-        input.addEventListener('change', function() {
-            const clinId = this.dataset.clin;
-            const value = this.value;
-            updateClinField(clinId, 'planned_split', value);
-        });
-    });
+            const lineType = this.querySelector('[name="line_type"]').value.trim();
+            const description = this.querySelector('[name="description"]').value.trim();
+            const amountBilled = this.querySelector('[name="amount_billed"]').value;
 
-    // Function to update CLIN fields
-    function updateClinField(clinId, field, value) {
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        loadingOverlay.classList.remove('hidden');
+            if (!lineType) { if (window.notify) window.notify('error', 'Type is required', 3000); return; }
+            if (!amountBilled) { if (window.notify) window.notify('error', 'Amount is required', 3000); return; }
 
-        fetch(`/contracts/api/clin/${clinId}/update-field/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                field: field,
-                value: value
+            fetch('/contracts/api/finance-lines/add/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    clin_id: clinId,
+                    line_type: lineType,
+                    description: description,
+                    amount_billed: parseFloat(amountBilled),
+                })
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Show success message
-                const messages = document.querySelector('.messages');
-                if (messages) {
-                    const message = document.createElement('div');
-                    message.className = 'p-4 rounded-md bg-green-100 text-green-700 mb-4';
-                    message.textContent = data.message;
-                    messages.appendChild(message);
-                    setTimeout(() => message.remove(), 3000);
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.reset();
+                    this.style.display = 'none';
+                    refreshFinanceLinesForClin(clinId);
+                    if (window.notify) window.notify('success', 'Finance line added', 3000);
+                } else {
+                    if (window.notify) window.notify('error', data.error || 'Failed to add finance line', 3000);
                 }
-            } else {
-                throw new Error(data.error || 'Failed to update field');
+            });
+        });
+    });
+
+    document.querySelectorAll('.js-toggle-add-finance-form').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const clinId = this.dataset.clinId;
+            const form = document.querySelector(`.finance-line-add-form[data-clin-id="${clinId}"]`);
+            if (!form) return;
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        });
+    });
+
+    const nhForm = document.getElementById('newHistoryForm');
+    if (nhForm) {
+        nhForm.addEventListener('submit', function(e) {
+            const popup = document.getElementById('paymentHistoryPopup');
+            if (!popup || popup.dataset.entityType !== 'finance_line') return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            const financeLineId = popup.dataset.entityId;
+            const formData = new FormData(this);
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            fetch(`/contracts/api/finance-lines/${financeLineId}/log-payment/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    payment_amount: parseFloat(formData.get('payment_amount')),
+                    payment_date: formData.get('payment_date'),
+                    payment_info: formData.get('payment_info') || '',
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof closePaymentHistoryPopup === 'function') {
+                        closePaymentHistoryPopup();
+                    }
+                    refreshFinanceLinesForClin(
+                        document.querySelector(`[data-finance-line-id="${financeLineId}"]`)
+                            ?.closest('tr[data-accordion-for]')
+                            ?.dataset.accordionFor
+                    );
+                    if (window.notify) window.notify('success', 'Payment logged successfully', 3000);
+                } else {
+                    if (window.notify) window.notify('error', data.error || 'Failed to log payment', 3000);
+                }
+            });
+        }, true);
+    }
+
+    const NOTES_POPUP_URL = "{% url 'contracts:notes_popup' contract.pk %}?tab=finance";
+    let notesPopupWin = null;
+    var btnNotes = document.getElementById('btn-open-notes');
+    if (btnNotes) {
+        btnNotes.addEventListener('click', function() {
+            if (notesPopupWin && !notesPopupWin.closed) {
+                notesPopupWin.focus();
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to update field: ' + error.message);
-        })
-        .finally(() => {
-            loadingOverlay.classList.add('hidden');
+            notesPopupWin = window.open(NOTES_POPUP_URL, 'notesPopup',
+                'width=700,height=700,resizable=yes,scrollbars=yes');
         });
     }
-
-    // Function to get CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
-    // Search functionality
-    searchInput.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        const query = this.value;
-
-        if (query.length < 3) {
-            searchResults.classList.add('hidden');
-            return;
-        }
-
-        debounceTimer = setTimeout(() => {
-            fetch(`/contracts/search/?q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    searchResults.innerHTML = '';
-                    const results = data.results || data;
-
-                    if (results.length > 0) {
-                        results.forEach(contract => {
-                            const div = document.createElement('div');
-                            div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
-
-                            let html = `
-                                <a href="/contracts/finance-audit/${contract.id}/" class="block">
-                                    <div class="text-sm text-blue-600">${contract.contract_number}</div>
-                            `;
-
-                            if (contract.po_numbers && contract.po_numbers.length > 0) {
-                                html += `<div class="text-xs text-gray-500 mt-1">PO: ${contract.po_numbers.join(', ')}</div>`;
-                            }
-
-                            html += `</a>`;
-                            div.innerHTML = html;
-
-                            searchResults.appendChild(div);
-                        });
-                        searchResults.classList.remove('hidden');
-                    } else {
-                        searchResults.classList.add('hidden');
-                    }
-                });
-        }, 300);
-    });
-
-    // Hide search results when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-    });
-});
+})();
 </script>
-{% endblock %}
+{% endif %}
 {% endblock %}
