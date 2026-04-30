@@ -12,8 +12,6 @@ from .views.finance_views import (
 from .views import (
     # Contract views
     ContractDetailView,
-    ContractCreateView,
-    ContractUpdateView,
     ContractCloseView,
     ContractCancelView,
     ContractReviewView,
@@ -107,10 +105,6 @@ from .views import (
     export_contract_log_xlsx,
     open_export_folder,
     get_export_estimate,
-    # DD1155 views
-    extract_dd1155_data,
-    export_dd1155_text,
-    export_dd1155_png,
     # Folder Tracking views
     folder_tracking,
     add_folder_tracking,
@@ -248,24 +242,13 @@ urlpatterns = [
     path("api/sharepoint-files/", sharepoint_files_api, name="sharepoint_files_api"),
     path("api/set-file-path/", set_file_path_api, name="set_file_path_api"),
     # Contract management
-    path("create/", ContractCreateView.as_view(), name="contract_create"),
     path("<int:pk>/", ContractManagementView.as_view(), name="contract_management"),
     path("<int:pk>/detail/", ContractDetailView.as_view(), name="contract_detail"),
-    path("<int:pk>/update/", ContractUpdateView.as_view(), name="contract_update"),
     path("<int:pk>/close/", ContractCloseView.as_view(), name="contract_close"),
     path("<int:pk>/cancel/", ContractCancelView.as_view(), name="contract_cancel"),
     path("<int:pk>/review/", ContractReviewView.as_view(), name="contract_review"),
     path(
         "<int:pk>/mark-reviewed/", mark_contract_reviewed, name="mark_contract_reviewed"
-    ),
-    # DD Form 1155 processing
-    path("extract-dd1155/", extract_dd1155_data, name="extract_dd1155"),
-    path("export-dd1155-text/", export_dd1155_text, name="export_dd1155_text"),
-    path("export-dd1155-png/", export_dd1155_png, name="export_dd1155_png"),
-    path(
-        "dd1155-test/",
-        TemplateView.as_view(template_name="contracts/dd1155_test.html"),
-        name="dd1155_test",
     ),
     # CLIN management
     path("clin/new/", ClinCreateView.as_view(), name="clin_create"),

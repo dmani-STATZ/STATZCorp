@@ -43,7 +43,6 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 - `contracts/views/nsn_views.py` — `NsnUpdateView` context keys
 - `contracts/views/idiq_views.py` — `NsnSearchView` queryset filter fields (`nsn_code`, `description`)
 - `contracts/views/api_views.py` — `get_select_options` response shape for NSN autocomplete
-- `contracts/views/dd1155_views.py` — imports and uses `Nsn` fields directly
 - `contracts/models.py` — `Clin` and `IdiqContractDetails` have FKs to `Nsn`
 - `contracts/management/commands/refresh_nsn_view.py` — references table/column names
 - `contracts/utils/contracts_schema.py` — auto-generates column descriptions from `concrete_fields`; hand-curated relationships still reference `contracts_nsn` FKs by name
@@ -99,7 +98,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 ### Apps that depend on this app:
 | App | What it imports/uses |
 |---|---|
-| `contracts` | `Nsn` in `models.py`, `forms.py`, `nsn_views.py`, `idiq_views.py`, `dd1155_views.py`, `api_views.py`, management command, schema util, and multiple templates |
+| `contracts` | `Nsn` in `models.py`, `forms.py`, `nsn_views.py`, `idiq_views.py`, `api_views.py`, management command, schema util, and multiple templates |
 | `processing` | `Nsn` in `processing_views.py` and `matching_views.py` — used in CLIN matching logic |
 | `reports` | References `'contracts_nsn'` table name directly in `views.py` |
 

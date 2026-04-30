@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
-from django.views.generic import DetailView, UpdateView, CreateView, TemplateView
+from django.views.generic import DetailView
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
@@ -17,9 +17,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, ClinSplit, Note, ContentType, Nsn, Expedite, CanceledReason, ContractStatus, GovAction
-from processing.models import SequenceNumber
-from ..forms import ContractForm
+from ..models import Contract, Clin, ClinSplit, Note, ContentType, Expedite, CanceledReason, ContractStatus, GovAction
 from .mixins import ActiveCompanyQuerysetMixin
 
 logger = logging.getLogger(__name__)
@@ -170,114 +168,6 @@ class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
             ).order_by('company_name')
         )
         return context
-
-
-@method_decorator(conditional_login_required, name='dispatch')
-class ContractCreateView(CreateView):
-    model = Contract
-    form_class = ContractForm
-    template_name = 'contracts/contract_form.html'
-
-    def get_initial(self):   #Page Load
-        initial = super().get_initial()
-        initial['po_number'] = SequenceNumber.get_po_number()
-        initial['tab_num'] = SequenceNumber.get_tab_number()
-        initial['sales_class'] = '2'
-        initial['status'] = '1'
-        return initial
-    
-    def form_valid(self, form): # Save
-        form.instance.created_by = self.request.user
-        if hasattr(form.instance, 'company') and getattr(self.request, 'active_company', None):
-            form.instance.company = self.request.active_company
-        response = super().form_valid(form)
-        
-        # Advance the sequence numbers after successful creation
-        SequenceNumber.advance_po_number()
-        SequenceNumber.advance_tab_number()
-        
-        # Process CLIN data if available
-        extracted_clin_data = self.request.POST.get('extracted_clin_data')
-        if extracted_clin_data:
-            try:
-                clin_data = json.loads(extracted_clin_data)
-                for clin_info in clin_data:
-                    # Create NSN if it doesn't exist
-                    nsn = None
-                    if clin_info.get('nsn_code'):
-                        nsn, _ = Nsn.objects.get_or_create(
-                            nsn_code=clin_info['nsn_code'],
-                            defaults={'description': clin_info.get('description', '')}
-                        )
-                    
-                    # Create CLIN
-                    clin = Clin(
-                        contract=self.object,
-                        po_number=self.object.po_number,  # Use contract's PO number
-                        nsn=nsn,
-                        order_qty=clin_info.get('order_qty'),
-                        ia=clin_info.get('ia'),
-                        fob=clin_info.get('fob'),
-                        due_date=clin_info.get('due_date'),
-                        quote_value=clin_info.get('quote_value'),
-                        created_by=self.request.user
-                    )
-                    clin.save()
-                                    
-                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': True,
-                        'message': f'Contract and {len(clin_data)} CLINs created successfully.',
-                        'redirect_url': self.get_success_url()
-                    })
-                
-                messages.success(self.request, f'Contract and {len(clin_data)} CLINs created successfully.')
-            except Exception as e:
-                logger.error(f"Error creating CLINs: {str(e)}")
-                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Contract created but there was an error creating CLINs: {str(e)}'
-                    })
-                messages.warning(self.request, f'Contract created but there was an error creating CLINs: {str(e)}')
-        else:
-            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Contract created successfully.',
-                    'redirect_url': self.get_success_url()
-                })
-            messages.success(self.request, 'Contract created successfully.')
-        
-        return response
-    
-    def get_success_url(self):
-        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
-
-
-@method_decorator(conditional_login_required, name='dispatch')
-class ContractUpdateView(ActiveCompanyQuerysetMixin, UpdateView):
-    model = Contract
-    form_class = ContractForm
-    template_name = 'contracts/contract_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        contract = self.get_object()
-        context['clin_split_rollup'] = list(
-            ClinSplit.objects.filter(clin__contract=contract).values('company_name').annotate(
-                total_value=Sum('split_value'),
-                total_paid=Sum('split_paid'),
-            ).order_by('company_name')
-        )
-        return context
-
-    def form_valid(self, form):
-        messages.success(self.request, 'Contract updated successfully.')
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('contracts:contract_management', kwargs={'pk': self.object.pk})
 
 
 @method_decorator(conditional_login_required, name='dispatch')

@@ -29,10 +29,8 @@
      * Fields: `nsn_code`, `description`, `part_number`, `revision`, `notes`, `directory_url`
 
 2. **Forms (contracts/forms.py):**
-   - `ContractForm`: ModelForm for Contract creation/editing
-     * Custom widgets for date/time fields
-     * Special handling for contract number uniqueness
-     * Dynamic user selection fields
+   - Canonical contract header create/edit: **`processing.forms.ProcessContractForm`** (Processing app), not `contracts.forms`.
+   - `ContractCloseForm` / `ContractCancelForm`: compatibility ModelForms for dedicated lifecycle pages.
 
    - `ClinForm`: Complex form for CLIN management
      * Custom initialization for foreign key fields
@@ -54,7 +52,6 @@
      * reminder_views.py: Reminder functionality
      * finance_views.py: Financial operations
      * api_views.py: API endpoints
-     * dd1155_views.py: Document processing
 
    Key View Classes:
    - `ContractManagementView` (DetailView):
@@ -76,11 +73,10 @@
    Organized by functionality:
    - Contract Management:
      * `/`: Dashboard
-     * `/create/`: Contract creation
      * `/<int:pk>/`: Contract management
-     * `/<int:pk>/update/`: Contract updates
      * `/<int:pk>/close/`: Contract closure
      * `/<int:pk>/cancel/`: Contract cancellation
+     * Contract **creation** and staged header editing: **processing** app URLs (not `/contracts/create/`).
 
    - CLIN Management:
      * `/clin/new/`: CLIN creation
@@ -95,13 +91,11 @@
      * `/nsn/<int:pk>/edit/`: NSN updates
 
    - Document Management:
-     * `/extract-dd1155/`: DD1155 processing
      * `/acknowledgment-letter/<int:pk>/`: Letter generation
 
 5. **Templates Structure:**
    - Base Templates:
      * `contract_base.html`: Base layout
-     * `contract_form.html`: Standard form layout
      * `contract_detail.html`: Detail view layout
 
    - Component Templates:

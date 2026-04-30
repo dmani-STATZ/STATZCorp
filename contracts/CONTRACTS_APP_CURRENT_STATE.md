@@ -20,9 +20,8 @@ The Contracts app is a full-lifecycle contract management system. At the core:
 
 ### 2.1 Contracts
 
-- **Create**: `/contracts/create/` — ContractForm; optional DD1155 extraction to prefill CLINs; sequence numbers for PO/Tab.
-- **View/Manage**: `/<pk>/` — Single “contract management” page: header, CLIN list, acknowledgment for selected CLIN, notes in tabs (Contract + one tab per CLIN), Gov Actions + Log Fields tabs, expedite, options; CLIN list includes Item Type, Quoted Due Date, supplier link; "Contract Search" button to jump to another contract; supplier links go to suppliers app. Options: update, close, cancel, review.
-- **Update**: `/<pk>/update/` — Full contract edit form.
+- **Create**: Through the **Processing** app (queue → process → finalize into `Contract`). The legacy `/contracts/create/` route and in-app contract ModelForm were removed 2026-04-30.
+- **View/Manage**: `/<pk>/` — Single “contract management” page: header, CLIN list, acknowledgment for selected CLIN, notes in tabs (Contract + one tab per CLIN), Gov Actions + Log Fields tabs, expedite, options; CLIN list includes Item Type, Quoted Due Date, supplier link; "Contract Search" button to jump to another contract; supplier links go to suppliers app. Options: close, cancel, review (header field edits: Transactions modal).
 - **Close / Cancel**: `/<pk>/close/`, `/<pk>/cancel/` with dedicated forms (reason, date).
 - **Review**: `/<pk>/review/` and mark-reviewed; toggles for expedite and other flags via API.
 
@@ -94,7 +93,7 @@ So “viewing” is spread across: dashboard, contract management page, CLIN det
 
 | What | How |
 |------|-----|
-| Contract header | Full form at `/<pk>/update/`; some toggles (e.g. expedite) via API. |
+| Contract header | Transactions edit modal for tracked fields; some toggles (e.g. expedite) via API. |
 | CLIN header | Full form at `clin/<pk>/edit/`; some fields via `api/clin/<id>/update-field/`. |
 | Contract/CLIN values | Largely through Payment History API (add entry → backend updates contract_value/plan_gross or CLIN totals). |
 | Notes | Add (form or API), edit (form, redirect to contract management), delete (with AJAX refresh). |
@@ -110,9 +109,9 @@ So there is a mix of full-page forms, modals, and API-driven updates; no single 
 
 - **Models**: `contracts/models.py` — Contract, Clin, Note, Reminder, PaymentHistory, ClinShipment, ContractSplit, FolderTracking, FolderStack, AcknowledgementLetter, ClinAcknowledgment, GovAction, Address, Company, plus code tables and IDIQ.
 - **Views**: Modular under `contracts/views/` (contract_views, clin_views, note_views, reminder_views, finance_views, payment_history_views, api_views, dashboard_views, contract_log_views, folder_tracking_views, etc.).
-- **Forms**: `contracts/forms.py` — ContractForm, ClinForm, NoteForm, ReminderForm, and others; BaseFormMixin for styling.
+- **Forms**: `contracts/forms.py` — ClinForm, NoteForm, ReminderForm, `ContractCloseForm`, `ContractCancelForm`, `IdiqContractForm`, and others; BaseFormMixin for styling. (Contract header create/edit: `processing.forms.ProcessContractForm`.)
 - **URLs**: `contracts/urls.py` — Many named routes for dashboard, CRUD, APIs, reminders, notes, folder tracking, IDIQ, companies, code tables.
-- **Templates**: `contracts/templates/contracts/` — contract_management.html (main hub), contract_detail, contract_form, clin_detail, clin_form, partials (notes_list, note_modal, clin_shipments, contract_splits, payment_history_popup), includes (modals, menu items), and feature-specific templates.
+- **Templates**: `contracts/templates/contracts/` — contract_management.html (main hub), contract_detail, clin_detail, clin_form, partials (notes_list, note_modal, clin_shipments, contract_splits, payment_history_popup), includes (modals, menu items), and feature-specific templates.
 - **Frontend**: Bootstrap; AJAX for notes, payment history, toggles, and some dropdowns; modals for notes and payment history.
 
 ---

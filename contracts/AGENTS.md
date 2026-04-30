@@ -28,6 +28,8 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **ClinSplit (2026-04):** `ClinSplit` rows cascade-delete with their parent `Clin`. Contract-level split totals are computed aggregates (`Contract.total_split_value` / `total_split_paid`), not stored fields. **Do not** add a stored split total back to the `Contract` model.
 
+**Removed 2026-04-30:** `ContractCreateView`, `ContractUpdateView`, `ContractForm`, `contract_form.html`, and `dd1155_views.py` have been deleted. Contract creation flows through the **Processing** app finalization workflow. Do not recreate these files or URL routes (`/contracts/create/`, `/contracts/<pk>/update/`, dd1155 extract/export URLs, `dd1155_test`).
+
 **Deprecation note:** `api_add_note` (in `contracts/views/note_views.py`) is deprecated. It redirects instead of returning JSON, lacks active-company scoping on note creation, and has been superseded by `add_note` for all AJAX flows. Debug `print` statements have been removed; the URL is retained temporarily for bookmarked links only. Do not add new callers. Planned removal: next cleanup pass.
 
 **Recent (2026-04-24):** Fixed note modal double-POST (removed duplicate `extra_js` block nesting in `contract_base.html`); removed Reminder Details from the note modal; added default Reminder Title for contract/CLIN notes; `reminder_text` is copied from the note body on save. Toast notifications: replaced `showSuccessMessage`/`showErrorMessage` in `note_modal.js` with `window.notify()`; moved `messages.success()` in `add_note` and `delete_note` to the non-AJAX branch only; static Django message banners now auto-dismiss after 5 seconds. CLIN detail page (`clin_detail.html`) redesigned with a fixed left sidebar + Bootstrap ScrollSpy, color-coded section cards, and always-visible Financials section; styles live in `components.css` under `/* === CLIN Detail Page === */`. `contract_base.html` gained `{% block body_class %}{% endblock %}` on the outer wrapper to support page-level layout overrides. See section 5 "CLIN detail page layout" below for the change-together file list. `contract_review.html` uses the same `.clin-detail-layout` / `.clin-detail-page` CSS classes as `clin_detail.html` for the fixed sidebar escape hatch. Review page sidebar id is `#review-page-nav`. All review page component classes are prefixed `.review-*` and live in `components.css` under `/* === Contract Review Page === */`.
@@ -83,7 +85,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **Multi-tenancy is pervasive.** Every model with user-visible data has a `company` FK. Querysets must be filtered by `request.active_company`. Use `ActiveCompanyQuerysetMixin` on CBVs; manually filter in function-based views.
 
-**Views are fat orchestrators.** Business logic lives in views, not in dedicated service layers. `ContractManagementView` and `ContractCreateView` contain substantial logic. There is no `services.py`. New logic should follow this pattern unless you are refactoring intentionally.
+**Views are fat orchestrators.** Business logic lives in views, not in dedicated service layers. `ContractManagementView` contains substantial orchestration logic. There is no `services.py`. New logic should follow this pattern unless you are refactoring intentionally.
 
 **Forms own validation, but views own object creation.** `ClinForm` intentionally strips NSN/Supplier errors because the view handles those objects separately. Do not move that responsibility without updating both sides.
 
@@ -103,11 +105,11 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 ### Adding a field to `Contract`
 - `contracts/models.py` + new migration
-- `contracts/forms.py` (`ContractForm`, possibly `ContractCloseForm`/`ContractCancelForm`)
-- `contracts/views/contract_views.py` (context for management page and create/update views)
-- `contracts/templates/contracts/contract_form.html`, `contract_management.html`, `contract_detail.html`
+- `processing/models.py` `QueueContract` / `ProcessContract` and finalization mapping if the field is part of import or staging edit
+- `contracts/forms.py` (`ContractCloseForm`/`ContractCancelForm` only if close/cancel flows need it)
+- `contracts/views/contract_views.py` (management/detail context; Transactions modal wiring in templates/JS when the field is user-editable)
+- `contracts/templates/contracts/contract_management.html`, `contract_detail.html`
 - `contracts/views/contract_log_views.py` (if it should appear in exports)
-- `processing/models.py` `QueueContract` (if the field is part of the import pipeline)
 - `contracts/CONTRACTS_APP_CURRENT_STATE.md` (living doc)
 
 ### Adding a field to `Clin`
@@ -266,7 +268,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 - **`ClinForm.clean()`** silently removes NSN and Supplier validation errors — the view handles those objects separately via modal creation flows. Do not add hard validation on those fields inside the form.
 - **`ClinForm.clean()`** auto-calculates `item_value = order_qty × unit_price` and `quote_value = order_qty × price_per_unit`. If you add new quantity/price fields, update this logic or the calculated values will be stale.
-- **`ContractForm.clean_contract_number()`** enforces uniqueness excluding self (for updates). If you add a similar uniqueness check elsewhere, use the same `exclude pk` pattern.
+- **Contract number uniqueness** on create/update is enforced in Processing finalization and related services; if you add a similar check elsewhere, use an `exclude(pk=...)` pattern when updating an existing row.
 - **`CompanyForm`** syncs `UserCompanyMembership` rows inside `save()`. If you override `save()` or call `form.save(commit=False)`, you must call `form.save_m2m()` or the membership sync will not run.
 - **`BaseFormMixin`** auto-applies CSS classes via widget inspection. If a new widget type is introduced, add it to `BaseFormMixin` to keep styling consistent.
 - **`ActiveUserModelChoiceField`** filters users to `is_active=True`. All user-selection dropdowns in this app must use this field, not bare `ModelChoiceField`.
@@ -305,7 +307,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 - If you changed an API view, test the HTMX interaction in the browser (notes add/delete, shipment add/edit, split operations)
 
 **After form changes:**
-- Submit the ContractForm with an empty required field and confirm validation fires
+- Submit the ClinForm (create flow) with an empty required field and confirm validation fires
 - Submit the ClinForm and confirm `item_value` is auto-calculated
 - If you changed `CompanyForm`, upload a logo and verify validation catches invalid types
 

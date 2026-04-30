@@ -5,7 +5,7 @@ This directory contains the modular views for the Contracts app. Each file conta
 ## File Structure
 
 - `__init__.py` - Imports all views from the modular structure to make them available at the package level
-- `contract_views.py` - Views for contract creation, updating, and management
+- `contract_views.py` - Views for contract management, detail, close/cancel/review, search, and related workspace logic (canonical contract create/edit is in the **processing** app)
 - `clin_views.py` - Views for CLIN (Contract Line Item Number) management
 - `supplier_views.py` - Views for supplier management
 - `nsn_views.py` - Views for NSN (National Stock Number) management
@@ -14,7 +14,6 @@ This directory contains the modular views for the Contracts app. Each file conta
 - `acknowledgement_letter_views.py` - Views for acknowledgement letter generation and management
 - `dashboard_views.py` - Views for the contract lifecycle dashboard
 - `contract_log_views.py` - Views for contract log and export functionality
-- `dd1155_views.py` - Views for DD1155 form processing
 
 ## Usage
 

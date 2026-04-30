@@ -15,14 +15,14 @@
     *   Base Class: `AuditModel` (adds creation/modification tracking).
 
 2.  **Forms (`contracts/forms.py`):
-    *   Provides `ModelForms` for most major models (`ContractForm`, `ClinForm`, `SupplierForm`, `NsnForm`, `NoteForm`, `ReminderForm`, `AddressForm`, `ContactForm`, `IdiqContractForm`, etc.).
+    *   Provides `ModelForms` for most major models (`ClinForm`, `SupplierForm`, `NsnForm`, `NoteForm`, `ReminderForm`, `AddressForm`, `ContactForm`, `IdiqContractForm`, `ContractCloseForm`, `ContractCancelForm`, etc.). Canonical contract header create/edit is `ProcessContractForm` in the **processing** app, not `contracts.forms`.
     *   Includes specialized forms for specific actions (`ContractCloseForm`, `ContractCancelForm`).
     *   Uses custom `ActiveUserModelChoiceField` for selecting active users.
     *   Applies Bootstrap CSS classes for styling via widgets.
     *   Includes standard forms like `ContractSearchForm`.
 
 3.  **Views (Modular Structure in `contracts/views/`):
-    *   Follows the `modular-views-rule`, organizing views into separate files based on functionality (e.g., `contract_views.py`, `clin_views.py`, `supplier_views.py`, `note_views.py`, `reminder_views.py`, `dashboard_views.py`, `dd1155_views.py`, `folder_tracking_views.py`, `finance_views.py`, etc.).
+    *   Follows the `modular-views-rule`, organizing views into separate files based on functionality (e.g., `contract_views.py`, `clin_views.py`, `supplier_views.py`, `note_views.py`, `reminder_views.py`, `dashboard_views.py`, `folder_tracking_views.py`, `finance_views.py`, etc.).
     *   Views are imported into `contracts/views/__init__.py`.
     *   Likely uses a mix of Class-Based Views (CBVs) (e.g., `ContractDetailView`, `ClinCreateView`) and Function-Based Views (FBVs) (e.g., `add_note`, `export_contract_log`).
     *   Includes views for CRUD operations, specialized actions (close, cancel, review), dashboard display, document generation/processing, AJAX interactions, and API endpoints.
@@ -30,7 +30,7 @@
 4.  **URLs (`contracts/urls.py`):
     *   Maps URL patterns to the modular views.
     *   Provides RESTful-style URLs for managing contracts, CLINs, suppliers, notes, reminders, etc.
-    *   Includes URLs for dashboard, contract log, DD1155 processing, folder tracking, IDIQ contracts, finance views, and API endpoints.
+    *   Includes URLs for dashboard, contract log, folder tracking, IDIQ contracts, finance views, and API endpoints.
 
 5.  **Templates (`contracts/templates/contracts/`):
     *   Contains HTML templates for rendering views (dashboards, detail pages, forms, lists, modals).
@@ -46,9 +46,9 @@
 **Core Processes:**
 
 1.  **Contract Lifecycle Management:**
-    *   **Creation:** Users create new `Contract` records via `/create/`, filling in details using `ContractForm`.
+    *   **Creation:** New `Contract` records are created through the **Processing** app finalization workflow (not `/contracts/create/` — removed).
     *   **Viewing:** Contracts are viewed on dashboards (`/`), logs (`/log/`), or detail pages (`/<pk>/detail/`). Optimized views (`ClinView`, `NsnView`) might be used for list performance.
-    *   **Updating:** Existing contracts are modified via `/<pk>/update/`.
+    *   **Header updates:** Field-level edits on live contracts use the Transactions edit modal; the legacy full-page contract update route was removed.
     *   **Status Changes:** Specific views handle closing (`/<pk>/close/`), canceling (`/<pk>/cancel/`), and reviewing (`/<pk>/review/`) contracts, updating their status and related fields.
 2.  **CLIN Management:**
     *   CLINs are added to contracts (`/contract/<contract_id>/clin/new/`), viewed (`/clin/<pk>/`), edited (`/clin/<pk>/edit/`), and deleted (`/clin/<pk>/delete/`).
@@ -67,7 +67,7 @@
     *   Finance-specific views (`/finance/...`) provide audit or overview capabilities.
 6.  **Document Processing & Generation:**
     *   **Acknowledgement Letters:** Data is captured (`AcknowledgementLetterForm`), and letters can be generated and viewed (`/acknowledgement-letter/...`).
-    *   **DD Form 1155:** Functionality exists to extract data from DD1155 forms and export it (`/extract-dd1155/`, `/export-dd1155-.../`).
+    *   **DD Form 1155:** Experimental parsing and related URLs were removed in 2026-04-30; do not re-add.
 7.  **Workflow & Tracking:**
     *   `FolderTracking` allows users to manage and view the status of contract folders through different stages (`/folder-tracking/...`).
     *   `ClinAcknowledgment` tracks steps related to CLIN acknowledgements.

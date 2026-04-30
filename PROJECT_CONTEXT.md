@@ -322,7 +322,7 @@ The documents browser uses a smart path resolver in `contracts/services/sharepoi
 | Company membership | `users.UserCompanyMembership` | `contracts.CompanyForm` |
 | Global AI model config | `suppliers.OpenRouterModelSetting` | `suppliers` enrichment, `reports` AI stream |
 | Reminder sidebar context | `contracts/context_processors.py` | All templates extending `contract_base.html` |
-| PO/TAB sequence numbers | `processing.SequenceNumber` | `contracts` `ContractCreateView` |
+| PO/TAB sequence numbers | `processing.SequenceNumber` | `processing` finalization into `contracts.Contract`; `initialize_sequence_numbers` management command |
 | Field-change audit | `transactions/signals.py` | `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date`), `suppliers.Supplier` |
 | Background task registry | `core/management/commands/run_background_tasks.py` | `sales/tasks/`, other app task modules |
 | CSS / design system | `static/css/theme-vars.css`, `app-core.css`, `utilities.css` | All templates |
