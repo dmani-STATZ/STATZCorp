@@ -244,27 +244,35 @@
                                         <button type="button" class="fl-btn js-toggle-add-finance-form" data-clin-id="{{ clin.id }}">+ add finance line</button>
                                     </div>
                                 </div>
-                                <form action="#" method="post" class="finance-line-add-form px-2 pb-3" data-clin-id="{{ clin.id }}" style="display: none;">
-                                    {% csrf_token %}
-                                    <div class="row g-2 small align-items-end">
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label mb-0">Type</label>
-                                            <input type="text" class="form-control form-control-sm" name="line_type" list="finance-line-type-suggestions" autocomplete="off">
-                                        </div>
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label mb-0">Description</label>
-                                            <input type="text" class="form-control form-control-sm" name="description">
-                                        </div>
-                                        <div class="col-12 col-md-2">
-                                            <label class="form-label mb-0">Amount Billed</label>
-                                            <input type="number" class="form-control form-control-sm" name="amount_billed" step="0.01" min="0">
-                                        </div>
-                                        <div class="col-12 col-md-3 d-flex gap-2">
-                                            <button type="submit" class="btn btn-sm btn-primary">Save</button>
-                                        </div>
-                                    </div>
-                                </form>
                                 {% endwith %}
+                                    </div>
+                                </div>
+                                <div id="finance-add-row-{{ clin.id }}"
+                                     style="display:none; background: var(--bs-tertiary-bg); padding: 6px 8px 6px 0;">
+                                    <div style="display: flex; justify-content: flex-end;">
+                                        <div style="width: 72%;">
+                                            <form class="finance-line-add-form d-flex align-items-center gap-2"
+                                                  data-clin-id="{{ clin.id }}">
+                                                {% csrf_token %}
+                                                <input type="text" name="line_type" placeholder="Type"
+                                                       list="finance-type-suggestions-{{ clin.id }}"
+                                                       class="form-control form-control-sm" style="width: 120px; flex-shrink: 0;">
+                                                <datalist id="finance-type-suggestions-{{ clin.id }}">
+                                                    <option value="Trucking">
+                                                    <option value="Freight">
+                                                    <option value="Labels">
+                                                    <option value="Miscellaneous">
+                                                </datalist>
+                                                <input type="text" name="description" placeholder="Description"
+                                                       class="form-control form-control-sm" style="flex: 1; min-width: 0;">
+                                                <input type="number" name="amount_billed" placeholder="Amount"
+                                                       step="0.01" min="0.01"
+                                                       class="form-control form-control-sm" style="width: 110px; flex-shrink: 0;">
+                                                <button type="submit" class="btn btn-sm btn-primary" style="flex-shrink: 0;">Save</button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary js-cancel-add-finance"
+                                                        data-clin-id="{{ clin.id }}" style="flex-shrink: 0;">Cancel</button>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -545,10 +553,15 @@ function refreshFinanceLinesForClin(clinId) {
         pill.addEventListener('click', function() {
             const clinId = this.dataset.clinId;
             const accordion = document.getElementById(`accordion-${clinId}`);
+            const addRow = document.getElementById(`finance-add-row-${clinId}`);
             if (!accordion) return;
             const isVisible = accordion.style.display !== 'none';
             accordion.style.display = isVisible ? 'none' : 'table-row';
             this.classList.toggle('pill-active', !isVisible);
+            // Always hide the add form when accordion closes
+            if (isVisible && addRow) {
+                addRow.style.display = 'none';
+            }
         });
     });
 
@@ -582,7 +595,8 @@ function refreshFinanceLinesForClin(clinId) {
             .then(data => {
                 if (data.success) {
                     this.reset();
-                    this.style.display = 'none';
+                    const addRow = document.getElementById(`finance-add-row-${clinId}`);
+                    if (addRow) addRow.style.display = 'none';
                     refreshFinanceLinesForClin(clinId);
                     if (window.notify) window.notify('success', 'Finance line added', 3000);
                 } else {
@@ -595,10 +609,17 @@ function refreshFinanceLinesForClin(clinId) {
     document.querySelectorAll('.js-toggle-add-finance-form').forEach(btn => {
         btn.addEventListener('click', function() {
             const clinId = this.dataset.clinId;
-            const form = document.querySelector(`.finance-line-add-form[data-clin-id="${clinId}"]`);
-            if (!form) return;
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            const addRow = document.getElementById(`finance-add-row-${clinId}`);
+            if (!addRow) return;
+            addRow.style.display = addRow.style.display === 'none' ? 'block' : 'none';
         });
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.js-cancel-add-finance');
+        if (!btn) return;
+        const addRow = document.getElementById(`finance-add-row-${btn.dataset.clinId}`);
+        if (addRow) addRow.style.display = 'none';
     });
 
     const nhForm = document.getElementById('newHistoryForm');
