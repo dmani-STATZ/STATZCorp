@@ -60,6 +60,16 @@ def reminders_processor(request):
             overdue_count = all_reminders.filter(
                 reminder_date__date__lte=seven_days_ago
             ).count()
+
+            # Footer pill: strictly overdue (any date before today, no 7-day cap)
+            footer_overdue_count = all_reminders.filter(
+                reminder_date__date__lt=today
+            ).count()
+
+            # Footer pill: due exactly today
+            footer_due_today_count = all_reminders.filter(
+                reminder_date__date=today
+            ).count()
             
             # For sidebar display: due, overdue, and (optionally) upcoming reminders
             # upcoming_days=0: only today and past; 1-7: include up to N days ahead
@@ -87,6 +97,8 @@ def reminders_processor(request):
             context['pending_count'] = pending_count
             context['due_count'] = due_count
             context['overdue_count'] = overdue_count
+            context['footer_overdue_count'] = footer_overdue_count
+            context['footer_due_today_count'] = footer_due_today_count
             context['reminder_sidebar_upcoming_days'] = upcoming_days
             
         except ProgrammingError:
@@ -99,6 +111,8 @@ def reminders_processor(request):
             context['pending_count'] = 0
             context['due_count'] = 0
             context['overdue_count'] = 0
+            context['footer_overdue_count'] = 0
+            context['footer_due_today_count'] = 0
             context['reminder_sidebar_upcoming_days'] = 0
     
     return context 

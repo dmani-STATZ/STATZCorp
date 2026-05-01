@@ -66,16 +66,18 @@
                 <!-- Right side: Reminders Button -->
                 <div class="flex items-center">
                     <button onclick="toggleReminderbar()"
-                            class="flex items-center gap-2 px-6 py-2 rounded-full shadow-md transition-all transform hover:scale-105 {% if overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white">
+                            class="flex items-center gap-2 px-6 py-2 rounded-full shadow-md transition-all transform hover:scale-105 {% if footer_overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span class="font-medium">Reminders</span>
-                        {% if total_reminders_count > 0 %}
-                            <span class="flex items-center justify-center h-6 w-6 rounded-full bg-white {% if overdue_count > 0 %}text-red-700{% else %}text-green-700{% endif %} text-xs font-bold">
-                                {{ total_reminders_count }}
-                            </span>
-                        {% endif %}
+                        {% with footer_pill_count=footer_overdue_count|add:footer_due_today_count %}
+                            {% if footer_pill_count > 0 %}
+                                <span class="flex items-center justify-center h-6 w-6 rounded-full bg-white {% if footer_overdue_count > 0 %}text-red-700{% else %}text-green-700{% endif %} text-xs font-bold">
+                                    {{ footer_pill_count }}
+                                </span>
+                            {% endif %}
+                        {% endwith %}
                     </button>
                 </div>
             </div>

@@ -146,9 +146,9 @@
                             <th>Supplier</th>
                             <th class="text-end">Order Qty</th>
                             <th class="text-end">Ship Qty</th>
-                            <th class="text-end">Item Value</th>
                             <th class="text-end">Quote Value</th>
                             <th class="text-end">Paid</th>
+                            <th class="text-end">Item Value</th>
                             <th class="text-end">Customer Pay</th>
                             <th class="text-end">Adj Gross</th>
                             <th>Finance</th>
@@ -162,10 +162,6 @@
                             <td>{{ clin.supplier.name|default:"—" }}</td>
                             <td class="text-end">{{ clin.order_qty|default:"—" }}</td>
                             <td class="text-end">{{ clin.ship_qty|default:"—" }}</td>
-                            <td class="text-end text-decoration-none">
-                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="item_value" data-value="{{ clin.item_value|floatformat:2 }}">${{ clin.item_value|floatformat:2|intcomma }}</span>
-                            </td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
                                       data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2 }}">${{ clin.quote_value|floatformat:2|intcomma }}</span>
@@ -173,6 +169,10 @@
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
                                       data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2 }}">${{ clin.paid_amount|floatformat:2|intcomma }}</span>
+                            </td>
+                            <td class="text-end text-decoration-none">
+                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
+                                      data-clin="{{ clin.id }}" data-type="item_value" data-value="{{ clin.item_value|floatformat:2 }}">${{ clin.item_value|floatformat:2|intcomma }}</span>
                             </td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
