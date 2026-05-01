@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.db.models import Q, Sum, Count, Value, CharField
+from django.db.models import Q, Sum, Count, Value, CharField, IntegerField, Case, When
 from django.db.models.functions import Replace
 from django.http import JsonResponse
 import json
@@ -283,54 +283,55 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, DetailView):
 @conditional_login_required
 def contract_search(request):
     query = request.GET.get('q', '')
-    status_filter = request.GET.get('status', 'both')  # open | closed | both
     if len(query) < 3:
         return JsonResponse([], safe=False)
 
     query_nodash = query.replace('-', '')
 
-    # Search by contract number, last 6 characters, or contract's PO number
     contracts = Contract.objects.annotate(
         contract_number_nodash=Replace(
             'contract_number', Value('-'), Value(''), output_field=CharField()
+        ),
+        status_sort=Case(
+            When(status__description='Open', then=Value(0)),
+            When(status__description='Closed', then=Value(1)),
+            When(status__description='Canceled', then=Value(2)),
+            default=Value(3),
+            output_field=IntegerField(),
         )
     ).filter(
         Q(contract_number__icontains=query) |
         Q(contract_number_nodash__icontains=query_nodash) |
         (Q(contract_number__iendswith=query[-6:]) if len(query) >= 6 else Q()) |
-        Q(po_number__icontains=query)  # Search Contract's po_number field
+        Q(po_number__icontains=query)
     )
-    # Company scope
+
     if getattr(request, 'active_company', None):
         contracts = contracts.filter(company=request.active_company)
-    # Open / Closed / Both filter (Closed includes Cancelled)
-    if status_filter == 'open':
-        contracts = contracts.filter(status__description='Open')
-    elif status_filter == 'closed':
-        contracts = contracts.filter(status__description__in=['Closed', 'Cancelled'])
-    elif status_filter == 'both':
-        contracts = contracts.filter(status__description__in=['Open', 'Closed', 'Cancelled'])
+
+    contracts = contracts.filter(
+        status__description__in=['Open', 'Closed', 'Canceled']
+    )
+
     contracts = contracts.values(
         'id',
         'contract_number',
-        'po_number'
-    ).order_by('contract_number')[:10]
-    
-    # Format the results
+        'po_number',
+        'status__description',
+    ).order_by('status_sort', 'contract_number')[:10]
+
     results = []
     for contract in contracts:
         contract_data = {
             'id': contract['id'],
             'contract_number': contract['contract_number'],
-            'po_numbers': []
+            'status': contract['status__description'] or '',
+            'po_numbers': [],
         }
-        
-        # Add contract's PO number if it exists and matches the query
         if contract['po_number'] and query.lower() in contract['po_number'].lower():
             contract_data['po_numbers'].append(contract['po_number'])
-        
         results.append(contract_data)
-    
+
     return JsonResponse(results, safe=False)
 
 

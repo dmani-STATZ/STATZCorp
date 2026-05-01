@@ -351,6 +351,12 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 ---
 
+## Recent fixes
+
+- **Contract search spelling bug fixed:** `contract_search` view was filtering on `'Cancelled'` (2 L) which did not match the `ContractStatus` DB record `'Canceled'` (1 L). Fixed. `dashboard_views.py` still uses 2-L spelling in some places — that is a separate known inconsistency not in scope here.
+
+---
+
 ## 13. Known Footguns
 
 1. **Renaming tracked fields without updating `transactions` signals.** The `transactions` app stores field names as strings. A rename will stop capturing that field in the audit trail with no error raised.

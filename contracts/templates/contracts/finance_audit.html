@@ -362,15 +362,45 @@ document.addEventListener('click', function(e) {
 
 function openDocumentsBrowser(contractId) {
     const url = `/contracts/documents/?contract_id=${encodeURIComponent(contractId)}`;
+    const windowName = 'statz_documents';
     const width = 1200;
     const height = 800;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     const windowFeatures = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
-    const win = window.open(url, 'statz_documents', windowFeatures);
+    const win = window.open(url, windowName, windowFeatures);
     if (win) win.focus();
     localStorage.setItem('statz_documents_contract_id', String(contractId));
+    return win;
 }
+
+// On page load, update localStorage and follow-me the documents window
+// if it is already open from a previous contract.
+document.addEventListener('DOMContentLoaded', function() {
+    localStorage.setItem('statz_documents_contract_id', String({{ contract.id }}));
+    try {
+        const existing = window.open('', 'statz_documents');
+        if (!existing || existing.closed) return;
+        try {
+            if (existing.location && existing.location.href === 'about:blank') {
+                existing.close();
+                return;
+            }
+        } catch (e) {
+            return;
+        }
+        const newUrl = `/contracts/documents/?contract_id={{ contract.id }}`;
+        try {
+            if (existing.location.href !== newUrl) {
+                existing.location.href = newUrl;
+            }
+        } catch (e) {
+            return;
+        }
+    } catch (e) {
+        console.debug('Documents follow-me skipped:', e);
+    }
+});
 
 function refreshFinanceLinesForClin(clinId) {
     if (!clinId) return;
@@ -666,16 +696,58 @@ function refreshFinanceLinesForClin(clinId) {
     }
 
     const NOTES_POPUP_URL = "{% url 'contracts:notes_popup' contract.pk %}?tab=finance";
-    let notesPopupWin = null;
+    const NOTES_POPUP_NAME = "NotesPopup";
+    const NOTES_POPUP_W = 1100;
+    const NOTES_POPUP_H = 750;
+
+    window.openNotesPopup = function() {
+        const left = window.screenX + (window.outerWidth - NOTES_POPUP_W) / 2;
+        const top = window.screenY + (window.outerHeight - NOTES_POPUP_H) / 2;
+        const win = window.open(
+            NOTES_POPUP_URL,
+            NOTES_POPUP_NAME,
+            `width=${NOTES_POPUP_W},height=${NOTES_POPUP_H},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+        if (win) {
+            window.notesPopup = win;
+            win.focus();
+        }
+        return win;
+    };
+
+    // On page load, if the notes popup is already open from a previous contract,
+    // navigate it to this contract's notes URL unless the user has pinned it.
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            const existing = window.open('', NOTES_POPUP_NAME);
+            if (!existing || existing.closed) return;
+            try {
+                if (existing.location && existing.location.href === 'about:blank') {
+                    existing.close();
+                    return;
+                }
+            } catch (e) {
+                return;
+            }
+            let isPinned = false;
+            try {
+                isPinned = !!existing.isPinned;
+            } catch (e) {
+                return;
+            }
+            if (!isPinned) {
+                existing.location.href = NOTES_POPUP_URL;
+            }
+            window.notesPopup = existing;
+        } catch (e) {
+            console.debug('Notes popup follow-me skipped:', e);
+        }
+    });
+
     var btnNotes = document.getElementById('btn-open-notes');
     if (btnNotes) {
         btnNotes.addEventListener('click', function() {
-            if (notesPopupWin && !notesPopupWin.closed) {
-                notesPopupWin.focus();
-                return;
-            }
-            notesPopupWin = window.open(NOTES_POPUP_URL, 'notesPopup',
-                'width=700,height=700,resizable=yes,scrollbars=yes');
+            window.openNotesPopup();
         });
     }
 })();
