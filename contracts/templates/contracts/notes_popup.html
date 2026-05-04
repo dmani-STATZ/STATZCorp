@@ -62,6 +62,7 @@
                     class="app-tab-btn type-clin"
                     data-tab-type="clin"
                     data-tab-id="{{ clin.id }}"
+                    data-item-number="{{ clin.item_number|default:''|escapejs }}"
                     data-content-type-id="{{ clin_content_type_id }}"
                     data-object-id="{{ clin.id }}"
                     data-tab-url="{% url 'contracts:notes_popup_tab_clin' contract.pk 'clin' clin.id %}">
@@ -122,6 +123,7 @@
     const CONTRACT_CT_ID = contractTabButton ? contractTabButton.dataset.contentTypeId : '';
     const CLIN_CT_ID = clinTabButton ? clinTabButton.dataset.contentTypeId : '';
     const CONTRACT_ID = contractTabButton ? contractTabButton.dataset.objectId : '';
+    const CONTRACT_NUMBER = "{{ contract.contract_number|escapejs }}";
 
     const noteModalElement = document.getElementById('noteModal');
     const noteModalTitle = document.getElementById('noteModalTitle');
@@ -565,6 +567,31 @@
 
     reminderCheckbox.addEventListener('change', function() {
         toggleReminderFields(this.checked);
+        if (this.checked) {
+            const titleInput = document.getElementById('reminderTitle');
+            if (titleInput && !titleInput.value.trim()) {
+                const tabType = _noteModalContext
+                    ? _noteModalContext.tabType
+                    : '';
+                const isClinNote = tabType === 'clin';
+                let defaultTitle = CONTRACT_NUMBER;
+                if (isClinNote) {
+                    // Find the active CLIN tab button to get item_number
+                    const activeTabBtn = tabButtons.find(btn =>
+                        btn.dataset.tabType === 'clin' &&
+                        btn.dataset.tabId === (_noteModalContext.tabId || '')
+                    );
+                    const clinItemNumber = activeTabBtn
+                        ? (activeTabBtn.dataset.itemNumber || '').trim()
+                        : '';
+                    if (clinItemNumber) {
+                        defaultTitle = [CONTRACT_NUMBER, clinItemNumber]
+                            .filter(Boolean).join('-');
+                    }
+                }
+                if (defaultTitle) titleInput.value = defaultTitle;
+            }
+        }
     });
 
     noteModalSaveBtn.addEventListener('click', saveNoteModal);

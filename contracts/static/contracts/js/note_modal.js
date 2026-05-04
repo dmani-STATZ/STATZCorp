@@ -66,6 +66,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const reminderSection = createReminderCheckbox
         ? createReminderCheckbox.closest('.mt-6')
         : null;
+
+    let currentEntityType = '';
+    let currentContractNumber = '';
+    let currentClinItemNumber = '';
     
     // Check if buttons exist
     if (!closeNoteModalBtn) console.error('closeNoteModalBtn element not found');
@@ -135,30 +139,35 @@ document.addEventListener('DOMContentLoaded', function() {
             if (referringUrlField) {
                 referringUrlField.value = window.location.pathname;
             }
+
+            // Capture context for reminder title defaulting
+            currentEntityType = (this.dataset.entityType || '').toLowerCase();
+            currentContractNumber = this.dataset.contractNumber
+                || window.contractNumberForReminders
+                || '';
+            currentClinItemNumber = this.dataset.itemNumber
+                || window.selectedClinItemNumber
+                || '';
             
             // Show modal
             noteModal.classList.remove('hidden');
         });
     });
     
-    // Toggle reminder fields visibility; default Reminder Title when the checkbox is turned on
     createReminderCheckbox.addEventListener('change', function() {
         if (this.checked) {
             reminderFields.classList.remove('hidden');
             const titleInput = document.getElementById('id_reminder_title');
             if (titleInput && !titleInput.value.trim()) {
-                const t = (noteModalTitle && noteModalTitle.textContent) || '';
-                const isClinNote = t.toLowerCase().includes('clin');
-                const contractNum = window.contractNumberForReminders || '';
-                const clinNum = (window.selectedClinItemNumber || '').trim();
+                const isClinNote = currentEntityType === 'clin'
+                    || currentEntityType.includes('clin');
+                const contractNum = currentContractNumber;
+                const clinNum = (currentClinItemNumber || '').trim();
                 let defaultTitle = contractNum;
                 if (isClinNote && clinNum) {
-                    const parts = [contractNum, clinNum].filter(Boolean);
-                    defaultTitle = parts.join('-');
+                    defaultTitle = [contractNum, clinNum].filter(Boolean).join('-');
                 }
-                if (defaultTitle) {
-                    titleInput.value = defaultTitle;
-                }
+                if (defaultTitle) titleInput.value = defaultTitle;
             }
         } else {
             reminderFields.classList.add('hidden');
@@ -352,6 +361,9 @@ document.addEventListener('DOMContentLoaded', function() {
         noteForm.dataset.canEdit = '1';
         noteForm.dataset.canManageReminder = '1';
         noteForm.dataset.initialReminderSnapshot = '';
+        currentEntityType = '';
+        currentContractNumber = '';
+        currentClinItemNumber = '';
         const noteTextArea = document.getElementById('id_note');
         if (noteTextArea) {
             noteTextArea.readOnly = false;
