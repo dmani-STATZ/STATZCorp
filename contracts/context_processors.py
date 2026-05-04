@@ -47,40 +47,40 @@ def reminders_processor(request):
             
             # Pending reminders - future dates (not shown in sidebar)
             pending_count = all_reminders.filter(
-                reminder_date__date__gt=today
+                reminder_date__gt=today
             ).count()
             
             # Due reminders - today and within past 7 days (visible in sidebar)
             due_count = all_reminders.filter(
-                reminder_date__date__lte=today,
-                reminder_date__date__gt=seven_days_ago
+                reminder_date__lte=today,
+                reminder_date__gt=seven_days_ago
             ).count()
             
             # Overdue reminders - more than 7 days old (visible in sidebar)
             overdue_count = all_reminders.filter(
-                reminder_date__date__lte=seven_days_ago
+                reminder_date__lte=seven_days_ago
             ).count()
 
             # Footer pill: strictly overdue (any date before today, no 7-day cap)
             footer_overdue_count = all_reminders.filter(
-                reminder_date__date__lt=today
+                reminder_date__lt=today
             ).count()
 
             # Footer pill: due exactly today
             footer_due_today_count = all_reminders.filter(
-                reminder_date__date=today
+                reminder_date=today
             ).count()
             
             # For sidebar display: due, overdue, and (optionally) upcoming reminders
             # upcoming_days=0: only today and past; 1-7: include up to N days ahead
             sidebar_reminders = all_reminders.filter(
-                reminder_date__date__lte=sidebar_end_date
-            ).order_by('reminder_date__date')[:30]
+                reminder_date__lte=sidebar_end_date
+            ).order_by('reminder_date')[:30]
 
             # Add flags and aliases for each reminder
             for reminder in sidebar_reminders:
-                reminder.is_overdue = reminder.reminder_date.date() <= seven_days_ago
-                reminder.is_upcoming = reminder.reminder_date.date() > today
+                reminder.is_overdue = reminder.reminder_date <= seven_days_ago
+                reminder.is_upcoming = reminder.reminder_date > today
                 reminder.title = reminder.reminder_title
                 reminder.description = reminder.reminder_text
                 reminder.completed = reminder.reminder_completed

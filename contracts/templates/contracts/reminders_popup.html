@@ -85,8 +85,8 @@
                         <p class="small text-muted mb-1 text-break">{{ reminder.reminder_text|linebreaksbr }}</p>
                         {% endif %}
                         <div class="small text-muted mb-1">
-                            {{ reminder.reminder_date|date:"M d, Y g:i A" }}
-                            ({{ reminder.reminder_date|naturaltime }})
+                            {{ reminder.reminder_date|date:"M j, Y" }}
+                            ({{ reminder.reminder_date }})
                         </div>
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             {% if reminder.note and reminder.note.content_type and reminder.note.content_object %}
@@ -102,7 +102,7 @@
                                     data-id="{{ reminder.id }}"
                                     data-title="{{ reminder.reminder_title|escape }}"
                                     data-description="{{ reminder.reminder_text|default:''|escape }}"
-                                    data-date="{{ reminder.reminder_date|date:'Y-m-d' }}T{{ reminder.reminder_date|date:'H:i' }}">Edit</button>
+                                    data-date="{{ reminder.reminder_date|date:'M j, Y' }}">Edit</button>
                             <a href="{% url 'contracts:delete_reminder' reminder.id %}?next={% url 'contracts:reminders_popup' %}" class="small text-danger">Delete</a>
                         </div>
                     </div>
@@ -133,7 +133,7 @@
           </div>
           <div class="mb-2">
             <label class="form-label small" for="popupReminderDate">Due date</label>
-            <input type="datetime-local" class="form-control form-control-sm" id="popupReminderDate" name="reminder_date" required>
+            <input type="date" class="form-control form-control-sm" id="popupReminderDate" name="reminder_date" required>
           </div>
           <div class="mb-0">
             <label class="form-label small" for="popupNewDescription">Description</label>
@@ -165,7 +165,7 @@
           </div>
           <div class="mb-2">
             <label class="form-label small" for="popupEditDate">Due date</label>
-            <input type="datetime-local" class="form-control form-control-sm" id="popupEditDate" name="reminder_date" required>
+            <input type="date" class="form-control form-control-sm" id="popupEditDate" name="reminder_date" required>
           </div>
           <div class="mb-0">
             <label class="form-label small" for="popupEditDescription">Description</label>
@@ -208,9 +208,7 @@
             newModalEl.addEventListener('show.bs.modal', function() {
                 var inp = document.getElementById('popupReminderDate');
                 if (inp && !inp.value) {
-                    var d = new Date();
-                    d.setHours(d.getHours() + 1);
-                    inp.value = d.toISOString().slice(0, 16);
+                  inp.value = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
                 }
             });
         }

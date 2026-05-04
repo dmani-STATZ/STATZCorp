@@ -52,13 +52,13 @@ class Supplier(AuditModel):
     last_enriched_at = models.DateTimeField(null=True, blank=True)
     contact = models.ForeignKey('Contact', on_delete=models.CASCADE, null=True, blank=True, related_name='primary_for_supplier')
     probation = models.BooleanField(null=True, blank=True)
-    probation_on = models.DateTimeField(null=True, blank=True)
+    probation_on = models.DateField(null=True, blank=True)
     probation_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='suppliers_supplier_probation')
     conditional = models.BooleanField(null=True, blank=True)
-    conditional_on = models.DateTimeField(null=True, blank=True)
+    conditional_on = models.DateField(null=True, blank=True)
     conditional_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='suppliers_supplier_conditional')
     special_terms = models.ForeignKey('contracts.SpecialPaymentTerms', on_delete=models.CASCADE, null=True, blank=True)
-    special_terms_on = models.DateTimeField(null=True, blank=True)
+    special_terms_on = models.DateField(null=True, blank=True)
     prime = models.IntegerField(null=True, blank=True)
     ppi = models.BooleanField(null=True, blank=True)
     iso = models.BooleanField(null=True, blank=True)
@@ -78,7 +78,7 @@ class Supplier(AuditModel):
         help_text="Whether the supplier allows GSI at facility (Unknown until confirmed).",
     )
     archived = models.BooleanField(default=False)
-    archived_on = models.DateTimeField(null=True, blank=True)
+    archived_on = models.DateField(null=True, blank=True)
     archived_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='suppliers_supplier_archived')
 
     class Meta:
@@ -152,8 +152,8 @@ class SupplierContactGroup(AuditModel):
 class SupplierCertification(models.Model):
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
     certification_type = models.ForeignKey('CertificationType', on_delete=models.CASCADE)
-    certification_date = models.DateTimeField(null=True, blank=True)
-    certification_expiration = models.DateTimeField(null=True, blank=True)
+    certification_date = models.DateField(null=True, blank=True)
+    certification_expiration = models.DateField(null=True, blank=True)
     compliance_status = models.CharField(max_length=25, null=True, blank=True, default=None)
 
     class Meta:
@@ -177,8 +177,8 @@ class CertificationType(models.Model):
 class SupplierClassification(models.Model):
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE)
     classification_type = models.ForeignKey('ClassificationType', on_delete=models.CASCADE)
-    classification_date = models.DateTimeField(null=True, blank=True)
-    classification_expiration = models.DateTimeField(null=True, blank=True)
+    classification_date = models.DateField(null=True, blank=True)
+    classification_expiration = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'contracts_supplierclassification'

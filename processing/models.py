@@ -26,8 +26,8 @@ class QueueContract(AuditModel):
     buyer = models.CharField(max_length=255, null=True, blank=True)  # String value to be matched later
     contractor_name = models.CharField(max_length=255, null=True, blank=True)
     contractor_cage = models.CharField(max_length=20, null=True, blank=True)
-    award_date = models.DateTimeField(null=True, blank=True)
-    due_date = models.DateTimeField(null=True, blank=True)
+    award_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
     contract_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     contract_type = models.CharField(max_length=50, null=True, blank=True)  # Unilateral, Bilateral, IDIQ
     solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
@@ -222,8 +222,8 @@ class ProcessContract(models.Model):
     buyer_text = models.CharField(max_length=255, null=True, blank=True)
     contract_type = models.ForeignKey(ContractType, on_delete=models.CASCADE, null=True, blank=True)
     contract_type_text = models.CharField(max_length=255, null=True, blank=True)
-    award_date = models.DateTimeField(null=True, blank=True)
-    due_date = models.DateTimeField(null=True, blank=True)
+    award_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
     due_date_late = models.BooleanField(null=True, blank=True)
     sales_class = models.ForeignKey(SalesClass, on_delete=models.CASCADE, null=True, blank=True)
     sales_class_text = models.CharField(max_length=255, null=True, blank=True)

@@ -755,9 +755,7 @@ class IdiqContractForm(BaseModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Convert award_date to date-only format if it exists
-        if self.instance and self.instance.award_date:
-            self.initial['award_date'] = self.instance.award_date.date()
+
 
 class IdiqContractDetailsForm(forms.ModelForm):
     class Meta:

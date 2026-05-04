@@ -77,7 +77,7 @@ def get_acknowledgment_letter(request, clin_id):
         letter.statz_contact_phone = settings.get('statz_contact_phone', '')
         
         # Set current date
-        letter.letter_date = timezone.now()
+        letter.letter_date = timezone.now().date()
         
         # Save the letter
         letter.save()
@@ -201,7 +201,7 @@ def generate_acknowledgment_letter_doc(request, letter_id):
 
     # Populate placeholders
     replace_placeholder(doc, '{{LETTER_DATE}}',
-        letter.letter_date.strftime('%B %d, %Y') if letter.letter_date else timezone.now().strftime('%B %d, %Y'))
+        letter.letter_date.strftime('%B %d, %Y') if letter.letter_date else timezone.now().date().strftime('%B %d, %Y'))
 
     full_name = f"{letter.salutation or ''} {letter.addr_fname or ''} {letter.addr_lname or ''}".strip()
     replace_placeholder(doc, '{{RECIPIENT_NAME}}', full_name)
@@ -234,7 +234,7 @@ def generate_acknowledgment_letter_doc(request, letter_id):
         buffer.seek(0)
 
         po_slug = (letter.po or 'letter').replace('/', '-').replace(' ', '_')
-        file_name = f"PO_Acknowledgment_{po_slug}_{timezone.now().strftime('%Y%m%d')}.docx"
+        file_name = f"PO_Acknowledgment_{po_slug}_{timezone.now().date().strftime('%Y%m%d')}.docx"
 
         response = HttpResponse(
             buffer.getvalue(),

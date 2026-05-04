@@ -99,20 +99,20 @@ class ReminderListView(ListView):
         if due_filter == 'overdue':
             # Overdue: reminder_date <= today-7days
             queryset = queryset.filter(
-                reminder_date__date__lte=seven_days_ago,
+                reminder_date__lte=seven_days_ago,
                 reminder_completed=False
             )
         elif due_filter == 'due':
             # Due: reminder_date <= today AND reminder_date > today-7days
             queryset = queryset.filter(
-                reminder_date__date__lte=today,
-                reminder_date__date__gt=seven_days_ago,
+                reminder_date__lte=today,
+                reminder_date__gt=seven_days_ago,
                 reminder_completed=False
             )
         elif due_filter == 'upcoming':
             # Future/Pending: reminder_date > today
             queryset = queryset.filter(
-                reminder_date__date__gt=today,
+                reminder_date__gt=today,
                 reminder_completed=False
             )
 
@@ -149,18 +149,18 @@ class ReminderListView(ListView):
         
         # Overdue: reminder_date <= today-7days
         context['overdue_count'] = active_reminders.filter(
-            reminder_date__date__lte=seven_days_ago
+            reminder_date__lte=seven_days_ago
         ).count()
         
         # Due: reminder_date <= today AND reminder_date > today-7days
         context['due_count'] = active_reminders.filter(
-            reminder_date__date__lte=today,
-            reminder_date__date__gt=seven_days_ago
+            reminder_date__lte=today,
+            reminder_date__gt=seven_days_ago
         ).count()
         
         # Future/Pending: reminder_date > today
         context['upcoming_count'] = active_reminders.filter(
-            reminder_date__date__gt=today
+            reminder_date__gt=today
         ).count()
         
         # Add seven_days_ago to context for template use
@@ -169,7 +169,7 @@ class ReminderListView(ListView):
         
         # Process reminders to add is_overdue flag
         for reminder in context['reminders_page']:
-            reminder.is_overdue = reminder.reminder_date.date() <= seven_days_ago
+            reminder.is_overdue = reminder.reminder_date <= seven_days_ago
         
         return context
 
@@ -209,15 +209,15 @@ def reminders_popup(request):
         queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
 
     if due_filter == 'overdue':
-        queryset = queryset.filter(reminder_date__date__lte=seven_days_ago, reminder_completed=False)
+        queryset = queryset.filter(reminder_date__lte=seven_days_ago, reminder_completed=False)
     elif due_filter == 'due':
         queryset = queryset.filter(
-            reminder_date__date__lte=today,
-            reminder_date__date__gt=seven_days_ago,
+            reminder_date__lte=today,
+            reminder_date__gt=seven_days_ago,
             reminder_completed=False
         )
     elif due_filter == 'upcoming':
-        queryset = queryset.filter(reminder_date__date__gt=today, reminder_completed=False)
+        queryset = queryset.filter(reminder_date__gt=today, reminder_completed=False)
 
     all_reminders = Reminder.objects.filter(reminder_user=user)
     if getattr(request, 'active_company', None):
@@ -228,7 +228,7 @@ def reminders_popup(request):
     )
 
     for reminder in queryset:
-        reminder.is_overdue = reminder.reminder_date.date() <= seven_days_ago
+        reminder.is_overdue = reminder.reminder_date <= seven_days_ago
 
     context = {
         'reminders': queryset,
@@ -237,12 +237,12 @@ def reminders_popup(request):
         'total_count': all_reminders.count(),
         'completed_count': all_reminders.filter(reminder_completed=True).count(),
         'pending_count': active_reminders.count(),
-        'overdue_count': active_reminders.filter(reminder_date__date__lte=seven_days_ago).count(),
+        'overdue_count': active_reminders.filter(reminder_date__lte=seven_days_ago).count(),
         'due_count': active_reminders.filter(
-            reminder_date__date__lte=today,
-            reminder_date__date__gt=seven_days_ago
+            reminder_date__lte=today,
+            reminder_date__gt=seven_days_ago
         ).count(),
-        'upcoming_count': active_reminders.filter(reminder_date__date__gt=today).count(),
+        'upcoming_count': active_reminders.filter(reminder_date__gt=today).count(),
         'today': today,
         'seven_days_ago': seven_days_ago,
     }

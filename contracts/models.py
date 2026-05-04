@@ -92,8 +92,8 @@ class Contract(AuditModel):
     solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
     prime = models.CharField(max_length=25, null=True, blank=True)
     prime_po_number = models.CharField(max_length=10, null=True, blank=True)
-    date_closed = models.DateTimeField(null=True, blank=True)
-    date_canceled = models.DateTimeField(null=True, blank=True)
+    date_closed = models.DateField(null=True, blank=True)
+    date_canceled = models.DateField(null=True, blank=True)
     closed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -111,14 +111,14 @@ class Contract(AuditModel):
     tab_num = models.CharField(max_length=10, null=True, blank=True)  # maybe part of clin?
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
     contract_type = models.ForeignKey('ContractType', on_delete=models.CASCADE, null=True, blank=True)
-    award_date = models.DateTimeField(null=True, blank=True)
-    due_date = models.DateTimeField(null=True, blank=True)
+    award_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
     due_date_late = models.BooleanField(null=True, blank=True)
     sales_class = models.ForeignKey('SalesClass', on_delete=models.CASCADE, null=True, blank=True)
     survey_date = models.DateField(null=True, blank=True)
     survey_type = models.CharField(max_length=10, null=True, blank=True)
     assigned_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_assigned_user')
-    assigned_date = models.DateTimeField(null=True, blank=True)
+    assigned_date = models.DateField(null=True, blank=True)
     nist = models.BooleanField(null=True, blank=True)
     files_url = models.CharField(max_length=200, null=True, blank=True)
     reviewed = models.BooleanField(null=True, blank=True)
@@ -330,9 +330,9 @@ class Clin(AuditModel):
     price_per_unit = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True) # data maps to PPP_Sup
     quote_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True) # Possible name change to quote_value? this is being populated with contract value
     paid_amount = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    paid_date = models.DateTimeField(null=True, blank=True)
+    paid_date = models.DateField(null=True, blank=True)
     wawf_payment = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
-    wawf_recieved = models.DateTimeField(null=True, blank=True)
+    wawf_recieved = models.DateField(null=True, blank=True)
     wawf_invoice = models.CharField(max_length=25, null=True, blank=True)
     special_payment_terms_interest = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     special_payment_terms_party = models.CharField(max_length=50, null=True, blank=True)
@@ -661,7 +661,7 @@ class FinanceLinePayment(AuditModel):
 class IdiqContract(AuditModel):
     contract_number = models.CharField(max_length=50, null=True, blank=True)
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
-    award_date = models.DateTimeField(null=True, blank=True)
+    award_date = models.DateField(null=True, blank=True)
     term_length = models.IntegerField(null=True, blank=True)
     option_length = models.IntegerField(null=True, blank=True)
     closed = models.BooleanField(null=True, blank=True)
@@ -856,13 +856,13 @@ class AcknowledgementLetter(models.Model):
 class ClinAcknowledgment(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)
     po_to_supplier_bool = models.BooleanField(null=True, blank=True)
-    po_to_supplier_date = models.DateTimeField(null=True, blank=True)
+    po_to_supplier_date = models.DateField(null=True, blank=True)
     po_to_supplier_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_acknowledgment_po_to_supplier')
     clin_reply_bool = models.BooleanField(null=True, blank=True)
-    clin_reply_date = models.DateTimeField(null=True, blank=True)
+    clin_reply_date = models.DateField(null=True, blank=True)
     clin_reply_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_acknowledgment_clin_reply')
     po_to_qar_bool = models.BooleanField(null=True, blank=True)
-    po_to_qar_date = models.DateTimeField(null=True, blank=True)
+    po_to_qar_date = models.DateField(null=True, blank=True)
     po_to_qar_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='clin_acknowledgment_po_to_qar')
 
     def __str__(self):
@@ -940,10 +940,10 @@ class Address(models.Model):
 class Reminder(models.Model):
     reminder_title = models.CharField(max_length=50, null=True, blank=True)
     reminder_text = models.TextField(null=True, blank=True)
-    reminder_date = models.DateTimeField(null=True, blank=True)
+    reminder_date = models.DateField(null=True, blank=True)
     reminder_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='created_reminders')
     reminder_completed = models.BooleanField(null=True, blank=True)
-    reminder_completed_date = models.DateTimeField(null=True, blank=True)
+    reminder_completed_date = models.DateField(null=True, blank=True)
     reminder_completed_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='completed_reminders')
     note = models.ForeignKey('Note', on_delete=models.CASCADE, null=True, blank=True, related_name='note_reminders')
     company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='reminders')
@@ -964,13 +964,13 @@ class Reminder(models.Model):
 class Expedite(models.Model):
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
     initiated = models.BooleanField(null=True, blank=True, default=False)
-    initiateddate = models.DateTimeField(null=True, blank=True)
+    initiateddate = models.DateField(null=True, blank=True)
     initiatedby = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='expedite_initiated')
     successful = models.BooleanField(null=True, blank=True, default=False)
-    successfuldate = models.DateTimeField(null=True, blank=True)
+    successfuldate = models.DateField(null=True, blank=True)
     successfulby = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='expedite_successful')
     used = models.BooleanField(null=True, blank=True, default=False)
-    useddate = models.DateTimeField(null=True, blank=True)
+    useddate = models.DateField(null=True, blank=True)
     usedby = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='expedite_used')
     
     class Meta:
@@ -1040,8 +1040,8 @@ class FolderTracking(AuditModel):
 
     # Behind the scenes fields
     closed = models.BooleanField(default=False)
-    date_added = models.DateTimeField(auto_now_add=True)
-    date_closed = models.DateTimeField(null=True, blank=True)
+    date_added = models.DateField(auto_now_add=True)
+    date_closed = models.DateField(null=True, blank=True)
     added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='folder_tracking_added')
     closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='folder_tracking_closed')
 
@@ -1069,7 +1069,7 @@ class FolderTracking(AuditModel):
         Close the record instead of deleting it
         """
         self.closed = True
-        self.date_closed = timezone.now()
+        self.date_closed = timezone.now().date()
         self.closed_by = user
         self.modified_by = user
         self.save()
@@ -1188,7 +1188,7 @@ class ContractRecord(models.Model):
     status_sort_index = models.IntegerField(default=0)
     is_closed = models.BooleanField(default=False)
     closed_at = models.DateTimeField(null=True, blank=True)
-    date_added = models.DateTimeField(auto_now_add=True)
+    date_added = models.DateField(auto_now_add=True)
     added_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='tracker_records_added')
 
     class Meta:
