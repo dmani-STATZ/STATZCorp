@@ -1,6 +1,7 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
 {% load humanize %}
+{% load contract_tags %}
 
 {% block title %}Finance Audit{% endblock %}
 
@@ -14,6 +15,7 @@
 {% block content %}
 <div class="container-fluid px-4 py-3">
     {% if contract %}
+    {% csrf_token %}
     {# Section A — Contract header bar #}
     <div class="finance-audit-header-bar rounded-top px-3 py-3 mb-3">
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
@@ -57,7 +59,7 @@
                     <div class="col-6">
                         <div class="text-body-secondary">Plan Gross</div>
                         <input type="hidden" name="plan_gross" id="id_plan_gross" value="{{ contract.plan_gross|default:'0.00' }}">
-                        <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none" id="plan_gross_display"
+                        <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none text-primary" id="plan_gross_display"
                                 data-current-value="{{ contract.plan_gross|default:'0.00' }}"
                                 onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'plan_gross', 'finance_audit', document.getElementById('id_plan_gross').value)">
                             ${{ contract.plan_gross|floatformat:2|intcomma|default:'0.00' }}
@@ -144,57 +146,87 @@
                             <th>Item #</th>
                             <th>Item Type</th>
                             <th>Supplier</th>
+                            <th class="text-end">Contract Due Date</th>
                             <th class="text-end">Order Qty</th>
+                            <th class="text-end">Ship Date</th>
                             <th class="text-end">Ship Qty</th>
                             <th class="text-end">Quote Value</th>
                             <th class="text-end">Paid</th>
                             <th class="text-end">Item Value</th>
                             <th class="text-end">Customer Pay</th>
                             <th class="text-end">Adj Gross</th>
-                            <th>Finance</th>
+                            <th class="text-center">Finance</th>
                         </tr>
                     </thead>
-                    <tbody>
                         {% for clin in clins %}
-                        <tr>
+                    <tbody>
+                        <tr class="clin-finance-audit-row" data-clin-id="{{ clin.id }}" data-clin-uom="{{ clin.uom|default:'' }}">
                             <td>{{ clin.item_number }}</td>
                             <td>{{ clin.get_item_type_display }}</td>
                             <td>{{ clin.supplier.name|default:"—" }}</td>
+                            <td class="text-end">{{ clin.due_date|date:"m/d/Y"|default:"—" }}</td>
                             <td class="text-end">{{ clin.order_qty|default:"—" }}</td>
+                            <td class="text-end">{{ clin.ship_date|date:"m/d/Y"|default:"—" }}</td>
                             <td class="text-end">{{ clin.ship_qty|default:"—" }}</td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="quote_value" data-value="{{ clin.quote_value|floatformat:2 }}">${{ clin.quote_value|floatformat:2|intcomma }}</span>
+                                      data-clin="{{ clin.id }}" data-type="quote_value"
+                                      data-value="{{ clin.quote_value|floatformat:2 }}">
+                                    ${{ clin.quote_value|floatformat:2|intcomma }}
+                                </span>
                             </td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="paid_amount" data-value="{{ clin.paid_amount|floatformat:2 }}">${{ clin.paid_amount|floatformat:2|intcomma }}</span>
-                            </td>
-                            <td class="text-end text-decoration-none">
-                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="item_value" data-value="{{ clin.item_value|floatformat:2 }}">${{ clin.item_value|floatformat:2|intcomma }}</span>
+                                      data-clin="{{ clin.id }}" data-type="paid_amount"
+                                      data-value="{{ clin.paid_amount|floatformat:2 }}">
+                                    ${{ clin.paid_amount|floatformat:2|intcomma }}
+                                </span>
                             </td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="wawf_payment" data-value="{{ clin.wawf_payment|floatformat:2 }}">${{ clin.wawf_payment|floatformat:2|intcomma }}</span>
+                                      data-clin="{{ clin.id }}" data-type="item_value"
+                                      data-value="{{ clin.item_value|floatformat:2 }}">
+                                    ${{ clin.item_value|floatformat:2|intcomma }}
+                                </span>
                             </td>
-                            <td class="text-end fw-semibold {% if clin.adjusted_gross > 0 %}text-success{% elif clin.adjusted_gross < 0 %}text-danger{% endif %}" data-adj-gross-clin="{{ clin.id }}">
+                            <td class="text-end">
+                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
+                                      data-clin="{{ clin.id }}" data-type="wawf_payment"
+                                      data-value="{{ clin.wawf_payment|floatformat:2 }}">
+                                    ${{ clin.wawf_payment|floatformat:2|intcomma }}
+                                </span>
+                            </td>
+                            <td class="text-end fw-semibold {% if clin.adjusted_gross > 0 %}text-success{% elif clin.adjusted_gross < 0 %}text-danger{% endif %}"
+                                data-adj-gross-clin="{{ clin.id }}">
                                 ${{ clin.adjusted_gross|floatformat:2|intcomma }}
                             </td>
-                            <td>
+                            <td class="text-center">
+                                {% with slist=shipments_by_clin|get_item:clin.id %}
+                                {% if slist %}
+                                <button type="button" class="pill pill-partials partials-pill me-1"
+                                        data-clin-id="{{ clin.id }}">
+                                    {{ slist|length }} partial{% if slist|length != 1 %}s{% endif %}
+                                </button>
+                                {% else %}
+                                <button type="button" class="pill pill-add partials-pill me-1"
+                                        data-clin-id="{{ clin.id }}">+ partial</button>
+                                {% endif %}
+                                {% endwith %}
                                 {% with flist=clin.finance_lines_for_audit %}
                                 {% if flist %}
-                                <button type="button" class="pill pill-finance finance-pill" data-clin-id="{{ clin.id }}">
+                                <button type="button" class="pill pill-finance finance-pill"
+                                        data-clin-id="{{ clin.id }}">
                                     {{ flist|length }} line{% if flist|length != 1 %}s{% endif %} · ${{ clin.finance_billed_sum|floatformat:2 }}
                                 </button>
                                 {% else %}
-                                <button type="button" class="pill pill-add finance-pill" data-clin-id="{{ clin.id }}">+ add</button>
+                                <button type="button" class="pill pill-add finance-pill"
+                                        data-clin-id="{{ clin.id }}">+ add</button>
                                 {% endif %}
                                 {% endwith %}
                             </td>
                         </tr>
                         <tr id="accordion-{{ clin.id }}" data-accordion-for="{{ clin.id }}" style="display:none;">
-                            <td colspan="11" style="padding: 0; border-top: none;">
+                            <td colspan="13" style="padding: 0; border-top: none;">
                                 <div style="display: flex; justify-content: flex-end;">
                                     <div style="width: 55%; padding: 8px 12px 8px 0;">
                                 {% with flist=clin.finance_lines_for_audit %}
@@ -218,12 +250,18 @@
                                                     {% endif %}
                                                 {% endwith %}
                                             </div>
-                                            <div class="fl-col-action">
+                                            <div class="fl-col-action d-flex gap-1 justify-content-end">
                                                 <button type="button" class="fl-btn js-log-payment"
                                                     data-finance-line-id="{{ line.id }}"
                                                     data-line-type="{{ line.line_type|escapejs }}"
                                                     data-amount-billed="{{ line.amount_billed }}">
                                                     log payment
+                                                </button>
+                                                <button type="button" class="fl-btn fl-btn-delete js-delete-finance-line"
+                                                    data-finance-line-id="{{ line.id }}"
+                                                    data-clin-id="{{ clin.id }}"
+                                                    data-line-type="{{ line.line_type|escapejs }}">
+                                                    delete
                                                 </button>
                                             </div>
                                         </div>
@@ -277,12 +315,182 @@
                                 </div>
                             </td>
                         </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="11" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
-                        </tr>
-                        {% endfor %}
                     </tbody>
+                    <tbody id="partials-accordion-{{ clin.id }}"
+                           data-partials-for="{{ clin.id }}"
+                           style="display:none;"
+                           class="partials-accordion-body">
+                        {% with slist=shipments_by_clin|get_item:clin.id %}
+                        {% if slist %}
+                            {% for shipment in slist %}
+                            <tr class="partial-row table-info" data-shipment-id="{{ shipment.id }}" data-clin-id="{{ clin.id }}">
+                                <td class="ps-4 text-muted small" colspan="2">Partial {{ forloop.counter }}</td>
+                                <td class="text-muted small">{{ shipment.uom|default:"—" }}</td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">{{ shipment.ship_date|date:"m/d/Y"|default:"—" }}</td>
+                                <td class="text-end">{{ shipment.ship_qty|default:"—" }}</td>
+                                <td class="text-end">${{ shipment.quote_value|floatformat:2|default:"0.00" }}</td>
+                                <td class="text-end">${{ shipment.paid_amount|floatformat:2|default:"0.00" }}</td>
+                                <td class="text-end">${{ shipment.item_value|floatformat:2|default:"0.00" }}</td>
+                                <td class="text-end">${{ shipment.wawf_payment|floatformat:2|default:"0.00" }}</td>
+                                <td class="text-end text-muted small">—</td>
+                                <td class="text-center">
+                                    {% with pflist=shipment.finance_lines_for_audit %}
+                                    {% if pflist %}
+                                    <button type="button" class="pill pill-finance partial-finance-pill"
+                                            data-shipment-id="{{ shipment.id }}"
+                                            data-clin-id="{{ clin.id }}">
+                                        {{ pflist|length }} line{% if pflist|length != 1 %}s{% endif %} · ${{ shipment.finance_billed_sum|floatformat:2 }}
+                                    </button>
+                                    {% else %}
+                                    <button type="button" class="pill pill-add partial-finance-pill"
+                                            data-shipment-id="{{ shipment.id }}"
+                                            data-clin-id="{{ clin.id }}">+ add</button>
+                                    {% endif %}
+                                    {% endwith %}
+                                </td>
+                            </tr>
+                            <tr id="partial-fl-accordion-{{ shipment.id }}"
+                                data-fl-accordion-for="{{ shipment.id }}"
+                                data-clin-id="{{ clin.id }}"
+                                data-shipment-id="{{ shipment.id }}"
+                                style="display:none;">
+                                <td colspan="13" style="padding: 0; border-top: none; background: var(--bs-tertiary-bg);">
+                                    <div style="display: flex; justify-content: flex-end;">
+                                        <div style="width: 55%; padding: 8px 12px 8px 0;">
+                                            <div class="partial-finance-lines-container px-2 pt-2"
+                                                 data-shipment-id="{{ shipment.id }}">
+                                                {% with pflist=shipment.finance_lines_for_audit %}
+                                                {% if pflist %}
+                                                    {% for line in pflist %}
+                                                    <div class="fl-row" data-finance-line-id="{{ line.id }}">
+                                                        <div class="fl-col-type">{{ line.line_type }}</div>
+                                                        <div class="fl-col-desc" title="{{ line.description|default:'' }}">{{ line.description|default:"—" }}</div>
+                                                        <div class="fl-col-val">Billed: ${{ line.amount_billed|floatformat:2 }}</div>
+                                                        <div class="fl-col-val">Paid: ${{ line.amount_paid_sum|default:0|floatformat:2 }}</div>
+                                                        <div class="fl-col-val">Remaining: ${{ line.amount_remaining|floatformat:2 }}</div>
+                                                        <div class="fl-col-status">
+                                                            {% with paid=line.amount_paid_sum|default:0 %}
+                                                                {% if paid <= 0 %}<span class="badge-sm b-unpaid">UNPAID</span>
+                                                                {% elif paid >= line.amount_billed %}<span class="badge-sm b-paid">PAID</span>
+                                                                {% else %}<span class="badge-sm b-partial">PARTIAL</span>
+                                                                {% endif %}
+                                                            {% endwith %}
+                                                        </div>
+                                                        <div class="fl-col-action d-flex gap-1 justify-content-end">
+                                                            <button type="button" class="fl-btn js-log-payment"
+                                                                data-finance-line-id="{{ line.id }}"
+                                                                data-line-type="{{ line.line_type|escapejs }}"
+                                                                data-amount-billed="{{ line.amount_billed }}">
+                                                                log payment
+                                                            </button>
+                                                            <button type="button" class="fl-btn fl-btn-delete js-delete-finance-line"
+                                                                data-finance-line-id="{{ line.id }}"
+                                                                data-clin-id="{{ clin.id }}"
+                                                                data-shipment-id="{{ shipment.id }}"
+                                                                data-line-type="{{ line.line_type|escapejs }}">
+                                                                delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <div class="text-muted small py-2">No finance lines for this partial.</div>
+                                                {% endif %}
+                                                {% endwith %}
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center px-2 py-2 border-top small text-body-secondary">
+                                                <div>
+                                                    Finance costs: $<span class="pfl-footer-costs" data-shipment-id="{{ shipment.id }}">{{ shipment.finance_billed_sum|floatformat:2 }}</span>
+                                                </div>
+                                                <div>
+                                                    <button type="button" class="fl-btn js-toggle-partial-finance-form"
+                                                            data-shipment-id="{{ shipment.id }}">
+                                                        + add finance line
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="partial-finance-add-row-{{ shipment.id }}"
+                                         style="display:none; background: var(--bs-tertiary-bg); padding: 6px 8px 6px 0;">
+                                        <div style="display: flex; justify-content: flex-end;">
+                                            <div style="width: 72%;">
+                                                <form class="partial-finance-line-add-form d-flex align-items-center gap-2"
+                                                      data-shipment-id="{{ shipment.id }}"
+                                                      data-clin-id="{{ clin.id }}">
+                                                    {% csrf_token %}
+                                                    <input type="text" name="line_type" placeholder="Type"
+                                                           list="finance-type-suggestions-{{ clin.id }}"
+                                                           class="form-control form-control-sm" style="width: 120px; flex-shrink: 0;">
+                                                    <input type="text" name="description" placeholder="Description"
+                                                           class="form-control form-control-sm" style="flex: 1; min-width: 0;">
+                                                    <input type="number" name="amount_billed" placeholder="Amount"
+                                                           step="0.01" min="0.01"
+                                                           class="form-control form-control-sm" style="width: 110px; flex-shrink: 0;">
+                                                    <button type="submit" class="btn btn-sm btn-primary" style="flex-shrink: 0;">Save</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-cancel-partial-finance"
+                                                            data-shipment-id="{{ shipment.id }}" style="flex-shrink: 0;">Cancel</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="partial-subtotals-row table-secondary small fw-semibold">
+                                <td colspan="7" class="ps-4 text-end pe-2">Subtotals</td>
+                                {% with sub=shipment_subtotals_by_clin|get_item:clin.id %}
+                                <td class="text-end">${{ sub.quote_value|floatformat:2|intcomma }}</td>
+                                <td class="text-end">${{ sub.paid_amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end">${{ sub.item_value|floatformat:2|intcomma }}</td>
+                                <td class="text-end">${{ sub.wawf_payment|floatformat:2|intcomma }}</td>
+                                {% endwith %}
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="13" class="ps-4 py-2 text-muted small border-0">
+                                    No partials recorded.
+                                    <button type="button" class="fl-btn ms-2 js-open-add-partial"
+                                            data-clin-id="{{ clin.id }}">+ add partial</button>
+                                </td>
+                            </tr>
+                        {% endif %}
+                        {% if slist %}
+                        <tr>
+                            <td colspan="13" class="ps-4 py-1 border-0 text-end pe-3">
+                                <button type="button" class="fl-btn js-open-add-partial"
+                                        data-clin-id="{{ clin.id }}">+ add partial</button>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endwith %}
+                    </tbody>
+                        {% empty %}
+                    <tbody>
+                        <tr>
+                            <td colspan="13" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
+                        </tr>
+                    </tbody>
+                        {% endfor %}
+                        {% if clins %}
+                    <tbody>
+                        <tr class="table-secondary fw-semibold small">
+                            <td colspan="7" class="text-end pe-2">Totals</td>
+                            <td class="text-end">${{ clin_totals.quote_value|floatformat:2|intcomma }}</td>
+                            <td class="text-end">${{ clin_totals.paid_amount|floatformat:2|intcomma }}</td>
+                            <td class="text-end">${{ clin_totals.item_value|floatformat:2|intcomma }}</td>
+                            <td class="text-end">${{ clin_totals.wawf_payment|floatformat:2|intcomma }}</td>
+                            <td class="text-end {% if clin_totals.adj_gross > 0 %}text-success{% elif clin_totals.adj_gross < 0 %}text-danger{% endif %}">
+                                ${{ clin_totals.adj_gross|floatformat:2|intcomma }}
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                        {% endif %}
                 </table>
             </div>
         </div>
@@ -293,16 +501,16 @@
         <option value="Labels"></option>
         <option value="Miscellaneous"></option>
     </datalist>
+    {% include 'contracts/includes/payment_history_popup.html' %}
+
+    {% include "contracts/includes/add_partial_modal.html" %}
     {% endif %}
 </div>
-
-{% if contract %}
-{% include 'contracts/includes/payment_history_popup.html' %}
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 {% if contract %}
+<script src="{% static 'contracts/js/add_partial_modal.js' %}?v={% now 'U' %}"></script>
 <script>
 function openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled) {
     fetch(`/contracts/api/finance-lines/${financeLineId}/payments/`)
@@ -358,6 +566,35 @@ document.addEventListener('click', function(e) {
     if (financeLineId && lineType && amountBilled) {
         openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled);
     }
+});
+
+// Delete finance line — hard delete with confirmation
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.js-delete-finance-line');
+    if (!btn) return;
+    const financeLineId = btn.dataset.financeLineId;
+    const clinId = btn.dataset.clinId;
+    const lineType = btn.dataset.lineType;
+    if (!confirm(`Delete finance line "${lineType}"? This cannot be undone.`)) return;
+
+    fetch(`/contracts/api/finance-lines/${financeLineId}/delete/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const shipmentId = btn.dataset.shipmentId;
+            if (shipmentId) {
+                refreshPartialFinanceLines(shipmentId, clinId);
+            } else {
+                refreshFinanceLinesForClin(clinId);
+            }
+            if (window.notify) window.notify('success', 'Finance line deleted', 3000);
+        } else {
+            if (window.notify) window.notify('error', data.error || 'Delete failed', 3000);
+        }
+    });
 });
 
 function openDocumentsBrowser(contractId) {
@@ -456,12 +693,18 @@ function refreshFinanceLinesForClin(clinId) {
                     <div class="fl-col-val">Paid: $${line.amount_paid.toFixed(2)}</div>
                     <div class="fl-col-val">Remaining: $${remaining}</div>
                     <div class="fl-col-status"><span class="${statusMap[line.payment_status] || ''}">${line.payment_status}</span></div>
-                    <div class="fl-col-action">
+                    <div class="fl-col-action d-flex gap-1 justify-content-end">
                         <button type="button" class="fl-btn js-log-payment"
                             data-finance-line-id="${line.id}"
                             data-line-type="${line.line_type}"
                             data-amount-billed="${line.amount_billed}">
                             log payment
+                        </button>
+                        <button type="button" class="fl-btn fl-btn-delete js-delete-finance-line"
+                            data-finance-line-id="${line.id}"
+                            data-clin-id="${clinId}"
+                            data-line-type="${line.line_type}">
+                            delete
                         </button>
                     </div>
                 </div>`;
@@ -475,6 +718,69 @@ function refreshFinanceLinesForClin(clinId) {
             if (footerCosts) footerCosts.textContent = `$${data.totals.total_billed.toFixed(2)}`;
             if (footerGross) footerGross.textContent = `$${data.totals.gross.toFixed(2)}`;
             if (footerAdj) footerAdj.textContent = `$${data.totals.adj_gross.toFixed(2)}`;
+        });
+}
+
+function refreshPartialFinanceLines(shipmentId, clinId) {
+    if (!shipmentId) return;
+    fetch(`/contracts/api/finance-lines/partial/${shipmentId}/`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+
+            const pill = document.querySelector(`.partial-finance-pill[data-shipment-id="${shipmentId}"]`);
+            if (pill) {
+                const count = data.finance_lines.length;
+                const total = data.totals.total_billed;
+                if (count > 0) {
+                    pill.textContent = `${count} line${count > 1 ? 's' : ''} · $${total.toFixed(2)}`;
+                    pill.className = 'pill pill-finance partial-finance-pill';
+                } else {
+                    pill.textContent = '+ add';
+                    pill.className = 'pill pill-add partial-finance-pill';
+                }
+                pill.dataset.shipmentId = shipmentId;
+                if (clinId) pill.dataset.clinId = clinId;
+            }
+
+            const footerCosts = document.querySelector(`.pfl-footer-costs[data-shipment-id="${shipmentId}"]`);
+            if (footerCosts) footerCosts.textContent = data.totals.total_billed.toFixed(2);
+
+            const container = document.querySelector(
+                `.partial-finance-lines-container[data-shipment-id="${shipmentId}"]`
+            );
+            if (!container) return;
+
+            if (data.finance_lines.length === 0) {
+                container.innerHTML = '<div class="text-muted small py-2">No finance lines for this partial.</div>';
+                return;
+            }
+
+            const statusMap = { 'PAID': 'badge-sm b-paid', 'PARTIAL': 'badge-sm b-partial', 'UNPAID': 'badge-sm b-unpaid' };
+            let html = '';
+            data.finance_lines.forEach(line => {
+                const remaining = (line.amount_billed - line.amount_paid).toFixed(2);
+                html += `<div class="fl-row" data-finance-line-id="${line.id}">
+                    <div class="fl-col-type">${line.line_type}</div>
+                    <div class="fl-col-desc" title="${line.description || ''}">${line.description || '—'}</div>
+                    <div class="fl-col-val">Billed: $${line.amount_billed.toFixed(2)}</div>
+                    <div class="fl-col-val">Paid: $${line.amount_paid.toFixed(2)}</div>
+                    <div class="fl-col-val">Remaining: $${remaining}</div>
+                    <div class="fl-col-status"><span class="${statusMap[line.payment_status] || ''}">${line.payment_status}</span></div>
+                    <div class="fl-col-action d-flex gap-1 justify-content-end">
+                        <button type="button" class="fl-btn js-log-payment"
+                            data-finance-line-id="${line.id}"
+                            data-line-type="${line.line_type}"
+                            data-amount-billed="${line.amount_billed}">log payment</button>
+                        <button type="button" class="fl-btn fl-btn-delete js-delete-finance-line"
+                            data-finance-line-id="${line.id}"
+                            data-clin-id="${clinId || ''}"
+                            data-shipment-id="${shipmentId}"
+                            data-line-type="${line.line_type}">delete</button>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
         });
 }
 
@@ -682,11 +988,15 @@ function refreshFinanceLinesForClin(clinId) {
                     if (typeof closePaymentHistoryPopup === 'function') {
                         closePaymentHistoryPopup();
                     }
-                    refreshFinanceLinesForClin(
-                        document.querySelector(`[data-finance-line-id="${financeLineId}"]`)
-                            ?.closest('tr[data-accordion-for]')
-                            ?.dataset.accordionFor
-                    );
+                    const lineEl = document.querySelector(`[data-finance-line-id="${financeLineId}"]`);
+                    const partialAcc = lineEl && lineEl.closest('tr[data-shipment-id][data-fl-accordion-for]');
+                    if (partialAcc && partialAcc.dataset.shipmentId) {
+                        refreshPartialFinanceLines(partialAcc.dataset.shipmentId, partialAcc.dataset.clinId);
+                    } else {
+                        refreshFinanceLinesForClin(
+                            lineEl?.closest('tr[data-accordion-for]')?.dataset.accordionFor
+                        );
+                    }
                     if (window.notify) window.notify('success', 'Payment logged successfully', 3000);
                 } else {
                     if (window.notify) window.notify('error', data.error || 'Failed to log payment', 3000);
@@ -742,6 +1052,85 @@ function refreshFinanceLinesForClin(clinId) {
         } catch (e) {
             console.debug('Notes popup follow-me skipped:', e);
         }
+    });
+
+    // Partials pill accordion toggle
+    document.querySelectorAll('.partials-pill').forEach(pill => {
+        pill.addEventListener('click', function() {
+            const clinId = this.dataset.clinId;
+            const accordion = document.getElementById(`partials-accordion-${clinId}`);
+            if (!accordion) return;
+            const isVisible = accordion.style.display !== 'none';
+            accordion.style.display = isVisible ? 'none' : 'table-row-group';
+            this.classList.toggle('pill-active', !isVisible);
+        });
+    });
+
+    // Delegated click handler for partial finance pills
+    document.addEventListener('click', function(e) {
+        const pill = e.target.closest('.partial-finance-pill');
+        if (!pill) return;
+        const shipmentId = pill.dataset.shipmentId;
+        const accordion = document.getElementById(`partial-fl-accordion-${shipmentId}`);
+        const addRow = document.getElementById(`partial-finance-add-row-${shipmentId}`);
+        if (!accordion) return;
+        const isVisible = accordion.style.display !== 'none';
+        accordion.style.display = isVisible ? 'none' : 'table-row';
+        pill.classList.toggle('pill-active', !isVisible);
+        if (isVisible && addRow) addRow.style.display = 'none';
+    });
+
+    // Toggle partial finance line add form
+    document.querySelectorAll('.js-toggle-partial-finance-form').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const shipmentId = this.dataset.shipmentId;
+            const addRow = document.getElementById(`partial-finance-add-row-${shipmentId}`);
+            if (!addRow) return;
+            addRow.style.display = addRow.style.display === 'none' ? 'block' : 'none';
+        });
+    });
+
+    // Cancel partial finance line add
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.js-cancel-partial-finance');
+        if (!btn) return;
+        const addRow = document.getElementById(`partial-finance-add-row-${btn.dataset.shipmentId}`);
+        if (addRow) addRow.style.display = 'none';
+    });
+
+    // Submit partial finance line add form
+    document.querySelectorAll('.partial-finance-line-add-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const shipmentId = this.dataset.shipmentId;
+            const clinId = this.dataset.clinId;
+            const csrfInput = this.querySelector('[name=csrfmiddlewaretoken]');
+            const csrfToken = csrfInput ? csrfInput.value : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+            const lineType = this.querySelector('[name="line_type"]').value.trim();
+            const description = this.querySelector('[name="description"]').value.trim();
+            const amountBilled = this.querySelector('[name="amount_billed"]').value;
+
+            if (!lineType) { if (window.notify) window.notify('error', 'Type is required', 3000); return; }
+            if (!amountBilled) { if (window.notify) window.notify('error', 'Amount is required', 3000); return; }
+
+            fetch(`/contracts/api/finance-lines/partial/${shipmentId}/add/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ line_type: lineType, description: description, amount_billed: parseFloat(amountBilled) })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    form.reset();
+                    const addRow = document.getElementById(`partial-finance-add-row-${shipmentId}`);
+                    if (addRow) addRow.style.display = 'none';
+                    refreshPartialFinanceLines(shipmentId, clinId);
+                    if (window.notify) window.notify('success', 'Finance line added', 3000);
+                } else {
+                    if (window.notify) window.notify('error', data.error || 'Failed', 3000);
+                }
+            });
+        });
     });
 
     var btnNotes = document.getElementById('btn-open-notes');

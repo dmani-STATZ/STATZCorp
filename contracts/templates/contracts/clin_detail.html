@@ -36,6 +36,10 @@ window.onTransactionSaved = function(data) {
 
     {# Fixed Sidebar #}
     <nav id="clin-page-nav" class="clin-detail-sidebar">
+        <a href="{% url 'contracts:contract_management' clin.contract.id %}"
+           class="btn btn-sm btn-primary w-100 mb-3">
+            ← Back to Contract
+        </a>
         <p class="clin-sidebar-label">Quick Jump</p>
         <div class="nav flex-column nav-pills">
             <a class="nav-link active" href="#clin-identification">Identification</a>
@@ -52,13 +56,10 @@ window.onTransactionSaved = function(data) {
     <div class="clin-detail-content">
 
         {# Page heading #}
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="mb-4">
             <h1 class="h4 fw-bold mb-0">
                 CLIN {{ clin.clin_po_num }} — Contract #{{ clin.contract.contract_number }}
             </h1>
-            <a href="{% url 'contracts:contract_management' clin.contract.id %}" class="btn btn-sm btn-outline-secondary">
-                ← Back to Contract
-            </a>
         </div>
 
         {# SECTION: Identification #}

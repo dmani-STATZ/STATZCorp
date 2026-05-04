@@ -388,7 +388,10 @@ class Clin(AuditModel):
         item_val = Decimal(str(self.item_value or 0))
         quote_val = Decimal(str(self.quote_value or 0))
         gross = item_val - quote_val
-        finance_costs = self.finance_lines.aggregate(total=Sum('amount_billed'))['total'] or Decimal('0.00')
+        finance_costs = (
+            self.finance_lines.filter(partial__isnull=True).aggregate(total=Sum('amount_billed'))['total']
+            or Decimal('0.00')
+        )
         return gross - finance_costs
 
 class ClinShipment(AuditModel):
@@ -402,6 +405,59 @@ class ClinShipment(AuditModel):
     ship_date = models.DateField(null=True, blank=True)
     comments = models.TextField(null=True, blank=True)
     pod_date = models.DateField(null=True, blank=True)
+
+    # Financial fields — added for partial shipment financial tracking
+    quote_value = models.DecimalField(
+        max_digits=19, decimal_places=2,
+        null=True, blank=True,
+        help_text="Supplier cost for this shipment (ship_qty × price_per_unit). Auto-calculated but editable."
+    )
+    item_value = models.DecimalField(
+        max_digits=19, decimal_places=2,
+        null=True, blank=True,
+        help_text="Contract value for this shipment (ship_qty × unit_price). Auto-calculated but editable."
+    )
+    paid_amount = models.DecimalField(
+        max_digits=19, decimal_places=2,
+        null=True, blank=True,
+        help_text="Amount paid by government for this partial shipment."
+    )
+    wawf_payment = models.DecimalField(
+        max_digits=19, decimal_places=2,
+        null=True, blank=True,
+        help_text="Customer pay / WAWF payment received for this partial shipment."
+    )
+
+    @property
+    def auto_quote_value(self):
+        """Returns ship_qty × clin.price_per_unit as a suggested quote value."""
+        if self.ship_qty is None:
+            return Decimal('0.00')
+        price = self.clin.price_per_unit if self.clin.price_per_unit else Decimal('0.00')
+        return Decimal(str(self.ship_qty)) * Decimal(str(price))
+
+    @property
+    def auto_item_value(self):
+        """Returns ship_qty × clin.unit_price as a suggested item value."""
+        if self.ship_qty is None:
+            return Decimal('0.00')
+        price = self.clin.unit_price if self.clin.unit_price else Decimal('0.00')
+        return Decimal(str(self.ship_qty)) * Decimal(str(price))
+
+    @property
+    def finance_lines_for_audit(self):
+        """Returns finance lines attached to this specific partial shipment."""
+        return self.finance_lines.annotate(
+            amount_paid_sum=Sum('payments__amount')
+        ).order_by('created_on')
+
+    @property
+    def finance_billed_sum(self):
+        """Total amount billed across all finance lines for this shipment."""
+        result = self.finance_lines.aggregate(
+            total=Sum('amount_billed')
+        )['total']
+        return result or Decimal('0.00')
 
     class Meta:
         ordering = ['-ship_date', '-created_on']
@@ -542,6 +598,14 @@ class FinanceLineType(models.Model):
 
 class ContractFinanceLine(AuditModel):
     clin = models.ForeignKey('Clin', on_delete=models.CASCADE, related_name='finance_lines')
+    partial = models.ForeignKey(
+        'ClinShipment',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='finance_lines',
+        help_text='When set, this finance line is scoped to this partial shipment; when null, it is CLIN-level only.',
+    )
     line_type = models.CharField(max_length=100)
     description = models.CharField(max_length=255, blank=True, null=True)
     amount_billed = models.DecimalField(max_digits=15, decimal_places=2)

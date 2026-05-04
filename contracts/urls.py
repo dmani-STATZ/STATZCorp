@@ -5,9 +5,14 @@ from . import views
 from .views.finance_views import FinanceAuditView
 from .views.finance_line_views import (
     add_finance_line,
-    get_finance_lines,
-    log_finance_line_payment,
+    add_partial_finance_line,
+    add_partial_shipment,
+    delete_finance_line,
     get_finance_line_payments,
+    get_finance_lines,
+    get_partial_auto_calc,
+    get_partial_finance_lines,
+    log_finance_line_payment,
 )
 
 # Import views from the modular structure
@@ -587,6 +592,31 @@ urlpatterns = [
         "api/finance-lines/<int:finance_line_id>/payments/",
         get_finance_line_payments,
         name="finance_line_payments",
+    ),
+    path(
+        "api/finance-lines/<int:finance_line_id>/delete/",
+        delete_finance_line,
+        name="finance_line_delete",
+    ),
+    path(
+        "api/finance-lines/partial/<int:shipment_id>/",
+        get_partial_finance_lines,
+        name="partial_finance_lines",
+    ),
+    path(
+        "api/finance-lines/partial/<int:shipment_id>/add/",
+        add_partial_finance_line,
+        name="partial_finance_line_add",
+    ),
+    path(
+        "api/partials/add/",
+        add_partial_shipment,
+        name="partial_shipment_add",
+    ),
+    path(
+        "api/partials/auto-calc/",
+        get_partial_auto_calc,
+        name="partial_auto_calc",
     ),
     # Payment History API
     path(

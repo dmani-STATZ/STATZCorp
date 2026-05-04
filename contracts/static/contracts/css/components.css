@@ -120,3 +120,18 @@
     text-align: right;
 }
 .fl-btn { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); color: #185FA5; cursor: pointer; }
+.fl-btn-delete {
+    color: #A32D2D;
+    border-color: #f5c2c2;
+}
+.fl-btn-delete:hover {
+    background: #FCEBEB;
+    border-color: #A32D2D;
+}
+
+/* Partials accordion */
+.pill-partials { background: #E6F1FB; color: #185FA5; }
+.partial-row { background: var(--bs-info-bg-subtle) !important; }
+.partial-row td { font-size: 12px; }
+.partial-subtotals-row td { font-size: 11px; border-top: 2px solid var(--bs-border-color) !important; }
+.partials-accordion-body .partial-row:first-child td { border-top: 2px solid #185FA5 !important; }

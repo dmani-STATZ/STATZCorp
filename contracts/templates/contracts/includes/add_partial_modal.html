@@ -1,0 +1,95 @@
+<!-- Add Partial Shipment Modal -->
+<div class="modal fade" id="addPartialModal" tabindex="-1"
+     aria-labelledby="addPartialModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addPartialModalLabel">
+                    Add Partial Shipment
+                </h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="addPartialClinId">
+
+                <!-- Row 1 — Ship Date full width -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">
+                        Ship Date <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm"
+                           id="addPartialShipDate">
+                </div>
+
+                <!-- Row 2 — QTY + UOM side by side -->
+                <div class="d-flex gap-3 mb-3">
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">
+                            QTY <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" class="form-control form-control-sm"
+                               id="addPartialQty" step="0.001" min="0.001"
+                               placeholder="0">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">UOM</label>
+                        <input type="text" class="form-control form-control-sm"
+                               id="addPartialUom" placeholder="EA">
+                    </div>
+                </div>
+
+                <!-- Row 3 — Quote Value + Paid side by side -->
+                <div class="d-flex gap-3 mb-3">
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">Quote Value</label>
+                        <input type="number" class="form-control form-control-sm"
+                               id="addPartialQuoteValue" step="0.01" min="0"
+                               placeholder="Auto-calculated">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">Paid</label>
+                        <input type="number" class="form-control form-control-sm"
+                               id="addPartialPaid" step="0.01" min="0"
+                               placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Row 4 — Item Value + Customer Pay side by side -->
+                <div class="d-flex gap-3 mb-3">
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">Item Value</label>
+                        <input type="number" class="form-control form-control-sm"
+                               id="addPartialItemValue" step="0.01" min="0"
+                               placeholder="Auto-calculated">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">Customer Pay</label>
+                        <input type="number" class="form-control form-control-sm"
+                               id="addPartialCustomerPay" step="0.01" min="0"
+                               placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Row 5 — Comments full width -->
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Comments</label>
+                    <textarea class="form-control form-control-sm"
+                              id="addPartialComments" rows="2"
+                              placeholder="Optional notes about this shipment"></textarea>
+                </div>
+
+                <div class="small text-muted fst-italic"
+                     id="addPartialAutoCalcNote" style="display:none;">
+                    Quote Value and Item Value auto-calculated from QTY. You may override.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary"
+                        id="addPartialSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>

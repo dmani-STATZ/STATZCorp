@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from .models import (
     CanceledReason,
+    ClinShipment,
     ClinSplit,
     ClinType,
     Company,
@@ -93,6 +94,14 @@ class ClinSplitAdmin(admin.ModelAdmin):
     list_display = ('id', 'clin', 'company_name', 'split_value', 'split_paid')
     list_filter = ('company_name',)
     search_fields = ('company_name',)
+
+
+@admin.register(ClinShipment)
+class ClinShipmentAdmin(admin.ModelAdmin):
+    list_display = ['clin', 'ship_date', 'ship_qty', 'uom',
+                    'quote_value', 'item_value', 'paid_amount', 'wawf_payment']
+    list_filter = ['ship_date']
+    search_fields = ['clin__item_number', 'clin__contract__contract_number']
 
 
 @admin.register(FinanceLineType)

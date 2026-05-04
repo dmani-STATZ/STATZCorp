@@ -8,7 +8,7 @@ from django.views.generic import DetailView
 from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
-from ..models import Clin, ClinSplit, Contract, ContractFinanceLine, PaymentHistory
+from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, PaymentHistory
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
 from decimal import Decimal
@@ -44,10 +44,20 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['clin_split_rollup'] = []
         context['finance_lines_by_clin'] = {}
+        context['shipments_by_clin'] = {}
+        context['shipment_subtotals_by_clin'] = {}
         context['finance_costs_total'] = Decimal('0.00')
         context['adj_gross_contract'] = Decimal('0.00')
         context['payment_notes_rollup'] = []
         context['clins'] = []
+        zero = Decimal('0.00')
+        context['clin_totals'] = {
+            'quote_value': zero,
+            'paid_amount': zero,
+            'item_value': zero,
+            'wawf_payment': zero,
+            'adj_gross': zero,
+        }
 
         try:
             if self.object:
@@ -67,13 +77,13 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 )
 
                 finance_lines_qs = ContractFinanceLine.objects.filter(
-                    clin__contract=self.object
+                    clin__contract=self.object,
+                    partial__isnull=True,
                 ).select_related('clin').annotate(
                     amount_paid_sum=Sum('payments__amount')
                 ).order_by('clin_id', 'id')
 
                 by_clin = defaultdict(list)
-                finance_costs_total = Decimal('0.00')
                 for line in finance_lines_qs:
                     paid_sum = line.amount_paid_sum
                     if paid_sum is None:
@@ -81,10 +91,36 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     line.display_paid_sum = paid_sum
                     line.display_remaining = (line.amount_billed or Decimal('0.00')) - paid_sum
                     by_clin[line.clin_id].append(line)
-                    finance_costs_total += line.amount_billed or Decimal('0.00')
+
+                finance_costs_total = (
+                    ContractFinanceLine.objects.filter(clin__contract=self.object).aggregate(
+                        t=Sum('amount_billed')
+                    )['t']
+                    or Decimal('0.00')
+                )
 
                 context['finance_lines_by_clin'] = dict(by_clin)
                 context['finance_costs_total'] = finance_costs_total
+
+                shipments_qs = ClinShipment.objects.filter(
+                    clin__contract=self.object
+                ).select_related('clin').order_by('clin_id', 'ship_date', 'created_on')
+
+                shipments_by_clin = {}
+                for shipment in shipments_qs:
+                    shipments_by_clin.setdefault(shipment.clin_id, []).append(shipment)
+
+                shipment_subtotals_by_clin = {}
+                for clin_id, shipments in shipments_by_clin.items():
+                    shipment_subtotals_by_clin[clin_id] = {
+                        'quote_value': sum(Decimal(str(s.quote_value or 0)) for s in shipments),
+                        'paid_amount': sum(Decimal(str(s.paid_amount or 0)) for s in shipments),
+                        'item_value': sum(Decimal(str(s.item_value or 0)) for s in shipments),
+                        'wawf_payment': sum(Decimal(str(s.wawf_payment or 0)) for s in shipments),
+                    }
+
+                context['shipments_by_clin'] = shipments_by_clin
+                context['shipment_subtotals_by_clin'] = shipment_subtotals_by_clin
 
                 plan = self.object.plan_gross
                 plan_dec = plan if plan is not None else Decimal('0.00')
@@ -128,6 +164,28 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         Decimal('0.00'),
                     )
                 context['clins'] = clins_list
+                context['clin_totals'] = {
+                    'quote_value': sum(
+                        (Decimal(str(c.quote_value or 0)) for c in clins_list),
+                        Decimal('0.00'),
+                    ),
+                    'paid_amount': sum(
+                        (Decimal(str(c.paid_amount or 0)) for c in clins_list),
+                        Decimal('0.00'),
+                    ),
+                    'item_value': sum(
+                        (Decimal(str(c.item_value or 0)) for c in clins_list),
+                        Decimal('0.00'),
+                    ),
+                    'wawf_payment': sum(
+                        (Decimal(str(c.wawf_payment or 0)) for c in clins_list),
+                        Decimal('0.00'),
+                    ),
+                    'adj_gross': sum(
+                        (c.adjusted_gross for c in clins_list),
+                        Decimal('0.00'),
+                    ),
+                }
 
         except Exception as e:
             logger.error(f"Error in FinanceAuditView: {str(e)}")

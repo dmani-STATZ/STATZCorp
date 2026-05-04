@@ -2,6 +2,9 @@
 
 <!-- Load the JS file first -->
 <script src="{% static 'contracts/js/clin_shipments.js' %}?v={% now 'U' %}"></script>
+{% if mode == 'form' %}
+<script src="{% static 'contracts/js/add_partial_modal.js' %}?v={% now 'U' %}"></script>
+{% endif %}
 
 <!-- CLIN Shipments Section -->
 <div class="section" data-clin-id="{{ clin.id }}"
@@ -12,8 +15,8 @@
         <span>Shipping Information <span class="text-sm text-gray-500">(Click to expand)</span></span>
         {% if mode == 'form' %}
         <button type="button"
-                onclick="ClinShipments.addNewShipment()"
-                class="ml-auto btn btn-sm btn-outline-secondary">
+                class="ml-auto btn btn-sm btn-outline-secondary js-open-add-partial"
+                data-clin-id="{{ clin.id }}">
             Add New Shipment
         </button>
         {% endif %}
@@ -26,6 +29,17 @@
                     <th class="px-4 py-3 text-right label tracking-wider">Quantity</th>
                     <th class="px-4 py-3 text-left label tracking-wider">UOM</th>
                     <th class="px-4 py-3 text-left label tracking-wider">Comments</th>
+                    {% if mode == 'form' %}
+                    <th class="px-4 py-3 text-right label tracking-wider">Quote Value</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Paid</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Item Value</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Customer Pay</th>
+                    {% else %}
+                    <th class="px-4 py-3 text-right label tracking-wider">Quote Value</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Paid</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Item Value</th>
+                    <th class="px-4 py-3 text-right label tracking-wider">Customer Pay</th>
+                    {% endif %}
                     <th class="px-4 py-3 text-left label tracking-wider">POD Date</th>
                     {% if mode == 'form' %}
                     <th class="px-4 py-3 text-center label tracking-wider">Actions</th>
@@ -87,6 +101,18 @@
                                    value="{{ shipment.comments }}"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.quote_value|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.paid_amount|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.item_value|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.wawf_payment|floatformat:2|default:"0.00" }}
+                        </td>
                         <td class="px-4 py-3">
                             <button type="button"
                                 id="shipment-{{ shipment.id }}-pod-date-value"
@@ -135,6 +161,18 @@
                         <td class="px-4 py-3 text-right">{{ shipment.ship_qty|floatformat:2|default:"0.00" }}</td>
                         <td class="px-4 py-3">{{ shipment.uom }}</td>
                         <td class="px-4 py-3">{{ shipment.comments }}</td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.quote_value|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.paid_amount|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.item_value|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            ${{ shipment.wawf_payment|floatformat:2|default:"0.00" }}
+                        </td>
                         <td class="px-4 py-3" id="shipment-{{ shipment.id }}-pod-date-value">
                             {{ shipment.pod_date|date:"m/d/Y"|default:"—" }}
                         </td>
@@ -142,7 +180,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td id="no-shipments-message" colspan="{% if mode == 'form' %}6{% else %}5{% endif %}" class="px-4 py-3 text-center text-gray-500">No shipments found for this CLIN</td>
+                    <td id="no-shipments-message" colspan="{% if mode == 'form' %}10{% else %}9{% endif %}" class="px-4 py-3 text-center text-gray-500">No shipments found for this CLIN</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -162,14 +200,14 @@
                             </span>
                         {% endif %}
                     </td>
-                    <td colspan="{% if mode == 'form' %}4{% else %}3{% endif %}"></td>
+                    <td colspan="{% if mode == 'form' %}8{% else %}7{% endif %}"></td>
                 </tr>
                 {% if mode == 'form' %}
                 <tr id="complete-shipping-row"
                     {% if clin.total_shipped != clin.order_qty or not clin.order_qty %}
                     style="display:none"
                     {% endif %}>
-                    <td colspan="5"></td>
+                    <td colspan="9"></td>
                     <td class="px-4 pt-1 pb-2 text-center">
                         <button type="button"
                                 onclick="ClinShipments.completeShipping()"
@@ -259,4 +297,5 @@
             </div>
         </div>
     </div>
+    {% include "contracts/includes/add_partial_modal.html" %}
 {% endif %}

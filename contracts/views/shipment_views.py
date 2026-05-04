@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
@@ -59,6 +61,11 @@ def create_shipment(request):
             uom=data.get('uom', clin.uom),  # Get UOM from data or default to what is in the CLIN
             ship_date=ship_date,
             comments=data.get('comments', ''),
+            # Financial fields — nullable, optional
+            quote_value=Decimal(str(data['quote_value'])) if data.get('quote_value') not in (None, '') else None,
+            item_value=Decimal(str(data['item_value'])) if data.get('item_value') not in (None, '') else None,
+            paid_amount=Decimal(str(data['paid_amount'])) if data.get('paid_amount') not in (None, '') else None,
+            wawf_payment=Decimal(str(data['wawf_payment'])) if data.get('wawf_payment') not in (None, '') else None,
             created_by=request.user,
             modified_by=request.user,
         )
@@ -113,7 +120,19 @@ def update_shipment(request, shipment_id):
             shipment.comments = data['comments']
         if 'pod_date' in data:
             shipment.pod_date = data['pod_date'] or None
-        
+        if 'quote_value' in data:
+            qv = data['quote_value']
+            shipment.quote_value = Decimal(str(qv)) if qv not in (None, '') else None
+        if 'item_value' in data:
+            iv = data['item_value']
+            shipment.item_value = Decimal(str(iv)) if iv not in (None, '') else None
+        if 'paid_amount' in data:
+            pa = data['paid_amount']
+            shipment.paid_amount = Decimal(str(pa)) if pa not in (None, '') else None
+        if 'wawf_payment' in data:
+            wp = data['wawf_payment']
+            shipment.wawf_payment = Decimal(str(wp)) if wp not in (None, '') else None
+
         shipment.modified_by = request.user
         shipment.save()
 
