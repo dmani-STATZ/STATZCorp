@@ -692,7 +692,11 @@ class IdiqContract(AuditModel):
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
     award_date = models.DateField(null=True, blank=True)
     term_length = models.IntegerField(null=True, blank=True)
-    option_length = models.IntegerField(null=True, blank=True)
+    option_length = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Total option period length in months (e.g. 3 one-year options = 36).",
+    )
     closed = models.BooleanField(null=True, blank=True)
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     max_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)

@@ -153,7 +153,7 @@ _RE_ACCEPTANCE_POINT = re.compile(
     re.IGNORECASE,
 )
 _RE_DLA_CONTRACT = re.compile(
-    r"\b(SPE[A-Z0-9]{2,3}-\d{2}-[A-Z]-[A-Z0-9]{4})\b",
+    r"\b(SPE[A-Z0-9]{2,3}-\d{2}-[DFPVCMAN]-[A-Z0-9]{4})\b",
     re.IGNORECASE,
 )
 
@@ -175,6 +175,24 @@ _RE_IDIQ_MIN_GUARANTEE = re.compile(
 _RE_IDIQ_TERM = re.compile(
     r"(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)"
     r"\s+(year|month)s?(?:\s+period)?",
+    re.IGNORECASE,
+)
+# Captures total option period length from IDIQ award text.
+# Handles patterns like:
+#   "Base Period of 5 years with 3 one-year options"       → 3 × 12 = 36 months
+#   "Base Period of 5 years with Zero (0) Options"         → 0 months
+#   "5-year Base effective ... with 2 two-year options"    → 2 × 24 = 48 months
+#   "base period ... with no options"                      → 0 months
+_RE_IDIQ_OPTION_ZERO = re.compile(
+    r"\bwith\s+(?:zero\s*\(\s*0\s*\)|no)\s+options?\b",
+    re.IGNORECASE,
+)
+_RE_IDIQ_OPTION_COUNT = re.compile(
+    r"\bwith\s+"
+    r"(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)"
+    r"\s+"
+    r"(?:(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)[\s-](?:year|month)s?[\s-])?"
+    r"options?\b",
     re.IGNORECASE,
 )
 _RE_MIN_ORDER_QTY = re.compile(
@@ -276,6 +294,7 @@ class AwardParseResult:
     idiq_max_value: Optional[Decimal] = None
     idiq_min_guarantee: Optional[Decimal] = None
     idiq_term_months: Optional[int] = None
+    idiq_option_months: Optional[int] = None
     pr_number: Optional[str] = None
 
 
@@ -1519,6 +1538,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
         idiq_max_value: Optional[Decimal] = None
         idiq_min_guarantee: Optional[Decimal] = None
         idiq_term_months: Optional[int] = None
+        idiq_option_months: Optional[int] = None
         if contract_type == "IDIQ":
             m_max = _RE_IDIQ_MAX_VALUE.search(text)
             if m_max:
@@ -1529,6 +1549,25 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             m_term = _RE_IDIQ_TERM.search(text)
             if m_term:
                 idiq_term_months = _term_to_months(m_term.group(1), m_term.group(2))
+            if _RE_IDIQ_OPTION_ZERO.search(text):
+                idiq_option_months = 0
+            else:
+                m_opt = _RE_IDIQ_OPTION_COUNT.search(text)
+                if m_opt:
+                    raw_count = m_opt.group(1).lower()
+                    try:
+                        opt_count = int(raw_count)
+                    except ValueError:
+                        opt_count = _WORD_TO_NUM.get(raw_count, 0)
+                    if m_opt.group(2):
+                        raw_period = m_opt.group(2).lower()
+                        try:
+                            period_years = int(raw_period)
+                        except ValueError:
+                            period_years = _WORD_TO_NUM.get(raw_period, 1)
+                    else:
+                        period_years = 1
+                    idiq_option_months = opt_count * period_years * 12
             # Attach per-CLIN minimum delivery order quantity
             if clins:
                 moq_map = _extract_min_order_qty_map(
@@ -1566,6 +1605,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             idiq_max_value=idiq_max_value,
             idiq_min_guarantee=idiq_min_guarantee,
             idiq_term_months=idiq_term_months,
+            idiq_option_months=idiq_option_months,
         )
     except Exception as exc:
         return AwardParseResult(
@@ -1711,6 +1751,8 @@ def ingest_parsed_award(
                 parts.append(f"MAX:{int(parse_result.idiq_max_value)}")
             if parse_result.idiq_min_guarantee is not None:
                 parts.append(f"MIN:{int(parse_result.idiq_min_guarantee)}")
+            if parse_result.idiq_option_months is not None:
+                parts.append(f"OPT:{parse_result.idiq_option_months}")
             if len(parts) > 1:
                 qc.description = "|".join(parts)
                 qc.save(update_fields=["description"])

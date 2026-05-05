@@ -1133,6 +1133,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         document.getElementById('deleteClinModal').classList.remove('hidden');
     }
 
+    document.getElementById('cancelDeleteClin').addEventListener('click', function() {
+        document.getElementById('deleteClinModal').classList.add('hidden');
+        clinToDelete = null;
+        clinRowToDelete = null;
+        detailsRowToDelete = null;
+    });
+
     // Update the delete confirmation handler
     document.getElementById('confirmDeleteClin').addEventListener('click', async function() {
         if (!clinToDelete || clinToDelete === 'None') {
@@ -1145,7 +1152,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         }
 
         try {
-            const response = await fetch(`{% url 'processing:api_delete_processing_clin' id=process_contract.id clin_id=0 %}`.replace('0', clinToDelete), {
+            const deleteUrl = `/processing/api/processing/{{ process_contract.id }}/clins/${clinToDelete}/delete/`;
+            const response = await fetch(deleteUrl, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
@@ -1728,15 +1736,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                     input.dataset.modified = 'false';
                 });
 
-                // Auto-trigger Calc Splits for this CLIN after save
-                const calcBtn = document.querySelector(
-                    `.calc-clin-splits[data-clin-id="${clinId}"]`
-                );
-                if (calcBtn) {
-                    calcBtn.click();
+                // Auto-trigger Calc Splits only if Quote Total is non-zero
+                const quoteValueInput = document.getElementById(`quote_value_${clinId}`);
+                const quoteTotal = quoteValueInput ? parseFloat(quoteValueInput.value) : 0;
+
+                if (quoteTotal && quoteTotal > 0) {
+                    const calcBtn = document.querySelector(
+                        `.calc-clin-splits[data-clin-id="${clinId}"]`
+                    );
+                    if (calcBtn) {
+                        calcBtn.click();
+                    }
                 }
 
-                // Auto-trigger Update Contract Values after Calc Splits has time to complete
+                // Always update contract header values regardless of split calc
                 setTimeout(() => {
                     updateContractValues();
                 }, 800);
@@ -1776,17 +1789,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     // Function to save CLIN and then open NSN match modal
     async function saveAndOpenNsnMatch(button) {
         try {
-            // First save the CLIN
             const clinId = button.dataset.id;
+            const nsnText = button.dataset.nsn || '';
+            const nsnDescription = button.dataset.description || '';
+
             const saveButton = document.querySelector(`button[onclick="saveClinDetails(this)"][data-clin-id="${clinId}"]`);
             if (saveButton) {
                 await saveClinDetails(saveButton);
             }
 
-            // Then open the NSN match modal
-            const nsnModal = document.querySelector('#nsnModal');
-            if (nsnModal && typeof openNsnModal === 'function') {
-                openNsnModal(button);
+            if (typeof openNsnModal === 'function') {
+                openNsnModal(clinId, nsnText, nsnDescription);
             }
         } catch (error) {
             console.error('Error in saveAndOpenNsnMatch:', error);
@@ -1797,17 +1810,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     // Function to save CLIN and then open Supplier match modal
     async function saveAndOpenSupplierMatch(button) {
         try {
-            // First save the CLIN
             const clinId = button.dataset.id;
+            const supplierText = button.dataset.supplier || '';
+
             const saveButton = document.querySelector(`button[onclick="saveClinDetails(this)"][data-clin-id="${clinId}"]`);
             if (saveButton) {
                 await saveClinDetails(saveButton);
             }
 
-            // Then open the Supplier match modal
-            const supplierModal = document.querySelector('#supplierModal');
-            if (supplierModal && typeof openSupplierModal === 'function') {
-                openSupplierModal(button);
+            if (typeof openSupplierModal === 'function') {
+                openSupplierModal(clinId, supplierText);
             }
         } catch (error) {
             console.error('Error in saveAndOpenSupplierMatch:', error);
@@ -1867,8 +1879,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                     }
                 }
 
-                // Reload the page to show all updated values including splits
-                window.location.reload();
             } else {
                 throw new Error(data.error || 'Unknown error occurred');
             }

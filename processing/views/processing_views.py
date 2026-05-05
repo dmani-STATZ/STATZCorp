@@ -1252,6 +1252,13 @@ def mark_ready_for_review(request, process_contract_id):
 def finalize_and_email_contract(request, process_contract_id):
     try:
         process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
+        # Normalize award_date to a plain date regardless of whether it's a date or datetime
+        from datetime import date as _date, datetime as _datetime
+        award_date_for_payment = (
+            process_contract.award_date.date()
+            if isinstance(process_contract.award_date, _datetime)
+            else process_contract.award_date
+        )
         process_clins = process_contract.clins.prefetch_related('splits')
         
         # Validate all CLINs before processing
@@ -1334,7 +1341,7 @@ def finalize_and_email_contract(request, process_contract_id):
             object_id=contract.id,
             payment_type='contract_value',
             payment_amount=process_contract.contract_value,
-            payment_date=process_contract.award_date.date(),
+            payment_date=award_date_for_payment,
             payment_info='Initial contract value',
             created_by=request.user,
             modified_by=request.user
@@ -1345,7 +1352,7 @@ def finalize_and_email_contract(request, process_contract_id):
             object_id=contract.id,
             payment_type='plan_gross',
             payment_amount=process_contract.plan_gross,
-            payment_date=process_contract.award_date.date(),
+            payment_date=award_date_for_payment,
             payment_info='Initial plan gross',
             created_by=request.user,
             modified_by=request.user
@@ -1403,7 +1410,7 @@ def finalize_and_email_contract(request, process_contract_id):
                 object_id=clin.id,
                 payment_type='item_value',
                 payment_amount=process_clin.item_value,
-                payment_date=process_contract.award_date.date(),
+                payment_date=award_date_for_payment,
                 payment_info='Initial item value',
                 created_by=request.user,
                 modified_by=request.user
@@ -1415,7 +1422,7 @@ def finalize_and_email_contract(request, process_contract_id):
                 object_id=clin.id,
                 payment_type='quote_value',
                 payment_amount=process_clin.quote_value,
-                payment_date=process_contract.award_date.date(),
+                payment_date=award_date_for_payment,
                 payment_info='Initial quote value',
                 created_by=request.user,
                 modified_by=request.user
@@ -2676,7 +2683,12 @@ def delete_queue_contract(request, queue_id):
 
 def _unpack_idiq_meta(description: str) -> dict:
     """Unpack IDIQ_META shadow-schema string from ProcessContract.description."""
-    result = {'term_months': None, 'max_value': None, 'min_guarantee': None}
+    result = {
+        'term_months': None,
+        'max_value': None,
+        'min_guarantee': None,
+        'option_months': None,
+    }
     if not description or not description.startswith('IDIQ_META'):
         return result
     for part in description.split('|')[1:]:
@@ -2695,6 +2707,11 @@ def _unpack_idiq_meta(description: str) -> dict:
                 result['min_guarantee'] = Decimal(part[4:])
             except InvalidOperation:
                 pass
+        elif part.startswith('OPT:'):
+            try:
+                result['option_months'] = int(part[4:])
+            except ValueError:
+                pass
     return result
 
 
@@ -2704,6 +2721,7 @@ def idiq_processing_edit(request, process_contract_id):
     process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
     meta = _unpack_idiq_meta(process_contract.description or '')
     term_months = meta['term_months']
+    option_months = meta['option_months']
     clins = process_contract.clins.all().order_by('item_number')
     context = {
         'process_contract': process_contract,
@@ -2712,6 +2730,8 @@ def idiq_processing_edit(request, process_contract_id):
         'idiq_term_years': (term_months / 12) if term_months else None,
         'idiq_max_value': meta['max_value'],
         'idiq_min_guarantee': meta['min_guarantee'],
+        'idiq_option_months': option_months,
+        'idiq_option_years': (option_months / 12) if option_months is not None else None,
     }
     return render(request, 'processing/idiq_processing_edit.html', context)
 
@@ -2748,12 +2768,19 @@ def finalize_idiq_contract(request, process_contract_id):
         except InvalidOperation:
             min_guarantee = None
 
+        try:
+            option_months_raw = request.POST.get('option_months', '')
+            option_months = int(option_months_raw) if option_months_raw != '' else None
+        except (ValueError, TypeError):
+            option_months = None
+
         # Create the canonical IdiqContract record
         idiq_contract = IdiqContract.objects.create(
             contract_number=process_contract.contract_number,
             buyer=process_contract.buyer,
             award_date=process_contract.award_date,
             term_length=term_months,
+            option_length=option_months,
             max_value=max_value,
             min_guarantee=min_guarantee,
             closed=False,

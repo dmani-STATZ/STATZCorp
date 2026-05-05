@@ -27,7 +27,7 @@
     <!-- Contract Header Card -->
     <div class="card card-padded mb-6">
         <h2 class="text-lg font-semibold mb-4">Contract Header</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
             <!-- Term -->
             <div>
@@ -46,6 +46,25 @@
                     </span>
                 </div>
                 <input type="hidden" name="term_months" id="term_months_hidden" value="{{ idiq_term_months|default:'' }}">
+            </div>
+
+            <!-- Option Length -->
+            <div>
+                <label class="label mb-1 block">Option Length (Years)</label>
+                <div class="input-group input-group-sm">
+                    <input type="number"
+                           id="option_years_input"
+                           class="form-control"
+                           step="0.5"
+                           min="0"
+                           value="{% if idiq_option_years is not None %}{{ idiq_option_years }}{% endif %}"
+                           placeholder="e.g. 0"
+                           oninput="updateOptionMonths(this.value)">
+                    <span class="input-group-text" id="option_months_display">
+                        {% if idiq_option_months is not None %}{{ idiq_option_months }} months{% else %}—{% endif %}
+                    </span>
+                </div>
+                <input type="hidden" name="option_months" id="option_months_hidden" value="{% if idiq_option_months is not None %}{{ idiq_option_months }}{% endif %}">
             </div>
 
             <!-- Max Value -->
@@ -369,6 +388,20 @@ function updateTermMonths(yearsVal) {
     }
 }
 
+function updateOptionMonths(yearsVal) {
+    const years = parseFloat(yearsVal);
+    const monthsHidden = document.getElementById('option_months_hidden');
+    const monthsDisplay = document.getElementById('option_months_display');
+    if (isNaN(years) || yearsVal === '') {
+        monthsHidden.value = '';
+        monthsDisplay.textContent = '—';
+    } else {
+        const months = Math.round(years * 12);
+        monthsHidden.value = months;
+        monthsDisplay.textContent = months + ' months';
+    }
+}
+
 // ── NSN Modal ─────────────────────────────────────────────────────────────────
 function openNsnModal(clinId) {
     activeClinId = clinId;
@@ -653,12 +686,14 @@ function checkFinalizeReady() {
 // ── Finalize ──────────────────────────────────────────────────────────────────
 function finalizeIdiq() {
     const termMonths = document.getElementById('term_months_hidden').value;
+    const optionMonths = document.getElementById('option_months_hidden').value;
     const maxValue = document.getElementById('max_value_input').value;
     const minGuarantee = document.getElementById('min_guarantee_input').value;
 
     const form = new FormData();
     form.append('csrfmiddlewaretoken', getCsrf());
     if (termMonths) form.append('term_months', termMonths);
+    if (optionMonths !== '') form.append('option_months', optionMonths);
     if (maxValue) form.append('max_value', maxValue);
     if (minGuarantee) form.append('min_guarantee', minGuarantee);
 

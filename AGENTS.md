@@ -215,7 +215,7 @@ Slow down and inspect deeply before editing when changes involve:
 
 ### IDIQ Parser Detection and Shadow-Schema Metadata
 
-**Contract number regex:** `_RE_DLA_CONTRACT` uses `[A-Z0-9]{4}` for the trailing segment (was `\d{4}`) so alphanumeric suffixes like `SPE7M5-26-D-60JK` are matched.
+**Contract number regex:** `_RE_DLA_CONTRACT` uses `[A-Z0-9]{4}` for the trailing segment (was `\d{4}`) so alphanumeric suffixes like `SPE7M5-26-D-60JK` are matched. Position-9 (the single letter after the second hyphen) is restricted to valid award-type characters `[DFPVCMAN]` so solicitation (`R`) and quote (`Q`) references in body text are not mistaken for contract numbers.
 
 **Detection (two independent gates — either triggers IDIQ):**
 1. **Type-code gate:** Strip hyphens from the extracted contract number and check `position[8] == 'D'` (1-based: 9th character). For `SPE7M5-26-D-60JK` → bare `SPE7M526D60JK`[8] = `'D'`.
@@ -229,24 +229,27 @@ Both gates set `contract_type = "IDIQ"` after `_apply_contract_number_rules`.
 | `idiq_max_value` | `Contract Maximum Value: $<amount>` |
 | `idiq_min_guarantee` | `Guaranteed Contract Minimum Quantity: <qty>` |
 | `idiq_term_months` | `_RE_IDIQ_TERM` captures `(one\|...\|N) (year\|month)[s] [period]` → `_term_to_months(qty, unit)` |
+| `idiq_option_months` | `_RE_IDIQ_OPTION_ZERO` / `_RE_IDIQ_OPTION_COUNT` on body text (e.g. “with 3 one-year options”, “Zero (0) Options”) → total option span in months |
 
 `_term_to_months(qty_str, unit)` accepts either a word (`"one"`, `"five"`) or digit string. Examples: `"one", "year"` → 12; `"five", "year"` → 60; `"6", "month"` → 6.
+
+**`option_length` field:** `IdiqContract.option_length` stores total option period in months (integer). `0` is a valid value meaning Zero Options. Use `is not None` checks, not truthiness, when testing whether a value has been set.
 
 Per-CLIN: `_extract_min_order_qty_map` scans up to 800 chars after each CLIN item-number marker for "Minimum Delivery Order Quantity". Result stored in `ClinParseResult.min_order_qty_text`.
 
 **Shadow Schema format** — packed into `QueueContract.description` by `ingest_parsed_award` when `contract_type` is IDIQ:
 ```
-IDIQ_META|TERM:12|MAX:350000|MIN:19
+IDIQ_META|TERM:12|OPT:36|MAX:350000|MIN:19
 ```
-All three segments are optional; only segments with extracted values are appended. `start_processing` copies `queue_item.description` into `ProcessContract.description` so metadata survives into the edit phase.
+`TERM`, `OPT`, `MAX`, and `MIN` segments are optional; only segments with extracted values are appended. `start_processing` copies `queue_item.description` into `ProcessContract.description` so metadata survives into the edit phase.
 
 For IDIQ CLINs, `QueueClin.nsn_description` is set to the min delivery order quantity string (e.g. `"5 EA"`) rather than item nomenclature, so the IDIQ processing page can initialise min-order-qty inputs from parsed data.
 
 **Routing:** `start_processing` checks `queue_item.contract_type == 'IDIQ'` and returns a `redirect_url` pointing to `processing:idiq_processing_edit` instead of the standard `process_contract_edit` view. The queue JS reads `data.redirect_url` (new field) if present before falling back to the default edit URL.
 
-**IDIQ Processing Page (`idiq_processing_edit`):** Unpacks the shadow-schema string from `process_contract.description`, displays Term / Max Value / Min Guarantee editable header fields, and a CLIN table with NSN Match, Supplier Match, and Min Order Qty inputs.
+**IDIQ Processing Page (`idiq_processing_edit`):** Unpacks the shadow-schema string from `process_contract.description`, displays Term / Option Length / Max Value / Min Guarantee editable header fields, and a CLIN table with NSN Match, Supplier Match, and Min Order Qty inputs.
 
-**Finalization (`finalize_idiq_contract`):** Validates all CLINs are matched, creates one `IdiqContract` and one `IdiqContractDetails` per CLIN, then deletes the `ProcessContract` and `QueueContract` records in a single `transaction.atomic` block.
+**Finalization (`finalize_idiq_contract`):** Validates all CLINs are matched, creates one `IdiqContract` (including `term_length` and `option_length` from the header POST) and one `IdiqContractDetails` per CLIN, then deletes the `ProcessContract` and `QueueContract` records in a single `transaction.atomic` block.
 
 **Schema additions (migrations):**
 - `QueueContract.description` (TextField, null=True) — `processing/0017`

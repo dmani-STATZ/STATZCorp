@@ -228,6 +228,8 @@ field does not already exist there.
 
 14. **`solicitation_type` is regex-extracted with `SDVOSB` as the default.** `_extract_solicitation_type` in `pdf_parser.py` uses FAR-clause references (52.219-27/-29/-30/-3/-4/-18/-6) as the primary path and narrative phrases as fallback; when neither matches, the value defaults to `SDVOSB` and a parse note is appended. There is no Claude API fallback for this field. The parser previously hardcoded `STATZ` (a sales-class value) into `solicitation_type` at five sites — fixed in the same change that introduced extraction. Do not reintroduce `STATZ` as a solicitation_type value.
 
+15. **`option_length` on `IdiqContract`:** Stores total option period length in months (integer). `0` is valid (Zero Options). In views, templates, and JS, use explicit checks (`is not None`, `!== ''` for form fields), not truthiness, so `0` is not dropped.
+
 ---
 
 ## 14. Safe Change Workflow
