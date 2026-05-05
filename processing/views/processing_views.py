@@ -255,7 +255,7 @@ def start_processing(request, queue_id):
                 ProcessClin.objects.create(
                     process_contract=process_contract,
                     item_number=clin_data.item_number,
-                    item_type=clin_data.item_type,
+                    item_type=clin_data.item_type if clin_data.item_type else 'P',
                     nsn_text=clin_data.nsn,
                     nsn_description_text=clin_data.nsn_description,
                     supplier_text=clin_data.supplier,

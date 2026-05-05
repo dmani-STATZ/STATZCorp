@@ -8,7 +8,7 @@ from django.views.decorators.http import require_http_methods
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, ContractFinanceLine, FinanceLinePayment, PaymentHistory
+from ..models import Contract, Clin, ClinShipment, ContractFinanceLine, FinanceLinePayment, PaymentHistory
 
 
 def _active_company_or_error(request):
@@ -87,6 +87,7 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
     model_map = {
         'contract': Contract,
         'clin': Clin,
+        'clinshipment': ClinShipment,
     }
 
     if entity_type not in model_map:
@@ -101,6 +102,11 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
 
     if entity_type == 'contract':
         entity = get_object_or_404(Contract.objects.filter(company=company), id=entity_id)
+    elif entity_type == 'clinshipment':
+        entity = get_object_or_404(
+            ClinShipment.objects.filter(clin__contract__company=company),
+            id=entity_id,
+        )
     else:
         entity = get_object_or_404(
             Clin.objects.filter(contract__company=company),
@@ -137,11 +143,14 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
         try:
             data = json.loads(request.body)
 
-            valid_types = (
-                PaymentHistory.get_contract_payment_types()
-                if entity_type == 'contract'
-                else PaymentHistory.get_clin_payment_types()
-            )
+            if entity_type == 'contract':
+                valid_types = PaymentHistory.get_contract_payment_types()
+            elif entity_type == 'clin':
+                valid_types = PaymentHistory.get_clin_payment_types()
+            elif entity_type == 'clinshipment':
+                valid_types = PaymentHistory.get_clinshipment_payment_types()
+            else:
+                valid_types = []
 
             if payment_type not in valid_types:
                 return JsonResponse({
@@ -187,6 +196,22 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                 elif payment_type == 'wawf_payment':
                     clin.wawf_payment = new_total
                 clin.save()
+            elif entity_type == 'clinshipment':
+                shipment = ClinShipment.objects.get(
+                    id=entity_id,
+                    clin__contract__company=company
+                )
+                if payment_type == 'partial_item_value':
+                    shipment.item_value = new_total
+                elif payment_type == 'partial_quote_value':
+                    shipment.quote_value = new_total
+                elif payment_type == 'partial_paid_amount':
+                    shipment.paid_amount = new_total
+                elif payment_type == 'partial_wawf_payment':
+                    shipment.wawf_payment = new_total
+                shipment.save()
+                # Do not call _sync_clin_ship_fields here. Partial and CLIN
+                # financial fields are tracked independently.
 
             return JsonResponse({
                 'success': True,
@@ -228,9 +253,10 @@ def get_entity_details(request, entity_type, entity_id):
     model_map = {
         'contract': Contract,
         'clin': Clin,
+        'clinshipment': ClinShipment,
     }
 
-    if entity_type not in model_map:
+    if entity_type not in model_map and entity_type != 'finance_line':
         return JsonResponse({'error': f'Invalid entity type: {entity_type}'}, status=400)
 
     model = model_map[entity_type]
@@ -242,7 +268,7 @@ def get_entity_details(request, entity_type, entity_id):
                 'number': entity.contract_number,
                 'valid_payment_types': PaymentHistory.get_contract_payment_types(),
             }
-        else:
+        elif entity_type == 'clin':
             entity = get_object_or_404(
                 Clin.objects.filter(contract__company=company),
                 id=entity_id,
@@ -252,6 +278,20 @@ def get_entity_details(request, entity_type, entity_id):
                 'contract_number': entity.contract.contract_number if entity.contract else None,
                 'valid_payment_types': PaymentHistory.get_clin_payment_types(),
             }
+        elif entity_type == 'clinshipment':
+            shipment = get_object_or_404(
+                ClinShipment.objects.select_related('clin__contract'),
+                pk=entity_id,
+                clin__contract__company=company,
+            )
+            details = {
+                'number': f"Partial — CLIN {shipment.clin.item_number}",
+                'contract_number': shipment.clin.contract.contract_number
+                    if shipment.clin.contract else None,
+                'valid_payment_types': PaymentHistory.get_clinshipment_payment_types(),
+            }
+        else:
+            return JsonResponse({'error': f'Invalid entity type: {entity_type}'}, status=400)
 
         return JsonResponse({
             'success': True,

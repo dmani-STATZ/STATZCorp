@@ -12,5 +12,6 @@ def content_type_id(obj):
 
 @register.filter
 def get_item(dictionary, key):
-    """Get an item from a dictionary using bracket notation."""
-    return dictionary.get(key) 
+    if isinstance(dictionary, dict):
+        return dictionary.get(key)
+    return None

@@ -198,6 +198,7 @@ from .views.documents_views import (
     set_file_path_api,
     sharepoint_files_api,
 )
+from .views.split_views import recalc_splits
 
 app_name = "contracts"
 
@@ -656,6 +657,7 @@ urlpatterns = [
     path("clin/splits/<int:split_pk>/update/", update_clin_split, name="update_clin_split"),
     path("clin/splits/<int:split_pk>/delete/", delete_clin_split, name="delete_clin_split"),
     path("clin/<int:clin_pk>/splits/", get_clin_splits, name="get_clin_splits"),
+    path("contracts/<int:contract_pk>/splits/recalc/", recalc_splits, name="recalc_splits"),
     # FolderStack AJAX endpoints
     path("folder-stack/list/", folderstack_list, name="folderstack_list"),
     path("folder-stack/save/", folderstack_save, name="folderstack_save"),

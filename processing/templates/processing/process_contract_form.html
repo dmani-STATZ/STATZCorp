@@ -226,6 +226,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                 <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                             </svg>
                         </button>
+                        <button type="button"
+                                id="update-values-button"
+                                onclick="updateContractValues()"
+                                class="mt-2 w-full px-6 py-2 btn btn-outline-secondary rounded-md focus:outline-none focus:ring-2">
+                            Recalculate Totals
+                        </button>
                     </div>
                 </div>
             </div>
@@ -294,16 +300,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 <div class="card card-padded shadow-md">
                     <h2 class="text-xl font-semibold mb-4">Contract Actions</h2>
                     <div class="flex flex-col gap-3 w-full">
-                        <button
-                            type="button"
-                            id="update-values-button"
-                            onclick="updateContractValues()"
-                            class="btn btn-save w-full d-flex align-items-center justify-content-center gap-2 py-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Update Value and Plan Gross
-                        </button>
                         <button type="button"
                                 onclick="confirmCancel()"
                                 class="btn btn-caution w-full d-flex align-items-center justify-content-center gap-2 py-2">
@@ -315,44 +311,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                             Submit Contract and Create Email
                         </button>
                     </div>
-                </div>
-            </div>
-
-            <!-- Split summary (all CLINs) — read-only -->
-            <div class="lg:col-span-3">
-                <div class="card card-padded shadow-md mb-6">
-                    <h2 class="text-xl font-semibold mb-3">Split Summary (all CLINs)</h2>
-                    <p class="text-muted small mb-3">Rollup of per-CLIN splits. Edit splits inside each CLIN block below.</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Company</th>
-                                    <th class="text-end">Total Split Value</th>
-                                    <th class="text-end">Total Split Paid</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in process_clin_split_rollup %}
-                                <tr>
-                                    <td>{{ row.company_name|default:"—" }}</td>
-                                    <td class="text-end">{{ row.total_value|default_if_none:0|floatformat:2 }}</td>
-                                    <td class="text-end">{{ row.total_paid|default_if_none:0|floatformat:2 }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr><td colspan="3" class="text-muted">No splits entered yet.</td></tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot class="table-group-divider">
-                                <tr>
-                                    <th>Contract totals</th>
-                                    <th class="text-end">{{ process_contract.total_split_value|floatformat:2 }}</th>
-                                    <th class="text-end">{{ process_contract.total_split_paid|floatformat:2 }}</th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-2 mb-0">Contract value: {{ process_contract.contract_value|default:"0.00" }}</p>
                 </div>
             </div>
 
@@ -1728,7 +1686,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             // Add all CLIN input values to formData
             clinInputs.forEach(input => {
                 if (input.name) {
-                    formData.append(input.name, input.value);
+                    const isDateField = input.type === 'date';
+                    const value = input.value ?? '';
+
+                    // Always append date fields (including blank) so backend can clear nullable dates.
+                    if (isDateField || value !== undefined) {
+                        formData.append(input.name, value);
+                    }
                 }
             });
 
@@ -1763,6 +1727,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 clinInputs.forEach(input => {
                     input.dataset.modified = 'false';
                 });
+
+                // Auto-trigger Calc Splits for this CLIN after save
+                const calcBtn = document.querySelector(
+                    `.calc-clin-splits[data-clin-id="${clinId}"]`
+                );
+                if (calcBtn) {
+                    calcBtn.click();
+                }
+
+                // Auto-trigger Update Contract Values after Calc Splits has time to complete
+                setTimeout(() => {
+                    updateContractValues();
+                }, 800);
             } else {
                 throw new Error(data.error || 'Failed to save CLIN details');
             }

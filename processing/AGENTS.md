@@ -269,6 +269,8 @@ field does not already exist there.
 - Sidebar buttons standardized for centering (removed `.row`).
 - Vertical density optimized in CLIN detail blocks.
 - Persistent expansion state implemented via `localStorage`.
+- CLIN save auto-chain: after a successful CLIN save, the page auto-clicks that CLIN's **Calc Splits** button and then calls `updateContractValues()` after an 800ms delay. Both controls remain visible as manual overrides.
+- Supplier Due Date is intentionally optional. Leave it blank during ingestion and early processing; Contract Admins fill it later when POs are issued. Never treat this field as required.
 
 
 ## CSS / Styling Rules

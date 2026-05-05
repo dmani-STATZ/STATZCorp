@@ -485,6 +485,15 @@ class ClinSplit(models.Model):
     split_paid = models.DecimalField(
         max_digits=19, decimal_places=2, null=True, blank=True
     )
+    percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Split percentage for this company on this CLIN (e.g. 60.00 = 60%). "
+                  "Percentages across all splits for a given CLIN should sum to 100. "
+                  "Used by Recalc Splits to compute split_value from Adj Gross."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -513,6 +522,12 @@ class PaymentHistory(AuditModel):
         ('quote_value', 'Quote Value'),
         ('paid_amount', 'Paid Amount'),
         ('wawf_payment', 'Customer Payment'),  # display label; DB value remains wawf_payment
+
+        # Partial shipment (ClinShipment) payment types
+        ('partial_item_value', 'Partial Item Value'),
+        ('partial_quote_value', 'Partial Quote Value'),
+        ('partial_paid_amount', 'Partial Paid Amount'),
+        ('partial_wawf_payment', 'Partial Customer Payment'),
     ]
 
     # Generic relation fields
@@ -566,6 +581,16 @@ class PaymentHistory(AuditModel):
             'wawf_payment',
         ]
 
+    @classmethod
+    def get_clinshipment_payment_types(cls):
+        """Returns payment types valid for ClinShipment partials."""
+        return [
+            'partial_item_value',
+            'partial_quote_value',
+            'partial_paid_amount',
+            'partial_wawf_payment',
+        ]
+
     def clean(self):
         """Validates that the payment type is appropriate for the content object"""
         if self.content_type.model == 'contract' and self.payment_type not in self.get_contract_payment_types():
@@ -575,6 +600,10 @@ class PaymentHistory(AuditModel):
         elif self.content_type.model == 'clin' and self.payment_type not in self.get_clin_payment_types():
             raise ValidationError({
                 'payment_type': f'Payment type {self.get_payment_type_display()} is not valid for CLINs'
+            })
+        elif self.content_type.model == 'clinshipment' and self.payment_type not in self.get_clinshipment_payment_types():
+            raise ValidationError({
+                'payment_type': f'Payment type {self.get_payment_type_display()} is not valid for partial shipments'
             })
         super().clean()
 

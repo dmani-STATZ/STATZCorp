@@ -104,6 +104,9 @@ def add_processing_clin(request, id):
             source_clin.price_per_unit = 0
             source_clin.quote_value = 0
             # Keep special payment terms from source CLIN
+            # Ensure copied CLIN defaults to Production if item_type is blank
+            if not source_clin.item_type:
+                source_clin.item_type = 'P'
             source_clin.save()
             
             return JsonResponse({
@@ -117,6 +120,7 @@ def add_processing_clin(request, id):
             # If no source CLIN exists, create a blank one
             new_clin = ProcessClin.objects.create(
                 process_contract=process_contract,
+                item_type='P',
                 status='draft',
                 special_payment_terms=None  # Explicitly set to None
             )

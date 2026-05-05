@@ -75,6 +75,30 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         total_paid=Sum('split_paid'),
                     ).order_by('company_name')
                 )
+                # Per-CLIN split breakdown for Finance Audit accordion.
+                clin_splits_by_company = {}
+                for split in ClinSplit.objects.filter(
+                    clin__contract=self.object
+                ).select_related('clin').order_by('company_name', 'clin__item_number'):
+                    cname = split.company_name
+                    if cname not in clin_splits_by_company:
+                        clin_splits_by_company[cname] = []
+                    clin_splits_by_company[cname].append({
+                        'item_number': split.clin.item_number,
+                        'split_value': split.split_value,
+                        'split_paid': split.split_paid,
+                        'percentage': split.percentage,
+                    })
+                context['clin_splits_by_company'] = clin_splits_by_company
+
+                # Use the first non-null percentage found per company for summary display.
+                company_percentages = {}
+                for cname, rows in clin_splits_by_company.items():
+                    for row in rows:
+                        if row['percentage'] is not None:
+                            company_percentages[cname] = row['percentage']
+                            break
+                context['company_percentages'] = company_percentages
 
                 finance_lines_qs = ContractFinanceLine.objects.filter(
                     clin__contract=self.object,

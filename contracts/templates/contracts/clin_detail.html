@@ -317,6 +317,7 @@ window.onTransactionSaved = function(data) {
                     {% csrf_token %}
                     <div id="clin-splits-root"
                          data-clin-id="{{ clin.id }}"
+                         data-contract-id="{{ clin.contract.id }}"
                          data-add-url="{% url 'contracts:add_clin_split' clin.id %}"
                          data-update-template="{% url 'contracts:update_clin_split' 12345 %}"
                          data-delete-template="{% url 'contracts:delete_clin_split' 12345 %}">
@@ -325,6 +326,7 @@ window.onTransactionSaved = function(data) {
                                 <thead>
                                     <tr>
                                         <th scope="col">Company</th>
+                                        <th scope="col" class="text-end" style="width:5rem">%</th>
                                         <th scope="col" class="text-end">Split value</th>
                                         <th scope="col" class="text-end">Split paid</th>
                                         <th scope="col" class="text-center" style="width:9rem">Actions</th>
@@ -334,8 +336,12 @@ window.onTransactionSaved = function(data) {
                                     {% for s in clin_splits %}
                                     <tr class="clin-split-data-row" data-id="{{ s.id }}"
                                         data-value="{% if s.split_value is not None %}{{ s.split_value }}{% endif %}"
-                                        data-paid="{% if s.split_paid is not None %}{{ s.split_paid }}{% endif %}">
+                                        data-paid="{% if s.split_paid is not None %}{{ s.split_paid }}{% endif %}"
+                                        data-percentage="{% if s.percentage is not None %}{{ s.percentage }}{% endif %}">
                                         <td class="clin-split-cell-company">{{ s.company_name }}</td>
+                                        <td class="text-end clin-split-cell-pct">
+                                            {% if s.percentage is not None %}{{ s.percentage|floatformat:1 }}%{% else %}—{% endif %}
+                                        </td>
                                         <td class="text-end clin-split-cell-value">{% if s.split_value is not None %}${{ s.split_value|floatformat:2 }}{% else %}—{% endif %}</td>
                                         <td class="text-end clin-split-cell-paid">{% if s.split_paid is not None %}${{ s.split_paid|floatformat:2 }}{% else %}—{% endif %}</td>
                                         <td class="text-center text-nowrap">
@@ -348,6 +354,7 @@ window.onTransactionSaved = function(data) {
                                 <tfoot>
                                     <tr class="table-secondary">
                                         <th scope="row">Total</th>
+                                        <td></td>
                                         <td class="text-end fw-semibold" id="clin-splits-foot-value">0.00</td>
                                         <td class="text-end fw-semibold" id="clin-splits-foot-paid">0.00</td>
                                         <td></td>

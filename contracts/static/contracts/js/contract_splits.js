@@ -84,6 +84,9 @@ const ClinSplits = {
                 <input type="text" class="form-control form-control-sm" name="company_name" required autocomplete="organization" />
             </td>
             <td class="text-end">
+                <input type="number" step="0.1" min="0" max="100" class="form-control form-control-sm text-end" name="percentage" placeholder="%" style="width:5rem" />
+            </td>
+            <td class="text-end">
                 <label class="form-label small visually-hidden">Split value</label>
                 <input type="number" step="0.01" class="form-control form-control-sm text-end" name="split_value" />
             </td>
@@ -103,6 +106,7 @@ const ClinSplits = {
 
     async _submitNew(tr) {
         const nameIn = tr.querySelector('[name=company_name]');
+        const pctIn = tr.querySelector('[name=percentage]');
         const vIn = tr.querySelector('[name=split_value]');
         const pIn = tr.querySelector('[name=split_paid]');
         const company = (nameIn && nameIn.value) ? nameIn.value.trim() : '';
@@ -121,7 +125,8 @@ const ClinSplits = {
                 body: JSON.stringify({
                     company_name: company,
                     split_value: this.parseNum(vIn && vIn.value) ?? 0,
-                    split_paid: this.parseNum(pIn && pIn.value) ?? 0
+                    split_paid: this.parseNum(pIn && pIn.value) ?? 0,
+                    percentage: this.parseNum(pctIn && pctIn.value)
                 })
             });
             const data = await res.json();
@@ -142,10 +147,13 @@ const ClinSplits = {
         tr.setAttribute('data-id', String(d.split_id));
         const sv = d.split_value != null ? d.split_value : '';
         const sp = d.split_paid != null ? d.split_paid : '';
+        const pct = d.percentage != null ? d.percentage : '';
         tr.setAttribute('data-value', String(sv));
         tr.setAttribute('data-paid', String(sp));
+        tr.setAttribute('data-percentage', String(pct));
         tr.innerHTML = `
             <td class="clin-split-cell-company">${(d.company_name || '').replace(/</g, '&lt;')}</td>
+            <td class="text-end clin-split-cell-pct">${d.percentage != null ? parseFloat(d.percentage).toFixed(1) + '%' : '—'}</td>
             <td class="text-end clin-split-cell-value">${this._formatMoneyCell(sv)}</td>
             <td class="text-end clin-split-cell-paid">${this._formatMoneyCell(sp)}</td>
             <td class="text-center text-nowrap">
@@ -177,9 +185,17 @@ const ClinSplits = {
         const company = tr.querySelector('.clin-split-cell-company').textContent.trim();
         const valText = (tr.getAttribute('data-value') != null) ? tr.getAttribute('data-value') : '';
         const paidText = (tr.getAttribute('data-paid') != null) ? tr.getAttribute('data-paid') : '';
+        const pctText = tr.getAttribute('data-percentage') || '';
         tr.innerHTML = `
             <td>
                 <input type="text" class="form-control form-control-sm" name="company_name" value="${company.replace(/"/g, '&quot;')}" />
+            </td>
+            <td class="text-end">
+                <input type="number" step="0.1" min="0" max="100" class="form-control form-control-sm text-end" name="percentage" value="${pctText}" placeholder="%" style="width:5rem" />
+                <div class="form-check form-check-inline mt-1" style="white-space:nowrap;font-size:0.7rem">
+                    <input class="form-check-input" type="checkbox" id="apply-all-${id}" name="apply_to_all_clins" />
+                    <label class="form-check-label" for="apply-all-${id}">Apply % to all CLINs</label>
+                </div>
             </td>
             <td class="text-end">
                 <input type="number" step="0.01" class="form-control form-control-sm text-end" name="split_value" value="${(valText !== 'null' && valText) ? valText : ''}" />
@@ -200,6 +216,8 @@ const ClinSplits = {
         const v = tr.querySelector('[name=split_value]');
         const p = tr.querySelector('[name=split_paid]');
         const c = tr.querySelector('[name=company_name]');
+        const pctIn = tr.querySelector('[name=percentage]');
+        const applyAll = tr.querySelector('[name=apply_to_all_clins]');
         try {
             const res = await fetch(this._urlUpdate(id), {
                 method: 'POST',
@@ -211,7 +229,9 @@ const ClinSplits = {
                 body: JSON.stringify({
                     company_name: c ? c.value.trim() : '',
                     split_value: this.parseNum(v && v.value),
-                    split_paid: this.parseNum(p && p.value)
+                    split_paid: this.parseNum(p && p.value),
+                    percentage: this.parseNum(pctIn && pctIn.value),
+                    apply_to_all_clins: applyAll ? applyAll.checked : false
                 })
             });
             const data = await res.json();
@@ -221,14 +241,17 @@ const ClinSplits = {
                 split_id: parseInt(id, 10),
                 company_name: c ? c.value.trim() : '',
                 split_value: v && v.value !== '' ? v.value : null,
-                split_paid: p && p.value !== '' ? p.value : null
+                split_paid: p && p.value !== '' ? p.value : null,
+                percentage: pctIn && pctIn.value !== '' ? pctIn.value : null
             };
             tr.setAttribute('data-value', v && v.value !== '' ? v.value : '');
             tr.setAttribute('data-paid', p && p.value !== '' ? p.value : '');
+            tr.setAttribute('data-percentage', pctIn && pctIn.value !== '' ? pctIn.value : '');
             tr.className = 'clin-split-data-row';
             tr.setAttribute('data-id', id);
             tr.innerHTML = `
             <td class="clin-split-cell-company">${(newRow.company_name || '').replace(/</g, '&lt;')}</td>
+            <td class="text-end clin-split-cell-pct">${pctIn && pctIn.value !== '' ? parseFloat(pctIn.value).toFixed(1) + '%' : '—'}</td>
             <td class="text-end clin-split-cell-value">${this._formatMoneyCell(newRow.split_value)}</td>
             <td class="text-end clin-split-cell-paid">${this._formatMoneyCell(newRow.split_paid)}</td>
             <td class="text-center text-nowrap">
@@ -236,7 +259,11 @@ const ClinSplits = {
                 <button type="button" class="btn btn-sm btn-outline-danger ms-1 clin-split-delete" data-id="${id}">Delete</button>
             </td>`;
             this.recalcFooter();
-            this.showMessage('success', 'Split updated');
+            if (data.applied_to_all) {
+                this.showMessage('success', '% applied to all CLINs on this contract');
+            } else {
+                this.showMessage('success', 'Split updated');
+            }
         } catch (e) {
             this.showMessage('error', String(e.message || e));
         }

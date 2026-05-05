@@ -1675,18 +1675,25 @@ def ingest_parsed_award(
             qc = QueueContract.objects.create(**create_kwargs)
 
         due_d_computed: Optional[date] = None
-        if parse_result.ado_days is not None and parse_result.award_date is not None:
+
+        # Priority 1: use the latest explicit CLIN delivery date if any CLINs have one
+        clin_dates = [
+            c.due_date
+            for c in (parse_result.clins or [])
+            if c.due_date is not None
+        ]
+        if clin_dates:
+            due_d_computed = max(clin_dates)
+
+        # Priority 2: fall back to award_date + ADO days only when no CLIN date exists
+        if (
+            due_d_computed is None
+            and parse_result.ado_days is not None
+            and parse_result.award_date is not None
+        ):
             due_d_computed = parse_result.award_date + timedelta(
                 days=parse_result.ado_days
             )
-        else:
-            clin_dates = [
-                c.due_date
-                for c in (parse_result.clins or [])
-                if c.due_date is not None
-            ]
-            if clin_dates:
-                due_d_computed = max(clin_dates)
 
         if due_d_computed is not None:
             dt = datetime.combine(due_d_computed, time.min)
