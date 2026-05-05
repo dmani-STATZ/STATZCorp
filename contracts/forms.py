@@ -426,7 +426,7 @@ class ClinForm(BaseModelForm):
             'contract', 'po_num_ext', 'tab_num',
             'clin_po_num', 'po_number', 'supplier',
             'nsn', 'ia', 'fob', 'order_qty', 'uom', 'ship_qty',
-            'due_date', 'supplier_due_date', 'ship_date',
+            'due_date', 'supplier_due_date', 'ship_date', 'pod_date',
             'special_payment_terms', 'special_payment_terms_paid', 
             'quote_value', 'paid_amount','unit_price', 'price_per_unit',
             'paid_date', 'wawf_payment', 'wawf_recieved', 
@@ -441,6 +441,9 @@ class ClinForm(BaseModelForm):
                 'type': 'date'
             }),
             'ship_date': forms.DateInput(attrs={
+                'type': 'date'
+            }),
+            'pod_date': forms.DateInput(attrs={
                 'type': 'date'
             }),
             'paid_amount': forms.NumberInput(attrs={

@@ -159,7 +159,7 @@ window.onTransactionSaved = function(data) {
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'due_date')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                    CLIN DUE DATE
+                                    CLIN Due Date
                                 </button>
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-due-date-value" class="{% if clin.due_date_late %}text-red-600{% endif %}">{{ clin.due_date|date:"m/d/Y"|default:"N/A" }}</span>
@@ -245,7 +245,7 @@ window.onTransactionSaved = function(data) {
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'supplier_due_date')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                    SUPPLIER DUE DATE
+                                    Target Ship Date
                                 </button>
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-supplier-due-date-value" class="{% if clin.supplier_due_date_late %}text-red-600{% endif %}">{{ clin.supplier_due_date|date:"m/d/Y"|default:"N/A" }}</span>

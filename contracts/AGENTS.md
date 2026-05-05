@@ -22,7 +22,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `Nsn` (National Stock Number) — owned by `products` app; `Clin` holds an FK to it
 - `SequenceNumber` — owned by `processing` app; used for PO/TAB number defaults
 - `UserCompanyMembership` — owned by `users` app; `CompanyForm` syncs to it but does not define it
-- The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves and on `ClinShipment` when `pod_date` changes. `Clin.ship_date` and `Clin.ship_qty` are tracked in `transactions/signals.py`; do not manually create `Transaction` rows when saving those fields — normal `Clin.save()` (including `save(update_fields=[...])` from views such as `complete_clin_shipping`) is enough for the audit trail.
+- The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves and on `ClinShipment` when **`ClinShipment.pod_date`** changes. **`Clin.pod_date`** is an optional CLIN-level `DateField` (null/blank, no late flag), distinct from shipment-level POD. `Clin.ship_date` and `Clin.ship_qty` are tracked in `transactions/signals.py`; do not manually create `Transaction` rows when saving those fields — normal `Clin.save()` (including `save(update_fields=[...])` from views such as `complete_clin_shipping`) is enough for the audit trail.
 
 **Role:** This is the core domain app of the project. Nearly every other app depends on or integrates with it.
 

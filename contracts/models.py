@@ -320,6 +320,7 @@ class Clin(AuditModel):
     supplier_due_date = models.DateField(null=True, blank=True)
     supplier_due_date_late = models.BooleanField(null=True, blank=True)
     ship_date = models.DateField(null=True, blank=True)
+    pod_date = models.DateField(null=True, blank=True)
     ship_date_late = models.BooleanField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='clin')
     payment_history = GenericRelation('PaymentHistory', related_query_name='clin')

@@ -34,11 +34,13 @@ def get_clin_details(request, clin_id):
             'special_payment_terms_paid': bool(clin.special_payment_terms_paid),
             'supplier_due_date': clin.supplier_due_date.strftime('%m/%d/%Y') if clin.supplier_due_date else 'N/A',
             'supplier_due_date_late': bool(clin.supplier_due_date_late),
+            'due_date_late': bool(clin.due_date_late),
             'order_qty': clin.order_qty if clin.order_qty is not None else '—',
             'uom': clin.uom or 'EA',
             'quoted_due_date': clin.supplier_due_date.strftime('%m/%d/%Y') if clin.supplier_due_date else (clin.due_date.strftime('%m/%d/%Y') if clin.due_date else 'N/A'),
             'due_date': clin.due_date.strftime('%m/%d/%Y') if clin.due_date else 'N/A',
             'ship_date': clin.ship_date.strftime('%m/%d/%Y') if clin.ship_date else '—',
+            'pod_date': clin.pod_date.strftime('%m/%d/%Y') if clin.pod_date else '—',
             'ship_qty': clin.ship_qty if clin.ship_qty is not None else '—',
             'total_shipped': float(clin.ship_qty) if clin.ship_qty is not None else 0,
             'is_partial': (
