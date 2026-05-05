@@ -537,24 +537,8 @@ def upload_award_pdf_to_sharepoint(pdf_file, queue_contract) -> bool:
     token = get_graph_service_token()
     drive_id = _get_drive_id()
 
-    company = getattr(queue_contract, "company", None)
-    docs_path = (
-        (company.sharepoint_documents_path or "").strip().rstrip("/")
-        if company
-        else ""
-    ) or _DEFAULT_DOCS_PATH
-
-    contract_number = (queue_contract.contract_number or "").strip()
-    contract_type = (queue_contract.contract_type or "").strip().upper()
-    idiq_number = (queue_contract.idiq_number or "").strip()
-
-    if contract_type == "DO" and idiq_number:
-        folder_path = f"{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}"
-    else:
-        folder_path = f"{docs_path}/Contract {contract_number}"
-
-    filename = f"{contract_number}.pdf"
-    file_path = f"{folder_path}/{filename}"
+    file_path = build_queue_contract_pdf_path(queue_contract)
+    folder_path, _ = file_path.rsplit("/", 1)
 
     # Check if the file is already in SharePoint before uploading
     if _check_path_exists(token, drive_id, file_path):
@@ -592,23 +576,9 @@ def check_contract_sharepoint_status(queue_contract) -> Dict[str, bool]:
     token = get_graph_service_token()
     drive_id = _get_drive_id()
 
-    company = getattr(queue_contract, "company", None)
-    docs_path = (
-        (company.sharepoint_documents_path or "").strip().rstrip("/")
-        if company
-        else ""
-    ) or _DEFAULT_DOCS_PATH
-
     contract_number = (queue_contract.contract_number or "").strip()
-    contract_type = (queue_contract.contract_type or "").strip().upper()
-    idiq_number = (queue_contract.idiq_number or "").strip()
-
-    if contract_type == "DO" and idiq_number:
-        folder_path = f"{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}"
-    else:
-        folder_path = f"{docs_path}/Contract {contract_number}"
-
-    file_path = f"{folder_path}/{contract_number}.pdf"
+    file_path = build_queue_contract_pdf_path(queue_contract)
+    folder_path, _ = file_path.rsplit("/", 1)
 
     folder_item = _check_path_exists(token, drive_id, folder_path)
     pdf_item = _check_path_exists(token, drive_id, file_path)
@@ -635,3 +605,52 @@ def check_contract_sharepoint_status(queue_contract) -> Dict[str, bool]:
         pdf_exists,
     )
     return {"folder_exists": folder_exists, "pdf_exists": pdf_exists}
+
+
+def build_queue_contract_pdf_path(queue_contract) -> str:
+    """
+    Build the canonical SharePoint award PDF path for a QueueContract.
+    """
+    contract_number = (queue_contract.contract_number or "").strip()
+    contract_type = (queue_contract.contract_type or "").strip().upper()
+    idiq_number = (queue_contract.idiq_number or "").strip()
+
+    company = getattr(queue_contract, "company", None)
+    docs_path = (
+        (company.sharepoint_documents_path or "").strip().rstrip("/")
+        if company
+        else ""
+    ) or _DEFAULT_DOCS_PATH
+
+    if contract_type == "DO" and idiq_number:
+        folder_path = f"{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}"
+    else:
+        folder_path = f"{docs_path}/Contract {contract_number}"
+
+    return f"{folder_path}/{contract_number}.pdf"
+
+
+def download_award_pdf_bytes(queue_contract) -> bytes:
+    """
+    Download the raw bytes of the award PDF from SharePoint for a QueueContract.
+    The file path is constructed via build_queue_contract_pdf_path().
+    Raises RuntimeError if the file does not exist or the download fails.
+    """
+    file_path = build_queue_contract_pdf_path(queue_contract)
+    token = get_graph_service_token()
+    drive_id = _get_drive_id()
+    enc_drive = quote(drive_id, safe="!_")
+    enc_path = quote(file_path, safe="/")
+    url = f"{GRAPH_BASE}/drives/{enc_drive}/root:/{enc_path}:/content"
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(url, headers=headers, timeout=120, allow_redirects=True)
+    if resp.status_code == 404:
+        raise RuntimeError(
+            f"Award PDF not found in SharePoint at path: {file_path}"
+        )
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"SharePoint PDF download failed (path={file_path!r}) "
+            f"with HTTP {resp.status_code}: {resp.text[:300]}"
+        )
+    return resp.content

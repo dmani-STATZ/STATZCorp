@@ -73,6 +73,26 @@
 - `upload_award_pdf` validates `.pdf` extensions, calls `parse_award_pdf` and `ingest_parsed_award` (from `processing.services.pdf_parser`) inside per-file `transaction.atomic()` blocks, returns JSON `results` per file, and calls `save_to_sharepoint` (no-op logger stub) after each successful ingestion for a future SharePoint/Microsoft Graph integration.
 - `pdf_parser.py` implements `parse_award_pdf` and `ingest_parsed_award`. Key behaviors: Section B is extracted precisely using `_section_b_slice()` — finds first SECTION B header, stops at the next SECTION X header (any letter except B), sends the full extracted text to the Claude API with no character truncation. Two CLIN table formats handled: Variant 2 (DLA Maritime/Land — CLIN PR PRLI UI header, NSN/MATERIAL: line, DELIVER BY: keyword, e.g. SPE7M3 contracts) and Variant 1 (DLA Aviation — ITEM NO. SUPPLIES/SERVICES header, inline NSN, CAGE/PN: supplier line, DELIVERY DATE: keyword, e.g. SPE4A7 contracts). Per-CLIN supplier is extracted from CAGE/PN: cage code within each CLIN block; falls back to Block 9 contractor cage only when not present. Block 9 is always STATZ (the contractor/distributor) — never the actual supplier. DLA S-codes (e.g. S00000053) are FAT/PLT service CLINs — stored as-is in the NSN field, description extracted from the plain English label preceding the CLIN row (e.g. 'Contractor First Article Test'). **Contract due date priority:** `QueueContract.due_date` is set by CLIN-level `DELIVERY DATE` values first (latest/max across all CLINs). ADO-based calculation (`award_date + ado_days`) is used only as a fallback when no CLIN delivery dates are present. `uom` is copied from `QueueClin` to `ProcessClin` in `start_processing` — if new fields are added to `QueueClin` they must be explicitly added to the `ProcessClin.objects.create()` call or they will be silently dropped.
 
+### Parse from SharePoint
+The queue table supports parsing award PDFs directly from SharePoint without
+a file upload. When a scan confirms a PDF exists (`award_pdf_status = 'uploaded'`)
+and the contract is not yet successfully parsed (`pdf_parse_status != 'success'`),
+a "Parse" button appears in the SharePoint PDF column.
+
+Endpoint: `POST /processing/queue/<queue_id>/parse-from-sharepoint/`
+- Downloads the PDF bytes from SharePoint via `download_award_pdf_bytes()`
+  in `users/sharepoint_services.py`
+- Passes bytes to `parse_award_pdf()` via a `BytesIO` wrapper
+- Calls `ingest_parsed_award()` to update the `QueueContract`
+- Does NOT call `save_to_sharepoint()` — the file is already there
+- Returns the same JSON shape as `upload_award_pdf` so `toastPdfResultRow()`
+  handles the result display
+
+PDF path construction is centralized in `build_queue_contract_pdf_path(queue_contract)`
+in `users/sharepoint_services.py`. Path rules:
+- DO contracts: `{docs_path}/Contract {idiq_number}/Delivery Order {contract_number}/{contract_number}.pdf`
+- All others (PO, AWD, IDIQ, MOD, AMD): `{docs_path}/Contract {contract_number}/{contract_number}.pdf`
+
 ### IDIQ contract number and option metadata (PDF parser)
 
 - **IDIQ contract number parsing:** `_RE_DLA_CONTRACT` restricts position-9 to valid award-type characters `[DFPVCMAN]`. Solicitation (`R`) and quote (`Q`) type codes are excluded so solicitation references embedded in IDIQ body text (e.g. incorporated-by-reference sol numbers) are not mistaken for the contract number when pdfplumber’s text order places body text ahead of page-1 headers.

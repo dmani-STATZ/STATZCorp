@@ -35,6 +35,7 @@ from .views.processing_views import (
     idiq_processing_edit,
     finalize_idiq_contract,
     scan_sharepoint_status,
+    parse_award_pdf_from_sharepoint,
 )
 from .views.api_views import (
     get_processing_contract,
@@ -92,6 +93,7 @@ urlpatterns = [
 
     # SharePoint
     path('queue/scan-sharepoint/', scan_sharepoint_status, name='scan_sharepoint_status'),
+    path('queue/<int:queue_id>/parse-from-sharepoint/', parse_award_pdf_from_sharepoint, name='parse_award_pdf_from_sharepoint'),
 
     # File Management
     path('download-template/', download_csv_template, name='download_csv_template'),

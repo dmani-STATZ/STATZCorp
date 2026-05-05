@@ -38,7 +38,7 @@ from products.models import Nsn
 from suppliers.models import Supplier
 import csv
 import os
-from io import StringIO
+from io import BytesIO, StringIO
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
@@ -2093,6 +2093,7 @@ def scan_sharepoint_status(request):
                 "pdf_status": qc.award_pdf_status,
                 "folder_exists": status["folder_exists"],
                 "pdf_exists": status["pdf_exists"],
+                "pdf_parse_status": qc.pdf_parse_status or "",
             })
         except Exception as exc:
             logger.warning("SharePoint scan failed for queue %s: %s", qc.pk, exc)
@@ -2205,6 +2206,84 @@ def upload_award_pdf(request):
             )
 
     return JsonResponse({"results": results})
+
+
+@login_required
+@require_POST
+def parse_award_pdf_from_sharepoint(request, queue_id):
+    """
+    Download the award PDF for a queued contract from SharePoint and parse it
+    server-side. No file upload required — the PDF must already exist in SharePoint
+    (confirmed by a prior scan). Returns the same JSON shape as upload_award_pdf
+    so the frontend can reuse toastPdfResultRow() for display.
+
+    Only processes contracts where pdf_parse_status is NOT 'success'.
+    Returns HTTP 400 if the contract is already successfully parsed.
+    """
+    from users.sharepoint_services import download_award_pdf_bytes
+
+    queue_contract = get_object_or_404(QueueContract, pk=queue_id)
+
+    # Guard: do not re-parse an already successfully parsed contract
+    if queue_contract.pdf_parse_status == "success":
+        return JsonResponse(
+            {"error": "Contract PDF has already been successfully parsed."},
+            status=400,
+        )
+
+    filename = f"{queue_contract.contract_number}.pdf"
+    parse_result = None
+
+    try:
+        pdf_bytes = download_award_pdf_bytes(queue_contract)
+        pdf_file = BytesIO(pdf_bytes)
+        pdf_file.name = filename  # pdf_parser checks .name for logging
+
+        parse_result = parse_award_pdf(pdf_file)
+
+        with transaction.atomic():
+            updated_qc = ingest_parsed_award(parse_result, user=request.user)
+
+        # Do NOT call save_to_sharepoint here — the PDF is already in SharePoint.
+        # That is exactly why this endpoint exists.
+
+        return JsonResponse(
+            {
+                "results": [
+                    {
+                        "filename": filename,
+                        "contract_number": updated_qc.contract_number,
+                        "pdf_parse_status": updated_qc.pdf_parse_status,
+                        "pdf_parse_notes": updated_qc.pdf_parse_notes or "",
+                        "was_existing_record": True,
+                    }
+                ]
+            }
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "parse_award_pdf_from_sharepoint failed for queue_id=%s", queue_id
+        )
+        contract_number = (
+            getattr(parse_result, "contract_number", None)
+            if parse_result is not None
+            else queue_contract.contract_number
+        )
+        return JsonResponse(
+            {
+                "results": [
+                    {
+                        "filename": filename,
+                        "contract_number": contract_number,
+                        "pdf_parse_status": "error",
+                        "pdf_parse_notes": str(exc),
+                        "was_existing_record": True,
+                    }
+                ]
+            },
+            status=500,
+        )
 
 
 @require_http_methods(["POST"])

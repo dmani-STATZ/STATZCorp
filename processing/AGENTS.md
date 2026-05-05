@@ -65,6 +65,15 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 ### Before changing award PDF intake
 - Before changing award PDF intake: `_section_b_slice()` extracts text from SECTION B to the next SECTION X — do not add character limits or reintroduce `_RE_SECTION_B` (it was removed). The full Section B goes to `_extract_clins_via_claude_api()` which calls claude-sonnet-4-20250514. Two CLIN variants exist — see the prompt in `_extract_clins_via_claude_api` for format examples; both variants are documented with examples in the prompt itself. `_RE_DELIVER_BY` matches both DELIVER BY: and DELIVERY DATE: — do not split these back into separate patterns. Per-CLIN CAGE/PN: cage code is the manufacturer/supplier; Block 9 is always STATZ. S-codes are valid NSN values — do not null them, do not skip those CLINs, the description comes from the label preceding the CLIN row. Contract due date logic: ADO days (Block 10) + award date takes priority; fallback is latest CLIN due date. `uom` must be explicitly copied in `start_processing` `ProcessClin.objects.create()` — this was a bug fixed in this session; any new `QueueClin` fields added in future must follow the same pattern.
 
+### SharePoint PDF parse helpers
+- `users/sharepoint_services.build_queue_contract_pdf_path(queue_contract)` —
+  single source of truth for SharePoint PDF path from a QueueContract. Use this
+  instead of constructing paths inline anywhere in the processing app.
+- `users/sharepoint_services.download_award_pdf_bytes(queue_contract)` —
+  downloads raw PDF bytes from SharePoint. Raises `RuntimeError` on 404 or HTTP error.
+- Never call `save_to_sharepoint()` from `parse_award_pdf_from_sharepoint` —
+  the file is already in SharePoint, that is the entire premise of the endpoint.
+
 ---
 
 ## 4. Local Architecture / Change Patterns
