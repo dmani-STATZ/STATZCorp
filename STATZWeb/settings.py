@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "STATZWeb",
     "users.apps.UsersConfig",
     "inventory.apps.InventoryConfig",
+    "imports",
     "contracts.apps.ContractsConfig",
     "sales.apps.SalesConfig",
     "accesslog.apps.AccesslogConfig",

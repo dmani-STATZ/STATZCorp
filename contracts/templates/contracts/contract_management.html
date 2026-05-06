@@ -471,7 +471,18 @@
                                 </tr>
                                 <tr>
                                     <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;">POD Date:</td>
-                                    <td style="font-size:13px; font-weight:500; padding:3px 0;"><span>{% if selected_clin.pod_date %}{{ selected_clin.pod_date|date:"m/d/Y" }}{% else %}—{% endif %}</span></td>
+                                    <td style="font-size:13px; font-weight:500; padding:3px 0;">
+                                        <span id="cd-pod-date"
+                                            {% if pod_status == 'partial' %}style="color: var(--bs-danger);"
+                                            {% elif pod_status == 'full' %}style="color: var(--bs-success);"
+                                            {% endif %}>
+                                            {% if selected_clin.pod_date %}
+                                                {{ selected_clin.pod_date|date:"m/d/Y" }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </span>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td colspan="2" style="padding-top:8px; border-top:0.5px solid var(--bs-border-color);">
@@ -566,15 +577,15 @@
                 </div>
             </div>
             <!-- Contract tab content -->
-            <div id="notes-panel-contract" class="notes-panel space-y-2 overflow-y-auto" style="max-height: 360px">
+            <div id="notes-panel-contract" class="notes-panel overflow-y-auto" style="max-height: 360px">
                 {% include "contracts/partials/notes_list.html" with notes=contract_notes entity_type="contract" show_note_type=False content_type_id=contract_content_type_id object_id=contract.id note_empty_msg="No contract notes" %}
             </div>
             <!-- CLIN tab content (single panel, populated via fetch when a CLIN tab is clicked) -->
-            <div id="notes-panel-clin" class="notes-panel hidden space-y-2 overflow-y-auto" style="max-height: 360px">
+            <div id="notes-panel-clin" class="notes-panel hidden overflow-y-auto" style="max-height: 360px">
                 {% if selected_clin %}
                 {% include "contracts/partials/notes_list.html" with notes=clin_notes entity_type="clin" show_note_type=False content_type_id=clin_content_type_id object_id=selected_clin.id note_empty_msg="No CLIN notes" %}
                 {% else %}
-                <p class="text-gray-500 text-center py-2 text-sm">{% if clins %}Click a CLIN tab above to view its notes.{% else %}No CLINs in this contract.{% endif %}</p>
+                <p class="text-center text-muted py-2 small">{% if clins %}Click a CLIN tab above to view its notes.{% else %}No CLINs in this contract.{% endif %}</p>
                 {% endif %}
             </div>
         </div>
@@ -1257,6 +1268,10 @@ async function openEditNoteModal(button) {
     const objectId = button.dataset.objectId;
     const entityType = button.dataset.entityType;
 
+    if (typeof window.noteModalApplyAddLayout === 'function') {
+        window.noteModalApplyAddLayout();
+    }
+
     const noteModal = document.getElementById('noteModal');
     const noteModalTitle = document.getElementById('noteModalTitle');
     const noteForm = document.getElementById('noteForm');
@@ -1342,6 +1357,9 @@ async function openEditNoteModal(button) {
             reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
             noteText: (noteData.note || (noteTextArea && noteTextArea.value) || '')
         });
+        if (typeof window.noteModalApplyEditLayout === 'function') {
+            window.noteModalApplyEditLayout(canEdit);
+        }
     } catch (error) {
         console.error('Failed to load note detail JSON:', error);
         noteTextArea.value = decodeUnicodeEscapes(button.dataset.noteText || '');
@@ -1351,6 +1369,9 @@ async function openEditNoteModal(button) {
             reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
             noteText: noteTextArea ? noteTextArea.value : ''
         });
+        if (typeof window.noteModalApplyEditLayout === 'function') {
+            window.noteModalApplyEditLayout(true);
+        }
     }
 
     noteModal.classList.remove('hidden');
@@ -1769,6 +1790,11 @@ function fetchClinDetails(clinId) {
                 : `<span id="cd-nsn">${fmt(d.nsn)}</span>`;
             const dueDateLateClass = d.due_date_late ? 'text-red-600' : '';
             const supplierDueDateLateClass = d.supplier_due_date_late ? 'text-red-600' : '';
+            const podColor = d.pod_status === 'partial'
+                ? 'color: var(--bs-danger);'
+                : d.pod_status === 'full'
+                    ? 'color: var(--bs-success);'
+                    : '';
             panel.innerHTML = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 28px;">
                     <div>
@@ -1829,7 +1855,7 @@ function fetchClinDetails(clinId) {
                             </tr>
                             <tr>
                                 <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;">POD Date:</td>
-                                <td style="font-size:13px; font-weight:500; padding:3px 0;"><span>${fmt(d.pod_date)}</span></td>
+                                <td style="font-size:13px; font-weight:500; padding:3px 0;"><span id="cd-pod-date" style="${podColor}">${fmt(d.pod_date)}</span></td>
                             </tr>
                             <tr>
                                 <td colspan="2" style="padding-top:8px; border-top:0.5px solid var(--bs-border-color);">
@@ -1901,6 +1927,18 @@ function saveLogFields() {
     });
 }
 
+/** When notes HTML is injected via AJAX, the partial may include another #noteFullViewModal; keep one and attach to body for correct stacking. */
+window.dedupeNoteFullViewModals = function dedupeNoteFullViewModals() {
+    var modals = document.querySelectorAll('#noteFullViewModal');
+    for (var i = 1; i < modals.length; i++) {
+        modals[i].remove();
+    }
+    var one = document.getElementById('noteFullViewModal');
+    if (one && one.parentElement && one.parentElement !== document.body) {
+        document.body.appendChild(one);
+    }
+};
+
 function switchNotesTab(tab, clinId) {
     document.querySelectorAll('.notes-panel').forEach(panel => panel.classList.add('hidden'));
     document.querySelectorAll('[aria-label="Notes tabs"] .app-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1935,6 +1973,9 @@ function fetchContractNotes() {
         .then(data => {
             if (data.success && data.notes_html) {
                 container.innerHTML = data.notes_html;
+                if (typeof window.dedupeNoteFullViewModals === 'function') {
+                    window.dedupeNoteFullViewModals();
+                }
                 setupEditButtons(container);
             } else {
                 container.innerHTML = '<p class="text-gray-500 text-center py-4">No contract notes.</p>';
@@ -1972,6 +2013,9 @@ function fetchClinNotes(clinId) {
         .then(data => {
             if (data.success && data.notes_html) {
                 container.innerHTML = data.notes_html;
+                if (typeof window.dedupeNoteFullViewModals === 'function') {
+                    window.dedupeNoteFullViewModals();
+                }
                 setupEditButtons(container);
             } else {
                 container.innerHTML = '<p class="text-gray-500 text-center py-4">No notes for this CLIN.</p>';
@@ -2004,6 +2048,7 @@ function setupEditButtons(container) {
         });
     });
 }
+window.setupEditButtons = setupEditButtons;
 
 function toggleAcknowledgment(field) {
     const clinId = '{{ selected_clin.id }}';

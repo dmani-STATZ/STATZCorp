@@ -1,0 +1,320 @@
+{% extends "base_template.html" %}
+{% load imports_tags %}
+
+{% block body %}
+<div class="container py-4" id="imports-session-detail" data-session-id="{{ session.pk }}">
+  {% csrf_token %}
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'imports:dashboard' %}">Import Manager</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Session {{ session.pk }}</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
+        <div>
+          <h1 class="h4 mb-2">{{ session.uploaded_filename }}</h1>
+          <p class="mb-1 text-muted small">
+            Target: <strong>{% import_target_label session.target_model %}</strong>
+            · Match field: <code>{{ session.match_field }}</code>
+          </p>
+          <p class="mb-0 text-muted small">
+            Created by {% if session.created_by %}{{ session.created_by.get_username }}{% else %}—{% endif %}
+            · {{ session.created_at|date:"M j, Y g:i A" }}
+          </p>
+        </div>
+        <div>
+          {% if session.status == 'draft' %}
+          <span class="badge text-bg-secondary">Draft</span>
+          {% elif session.status == 'previewing' %}
+          <span class="badge text-bg-warning text-dark">Previewing</span>
+          {% elif session.status == 'committed' %}
+          <span class="badge text-bg-success">Committed</span>
+          {% else %}
+          <span class="badge text-bg-secondary">{{ session.status }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="badge text-bg-success">Matched: {{ session.matched_count }}</span>
+        <span class="badge text-bg-danger">Unmatched: {{ session.unmatched_count }}</span>
+        <span class="badge text-bg-secondary">Total rows: {{ rows|length }}</span>
+      </div>
+
+      {% if session.status == 'committed' %}
+      <div class="alert alert-success mb-3 py-2" role="alert">
+        This import was committed{% if session.committed_at %} on {{ session.committed_at|date:"M j, Y g:i A" }}{% endif %}.
+      </div>
+      {% endif %}
+
+      <div class="d-flex flex-wrap gap-2">
+        {% if can_commit %}
+        <form method="post" action="{% url 'imports:session_commit' session.pk %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">Commit All Matched</button>
+        </form>
+        {% endif %}
+        <a href="{% url 'imports:session_export' session.pk %}" class="btn btn-outline-brand">Export Preview CSV</a>
+        <a href="{% url 'imports:dashboard' %}" class="btn btn-outline-secondary">Back to list</a>
+      </div>
+    </div>
+  </div>
+
+  {% if unresolved_fk_fields %}
+  {% unresolved_fk_panel unresolved_fk_fields rows session %}
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="h5 mb-0">Rows</h2>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0" id="imports-rows-table">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Status</th>
+              <th scope="col">Confidence</th>
+              <th scope="col">Match</th>
+              <th scope="col">Proposed changes</th>
+              <th scope="col" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr id="import-row-{{ row.pk }}"
+                data-row-id="{{ row.pk }}"
+                data-matched-id="{{ row.matched_target_id|default:'' }}"
+                data-match-display="{{ matched_names|imports_get_item:row.matched_target_id|default:'' }}">
+              <td>{{ row.row_number }}</td>
+              <td>
+                {% if row.status == 'matched' %}
+                <span class="badge text-bg-success js-row-status">Matched</span>
+                {% elif row.status == 'unmatched' %}
+                <span class="badge text-bg-danger js-row-status">Unmatched</span>
+                {% elif row.status == 'skipped' %}
+                <span class="badge text-bg-secondary js-row-status">Skipped</span>
+                {% elif row.status == 'committed' %}
+                <span class="badge text-bg-primary js-row-status">Committed</span>
+                {% else %}
+                <span class="badge text-bg-secondary js-row-status">{{ row.status }}</span>
+                {% endif %}
+              </td>
+              <td class="js-row-confidence">
+                {% if row.match_confidence is not None %}
+                  {% with pct=row.match_confidence|confidence_pct %}
+                  <span class="{% if row.match_confidence >= 0.85 %}text-success{% elif row.match_confidence >= 0.5 %}text-warning{% else %}text-danger{% endif %}">
+                    {{ pct }}%
+                  </span>
+                  {% endwith %}
+                {% else %}
+                  <span class="text-danger">—</span>
+                {% endif %}
+              </td>
+              <td class="text-break js-row-match">
+                {% if row.matched_target_id %}
+                  {{ matched_names|imports_get_item:row.matched_target_id|default:row.matched_target_id }}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="small text-break">
+                {% if row.proposed_changes %}
+                  <ul class="list-unstyled mb-0">
+                    {% for k, v in row.proposed_changes.items %}
+                    <li><code>{{ k }}</code>: {{ v }}</li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="text-end text-nowrap">
+                <button type="button"
+                  class="btn btn-sm btn-outline-secondary js-open-match-modal"
+                  data-row-id="{{ row.pk }}"
+                  data-matched-id="{{ row.matched_target_id|default:'' }}"
+                  data-match-label="{{ matched_names|imports_get_item:row.matched_target_id|default:'' }}"
+                  {% if row.status == 'committed' %}disabled{% endif %}>Change Match</button>
+                <button type="button"
+                  class="btn btn-sm btn-outline-secondary js-skip-row"
+                  data-row-id="{{ row.pk }}"
+                  {% if row.status == 'committed' or row.status == 'skipped' %}disabled{% endif %}>Skip</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="changeMatchModal" tabindex="-1" aria-labelledby="changeMatchModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="changeMatchModalLabel">Change match</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">Current match</p>
+        <p class="mb-3" id="modal-current-match">—</p>
+        <label for="modal-search-q" class="form-label">Search</label>
+        <input type="search" class="form-control mb-3" id="modal-search-q" placeholder="Type to search…" autocomplete="off">
+        <div id="modal-search-results" class="list-group small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var sessionId = document.getElementById('imports-session-detail').dataset.sessionId;
+  var UPDATE_MATCH_TMPL = "{% url 'imports:ajax_update_match' session.pk 0 %}";
+  var SKIP_ROW_TMPL = "{% url 'imports:ajax_skip_row' session.pk 0 %}";
+  function getCsrf() {
+    var inp = document.querySelector('#imports-session-detail input[name="csrfmiddlewaretoken"]');
+    if (inp && inp.value) return inp.value;
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  var csrfToken = getCsrf();
+  var searchUrl = "{% url 'imports:ajax_search_target' session.pk %}";
+  var modalEl = document.getElementById('changeMatchModal');
+  var modal = modalEl && window.bootstrap ? new bootstrap.Modal(modalEl) : null;
+  var activeRowId = null;
+  var searchInput = document.getElementById('modal-search-q');
+  var resultsEl = document.getElementById('modal-search-results');
+  var currentMatchEl = document.getElementById('modal-current-match');
+  var searchTimer = null;
+
+  function rowEl(rowId) {
+    return document.getElementById('import-row-' + rowId);
+  }
+
+  function setRowMatchUi(rowId, matchedId, display, confidencePct, statusClass, statusLabel) {
+    var tr = rowEl(rowId);
+    if (!tr) return;
+    tr.dataset.matchedId = matchedId || '';
+    tr.dataset.matchDisplay = display || '';
+    var matchCell = tr.querySelector('.js-row-match');
+    if (matchCell) {
+      if (matchedId) {
+        matchCell.textContent = display || String(matchedId);
+      } else {
+        matchCell.innerHTML = '<span class="text-muted">—</span>';
+      }
+    }
+    var conf = tr.querySelector('.js-row-confidence');
+    if (conf) {
+      if (confidencePct != null) {
+        var cls = confidencePct >= 85 ? 'text-success' : (confidencePct >= 50 ? 'text-warning' : 'text-danger');
+        conf.innerHTML = '<span class="' + cls + '">' + confidencePct + '%</span>';
+      }
+    }
+    var st = tr.querySelector('.js-row-status');
+    if (st) {
+      st.className = 'badge js-row-status ' + statusClass;
+      st.textContent = statusLabel;
+    }
+    var openBtn = tr.querySelector('.js-open-match-modal');
+    if (openBtn) {
+      openBtn.dataset.matchedId = matchedId || '';
+      openBtn.dataset.matchLabel = display || '';
+    }
+  }
+
+  document.querySelectorAll('.js-open-match-modal').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      activeRowId = btn.dataset.rowId;
+      var label = btn.dataset.matchLabel || '—';
+      var mid = btn.dataset.matchedId;
+      currentMatchEl.textContent = mid ? (label + ' (ID ' + mid + ')') : '—';
+      searchInput.value = '';
+      resultsEl.innerHTML = '';
+      if (modal) modal.show();
+      triggerSearch('');
+    });
+  });
+
+  function triggerSearch(q) {
+    var url = searchUrl + (q ? ('?q=' + encodeURIComponent(q)) : '');
+    fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        resultsEl.innerHTML = '';
+        (data.results || []).forEach(function(item) {
+          var a = document.createElement('div');
+          a.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2';
+          var span = document.createElement('span');
+          span.textContent = item.display || ('#' + item.id);
+          var sel = document.createElement('button');
+          sel.type = 'button';
+          sel.className = 'btn btn-sm btn-primary';
+          sel.textContent = 'Select';
+          sel.addEventListener('click', function() {
+            selectMatch(item.id, item.display || '');
+          });
+          a.appendChild(span);
+          a.appendChild(sel);
+          resultsEl.appendChild(a);
+        });
+      })
+      .catch(function() { resultsEl.innerHTML = '<div class="text-danger small">Search failed.</div>'; });
+  }
+
+  function selectMatch(id, display) {
+    if (!activeRowId) return;
+    var url = UPDATE_MATCH_TMPL.replace(/\/row\/\d+\/match\/$/, '/row/' + String(activeRowId) + '/match/');
+    fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
+      body: JSON.stringify({ matched_target_id: typeof id === 'number' ? id : parseInt(id, 10) })
+    }).then(function(r) { return r.json(); }).then(function() {
+      setRowMatchUi(activeRowId, String(id), display, 100, 'text-bg-success', 'Matched');
+      if (modal) modal.hide();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('keyup', function() {
+      if (searchTimer) clearTimeout(searchTimer);
+      var q = searchInput.value.trim();
+      searchTimer = setTimeout(function() { triggerSearch(q); }, 300);
+    });
+  }
+
+  document.querySelectorAll('.js-skip-row').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var rowId = btn.dataset.rowId;
+      var url = SKIP_ROW_TMPL.replace(/\/row\/\d+\/skip\/$/, '/row/' + String(rowId) + '/skip/');
+      fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrfToken }
+      }).then(function(r) { return r.json(); }).then(function() {
+        var tr = rowEl(rowId);
+        if (!tr) return;
+        var st = tr.querySelector('.js-row-status');
+        if (st) { st.className = 'badge text-bg-secondary js-row-status'; st.textContent = 'Skipped'; }
+        btn.disabled = true;
+      });
+    });
+  });
+})();
+</script>
+{% endblock body %}

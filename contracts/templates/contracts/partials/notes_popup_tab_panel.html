@@ -2,40 +2,70 @@
     <div class="d-flex flex-column gap-2">
         {% for note in notes %}
             {% with note_type=note.entity_type|default:entity_type|default:'contract' %}
-                <article class="notes-popup-note-row type-{{ note_type|lower }} bg-body rounded-3 shadow-sm p-3">
-                    <div class="notes-popup-note-content text-body-secondary mb-2">
-                        {{ note.note|linebreaksbr }}
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="small text-muted">
-                            Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
+                <article class="notes-popup-note-row type-{{ note_type|lower }} bg-body rounded-3 shadow-sm">
+
+                    <div class="note-card-body js-note-expand"
+                         role="button"
+                         tabindex="0"
+                         aria-label="View full note"
+                         data-note-id="{{ note.id }}"
+                         data-note-type="{{ note_type|lower }}"
+                         data-note-text="{{ note.note|escape }}"
+                         data-note-created-by="{{ note.created_by }}"
+                         data-note-created-on="{{ note.created_on|date:'M d, Y H:i' }}"
+                         data-note-has-reminder="{% if note.current_user_has_reminder %}1{% else %}0{% endif %}"
+                         data-reminder-title="{{ note.current_user_reminder.reminder_title|default:''|escape }}"
+                         data-reminder-date="{{ note.current_user_reminder.reminder_date|date:'M j, Y'|default:'' }}"
+                         data-reminder-text="{{ note.current_user_reminder.reminder_text|default:''|escape }}"
+                         data-reminder-completed="{% if note.current_user_reminder.reminder_completed %}1{% else %}0{% endif %}"
+                         data-reminder-id="{{ note.current_user_reminder.id|default:'' }}">
+                        <div class="px-3 pt-2 pb-1">
+                            <span class="badge rounded-pill note-type-pill note-type-{{ note_type|lower }}">
+                                {{ note_type|capfirst }}
+                            </span>
                         </div>
+                        <div class="note-card-text px-3 pb-2">
+                            {{ note.note|linebreaksbr }}
+                        </div>
+                    </div>
+
+                    <div class="note-card-meta d-flex align-items-center justify-content-between px-3 py-2">
+                        <span class="small text-muted">
+                            {{ note.created_by }} &middot; {{ note.created_on|date:"M d, Y H:i" }}
+                        </span>
                         <div class="d-flex align-items-center gap-2">
                             {% if note.current_user_has_reminder %}
-                                <span class="badge rounded-pill bg-info-subtle text-info-emphasis" title="You have a reminder on this note">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="me-1" viewBox="0 0 16 16" aria-hidden="true">
-                                        <path d="M8 3.5a.5.5 0 0 1 .5.5v4.25l2.5 1.5a.5.5 0 1 1-.5.86l-2.75-1.65A.5.5 0 0 1 7.5 8.5V4a.5.5 0 0 1 .5-.5z"/>
-                                        <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zm0-1A7 7 0 1 0 8 1a7 7 0 0 0 0 14z"/>
-                                    </svg>
-                                    Reminder
-                                </span>
+                                <button type="button"
+                                        class="btn btn-sm p-0 border-0 bg-transparent js-reminder-pill"
+                                        data-reminder-id="{{ note.current_user_reminder.id|default:'' }}"
+                                        data-reminder-title="{{ note.current_user_reminder.reminder_title|default:''|escape }}"
+                                        data-reminder-date="{{ note.current_user_reminder.reminder_date|date:'M j, Y'|default:'' }}"
+                                        data-reminder-text="{{ note.current_user_reminder.reminder_text|default:''|escape }}"
+                                        data-reminder-completed="{% if note.current_user_reminder.reminder_completed %}1{% else %}0{% endif %}"
+                                        title="View reminder">
+                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis">
+                                        &#9201; Reminder
+                                    </span>
+                                </button>
                             {% endif %}
-                            {% if request.user == note.created_by or request.user.is_staff %}
+                            {% if request.user == note.created_by %}
                                 <button type="button"
                                         class="btn btn-sm btn-link text-primary p-0 js-popup-edit-note"
                                         data-note-id="{{ note.id }}"
                                         title="Edit note"
                                         aria-label="Edit note">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                                         <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708L5.207 13.793 2 14l.207-3.207L12.146.854zM11.207 2 3 10.207V13h2.793L14 4.793 11.207 2z"/>
                                     </svg>
                                 </button>
+                            {% endif %}
+                            {% if request.user == note.created_by or request.user.is_staff %}
                                 <button type="button"
                                         class="btn btn-sm btn-link text-danger p-0 js-popup-delete-note"
                                         data-note-id="{{ note.id }}"
                                         title="Delete note"
                                         aria-label="Delete note">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                                         <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm4 0A.5.5 0 0 1 10 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z"/>
                                         <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4H4z"/>
                                     </svg>
@@ -43,10 +73,193 @@
                             {% endif %}
                         </div>
                     </div>
+
                 </article>
             {% endwith %}
         {% endfor %}
     </div>
+
+    <div class="modal fade" id="noteFullViewModal" tabindex="-1" aria-labelledby="noteFullViewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h5 class="modal-title mb-0" id="noteFullViewModalLabel">Note</h5>
+                        <span id="noteFullViewTypePill" class="badge rounded-pill"></span>
+                        <span id="noteFullViewReminderPill" class="badge rounded-pill bg-info-subtle text-info-emphasis d-none">
+                            &#9201; Reminder
+                        </span>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                    <div id="noteFullViewText" class="note-fullview-text mb-3"></div>
+                    <div class="small text-muted" id="noteFullViewMeta"></div>
+                </div>
+                <div class="modal-footer py-2 d-none gap-2 flex-wrap" id="noteFullViewReminderFooter">
+                    <form method="post" id="noteFullViewToggleForm" action="" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success" id="noteFullViewToggleBtn">
+                            Mark Complete
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+                <div class="modal-footer py-2 d-flex justify-content-end" id="noteFullViewNoReminderFooter">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var modals = document.querySelectorAll('#noteFullViewModal');
+        if (modals.length > 1) {
+            for (var i = 1; i < modals.length; i++) modals[i].remove();
+        }
+        if (window.__contractsNoteFullViewBound) return;
+        window.__contractsNoteFullViewBound = true;
+
+        var toggleUrlTemplate = "{% url 'contracts:toggle_reminder' 888888888 %}";
+
+        function noteTextToHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#x27;/g, "'")
+                .replace(/\n/g, '<br>');
+        }
+
+        function escapeHtmlAttrDecoded(s) {
+            if (!s) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setTypePill(noteType, visible) {
+            var el = document.getElementById('noteFullViewTypePill');
+            if (!el) return;
+            var t = (noteType || '').toLowerCase();
+            if (!visible || !t) {
+                el.textContent = '';
+                el.className = 'badge rounded-pill d-none';
+                return;
+            }
+            el.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+            el.className = 'badge rounded-pill note-type-pill note-type-' + t;
+        }
+
+        function openNoteFullView(el) {
+            var ds = el.dataset || {};
+            var noteText = ds.noteText || '';
+            var createdBy = ds.noteCreatedBy || '';
+            var createdOn = ds.noteCreatedOn || '';
+            var hasReminder = ds.noteHasReminder === '1';
+            var reminderId = ds.reminderId || '';
+            var reminderTitle = ds.reminderTitle || '';
+            var reminderDate = ds.reminderDate || '';
+            var reminderText = ds.reminderText || '';
+            var reminderCompleted = ds.reminderCompleted === '1';
+            var noteType = ds.noteType || '';
+
+            var titleEl = document.getElementById('noteFullViewModalLabel');
+            var reminderOnly = !noteText && hasReminder && reminderId;
+
+            if (reminderOnly) {
+                if (titleEl) titleEl.textContent = 'Reminder';
+                setTypePill('', false);
+                var rHtml = '';
+                if (reminderTitle) rHtml += '<p class="mb-2 fw-semibold">' + escapeHtmlAttrDecoded(reminderTitle) + '</p>';
+                if (reminderDate) rHtml += '<p class="small text-muted mb-2">' + escapeHtmlAttrDecoded(reminderDate) + '</p>';
+                rHtml += '<div class="note-fullview-text">' + noteTextToHtml(reminderText) + '</div>';
+                document.getElementById('noteFullViewText').innerHTML = rHtml;
+                document.getElementById('noteFullViewMeta').textContent = '';
+            } else {
+                if (titleEl) titleEl.textContent = 'Note';
+                setTypePill(noteType, true);
+                document.getElementById('noteFullViewText').innerHTML = noteTextToHtml(noteText);
+                document.getElementById('noteFullViewMeta').textContent =
+                    'Added by ' + createdBy + ' on ' + createdOn;
+            }
+
+            var reminderPill = document.getElementById('noteFullViewReminderPill');
+            var reminderFooter = document.getElementById('noteFullViewReminderFooter');
+            var noReminderFooter = document.getElementById('noteFullViewNoReminderFooter');
+
+            if (hasReminder && reminderId) {
+                reminderPill.classList.remove('d-none');
+                reminderFooter.classList.remove('d-none');
+                noReminderFooter.classList.add('d-none');
+                var toggleUrl = toggleUrlTemplate.replace('888888888', reminderId);
+                document.getElementById('noteFullViewToggleForm').action = toggleUrl;
+                var toggleBtn = document.getElementById('noteFullViewToggleBtn');
+                toggleBtn.textContent = reminderCompleted ? 'Mark Incomplete' : 'Mark Complete';
+                toggleBtn.className = reminderCompleted
+                    ? 'btn btn-sm btn-warning'
+                    : 'btn btn-sm btn-success';
+            } else {
+                reminderPill.classList.add('d-none');
+                reminderFooter.classList.add('d-none');
+                noReminderFooter.classList.remove('d-none');
+            }
+
+            var modalEl = document.getElementById('noteFullViewModal');
+            if (modalEl && typeof bootstrap !== 'undefined') {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            var el = e.target.closest('.js-note-expand');
+            if (!el) return;
+            if (e.target.closest('button')) return;
+            openNoteFullView(el);
+        });
+
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.js-reminder-pill');
+            if (!btn) return;
+            e.stopPropagation();
+            openNoteFullView({
+                dataset: {
+                    noteText: '',
+                    noteType: '',
+                    noteCreatedBy: '',
+                    noteCreatedOn: '',
+                    noteHasReminder: '1',
+                    reminderId: btn.dataset.reminderId,
+                    reminderTitle: btn.dataset.reminderTitle,
+                    reminderDate: btn.dataset.reminderDate,
+                    reminderText: btn.dataset.reminderText,
+                    reminderCompleted: btn.dataset.reminderCompleted,
+                }
+            });
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            var el = e.target.closest('.js-note-expand');
+            if (!el) return;
+            e.preventDefault();
+            openNoteFullView(el);
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var m = document.querySelectorAll('#noteFullViewModal');
+            if (m.length > 1) {
+                for (var j = 1; j < m.length; j++) m[j].remove();
+            }
+        });
+    })();
+    </script>
 {% else %}
     <div class="h-100 d-flex align-items-center justify-content-center text-muted py-5">
         {{ note_empty_msg }}

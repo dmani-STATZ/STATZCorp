@@ -1,66 +1,219 @@
 {% if notes %}
-    {% for note in notes %}
-    {% with note_entity_type=note.entity_type|default:entity_type|default:'note' %}
-    {% with note_content_type_id=note.content_type_id|default:content_type_id %}
-    {% with note_object_id=note.object_id|default:object_id|default:"0" %}
-    <div class="border-l-4 {% if note_entity_type|lower == 'contract' %}border-green-500{% elif note_entity_type|lower == 'clin' %}border-blue-500{% else %}border-{{ note_color|default:'green' }}-500{% endif %} pl-3 py-1 mb-2">
-        <!-- Note type indicator -->
-        {% if show_note_type or combined_view %}
-        <div class="row-between mb-1">
-            <div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if note_entity_type|lower == 'contract' %}bg-green-100 text-green-800{% elif note_entity_type|lower == 'clin' %}bg-blue-100 text-blue-800{% else %}bg-{{ note_color|default:'green' }}-100 text-{{ note_color|default:'green' }}-800{% endif %}">
-                    {{ note_entity_type|title }}
-                </span>
-            </div>
-        </div>
-        {% endif %}
-        <!-- Fixed height container with absolute constraint -->
-        <div class="relative" style="max-height: 100px;">
-            <!-- Text content with fixed height and scroll -->
-            <div class="note-content overflow-y-auto" style="max-height: 100px;">
-                <p class="text-gray-700 whitespace-pre-wrap">{{ note.note|linebreaksbr }}</p>
-            </div>
-        </div>
-        <div class="mt-1 row-between">
-            <div class="text-sm text-gray-500">
-                Added by {{ note.created_by }} on {{ note.created_on|date:"M d, Y H:i" }}
-            </div>
-            <div class="flex space-x-2">
-                {% if note.note_reminders.exists %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Reminder
+    <div class="d-flex flex-column gap-2">
+        {% for note in notes %}
+            {% with note_type=note.entity_type|default:entity_type|default:'contract' %}
+                <article class="notes-popup-note-row type-{{ note_type|lower }} bg-body rounded-3 shadow-sm">
+
+                    <!-- Clickable note body — truncated to 3 lines -->
+                    <div class="note-card-body js-note-expand"
+                         role="button"
+                         tabindex="0"
+                         aria-label="View full note"
+                         data-note-id="{{ note.id }}"
+                         data-note-text="{{ note.note|escape }}"
+                         data-note-created-by="{{ note.created_by }}"
+                         data-note-created-on="{{ note.created_on|date:'M d, Y H:i' }}"
+                         data-note-has-reminder="{% if note.current_user_has_reminder %}1{% else %}0{% endif %}">
+                        {% if show_note_type or combined_view %}
+                        <div class="px-3 pt-2 pb-1">
+                            <span class="badge rounded-pill note-type-pill note-type-{{ note_type|lower }}">
+                                {{ note_type|capfirst }}
+                            </span>
+                        </div>
+                        {% endif %}
+                        <div class="note-card-text px-3 {% if show_note_type or combined_view %}pb-2{% else %}pt-2 pb-2{% endif %}">
+                            {{ note.note|linebreaksbr }}
+                        </div>
+                    </div>
+
+                    <!-- Meta row -->
+                    <div class="note-card-meta d-flex align-items-center justify-content-between px-3 py-2">
+                        <span class="small text-muted">
+                            {{ note.created_by }} &middot; {{ note.created_on|date:"M d, Y H:i" }}
+                        </span>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if note.current_user_has_reminder %}
+                                <button type="button"
+                                        class="btn btn-sm p-0 border-0 bg-transparent js-reminder-pill"
+                                        data-reminder-id="{{ note.current_user_reminder.id|default:'' }}"
+                                        data-reminder-title="{{ note.current_user_reminder.reminder_title|default:''|escape }}"
+                                        data-reminder-date="{{ note.current_user_reminder.reminder_date|date:'M j, Y'|default:'' }}"
+                                        data-reminder-text="{{ note.current_user_reminder.reminder_text|default:''|escape }}"
+                                        data-reminder-completed="{% if note.current_user_reminder.reminder_completed %}1{% else %}0{% endif %}"
+                                        title="View reminder">
+                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis">
+                                        &#9201; Reminder
+                                    </span>
+                                </button>
+                            {% endif %}
+                            {% if request.user == note.created_by %}
+                                <button type="button"
+                                        class="btn btn-sm btn-link text-primary p-0 js-edit-note-btn"
+                                        data-note-action="edit"
+                                        data-content-type-id="{{ note.content_type_id|default:content_type_id }}"
+                                        data-object-id="{{ note.object_id|default:object_id }}"
+                                        data-note-id="{{ note.id }}"
+                                        data-note-text="{{ note.note|escapejs }}"
+                                        data-entity-type="{{ note_type }}"
+                                        title="Edit note"
+                                        aria-label="Edit note"
+                                        onclick="if(typeof openEditNoteModal==='function'){openEditNoteModal(this);} return false;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708L5.207 13.793 2 14l.207-3.207L12.146.854zM11.207 2 3 10.207V13h2.793L14 4.793 11.207 2z"/>
+                                    </svg>
+                                </button>
+                                <a href="{% url 'contracts:delete_note' note.id %}"
+                                   class="btn btn-sm btn-link text-danger p-0"
+                                   title="Delete note"
+                                   aria-label="Delete note"
+                                   onclick="return confirm('Are you sure you want to delete this note?');">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm4 0A.5.5 0 0 1 10 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z"/>
+                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4H4z"/>
+                                    </svg>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                </article>
+            {% endwith %}
+        {% endfor %}
+    </div>
+{% else %}
+    <p class="text-center text-muted py-2 small">{{ note_empty_msg|default:"No notes found" }}</p>
+{% endif %}
+
+<!-- Full view modal — deduplicated synchronously when this partial is included more than once -->
+<div class="modal fade" id="noteFullViewModal" tabindex="-1" aria-labelledby="noteFullViewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="modal-title mb-0" id="noteFullViewModalLabel">Note</h5>
+                    <span id="noteFullViewReminderPill" class="badge rounded-pill bg-info-subtle text-info-emphasis d-none">
+                        &#9201; Reminder
                     </span>
-                {% endif %}
-                <button
-                    class="btn btn-link p-0 text-indigo-600 hover:text-indigo-900 js-edit-note-btn" 
-                    title="Edit"
-                    data-note-action="edit"
-                    data-content-type-id="{{ note_content_type_id }}"
-                    data-object-id="{{ note_object_id }}"
-                    data-note-id="{{ note.id }}"
-                    data-note-text="{{ note.note|escapejs }}"
-                    data-entity-type="{{ note_entity_type }}"
-                    onclick="openEditNoteModal(this); return false;"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                </button>
-                <a href="{% url 'contracts:delete_note' note.id %}" class="text-red-600 hover:text-red-900" title="Delete" onclick="return confirm('Are you sure you want to delete this note?');">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </a>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <div id="noteFullViewText" class="note-fullview-text mb-3"></div>
+                <div class="small text-muted" id="noteFullViewMeta"></div>
+            </div>
+            <div class="modal-footer py-2 d-none" id="noteFullViewReminderFooter">
+                <form method="post" id="noteFullViewToggleForm" action="">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-success" id="noteFullViewToggleBtn">
+                        Mark Complete
+                    </button>
+                </form>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+            <div class="modal-footer py-2 d-flex justify-content-end" id="noteFullViewNoReminderFooter">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
-    {% endwith %}
-    {% endwith %}
-    {% endwith %}
-    {% endfor %}
-{% else %}
-    <p class="text-gray-500 text-center py-2 text-sm">{{ note_empty_msg|default:"No notes found" }}</p>
-{% endif %} 
+</div>
+
+<script>
+(function () {
+    var modals = document.querySelectorAll('#noteFullViewModal');
+    if (modals.length > 1) {
+        for (var j = 1; j < modals.length; j++) { modals[j].remove(); }
+    }
+    var modalKeep = document.getElementById('noteFullViewModal');
+    if (modalKeep && modalKeep.parentElement && modalKeep.parentElement !== document.body) {
+        document.body.appendChild(modalKeep);
+    }
+
+    if (window.__contractsMgmtNoteFullViewListeners) return;
+    window.__contractsMgmtNoteFullViewListeners = true;
+
+    var toggleUrlTemplate = "{% url 'contracts:toggle_reminder' 888888888 %}";
+
+    function noteTextToHtml(text) {
+        return text
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#x27;/g, "'")
+            .replace(/\n/g, '<br>');
+    }
+
+    function openNoteFullView(data) {
+        document.getElementById('noteFullViewText').innerHTML = noteTextToHtml(data.noteText || '');
+        document.getElementById('noteFullViewMeta').textContent =
+            'Added by ' + (data.createdBy || '') + ' on ' + (data.createdOn || '');
+
+        var reminderPill = document.getElementById('noteFullViewReminderPill');
+        var reminderFooter = document.getElementById('noteFullViewReminderFooter');
+        var noReminderFooter = document.getElementById('noteFullViewNoReminderFooter');
+
+        if (data.hasReminder && data.reminderId) {
+            reminderPill.classList.remove('d-none');
+            reminderFooter.classList.remove('d-none');
+            noReminderFooter.classList.add('d-none');
+            document.getElementById('noteFullViewToggleForm').action =
+                toggleUrlTemplate.replace('888888888', data.reminderId);
+            var btn = document.getElementById('noteFullViewToggleBtn');
+            btn.textContent = data.reminderCompleted ? 'Mark Incomplete' : 'Mark Complete';
+            btn.className = data.reminderCompleted
+                ? 'btn btn-sm btn-warning'
+                : 'btn btn-sm btn-success';
+        } else {
+            reminderPill.classList.add('d-none');
+            reminderFooter.classList.add('d-none');
+            noReminderFooter.classList.remove('d-none');
+        }
+
+        var modalEl = document.getElementById('noteFullViewModal');
+        if (modalEl) { new bootstrap.Modal(modalEl).show(); }
+    }
+
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest('.js-note-expand');
+        if (!el) return;
+        if (e.target.closest('button, a')) return;
+        openNoteFullView({
+            noteText: el.dataset.noteText || '',
+            createdBy: el.dataset.noteCreatedBy || '',
+            createdOn: el.dataset.noteCreatedOn || '',
+            hasReminder: false,
+            reminderId: '',
+            reminderCompleted: false,
+        });
+    });
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.js-reminder-pill');
+        if (!btn) return;
+        e.stopPropagation();
+        openNoteFullView({
+            noteText: '',
+            createdBy: '',
+            createdOn: '',
+            hasReminder: true,
+            reminderId: btn.dataset.reminderId || '',
+            reminderCompleted: btn.dataset.reminderCompleted === '1',
+        });
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var el = e.target.closest('.js-note-expand');
+        if (!el) return;
+        e.preventDefault();
+        openNoteFullView({
+            noteText: el.dataset.noteText || '',
+            createdBy: el.dataset.noteCreatedBy || '',
+            createdOn: el.dataset.noteCreatedOn || '',
+            hasReminder: false,
+            reminderId: '',
+            reminderCompleted: false,
+        });
+    });
+})();
+</script>

@@ -391,6 +391,7 @@
 <script>
 // Get CSRF token once at the start
 const csrftoken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+const noteDetailUrlTemplate = "{% url 'contracts:note_detail_json' 0 %}";
 window.contractNumberForReminders = "{{ idiq_contract.contract_number|escapejs }}";
 window.selectedClinItemNumber = "";
 
@@ -416,35 +417,126 @@ function getRequestHeaders() {
     };
 }
 
-// Function to open edit note modal
-function openEditNoteModal(button) {
+function formatReminderDateForInputIdiq(isoDate) {
+    if (!isoDate) return '';
+    const parsed = new Date(isoDate);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const hours = String(parsed.getHours()).padStart(2, '0');
+    const minutes = String(parsed.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+// Function to open edit note modal (aligned with contract_management + note_modal.js)
+async function openEditNoteModal(button) {
     const noteId = button.dataset.noteId;
-    const noteText = button.dataset.noteText;
     const contentTypeId = button.dataset.contentTypeId;
     const objectId = button.dataset.objectId;
     const entityType = button.dataset.entityType;
 
-    // Get modal elements
+    if (typeof window.noteModalApplyAddLayout === 'function') {
+        window.noteModalApplyAddLayout();
+    }
+
     const modal = document.getElementById('noteModal');
     const modalTitle = document.getElementById('noteModalTitle');
     const noteForm = document.getElementById('noteForm');
     const noteTextarea = document.getElementById('id_note');
     const noteContentTypeId = document.getElementById('noteContentTypeId');
     const noteObjectId = document.getElementById('noteObjectId');
+    const createReminderCheckbox = document.getElementById('createReminder');
+    const reminderFields = document.getElementById('reminderFields');
+    const reminderSection = createReminderCheckbox ? createReminderCheckbox.closest('.mt-6') : null;
+    const reminderTitle = document.getElementById('id_reminder_title');
+    const reminderDate = document.getElementById('id_reminder_date');
+    const reminderCompleted = document.getElementById('id_reminder_completed');
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
 
-    // Set modal title
     modalTitle.textContent = `Edit ${entityType} Note`;
-
-    // Set form values
-    noteTextarea.value = noteText;
+    noteForm.action = `/contracts/note/update/${noteId}/`;
+    noteForm.method = 'POST';
+    noteForm.dataset.isEdit = '1';
+    noteForm.dataset.initialReminderExists = '0';
+    noteForm.dataset.canEdit = '1';
+    noteForm.dataset.canManageReminder = '1';
+    noteForm.dataset.initialReminderSnapshot = '';
     noteContentTypeId.value = contentTypeId;
     noteObjectId.value = objectId;
 
-    // Set form action for edit
-    noteForm.action = `/contracts/note/update/${noteId}/`;
-    noteForm.method = 'POST';
+    if (createReminderCheckbox) createReminderCheckbox.checked = false;
+    if (reminderFields) reminderFields.classList.add('hidden');
+    if (reminderTitle) reminderTitle.value = '';
+    if (reminderDate) reminderDate.value = '';
+    if (reminderCompleted) reminderCompleted.checked = false;
+    if (noteTextarea) noteTextarea.readOnly = false;
+    if (saveNoteBtn) saveNoteBtn.style.display = '';
+    if (reminderSection) reminderSection.classList.remove('hidden');
 
-    // Show modal
+    try {
+        const detailUrl = noteDetailUrlTemplate.replace('/0/', `/${noteId}/`);
+        const response = await fetch(detailUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok) {
+            throw new Error(`Unable to load note details (${response.status})`);
+        }
+        const data = await response.json();
+        const noteData = data.note || {};
+        const reminderData = data.reminder || null;
+        const permissions = data.permissions || {};
+        const canEdit = !!permissions.can_edit;
+        const canManageReminder = !!permissions.can_manage_reminder;
+
+        noteTextarea.value = noteData.note || '';
+        noteTextarea.readOnly = !canEdit;
+        noteForm.dataset.canEdit = canEdit ? '1' : '0';
+        noteForm.dataset.canManageReminder = canManageReminder ? '1' : '0';
+        if (saveNoteBtn) saveNoteBtn.style.display = canEdit ? '' : 'none';
+
+        if (!canManageReminder && reminderSection) {
+            reminderSection.classList.add('hidden');
+            if (createReminderCheckbox) createReminderCheckbox.checked = false;
+            if (reminderFields) reminderFields.classList.add('hidden');
+        } else {
+            if (reminderSection) reminderSection.classList.remove('hidden');
+            if (reminderData) {
+                if (createReminderCheckbox) createReminderCheckbox.checked = true;
+                if (reminderFields) reminderFields.classList.remove('hidden');
+                if (reminderTitle) reminderTitle.value = reminderData.reminder_title || '';
+                if (reminderDate) reminderDate.value = formatReminderDateForInputIdiq(reminderData.reminder_date);
+                if (reminderCompleted) reminderCompleted.checked = !!reminderData.reminder_completed;
+                noteForm.dataset.initialReminderExists = '1';
+            }
+        }
+
+        noteForm.dataset.initialReminderSnapshot = JSON.stringify({
+            reminderTitle: reminderTitle ? reminderTitle.value : '',
+            reminderDate: reminderDate ? reminderDate.value : '',
+            reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            noteText: (noteData.note || (noteTextarea && noteTextarea.value) || '')
+        });
+        if (typeof window.noteModalApplyEditLayout === 'function') {
+            window.noteModalApplyEditLayout(canEdit);
+        }
+    } catch (error) {
+        console.error('Failed to load note detail JSON:', error);
+        noteTextarea.value = (button.dataset.noteText || '').replace(/\\u([0-9a-f]{4})/gi, function(match, grp) {
+            return String.fromCharCode(parseInt(grp, 16));
+        });
+        noteForm.dataset.initialReminderSnapshot = JSON.stringify({
+            reminderTitle: reminderTitle ? reminderTitle.value : '',
+            reminderDate: reminderDate ? reminderDate.value : '',
+            reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            noteText: noteTextarea ? noteTextarea.value : ''
+        });
+        if (typeof window.noteModalApplyEditLayout === 'function') {
+            window.noteModalApplyEditLayout(true);
+        }
+    }
+
     modal.classList.remove('hidden');
 }
 

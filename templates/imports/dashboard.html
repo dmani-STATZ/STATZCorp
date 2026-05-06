@@ -1,0 +1,69 @@
+{% extends "base_template.html" %}
+{% load imports_tags %}
+
+{% block body %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Import Manager</h1>
+      <p class="text-muted small mb-0">Upload spreadsheets, map columns, preview matches, and commit updates.</p>
+    </div>
+    <a href="{% url 'imports:session_create' %}" class="btn btn-primary">New Import</a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      {% if sessions %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Filename</th>
+              <th scope="col">Target</th>
+              <th scope="col">Status</th>
+              <th scope="col">Matched / Unmatched</th>
+              <th scope="col">Created by</th>
+              <th scope="col">Created</th>
+              <th scope="col" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td class="text-break">{{ s.uploaded_filename }}</td>
+              <td>{% import_target_label s.target_model %}</td>
+              <td>
+                {% if s.status == 'draft' %}
+                <span class="badge text-bg-secondary">Draft</span>
+                {% elif s.status == 'previewing' %}
+                <span class="badge text-bg-warning text-dark">Previewing</span>
+                {% elif s.status == 'committed' %}
+                <span class="badge text-bg-success">Committed</span>
+                {% else %}
+                <span class="badge text-bg-secondary">{{ s.status }}</span>
+                {% endif %}
+              </td>
+              <td>{{ s.matched_count }} / {{ s.unmatched_count }}</td>
+              <td>{% if s.created_by %}{{ s.created_by.get_username }}{% else %}—{% endif %}</td>
+              <td><span class="text-nowrap">{{ s.created_at|date:"M j, Y g:i A" }}</span></td>
+              <td class="text-end">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Session actions">
+                  <a href="{% url 'imports:session_detail' s.pk %}" class="btn btn-outline-secondary">View</a>
+                  <a href="{% url 'imports:session_export' s.pk %}" class="btn btn-outline-brand">Export CSV</a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-5 text-center text-muted">
+        <p class="mb-3">No imports yet. Start one above.</p>
+        <a href="{% url 'imports:session_create' %}" class="btn btn-outline-brand btn-tinted">New Import</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock body %}

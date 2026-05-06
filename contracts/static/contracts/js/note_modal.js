@@ -123,6 +123,9 @@ document.addEventListener('DOMContentLoaded', function() {
             noteForm.reset();
             createReminderCheckbox.checked = false;
             reminderFields.classList.add('hidden');
+            if (typeof window.noteModalApplyAddLayout === 'function') {
+                window.noteModalApplyAddLayout();
+            }
             
             // Set form action for add
             noteForm.action = `/contracts/note/add/${contentTypeId}/${objectId}/`;
@@ -181,22 +184,59 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle form submission
     saveNoteBtn.addEventListener('click', async function() {
-        // console.log('Save Note button clicked');
-        
-        // Get form data
-        const formData = new FormData(noteForm);
-        const noteText = formData.get('note');
-        const contentTypeId = formData.get('content_type_id');
-        const objectId = formData.get('object_id');
+        const contentTypeId = noteContentTypeId ? noteContentTypeId.value : '';
+        const objectId = noteObjectId ? noteObjectId.value : '';
         const isEdit = noteForm.dataset.isEdit === '1' || /\/note\/update\/\d+\/$/.test(noteForm.action);
 
         if (noteForm.dataset.canEdit === '0') {
             window.notify('error', 'This note is read-only.', 5000);
             return;
         }
-        
-        // Validate note text
-        if (!noteText || noteText.trim() === '') {
+
+        const noteField = document.getElementById('id_note');
+        const additionField = document.getElementById('id_note_addition');
+        if (!noteField) {
+            window.notify('error', 'Note field not found.', 5000);
+            return;
+        }
+
+        if (isEdit) {
+            const hadReminderInitially = noteForm.dataset.initialReminderExists === '1';
+            const canManageReminderPre = noteForm.dataset.canManageReminder !== '0';
+            const reminderCheckedPre = canManageReminderPre && createReminderCheckbox.checked;
+            if (canManageReminderPre && hadReminderInitially && !reminderCheckedPre) {
+                if (!confirm('This will delete the reminder. Are you sure?')) {
+                    return;
+                }
+            }
+        }
+
+        let finalNoteBody;
+        if (isEdit) {
+            const addTrim = additionField ? (additionField.value || '').trim() : '';
+            if (addTrim.length > 0) {
+                finalNoteBody = `${formatNoteTimestamp()}\n${additionField.value.trim()}\n\n${noteField.value}`;
+            } else {
+                finalNoteBody = noteField.value;
+            }
+            if (additionField) {
+                additionField.value = '';
+            }
+        } else {
+            const trimmed = (noteField.value || '').trim();
+            if (!trimmed) {
+                window.notify('error', 'Please enter a note.', 5000);
+                return;
+            }
+            finalNoteBody = `${formatNoteTimestamp()}\n${trimmed}`;
+        }
+        noteField.value = finalNoteBody;
+
+        const formData = new FormData(noteForm);
+        const noteText = formData.get('note');
+
+        // Validate note text after transforms
+        if (!noteText || String(noteText).trim() === '') {
             window.notify('error', 'Please enter a note.', 5000);
             return;
         }
@@ -232,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 reminderTitle: formData.get('reminder_title') || '',
                 reminderDate: formData.get('reminder_date') || '',
                 reminderCompleted: formData.get('reminder_completed') === 'on',
-                noteText: (formData.get('note') || '')
+                noteText: String(noteText || '')
             };
 
             const reminderChanged = initialReminderSnapshot
@@ -246,9 +286,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (canManageReminder) {
                 if (hadReminderInitially && !reminderChecked) {
-                    if (!confirm('This will delete the reminder. Are you sure?')) {
-                        return;
-                    }
                     reminderAction = 'delete';
                 } else if (reminderChecked && !hadReminderInitially) {
                     reminderAction = 'create';
@@ -275,9 +312,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.notify('error', 'Please select a reminder date.', 5000);
                 return;
             }
-            // Reminder body mirrors note text (separate Reminder Details field removed)
-            const noteTextForReminder = (formData.get('note') || '');
-            formData.set('reminder_text', noteTextForReminder);
+            // Reminder body mirrors final note text (after timestamp / addition merge)
+            formData.set('reminder_text', String(noteText || ''));
         }
         
         // Show loading state
@@ -318,6 +354,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             : document.getElementById('notes-panel-clin');
                         if (notesPanel) {
                             notesPanel.innerHTML = data.notes_html;
+                            if (typeof window.dedupeNoteFullViewModals === 'function') {
+                                window.dedupeNoteFullViewModals();
+                            }
                             if (typeof window.setupEditButtons === 'function') {
                                 window.setupEditButtons(notesPanel);
                             }
@@ -374,6 +413,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (reminderSection) {
             reminderSection.classList.remove('hidden');
         }
+        if (typeof window.noteModalApplyAddLayout === 'function') {
+            window.noteModalApplyAddLayout();
+        }
     }
     
     // Close modal when pressing Escape key
@@ -385,4 +427,75 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Make the closeModal function globally available
     window.closeNoteModal = closeModal;
-}); 
+});
+
+/**
+ * Local timestamp line prepended/appended to note bodies from the modal.
+ * Format: --- MM/DD/YYYY HH:MM AM/PM ---
+ */
+function formatNoteTimestamp() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) {
+        hours = 12;
+    }
+    const minutes = pad(d.getMinutes());
+    return `--- ${month}/${day}/${year} ${hours}:${minutes} ${ampm} ---`;
+}
+
+window.noteModalApplyAddLayout = function() {
+    const wrap = document.getElementById('noteAdditionWrap');
+    const lblAdd = document.getElementById('label_id_note_addition');
+    const lblNote = document.getElementById('label_id_note');
+    const addTa = document.getElementById('id_note_addition');
+    if (wrap) {
+        wrap.classList.add('d-none');
+    }
+    if (lblAdd) {
+        lblAdd.textContent = 'Add to Note';
+    }
+    if (lblNote) {
+        lblNote.textContent = 'Note Details';
+    }
+    if (addTa) {
+        addTa.value = '';
+    }
+};
+
+/**
+ * @param {boolean} canEdit - when false, hide the "addition" box (read-only note)
+ */
+window.noteModalApplyEditLayout = function(canEdit) {
+    const wrap = document.getElementById('noteAdditionWrap');
+    const lblAdd = document.getElementById('label_id_note_addition');
+    const lblNote = document.getElementById('label_id_note');
+    const addTa = document.getElementById('id_note_addition');
+    if (!canEdit) {
+        window.noteModalApplyAddLayout();
+        if (wrap) {
+            wrap.classList.add('d-none');
+        }
+        if (lblNote) {
+            lblNote.textContent = 'Note Details';
+        }
+        return;
+    }
+    if (wrap) {
+        wrap.classList.remove('d-none');
+    }
+    if (lblAdd) {
+        lblAdd.textContent = 'Add to Note';
+    }
+    if (lblNote) {
+        lblNote.textContent = 'Existing Note';
+    }
+    if (addTa) {
+        addTa.value = '';
+    }
+}; 

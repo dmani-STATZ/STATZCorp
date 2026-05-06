@@ -201,3 +201,58 @@
     color: var(--bs-secondary-color);
     line-height: 1;
 }
+
+/* === Note Card Redesign (notes popup tab panel) === */
+
+.note-card-body {
+    cursor: pointer;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.note-card-body:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.note-card-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.875rem;
+    color: var(--bs-body-color);
+    line-height: 1.5;
+}
+
+.note-card-meta {
+    border-top: 1px solid var(--bs-border-color);
+    font-size: 0.8rem;
+}
+
+.note-type-pill {
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.note-type-contract {
+    background-color: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text-emphasis);
+}
+
+.note-type-clin {
+    background-color: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+}
+
+.note-type-finance {
+    background-color: rgba(25, 135, 84, 0.15);
+    color: #0f6e56;
+}
+
+.note-fullview-text {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}

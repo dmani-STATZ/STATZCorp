@@ -163,6 +163,7 @@ urlpatterns = [
     # Secret TD Now app (tower defense)
     path("td-now/", include("td_now.urls")),
     path("tools/", include("tools.urls")),
+    path("imports/", include("imports.urls", namespace="imports")),
 ]
 
 # Always serve static/media files (even in production)

@@ -129,6 +129,9 @@
     const noteModalTitle = document.getElementById('noteModalTitle');
     const noteModalSaveBtn = document.getElementById('noteModalSaveBtn');
     const noteTextArea = document.getElementById('noteTextArea');
+    const noteTextAreaLabel = document.getElementById('noteTextAreaLabel');
+    const notePopupAdditionWrap = document.getElementById('notePopupAdditionWrap');
+    const notePopupAdditionArea = document.getElementById('notePopupAdditionArea');
     const noteModalMeta = document.getElementById('noteModalMeta');
     const reminderSectionWrap = document.getElementById('reminderSectionWrap');
     const reminderCheckbox = document.getElementById('reminderCheckbox');
@@ -176,6 +179,20 @@
         const hours = String(parsed.getHours()).padStart(2, '0');
         const minutes = String(parsed.getMinutes()).padStart(2, '0');
         return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    function formatNoteTimestampPopup() {
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const year = d.getFullYear();
+        let hours = d.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        if (hours === 0) hours = 12;
+        const minutes = pad(d.getMinutes());
+        return `--- ${month}/${day}/${year} ${hours}:${minutes} ${ampm} ---`;
     }
 
     function getClinLabel(buttonEl) {
@@ -266,6 +283,17 @@
         );
     }
 
+    function noteOrReminderInputsChanged() {
+        const init = (_noteModalContext && _noteModalContext.initialNoteBody != null)
+            ? _noteModalContext.initialNoteBody
+            : '';
+        const raw = noteTextArea.value || '';
+        const addTrim = notePopupAdditionArea ? (notePopupAdditionArea.value || '').trim() : '';
+        if (addTrim.length > 0) return true;
+        if (raw !== init) return true;
+        return reminderFieldsChanged();
+    }
+
     function openModal() {
         bootstrap.Modal.getOrCreateInstance(noteModalElement).show();
     }
@@ -276,6 +304,9 @@
 
     function resetModalForNewState() {
         noteTextArea.value = '';
+        if (notePopupAdditionArea) notePopupAdditionArea.value = '';
+        if (notePopupAdditionWrap) notePopupAdditionWrap.classList.add('d-none');
+        if (noteTextAreaLabel) noteTextAreaLabel.textContent = 'Note';
         noteModalMeta.textContent = 'Added by —';
         reminderCheckbox.checked = false;
         clearReminderFields();
@@ -319,6 +350,7 @@
         noteModalTitle.textContent = 'Add Note';
         noteModalSaveBtn.textContent = 'Save Note';
         noteModalMeta.textContent = 'New note';
+        if (noteTextAreaLabel) noteTextAreaLabel.textContent = 'Note Details';
         showReminderSection(true);
         showReminderCompletedField(false);
         reminderCheckbox.checked = false;
@@ -331,6 +363,18 @@
         const tab = getActiveTabInfo();
         if (!tab) return;
         openAddNoteModal(tab.tabType, tab.tabId);
+    }
+
+    function activateScriptsInNotesTabPanel(container) {
+        if (!container) return;
+        container.querySelectorAll('script').forEach((oldScript) => {
+            const s = document.createElement('script');
+            Array.from(oldScript.attributes).forEach((attr) => {
+                s.setAttribute(attr.name, attr.value);
+            });
+            s.textContent = oldScript.textContent;
+            oldScript.parentNode.replaceChild(s, oldScript);
+        });
     }
 
     function bindTabPanelActions() {
@@ -377,6 +421,7 @@
                 throw new Error(data.error || `Failed to load ${activeTab.tabType} notes.`);
             }
             panel.innerHTML = data.notes_html || '<div class="text-center text-muted py-4">No notes found.</div>';
+            activateScriptsInNotesTabPanel(panel);
             bindTabPanelActions();
         } catch (error) {
             panel.innerHTML = `<div class="alert alert-danger mb-0">${error.message || 'Failed to load notes.'}</div>`;
@@ -394,6 +439,7 @@
             canEdit: false,
             canManageReminder: false,
             originalHadReminder: false,
+            initialNoteBody: '',
             initialReminderSnapshot: { title: '', text: '', date: '', completed: false }
         };
 
@@ -438,12 +484,22 @@
                 }
             }
 
+            if (permissions.can_edit) {
+                if (notePopupAdditionWrap) notePopupAdditionWrap.classList.remove('d-none');
+                if (noteTextAreaLabel) noteTextAreaLabel.textContent = 'Existing Note';
+                if (notePopupAdditionArea) notePopupAdditionArea.value = '';
+            } else {
+                if (notePopupAdditionWrap) notePopupAdditionWrap.classList.add('d-none');
+                if (noteTextAreaLabel) noteTextAreaLabel.textContent = 'Note';
+            }
+
             _noteModalContext = {
                 ..._noteModalContext,
                 noteId: String(noteData.id || noteId),
                 canEdit: !!permissions.can_edit,
                 canManageReminder: !!permissions.can_manage_reminder,
                 originalHadReminder: !!reminder,
+                initialNoteBody: noteData.note || '',
                 initialReminderSnapshot: reminder ? getReminderSnapshot() : { title: '', text: '', date: '', completed: false }
             };
         } catch (err) {
@@ -482,20 +538,46 @@
     async function saveNoteModal() {
         if (!_noteModalContext) return;
 
-        const noteText = (noteTextArea.value || '').trim();
-        if (!noteText) {
-            alert('Note text is required.');
-            return;
+        if (_noteModalMode === 'edit') {
+            if (!_noteModalContext.noteId) return;
+            if (!_noteModalContext.canEdit) {
+                alert('You do not have permission to edit this note.');
+                return;
+            }
+            const hasReminderNowPre = reminderCheckbox.checked;
+            if (_noteModalContext.canManageReminder && _noteModalContext.originalHadReminder && !hasReminderNowPre) {
+                if (!confirm('This will delete the reminder. Are you sure?')) {
+                    return;
+                }
+            }
         }
 
+        let finalNoteBody;
+        if (_noteModalMode === 'edit') {
+            const addTrim = notePopupAdditionArea ? (notePopupAdditionArea.value || '').trim() : '';
+            if (addTrim.length > 0) {
+                finalNoteBody = `${formatNoteTimestampPopup()}\n${notePopupAdditionArea.value.trim()}\n\n${noteTextArea.value}`;
+            } else {
+                finalNoteBody = noteTextArea.value;
+            }
+            if (notePopupAdditionArea) notePopupAdditionArea.value = '';
+        } else {
+            const trimmed = (noteTextArea.value || '').trim();
+            if (!trimmed) {
+                alert('Note text is required.');
+                return;
+            }
+            finalNoteBody = `${formatNoteTimestampPopup()}\n${trimmed}`;
+        }
+        noteTextArea.value = finalNoteBody;
+
         const formData = new FormData();
-        formData.append('note', noteText);
+        formData.append('note', finalNoteBody);
         formData.append('csrfmiddlewaretoken', getCsrfToken());
 
         const hasReminderNow = reminderCheckbox.checked;
         const reminderTitle = reminderTitleInput.value || '';
         const reminderDate = reminderDateInput.value || '';
-        const reminderText = reminderTextInput.value || '';
         const reminderCompleted = reminderCompletedInput.checked;
 
         if (_noteModalMode === 'add') {
@@ -511,7 +593,7 @@
             if (hasReminderNow) {
                 formData.append('create_reminder', 'on');
                 formData.append('reminder_title', reminderTitle);
-                formData.append('reminder_text', reminderText);
+                formData.append('reminder_text', finalNoteBody);
                 formData.append('reminder_date', reminderDate);
             }
 
@@ -524,20 +606,13 @@
         }
 
         if (_noteModalMode === 'edit') {
-            if (!_noteModalContext.noteId) return;
-            if (!_noteModalContext.canEdit) {
-                alert('You do not have permission to edit this note.');
-                return;
-            }
-
             let reminderAction = 'none';
             if (_noteModalContext.canManageReminder) {
                 if (_noteModalContext.originalHadReminder && !hasReminderNow) {
-                    if (!confirm('This will delete the reminder. Are you sure?')) return;
                     reminderAction = 'delete';
                 } else if (!_noteModalContext.originalHadReminder && hasReminderNow) {
                     reminderAction = 'create';
-                } else if (_noteModalContext.originalHadReminder && hasReminderNow && reminderFieldsChanged()) {
+                } else if (_noteModalContext.originalHadReminder && hasReminderNow && noteOrReminderInputsChanged()) {
                     reminderAction = 'update';
                 }
             }
@@ -554,7 +629,7 @@
             formData.append('reminder_action', reminderAction);
             if ((reminderAction === 'create' || reminderAction === 'update') && _noteModalContext.canManageReminder) {
                 formData.append('reminder_title', reminderTitle);
-                formData.append('reminder_text', reminderText);
+                formData.append('reminder_text', finalNoteBody);
                 formData.append('reminder_date', reminderDate);
                 if (reminderCompleted) {
                     formData.append('reminder_completed', 'on');
@@ -641,6 +716,8 @@
         refreshCurrentTab();
     }
     updateTabArrowState();
+
+    /* Reminder pills on tab rows use #noteFullViewModal (see partial script in notes_popup_tab_panel.html). */
 })();
 </script>
 {% endblock %}

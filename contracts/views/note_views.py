@@ -3,12 +3,51 @@ from django.contrib import messages
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Prefetch
 from django.template.loader import render_to_string
 from django.utils import timezone
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Note, Contract, Clin, Reminder
 from ..forms import NoteForm, ReminderForm
+
+
+def annotate_notes_for_current_user(notes, request):
+    """
+    For each Note, set current_user_has_reminder and current_user_reminder
+    (that user's Reminder on the note, if any). Used by all views that render
+    note lists for the popup or AJAX partials. note_update does not render
+    note lists (standalone note_form only).
+    """
+    for note in notes:
+        user_reminders = note.note_reminders.filter(reminder_user=request.user)
+        setattr(
+            note,
+            'current_user_has_reminder',
+            user_reminders.exists(),
+        )
+        setattr(note, 'current_user_reminder', user_reminders.first())
+
+
+def bulk_annotate_notes_for_current_user(notes, request):
+    """Same as annotate_notes_for_current_user but one query for many notes."""
+    if not notes:
+        return
+    note_ids = [n.id for n in notes]
+    reminders = list(
+        Reminder.objects.filter(
+            note_id__in=note_ids,
+            reminder_user=request.user,
+        ).order_by('id')
+    )
+    first_by_note = {}
+    for r in reminders:
+        if r.note_id not in first_by_note:
+            first_by_note[r.note_id] = r
+    for note in notes:
+        rem = first_by_note.get(note.id)
+        setattr(note, 'current_user_has_reminder', rem is not None)
+        setattr(note, 'current_user_reminder', rem)
 
 
 @conditional_login_required
@@ -81,15 +120,20 @@ def add_note(request, content_type_id, object_id):
                     setattr(note, 'entity_type', content_type.model)
                     setattr(note, 'content_type_id', content_type.id)
                     setattr(note, 'object_id', object_id)
+                annotate_notes_for_current_user(notes, request)
 
-                notes_html = render_to_string('contracts/partials/notes_list.html', {
-                    'notes': notes,
-                    'content_object': content_object,
-                    'entity_type': content_type.model,
-                    'content_type_id': content_type.id,
-                    'object_id': object_id,
-                    'show_note_type': False,
-                })
+                notes_html = render_to_string(
+                    'contracts/partials/notes_list.html',
+                    {
+                        'notes': notes,
+                        'content_object': content_object,
+                        'entity_type': content_type.model,
+                        'content_type_id': content_type.id,
+                        'object_id': object_id,
+                        'show_note_type': False,
+                    },
+                    request=request,
+                )
 
                 return JsonResponse({
                     'success': True,
@@ -134,12 +178,25 @@ def delete_note(request, note_id):
         ).order_by('-created_on')
         if content_type.model == 'contract':
             notes_qs = notes_qs.exclude(note_tag='finance')
-        notes = notes_qs
+        notes = list(notes_qs)
+        for note in notes:
+            setattr(note, 'entity_type', content_type.model)
+            setattr(note, 'content_type_id', content_type.id)
+            setattr(note, 'object_id', object_id)
+        annotate_notes_for_current_user(notes, request)
 
-        notes_html = render_to_string('contracts/partials/notes_list.html', {
-            'notes': notes,
-            'content_object': content_object
-        })
+        notes_html = render_to_string(
+            'contracts/partials/notes_list.html',
+            {
+                'notes': notes,
+                'content_object': content_object,
+                'entity_type': content_type.model,
+                'content_type_id': content_type.id,
+                'object_id': object_id,
+                'show_note_type': False,
+            },
+            request=request,
+        )
         
         return JsonResponse({
             'success': True,
@@ -344,20 +401,21 @@ def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
         empty_msg = 'No CLIN notes'
         notes_qs = Note.objects.filter(content_type=content_type, object_id=object_id)
 
+    user_reminder_prefetch = Prefetch(
+        'note_reminders',
+        Reminder.objects.filter(reminder_user=request.user),
+        to_attr='_prefetched_user_note_reminders',
+    )
     notes = list(
-        notes_qs.select_related('created_by').order_by('-created_on')
+        notes_qs.select_related('created_by')
+        .prefetch_related(user_reminder_prefetch)
+        .order_by('-created_on')
     )
 
-    # Pre-compute current-user reminder flags for popup badge rendering.
-    note_ids = [n.id for n in notes]
-    user_reminder_note_ids = set(
-        Reminder.objects.filter(
-            note_id__in=note_ids,
-            reminder_user=request.user,
-        ).values_list('note_id', flat=True)
-    )
     for n in notes:
-        setattr(n, 'current_user_has_reminder', n.id in user_reminder_note_ids)
+        pr = getattr(n, '_prefetched_user_note_reminders', None)
+        setattr(n, 'current_user_has_reminder', bool(pr))
+        setattr(n, 'current_user_reminder', pr[0] if pr else None)
         setattr(n, 'entity_type', tab_type)
         setattr(n, 'content_type_id', content_type.id)
         setattr(n, 'object_id', object_id)
@@ -581,19 +639,25 @@ def get_combined_notes(request, contract_id, clin_id=None):
                     setattr(note, 'content_type_id', contract_type.id)
                     if not hasattr(note, 'object_id'):
                         setattr(note, 'object_id', note.object_id)
-        
+
+        bulk_annotate_notes_for_current_user(all_notes, request)
+
         # Render the combined notes to HTML
-        notes_html = render_to_string('contracts/partials/notes_list.html', {
-            'notes': all_notes,
-            'content_object': contract,
-            'combined_view': True,
-            'show_note_type': True,
-            'entity_type': 'Note',
-            'content_type_id': '',
-            'object_id': contract_id,
-            'contract_content_type_id': str(contract_type.id),
-            'clin_content_type_id': str(clin_type.id)
-        })
+        notes_html = render_to_string(
+            'contracts/partials/notes_list.html',
+            {
+                'notes': all_notes,
+                'content_object': contract,
+                'combined_view': True,
+                'show_note_type': True,
+                'entity_type': 'Note',
+                'content_type_id': '',
+                'object_id': contract_id,
+                'contract_content_type_id': str(contract_type.id),
+                'clin_content_type_id': str(clin_type.id),
+            },
+            request=request,
+        )
         
         return JsonResponse({
             'success': True,

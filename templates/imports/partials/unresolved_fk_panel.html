@@ -1,0 +1,73 @@
+{% if panel %}
+<div class="card border-warning shadow-sm mb-4">
+  <div class="card-header bg-warning-subtle">
+    <h2 class="h6 mb-0">Foreign key resolution</h2>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-warning py-2 mb-3" role="alert">
+      Some rows have unmapped field values. Resolve them below to improve proposed changes.
+    </div>
+    {% for block in panel %}
+    <div class="mb-4 pb-3 border-bottom">
+      <p class="mb-2"><strong>{{ block.model_field }}</strong> <span class="text-muted small">(column: <code>{{ block.sheet_col }}</code>)</span></p>
+      <ul class="list-unstyled mb-0">
+        {% for raw in block.raw_values %}
+        <li class="d-flex flex-wrap align-items-center gap-2 mb-2" data-fk-raw="{{ raw }}" data-fk-field="{{ block.model_field }}">
+          <span class="text-break small flex-grow-1" style="min-width: 8rem;"><code>{{ raw }}</code></span>
+          <input type="number" class="form-control form-control-sm js-fk-resolved-id" style="max-width: 8rem;" min="1" step="1" placeholder="ID" aria-label="Resolved ID for {{ raw }}">
+          <button type="button" class="btn btn-sm btn-outline-primary js-fk-save">Save</button>
+          <span class="small text-success js-fk-saved d-none">Saved ✓</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    <p class="small text-muted mb-0">Saving runs matching again so proposed changes pick up new translations.</p>
+  </div>
+</div>
+
+<script>
+(function() {
+  var sessionId = "{{ session.pk }}";
+  function getCsrf() {
+    var inp = document.querySelector('#imports-session-detail input[name="csrfmiddlewaretoken"]');
+    if (inp && inp.value) return inp.value;
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  var csrfToken = getCsrf();
+  var translationUrl = "{% url 'imports:ajax_save_translation' session.pk %}";
+
+  document.querySelectorAll('.js-fk-save').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var li = btn.closest('li');
+      if (!li) return;
+      var raw = li.dataset.fkRaw;
+      var field = li.dataset.fkField;
+      var inp = li.querySelector('.js-fk-resolved-id');
+      var resolved = inp && inp.value ? parseInt(inp.value, 10) : null;
+      if (!field || !raw || !resolved) return;
+      fetch(translationUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+          target_field: field,
+          raw_value: raw,
+          resolved_id: resolved
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.success) {
+          var mark = li.querySelector('.js-fk-saved');
+          if (mark) mark.classList.remove('d-none');
+          setTimeout(function() { window.location.reload(); }, 450);
+        }
+      });
+    });
+  });
+})();
+</script>
+{% endif %}

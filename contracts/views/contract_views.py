@@ -56,6 +56,9 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             setattr(note, 'entity_type', 'contract')
             setattr(note, 'content_type_id', contract_type.id)
             setattr(note, 'object_id', contract.id)
+            user_reminder = note.note_reminders.filter(reminder_user=self.request.user).first()
+            setattr(note, 'current_user_has_reminder', user_reminder is not None)
+            setattr(note, 'current_user_reminder', user_reminder)
         context['contract_notes'] = contract_notes_qs
         context['contract_content_type_id'] = contract_type.id
         context['clin_content_type_id'] = clin_type.id
@@ -68,13 +71,23 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         
         # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
         context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
+        context['pod_status'] = 'none'
         if context['selected_clin']:
+            sc = context['selected_clin'].shipments.aggregate(
+                total=Count('id'),
+                with_pod=Count('id', filter=Q(pod_date__isnull=False)),
+            )
+            if sc['total'] > 0 and sc['with_pod'] > 0:
+                context['pod_status'] = 'full' if sc['with_pod'] >= sc['total'] else 'partial'
             # Get CLIN notes with entity_type for template
             clin_notes_qs = context['selected_clin'].notes.all().order_by('-created_on')
             for note in clin_notes_qs:
                 setattr(note, 'entity_type', 'clin')
                 setattr(note, 'content_type_id', clin_type.id)
                 setattr(note, 'object_id', context['selected_clin'].id)
+                user_reminder = note.note_reminders.filter(reminder_user=self.request.user).first()
+                setattr(note, 'current_user_has_reminder', user_reminder is not None)
+                setattr(note, 'current_user_reminder', user_reminder)
             context['clin_notes'] = clin_notes_qs
             try:
                 context['acknowledgment'] = context['selected_clin'].clinacknowledgment_set.first()
@@ -102,10 +115,18 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
                 setattr(note, 'entity_type', 'contract')
                 setattr(note, 'content_type_id', contract_type.id)
                 setattr(note, 'object_id', contract.id)
+                if not hasattr(note, 'current_user_has_reminder'):
+                    user_reminder = note.note_reminders.filter(reminder_user=self.request.user).first()
+                    setattr(note, 'current_user_has_reminder', user_reminder is not None)
+                    setattr(note, 'current_user_reminder', user_reminder)
             for note in clin_notes:
                 setattr(note, 'entity_type', 'clin')
                 setattr(note, 'content_type_id', clin_type.id)
                 setattr(note, 'object_id', context['selected_clin'].id)
+                if not hasattr(note, 'current_user_has_reminder'):
+                    user_reminder = note.note_reminders.filter(reminder_user=self.request.user).first()
+                    setattr(note, 'current_user_has_reminder', user_reminder is not None)
+                    setattr(note, 'current_user_reminder', user_reminder)
             
             # Combine the notes
             all_notes = contract_notes + clin_notes
@@ -130,6 +151,10 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
                         # Set a default content type ID for unknown types
                         setattr(note, 'content_type_id', contract_type.id)
                         setattr(note, 'object_id', contract.id)
+                if not hasattr(note, 'current_user_has_reminder'):
+                    user_reminder = note.note_reminders.filter(reminder_user=self.request.user).first()
+                    setattr(note, 'current_user_has_reminder', user_reminder is not None)
+                    setattr(note, 'current_user_reminder', user_reminder)
             
             # Add to context
             context['all_notes'] = all_notes
@@ -143,6 +168,10 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
                 setattr(note, 'entity_type', 'contract')
                 setattr(note, 'content_type_id', contract_type.id)
                 setattr(note, 'object_id', contract.id)
+                if not hasattr(note, 'current_user_has_reminder'):
+                    user_reminder = note.note_reminders.filter(reminder_user=self.request.user).first()
+                    setattr(note, 'current_user_has_reminder', user_reminder is not None)
+                    setattr(note, 'current_user_reminder', user_reminder)
             context['all_notes'] = contract_notes
 
         return context

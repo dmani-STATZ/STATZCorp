@@ -7,8 +7,12 @@
             </div>
             <div class="modal-body">
                 <form id="noteModalForm" novalidate>
+                    <div id="notePopupAdditionWrap" class="mb-3 d-none">
+                        <label for="notePopupAdditionArea" class="form-label" id="notePopupAdditionLabel">Add to Note</label>
+                        <textarea id="notePopupAdditionArea" class="form-control" rows="3" placeholder="Type your addition here..." autocomplete="off"></textarea>
+                    </div>
                     <div class="mb-3">
-                        <label for="noteTextArea" class="form-label">Note</label>
+                        <label for="noteTextArea" class="form-label" id="noteTextAreaLabel">Note</label>
                         <textarea id="noteTextArea" class="form-control" rows="5" required></textarea>
                     </div>
                     <p class="small text-muted mb-3" id="noteModalMeta">Added by —</p>

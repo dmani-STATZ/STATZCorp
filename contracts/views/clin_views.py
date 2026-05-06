@@ -15,6 +15,7 @@ from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, ClinAcknowledgment, ClinShipment, Contract, Note, Reminder, Nsn, Supplier
 from .mixins import ActiveCompanyQuerysetMixin
 from ..forms import ClinForm, ClinAcknowledgmentForm
+from .note_views import annotate_notes_for_current_user
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -206,16 +207,18 @@ def get_clin_notes(request, clin_id):
         # Get notes for this CLIN
         clin_type = ContentType.objects.get_for_model(Clin)
         
-        notes = Note.objects.filter(
-            content_type=clin_type,
-            object_id=clin.id
-        ).order_by('-created_on')
-        
-        # Add entity_type and content_type_id attributes
+        notes = list(
+            Note.objects.filter(
+                content_type=clin_type,
+                object_id=clin.id,
+            ).order_by('-created_on')
+        )
+
         for note in notes:
             setattr(note, 'entity_type', 'clin')
-            setattr(note, 'content_type_id', clin_type.id) 
+            setattr(note, 'content_type_id', clin_type.id)
             setattr(note, 'object_id', clin.id)
+        annotate_notes_for_current_user(notes, request)
         
         # Format notes for JSON response
         notes_data = []
@@ -225,18 +228,22 @@ def get_clin_notes(request, clin_id):
                 'note': note.note,
                 'created_by': note.created_by.username if note.created_by else 'Unknown',
                 'created_on': note.created_on.strftime('%b %d, %Y %H:%M'),
-                'has_reminder': note.note_reminders.exists()
+                'has_reminder': bool(getattr(note, 'current_user_has_reminder', False)),
             })
         
         # Also render HTML for direct insertion
-        notes_html = render_to_string('contracts/partials/notes_list.html', {
-            'notes': notes,
-            'content_object': clin,
-            'entity_type': 'clin',
-            'content_type_id': str(clin_type.id),
-            'object_id': clin.id,
-            'note_empty_msg': 'No CLIN notes'
-        })
+        notes_html = render_to_string(
+            'contracts/partials/notes_list.html',
+            {
+                'notes': notes,
+                'content_object': clin,
+                'entity_type': 'clin',
+                'content_type_id': str(clin_type.id),
+                'object_id': clin.id,
+                'note_empty_msg': 'No CLIN notes',
+            },
+            request=request,
+        )
         
         return JsonResponse({
             'success': True,
