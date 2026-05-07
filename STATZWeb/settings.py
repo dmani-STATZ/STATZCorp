@@ -141,6 +141,7 @@ TEMPLATES = [
                 "users.context_processors.unread_messages",
                 "users.context_processors.active_company",
                 "STATZWeb.context_processors.version_context",
+                "STATZWeb.context_processors.cache_version_context",
                 "sales.context_processors.rfq_counts",
                 "sales.context_processors.solicitation_nav_tools",
             ],

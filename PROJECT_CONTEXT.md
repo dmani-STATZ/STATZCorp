@@ -406,4 +406,6 @@ No Tailwind. Bootstrap 5 plus three global CSS files:
 - `static/css/app-core.css` — all layout, component, button, and modal styles. New named classes go here.
 - `static/css/utilities.css` — utility and helper classes.
 
+Cache-busting: all CSS `<link>` tags use `?v={{ cache_version }}` which is injected by `STATZWeb.context_processors.cache_version_context`. The service worker cache name is also versioned with the same value. Both are sourced from `WEBSITE_DEPLOYMENT_ID` on Azure.
+
 When editing any template: replace Tailwind utility classes with Bootstrap 5 equivalents or named classes from `app-core.css`. Do not leave Tailwind classes in place. Button pattern: `.btn-outline-brand` (standard) and `.btn-outline-brand.btn-tinted` (pill with `#eff6ff` tint).

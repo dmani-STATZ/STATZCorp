@@ -275,6 +275,8 @@ This project does not use Tailwind in any form. All styling uses Bootstrap 5 plu
 - `static/css/app-core.css` — all component, layout, and button styles
 - `static/css/utilities.css` — utility and helper classes
 
+`sw.js` is served as a Django template from `templates/sw.js`, not from `static/sw.js`. The `CACHE_NAME` constant is injected at request time using `cache_version` (sourced from `WEBSITE_DEPLOYMENT_ID` env var). Do not edit `static/sw.js` — changes there have no effect in production.
+
 **Dark mode selector pattern:** Dark mode overrides use `[data-bs-theme="dark"]` as the selector prefix (e.g. `[data-bs-theme="dark"] .some-class { ... }`). This is Bootstrap 5.3 native dark mode. The `data-bs-theme` attribute is set on the `<html>` element by `theme_toggle.js` and the anti-FOUC inline script in `base_template.html`. Do not use a `dark` class on `body` for theming; that pattern is removed. Do not use a `.dark` class on any element for theme purposes.
 
 **When editing templates:** if you encounter Tailwind utility classes, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.

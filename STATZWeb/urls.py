@@ -24,6 +24,7 @@ from django.views.static import serve
 from django.views.generic import TemplateView
 import os
 from . import views
+from STATZWeb.version_utils import get_version_info
 from users import views as user_views
 from users.ms_views import MicrosoftAuthView, MicrosoftCallbackView
 
@@ -64,19 +65,25 @@ def manifest_json(request):
 
 
 def service_worker(request):
-    """Serve service worker with proper headers."""
-    sw_path = os.path.join(
-        (
-            settings.STATIC_ROOT
-            if settings.STATIC_ROOT
-            else os.path.join(settings.BASE_DIR, "static")
-        ),
-        "sw.js",
+    """Serve service worker as a Django template so cache_version is injected."""
+    from django.template.loader import render_to_string as render_template
+
+    version_info = get_version_info()
+    short_hash = version_info.get("short_hash", "")
+    cache_version = os.environ.get("WEBSITE_DEPLOYMENT_ID", "")
+    if not cache_version and short_hash and short_hash != "unknown":
+        cache_version = short_hash
+    cache_version = cache_version or "1"
+    cache_version = (
+        cache_version.strip().replace("'", "").replace('"', "").replace(" ", "-")
     )
-    response = serve(request, os.path.basename(sw_path), os.path.dirname(sw_path))
-    response["Content-Type"] = "application/javascript"
+
+    content = render_template("sw.js", {"cache_version": cache_version})
+    response = HttpResponse(content, content_type="application/javascript")
     response["Service-Worker-Allowed"] = "/"
     response["Access-Control-Allow-Origin"] = "*"
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
     return response
 
 
