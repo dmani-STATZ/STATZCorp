@@ -10,6 +10,7 @@
                          tabindex="0"
                          aria-label="View full note"
                          data-note-id="{{ note.id }}"
+                         data-note-type="{{ note_type|lower }}"
                          data-note-text="{{ note.note|escape }}"
                          data-note-created-by="{{ note.created_by }}"
                          data-note-created-on="{{ note.created_on|date:'M d, Y H:i' }}"
@@ -41,7 +42,7 @@
                                         data-reminder-text="{{ note.current_user_reminder.reminder_text|default:''|escape }}"
                                         data-reminder-completed="{% if note.current_user_reminder.reminder_completed %}1{% else %}0{% endif %}"
                                         title="View reminder">
-                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis">
+                                    <span class="badge rounded-pill {% if note.current_user_reminder.reminder_completed %}reminder-pill-completed{% else %}bg-info-subtle text-info-emphasis{% endif %}">
                                         &#9201; Reminder
                                     </span>
                                 </button>
@@ -89,8 +90,9 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
                     <h5 class="modal-title mb-0" id="noteFullViewModalLabel">Note</h5>
+                    <span id="noteFullViewTypePill" class="badge rounded-pill"></span>
                     <span id="noteFullViewReminderPill" class="badge rounded-pill bg-info-subtle text-info-emphasis d-none">
                         &#9201; Reminder
                     </span>
@@ -101,8 +103,8 @@
                 <div id="noteFullViewText" class="note-fullview-text mb-3"></div>
                 <div class="small text-muted" id="noteFullViewMeta"></div>
             </div>
-            <div class="modal-footer py-2 d-none" id="noteFullViewReminderFooter">
-                <form method="post" id="noteFullViewToggleForm" action="">
+            <div class="modal-footer py-2 d-none gap-2 flex-wrap" id="noteFullViewReminderFooter">
+                <form method="post" id="noteFullViewToggleForm" action="" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-success" id="noteFullViewToggleBtn">
                         Mark Complete
@@ -119,6 +121,8 @@
 
 <script>
 (function () {
+    /* Synchronous dedupe + body stacking — must run on every partial render
+       (AJAX refreshes inject this script with the new HTML). */
     var modals = document.querySelectorAll('#noteFullViewModal');
     if (modals.length > 1) {
         for (var j = 1; j < modals.length; j++) { modals[j].remove(); }
@@ -128,13 +132,15 @@
         document.body.appendChild(modalKeep);
     }
 
+    /* Delegated listeners: register once per page even if partial re-renders. */
     if (window.__contractsMgmtNoteFullViewListeners) return;
     window.__contractsMgmtNoteFullViewListeners = true;
 
     var toggleUrlTemplate = "{% url 'contracts:toggle_reminder' 888888888 %}";
 
     function noteTextToHtml(text) {
-        return text
+        if (!text) return '';
+        return String(text)
             .replace(/&amp;/g, '&')
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
@@ -143,24 +149,75 @@
             .replace(/\n/g, '<br>');
     }
 
-    function openNoteFullView(data) {
-        document.getElementById('noteFullViewText').innerHTML = noteTextToHtml(data.noteText || '');
-        document.getElementById('noteFullViewMeta').textContent =
-            'Added by ' + (data.createdBy || '') + ' on ' + (data.createdOn || '');
+    function escapeHtmlAttrDecoded(s) {
+        if (!s) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function setTypePill(noteType, visible) {
+        var el = document.getElementById('noteFullViewTypePill');
+        if (!el) return;
+        var t = (noteType || '').toLowerCase();
+        if (!visible || !t) {
+            el.textContent = '';
+            el.className = 'badge rounded-pill d-none';
+            return;
+        }
+        el.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+        el.className = 'badge rounded-pill note-type-pill note-type-' + t;
+    }
+
+    function openNoteFullView(ds) {
+        ds = ds || {};
+        var noteText = ds.noteText || '';
+        var createdBy = ds.noteCreatedBy || '';
+        var createdOn = ds.noteCreatedOn || '';
+        var hasReminder = ds.noteHasReminder === '1';
+        var reminderId = ds.reminderId || '';
+        var reminderTitle = ds.reminderTitle || '';
+        var reminderDate = ds.reminderDate || '';
+        var reminderText = ds.reminderText || '';
+        var reminderCompleted = ds.reminderCompleted === '1';
+        var noteType = ds.noteType || '';
+
+        var titleEl = document.getElementById('noteFullViewModalLabel');
+        var reminderOnly = !noteText && hasReminder && reminderId;
+
+        if (reminderOnly) {
+            if (titleEl) titleEl.textContent = 'Reminder';
+            setTypePill('', false);
+            var rHtml = '';
+            if (reminderTitle) rHtml += '<p class="mb-2 fw-semibold">' + escapeHtmlAttrDecoded(reminderTitle) + '</p>';
+            if (reminderDate)  rHtml += '<p class="small text-muted mb-2">' + escapeHtmlAttrDecoded(reminderDate) + '</p>';
+            rHtml += '<div class="note-fullview-text">' + noteTextToHtml(reminderText) + '</div>';
+            document.getElementById('noteFullViewText').innerHTML = rHtml;
+            document.getElementById('noteFullViewMeta').textContent = '';
+        } else {
+            if (titleEl) titleEl.textContent = 'Note';
+            setTypePill(noteType, true);
+            document.getElementById('noteFullViewText').innerHTML = noteTextToHtml(noteText);
+            document.getElementById('noteFullViewMeta').textContent =
+                'Added by ' + createdBy + ' on ' + createdOn;
+        }
 
         var reminderPill = document.getElementById('noteFullViewReminderPill');
         var reminderFooter = document.getElementById('noteFullViewReminderFooter');
         var noReminderFooter = document.getElementById('noteFullViewNoReminderFooter');
 
-        if (data.hasReminder && data.reminderId) {
+        if (hasReminder && reminderId) {
             reminderPill.classList.remove('d-none');
             reminderFooter.classList.remove('d-none');
             noReminderFooter.classList.add('d-none');
             document.getElementById('noteFullViewToggleForm').action =
-                toggleUrlTemplate.replace('888888888', data.reminderId);
-            var btn = document.getElementById('noteFullViewToggleBtn');
-            btn.textContent = data.reminderCompleted ? 'Mark Incomplete' : 'Mark Complete';
-            btn.className = data.reminderCompleted
+                toggleUrlTemplate.replace('888888888', reminderId);
+            var toggleBtn = document.getElementById('noteFullViewToggleBtn');
+            toggleBtn.textContent = reminderCompleted ? 'Mark Incomplete' : 'Mark Complete';
+            toggleBtn.className = reminderCompleted
                 ? 'btn btn-sm btn-warning'
                 : 'btn btn-sm btn-success';
         } else {
@@ -170,34 +227,95 @@
         }
 
         var modalEl = document.getElementById('noteFullViewModal');
-        if (modalEl) { new bootstrap.Modal(modalEl).show(); }
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
     }
 
+    document.addEventListener('submit', function(e) {
+        const form = e.target.closest('#noteFullViewToggleForm');
+        if (!form) return;
+        e.preventDefault();
+
+        const url    = form.action;
+        const csrfEl = form.querySelector('[name="csrfmiddlewaretoken"]');
+        if (!url || !csrfEl) return;
+
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': csrfEl.value,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+
+            const modalEl = document.getElementById('noteFullViewModal');
+            if (modalEl && typeof bootstrap !== 'undefined') {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }
+
+            const reminderId = String(data.reminder_id || '');
+            if (reminderId) {
+                const pill = document.querySelector('.js-reminder-pill[data-reminder-id="' + reminderId + '"]');
+                if (pill) {
+                    const badge = pill.querySelector('.badge');
+                    if (badge) {
+                        if (data.reminder_completed) {
+                            badge.classList.remove('bg-info-subtle', 'text-info-emphasis');
+                            badge.classList.add('reminder-pill-completed');
+                        } else {
+                            badge.classList.add('bg-info-subtle', 'text-info-emphasis');
+                            badge.classList.remove('reminder-pill-completed');
+                        }
+                    }
+                    pill.dataset.reminderCompleted = data.reminder_completed ? '1' : '0';
+                }
+            }
+
+            if (typeof window.patchReminderFooterPill === 'function') {
+                window.patchReminderFooterPill();
+            }
+        })
+        .catch(() => {
+            window.location.reload();
+        });
+    });
+
+    /* Body click → full note view (no reminder data — body intentionally
+       carries only data-note-* per AGENTS.md). */
     document.addEventListener('click', function (e) {
         var el = e.target.closest('.js-note-expand');
         if (!el) return;
         if (e.target.closest('button, a')) return;
         openNoteFullView({
             noteText: el.dataset.noteText || '',
-            createdBy: el.dataset.noteCreatedBy || '',
-            createdOn: el.dataset.noteCreatedOn || '',
-            hasReminder: false,
-            reminderId: '',
-            reminderCompleted: false,
+            noteType: el.dataset.noteType || '',
+            noteCreatedBy: el.dataset.noteCreatedBy || '',
+            noteCreatedOn: el.dataset.noteCreatedOn || '',
+            noteHasReminder: '0',
         });
     });
 
+    /* Reminder pill click → reminder-only modal (title / date / text). */
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.js-reminder-pill');
         if (!btn) return;
         e.stopPropagation();
         openNoteFullView({
             noteText: '',
-            createdBy: '',
-            createdOn: '',
-            hasReminder: true,
-            reminderId: btn.dataset.reminderId || '',
-            reminderCompleted: btn.dataset.reminderCompleted === '1',
+            noteType: '',
+            noteCreatedBy: '',
+            noteCreatedOn: '',
+            noteHasReminder: '1',
+            reminderId: btn.dataset.reminderId,
+            reminderTitle: btn.dataset.reminderTitle,
+            reminderDate: btn.dataset.reminderDate,
+            reminderText: btn.dataset.reminderText,
+            reminderCompleted: btn.dataset.reminderCompleted,
         });
     });
 
@@ -208,11 +326,10 @@
         e.preventDefault();
         openNoteFullView({
             noteText: el.dataset.noteText || '',
-            createdBy: el.dataset.noteCreatedBy || '',
-            createdOn: el.dataset.noteCreatedOn || '',
-            hasReminder: false,
-            reminderId: '',
-            reminderCompleted: false,
+            noteType: el.dataset.noteType || '',
+            noteCreatedBy: el.dataset.noteCreatedBy || '',
+            noteCreatedOn: el.dataset.noteCreatedOn || '',
+            noteHasReminder: '0',
         });
     });
 })();

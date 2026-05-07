@@ -1,7 +1,7 @@
 {% extends "base_template.html" %}
 {% load static %}
 {% block extra_head %}
-    <link rel="stylesheet" href="{% static 'css/components.css' %}?v={{ cache_version }}">
+    <link rel="stylesheet" href="{% static 'contracts/css/components.css' %}?v={{ cache_version }}">
 {% endblock %}
 
 {% block body %}
@@ -65,7 +65,7 @@
 
                 <!-- Right side: Reminders Button -->
                 <div class="flex items-center">
-                    <button onclick="toggleReminderbar()"
+                    <button type="button" id="contracts-reminders-footer-pill" onclick="openRemindersPopup()"
                             class="flex items-center gap-2 px-6 py-2 rounded-full shadow-md transition-all transform hover:scale-105 {% if footer_overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -84,8 +84,6 @@
         </div>
     </div>
 </div>
-
-<div class="overlay hidden fixed inset-0 z-40" style="background: rgba(0,0,0,0.3);" id="overlay" onclick="toggleReminderbar()"></div>
 
 <!-- Contract Search Modal -->
 <div id="contractSearchModal"
@@ -302,361 +300,92 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-    function toggleReminderbar() {
-        const reminderbar = document.getElementById('reminderbar');
-        const overlay = document.getElementById('overlay');
+function openRemindersPopup() {
+    const url = "{% url 'contracts:reminders_popup' %}";
+    const width = 560;
+    const height = 750;
+    const left = Math.round((screen.width - width) / 2);
+    const top = Math.round((screen.height - height) / 2);
+    window.open(
+        url,
+        'RemindersPopup',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
+    );
+}
 
-        if (reminderbar.classList.contains('inactive')) {
-            reminderbar.classList.remove('inactive');
-            reminderbar.classList.add('active');
-            reminderbar.style.transform = 'translateX(0)';
-            overlay.classList.remove('hidden');
-        } else {
-            reminderbar.classList.remove('active');
-            reminderbar.classList.add('inactive');
-            reminderbar.style.transform = 'translateX(100%)';
-            overlay.classList.add('hidden');
-        }
-    }
+document.addEventListener('DOMContentLoaded', function() {
+    const menuBtn = document.getElementById('menuBtn');
+    const menuPanel = document.getElementById('menuPanel');
+    if (!menuBtn || !menuPanel) return;
 
-    function openRemindersPopup() {
-        const url = "{% url 'contracts:reminders_popup' %}";
-        const width = 560;
-        const height = 750;
-        const left = Math.round((screen.width - width) / 2);
-        const top = Math.round((screen.height - height) / 2);
-        window.open(
-            url,
-            'RemindersPopup',
-            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
-        );
-    }
+    let isMenuOpen = false;
 
-    function showReminderDetails(element) {
-        const id = element.dataset.reminderId;
-        const title = element.dataset.reminderTitle;
-        const text = element.dataset.reminderText;
-        const dateStr = element.dataset.reminderDate;
+    menuBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        isMenuOpen = !isMenuOpen;
+        menuPanel.classList.toggle('show');
+    });
 
-        document.getElementById('reminderDetailTitle').textContent = title || 'Reminder';
-        document.getElementById('reminderDetailDate').textContent = dateStr || '';
-
-        const descEl = document.getElementById('reminderDetailDescription');
-        if (text && text.trim()) {
-            descEl.textContent = text;
-            descEl.classList.remove('text-muted', 'fst-italic');
-        } else {
-            descEl.textContent = 'No description.';
-            descEl.classList.add('text-muted', 'fst-italic');
-        }
-
-        const completeBtn = document.getElementById('reminderDetailComplete');
-        completeBtn.onclick = function() { completeReminder(id); };
-
-        const modalEl = document.getElementById('reminderDetailModal');
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
-    }
-
-    function completeReminder(id) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/contracts/reminder/${id}/complete/`;
-
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = csrfToken;
-
-        form.appendChild(csrfInput);
-        document.body.appendChild(form);
-        form.submit();
-    }
-
-    function showNewReminderModal() {
-        // Set default date to today + 1 hour
-        const defaultDate = new Date();
-        defaultDate.setHours(defaultDate.getHours() + 1);
-        document.getElementById('reminderDate').value = defaultDate.toISOString().slice(0, 16);
-
-        document.getElementById('newReminderModal').classList.add('active');
-    }
-
-    function closeNewReminderModal() {
-        document.getElementById('newReminderModal').classList.remove('active');
-    }
-
-    function editReminder(id, title, description, dueDate) {
-        // Populate the form fields
-        document.getElementById('editReminderId').value = id;
-        document.getElementById('editReminderTitle').value = title;
-        document.getElementById('editReminderDescription').value = description;
-        document.getElementById('editReminderDate').value = dueDate;
-
-        // Update the form action
-        document.getElementById('editReminderForm').action = `/contracts/reminder/${id}/edit/`;
-
-        // Show the modal
-        document.getElementById('editReminderModal').classList.add('active');
-    }
-
-    function closeEditReminderModal() {
-        document.getElementById('editReminderModal').classList.remove('active');
-    }
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-        const reminderbar = document.getElementById('reminderbar');
-        if (reminderbar) {
-            reminderbar.style.transform = 'translateX(100%)';
-            reminderbar.style.transition = 'transform 0.3s ease-in-out';
+    document.addEventListener('click', function(e) {
+        if (isMenuOpen && !menuPanel.contains(e.target)) {
+            isMenuOpen = false;
+            menuPanel.classList.remove('show');
         }
     });
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const menuBtn = document.getElementById('menuBtn');
-        const menuPanel = document.getElementById('menuPanel');
-        let isMenuOpen = false;
-
-        // Toggle menu when clicking the button
-        menuBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            isMenuOpen = !isMenuOpen;
-            menuPanel.classList.toggle('show');
-        });
-
-        // Close menu when clicking outside
-        document.addEventListener('click', function(e) {
-            if (isMenuOpen && !menuPanel.contains(e.target)) {
-                isMenuOpen = false;
-                menuPanel.classList.remove('show');
-            }
-        });
-
-        // Prevent menu from closing when clicking inside it
-        menuPanel.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+    menuPanel.addEventListener('click', function(e) {
+        e.stopPropagation();
     });
+});
 </script>
 
-<!-- Reminder Detail Modal (read-only) -->
-<div class="modal fade" id="reminderDetailModal" tabindex="-1" aria-labelledby="reminderDetailTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h5 class="modal-title" id="reminderDetailTitle">Reminder</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="small text-muted mb-2" id="reminderDetailDate"></p>
-                <p class="mb-0" id="reminderDetailDescription" style="white-space: pre-line;"></p>
-            </div>
-            <div class="modal-footer justify-content-between">
-                <button type="button" class="btn btn-success btn-sm" id="reminderDetailComplete">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="vertical-align:-2px;margin-right:4px;">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Mark Complete
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- New Reminder Modal -->
-<div class="reminder-modal" id="newReminderModal">
-    <div class="reminder-modal-content">
-        <div class="p-4 border-b border-gray-200 row-between bg-gray-50">
-            <h3 class="text-lg font-semibold text-gray-800">New Reminder</h3>
-            <button class="text-gray-600 hover:text-gray-800" onclick="closeNewReminderModal()">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <div class="p-6">
-            <form id="newReminderForm" method="post" action="{% url 'contracts:add_reminder' %}">
-                {% csrf_token %}
-                <div class="mb-4">
-                    <label for="reminderTitle" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                    <input type="text" id="reminderTitle" name="reminder_title" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                </div>
-                <div class="mb-4">
-                    <label for="reminderDate" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                    <input type="datetime-local" id="reminderDate" name="reminder_date" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                </div>
-                <div class="mb-4">
-                    <label for="reminderDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea id="reminderDescription" name="reminder_text" rows="4" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
-                </div>
-                <div class="flex justify-end mt-6 space-x-3">
-                    <button type="button" onclick="closeNewReminderModal()" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md btn btn-caution focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-4 py-2 btn btn-save text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2">
-                        Save Reminder
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Edit Reminder Modal -->
-<div class="reminder-modal" id="editReminderModal">
-    <div class="reminder-modal-content">
-        <div class="p-4 border-b border-gray-200 row-between bg-gray-50">
-            <h3 class="text-lg font-semibold text-gray-800">Edit Reminder</h3>
-            <button class="text-gray-600 hover:text-gray-800" onclick="closeEditReminderModal()">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <div class="p-6">
-            <form id="editReminderForm" method="post">
-                {% csrf_token %}
-                <input type="hidden" id="editReminderId" name="reminder_id">
-                <div class="mb-4">
-                    <label for="editReminderTitle" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                    <input type="text" id="editReminderTitle" name="reminder_title" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                </div>
-                <div class="mb-4">
-                    <label for="editReminderDate" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                    <input type="datetime-local" id="editReminderDate" name="reminder_date" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                </div>
-                <div class="mb-4">
-                    <label for="editReminderDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea id="editReminderDescription" name="reminder_text" rows="4" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
-                </div>
-                <div class="flex justify-end mt-6 space-x-3">
-                    <button type="button" onclick="closeEditReminderModal()" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md btn btn-caution focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md btn btn-save focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Update Reminder
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Reminders Sidebar -->
-<div id="reminderbar" class="reminderbar inactive">
-    {# Top accent strip reflects global status: red if overdue, amber if due, green otherwise #}
-    <div class="reminders-panel-accent {% if overdue_count > 0 %}accent-danger{% elif due_count > 0 %}accent-warning{% else %}accent-success{% endif %}"></div>
-
-    <div class="reminders-panel-header">
-        <h2 class="reminders-panel-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span>My Reminders</span>
-        </h2>
-        <select id="reminder-upcoming-days" class="form-select form-select-sm reminders-panel-days"
-                title="Show reminders this many days ahead (0 = today only)"
-                aria-label="Future days">
-            {% for n in "01234567" %}
-            <option value="{{ forloop.counter0 }}" {% if reminder_sidebar_upcoming_days|default:0 == forloop.counter0 %}selected{% endif %}>{{ forloop.counter0 }}</option>
-            {% endfor %}
-        </select>
-        <button type="button" class="reminders-panel-iconbtn"
-                onclick="openRemindersPopup()"
-                title="Open in separate window"
-                aria-label="Open reminders in separate window">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-        </button>
-    </div>
-
-    <div class="reminders-panel-list">
-        {% if reminders %}
-            {% for reminder in reminders %}
-                {% if not reminder.completed %}
-                    <div class="reminder-card"
-                         role="button" tabindex="0"
-                         data-reminder-id="{{ reminder.id }}"
-                         data-reminder-title="{{ reminder.title|escapejs }}"
-                         data-reminder-text="{{ reminder.description|escapejs }}"
-                         data-reminder-date="{{ reminder.reminder_date|date:'M j, Y' }}"
-                         data-reminder-completed="{{ reminder.completed }}"
-                         data-reminder-iso-date="{{ reminder.reminder_date|date:'Y-m-d' }}"
-                         onclick="showReminderDetails(this)"
-                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showReminderDetails(this);}">
-                        <span class="reminder-card-strip {% if reminder.is_overdue %}strip-danger{% elif reminder.is_upcoming %}strip-success{% else %}strip-warning{% endif %}" aria-hidden="true"></span>
-                        <div class="reminder-card-body">
-                            <div class="reminder-card-title">{{ reminder.title }}</div>
-                            <div class="reminder-card-date">{{ reminder.reminder_date|date:"M j, Y" }}</div>
-                        </div>
-                        <button type="button" class="reminder-card-edit"
-                                title="Edit reminder"
-                                aria-label="Edit reminder"
-                                data-reminder-id="{{ reminder.id }}"
-                                data-reminder-title="{{ reminder.title|escapejs }}"
-                                data-reminder-description="{{ reminder.description|escapejs }}"
-                                data-reminder-date="{{ reminder.reminder_date|date:'M j, Y' }}"
-                                onclick="event.stopPropagation(); editReminder(this.dataset.reminderId, this.dataset.reminderTitle, this.dataset.reminderDescription, this.dataset.reminderDate)">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                        </button>
-                    </div>
-                {% endif %}
-            {% empty %}
-                <div class="reminders-panel-empty">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.73 21a2 2 0 0 1-3.46 0M18.63 13A17.89 17.89 0 0 1 18 8M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.33-5M1 1l22 22" />
-                    </svg>
-                    <div>No reminders in this range.</div>
-                </div>
-            {% endfor %}
-        {% else %}
-            <div class="reminders-panel-empty">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.73 21a2 2 0 0 1-3.46 0M18.63 13A17.89 17.89 0 0 1 18 8M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.33-5M1 1l22 22" />
-                </svg>
-                <div>No reminders in this range.</div>
-            </div>
-        {% endif %}
-    </div>
-
-    <div class="reminders-panel-footer">
-        <button type="button" onclick="showNewReminderModal()" class="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            New Reminder
-        </button>
-    </div>
-</div>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const upcomingSelect = document.getElementById('reminder-upcoming-days');
-    if (upcomingSelect) {
-        upcomingSelect.addEventListener('change', function() {
-            const value = this.value;
-            const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (typeof getCookie === 'function' && getCookie('csrftoken'));
-            if (!csrf) return;
-            fetch("{% url 'users:settings-save' %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-                body: JSON.stringify({
-                    user_id: "{{ user.id }}",
-                    setting_name: 'reminder_sidebar_upcoming_days',
-                    setting_value: value,
-                    setting_type: 'integer'
-                })
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.success) window.location.reload();
-            });
-        });
-    }
-});
+/**
+ * Fetches current reminder counts from the API and patches the footer
+ * Reminders pill badge in-place. Call this after any AJAX reminder action.
+ */
+window.patchReminderFooterPill = function() {
+    fetch("{% url 'contracts:reminder_counts_api' %}", {
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) return;
+
+        const total    = (data.footer_overdue_count || 0) + (data.footer_due_today_count || 0);
+        const overdue  = data.footer_overdue_count || 0;
+
+        const pillBtn = document.getElementById('contracts-reminders-footer-pill');
+        if (!pillBtn) return;
+
+        let badge = pillBtn.querySelector('span:last-child[class*="rounded-full"]');
+
+        if (total > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                pillBtn.appendChild(badge);
+            }
+            badge.textContent = String(total);
+            badge.className = [
+                'flex items-center justify-center h-6 w-6 rounded-full bg-white text-xs font-bold',
+                overdue > 0 ? 'text-red-700' : 'text-green-700'
+            ].join(' ');
+
+            pillBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-green-600', 'hover:bg-green-700');
+            if (overdue > 0) {
+                pillBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                pillBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+        } else {
+            if (badge) badge.remove();
+            pillBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-green-600', 'hover:bg-green-700');
+            pillBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+        }
+    })
+    .catch(() => {});
+};
 </script>
 
 {% endblock body %}

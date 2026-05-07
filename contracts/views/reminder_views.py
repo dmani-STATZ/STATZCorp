@@ -5,11 +5,18 @@ from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.db.models import Q
+from django.core.paginator import Paginator
 from datetime import timedelta
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Reminder, Note
 from ..forms import ReminderForm
+
+
+def _request_is_ajax(request):
+    """True for fetch/XHR from the reminders popup (tolerates header casing)."""
+    v = request.headers.get('x-requested-with') or request.META.get('HTTP_X_REQUESTED_WITH', '')
+    return (v or '').lower() == 'xmlhttprequest'
 
 
 @conditional_login_required
@@ -81,18 +88,19 @@ class ReminderListView(ListView):
         if getattr(self.request, 'active_company', None):
             queryset = queryset.filter(company=self.request.active_company)
         
-        # Filter by completion status if specified
+        # Default to all pending on a fresh visit (no query params) — matches popup + pill.
         status_filter = self.request.GET.get('status')
+        due_filter = self.request.GET.get('due')
+        if due_filter is None and status_filter is None:
+            status_filter = 'pending'
+
+        # Filter by completion status
         if status_filter == 'completed':
             queryset = queryset.filter(reminder_completed=True)
         elif status_filter == 'pending':
             queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
-        
-        # Filter by due date. Default to 'due' on a fresh visit (no due and no
-        # status params). 'all' is the sentinel value that means "no due filter".
-        due_filter = self.request.GET.get('due')
-        if due_filter is None and status_filter is None:
-            due_filter = 'due'
+
+        # Filter by due date. 'all' is the sentinel value that means "no due filter".
         today = timezone.now().date()
         seven_days_ago = today - timedelta(days=7)
 
@@ -124,12 +132,11 @@ class ReminderListView(ListView):
         today = timezone.now().date()
         seven_days_ago = today - timedelta(days=7)
         
-        # Add filter parameters to context, applying the same default-to-'due'
-        # logic as get_queryset so the template's active chip state matches.
+        # Add filter parameters to context, applying the same default as get_queryset.
         status_param = self.request.GET.get('status')
         due_param = self.request.GET.get('due')
         if due_param is None and status_param is None:
-            due_param = 'due'
+            status_param = 'pending'
         context['status_filter'] = status_param or ''
         context['due_filter'] = due_param or ''
         
@@ -174,12 +181,24 @@ class ReminderListView(ListView):
         return context
 
 
+def _pending_reminder_q():
+    return Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
+
+
+def _annotate_popup_reminder(reminder, today):
+    """Card chrome: footer-aligned overdue (before today) vs due today vs upcoming."""
+    done = bool(reminder.reminder_completed)
+    reminder.is_footer_overdue = (not done and reminder.reminder_date < today)
+    reminder.is_due_today = (not done and reminder.reminder_date == today)
+    reminder.is_upcoming_card = (not done and reminder.reminder_date > today)
+
+
 @conditional_login_required
 def reminders_popup(request):
     """
-    Bare-chrome reminders window opened via window.open() from the sidebar pop-out button.
-    Renders the same data as ReminderListView but in a chrome-free popup template.
-    Supports ?status= and ?due= query params identically to ReminderListView.
+    Bare-chrome reminders window opened via window.open() from the footer pill.
+    Default: overdue + due today (non-completed), matching footer badge counts.
+    ?due=all&status=pending — all non-completed, due ASC, paginated (50).
     """
     user = request.user
     today = timezone.now().date()
@@ -188,61 +207,101 @@ def reminders_popup(request):
     queryset = Reminder.objects.filter(
         reminder_user=user
     ).select_related(
-        'reminder_user', 'reminder_completed_user', 'note'
-    ).order_by('reminder_date')
+        'reminder_user', 'reminder_completed_user', 'note', 'note__content_type'
+    )
 
     if getattr(request, 'active_company', None):
         queryset = queryset.filter(company=request.active_company)
 
     status_param = request.GET.get('status')
     due_param = request.GET.get('due')
-    # Default to the 'due' filter on a fresh visit (no due and no status params).
-    # 'all' is the sentinel meaning "no due filter".
     if due_param is None and status_param is None:
-        due_param = 'due'
-    status_filter = status_param or ''
-    due_filter = due_param or ''
+        due_param = 'due_and_overdue'
+
+    status_filter = (status_param or '').strip()
+    due_filter = (due_param or '').strip()
+
+    paginate = False
+    view_mode = 'due_now'
 
     if status_filter == 'completed':
-        queryset = queryset.filter(reminder_completed=True)
-    elif status_filter == 'pending':
-        queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
-
-    if due_filter == 'overdue':
-        queryset = queryset.filter(reminder_date__lte=seven_days_ago, reminder_completed=False)
+        queryset = queryset.filter(reminder_completed=True).order_by('-reminder_date', '-id')
+        view_mode = 'completed'
+    elif due_filter == 'due_and_overdue':
+        queryset = queryset.filter(
+            reminder_date__lte=today,
+        ).filter(_pending_reminder_q()).order_by('reminder_date', 'id')
+        view_mode = 'due_now'
+    elif due_filter == 'overdue':
+        queryset = queryset.filter(
+            reminder_date__lte=seven_days_ago,
+        ).filter(_pending_reminder_q()).order_by('reminder_date', 'id')
+        view_mode = 'due_now'
     elif due_filter == 'due':
         queryset = queryset.filter(
             reminder_date__lte=today,
             reminder_date__gt=seven_days_ago,
-            reminder_completed=False
-        )
+        ).filter(_pending_reminder_q()).order_by('reminder_date', 'id')
+        view_mode = 'due_now'
     elif due_filter == 'upcoming':
-        queryset = queryset.filter(reminder_date__gt=today, reminder_completed=False)
+        queryset = queryset.filter(reminder_date__gt=today).filter(_pending_reminder_q()).order_by(
+            'reminder_date', 'id'
+        )
+        view_mode = 'all_pending'
+    elif due_filter == 'all' or status_filter == 'pending':
+        queryset = queryset.filter(_pending_reminder_q()).order_by('reminder_date', 'id')
+        paginate = True
+        view_mode = 'all_pending'
+    else:
+        queryset = queryset.filter(
+            reminder_date__lte=today,
+        ).filter(_pending_reminder_q()).order_by('reminder_date', 'id')
+        due_filter = 'due_and_overdue'
+        view_mode = 'due_now'
 
     all_reminders = Reminder.objects.filter(reminder_user=user)
     if getattr(request, 'active_company', None):
         all_reminders = all_reminders.filter(company=request.active_company)
 
-    active_reminders = all_reminders.filter(
-        Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
-    )
+    active_reminders = all_reminders.filter(_pending_reminder_q())
 
-    for reminder in queryset:
-        reminder.is_overdue = reminder.reminder_date <= seven_days_ago
+    footer_overdue_count = active_reminders.filter(reminder_date__lt=today).count()
+    footer_due_today_count = active_reminders.filter(reminder_date=today).count()
+
+    pagination_base_query = ''
+    page_obj = None
+    is_paginated = False
+
+    if paginate:
+        paginator = Paginator(queryset, 50)
+        page_number = request.GET.get('page') or 1
+        page_obj = paginator.get_page(page_number)
+        for reminder in page_obj.object_list:
+            _annotate_popup_reminder(reminder, today)
+        get_params = request.GET.copy()
+        get_params.pop('page', None)
+        pagination_base_query = get_params.urlencode()
+        reminders_iterable = page_obj
+        is_paginated = paginator.num_pages > 1
+    else:
+        reminders_list = list(queryset)
+        for reminder in reminders_list:
+            _annotate_popup_reminder(reminder, today)
+        reminders_iterable = reminders_list
 
     context = {
-        'reminders': queryset,
+        'reminders': reminders_iterable,
+        'page_obj': page_obj,
+        'is_paginated': is_paginated,
+        'pagination_base_query': pagination_base_query,
         'status_filter': status_filter,
         'due_filter': due_filter,
+        'view_mode': view_mode,
         'total_count': all_reminders.count(),
         'completed_count': all_reminders.filter(reminder_completed=True).count(),
         'pending_count': active_reminders.count(),
-        'overdue_count': active_reminders.filter(reminder_date__lte=seven_days_ago).count(),
-        'due_count': active_reminders.filter(
-            reminder_date__lte=today,
-            reminder_date__gt=seven_days_ago
-        ).count(),
-        'upcoming_count': active_reminders.filter(reminder_date__gt=today).count(),
+        'footer_overdue_count': footer_overdue_count,
+        'footer_due_today_count': footer_due_today_count,
         'today': today,
         'seven_days_ago': seven_days_ago,
     }
@@ -275,21 +334,27 @@ def reminders_popup_add(request):
 def reminders_popup_edit(request, reminder_id):
     """
     Handles the Edit Reminder form POST from the popup window.
-    On success redirects back to the popup window preserving current filters.
+    AJAX (X-Requested-With) returns JSON; otherwise redirects to default popup view.
     """
     reminder = get_object_or_404(Reminder, id=reminder_id)
 
     if reminder.reminder_user != request.user and not request.user.is_staff:
         messages.error(request, 'You do not have permission to edit this reminder.')
+        if request.method == 'POST' and _request_is_ajax(request):
+            return JsonResponse({'success': False}, status=403)
         return HttpResponseRedirect(reverse('contracts:reminders_popup'))
 
     if request.method == 'POST':
         form = ReminderForm(request.POST, instance=reminder)
         if form.is_valid():
             form.save()
+            if _request_is_ajax(request):
+                return JsonResponse({'success': True, 'reminder_id': reminder.id})
             messages.success(request, 'Reminder updated.')
         else:
-            messages.error(request, 'Error updating reminder. Please check the form.')
+            if _request_is_ajax(request):
+                return JsonResponse({'success': False, 'errors': str(form.errors)}, status=400)
+            messages.error(request, 'Error updating reminder.')
 
     return HttpResponseRedirect(reverse('contracts:reminders_popup'))
 
@@ -317,8 +382,14 @@ def toggle_reminder_completion(request, reminder_id):
     reminder.save()
     
     messages.success(request, f'Reminder marked as {"completed" if reminder.reminder_completed else "pending"}.')
-    
-    # Redirect back to the referring page
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'reminder_id': reminder.id,
+            'reminder_completed': reminder.reminder_completed,
+        })
+
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list')))
 
 
@@ -339,8 +410,14 @@ def mark_reminder_complete(request, reminder_id):
     reminder.save()
     
     messages.success(request, 'Reminder marked as completed.')
-    
-    # Redirect back to the referring page
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'reminder_id': reminder.id,
+            'reminder_completed': True,
+        })
+
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list')))
 
 
@@ -385,12 +462,41 @@ def delete_reminder(request, reminder_id):
     # Check if the user has permission to delete this reminder
     if reminder.reminder_user != request.user and not request.user.is_staff:
         messages.error(request, 'You do not have permission to delete this reminder.')
+        if _request_is_ajax(request):
+            return JsonResponse({'success': False}, status=403)
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
-    
-    # Delete the reminder
+
     reminder.delete()
-    
     messages.success(request, 'Reminder deleted successfully.')
-    
+
+    if _request_is_ajax(request):
+        return JsonResponse({'success': True})
+
     # Redirect back to the referring page
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list'))) 
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('contracts:reminders_list')))
+
+
+@conditional_login_required
+def reminder_counts_api(request):
+    """
+    Returns the footer pill counts for the current user / active company.
+    Used by JS to patch the footer pill badge after AJAX reminder actions
+    without a full page reload.
+    """
+    today = timezone.now().date()
+    qs = Reminder.objects.filter(
+        reminder_user=request.user,
+        reminder_completed=False,
+    )
+    if getattr(request, 'active_company', None):
+        qs = qs.filter(company=request.active_company)
+
+    footer_overdue_count = qs.filter(reminder_date__lt=today).count()
+    footer_due_today_count = qs.filter(reminder_date=today).count()
+
+    return JsonResponse({
+        'success': True,
+        'footer_overdue_count': footer_overdue_count,
+        'footer_due_today_count': footer_due_today_count,
+        'total': footer_overdue_count + footer_due_today_count,
+    })

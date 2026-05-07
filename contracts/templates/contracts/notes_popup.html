@@ -171,14 +171,11 @@
 
     function formatDateForInput(isoDate) {
         if (!isoDate) return '';
-        const parsed = new Date(isoDate);
-        if (Number.isNaN(parsed.getTime())) return '';
-        const year = parsed.getFullYear();
-        const month = String(parsed.getMonth() + 1).padStart(2, '0');
-        const day = String(parsed.getDate()).padStart(2, '0');
-        const hours = String(parsed.getHours()).padStart(2, '0');
-        const minutes = String(parsed.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
+        // isoDate is "YYYY-MM-DD" from the server (DateField, no time component).
+        // Slice directly instead of using new Date() to avoid UTC-to-local timezone shift.
+        const datePart = isoDate.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return '';
+        return datePart;
     }
 
     function formatNoteTimestampPopup() {

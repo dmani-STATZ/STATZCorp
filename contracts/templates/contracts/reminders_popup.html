@@ -1,120 +1,152 @@
 {% extends "contracts/reminders_popup_base.html" %}
-{% load humanize %}
 
 {% block title %}My Reminders{% endblock %}
 
 {% block popup_content %}
-<div class="container-fluid px-2 py-2" style="max-width: 540px;">
-    <div class="card shadow-sm mb-2">
-        <div class="card-body py-2 px-3">
-            <div class="d-flex justify-content-between align-items-start gap-2">
-                <div>
-                    <h1 class="h5 mb-0">My Reminders</h1>
-                    <div class="small text-muted mt-1">
-                        <span class="me-2"><span class="badge bg-primary">Due</span> {{ due_count }}</span>
-                        <span class="me-2"><span class="badge bg-danger">Overdue</span> {{ overdue_count }}</span>
-                        <span><span class="badge bg-success">Upcoming</span> {{ upcoming_count }}</span>
-                    </div>
+<div class="d-flex flex-column vh-100 mx-auto px-3" style="max-width: 480px;">
+    <div class="flex-shrink-0 pt-2 pb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <h1 class="h5 mb-0 fw-semibold">My Reminders</h1>
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newReminderModal">+ New</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center small mb-2">
+            <span class="badge rounded-pill bg-danger">Overdue ({{ footer_overdue_count }})</span>
+            <span class="badge rounded-pill bg-primary">Due Today ({{ footer_due_today_count }})</span>
+        </div>
+        <div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Reminder view">
+            <a href="{% url 'contracts:reminders_popup' %}"
+               class="btn btn-outline-secondary {% if view_mode == 'due_now' %}active fw-semibold{% endif %}">Due Now</a>
+            <a href="{% url 'contracts:reminders_popup' %}?due=all&amp;status=pending"
+               class="btn btn-outline-secondary {% if view_mode == 'all_pending' %}active fw-semibold{% endif %}">All Pending</a>
+        </div>
+        <div class="text-end">
+            <a href="{% url 'contracts:reminders_popup' %}?status=completed"
+               class="small text-muted text-decoration-none {% if status_filter == 'completed' %}fw-semibold text-body{% endif %}">Completed{% if status_filter == 'completed' %} ({{ completed_count }}){% endif %}</a>
+        </div>
+    </div>
+
+    <div class="flex-grow-1 overflow-auto pb-2" id="remindersPopupScroll">
+        {% for reminder in reminders %}
+        <div class="card shadow-sm mb-2 reminder-popup-card border-0{% if reminder.reminder_completed %} opacity-75{% endif %}{% if reminder.reminder_completed %} border-start border-secondary border-4{% elif reminder.is_footer_overdue %} border-start border-danger border-4{% elif reminder.is_due_today %} border-start border-primary border-4{% else %} border-start border-success border-4{% endif %}"
+             data-reminder-id="{{ reminder.id }}"
+             data-reminder-title="{{ reminder.reminder_title|escape }}"
+             data-reminder-date="{{ reminder.reminder_date|date:'Y-m-d' }}"
+             data-reminder-completed="{% if reminder.reminder_completed %}1{% else %}0{% endif %}">
+            {# Clickable region: title, badge, date, hidden description for modals #}
+            <div class="js-reminder-card-click px-3 pt-2 pb-1" role="button" tabindex="0"
+                 data-reminder-id="{{ reminder.id }}"
+                 data-reminder-title="{{ reminder.reminder_title|escape }}"
+                 data-reminder-date="{{ reminder.reminder_date|date:'Y-m-d' }}"
+                 data-reminder-completed="{% if reminder.reminder_completed %}1{% else %}0{% endif %}"
+                 data-reminder-date-label="Due {{ reminder.reminder_date|date:'M j, Y' }}"
+                 {% if reminder.note_id and reminder.note.content_type_id %}
+                 {% with content_object=reminder.note.content_object %}
+                 {% if reminder.note.content_type.model == 'contract' %}
+                 data-view-url="{% url 'contracts:contract_management' content_object.id %}"
+                 data-view-label="View Contract: {{ content_object.contract_number|escape }}"
+                 {% elif reminder.note.content_type.model == 'clin' %}
+                 data-view-url="{% url 'contracts:clin_detail' content_object.id %}"
+                 data-view-label="View CLIN: {{ content_object.clin_po_num|escape }}"
+                 {% endif %}
+                 {% endwith %}
+                 {% endif %}>
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <span class="fw-semibold small text-break reminder-card-title {% if reminder.reminder_completed %}text-decoration-line-through text-muted{% endif %}">{{ reminder.reminder_title }}</span>
+                    <span class="badge flex-shrink-0 reminder-card-status {% if reminder.reminder_completed %}bg-secondary{% elif reminder.is_footer_overdue %}bg-danger{% elif reminder.is_due_today %}bg-primary{% else %}bg-success{% endif %}">
+                        {% if reminder.reminder_completed %}Completed{% elif reminder.is_footer_overdue %}Overdue{% elif reminder.is_due_today %}Due{% else %}Upcoming{% endif %}
+                    </span>
                 </div>
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newReminderModal">
-                    + New
-                </button>
+                <div class="small text-muted reminder-card-date-label mt-1">{{ reminder.reminder_date|date:"M j, Y" }}</div>
+                <div class="d-none js-reminder-full-text">{{ reminder.reminder_text|default:'' }}</div>
             </div>
-        </div>
-    </div>
-
-    <div class="card shadow-sm mb-2">
-        <div class="card-body py-2 px-3">
-            <div class="small fw-semibold text-muted mb-1">Status</div>
-            <div class="d-flex flex-wrap gap-1 mb-2">
-                <a class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}{% if due_filter %}?due={{ due_filter }}{% endif %}">All ({{ total_count }})</a>
-                <a class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}?status=pending{% if due_filter %}&due={{ due_filter }}{% endif %}">Pending ({{ pending_count }})</a>
-                <a class="btn btn-sm {% if status_filter == 'completed' %}btn-success{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}?status=completed{% if due_filter %}&due={{ due_filter }}{% endif %}">Completed ({{ completed_count }})</a>
-            </div>
-            <div class="small fw-semibold text-muted mb-1">Time period</div>
-            <div class="d-flex flex-wrap gap-1">
-                <a class="btn btn-sm {% if due_filter == 'upcoming' %}btn-success{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}?due=upcoming{% if status_filter %}&status={{ status_filter }}{% endif %}">Upcoming ({{ upcoming_count }})</a>
-                <a class="btn btn-sm {% if due_filter == 'due' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}?due=due{% if status_filter %}&status={{ status_filter }}{% endif %}">Due ({{ due_count }})</a>
-                <a class="btn btn-sm {% if due_filter == 'overdue' %}btn-danger{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}?due=overdue{% if status_filter %}&status={{ status_filter }}{% endif %}">Overdue ({{ overdue_count }})</a>
-                <a class="btn btn-sm {% if due_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                   href="{% url 'contracts:reminders_popup' %}?due=all{% if status_filter %}&status={{ status_filter }}{% endif %}">All Time</a>
-            </div>
-        </div>
-    </div>
-
-    {% if overdue_count > 0 and status_filter != 'completed' %}
-    <div class="alert alert-danger py-2 px-3 small mb-2" role="alert">
-        You have {{ overdue_count }} overdue reminder{{ overdue_count|pluralize }}.
-    </div>
-    {% endif %}
-
-    <div class="card shadow-sm">
-        <div class="list-group list-group-flush" style="max-height: calc(100vh - 320px); overflow-y: auto;">
-            {% for reminder in reminders %}
-            <div class="list-group-item py-2 px-3
-                {% if reminder.reminder_completed %}bg-light
-                {% elif reminder.is_overdue %}list-group-item-danger
-                {% elif reminder.reminder_date.date <= today %}list-group-item-primary
-                {% else %}list-group-item-success{% endif %}">
-                <div class="d-flex align-items-start gap-2">
-                    <form method="post" action="{% url 'contracts:toggle_reminder' reminder.id %}" class="m-0 p-0">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm border rounded-circle p-0 d-flex align-items-center justify-content-center"
-                                style="width: 28px; height: 28px; min-width: 28px;"
-                                title="Toggle complete"
-                                aria-label="Toggle complete">
-                            {% if reminder.reminder_completed %}
-                            <span class="text-success small">&#10003;</span>
+            {# View link + edit/delete — outside clickable region #}
+            <div class="d-flex align-items-center justify-content-between px-3 pb-2 gap-2">
+                <div class="min-w-0 flex-grow-1">
+                    {% if reminder.note_id and reminder.note.content_type_id %}
+                        {% with content_object=reminder.note.content_object %}
+                            {% if reminder.note.content_type.model == 'contract' %}
+                            <a href="{% url 'contracts:contract_management' content_object.id %}"
+                               class="small text-decoration-none text-truncate d-inline-block js-reminder-view-contract"
+                               style="max-width: 260px;"
+                               target="_blank" rel="noopener noreferrer">
+                                View Contract: {{ content_object.contract_number }}
+                            </a>
+                            {% elif reminder.note.content_type.model == 'clin' %}
+                            <a href="{% url 'contracts:clin_detail' content_object.id %}"
+                               class="small text-decoration-none text-truncate d-inline-block js-reminder-view-clin"
+                               style="max-width: 260px;"
+                               target="_blank" rel="noopener noreferrer">
+                                View CLIN: {{ content_object.clin_po_num }}
+                            </a>
                             {% endif %}
-                        </button>
-                    </form>
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="d-flex justify-content-between align-items-start gap-1">
-                            <span class="fw-semibold small text-break">{{ reminder.reminder_title }}</span>
-                            <span class="badge {% if reminder.reminder_completed %}bg-success{% elif reminder.is_overdue %}bg-danger{% elif reminder.reminder_date.date <= today %}bg-primary{% else %}bg-success{% endif %} flex-shrink-0">
-                                {% if reminder.reminder_completed %}Completed{% elif reminder.is_overdue %}Overdue{% elif reminder.reminder_date.date <= today %}Due{% else %}Upcoming{% endif %}
-                            </span>
-                        </div>
-                        {% if reminder.reminder_text %}
-                        <p class="small text-muted mb-1 text-break">{{ reminder.reminder_text|linebreaksbr }}</p>
-                        {% endif %}
-                        <div class="small text-muted mb-1">
-                            {{ reminder.reminder_date|date:"M j, Y" }}
-                            ({{ reminder.reminder_date }})
-                        </div>
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            {% if reminder.note and reminder.note.content_type and reminder.note.content_object %}
-                                {% with content_object=reminder.note.content_object content_type=reminder.note.content_type %}
-                                    {% if content_type.model == 'contract' %}
-                                    <a href="{% url 'contracts:contract_management' content_object.id %}" target="_blank" rel="noopener noreferrer" class="small">View Contract: {{ content_object.contract_number }}</a>
-                                    {% elif content_type.model == 'clin' %}
-                                    <a href="{% url 'contracts:clin_detail' content_object.id %}" target="_blank" rel="noopener noreferrer" class="small">View CLIN: {{ content_object.clin_po_num }}</a>
-                                    {% endif %}
-                                {% endwith %}
-                            {% endif %}
-                            <button type="button" class="btn btn-link btn-sm p-0 small edit-reminder-popup-btn"
-                                    data-id="{{ reminder.id }}"
-                                    data-title="{{ reminder.reminder_title|escape }}"
-                                    data-description="{{ reminder.reminder_text|default:''|escape }}"
-                                    data-date="{{ reminder.reminder_date|date:'M j, Y' }}">Edit</button>
-                            <a href="{% url 'contracts:delete_reminder' reminder.id %}?next={% url 'contracts:reminders_popup' %}" class="small text-danger">Delete</a>
-                        </div>
-                    </div>
+                        {% endwith %}
+                    {% endif %}
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <button type="button"
+                            class="btn btn-sm btn-link p-0 text-secondary js-edit-reminder-btn"
+                            title="Edit reminder" aria-label="Edit reminder"
+                            data-id="{{ reminder.id }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm btn-link p-0 text-danger js-delete-reminder-link"
+                            title="Delete reminder" aria-label="Delete reminder"
+                            data-reminder-id="{{ reminder.id }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
-            {% empty %}
-            <div class="list-group-item text-center text-muted py-4 small">
-                No reminders found for this view.
-            </div>
-            {% endfor %}
         </div>
+        {% empty %}
+        <div class="text-center text-muted py-5 small border rounded-2 bg-body-tertiary">
+            No reminders in this view.
+        </div>
+        {% endfor %}
+
+        {% if is_paginated %}
+        <div class="d-flex justify-content-between align-items-center px-2 py-2 small">
+            {% if page_obj.has_previous %}
+            <a href="?{% if pagination_base_query %}{{ pagination_base_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}"
+               class="btn btn-outline-secondary btn-sm">← Prev</a>
+            {% else %}<span></span>{% endif %}
+            <span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?{% if pagination_base_query %}{{ pagination_base_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}"
+               class="btn btn-outline-secondary btn-sm">Next →</a>
+            {% else %}<span></span>{% endif %}
+        </div>
+        {% endif %}
     </div>
+</div>
+
+<div class="modal fade" id="reminderDetailModal" tabindex="-1" aria-labelledby="reminderDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2 align-items-start">
+        <div class="me-auto pe-2">
+          <h5 class="modal-title mb-1" id="reminderDetailModalLabel"></h5>
+          <div><span id="reminderDetailModalBadge" class="badge"></span></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2" id="reminderDetailModalDate"></p>
+        <div class="text-body small" id="reminderDetailModalBody" style="white-space: pre-wrap; word-break: break-word; max-height: 45vh; overflow-y: auto;"></div>
+        <div class="mt-3" id="reminderDetailModalViewWrap" hidden>
+          <a href="#" class="small" id="reminderDetailModalViewLink" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+      </div>
+      <div class="modal-footer py-2 justify-content-between">
+        <button type="button" class="btn btn-sm btn-success" id="reminderDetailModalCompleteBtn">Mark Complete</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="newReminderModal" tabindex="-1" aria-labelledby="newReminderModalLabel" aria-hidden="true">
@@ -157,7 +189,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="editReminderForm" method="post" action="">
+        <form id="editReminderForm" method="post" action="#" autocomplete="off">
           {% csrf_token %}
           <div class="mb-2">
             <label class="form-label small" for="popupEditTitle">Title</label>
@@ -175,7 +207,7 @@
       </div>
       <div class="modal-footer py-2">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" form="editReminderForm" class="btn btn-primary btn-sm">Update Reminder</button>
+        <button type="submit" form="editReminderForm" class="btn btn-primary btn-sm">Save</button>
       </div>
     </div>
   </div>
@@ -183,36 +215,330 @@
 {% endblock %}
 
 {% block popup_scripts %}
+<style>
+.reminder-popup-card .js-reminder-card-click { cursor: pointer; }
+</style>
 <script>
 (function() {
     var editUrlTemplate = "{% url 'contracts:reminders_popup_edit' 888888888 %}";
+    var urlMarkCompleteTpl = "{% url 'contracts:mark_reminder_complete' 888888888 %}";
+    var urlDeleteTpl = "{% url 'contracts:delete_reminder' 888888888 %}";
 
-    window.openEditModal = function(id, title, description, date) {
-        document.getElementById('popupEditTitle').value = title || '';
-        document.getElementById('popupEditDescription').value = description || '';
-        document.getElementById('popupEditDate').value = date || '';
-        document.getElementById('editReminderForm').action = editUrlTemplate.replace('888888888', String(id));
-        var modal = new bootstrap.Modal(document.getElementById('editReminderModal'));
-        modal.show();
+    function reminderCompleteUrl(id) {
+        return urlMarkCompleteTpl.replace('888888888', String(id));
+    }
+    function reminderDeleteUrl(id) {
+        return urlDeleteTpl.replace('888888888', String(id));
+    }
+    function reminderEditUrl(id) {
+        return editUrlTemplate.replace('888888888', String(id));
+    }
+
+    function patchOpenerPill() {
+        try {
+            if (window.opener && !window.opener.closed && typeof window.opener.patchReminderFooterPill === 'function') {
+                window.opener.patchReminderFooterPill();
+            }
+        } catch (e) {}
+    }
+
+    window.openEditModal = function(id, title, date, text) {
+        if (typeof bootstrap === 'undefined') return;
+        var editModal = document.getElementById('editReminderModal');
+        var ti = document.getElementById('popupEditTitle');
+        var da = document.getElementById('popupEditDate');
+        var tx = document.getElementById('popupEditDescription');
+        var fm = document.getElementById('editReminderForm');
+        if (!editModal || !ti || !da || !tx || !fm) return;
+        ti.value = title || '';
+        da.value = date || '';
+        tx.value = text || '';
+        fm.dataset.reminderId = id;
+        bootstrap.Modal.getOrCreateInstance(editModal).show();
     };
 
-    document.addEventListener('click', function(e) {
-        var btn = e.target.closest('.edit-reminder-popup-btn');
-        if (!btn) return;
-        openEditModal(btn.dataset.id, btn.dataset.title, btn.dataset.description, btn.dataset.date);
-    });
+    function deleteReminder(id) {
+        if (!confirm('Delete this reminder?')) return;
+        var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfEl) return;
+        fetch(reminderDeleteUrl(id), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': csrfEl.value,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) return;
+            var card = document.querySelector('.reminder-popup-card[data-reminder-id="' + id + '"]');
+            if (card) card.remove();
+            patchOpenerPill();
+        })
+        .catch(function() { window.location.reload(); });
+    }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    var detailModalEl = null;
+    var detailTitleEl = null;
+    var detailBadgeEl = null;
+    var detailDateEl = null;
+    var detailBodyEl = null;
+    var detailViewWrap = null;
+    var detailViewLink = null;
+    var detailCompleteBtn = null;
+    var currentDetailId = null;
+    var currentDetailCompleted = false;
+
+    function setBadge(el, text, variant) {
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'badge ' + (variant || 'bg-secondary');
+    }
+
+    function wireViewLink(href, label) {
+        if (!detailViewWrap || !detailViewLink) return;
+        if (!href || !label) {
+            detailViewWrap.hidden = true;
+            detailViewLink.removeAttribute('href');
+            detailViewLink.textContent = '';
+            detailViewLink.onclick = null;
+            return;
+        }
+        detailViewWrap.hidden = false;
+        detailViewLink.href = href;
+        detailViewLink.textContent = label;
+        detailViewLink.onclick = function(ev) {
+            ev.stopPropagation();
+            if (window.opener && !window.opener.closed) {
+                ev.preventDefault();
+                window.opener.location.href = href;
+                return false;
+            }
+            return true;
+        };
+    }
+
+    function openDetailFromRegion(region) {
+        if (typeof bootstrap === 'undefined' || !detailModalEl || !detailTitleEl || !detailBadgeEl || !detailDateEl || !detailBodyEl || !detailCompleteBtn) return;
+        var ds = region.dataset;
+        currentDetailId = ds.reminderId;
+        currentDetailCompleted = ds.reminderCompleted === '1';
+        detailTitleEl.textContent = ds.reminderTitle || 'Reminder';
+
+        var cardEl = region.closest('.reminder-popup-card');
+        var rawEl = cardEl ? cardEl.querySelector('.js-reminder-full-text') : null;
+        var body = rawEl ? rawEl.textContent : '';
+
+        if (currentDetailCompleted) {
+            setBadge(detailBadgeEl, 'Completed', 'bg-secondary');
+        } else if (ds.reminderDate) {
+            var todayIso = new Date().toISOString().slice(0, 10);
+            if (ds.reminderDate < todayIso) {
+                setBadge(detailBadgeEl, 'Overdue', 'bg-danger');
+            } else if (ds.reminderDate === todayIso) {
+                setBadge(detailBadgeEl, 'Due', 'bg-primary');
+            } else {
+                setBadge(detailBadgeEl, 'Upcoming', 'bg-success');
+            }
+        } else {
+            setBadge(detailBadgeEl, '', 'bg-secondary');
+        }
+
+        detailDateEl.textContent = ds.reminderDateLabel || '';
+        detailBodyEl.textContent = (body && body.trim()) ? body : '—';
+        wireViewLink(ds.viewUrl || '', ds.viewLabel || '');
+
+        if (currentDetailCompleted) {
+            detailCompleteBtn.classList.add('d-none');
+        } else {
+            detailCompleteBtn.classList.remove('d-none');
+        }
+        bootstrap.Modal.getOrCreateInstance(detailModalEl).show();
+    }
+
+    function remindersPopupInit() {
+        detailModalEl = document.getElementById('reminderDetailModal');
+        detailTitleEl = document.getElementById('reminderDetailModalLabel');
+        detailBadgeEl = document.getElementById('reminderDetailModalBadge');
+        detailDateEl = document.getElementById('reminderDetailModalDate');
+        detailBodyEl = document.getElementById('reminderDetailModalBody');
+        detailViewWrap = document.getElementById('reminderDetailModalViewWrap');
+        detailViewLink = document.getElementById('reminderDetailModalViewLink');
+        detailCompleteBtn = document.getElementById('reminderDetailModalCompleteBtn');
+
+        var listRoot = document.getElementById('remindersPopupScroll') || document;
+
+        listRoot.addEventListener('click', function(e) {
+            var viewA = e.target.closest('a.js-reminder-view-contract, a.js-reminder-view-clin');
+            if (viewA && listRoot.contains(viewA)) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.opener && !window.opener.closed) {
+                    window.opener.location.href = viewA.href;
+                } else {
+                    window.location.href = viewA.href;
+                }
+                return;
+            }
+
+            var delBtn = e.target.closest('.js-delete-reminder-link');
+            if (delBtn && listRoot.contains(delBtn)) {
+                e.preventDefault();
+                e.stopPropagation();
+                var rid = delBtn.getAttribute('data-reminder-id');
+                if (rid) deleteReminder(rid);
+                return;
+            }
+
+            var editBtn = e.target.closest('.js-edit-reminder-btn');
+            if (editBtn && listRoot.contains(editBtn)) {
+                e.preventDefault();
+                e.stopPropagation();
+                var card = editBtn.closest('.reminder-popup-card');
+                var id = editBtn.getAttribute('data-id');
+                var titleEl = card ? card.querySelector('.reminder-card-title') : null;
+                var title = titleEl ? titleEl.textContent : '';
+                var date = card ? card.getAttribute('data-reminder-date') : '';
+                var textEl = card ? card.querySelector('.js-reminder-full-text') : null;
+                var text = textEl ? textEl.textContent : '';
+                openEditModal(id, title, date, text);
+                return;
+            }
+
+            var region = e.target.closest('.js-reminder-card-click');
+            if (region && listRoot.contains(region)) {
+                if (e.target.closest('button, a')) return;
+                openDetailFromRegion(region);
+            }
+        });
+
+        listRoot.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            var region = e.target.closest('.js-reminder-card-click');
+            if (!region || !listRoot.contains(region)) return;
+            if (e.target.closest('button, a')) return;
+            e.preventDefault();
+            openDetailFromRegion(region);
+        });
+
+        if (detailCompleteBtn) {
+            detailCompleteBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (!currentDetailId || currentDetailCompleted) return;
+                var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+                if (!csrfEl) return;
+                fetch(reminderCompleteUrl(currentDetailId), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': csrfEl.value,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) return;
+                    if (detailModalEl) bootstrap.Modal.getOrCreateInstance(detailModalEl).hide();
+                    var card = document.querySelector('.reminder-popup-card[data-reminder-id="' + String(data.reminder_id) + '"]');
+                    if (card) card.remove();
+                    patchOpenerPill();
+                })
+                .catch(function() { window.location.reload(); });
+            });
+        }
+
+        var editForm = document.getElementById('editReminderForm');
+        if (editForm) {
+            editForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var id = editForm.dataset.reminderId;
+                if (!id) return;
+                var formData = new FormData(editForm);
+                fetch(reminderEditUrl(id), {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                })
+                .then(function(r) {
+                    if (!r.ok) return r.json().then(function(d) { throw d; });
+                    return r.json();
+                })
+                .then(function(data) {
+                    if (!data.success) {
+                        alert('Error saving reminder.');
+                        return;
+                    }
+                    var editModal = document.getElementById('editReminderModal');
+                    if (editModal && typeof bootstrap !== 'undefined') {
+                        bootstrap.Modal.getOrCreateInstance(editModal).hide();
+                    }
+                    var card = document.querySelector('.reminder-popup-card[data-reminder-id="' + id + '"]');
+                    if (card) {
+                        var newTitle = formData.get('reminder_title') || '';
+                        var newDate = formData.get('reminder_date') || '';
+                        var newText = formData.get('reminder_text') || '';
+                        var titleEl = card.querySelector('.reminder-card-title');
+                        var textEl = card.querySelector('.reminder-card-text');
+                        var fullEl = card.querySelector('.js-reminder-full-text');
+                        var dateLabelEl = card.querySelector('.reminder-card-date-label');
+                        if (titleEl) titleEl.textContent = newTitle;
+                        if (textEl) {
+                            textEl.textContent = newText;
+                            if (!newText.trim()) textEl.innerHTML = '&nbsp;';
+                        }
+                        if (fullEl) fullEl.textContent = newText;
+                        if (dateLabelEl) {
+                            var d0 = new Date(newDate + 'T12:00:00');
+                            if (!isNaN(d0.getTime())) {
+                                dateLabelEl.textContent = d0.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                            }
+                        }
+                        card.setAttribute('data-reminder-title', newTitle);
+                        card.setAttribute('data-reminder-date', newDate);
+                        var clickEl = card.querySelector('.js-reminder-card-click');
+                        if (clickEl) {
+                            clickEl.setAttribute('data-reminder-title', newTitle);
+                            clickEl.setAttribute('data-reminder-date', newDate);
+                            if (!isNaN(new Date(newDate + 'T12:00:00').getTime())) {
+                                var dl = new Date(newDate + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                                clickEl.setAttribute('data-reminder-date-label', 'Due ' + dl);
+                            }
+                        }
+                    }
+                })
+                .catch(function() { window.location.reload(); });
+            });
+        }
+
         var newModalEl = document.getElementById('newReminderModal');
         if (newModalEl) {
             newModalEl.addEventListener('show.bs.modal', function() {
                 var inp = document.getElementById('popupReminderDate');
                 if (inp && !inp.value) {
-                  inp.value = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+                    inp.value = new Date().toISOString().slice(0, 10);
                 }
             });
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', remindersPopupInit);
+    } else {
+        remindersPopupInit();
+    }
+})();
+</script>
+<script>
+(function() {
+    if (window.opener && !window.opener.closed) {
+        try {
+            if (typeof window.opener.patchReminderFooterPill === 'function') {
+                window.opener.patchReminderFooterPill();
+            }
+        } catch (e) {}
+    }
 })();
 </script>
 {% endblock %}

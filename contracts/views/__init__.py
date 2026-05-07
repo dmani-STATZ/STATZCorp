@@ -95,6 +95,7 @@ from .reminder_views import (
     reminders_popup,
     reminders_popup_add,
     reminders_popup_edit,
+    reminder_counts_api,
 )
 
 from .acknowledgement_letter_views import (

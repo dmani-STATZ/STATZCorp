@@ -43,7 +43,7 @@
                                         data-reminder-text="{{ note.current_user_reminder.reminder_text|default:''|escape }}"
                                         data-reminder-completed="{% if note.current_user_reminder.reminder_completed %}1{% else %}0{% endif %}"
                                         title="View reminder">
-                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis">
+                                    <span class="badge rounded-pill {% if note.current_user_reminder.reminder_completed %}reminder-pill-completed{% else %}bg-info-subtle text-info-emphasis{% endif %}">
                                         &#9201; Reminder
                                     </span>
                                 </button>
@@ -216,6 +216,59 @@
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
             }
         }
+
+        document.addEventListener('submit', function (e) {
+            var form = e.target.closest('#noteFullViewToggleForm');
+            if (!form) return;
+            e.preventDefault();
+
+            var url = form.action;
+            var csrfEl = form.querySelector('[name="csrfmiddlewaretoken"]');
+            if (!url || !csrfEl) return;
+
+            fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': csrfEl.value,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.success) return;
+
+                var modalEl = document.getElementById('noteFullViewModal');
+                if (modalEl && typeof bootstrap !== 'undefined') {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                }
+
+                var reminderId = String(data.reminder_id || '');
+                if (reminderId) {
+                    var pill = document.querySelector('.js-reminder-pill[data-reminder-id="' + reminderId + '"]');
+                    if (pill) {
+                        var badge = pill.querySelector('.badge');
+                        if (badge) {
+                            if (data.reminder_completed) {
+                                badge.classList.remove('bg-info-subtle', 'text-info-emphasis');
+                                badge.classList.add('reminder-pill-completed');
+                            } else {
+                                badge.classList.add('bg-info-subtle', 'text-info-emphasis');
+                                badge.classList.remove('reminder-pill-completed');
+                            }
+                        }
+                        pill.dataset.reminderCompleted = data.reminder_completed ? '1' : '0';
+                    }
+                }
+
+                if (typeof window.patchReminderFooterPill === 'function') {
+                    window.patchReminderFooterPill();
+                }
+            })
+            .catch(function () {
+                window.location.reload();
+            });
+        });
 
         document.addEventListener('click', function (e) {
             var el = e.target.closest('.js-note-expand');

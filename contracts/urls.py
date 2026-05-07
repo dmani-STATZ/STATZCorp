@@ -98,6 +98,7 @@ from .views import (
     reminders_popup,
     reminders_popup_add,
     reminders_popup_edit,
+    reminder_counts_api,
     # Acknowledgement letter views
     generate_acknowledgement_letter,
     view_acknowledgement_letter,
@@ -394,6 +395,11 @@ urlpatterns = [
         "reminder/<int:reminder_id>/complete/",
         mark_reminder_complete,
         name="mark_reminder_complete",
+    ),
+    path(
+        "api/reminder-counts/",
+        reminder_counts_api,
+        name="reminder_counts_api",
     ),
     path("reminder/<int:reminder_id>/edit/", edit_reminder, name="edit_reminder"),
     # Reminders popup window
