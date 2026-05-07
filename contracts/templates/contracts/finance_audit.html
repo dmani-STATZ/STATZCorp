@@ -176,23 +176,51 @@
         </div>
 
         <div class="card finance-audit-notes-card shadow-sm" style="flex: 0 0 calc(33.333% - 0.75rem); max-width: calc(33.333% - 0.75rem);">
-            <div class="card-header py-2 small fw-semibold">Payment notes</div>
+            <div class="card-header py-2 small fw-semibold d-flex justify-content-between align-items-center">
+                <span>Payment Activity</span>
+                <span class="text-body-secondary fw-normal">· {{ payment_activity_total }} total</span>
+            </div>
             <div class="card-body finance-audit-notes-scroll">
-                {% if payment_notes_rollup %}
-                    {% for row in payment_notes_rollup %}
+                {% if payment_activity_rollup %}
+                    {% for row in payment_activity_rollup %}
                     <div class="finance-audit-payment-note">
-                        <span class="text-body-secondary">{{ row.entity_label }}</span>
-                        <span class="text-body-secondary">·</span>
-                        {{ row.field_label }}
-                        <span class="text-body-secondary">·</span>
-                        <span class="fw-semibold">${{ row.amount|floatformat:2 }}</span>
+                        <div>
+                            <span class="text-body-secondary">{{ row.entity_label }}</span>
+                            <span class="text-body-secondary">·</span>
+                            {{ row.field_label }}
+                            <span class="text-body-secondary">·</span>
+                            <span class="text-body-secondary">{{ row.payment_date|date:"n/j/Y" }}</span>
+                            <span class="text-body-secondary">·</span>
+                            <span class="fw-semibold">${{ row.amount|floatformat:2 }}</span>
+                        </div>
+                        {% if row.note_text %}
                         <div class="text-body-secondary mt-1">{{ row.note_text }}</div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 {% else %}
-                <p class="text-body-secondary small mb-0">No payment notes recorded.</p>
+                <p class="text-body-secondary small mb-0">No payment activity recorded.</p>
                 {% endif %}
             </div>
+            {% if payment_activity_page and payment_activity_page.paginator.num_pages > 1 %}
+            <div class="card-footer py-2 small">
+                {% with page=payment_activity_page %}
+                <div class="d-flex justify-content-between align-items-center">
+                    {% if page.has_previous %}
+                    <a href="?pa_page={{ page.previous_page_number }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
+                    {% else %}
+                    <a href="#" class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true" tabindex="-1">← Prev</a>
+                    {% endif %}
+                    <span class="text-body-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+                    {% if page.has_next %}
+                    <a href="?pa_page={{ page.next_page_number }}" class="btn btn-sm btn-outline-secondary">Next →</a>
+                    {% else %}
+                    <a href="#" class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true" tabindex="-1">Next →</a>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            </div>
+            {% endif %}
         </div>
     </div>
 

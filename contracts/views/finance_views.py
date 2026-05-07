@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.db.models import Q, Sum
 from django.views.generic import DetailView
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
@@ -15,6 +16,9 @@ from decimal import Decimal
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+PAYMENT_ACTIVITY_PAGE_SIZE = 50
+
 
 def safe_float(value):
     """Convert a value to float, returning 0.0 if the value is None."""
@@ -48,7 +52,9 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['shipment_subtotals_by_clin'] = {}
         context['finance_costs_total'] = Decimal('0.00')
         context['adj_gross_contract'] = Decimal('0.00')
-        context['payment_notes_rollup'] = []
+        context['payment_activity_rollup'] = []
+        context['payment_activity_page'] = None
+        context['payment_activity_total'] = 0
         context['clins'] = []
         zero = Decimal('0.00')
         context['clin_totals'] = {
@@ -158,26 +164,39 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 ph_base = PaymentHistory.objects.filter(
                     Q(content_type=ct_contract, object_id=self.object.id)
                     | Q(content_type=ct_clin, object_id__in=clin_ids)
-                ).exclude(
-                    payment_info__isnull=True
-                ).exclude(
-                    payment_info=''
                 ).order_by('-payment_date', '-created_on')
 
-                payment_notes_rollup = []
-                for entry in ph_base:
-                    if entry.content_type_id == ct_contract.id:
-                        entity_label = 'Contract'
-                    else:
-                        item_no = clin_item_by_id.get(entry.object_id, '')
-                        entity_label = f'CLIN {item_no}' if item_no != '' else f'CLIN {entry.object_id}'
-                    payment_notes_rollup.append({
-                        'field_label': entry.get_payment_type_display(),
-                        'amount': entry.payment_amount,
-                        'note_text': entry.payment_info,
-                        'entity_label': entity_label,
-                    })
-                context['payment_notes_rollup'] = payment_notes_rollup
+                total_count = ph_base.count()
+                paginator = Paginator(ph_base, PAYMENT_ACTIVITY_PAGE_SIZE)
+                raw_page = self.request.GET.get('pa_page', '1')
+                page_obj = None
+                if paginator.num_pages > 0:
+                    try:
+                        page_obj = paginator.page(raw_page)
+                    except PageNotAnInteger:
+                        page_obj = paginator.page(1)
+                    except EmptyPage:
+                        page_obj = paginator.page(paginator.num_pages)
+
+                payment_activity_rollup = []
+                if page_obj is not None:
+                    for entry in page_obj.object_list:
+                        if entry.content_type_id == ct_contract.id:
+                            entity_label = 'Contract'
+                        else:
+                            item_no = clin_item_by_id.get(entry.object_id, '')
+                            entity_label = f'CLIN {item_no}' if item_no != '' else f'CLIN {entry.object_id}'
+                        payment_activity_rollup.append({
+                            'entity_label': entity_label,
+                            'field_label': entry.get_payment_type_display(),
+                            'amount': entry.payment_amount,
+                            'payment_date': entry.payment_date,
+                            'note_text': entry.payment_info or '',
+                        })
+
+                context['payment_activity_rollup'] = payment_activity_rollup
+                context['payment_activity_page'] = page_obj
+                context['payment_activity_total'] = total_count
 
                 clins_list = list(clins_qs)
                 for clin in clins_list:
