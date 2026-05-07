@@ -37,9 +37,10 @@ window.onTransactionSaved = function(data) {
     {# Fixed Sidebar #}
     <nav id="clin-page-nav" class="clin-detail-sidebar">
         <a href="{% url 'contracts:contract_management' clin.contract.id %}"
-           class="btn btn-sm btn-primary w-100 mb-3">
+           class="nav-link">
             ← Back to Contract
         </a>
+        <br><br>
         <p class="clin-sidebar-label">Quick Jump</p>
         <div class="nav flex-column nav-pills">
             <a class="nav-link active" href="#clin-identification">Identification</a>
@@ -49,6 +50,13 @@ window.onTransactionSaved = function(data) {
             <a class="nav-link" href="#clin-splits">CLIN Splits</a>
             <a class="nav-link" href="#clin-financials">Financials</a>
             <a class="nav-link" href="#clin-history">Change History</a>
+            <br>
+            {% if request.user.is_staff %}
+            <a href="{% url 'contracts:clin_delete' clin.pk %}"
+               class="nav-link text-danger">
+              <i class="bi bi-trash"></i> Delete CLIN
+            </a>
+            {% endif %}
         </div>
     </nav>
 
@@ -58,8 +66,9 @@ window.onTransactionSaved = function(data) {
         {# Page heading #}
         <div class="mb-4">
             <h1 class="h4 fw-bold mb-0">
-                CLIN {{ clin.clin_po_num }} — Contract #{{ clin.contract.contract_number }}
+                CLIN {{ clin.item_number }} — Contract #{{ clin.contract.contract_number }} — PO #{{ clin.contract.po_number }}
             </h1>
+            <p class="text-xs text-gray-600">Click Labels to Edit Fields</p>
         </div>
 
         {# SECTION: Identification #}

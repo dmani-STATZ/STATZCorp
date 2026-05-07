@@ -374,6 +374,8 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 ## 13. Known Footguns
 
+`clin-delete-note-cleanup-rule`: When deleting a Clin, always manually delete Notes (ContentType-linked) and their child Reminders before calling `clin.delete()`. These do NOT auto-cascade. Pattern: get Clin ContentType → filter Notes → delete Reminders on those Notes → delete Notes → then delete Clin.
+
 1. **Renaming tracked fields without updating `transactions` signals.** The `transactions` app stores field names as strings. A rename will stop capturing that field in the audit trail with no error raised.
 
 2. **Using `queryset.update()` instead of `.save()` on Contract/Clin.** This bypasses the `transactions` signals entirely. Always use `.save()` unless you intentionally want to skip the audit trail (rare; document it if so).

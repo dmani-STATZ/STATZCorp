@@ -1,0 +1,98 @@
+{% extends "contracts/contract_base.html" %}
+
+{% block title %}Delete CLIN — {{ clin.item_number|default:clin.clin_po_num }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto px-3 py-5" style="max-width: 680px;">
+  <div class="mb-4 text-center">
+    <div class="mb-2">
+      <i class="bi bi-trash3-fill text-danger" style="font-size: 2.5rem;"></i>
+    </div>
+    <h1 class="display-6 fw-bold mb-1">Delete CLIN {{ clin.item_number|default:clin.clin_po_num }}</h1>
+    <p class="text-body-secondary mb-3">Contract {{ contract.contract_number }}</p>
+    <hr class="border-danger opacity-25 mb-0">
+  </div>
+
+  <div class="card border-danger bg-danger bg-opacity-10 mb-4">
+    <div class="card-header border-danger bg-transparent">
+      <h2 class="h5 mb-0">What will be permanently deleted</h2>
+    </div>
+    <div class="card-body">
+      {% if splits_count > 0 %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-danger border-opacity-25">
+        <span><i class="bi bi-diagram-3 text-danger me-2"></i>CLIN Splits</span>
+        <span class="badge bg-danger">{{ splits_count }}</span>
+      </div>
+      {% endif %}
+      {% if finance_lines_count > 0 %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-danger border-opacity-25">
+        <span><i class="bi bi-cash-stack text-danger me-2"></i>Finance Lines</span>
+        <span class="badge bg-danger">{{ finance_lines_count }}</span>
+      </div>
+      {% endif %}
+      {% if shipments_count > 0 %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-danger border-opacity-25">
+        <span><i class="bi bi-box-seam text-danger me-2"></i>Shipments</span>
+        <span class="badge bg-danger">{{ shipments_count }}</span>
+      </div>
+      {% endif %}
+      {% if notes_count > 0 %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-danger border-opacity-25">
+        <span><i class="bi bi-sticky text-danger me-2"></i>Notes</span>
+        <span class="badge bg-danger">{{ notes_count }}</span>
+      </div>
+      {% endif %}
+      {% if reminders_count > 0 %}
+      <div class="d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-bell text-danger me-2"></i>Reminders</span>
+        <span class="badge bg-danger">{{ reminders_count }}</span>
+      </div>
+      {% endif %}
+
+      {% if splits_count == 0 and finance_lines_count == 0 and shipments_count == 0 and notes_count == 0 and reminders_count == 0 %}
+      <p class="text-body-secondary mb-0">This CLIN has no related data attached.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if affected_users %}
+  <div class="card border-warning bg-warning bg-opacity-10 mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+        <p class="fw-bold mb-0">Talk to these people before you delete</p>
+      </div>
+      <p class="text-body-secondary small mb-3">They have notes or reminders attached to this CLIN that will be permanently destroyed.</p>
+      <div class="d-flex flex-wrap gap-2">
+      {% for user in affected_users %}
+        <span class="badge rounded-pill bg-warning text-dark fs-6 fw-semibold px-3 py-2">
+          <i class="bi bi-person-fill me-1"></i>{{ user.get_full_name|default:user.username }}
+        </span>
+      {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="bg-danger bg-opacity-10 border border-danger rounded-3 p-4 mb-4 text-center">
+    <div class="mb-2">
+      <i class="bi bi-exclamation-octagon-fill text-danger" style="font-size: 1.75rem;"></i>
+    </div>
+    <p class="text-danger fw-semibold mb-2">
+      You are about to permanently delete CLIN {{ clin.item_number|default:clin.clin_po_num }}
+      from Contract {{ contract.contract_number }}.
+    </p>
+    <p class="text-danger fw-bold fs-5 mb-2">This action cannot be undone.</p>
+    <p class="text-body-secondary small mb-0">All splits, shipments, finance lines, notes, and reminders will be destroyed. There is no recovery.</p>
+  </div>
+
+  <form method="post" action="{% url 'contracts:clin_delete' clin.pk %}">
+    {% csrf_token %}
+    <div class="d-flex gap-3 align-items-center">
+      <button type="submit" class="btn btn-danger btn-lg px-4"><i class="bi bi-trash3-fill me-2"></i>Delete CLIN</button>
+      <a href="{% url 'contracts:clin_detail' clin.pk %}" class="btn btn-outline-secondary btn-lg px-4">Cancel</a>
+    </div>
+    <p class="text-body-secondary small mt-2 mb-0">You will be returned to the contract page after deletion.</p>
+  </form>
+</div>
+{% endblock %}

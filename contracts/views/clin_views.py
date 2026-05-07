@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse, HttpResponseRedirect, Http404
+from django.http import JsonResponse, HttpResponseRedirect, Http404, HttpResponseForbidden
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
@@ -375,22 +375,59 @@ def toggle_clin_acknowledgment(request, clin_id):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
+def _get_clin_delete_context(clin):
+    clin_ct = ContentType.objects.get_for_model(Clin)
+    notes = Note.objects.filter(
+        content_type=clin_ct,
+        object_id=clin.pk,
+    ).select_related("created_by")
+    reminders = Reminder.objects.filter(note__in=notes).select_related("reminder_user")
+
+    users_by_pk = {}
+    for note in notes:
+        if note.created_by:
+            users_by_pk[note.created_by.pk] = note.created_by
+    for reminder in reminders:
+        if reminder.reminder_user:
+            users_by_pk[reminder.reminder_user.pk] = reminder.reminder_user
+
+    return {
+        "splits_count": clin.splits.count(),
+        "shipments_count": clin.shipments.count(),
+        "finance_lines_count": clin.finance_lines.count(),
+        "notes_count": notes.count(),
+        "reminders_count": reminders.count(),
+        "affected_users": sorted(users_by_pk.values(), key=lambda user: user.username),
+    }
+
+
 @conditional_login_required
 def clin_delete(request, pk):
-    """
-    Delete a CLIN and redirect to its contract detail page.
-    """
-    clin = get_object_or_404(Clin, pk=pk)
-    contract_id = clin.contract.id
-    
-    if request.method == 'GET':
-        # Delete related objects first (if needed)
-        # Then delete the CLIN
-        try:
-            clin_po_num = clin.clin_po_num  # Save for the success message
-            clin.delete()
-            messages.success(request, f'CLIN {clin_po_num} has been deleted successfully.')
-        except Exception as e:
-            messages.error(request, f'Error deleting CLIN: {str(e)}')
-            
-    return redirect('contracts:contract_management', pk=contract_id) 
+    clin = get_object_or_404(Clin, pk=pk, company=request.active_company)
+    delete_context = _get_clin_delete_context(clin)
+
+    if request.method == 'POST':
+        if not request.user.is_staff:
+            return HttpResponseForbidden("You do not have permission to delete this CLIN.")
+
+        contract_id = clin.contract_id
+        clin_label = clin.item_number or clin.clin_po_num or str(clin.pk)
+
+        # Notes and reminders linked through ContentType do not cascade from Clin.
+        clin_ct = ContentType.objects.get_for_model(Clin)
+        notes = Note.objects.filter(content_type=clin_ct, object_id=clin.pk)
+        Reminder.objects.filter(note__in=notes).delete()
+        notes.delete()
+
+        clin.delete()
+        messages.success(request, f"CLIN {clin_label} has been permanently deleted.")
+        return redirect("contracts:contract_management", pk=contract_id)
+
+    if not request.user.is_staff:
+        messages.error(request, "Only staff users can delete CLINs.")
+        return redirect("contracts:clin_detail", pk=pk)
+
+    context = dict(delete_context)
+    context["clin"] = clin
+    context["contract"] = clin.contract
+    return render(request, "contracts/clin_delete_confirm.html", context)
