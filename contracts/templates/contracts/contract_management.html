@@ -217,6 +217,15 @@
                 </div>
             {% endif %}
 
+            {% if contract.idiq_contract %}
+            <div class="mb-2 d-flex align-items-center">
+                <h2 class="text-lg font-bold mb-0">
+                    <span class="text-gray-600">IDIQ #</span> 
+                    <a href="{% url 'contracts:idiq_contract_detail' contract.idiq_contract.id %}">{{ contract.idiq_contract.contract_number }}</a>
+                </h2>
+            </div>
+            {% endif %}
+
             <!-- Contract Details + Controls -->
             <div class="flex gap-3 items-start flex-wrap">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-0.5 flex-1 min-w-0">
@@ -226,6 +235,7 @@
                         </p>
                         <p id="contract-contract-number-value" class="font-medium text-sm">{{ contract.contract_number|default:"N/A" }}</p>
                     </div>
+
                     <div class="field-group">
                         <p class="text-xs text-gray-600">PR Number</p>
                         <p id="contract-pr-number-value" class="font-medium text-sm">{{ contract.pr_number|default:"—" }}</p>
@@ -1351,10 +1361,27 @@ async function openEditNoteModal(button) {
             }
         }
 
+        if (typeof window.setNoteModalUserSelections === 'function') {
+            let raId = '';
+            if (noteData.assigned_to_id != null && noteData.assigned_to_id !== '') {
+                raId = noteData.assigned_to_id;
+            } else if (noteData.created_by_id != null && noteData.created_by_id !== '') {
+                raId = noteData.created_by_id;
+            }
+            const ruId = reminderData && reminderData.reminder_user_id != null
+                ? reminderData.reminder_user_id
+                : '';
+            window.setNoteModalUserSelections(raId, ruId);
+        }
+
+        const assignedToEl = document.getElementById('noteAssignedTo');
+        const reminderUserEl = document.getElementById('noteReminderUser');
         noteForm.dataset.initialReminderSnapshot = JSON.stringify({
             reminderTitle: reminderTitle ? reminderTitle.value : '',
             reminderDate: reminderDate ? reminderDate.value : '',
             reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            reminderUserId: reminderUserEl ? reminderUserEl.value : '',
+            assignedToId: assignedToEl ? assignedToEl.value : '',
             noteText: (noteData.note || (noteTextArea && noteTextArea.value) || '')
         });
         if (typeof window.noteModalApplyEditLayout === 'function') {
@@ -1363,10 +1390,14 @@ async function openEditNoteModal(button) {
     } catch (error) {
         console.error('Failed to load note detail JSON:', error);
         noteTextArea.value = decodeUnicodeEscapes(button.dataset.noteText || '');
+        const assignedToElCatch = document.getElementById('noteAssignedTo');
+        const reminderUserElCatch = document.getElementById('noteReminderUser');
         noteForm.dataset.initialReminderSnapshot = JSON.stringify({
             reminderTitle: reminderTitle ? reminderTitle.value : '',
             reminderDate: reminderDate ? reminderDate.value : '',
             reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            reminderUserId: reminderUserElCatch ? reminderUserElCatch.value : '',
+            assignedToId: assignedToElCatch ? assignedToElCatch.value : '',
             noteText: noteTextArea ? noteTextArea.value : ''
         });
         if (typeof window.noteModalApplyEditLayout === 'function') {

@@ -1,8 +1,13 @@
+import json
+
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import Reminder
 from django.db.models import Q
 from django.db import ProgrammingError
 from datetime import timedelta
+
+User = get_user_model()
 
 try:
     from users.user_settings import UserSettings
@@ -115,4 +120,16 @@ def reminders_processor(request):
             context['footer_due_today_count'] = 0
             context['reminder_sidebar_upcoming_days'] = 0
     
-    return context 
+    return context
+
+
+def active_users_processor(request):
+    """
+    Active users for note/reminder modal dropdowns (JSON list of {id, username}).
+    """
+    if request.user.is_authenticated:
+        users = list(
+            User.objects.filter(is_active=True).order_by('username').values('id', 'username')
+        )
+        return {'active_users_json': json.dumps(users)}
+    return {'active_users_json': '[]'}

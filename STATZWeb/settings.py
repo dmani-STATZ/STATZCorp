@@ -137,6 +137,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "contracts.context_processors.reminders_processor",
+                "contracts.context_processors.active_users_processor",
                 "users.context_processors.user_preferences",
                 "users.context_processors.unread_messages",
                 "users.context_processors.active_company",

@@ -31,6 +31,59 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    function getActiveUsersListEl() {
+        return document.getElementById('activeUsersList');
+    }
+
+    function getActiveUsersJson() {
+        const el = getActiveUsersListEl();
+        try {
+            return JSON.parse(el?.dataset.users || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function getNoteModalCurrentUserId() {
+        const el = getActiveUsersListEl();
+        const raw = el && el.dataset.currentUserId != null ? String(el.dataset.currentUserId).trim() : '';
+        return raw || '';
+    }
+
+    function ensureNoteModalUserSelects() {
+        const users = getActiveUsersJson();
+        const assignedSel = document.getElementById('noteAssignedTo');
+        const reminderSel = document.getElementById('noteReminderUser');
+        [assignedSel, reminderSel].forEach(function (sel) {
+            if (!sel || sel.options.length > 0) {
+                return;
+            }
+            users.forEach(function (u) {
+                const opt = document.createElement('option');
+                opt.value = String(u.id);
+                opt.textContent = u.username;
+                sel.appendChild(opt);
+            });
+        });
+    }
+
+    function setNoteModalUserSelections(assignedToId, reminderUserId) {
+        ensureNoteModalUserSelects();
+        const assignedSel = document.getElementById('noteAssignedTo');
+        const reminderSel = document.getElementById('noteReminderUser');
+        const fallback = getNoteModalCurrentUserId();
+        const aId = assignedToId != null && String(assignedToId) !== '' ? String(assignedToId) : fallback;
+        const rId = reminderUserId != null && String(reminderUserId) !== '' ? String(reminderUserId) : fallback;
+        if (assignedSel && aId) {
+            assignedSel.value = aId;
+        }
+        if (reminderSel && rId) {
+            reminderSel.value = rId;
+        }
+    }
+
+    window.setNoteModalUserSelections = setNoteModalUserSelections;
+
     // Set up CSRF token for all fetch requests
     function fetchWithCSRF(url, options = {}) {
         if (!options.headers) {
@@ -123,6 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
             noteForm.reset();
             createReminderCheckbox.checked = false;
             reminderFields.classList.add('hidden');
+            ensureNoteModalUserSelects();
+            setNoteModalUserSelections(getNoteModalCurrentUserId(), getNoteModalCurrentUserId());
             if (typeof window.noteModalApplyAddLayout === 'function') {
                 window.noteModalApplyAddLayout();
             }
@@ -272,6 +327,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 reminderTitle: formData.get('reminder_title') || '',
                 reminderDate: formData.get('reminder_date') || '',
                 reminderCompleted: formData.get('reminder_completed') === 'on',
+                reminderUserId: formData.get('reminder_user') || '',
+                assignedToId: formData.get('assigned_to') || '',
                 noteText: String(noteText || '')
             };
 
@@ -280,6 +337,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     (initialReminderSnapshot.reminderTitle || '') !== currentReminderSnapshot.reminderTitle ||
                     (initialReminderSnapshot.reminderDate || '') !== currentReminderSnapshot.reminderDate ||
                     !!initialReminderSnapshot.reminderCompleted !== currentReminderSnapshot.reminderCompleted ||
+                    (initialReminderSnapshot.reminderUserId || '') !== currentReminderSnapshot.reminderUserId ||
+                    (initialReminderSnapshot.assignedToId || '') !== currentReminderSnapshot.assignedToId ||
                     (initialReminderSnapshot.noteText || '') !== currentReminderSnapshot.noteText
                 )
                 : true;

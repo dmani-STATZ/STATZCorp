@@ -419,14 +419,9 @@ function getRequestHeaders() {
 
 function formatReminderDateForInputIdiq(isoDate) {
     if (!isoDate) return '';
-    const parsed = new Date(isoDate);
-    if (Number.isNaN(parsed.getTime())) return '';
-    const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, '0');
-    const day = String(parsed.getDate()).padStart(2, '0');
-    const hours = String(parsed.getHours()).padStart(2, '0');
-    const minutes = String(parsed.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    const datePart = String(isoDate).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return '';
+    return datePart;
 }
 
 // Function to open edit note modal (aligned with contract_management + note_modal.js)
@@ -512,10 +507,27 @@ async function openEditNoteModal(button) {
             }
         }
 
+        if (typeof window.setNoteModalUserSelections === 'function') {
+            let raId = '';
+            if (noteData.assigned_to_id != null && noteData.assigned_to_id !== '') {
+                raId = noteData.assigned_to_id;
+            } else if (noteData.created_by_id != null && noteData.created_by_id !== '') {
+                raId = noteData.created_by_id;
+            }
+            const ruId = reminderData && reminderData.reminder_user_id != null
+                ? reminderData.reminder_user_id
+                : '';
+            window.setNoteModalUserSelections(raId, ruId);
+        }
+
+        const assignedToElIdiq = document.getElementById('noteAssignedTo');
+        const reminderUserElIdiq = document.getElementById('noteReminderUser');
         noteForm.dataset.initialReminderSnapshot = JSON.stringify({
             reminderTitle: reminderTitle ? reminderTitle.value : '',
             reminderDate: reminderDate ? reminderDate.value : '',
             reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            reminderUserId: reminderUserElIdiq ? reminderUserElIdiq.value : '',
+            assignedToId: assignedToElIdiq ? assignedToElIdiq.value : '',
             noteText: (noteData.note || (noteTextarea && noteTextarea.value) || '')
         });
         if (typeof window.noteModalApplyEditLayout === 'function') {
@@ -526,10 +538,14 @@ async function openEditNoteModal(button) {
         noteTextarea.value = (button.dataset.noteText || '').replace(/\\u([0-9a-f]{4})/gi, function(match, grp) {
             return String.fromCharCode(parseInt(grp, 16));
         });
+        const assignedToElCatchIdiq = document.getElementById('noteAssignedTo');
+        const reminderUserElCatchIdiq = document.getElementById('noteReminderUser');
         noteForm.dataset.initialReminderSnapshot = JSON.stringify({
             reminderTitle: reminderTitle ? reminderTitle.value : '',
             reminderDate: reminderDate ? reminderDate.value : '',
             reminderCompleted: reminderCompleted ? reminderCompleted.checked : false,
+            reminderUserId: reminderUserElCatchIdiq ? reminderUserElCatchIdiq.value : '',
+            assignedToId: assignedToElCatchIdiq ? assignedToElCatchIdiq.value : '',
             noteText: noteTextarea ? noteTextarea.value : ''
         });
         if (typeof window.noteModalApplyEditLayout === 'function') {

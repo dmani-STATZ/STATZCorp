@@ -141,6 +141,8 @@
     const reminderTextInput = document.getElementById('reminderText');
     const reminderCompletedWrap = document.getElementById('reminderCompletedWrap');
     const reminderCompletedInput = document.getElementById('reminderCompleted');
+    const notePopupAssignedTo = document.getElementById('notePopupAssignedTo');
+    const notePopupReminderUser = document.getElementById('notePopupReminderUser');
 
     let activeTab = null;
     let isPinned = false;
@@ -176,6 +178,48 @@
         const datePart = isoDate.slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return '';
         return datePart;
+    }
+
+    function getPopupActiveUsers() {
+        try {
+            const el = document.getElementById('activeUsersList');
+            return JSON.parse(el && el.dataset.users ? el.dataset.users : '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function getPopupCurrentUserId() {
+        const el = document.getElementById('activeUsersList');
+        return el && el.dataset.currentUserId ? String(el.dataset.currentUserId).trim() : '';
+    }
+
+    function ensurePopupUserSelects() {
+        const users = getPopupActiveUsers();
+        [notePopupAssignedTo, notePopupReminderUser].forEach(function (sel) {
+            if (!sel || sel.options.length > 0) {
+                return;
+            }
+            users.forEach(function (u) {
+                const opt = document.createElement('option');
+                opt.value = String(u.id);
+                opt.textContent = u.username;
+                sel.appendChild(opt);
+            });
+        });
+    }
+
+    function setPopupUserSelections(assignedId, reminderId) {
+        ensurePopupUserSelects();
+        const fb = getPopupCurrentUserId();
+        const a = assignedId != null && String(assignedId) !== '' ? String(assignedId) : fb;
+        const r = reminderId != null && String(reminderId) !== '' ? String(reminderId) : fb;
+        if (notePopupAssignedTo && a) {
+            notePopupAssignedTo.value = a;
+        }
+        if (notePopupReminderUser && r) {
+            notePopupReminderUser.value = r;
+        }
     }
 
     function formatNoteTimestampPopup() {
@@ -260,7 +304,8 @@
             title: reminderTitleInput.value || '',
             text: reminderTextInput.value || '',
             date: reminderDateInput.value || '',
-            completed: reminderCompletedInput.checked
+            completed: reminderCompletedInput.checked,
+            reminderUserId: notePopupReminderUser ? (notePopupReminderUser.value || '') : ''
         };
     }
 
@@ -269,14 +314,16 @@
             title: '',
             text: '',
             date: '',
-            completed: false
+            completed: false,
+            reminderUserId: ''
         };
         const current = getReminderSnapshot();
         return (
             baseline.title !== current.title ||
             baseline.text !== current.text ||
             baseline.date !== current.date ||
-            !!baseline.completed !== !!current.completed
+            !!baseline.completed !== !!current.completed ||
+            (baseline.reminderUserId || '') !== (current.reminderUserId || '')
         );
     }
 
@@ -288,6 +335,10 @@
         const addTrim = notePopupAdditionArea ? (notePopupAdditionArea.value || '').trim() : '';
         if (addTrim.length > 0) return true;
         if (raw !== init) return true;
+        if (notePopupAssignedTo && _noteModalContext
+                && (_noteModalContext.initialAssignedToId || '') !== (notePopupAssignedTo.value || '')) {
+            return true;
+        }
         return reminderFieldsChanged();
     }
 
@@ -340,7 +391,8 @@
             canEdit: true,
             canManageReminder: true,
             originalHadReminder: false,
-            initialReminderSnapshot: { title: '', text: '', date: '', completed: false }
+            initialReminderSnapshot: { title: '', text: '', date: '', completed: false, reminderUserId: '' },
+            initialAssignedToId: ''
         };
 
         resetModalForNewState();
@@ -353,6 +405,7 @@
         reminderCheckbox.checked = false;
         toggleReminderFields(false);
         clearReminderFields();
+        setPopupUserSelections(getPopupCurrentUserId(), getPopupCurrentUserId());
         openModal();
     }
 
@@ -437,7 +490,8 @@
             canManageReminder: false,
             originalHadReminder: false,
             initialNoteBody: '',
-            initialReminderSnapshot: { title: '', text: '', date: '', completed: false }
+            initialReminderSnapshot: { title: '', text: '', date: '', completed: false, reminderUserId: '' },
+            initialAssignedToId: ''
         };
 
         resetModalForNewState();
@@ -481,6 +535,15 @@
                 }
             }
 
+            let raId = '';
+            if (noteData.assigned_to_id != null && noteData.assigned_to_id !== '') {
+                raId = noteData.assigned_to_id;
+            } else if (noteData.created_by_id != null && noteData.created_by_id !== '') {
+                raId = noteData.created_by_id;
+            }
+            const ruId = reminder && reminder.reminder_user_id != null ? reminder.reminder_user_id : '';
+            setPopupUserSelections(raId, ruId);
+
             if (permissions.can_edit) {
                 if (notePopupAdditionWrap) notePopupAdditionWrap.classList.remove('d-none');
                 if (noteTextAreaLabel) noteTextAreaLabel.textContent = 'Existing Note';
@@ -497,7 +560,8 @@
                 canManageReminder: !!permissions.can_manage_reminder,
                 originalHadReminder: !!reminder,
                 initialNoteBody: noteData.note || '',
-                initialReminderSnapshot: reminder ? getReminderSnapshot() : { title: '', text: '', date: '', completed: false }
+                initialAssignedToId: notePopupAssignedTo ? (notePopupAssignedTo.value || '') : '',
+                initialReminderSnapshot: reminder ? getReminderSnapshot() : { title: '', text: '', date: '', completed: false, reminderUserId: '' }
             };
         } catch (err) {
             closeModal();
@@ -571,6 +635,7 @@
         const formData = new FormData();
         formData.append('note', finalNoteBody);
         formData.append('csrfmiddlewaretoken', getCsrfToken());
+        formData.append('assigned_to', notePopupAssignedTo ? notePopupAssignedTo.value : '');
 
         const hasReminderNow = reminderCheckbox.checked;
         const reminderTitle = reminderTitleInput.value || '';
@@ -592,6 +657,7 @@
                 formData.append('reminder_title', reminderTitle);
                 formData.append('reminder_text', finalNoteBody);
                 formData.append('reminder_date', reminderDate);
+                formData.append('reminder_user', notePopupReminderUser ? notePopupReminderUser.value : '');
             }
 
             if (_noteModalContext.tabType === 'finance') {
@@ -628,6 +694,7 @@
                 formData.append('reminder_title', reminderTitle);
                 formData.append('reminder_text', finalNoteBody);
                 formData.append('reminder_date', reminderDate);
+                formData.append('reminder_user', notePopupReminderUser ? notePopupReminderUser.value : '');
                 if (reminderCompleted) {
                     formData.append('reminder_completed', 'on');
                 }

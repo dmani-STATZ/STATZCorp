@@ -51,7 +51,11 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         # Get contract notes with entity_type for template
         contract_type = ContentType.objects.get_for_model(Contract)
         clin_type = ContentType.objects.get_for_model(Clin)
-        contract_notes_qs = contract.notes.exclude(note_tag='finance').order_by('-created_on')
+        contract_notes_qs = (
+            contract.notes.exclude(note_tag='finance')
+            .select_related('created_by', 'assigned_to')
+            .order_by('-created_on')
+        )
         for note in contract_notes_qs:
             setattr(note, 'entity_type', 'contract')
             setattr(note, 'content_type_id', contract_type.id)
@@ -80,7 +84,11 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             if sc['total'] > 0 and sc['with_pod'] > 0:
                 context['pod_status'] = 'full' if sc['with_pod'] >= sc['total'] else 'partial'
             # Get CLIN notes with entity_type for template
-            clin_notes_qs = context['selected_clin'].notes.all().order_by('-created_on')
+            clin_notes_qs = (
+                context['selected_clin'].notes.all()
+                .select_related('created_by', 'assigned_to')
+                .order_by('-created_on')
+            )
             for note in clin_notes_qs:
                 setattr(note, 'entity_type', 'clin')
                 setattr(note, 'content_type_id', clin_type.id)

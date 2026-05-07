@@ -31,7 +31,7 @@
 
                     <div class="note-card-meta d-flex align-items-center justify-content-between px-3 py-2">
                         <span class="small text-muted">
-                            {{ note.created_by }} &middot; {{ note.created_on|date:"M d, Y H:i" }}
+                            Assigned to {% if note.assigned_to %}{{ note.assigned_to.username }}{% elif note.created_by %}{{ note.created_by.username }}{% else %}—{% endif %} on {{ note.created_on|date:"M d, Y H:i" }}
                         </span>
                         <div class="d-flex align-items-center gap-2">
                             {% if note.current_user_has_reminder %}
@@ -48,7 +48,7 @@
                                     </span>
                                 </button>
                             {% endif %}
-                            {% if request.user == note.created_by %}
+                            {% if request.user == note.created_by or request.user == note.assigned_to %}
                                 <button type="button"
                                         class="btn btn-sm btn-link text-primary p-0 js-popup-edit-note"
                                         data-note-id="{{ note.id }}"

@@ -1,3 +1,6 @@
+import re
+from urllib.parse import urlparse
+
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from .forms import (
@@ -365,6 +368,26 @@ def on_user_logged_out(sender, request, **kwargs):
 def permission_denied(request):
     return render(request, 'users/permission_denied.html')
 
+
+def _normalize_company_switch_next_url(next_url):
+    """If next targets a company-scoped contract URL, return the contracts dashboard path."""
+    if not next_url or next_url == 'index':
+        return next_url
+    path = next_url
+    if isinstance(path, str) and (path.startswith('http://') or path.startswith('https://')):
+        path = urlparse(path).path or ''
+    elif isinstance(path, str) and '?' in path:
+        path = path.split('?', 1)[0]
+    if not isinstance(path, str):
+        return next_url
+    # Redirect away from contract-specific pages on company switch — contract PKs are company-scoped
+    if re.match(r'^/contracts/\d+(?:/|$)', path) or re.match(
+        r'^/contracts/finance-audit/\d+(?:/|$)', path
+    ):
+        return reverse('contracts:contracts_dashboard')
+    return next_url
+
+
 @login_required
 @require_POST
 def switch_company(request):
@@ -372,7 +395,9 @@ def switch_company(request):
     - Superusers can select any active company
     - Non-superusers must have membership in the selected company
     """
-    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or 'index'
+    next_url = _normalize_company_switch_next_url(
+        request.POST.get('next') or request.META.get('HTTP_REFERER') or 'index'
+    )
     company_id = request.POST.get('company_id')
     if not company_id:
         messages.error(request, 'No company selected.')

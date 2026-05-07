@@ -1,5 +1,8 @@
+from datetime import date, datetime
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect
 from django.contrib.contenttypes.models import ContentType
@@ -9,7 +12,43 @@ from django.utils import timezone
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Note, Contract, Clin, Reminder
-from ..forms import NoteForm, ReminderForm
+from ..forms import NoteForm
+
+User = get_user_model()
+
+
+def _note_assigned_to_from_post(request):
+    """Resolve Note.assigned_to from POST; invalid or inactive users → None."""
+    assigned_to_id = request.POST.get('assigned_to')
+    if not assigned_to_id:
+        return None
+    try:
+        return User.objects.get(pk=int(assigned_to_id), is_active=True)
+    except (User.DoesNotExist, ValueError, TypeError):
+        return None
+
+
+def _reminder_user_from_post(request):
+    """Resolve Reminder.reminder_user from POST; invalid or inactive → request.user."""
+    reminder_user_id = request.POST.get('reminder_user')
+    if not reminder_user_id:
+        return request.user
+    try:
+        return User.objects.get(pk=int(reminder_user_id), is_active=True)
+    except (User.DoesNotExist, ValueError, TypeError):
+        return request.user
+
+
+def _reminder_date_from_post(reminder_date_str):
+    if not reminder_date_str or not reminder_date_str.strip():
+        return None
+    reminder_date_str = reminder_date_str.strip()
+    try:
+        if 'T' in reminder_date_str:
+            return datetime.fromisoformat(reminder_date_str).date()
+        return date.fromisoformat(reminder_date_str[:10])
+    except (ValueError, TypeError):
+        return None
 
 
 def annotate_notes_for_current_user(notes, request):
@@ -67,13 +106,12 @@ def add_note(request, content_type_id, object_id):
             note.content_type = content_type
             note.object_id = object_id
             note.created_by = request.user
+            note.assigned_to = _note_assigned_to_from_post(request)
             if request.POST.get('note_tag') == 'finance':
                 note.note_tag = 'finance'
             note.save()
 
             # Optional reminder creation (mirrors old api_add_note behavior).
-            # On add_note, the current user is always the note creator, so the
-            # creator/staff reminder permission rule is implicitly satisfied.
             create_reminder = request.POST.get('create_reminder') == 'on'
             if create_reminder:
                 reminder_title = request.POST.get('reminder_title', '').strip()
@@ -81,23 +119,24 @@ def add_note(request, content_type_id, object_id):
                 reminder_date_str = request.POST.get('reminder_date', '').strip()
 
                 if reminder_title and reminder_date_str:
-                    try:
-                        reminder_date = timezone.datetime.fromisoformat(reminder_date_str)
-                        Reminder.objects.create(
-                            reminder_title=reminder_title,
-                            reminder_text=reminder_text,
-                            reminder_date=reminder_date,
-                            reminder_user=request.user,
-                            reminder_completed=False,
-                            note=note,
-                            company=getattr(request, 'active_company', None),
-                        )
-                    except (ValueError, TypeError) as e:
-                        # Don't fail note creation if reminder parsing fails; log and continue.
-                        import logging
-                        logging.getLogger(__name__).warning(
-                            "Failed to create reminder for note %s: %s", note.id, e
-                        )
+                    reminder_date = _reminder_date_from_post(reminder_date_str)
+                    if reminder_date:
+                        reminder_user = _reminder_user_from_post(request)
+                        try:
+                            Reminder.objects.create(
+                                reminder_title=reminder_title,
+                                reminder_text=reminder_text,
+                                reminder_date=reminder_date,
+                                reminder_user=reminder_user,
+                                reminder_completed=False,
+                                note=note,
+                                company=getattr(request, 'active_company', None),
+                            )
+                        except (ValueError, TypeError) as e:
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                "Failed to create reminder for note %s: %s", note.id, e
+                            )
             
             # Determine the redirect URL based on the content object type
             if content_type.model == 'contract':
@@ -112,7 +151,7 @@ def add_note(request, content_type_id, object_id):
                 notes_qs = Note.objects.filter(
                     content_type=content_type,
                     object_id=object_id,
-                ).order_by('-created_on')
+                ).select_related('created_by', 'assigned_to').order_by('-created_on')
                 if content_type.model == 'contract':
                     notes_qs = notes_qs.exclude(note_tag='finance')
                 notes = list(notes_qs)
@@ -155,7 +194,7 @@ def add_note(request, content_type_id, object_id):
 
 @conditional_login_required
 def delete_note(request, note_id):
-    note = get_object_or_404(Note, id=note_id)
+    note = get_object_or_404(Note.objects.select_related('created_by', 'assigned_to'), id=note_id)
     
     # Check if the user has permission to delete this note
     if note.created_by != request.user and not request.user.is_staff:
@@ -175,7 +214,7 @@ def delete_note(request, note_id):
         notes_qs = Note.objects.filter(
             content_type=content_type,
             object_id=object_id,
-        ).order_by('-created_on')
+        ).select_related('created_by', 'assigned_to').order_by('-created_on')
         if content_type.model == 'contract':
             notes_qs = notes_qs.exclude(note_tag='finance')
         notes = list(notes_qs)
@@ -218,10 +257,10 @@ def delete_note(request, note_id):
 
 @conditional_login_required
 def note_update(request, pk):
-    note = get_object_or_404(Note, id=pk)
+    note = get_object_or_404(Note.objects.select_related('created_by', 'assigned_to'), id=pk)
 
-    # Permission: only creator or staff can edit
-    if note.created_by != request.user and not request.user.is_staff:
+    # Permission: creator or assignee only (no staff bypass)
+    if note.created_by != request.user and note.assigned_to != request.user:
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse(
                 {'success': False, 'error': 'You do not have permission to edit this note.'},
@@ -233,14 +272,16 @@ def note_update(request, pk):
     if request.method == 'POST':
         form = NoteForm(request.POST, instance=note)
         if form.is_valid():
-            form.save()
+            updated = form.save(commit=False)
+            updated.assigned_to = _note_assigned_to_from_post(request)
+            updated.save()
 
             # Reminder handling
             # Business rule: one reminder per note (enforced at UI layer).
             # The DB allows multiple Reminders per Note via FK with related_name='note_reminders'.
             reminder_action = request.POST.get('reminder_action', 'none')
             # reminder_action values: 'none' (no change), 'create', 'update', 'delete'
-            existing_reminder = note.note_reminders.filter(reminder_user=request.user).first()
+            existing_reminder = note.note_reminders.order_by('id').first()
 
             if reminder_action == 'delete' and existing_reminder:
                 existing_reminder.delete()
@@ -251,31 +292,28 @@ def note_update(request, pk):
                 reminder_date_str = request.POST.get('reminder_date', '').strip()
 
                 if reminder_title and reminder_date_str:
-                    try:
-                        reminder_date = timezone.datetime.fromisoformat(reminder_date_str)
+                    reminder_date = _reminder_date_from_post(reminder_date_str)
+                    if reminder_date:
                         reminder_completed = request.POST.get('reminder_completed') == 'on'
+                        reminder_user = _reminder_user_from_post(request)
 
                         if existing_reminder:
                             existing_reminder.reminder_title = reminder_title
                             existing_reminder.reminder_text = reminder_text
                             existing_reminder.reminder_date = reminder_date
                             existing_reminder.reminder_completed = reminder_completed
+                            existing_reminder.reminder_user = reminder_user
                             existing_reminder.save()
                         else:
                             Reminder.objects.create(
                                 reminder_title=reminder_title,
                                 reminder_text=reminder_text,
                                 reminder_date=reminder_date,
-                                reminder_user=request.user,
+                                reminder_user=reminder_user,
                                 reminder_completed=reminder_completed,
                                 note=note,
                                 company=getattr(request, 'active_company', None),
                             )
-                    except (ValueError, TypeError) as e:
-                        import logging
-                        logging.getLogger(__name__).warning(
-                            "Failed to save reminder for note %s: %s", note.id, e
-                        )
 
             # AJAX response
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
@@ -300,12 +338,12 @@ def note_update(request, pk):
 @conditional_login_required
 def note_detail_json(request, pk):
     """
-    Return JSON with note content and current-user's reminder (if any).
+    Return JSON with note content and the note's first reminder (if any), ordered by id.
     Used by the edit-note modal to prefill fields.
     """
-    note = get_object_or_404(Note, id=pk)
+    note = get_object_or_404(Note.objects.select_related('created_by', 'assigned_to'), id=pk)
 
-    reminder = note.note_reminders.filter(reminder_user=request.user).first()
+    reminder = note.note_reminders.order_by('id').first()
     reminder_data = None
     if reminder:
         reminder_data = {
@@ -314,9 +352,10 @@ def note_detail_json(request, pk):
             'reminder_text': reminder.reminder_text or '',
             'reminder_date': reminder.reminder_date.isoformat() if reminder.reminder_date else '',
             'reminder_completed': reminder.reminder_completed,
+            'reminder_user_id': reminder.reminder_user_id,
         }
 
-    can_edit = (note.created_by == request.user or request.user.is_staff)
+    can_edit = (note.created_by == request.user or note.assigned_to == request.user)
     can_manage_reminder = can_edit
 
     return JsonResponse({
@@ -326,6 +365,8 @@ def note_detail_json(request, pk):
             'note': note.note,
             'created_by_id': note.created_by_id,
             'created_by_username': note.created_by.username if note.created_by else '',
+            'assigned_to_id': note.assigned_to_id,
+            'assigned_to_username': note.assigned_to.username if note.assigned_to else '',
             'created_on': note.created_on.isoformat() if note.created_on else '',
             'content_type_id': note.content_type_id,
             'object_id': note.object_id,
@@ -407,7 +448,7 @@ def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
         to_attr='_prefetched_user_note_reminders',
     )
     notes = list(
-        notes_qs.select_related('created_by')
+        notes_qs.select_related('created_by', 'assigned_to')
         .prefetch_related(user_reminder_prefetch)
         .order_by('-created_on')
     )
@@ -587,7 +628,9 @@ def get_combined_notes(request, contract_id, clin_id=None):
         contract_notes = Note.objects.filter(
             content_type=contract_type,
             object_id=contract_id,
-        ).exclude(note_tag='finance').order_by('-created_on')
+        ).exclude(note_tag='finance').select_related(
+            'created_by', 'assigned_to'
+        ).order_by('-created_on')
         
         # Add entity type to contract notes for visual distinction
         for note in contract_notes:
@@ -605,7 +648,7 @@ def get_combined_notes(request, contract_id, clin_id=None):
             clin_notes = Note.objects.filter(
                 content_type=clin_type,
                 object_id=clin_id
-            ).order_by('-created_on')
+            ).select_related('created_by', 'assigned_to').order_by('-created_on')
             
             # Add entity type to clin notes for visual distinction
             for note in clin_notes:

@@ -827,6 +827,13 @@ class Note(AuditModel):
     content_object = GenericForeignKey('content_type', 'object_id')
     note = models.TextField(null=True, blank=True)
     note_tag = models.CharField(max_length=20, blank=True, null=True, default='')
+    assigned_to = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_notes',
+    )
     company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='notes')
 
     class Meta:

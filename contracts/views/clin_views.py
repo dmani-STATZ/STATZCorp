@@ -211,7 +211,7 @@ def get_clin_notes(request, clin_id):
             Note.objects.filter(
                 content_type=clin_type,
                 object_id=clin.id,
-            ).order_by('-created_on')
+            ).select_related('created_by', 'assigned_to').order_by('-created_on')
         )
 
         for note in notes:

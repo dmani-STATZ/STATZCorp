@@ -15,6 +15,10 @@
                         <label for="noteTextArea" class="form-label" id="noteTextAreaLabel">Note</label>
                         <textarea id="noteTextArea" class="form-control" rows="5" required></textarea>
                     </div>
+                    <div class="mb-3">
+                        <label for="notePopupAssignedTo" class="form-label">Assigned To</label>
+                        <select id="notePopupAssignedTo" class="form-select form-select-sm"></select>
+                    </div>
                     <p class="small text-muted mb-3" id="noteModalMeta">Added by —</p>
 
                     <div id="reminderSectionWrap" class="border rounded-3 p-3">
@@ -25,6 +29,10 @@
                             </label>
                         </div>
                         <div id="reminderFields" class="d-none">
+                            <div class="mb-3">
+                                <label for="notePopupReminderUser" class="form-label">Reminder For</label>
+                                <select id="notePopupReminderUser" class="form-select form-select-sm"></select>
+                            </div>
                             <div class="mb-3">
                                 <label for="reminderTitle" class="form-label">Reminder title</label>
                                 <input type="text" class="form-control" id="reminderTitle">

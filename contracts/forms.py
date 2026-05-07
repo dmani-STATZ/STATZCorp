@@ -605,21 +605,31 @@ class ClinForm(BaseModelForm):
         return cleaned_data
 
 class NoteForm(BaseModelForm):
+    assigned_to = ActiveUserModelChoiceField(
+        required=False,
+        empty_label=None,
+    )
+
     class Meta:
         model = Note
-        fields = ['note']
+        fields = ['note', 'assigned_to']
         widgets = {
             'note': forms.Textarea(attrs={
                 'rows': 4
             })
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'assigned_to' in self.fields:
+            self.fields['assigned_to'].widget.attrs['class'] = 'form-select form-select-sm'
+
 class ReminderForm(BaseModelForm):
-    assigned_to = ActiveUserModelChoiceField(
+    reminder_user = ActiveUserModelChoiceField(
         required=False,
-        empty_label="Select User",
+        empty_label=None,
     )
-    
+
     class Meta:
         model = Reminder
         fields = ['reminder_title', 'reminder_text', 'reminder_date', 'reminder_user', 'reminder_completed']
@@ -627,10 +637,15 @@ class ReminderForm(BaseModelForm):
             'reminder_text': forms.Textarea(attrs={
                 'rows': 3
             }),
-            'reminder_date': forms.DateTimeInput(attrs={
-                'type': 'datetime-local'
+            'reminder_date': forms.DateInput(attrs={
+                'type': 'date'
             })
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'reminder_user' in self.fields:
+            self.fields['reminder_user'].widget.attrs['class'] = 'form-select form-select-sm'
 
 class ClinAcknowledgmentForm(BaseModelForm):
     class Meta:
