@@ -1,17 +1,18 @@
 {% load static %}
 
-<div class="payment-history-modal hidden fixed inset-0 modal-backdrop-overlay flex items-center justify-center z-50"
+<div class="payment-history-modal hidden fixed-top fixed-bottom modal-backdrop-overlay d-flex align-items-center justify-content-center z-50"
      id="paymentHistoryPopup"
      data-source-page=""
      data-entity-type=""
      data-entity-id=""
-     data-field-type="">
-    <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
-        <div class="row-between mb-4">
+     data-field-type=""
+     style="position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.5);">
+    <div class="bg-body rounded p-4 w-100" style="max-width:680px;">
+        <div class="d-flex justify-content-between align-items-start mb-3">
             <div>
-                <h3 class="text-lg font-semibold" id="popupTitle">Payment History</h3>
-                <p class="text-sm text-gray-500" id="popupSubtitle"></p>
-                <p class="text-sm font-medium text-blue-600 mt-1" id="currentValue"></p>
+                <h3 class="fs-5 fw-semibold" id="popupTitle">Payment History</h3>
+                <p class="small text-body-secondary" id="popupSubtitle"></p>
+                <p class="small fw-medium text-primary mt-2" id="currentValue"></p>
             </div>
             <button type="button" onclick="closePaymentHistoryPopup()" class="btn btn-link p-0 text-secondary">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -19,36 +20,36 @@
                 </svg>
             </button>
         </div>
-        <div id="historyContent" class="mb-4 max-h-96 overflow-y-auto">
+        <div id="historyContent" class="mb-3" style="max-height: 24rem; overflow-y: auto;">
             <!-- History entries will be populated here -->
         </div>
-        <form id="newHistoryForm" class="space-y-4">
+        <form id="newHistoryForm">
             {% csrf_token %}
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="payment_amount" class="block text-sm font-medium text-gray-700">Amount</label>
+            <div class="d-flex gap-3">
+                <div class="flex-fill">
+                    <label for="payment_amount" class="form-label">Amount</label>
                     <input type="number" id="payment_amount" name="payment_amount" step="0.01"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           class="form-control"
                            required>
                 </div>
-                <div>
-                    <label for="payment_date" class="block text-sm font-medium text-gray-700">Date</label>
+                <div class="flex-fill">
+                    <label for="payment_date" class="form-label">Date</label>
                     <input type="date" id="payment_date" name="payment_date"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           class="form-control"
                            required>
                 </div>
             </div>
-            <div>
-                <label for="reference_number" class="block text-sm font-medium text-gray-700">Reference Number</label>
+            <div class="mb-3">
+                <label for="reference_number" class="form-label">Reference Number</label>
                 <input type="text" id="reference_number" name="reference_number"
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                       class="form-control">
             </div>
-            <div>
-                <label for="payment_info" class="block text-sm font-medium text-gray-700">Additional Information</label>
+            <div class="mb-3">
+                <label for="payment_info" class="form-label">Additional Information</label>
                 <textarea id="payment_info" name="payment_info" rows="3"
-                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                         class="form-control"></textarea>
             </div>
-            <div class="flex justify-end space-x-3">
+            <div class="d-flex justify-content-end gap-2">
                 <button type="button" onclick="closePaymentHistoryPopup()"
                         class="btn btn-secondary">
                     Cancel
@@ -171,22 +172,60 @@ if (form) {
     });
 }
 
+const historyContent = document.getElementById('historyContent');
+if (historyContent) {
+    historyContent.addEventListener('click', function(e) {
+        const btn = e.target.closest('.js-delete-payment-history');
+        if (!btn) return;
+        if (!confirm('Delete this payment history entry? This cannot be undone.')) return;
+
+        const paymentId = btn.dataset.paymentId;
+        const popup = document.getElementById('paymentHistoryPopup');
+        const entityType = popup.dataset.entityType;
+        const entityId = popup.dataset.entityId;
+        const fieldType = popup.dataset.fieldType;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch(`/contracts/api/payment-history/${paymentId}/delete/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': csrfToken },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                loadPaymentHistory(entityType, entityId, fieldType);
+                const formattedValue = formatCurrency(data.new_total);
+                document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
+                if (typeof window.updateCellValue === 'function') {
+                    window.updateCellValue(entityId, fieldType, data.new_total);
+                }
+                notifyToast('Entry deleted', 'success');
+            } else {
+                notifyToast(data.error || 'Delete failed', 'error');
+            }
+        })
+        .catch(() => notifyToast('Delete failed', 'error'));
+    });
+}
+
 function loadPaymentHistory(entityType, entityId, paymentType) {
     fetch(`/contracts/api/payment-history/${entityType}/${entityId}/${paymentType}/`)
         .then(response => response.json())
         .then(data => {
             const historyContent = document.getElementById('historyContent');
+            const popupEntityType = document.getElementById('paymentHistoryPopup').dataset.entityType;
+            const showDelete = popupEntityType !== 'finance_line';
             if (data.history && data.history.length > 0) {
                 let html = `
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 payment-history-table">
-                            <thead class="bg-gray-50">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover payment-history-table mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th class="px-4 py-2 text-left label">Date</th>
-                                    <th class="px-4 py-2 text-right label">Amount</th>
-                                    <th class="px-4 py-2 text-left label">Reference</th>
-                                    <th class="px-4 py-2 text-left label">Notes</th>
-                                    <th class="px-4 py-2 text-left label">Created By</th>
+                                    <th class="text-start" style="width:90px; white-space:nowrap">Date</th>
+                                    <th class="text-end" style="width:90px; white-space:nowrap">Amount</th>
+                                    <th class="text-start">Notes</th>
+                                    <th class="text-start" style="width:80px; white-space:nowrap">Created By</th>
+                                    ${showDelete ? '<th style="width:36px"></th>' : ''}
                                 </tr>
                             </thead>
                             <tbody>
@@ -195,22 +234,34 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                 data.history.forEach(entry => {
                     html += `
                         <tr>
-                            <td class="px-4 py-2 text-sm text-gray-900">${formatDate(entry.payment_date)}</td>
-                            <td class="px-4 py-2 text-sm text-right text-gray-900">${formatCurrency(entry.payment_amount)}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">${entry.reference_number || '-'}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">${entry.payment_info || '-'}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">${entry.created_by}</td>
+                            <td class="small" style="width:90px; white-space:nowrap">${formatDate(entry.payment_date)}</td>
+                            <td class="small text-end" style="width:90px; white-space:nowrap">${formatCurrency(entry.payment_amount)}</td>
+                            <td class="small">${entry.payment_info || '-'}</td>
+                            <td class="small" style="width:80px; white-space:nowrap">${entry.created_by}</td>
+                            ${showDelete ? `
+                            <td class="text-center" style="width:36px">
+                                <button class="btn btn-link p-0 text-danger js-delete-payment-history"
+                                        data-payment-id="${entry.id}"
+                                        title="Delete entry"
+                                        style="line-height:1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                      <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
+                                </button>
+                            </td>` : ''}
                         </tr>
                     `;
                 });
 
+                const totalColspan = showDelete ? 3 : 2;
                 html += `
                             </tbody>
-                            <tfoot class="bg-gray-50">
+                            <tfoot class="table-secondary">
                                 <tr>
-                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">Total</td>
-                                    <td class="px-4 py-2 text-sm text-right font-medium text-gray-900">${formatCurrency(data.total)}</td>
-                                    <td colspan="3"></td>
+                                    <td class="small fw-medium">Total</td>
+                                    <td class="small fw-medium text-end">${formatCurrency(data.total)}</td>
+                                    <td colspan="${totalColspan}"></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -227,7 +278,7 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                     window.updateCellValue(entityId, paymentType, data.total);
                 }
             } else {
-                historyContent.innerHTML = '<p class="text-gray-500 text-center">No payment history found</p>';
+                historyContent.innerHTML = '<p class="small text-body-secondary text-center">No payment history found</p>';
             }
         });
 }

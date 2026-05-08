@@ -183,20 +183,33 @@
             <div class="card-body finance-audit-notes-scroll">
                 {% if payment_activity_rollup %}
                     {% for row in payment_activity_rollup %}
-                    <div class="finance-audit-payment-note">
-                        <div>
+                    <button type="button"
+                            class="finance-audit-payment-note w-100 text-start border-0 bg-transparent"
+                            onclick="openPaymentHistoryPopup(
+                                '{{ row.entity_type }}',
+                                '{{ row.entity_id }}',
+                                '{{ row.payment_type }}',
+                                'finance_audit',
+                                {{ row.current_value }}
+                            )">
+                        <div class="d-flex align-items-baseline gap-1 flex-wrap">
                             <span class="text-body-secondary">{{ row.entity_label }}</span>
                             <span class="text-body-secondary">·</span>
-                            {{ row.field_label }}
+                            <span>{{ row.field_label }}</span>
                             <span class="text-body-secondary">·</span>
-                            <span class="text-body-secondary">{{ row.payment_date|date:"n/j/Y" }}</span>
-                            <span class="text-body-secondary">·</span>
-                            <span class="fw-semibold">${{ row.amount|floatformat:2 }}</span>
+                            <span class="fw-semibold">
+                                ${{ row.amount|floatformat:2 }}
+                            </span>
+                            <span class="text-body-secondary small ms-1">
+                                {{ row.payment_date|date:"n/j/Y" }}
+                            </span>
                         </div>
                         {% if row.note_text %}
-                        <div class="text-body-secondary mt-1">{{ row.note_text }}</div>
+                        <div class="text-body-secondary mt-1" style="font-size:0.8rem">
+                            {{ row.note_text }}
+                        </div>
                         {% endif %}
-                    </div>
+                    </button>
                     {% endfor %}
                 {% else %}
                 <p class="text-body-secondary small mb-0">No payment activity recorded.</p>

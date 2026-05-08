@@ -1,3 +1,8 @@
+/* Payment History Popup hidden state */
+#paymentHistoryPopup.hidden {
+    display: none !important;
+}
+
 /* Finance Audit page — full-width layout override (contract_base 75% container) */
 .finance-audit-page main > div.mx-auto {
     width: 100% !important;
@@ -44,6 +49,23 @@
     border-bottom: none;
     margin-bottom: 0;
     padding-bottom: 0;
+}
+
+button.finance-audit-payment-note {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    border-radius: var(--bs-border-radius, 0.375rem);
+    padding: 0.35rem 0.5rem !important;
+    margin: -0.35rem -0.5rem !important;
+    width: calc(100% + 1rem) !important;
+}
+
+button.finance-audit-payment-note:hover {
+    background-color: var(--bs-tertiary-bg) !important;
+}
+
+[data-bs-theme="dark"] button.finance-audit-payment-note:hover {
+    background-color: var(--bs-secondary-bg) !important;
 }
 
 .finance-pill-amber {

@@ -183,15 +183,21 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     for entry in page_obj.object_list:
                         if entry.content_type_id == ct_contract.id:
                             entity_label = 'Contract'
+                            entity_type = 'contract'
                         else:
                             item_no = clin_item_by_id.get(entry.object_id, '')
                             entity_label = f'CLIN {item_no}' if item_no != '' else f'CLIN {entry.object_id}'
+                            entity_type = 'clin'
                         payment_activity_rollup.append({
                             'entity_label': entity_label,
                             'field_label': entry.get_payment_type_display(),
                             'amount': entry.payment_amount,
                             'payment_date': entry.payment_date,
                             'note_text': entry.payment_info or '',
+                            'entity_type': entity_type,
+                            'entity_id': entry.object_id,
+                            'payment_type': entry.payment_type,
+                            'current_value': float(entry.payment_amount),
                         })
 
                 context['payment_activity_rollup'] = payment_activity_rollup

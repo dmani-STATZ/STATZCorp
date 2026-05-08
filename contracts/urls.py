@@ -636,6 +636,11 @@ urlpatterns = [
         payment_history_views.payment_history_api,
         name="payment_history_api",
     ),
+    path(
+        "api/payment-history/<int:payment_id>/delete/",
+        payment_history_views.delete_payment_history_entry,
+        name="payment_history_delete",
+    ),
     # CLIN Field Update API
     path(
         "api/clin/<int:clin_id>/update-field/",

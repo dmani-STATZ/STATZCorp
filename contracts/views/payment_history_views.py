@@ -123,6 +123,7 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
         total = history.aggregate(total=Sum('payment_amount'))['total'] or 0
 
         history_data = [{
+            'id': entry.id,
             'payment_date': entry.payment_date.isoformat(),
             'payment_amount': float(entry.payment_amount),
             'payment_info': entry.payment_info,
@@ -224,6 +225,104 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
             return JsonResponse({'error': f'Invalid request data: {str(e)}'}, status=400)
         except Exception as e:
             return JsonResponse({'error': f'Failed to create payment history: {str(e)}'}, status=500)
+
+
+@conditional_login_required
+@require_http_methods(["DELETE"])
+def delete_payment_history_entry(request, payment_id):
+    company, err = _active_company_or_error(request)
+    if err:
+        return err
+
+    try:
+        entry = PaymentHistory.objects.select_related('content_type').get(pk=payment_id)
+    except PaymentHistory.DoesNotExist:
+        return JsonResponse({'error': 'Payment history entry not found'}, status=404)
+
+    entity_type = entry.entity_type
+    object_id = entry.object_id
+    payment_type = entry.payment_type
+    content_type = entry.content_type
+
+    if entity_type == 'contract':
+        try:
+            contract = Contract.objects.select_related('idiq_contract', 'status').get(id=object_id)
+        except Contract.DoesNotExist:
+            return JsonResponse({'error': 'Contract not found'}, status=404)
+        if contract.company_id != company.id:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+    elif entity_type == 'clin':
+        try:
+            clin = Clin.objects.select_related('contract').get(id=object_id)
+        except Clin.DoesNotExist:
+            return JsonResponse({'error': 'CLIN not found'}, status=404)
+        if clin.contract.company_id != company.id:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+    elif entity_type == 'clinshipment':
+        try:
+            shipment = ClinShipment.objects.select_related('clin__contract').get(id=object_id)
+        except ClinShipment.DoesNotExist:
+            return JsonResponse({'error': 'Shipment not found'}, status=404)
+        if shipment.clin.contract.company_id != company.id:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+    else:
+        return JsonResponse({'error': 'Unsupported entity type'}, status=400)
+
+    try:
+        entry.delete()
+
+        new_total = PaymentHistory.objects.filter(
+            content_type=content_type,
+            object_id=object_id,
+            payment_type=payment_type,
+        ).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
+
+        if entity_type == 'contract':
+            contract = Contract.objects.select_related('idiq_contract', 'status').get(
+                id=object_id, company=company
+            )
+            if payment_type == 'contract_value':
+                contract.contract_value = new_total
+            elif payment_type == 'plan_gross':
+                contract.plan_gross = new_total
+            contract.save()
+
+        elif entity_type == 'clin':
+            clin = Clin.objects.get(id=object_id, contract__company=company)
+            if payment_type == 'item_value':
+                clin.item_value = new_total
+            elif payment_type == 'quote_value':
+                clin.quote_value = new_total
+            elif payment_type == 'paid_amount':
+                clin.paid_amount = new_total
+            elif payment_type == 'wawf_payment':
+                clin.wawf_payment = new_total
+            clin.save()
+
+        elif entity_type == 'clinshipment':
+            shipment = ClinShipment.objects.get(
+                id=object_id,
+                clin__contract__company=company
+            )
+            if payment_type == 'partial_item_value':
+                shipment.item_value = new_total
+            elif payment_type == 'partial_quote_value':
+                shipment.quote_value = new_total
+            elif payment_type == 'partial_paid_amount':
+                shipment.paid_amount = new_total
+            elif payment_type == 'partial_wawf_payment':
+                shipment.wawf_payment = new_total
+            shipment.save()
+            # Do not call _sync_clin_ship_fields here. Partial and CLIN
+            # financial fields are tracked independently.
+
+        return JsonResponse({
+            'success': True,
+            'new_total': float(new_total),
+            'payment_id': payment_id,
+        })
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to delete payment history: {str(e)}'}, status=500)
 
 
 @conditional_login_required
