@@ -86,7 +86,7 @@ class Command(BaseCommand):
         seen_files = set()
 
         for path in sorted(notes_dir.glob("*.md")):
-            if path.name.upper() == "README.MD":
+            if path.name.upper() == "README-RN.MD":
                 continue
             stem = path.stem
             seen_files.add(stem)
