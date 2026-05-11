@@ -385,12 +385,15 @@ class Clin(AuditModel):
 
     @property
     def adjusted_gross(self):
-        """Gross profit minus all finance line costs for this CLIN."""
+        """
+        Gross profit minus ALL finance line costs for this CLIN
+        (both CLIN-level and partial-shipment-level).
+        """
         item_val = Decimal(str(self.item_value or 0))
         quote_val = Decimal(str(self.quote_value or 0))
         gross = item_val - quote_val
         finance_costs = (
-            self.finance_lines.filter(partial__isnull=True).aggregate(total=Sum('amount_billed'))['total']
+            self.finance_lines.aggregate(total=Sum('amount_billed'))['total']
             or Decimal('0.00')
         )
         return gross - finance_costs

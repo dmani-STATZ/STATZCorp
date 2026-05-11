@@ -9,6 +9,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
+from django.http import JsonResponse
 from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, PaymentHistory
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
@@ -236,8 +237,167 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     ),
                 }
 
+                # Contract-level CLIN sum comparison
+                clin_item_value_sum = context['clin_totals']['item_value']
+                contract_value = Decimal(str(self.object.contract_value or 0))
+                context['clin_item_value_sum'] = clin_item_value_sum
+                context['contract_value_delta'] = clin_item_value_sum - contract_value
+                context['contract_value_balanced'] = abs(
+                    clin_item_value_sum - contract_value
+                ) <= Decimal('0.01')
+
+                # Per-CLIN shipment sum comparison
+                for clin in clins_list:
+                    subtotals = shipment_subtotals_by_clin.get(clin.id, {})
+                    clin.shipment_item_value_sum = subtotals.get(
+                        'item_value', Decimal('0.00')
+                    )
+                    clin.has_shipments = clin.id in shipments_by_clin
+                    clin_item_val = Decimal(str(clin.item_value or 0))
+                    clin.shipment_item_value_delta = (
+                        clin.shipment_item_value_sum - clin_item_val
+                    )
+                    clin.shipment_item_value_balanced = (
+                        not clin.has_shipments
+                        or abs(clin.shipment_item_value_delta) <= Decimal('0.01')
+                    )
+
         except Exception as e:
             logger.error(f"Error in FinanceAuditView: {str(e)}")
             messages.error(self.request, 'An error occurred while loading the page.')
 
         return context
+
+
+@login_required
+def finance_audit_summary_api(request, contract_id):
+    try:
+        company = getattr(request, 'active_company', None)
+        if not company:
+            return JsonResponse({'error': 'No active company'}, status=403)
+
+        contract = get_object_or_404(Contract, id=contract_id, company_id=company)
+
+        finance_costs_total = (
+            ContractFinanceLine.objects.filter(clin__contract=contract).aggregate(
+                t=Sum('amount_billed')
+            )['t']
+            or Decimal('0.00')
+        )
+
+        plan = contract.plan_gross
+        plan_dec = plan if plan is not None else Decimal('0.00')
+        adj_gross_contract = plan_dec - finance_costs_total
+
+        clins_qs = Clin.objects.filter(contract=contract)
+        clin_totals = {
+            'quote_value': sum(
+                (Decimal(str(c.quote_value or 0)) for c in clins_qs),
+                Decimal('0.00'),
+            ),
+            'paid_amount': sum(
+                (Decimal(str(c.paid_amount or 0)) for c in clins_qs),
+                Decimal('0.00'),
+            ),
+            'item_value': sum(
+                (Decimal(str(c.item_value or 0)) for c in clins_qs),
+                Decimal('0.00'),
+            ),
+            'wawf_payment': sum(
+                (Decimal(str(c.wawf_payment or 0)) for c in clins_qs),
+                Decimal('0.00'),
+            ),
+            'adj_gross': sum(
+                (c.adjusted_gross for c in clins_qs),
+                Decimal('0.00'),
+            ),
+        }
+
+        clin_item_value_sum = clin_totals['item_value']
+        contract_value = Decimal(str(contract.contract_value or 0))
+        contract_value_delta = clin_item_value_sum - contract_value
+        contract_value_balanced = abs(contract_value_delta) <= Decimal('0.01')
+
+        ct_contract = ContentType.objects.get_for_model(Contract)
+        ct_clin = ContentType.objects.get_for_model(Clin)
+        clin_ids = list(Clin.objects.filter(contract=contract).values_list('id', flat=True))
+
+        ph_base = PaymentHistory.objects.filter(
+            Q(content_type=ct_contract, object_id=contract.id)
+            | Q(content_type=ct_clin, object_id__in=clin_ids)
+        ).order_by('-payment_date', '-created_on')
+
+        total_count = ph_base.count()
+
+        return JsonResponse({
+            'finance_costs_total': str(finance_costs_total),
+            'adj_gross_contract': str(adj_gross_contract),
+            'clin_totals': {
+                'quote_value': str(clin_totals['quote_value']),
+                'paid_amount': str(clin_totals['paid_amount']),
+                'item_value': str(clin_totals['item_value']),
+                'wawf_payment': str(clin_totals['wawf_payment']),
+                'adj_gross': str(clin_totals['adj_gross']),
+            },
+            'clin_item_value_sum': str(clin_item_value_sum),
+            'contract_value_delta': str(contract_value_delta),
+            'contract_value_balanced': contract_value_balanced,
+            'payment_activity_total': total_count,
+        })
+    except Exception as e:
+        logger.error(f"Error in finance_audit_summary_api: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def finance_audit_clin_api(request, contract_id, clin_id):
+    try:
+        company = getattr(request, 'active_company', None)
+        if not company:
+            return JsonResponse({'error': 'No active company'}, status=403)
+
+        contract = get_object_or_404(Contract, id=contract_id, company_id=company)
+        clin = get_object_or_404(Clin, id=clin_id, contract=contract)
+
+        shipments_qs = ClinShipment.objects.filter(clin=clin).order_by('ship_date', 'created_on')
+        shipment_subtotals = {
+            'quote_value': sum(Decimal(str(s.quote_value or 0)) for s in shipments_qs),
+            'paid_amount': sum(Decimal(str(s.paid_amount or 0)) for s in shipments_qs),
+            'item_value': sum(Decimal(str(s.item_value or 0)) for s in shipments_qs),
+            'wawf_payment': sum(Decimal(str(s.wawf_payment or 0)) for s in shipments_qs),
+        }
+
+        has_shipments = shipments_qs.exists()
+        clin_item_val = Decimal(str(clin.item_value or 0))
+        shipment_item_value_delta = shipment_subtotals['item_value'] - clin_item_val
+        shipment_item_value_balanced = (
+            not has_shipments
+            or abs(shipment_item_value_delta) <= Decimal('0.01')
+        )
+
+        finance_lines_qs = ContractFinanceLine.objects.filter(
+            clin=clin,
+            partial__isnull=True,
+        ).annotate(amount_paid_sum=Sum('payments__amount'))
+
+        finance_billed_sum = sum(
+            (l.amount_billed for l in finance_lines_qs),
+            Decimal('0.00'),
+        )
+
+        return JsonResponse({
+            'clin_id': clin.id,
+            'quote_value': str(clin.quote_value or 0),
+            'paid_amount': str(clin.paid_amount or 0),
+            'item_value': str(clin.item_value or 0),
+            'wawf_payment': str(clin.wawf_payment or 0),
+            'adjusted_gross': str(clin.adjusted_gross),
+            'has_shipments': has_shipments,
+            'shipment_item_value_sum': str(shipment_subtotals['item_value']),
+            'shipment_item_value_delta': str(shipment_item_value_delta),
+            'shipment_item_value_balanced': shipment_item_value_balanced,
+            'finance_billed_sum': str(finance_billed_sum),
+        })
+    except Exception as e:
+        logger.error(f"Error in finance_audit_clin_api: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)

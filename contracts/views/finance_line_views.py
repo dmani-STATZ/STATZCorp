@@ -1,6 +1,6 @@
 import json
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -385,6 +385,34 @@ def add_partial_shipment(request):
         # Sync clin ship_qty and ship_date rollup fields
         from ..views.shipment_views import _sync_clin_ship_fields
         _sync_clin_ship_fields(clin, request.user)
+
+        # Backfill unit prices on CLIN if missing but derivable from totals
+        # (one-time self-healing write for migrated contracts)
+        if (clin.unit_price is None and
+                clin.item_value and
+                clin.order_qty and
+                float(clin.order_qty) != 0):
+            try:
+                clin.unit_price = (
+                    Decimal(str(clin.item_value)) /
+                    Decimal(str(clin.order_qty))
+                )
+                clin.save(update_fields=['unit_price'])
+            except (InvalidOperation, ZeroDivisionError):
+                pass
+
+        if (clin.price_per_unit is None and
+                clin.quote_value and
+                clin.order_qty and
+                float(clin.order_qty) != 0):
+            try:
+                clin.price_per_unit = (
+                    Decimal(str(clin.quote_value)) /
+                    Decimal(str(clin.order_qty))
+                )
+                clin.save(update_fields=['price_per_unit'])
+            except (InvalidOperation, ZeroDivisionError):
+                pass
 
         return JsonResponse({
             'success': True,

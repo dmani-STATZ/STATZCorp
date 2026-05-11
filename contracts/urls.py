@@ -2,7 +2,7 @@ from django.urls import path, re_path
 from django.views.generic import TemplateView
 from users.views import test_app_name
 from . import views
-from .views.finance_views import FinanceAuditView
+from .views.finance_views import FinanceAuditView, finance_audit_summary_api, finance_audit_clin_api
 from .views.finance_line_views import (
     add_finance_line,
     add_partial_finance_line,
@@ -584,6 +584,8 @@ urlpatterns = [
         FinanceAuditView.as_view(),
         name="finance_audit_detail",
     ),
+    path("api/finance-audit/<int:contract_id>/summary/", finance_audit_summary_api, name="finance_audit_summary_api"),
+    path("api/finance-audit/<int:contract_id>/clin/<int:clin_id>/", finance_audit_clin_api, name="finance_audit_clin_api"),
     path("api/finance-lines/add/", add_finance_line, name="finance_line_add"),
     path(
         "api/finance-lines/clin/<int:clin_id>/",

@@ -197,7 +197,6 @@ def recalc_splits(request, contract_pk):
         finance_costs = sum(
             Decimal(str(fl.amount_billed or 0))
             for fl in clin.finance_lines.all()
-            if fl.partial_id is None
         )
         adj_gross = gross - finance_costs
 

@@ -68,6 +68,22 @@ button.finance-audit-payment-note:hover {
     background-color: var(--bs-secondary-bg) !important;
 }
 
+/* Checks and balances indicators */
+.finance-clin-mode-badge {
+    font-size: 0.6rem;
+    vertical-align: middle;
+}
+
+/* Shipment-mode CLIN item value cell */
+.value-cell.has-shipments {
+    border-bottom: 2px solid var(--bs-primary);
+    padding-bottom: 1px;
+}
+
+[data-bs-theme="dark"] .value-cell.has-shipments {
+    border-bottom-color: var(--bs-primary);
+}
+
 .finance-pill-amber {
     cursor: pointer;
     font-size: 0.75rem;

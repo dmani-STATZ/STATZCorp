@@ -53,13 +53,38 @@
                     <span class="finance-summary-label">
                         <i class="bi bi-arrow-up-right text-info me-1"></i>Contract Value
                     </span>
-                    <button type="button" class="btn btn-link p-0 fw-semibold finance-summary-value text-info"
-                            id="contract_value_display"
-                            data-current-value="{{ contract.contract_value|default:'0.00' }}"
-                            onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'contract_value', 'finance_audit', document.getElementById('id_contract_value').value)">
-                        ${{ contract.contract_value|floatformat:2|intcomma|default:'0.00' }}
-                    </button>
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-link p-0 fw-semibold finance-summary-value text-info"
+                                id="contract_value_display"
+                                data-current-value="{{ contract.contract_value|default:'0.00' }}"
+                                onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'contract_value', 'finance_audit', document.getElementById('id_contract_value').value)">
+                            ${{ contract.contract_value|floatformat:2|intcomma|default:'0.00' }}
+                        </button>
+                        {% if contract_value_balanced %}
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="14" height="14"
+                             fill="currentColor"
+                             viewBox="0 0 16 16"
+                             class="text-success flex-shrink-0"
+                             title="CLIN sum matches Contract Value"
+                             style="cursor:default">
+                          <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                        </svg>
+                        {% endif %}
+                    </div>
                     <input type="hidden" name="contract_value" id="id_contract_value" value="{{ contract.contract_value|default:'0.00' }}">
+                    {% if not contract_value_balanced %}
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                        <span class="small text-body-secondary">CLIN sum:</span>
+                        <span class="small fw-semibold text-warning">
+                            ${{ clin_item_value_sum|floatformat:2|intcomma }}
+                        </span>
+                        <span class="small text-danger ms-1">
+                            {% if contract_value_delta > 0 %}+{% endif %}
+                            ${{ contract_value_delta|floatformat:2|intcomma }} variance
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="d-flex gap-2">
@@ -79,7 +104,7 @@
                         <span class="finance-summary-label">
                             <i class="bi bi-arrow-down text-danger me-1"></i>Finance Costs
                         </span>
-                        <span class="fw-semibold finance-summary-value text-danger">
+                        <span class="fw-semibold finance-summary-value text-danger" id="finance-costs-display">
                             ${{ finance_costs_total|floatformat:2|intcomma }}
                         </span>
                     </div>
@@ -89,7 +114,7 @@
                     <span class="finance-summary-label">
                         <i class="bi bi-currency-dollar text-success me-1"></i>Adj Gross
                     </span>
-                    <span class="fw-bold finance-summary-value text-success fs-6">
+                    <span class="fw-bold finance-summary-value text-success fs-6" id="adj-gross-display">
                         ${{ adj_gross_contract|floatformat:2|intcomma }}
                     </span>
                 </div>
@@ -178,9 +203,9 @@
         <div class="card finance-audit-notes-card shadow-sm" style="flex: 0 0 calc(33.333% - 0.75rem); max-width: calc(33.333% - 0.75rem);">
             <div class="card-header py-2 small fw-semibold d-flex justify-content-between align-items-center">
                 <span>Payment Activity</span>
-                <span class="text-body-secondary fw-normal">· {{ payment_activity_total }} total</span>
+                <span class="text-body-secondary fw-normal" id="payment-activity-count">· {{ payment_activity_total }} total</span>
             </div>
-            <div class="card-body finance-audit-notes-scroll">
+            <div class="card-body finance-audit-notes-scroll" id="payment-activity-list">
                 {% if payment_activity_rollup %}
                     {% for row in payment_activity_rollup %}
                     <button type="button"
@@ -263,7 +288,13 @@
                         {% for clin in clins %}
                     <tbody>
                         <tr class="clin-finance-audit-row" data-clin-id="{{ clin.id }}" data-clin-uom="{{ clin.uom|default:'' }}">
-                            <td>{{ clin.item_number }}</td>
+                            <td>
+                                {{ clin.item_number }}
+                                {% if clin.has_shipments %}
+                                <span class="badge bg-primary ms-1 finance-clin-mode-badge"
+                                      title="Shipment mode — values tracked via shipments">S</span>
+                                {% endif %}
+                            </td>
                             <td>{{ clin.get_item_type_display }}</td>
                             <td>{{ clin.supplier.name|default:"—" }}</td>
                             <td class="text-end">{{ clin.due_date|date:"m/d/Y"|default:"—" }}</td>
@@ -285,11 +316,27 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="item_value"
-                                      data-value="{{ clin.item_value|floatformat:2 }}">
-                                    ${{ clin.item_value|floatformat:2|intcomma }}
+                                <span class="value-cell {% if clin.has_shipments %}has-shipments{% endif %}"
+                                      role="button" tabindex="0"
+                                      data-entity-type="clin"
+                                      data-entity-id="{{ clin.id }}"
+                                      data-field-type="item_value"
+                                      data-current-value="{{ clin.item_value|default:'0' }}"
+                                      onclick="openPaymentHistoryPopup('clin', '{{ clin.id }}', 'item_value', 'finance_audit', {{ clin.item_value|default:'0' }})">
+                                    ${{ clin.item_value|floatformat:2|intcomma|default:"0.00" }}
                                 </span>
+                                {% if clin.has_shipments %}
+                                    {% if not clin.shipment_item_value_balanced %}
+                                    <div class="small text-warning mt-1"
+                                         title="Shipment sum vs CLIN item value">
+                                        ⚠ ${{ clin.shipment_item_value_sum|floatformat:2 }}
+                                    </div>
+                                    {% else %}
+                                    <div class="small text-success mt-1">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
                             </td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
@@ -307,11 +354,11 @@
                                 {% if slist %}
                                 <button type="button" class="pill pill-partials partials-pill me-1"
                                         data-clin-id="{{ clin.id }}">
-                                    {{ slist|length }} partial{% if slist|length != 1 %}s{% endif %}
+                                    {{ slist|length }} shipment{% if slist|length != 1 %}s{% endif %}
                                 </button>
                                 {% else %}
                                 <button type="button" class="pill pill-add partials-pill me-1"
-                                        data-clin-id="{{ clin.id }}">+ partial</button>
+                                        data-clin-id="{{ clin.id }}">+ add shipment</button>
                                 {% endif %}
                                 {% endwith %}
                                 {% with flist=clin.finance_lines_for_audit %}
@@ -381,38 +428,15 @@
                                         Adj gross: <span class="fl-footer-adj">${{ clin.adjusted_gross|floatformat:2 }}</span>
                                     </div>
                                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                                        <button type="button" class="fl-btn js-toggle-add-finance-form" data-clin-id="{{ clin.id }}">+ add finance line</button>
+                                        <button type="button"
+                                                class="fl-btn js-open-add-finance-modal"
+                                                data-clin-id="{{ clin.id }}"
+                                                data-partial-id="">
+                                            + add finance line
+                                        </button>
                                     </div>
                                 </div>
                                 {% endwith %}
-                                    </div>
-                                </div>
-                                <div id="finance-add-row-{{ clin.id }}"
-                                     style="display:none; background: var(--bs-tertiary-bg); padding: 6px 8px 6px 0;">
-                                    <div style="display: flex; justify-content: flex-end;">
-                                        <div style="width: 72%;">
-                                            <form class="finance-line-add-form d-flex align-items-center gap-2"
-                                                  data-clin-id="{{ clin.id }}">
-                                                {% csrf_token %}
-                                                <input type="text" name="line_type" placeholder="Type"
-                                                       list="finance-type-suggestions-{{ clin.id }}"
-                                                       class="form-control form-control-sm" style="width: 120px; flex-shrink: 0;">
-                                                <datalist id="finance-type-suggestions-{{ clin.id }}">
-                                                    <option value="Trucking">
-                                                    <option value="Freight">
-                                                    <option value="Labels">
-                                                    <option value="Miscellaneous">
-                                                </datalist>
-                                                <input type="text" name="description" placeholder="Description"
-                                                       class="form-control form-control-sm" style="flex: 1; min-width: 0;">
-                                                <input type="number" name="amount_billed" placeholder="Amount"
-                                                       step="0.01" min="0.01"
-                                                       class="form-control form-control-sm" style="width: 110px; flex-shrink: 0;">
-                                                <button type="submit" class="btn btn-sm btn-primary" style="flex-shrink: 0;">Save</button>
-                                                <button type="button" class="btn btn-sm btn-outline-secondary js-cancel-add-finance"
-                                                        data-clin-id="{{ clin.id }}" style="flex-shrink: 0;">Cancel</button>
-                                            </form>
-                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -426,7 +450,7 @@
                         {% if slist %}
                             {% for shipment in slist %}
                             <tr class="partial-row table-info" data-shipment-id="{{ shipment.id }}" data-clin-id="{{ clin.id }}">
-                                <td class="ps-4 text-muted small" colspan="2">Partial {{ forloop.counter }}</td>
+                                <td class="ps-4 text-muted small" colspan="2">Shipment {{ forloop.counter }}</td>
                                 <td class="text-muted small">{{ shipment.uom|default:"—" }}</td>
                                 <td class="text-end">—</td>
                                 <td class="text-end">—</td>
@@ -534,7 +558,7 @@
                                                     </div>
                                                     {% endfor %}
                                                 {% else %}
-                                                    <div class="text-muted small py-2">No finance lines for this partial.</div>
+                                                    <div class="text-muted small py-2">No finance lines for this shipment.</div>
                                                 {% endif %}
                                                 {% endwith %}
                                             </div>
@@ -543,34 +567,13 @@
                                                     Finance costs: $<span class="pfl-footer-costs" data-shipment-id="{{ shipment.id }}">{{ shipment.finance_billed_sum|floatformat:2 }}</span>
                                                 </div>
                                                 <div>
-                                                    <button type="button" class="fl-btn js-toggle-partial-finance-form"
-                                                            data-shipment-id="{{ shipment.id }}">
+                                                    <button type="button"
+                                                            class="fl-btn js-open-add-finance-modal"
+                                                            data-clin-id="{{ clin.id }}"
+                                                            data-partial-id="{{ shipment.id }}">
                                                         + add finance line
                                                     </button>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div id="partial-finance-add-row-{{ shipment.id }}"
-                                         style="display:none; background: var(--bs-tertiary-bg); padding: 6px 8px 6px 0;">
-                                        <div style="display: flex; justify-content: flex-end;">
-                                            <div style="width: 72%;">
-                                                <form class="partial-finance-line-add-form d-flex align-items-center gap-2"
-                                                      data-shipment-id="{{ shipment.id }}"
-                                                      data-clin-id="{{ clin.id }}">
-                                                    {% csrf_token %}
-                                                    <input type="text" name="line_type" placeholder="Type"
-                                                           list="finance-type-suggestions-{{ clin.id }}"
-                                                           class="form-control form-control-sm" style="width: 120px; flex-shrink: 0;">
-                                                    <input type="text" name="description" placeholder="Description"
-                                                           class="form-control form-control-sm" style="flex: 1; min-width: 0;">
-                                                    <input type="number" name="amount_billed" placeholder="Amount"
-                                                           step="0.01" min="0.01"
-                                                           class="form-control form-control-sm" style="width: 110px; flex-shrink: 0;">
-                                                    <button type="submit" class="btn btn-sm btn-primary" style="flex-shrink: 0;">Save</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-cancel-partial-finance"
-                                                            data-shipment-id="{{ shipment.id }}" style="flex-shrink: 0;">Cancel</button>
-                                                </form>
                                             </div>
                                         </div>
                                     </div>
@@ -592,9 +595,9 @@
                         {% else %}
                             <tr>
                                 <td colspan="13" class="ps-4 py-2 text-muted small border-0">
-                                    No partials recorded.
+                                    No shipments recorded.
                                     <button type="button" class="fl-btn ms-2 js-open-add-partial"
-                                            data-clin-id="{{ clin.id }}">+ add partial</button>
+                                            data-clin-id="{{ clin.id }}">+ add shipment</button>
                                 </td>
                             </tr>
                         {% endif %}
@@ -602,7 +605,7 @@
                         <tr>
                             <td colspan="13" class="ps-4 py-1 border-0 text-end pe-3">
                                 <button type="button" class="fl-btn js-open-add-partial"
-                                        data-clin-id="{{ clin.id }}">+ add partial</button>
+                                        data-clin-id="{{ clin.id }}">+ add shipment</button>
                             </td>
                         </tr>
                         {% endif %}
@@ -621,7 +624,14 @@
                             <td colspan="7" class="text-end pe-2">Totals</td>
                             <td class="text-end">${{ clin_totals.quote_value|floatformat:2|intcomma }}</td>
                             <td class="text-end">${{ clin_totals.paid_amount|floatformat:2|intcomma }}</td>
-                            <td class="text-end">${{ clin_totals.item_value|floatformat:2|intcomma }}</td>
+                            <td class="text-end fw-semibold">
+                                ${{ clin_totals.item_value|floatformat:2 }}
+                                {% if not contract_value_balanced %}
+                                <div class="small text-warning">
+                                    ≠ ${{ contract.contract_value|floatformat:2|intcomma }}
+                                </div>
+                                {% endif %}
+                            </td>
                             <td class="text-end">${{ clin_totals.wawf_payment|floatformat:2|intcomma }}</td>
                             <td class="text-end {% if clin_totals.adj_gross > 0 %}text-success{% elif clin_totals.adj_gross < 0 %}text-danger{% endif %}">
                                 ${{ clin_totals.adj_gross|floatformat:2|intcomma }}
@@ -634,15 +644,65 @@
             </div>
         </div>
     </div>
-    <datalist id="finance-line-type-suggestions">
-        <option value="Trucking"></option>
-        <option value="Freight"></option>
-        <option value="Labels"></option>
-        <option value="Miscellaneous"></option>
-    </datalist>
     {% include 'contracts/includes/payment_history_popup.html' %}
 
     {% include "contracts/includes/add_partial_modal.html" %}
+
+    <!-- Add Finance Line Modal -->
+    <div class="modal fade" id="addFinanceLineModal" tabindex="-1"
+         aria-labelledby="addFinanceLineModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-md">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="addFinanceLineModalLabel">Add Finance Line</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="flModalClinId" value="">
+            <input type="hidden" id="flModalPartialId" value="">
+            <div class="mb-3">
+              <label for="flModalLineType" class="form-label form-label-sm fw-semibold">
+                Type <span class="text-danger">*</span>
+              </label>
+              <input type="text" id="flModalLineType" class="form-control form-control-sm"
+                     placeholder="e.g. Trucking, Freight"
+                     list="flModalLineTypeSuggestions" autocomplete="off">
+              <datalist id="flModalLineTypeSuggestions">
+                <option value="Trucking">
+                <option value="Freight">
+                <option value="Crating">
+                <option value="Insurance">
+                <option value="Handling">
+                <option value="Storage">
+                <option value="Customs">
+                <option value="Other">
+              </datalist>
+            </div>
+            <div class="mb-3">
+              <label for="flModalDescription" class="form-label form-label-sm fw-semibold">
+                Description
+              </label>
+              <input type="text" id="flModalDescription" class="form-control form-control-sm"
+                     placeholder="Optional">
+            </div>
+            <div class="mb-2">
+              <label for="flModalAmountBilled" class="form-label form-label-sm fw-semibold">
+                Amount Billed <span class="text-danger">*</span>
+              </label>
+              <input type="number" id="flModalAmountBilled" class="form-control form-control-sm"
+                     step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div id="flModalError" class="text-danger small mt-2" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-sm btn-primary"
+                    id="flModalSaveBtn">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
     {% endif %}
 </div>
 {% endblock %}
@@ -651,6 +711,8 @@
 {% if contract %}
 <script src="{% static 'contracts/js/add_partial_modal.js' %}?v={% now 'U' %}"></script>
 <script>
+window.FINANCE_AUDIT_CONTRACT_ID = {{ contract.id }};
+
 function openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled) {
     fetch(`/contracts/api/finance-lines/${financeLineId}/payments/`)
         .then(r => r.json())
@@ -729,6 +791,10 @@ document.addEventListener('click', function(e) {
             } else {
                 refreshFinanceLinesForClin(clinId);
             }
+            setTimeout(() => {
+                refreshClinRow(clinId);
+                refreshContractSummary();
+            }, 200);
             if (window.notify) window.notify('success', 'Finance line deleted', 3000);
         } else {
             if (window.notify) window.notify('error', data.error || 'Delete failed', 3000);
@@ -891,7 +957,7 @@ function refreshPartialFinanceLines(shipmentId, clinId) {
             if (!container) return;
 
             if (data.finance_lines.length === 0) {
-                container.innerHTML = '<div class="text-muted small py-2">No finance lines for this partial.</div>';
+                container.innerHTML = '<div class="text-muted small py-2">No finance lines for this shipment.</div>';
                 return;
             }
 
@@ -958,6 +1024,93 @@ function refreshPartialSubtotals(clinId) {
         if (field === 'item_value') cell.textContent = `$${totalItem.toFixed(2)}`;
         if (field === 'wawf_payment') cell.textContent = `$${totalWawf.toFixed(2)}`;
     });
+}
+
+function refreshContractSummary() {
+    const contractId = window.FINANCE_AUDIT_CONTRACT_ID;
+    if (!contractId) return;
+
+    fetch(`/contracts/api/finance-audit/${contractId}/summary/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Summary refresh error:', data.error);
+                return;
+            }
+
+            const financeEl = document.querySelector('#finance-costs-display');
+            if (financeEl) {
+                financeEl.textContent = `$${parseFloat(data.finance_costs_total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+
+            const adjGrossEl = document.querySelector('#adj-gross-display');
+            if (adjGrossEl) {
+                adjGrossEl.textContent = `$${parseFloat(data.adj_gross_contract).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+
+            const totalsRow = document.querySelector('tr.table-secondary.fw-semibold.small');
+            if (totalsRow) {
+                const cells = totalsRow.querySelectorAll('td');
+                if (cells.length >= 5) {
+                    cells[1].textContent = `$${parseFloat(data.clin_totals.quote_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    cells[2].textContent = `$${parseFloat(data.clin_totals.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    cells[3].textContent = `$${parseFloat(data.clin_totals.item_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    cells[4].textContent = `$${parseFloat(data.clin_totals.wawf_payment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    if (cells[5]) {
+                        const adjGross = parseFloat(data.clin_totals.adj_gross);
+                        cells[5].textContent = `$${adjGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        cells[5].className = adjGross > 0 ? 'text-end' : adjGross < 0 ? 'text-end text-danger' : 'text-end';
+                    }
+                }
+            }
+
+            const paymentCountEl = document.querySelector('.finance-audit-notes-card .card-header span.text-body-secondary');
+            if (paymentCountEl) {
+                paymentCountEl.textContent = `· ${data.payment_activity_total} total`;
+            }
+        })
+        .catch(e => console.error('Summary refresh failed:', e));
+}
+
+function refreshClinRow(clinId) {
+    const contractId = window.FINANCE_AUDIT_CONTRACT_ID;
+    if (!contractId || !clinId) return;
+
+    fetch(`/contracts/api/finance-audit/${contractId}/clin/${clinId}/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                console.error('CLIN refresh error:', data.error);
+                return;
+            }
+
+            const clinRow = document.querySelector(`.clin-finance-audit-row[data-clin-id="${clinId}"]`);
+            if (!clinRow) return;
+
+            const cells = clinRow.querySelectorAll('td');
+            if (cells.length >= 9) {
+                cells[7].textContent = `$${parseFloat(data.quote_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                cells[8].textContent = `$${parseFloat(data.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                cells[9].textContent = `$${parseFloat(data.item_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                cells[10].textContent = `$${parseFloat(data.wawf_payment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const adjGross = parseFloat(data.adjusted_gross);
+                cells[11].textContent = `$${adjGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                cells[11].className = adjGross > 0 ? 'text-end fw-semibold text-success' : adjGross < 0 ? 'text-end fw-semibold text-danger' : 'text-end fw-semibold';
+            }
+
+            if (data.has_shipments) {
+                const badge = clinRow.querySelector('.finance-clin-mode-badge');
+                if (!badge) {
+                    const itemCell = cells[0];
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'badge bg-primary ms-1 finance-clin-mode-badge';
+                    newBadge.title = 'Shipment mode — values tracked via shipments';
+                    newBadge.textContent = 'S';
+                    itemCell.appendChild(newBadge);
+                }
+            }
+        })
+        .catch(e => console.error('CLIN refresh failed:', e));
 }
 
 (function() {
@@ -1079,6 +1232,7 @@ function refreshPartialSubtotals(clinId) {
                 targetElement.dataset.currentValue = newValue;
                 hiddenInput.value = newValue;
                 notifyToast('Contract ' + fieldType.replace(/_/g, ' ') + ' updated to ' + fmtMoney, 'success');
+                setTimeout(() => refreshContractSummary(), 200);
                 return true;
             }
             notifyToast('Could not update contract display', 'error');
@@ -1097,10 +1251,10 @@ function refreshPartialSubtotals(clinId) {
                 if (clinId) {
                     refreshPartialSubtotals(clinId);
                 }
-                notifyToast('Partial ' + fieldType.replace(/_/g, ' ') + ' updated to ' + fmtMoney, 'success');
+                notifyToast('Shipment ' + fieldType.replace(/_/g, ' ') + ' updated to ' + fmtMoney, 'success');
                 return true;
             }
-            notifyToast('Could not update partial display', 'error');
+            notifyToast('Could not update shipment display', 'error');
             return false;
         }
 
@@ -1109,6 +1263,10 @@ function refreshPartialSubtotals(clinId) {
             targetElement.textContent = fmtMoney;
             targetElement.dataset.value = newValue;
             notifyToast('CLIN ' + fieldType.replace(/_/g, ' ') + ' updated to ' + fmtMoney, 'success');
+            setTimeout(() => {
+                refreshClinRow(entityId);
+                refreshContractSummary();
+            }, 200);
             return true;
         }
         notifyToast('Could not update CLIN display', 'error');
@@ -1162,74 +1320,126 @@ function refreshPartialSubtotals(clinId) {
         pill.addEventListener('click', function() {
             const clinId = this.dataset.clinId;
             const accordion = document.getElementById(`accordion-${clinId}`);
-            const addRow = document.getElementById(`finance-add-row-${clinId}`);
             if (!accordion) return;
             const isVisible = accordion.style.display !== 'none';
             accordion.style.display = isVisible ? 'none' : 'table-row';
             this.classList.toggle('pill-active', !isVisible);
-            // Always hide the add form when accordion closes
-            if (isVisible && addRow) {
-                addRow.style.display = 'none';
-            }
         });
     });
 
-    document.querySelectorAll('.finance-line-add-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const clinId = this.dataset.clinId;
+    // ── Add Finance Line Modal ──────────────────────────────────────────────
+    (function () {
+        const modal = document.getElementById('addFinanceLineModal');
+        if (!modal) return;
+        const bsModal = new bootstrap.Modal(modal);
+
+        const flClinIdInput    = document.getElementById('flModalClinId');
+        const flPartialIdInput = document.getElementById('flModalPartialId');
+        const flLineType       = document.getElementById('flModalLineType');
+        const flDescription    = document.getElementById('flModalDescription');
+        const flAmount         = document.getElementById('flModalAmountBilled');
+        const flError          = document.getElementById('flModalError');
+        const flSaveBtn        = document.getElementById('flModalSaveBtn');
+
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.js-open-add-finance-modal');
+            if (!btn) return;
+            flLineType.value       = '';
+            flDescription.value    = '';
+            flAmount.value         = '';
+            flError.style.display  = 'none';
+            flError.textContent    = '';
+            flClinIdInput.value    = btn.dataset.clinId    || '';
+            flPartialIdInput.value = btn.dataset.partialId || '';
+            bsModal.show();
+        });
+
+        flSaveBtn.addEventListener('click', function () {
+            const clinId    = flClinIdInput.value;
+            const partialId = flPartialIdInput.value;
+            const lineType  = flLineType.value.trim();
+            const desc      = flDescription.value.trim();
+            const amount    = flAmount.value;
+
+            if (!lineType) {
+                flError.textContent = 'Type is required.';
+                flError.style.display = 'block';
+                return;
+            }
+            if (!amount || parseFloat(amount) === 0) {
+                flError.textContent = 'Amount is required and must be non-zero.';
+                flError.style.display = 'block';
+                return;
+            }
+            flError.style.display = 'none';
+
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const amt = parseFloat(amount);
+            const url = partialId
+                ? `/contracts/api/finance-lines/partial/${partialId}/add/`
+                : '/contracts/api/finance-lines/add/';
+            const payload = partialId
+                ? { line_type: lineType, description: desc, amount_billed: amt }
+                : {
+                    clin_id:       clinId,
+                    line_type:     lineType,
+                    description:   desc,
+                    amount_billed: amt,
+                };
 
-            const lineType = this.querySelector('[name="line_type"]').value.trim();
-            const description = this.querySelector('[name="description"]').value.trim();
-            const amountBilled = this.querySelector('[name="amount_billed"]').value;
+            flSaveBtn.disabled = true;
 
-            if (!lineType) { if (window.notify) window.notify('error', 'Type is required', 3000); return; }
-            if (!amountBilled) { if (window.notify) window.notify('error', 'Amount is required', 3000); return; }
-
-            fetch('/contracts/api/finance-lines/add/', {
+            fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
+                    'X-CSRFToken': csrfToken,
                 },
-                body: JSON.stringify({
-                    clin_id: clinId,
-                    line_type: lineType,
-                    description: description,
-                    amount_billed: parseFloat(amountBilled),
-                })
+                body: JSON.stringify(payload),
             })
             .then(r => r.json())
             .then(data => {
+                flSaveBtn.disabled = false;
                 if (data.success) {
-                    this.reset();
-                    const addRow = document.getElementById(`finance-add-row-${clinId}`);
-                    if (addRow) addRow.style.display = 'none';
-                    refreshFinanceLinesForClin(clinId);
+                    bsModal.hide();
+                    if (partialId) {
+                        refreshPartialFinanceLines(partialId, clinId);
+                    } else {
+                        refreshFinanceLinesForClin(clinId);
+                    }
+                    if (partialId) {
+                        const acc = document.getElementById(`partial-fl-accordion-${partialId}`);
+                        if (acc) acc.style.display = 'table-row';
+                    } else {
+                        const acc = document.getElementById(`accordion-${clinId}`);
+                        if (acc) acc.style.display = 'table-row';
+                    }
+                    setTimeout(() => {
+                        refreshClinRow(clinId);
+                        refreshContractSummary();
+                    }, 200);
                     if (window.notify) window.notify('success', 'Finance line added', 3000);
                 } else {
-                    if (window.notify) window.notify('error', data.error || 'Failed to add finance line', 3000);
+                    flError.textContent = data.error || 'Failed to add finance line.';
+                    flError.style.display = 'block';
                 }
+            })
+            .catch(() => {
+                flSaveBtn.disabled = false;
+                flError.textContent = 'Network error. Please try again.';
+                flError.style.display = 'block';
             });
         });
-    });
 
-    document.querySelectorAll('.js-toggle-add-finance-form').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const clinId = this.dataset.clinId;
-            const addRow = document.getElementById(`finance-add-row-${clinId}`);
-            if (!addRow) return;
-            addRow.style.display = addRow.style.display === 'none' ? 'block' : 'none';
+        modal.addEventListener('hidden.bs.modal', function () {
+            flLineType.value      = '';
+            flDescription.value   = '';
+            flAmount.value        = '';
+            flError.style.display = 'none';
+            flError.textContent   = '';
+            flSaveBtn.disabled    = false;
         });
-    });
-
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.js-cancel-add-finance');
-        if (!btn) return;
-        const addRow = document.getElementById(`finance-add-row-${btn.dataset.clinId}`);
-        if (addRow) addRow.style.display = 'none';
-    });
+    })();
 
     const nhForm = document.getElementById('newHistoryForm');
     if (nhForm) {
@@ -1262,13 +1472,19 @@ function refreshPartialSubtotals(clinId) {
                         closePaymentHistoryPopup();
                     }
                     const lineEl = document.querySelector(`[data-finance-line-id="${financeLineId}"]`);
+                    const clinId = lineEl?.closest('tr[data-accordion-for]')?.dataset.accordionFor ||
+                                   lineEl?.closest('tr[data-shipment-id][data-fl-accordion-for]')?.dataset.clinId;
                     const partialAcc = lineEl && lineEl.closest('tr[data-shipment-id][data-fl-accordion-for]');
                     if (partialAcc && partialAcc.dataset.shipmentId) {
                         refreshPartialFinanceLines(partialAcc.dataset.shipmentId, partialAcc.dataset.clinId);
                     } else {
-                        refreshFinanceLinesForClin(
-                            lineEl?.closest('tr[data-accordion-for]')?.dataset.accordionFor
-                        );
+                        refreshFinanceLinesForClin(clinId);
+                    }
+                    if (clinId) {
+                        setTimeout(() => {
+                            refreshClinRow(clinId);
+                            refreshContractSummary();
+                        }, 200);
                     }
                     if (window.notify) window.notify('success', 'Payment logged successfully', 3000);
                 } else {
@@ -1345,65 +1561,10 @@ function refreshPartialSubtotals(clinId) {
         if (!pill) return;
         const shipmentId = pill.dataset.shipmentId;
         const accordion = document.getElementById(`partial-fl-accordion-${shipmentId}`);
-        const addRow = document.getElementById(`partial-finance-add-row-${shipmentId}`);
         if (!accordion) return;
         const isVisible = accordion.style.display !== 'none';
         accordion.style.display = isVisible ? 'none' : 'table-row';
         pill.classList.toggle('pill-active', !isVisible);
-        if (isVisible && addRow) addRow.style.display = 'none';
-    });
-
-    // Toggle partial finance line add form
-    document.querySelectorAll('.js-toggle-partial-finance-form').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const shipmentId = this.dataset.shipmentId;
-            const addRow = document.getElementById(`partial-finance-add-row-${shipmentId}`);
-            if (!addRow) return;
-            addRow.style.display = addRow.style.display === 'none' ? 'block' : 'none';
-        });
-    });
-
-    // Cancel partial finance line add
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.js-cancel-partial-finance');
-        if (!btn) return;
-        const addRow = document.getElementById(`partial-finance-add-row-${btn.dataset.shipmentId}`);
-        if (addRow) addRow.style.display = 'none';
-    });
-
-    // Submit partial finance line add form
-    document.querySelectorAll('.partial-finance-line-add-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const shipmentId = this.dataset.shipmentId;
-            const clinId = this.dataset.clinId;
-            const csrfInput = this.querySelector('[name=csrfmiddlewaretoken]');
-            const csrfToken = csrfInput ? csrfInput.value : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
-            const lineType = this.querySelector('[name="line_type"]').value.trim();
-            const description = this.querySelector('[name="description"]').value.trim();
-            const amountBilled = this.querySelector('[name="amount_billed"]').value;
-
-            if (!lineType) { if (window.notify) window.notify('error', 'Type is required', 3000); return; }
-            if (!amountBilled) { if (window.notify) window.notify('error', 'Amount is required', 3000); return; }
-
-            fetch(`/contracts/api/finance-lines/partial/${shipmentId}/add/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ line_type: lineType, description: description, amount_billed: parseFloat(amountBilled) })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    form.reset();
-                    const addRow = document.getElementById(`partial-finance-add-row-${shipmentId}`);
-                    if (addRow) addRow.style.display = 'none';
-                    refreshPartialFinanceLines(shipmentId, clinId);
-                    if (window.notify) window.notify('success', 'Finance line added', 3000);
-                } else {
-                    if (window.notify) window.notify('error', data.error || 'Failed', 3000);
-                }
-            });
-        });
     });
 
     var btnNotes = document.getElementById('btn-open-notes');
