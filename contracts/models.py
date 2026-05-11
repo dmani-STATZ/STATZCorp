@@ -204,7 +204,7 @@ class Contract(AuditModel):
         base = f'{base_url}/{site_name}/Shared%20Documents/Forms/AllItems.aspx'
         root = f'/sites/{site_name}/Shared Documents/{docs_path}'
         status_desc = (self.status.description or '').strip() if self.status else ''
-        closed_prefix = f'{root}/Closed Contracts/' if status_desc in ('Closed', 'Cancelled') else f'{root}/'
+        closed_prefix = f'{root}/Closed Contracts/' if status_desc in ('Closed', 'Canceled') else f'{root}/'
         if self.idiq_contract and getattr(self.idiq_contract, 'contract_number', None):
             path = f'{closed_prefix}Contract {self.idiq_contract.contract_number}/Delivery Order {self.contract_number}'
         else:
@@ -258,7 +258,7 @@ class Contract(AuditModel):
 
         # Determine if this contract is closed or cancelled
         status_desc = (self.status.description or '').strip() if self.status else ''
-        is_closed = status_desc in ('Closed', 'Cancelled')
+        is_closed = status_desc in ('Closed', 'Canceled')
 
         # Build path segments
         if is_closed:
@@ -282,6 +282,59 @@ class ContractStatus(models.Model):
 
     def __str__(self):
         return self.description
+
+
+class ContractStatusHistory(models.Model):
+    """
+    Append-only audit log of every contract status transition.
+
+    The Contract.status field remains the source of truth for the contract's
+    CURRENT state (cached for query performance). This table is the source of
+    truth for the contract's status HISTORY. The two are kept in sync inside
+    the same DB transaction whenever status changes.
+
+    Phase 1: dual-write with legacy fields (closed_by, cancelled_by, etc.).
+    Phase 2 (future): legacy fields are removed; this table is sole source.
+    """
+    contract = models.ForeignKey(
+        'Contract',
+        related_name='status_history',
+        on_delete=models.CASCADE,
+    )
+    from_status = models.ForeignKey(
+        'ContractStatus',
+        related_name='+',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Null for the initial creation row.",
+    )
+    to_status = models.ForeignKey(
+        'ContractStatus',
+        related_name='+',
+        on_delete=models.PROTECT,
+    )
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='+',
+        on_delete=models.PROTECT,
+    )
+    changed_at = models.DateTimeField(default=timezone.now)
+    reason = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'contracts_contractstatushistory'
+        ordering = ['-changed_at', '-id']
+        indexes = [
+            models.Index(fields=['contract', '-changed_at'], name='csh_contract_changed_at_idx'),
+        ]
+        verbose_name = 'Contract Status History'
+        verbose_name_plural = 'Contract Status History'
+
+    def __str__(self):
+        from_label = self.from_status.description if self.from_status else '(initial)'
+        return f"{self.contract.contract_number}: {from_label} → {self.to_status.description} @ {self.changed_at:%Y-%m-%d %H:%M}"
+
 
 class Clin(AuditModel):
     company = models.ForeignKey('Company', on_delete=models.PROTECT, related_name='clins', null=False, blank=True)

@@ -63,7 +63,7 @@
                     <option value="">All Statuses</option>
                     <option value="open">Open</option>
                     <option value="closed">Closed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="canceled">Canceled</option>
                 </select>
             </div>
 
@@ -145,10 +145,10 @@
                     <tr class="hover:bg-gray-50 text-xs">
                         <td class="px-1.5 py-1">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                              {% if clin.contract.status.description == 'Cancelled' %}bg-red-100 text-red-800
+                                              {% if clin.contract.status.description == 'Canceled' %}bg-red-100 text-red-800
                                               {% elif clin.contract.date_closed %}bg-yellow-100 text-yellow-800
                                               {% else %}bg-green-100 text-green-800{% endif %}">
-                                            {% if clin.contract.status.description == 'Cancelled' %}Cancelled
+                                            {% if clin.contract.status.description == 'Canceled' %}Canceled
                                             {% elif clin.contract.date_closed %}Closed
                                             {% else %}Open{% endif %}
                                 </span>
@@ -340,7 +340,11 @@
         // Set initial values from URL if they exist
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('status')) {
-            filterStatus.value = urlParams.get('status');
+            let st = urlParams.get('status');
+            if (st === 'cancelled') {
+                st = 'canceled';
+            }
+            filterStatus.value = st;
         }
         if (urlParams.has('supplier')) {
             filterSupplier.value = urlParams.get('supplier');

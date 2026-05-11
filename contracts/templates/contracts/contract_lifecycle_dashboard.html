@@ -279,9 +279,9 @@
                     </thead>
                     <tbody>
                         {% for contract in contracts %}
-                        <tr class="contract-table-row {% if contract.status.description == 'Cancelled' %}table-danger{% endif %}">
+                        <tr class="contract-table-row {% if contract.status.description == 'Canceled' %}table-danger{% endif %}">
                             <td class="text-nowrap small fw-medium text-body">
-                                <span class="status-badge {% if contract.status.description == 'Cancelled' %}cancelled{% elif contract.status.description == 'Open' %}open{% else %}closed{% endif %}">
+                                <span class="status-badge {% if contract.status.description == 'Canceled' %}cancelled{% elif contract.status.description == 'Open' %}open{% else %}closed{% endif %}">
                                     {{ contract.status.description }}
                                 </span>
                             </td>
@@ -346,7 +346,7 @@
                                         </svg>
                                     </a>
                                     {% endif %}
-                                    {% if contract.status.description != 'Cancelled' %}
+                                    {% if contract.status.description != 'Canceled' %}
                                     <a href="{% url 'contracts:contract_cancel' contract.id %}" class="btn btn-caution" title="Cancel">
                                         <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

@@ -103,13 +103,13 @@ def get_dashboard_metric_queryset(request, metric, period):
     contracts_qs = base_qs
 
     if metric == 'contracts_due':
-        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date)).exclude(status__description='Canceled')
     elif metric == 'contracts_due_late':
-        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=True).exclude(status__description='Cancelled')
+        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=True).exclude(status__description='Canceled')
     elif metric == 'contracts_due_ontime':
-        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=False).exclude(status__description='Cancelled')
+        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=False).exclude(status__description='Canceled')
     elif metric in ('new_contracts', 'new_contract_value'):
-        contracts_qs = contracts_qs.filter(award_date__range=(start_date, end_date)).exclude(status__description='Cancelled')
+        contracts_qs = contracts_qs.filter(award_date__range=(start_date, end_date)).exclude(status__description='Canceled')
 
     contracts_qs = contracts_qs.order_by('-award_date', '-due_date', '-id')
 
@@ -200,15 +200,15 @@ class ContractLifecycleDashboardView(TemplateView):
             past_contracts = Contract.objects.filter(
                 company=self.request.active_company,
                 due_date__range=(start_date, end_date),
-            ).exclude(status__description='Cancelled')
+            ).exclude(status__description='Canceled')
             contracts = Contract.objects.filter(
                 company=self.request.active_company,
                 award_date__range=(start_date, end_date),
-            ).exclude(status__description='Cancelled')
+            ).exclude(status__description='Canceled')
             clins = Clin.objects.filter(
                 company=self.request.active_company,
                 contract__award_date__range=(start_date, end_date),
-            ).exclude(contract__status__description='Cancelled')
+            ).exclude(contract__status__description='Canceled')
             
             return {
                 'contracts_due': past_contracts.distinct().count(),
@@ -239,7 +239,7 @@ class ContractLifecycleDashboardView(TemplateView):
         
         # Get all active contracts (not cancelled and not closed)
         active_contracts = Contract.objects.filter(
-            ~Q(status__description='Cancelled') & ~Q(status__description='Closed'), company=self.request.active_company)
+            ~Q(status__description='Canceled') & ~Q(status__description='Closed'), company=self.request.active_company)
         
         # Contracts by stage
         context['new_contracts'] = active_contracts.filter(
@@ -495,7 +495,7 @@ class DashboardMetricDetailView(TemplateView):
             qs = Contract.objects.filter(
                 company=self.request.active_company,
                 award_date__range=(start, end),
-            ).exclude(status__description='Cancelled')
+            ).exclude(status__description='Canceled')
 
             series.append({
                 'label': label,

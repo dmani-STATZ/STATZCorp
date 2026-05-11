@@ -6,9 +6,11 @@ from datetime import timedelta
 from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.db import transaction
 from django.db.models import Q, Sum, Count, Value, CharField, IntegerField, Case, When
 from django.db.models.functions import Replace
 from django.http import JsonResponse
+from django.core.exceptions import PermissionDenied
 import json
 import logging
 from django.contrib.contenttypes.models import ContentType
@@ -17,7 +19,18 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, ClinSplit, Note, ContentType, Expedite, CanceledReason, ContractStatus, GovAction
+from ..models import (
+    Contract,
+    Clin,
+    ClinSplit,
+    Note,
+    ContentType,
+    Expedite,
+    CanceledReason,
+    ContractStatus,
+    ContractStatusHistory,
+    GovAction,
+)
 from .mixins import ActiveCompanyQuerysetMixin
 
 logger = logging.getLogger(__name__)
@@ -204,6 +217,9 @@ class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
                 total_paid=Sum('split_paid'),
             ).order_by('company_name')
         )
+        context['status_history'] = contract.status_history.select_related(
+            'from_status', 'to_status', 'changed_by'
+        ).all()
         return context
 
 
@@ -232,10 +248,23 @@ class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
         contract = self.get_object()
         try:
             closed_status = ContractStatus.objects.get(description='Closed')
-            contract.status = closed_status
-            contract.date_closed = timezone.now()
-            contract.closed_by = request.user
-            contract.save()
+            from_status = contract.status
+            if from_status_id := getattr(from_status, 'pk', None):
+                if from_status_id == closed_status.pk:
+                    messages.info(request, f'Contract {contract.contract_number} is already closed.')
+                    return redirect('contracts:contract_close', pk=contract.pk)
+            with transaction.atomic():
+                contract.status = closed_status
+                contract.date_closed = timezone.now()
+                contract.closed_by = request.user
+                contract.save()
+                ContractStatusHistory.objects.create(
+                    contract=contract,
+                    from_status=from_status,
+                    to_status=closed_status,
+                    changed_by=request.user,
+                    reason='',
+                )
             messages.success(request, f'Contract {contract.contract_number} has been closed.')
             return redirect('contracts:contract_close', pk=contract.pk)
         except ContractStatus.DoesNotExist:
@@ -280,14 +309,32 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, DetailView):
             cancel_reason = CanceledReason.objects.get(id=reason_id)
             cancelled_status = ContractStatus.objects.get(description='Canceled')
 
-            contract.status = cancelled_status
-            contract.date_canceled = timezone.now()
-            contract.cancelled_by = request.user
-            contract.canceled_reason = cancel_reason
-            contract.save()
+            from_status = contract.status
+            if getattr(from_status, 'pk', None) == cancelled_status.pk:
+                messages.info(request, f'Contract {contract.contract_number} is already canceled.')
+                return redirect('contracts:contract_cancel', pk=contract.pk)
+
+            note_text = request.POST.get('cancelNote', '').strip()
+            reason_parts = [cancel_reason.description]
+            if note_text:
+                reason_parts.append(note_text)
+            history_reason = ' — '.join(reason_parts)
+
+            with transaction.atomic():
+                contract.status = cancelled_status
+                contract.date_canceled = timezone.now()
+                contract.cancelled_by = request.user
+                contract.canceled_reason = cancel_reason
+                contract.save()
+                ContractStatusHistory.objects.create(
+                    contract=contract,
+                    from_status=from_status,
+                    to_status=cancelled_status,
+                    changed_by=request.user,
+                    reason=history_reason,
+                )
 
             # Always create an audit note; append optional user note if provided
-            note_text = request.POST.get('cancelNote', '').strip()
             full_note = f"Contract cancelled — Reason: {cancel_reason.description}"
             if note_text:
                 full_note += f"\nNote: {note_text}"
@@ -315,6 +362,77 @@ class ContractCancelView(ActiveCompanyQuerysetMixin, DetailView):
             logger.error(f"Error cancelling contract {contract.pk}: {str(e)}")
             messages.error(request, f'An error occurred: {str(e)}')
             return redirect('contracts:contract_cancel', pk=contract.pk)
+
+
+@conditional_login_required
+def contract_reopen_view(request, pk):
+    company = getattr(request, 'active_company', None)
+    if not company:
+        raise PermissionDenied('No active company set')
+
+    contract = get_object_or_404(
+        Contract.objects.select_related('idiq_contract', 'status', 'company'),
+        pk=pk,
+        company=company,
+    )
+
+    status_desc = (contract.status.description or '').strip() if contract.status else ''
+    if status_desc not in ('Closed', 'Canceled'):
+        messages.error(request, 'Only Closed or Canceled contracts can be re-opened.')
+        return redirect('contracts:contract_management', pk=contract.pk)
+
+    clins = contract.clin_set.select_related('supplier', 'clin_type').order_by('item_number')
+    clin_count = clins.count()
+
+    if request.method == 'POST':
+        reason = (request.POST.get('reopenReason') or '').strip()
+        if not reason:
+            messages.error(request, 'A reason is required to re-open a contract.')
+            return render(
+                request,
+                'contracts/contract_reopen.html',
+                {
+                    'contract': contract,
+                    'clins': clins,
+                    'clin_count': clin_count,
+                    'submitted_reason': (request.POST.get('reopenReason') or ''),
+                },
+            )
+
+        open_status = ContractStatus.objects.get(description='Open')
+        from_status = contract.status
+
+        with transaction.atomic():
+            ContractStatusHistory.objects.create(
+                contract=contract,
+                from_status=from_status,
+                to_status=open_status,
+                changed_by=request.user,
+                reason=reason,
+            )
+            contract.status = open_status
+            contract.closed_by = None
+            contract.date_closed = None
+            contract.cancelled_by = None
+            contract.date_canceled = None
+            contract.canceled_reason = None
+            contract.save()
+
+        messages.success(
+            request,
+            f'Contract {contract.contract_number} has been re-opened.',
+        )
+        return redirect('contracts:contract_management', pk=contract.pk)
+
+    return render(
+        request,
+        'contracts/contract_reopen.html',
+        {
+            'contract': contract,
+            'clins': clins,
+            'clin_count': clin_count,
+        },
+    )
 
 
 @conditional_login_required

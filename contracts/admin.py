@@ -9,6 +9,7 @@ from .models import (
     Contract,
     ContractFinanceLine,
     ContractStatus,
+    ContractStatusHistory,
     ContractType,
     FinanceLinePayment,
     FinanceLineType,
@@ -69,6 +70,14 @@ class ClinTypeAdmin(admin.ModelAdmin):
 class ContractStatusAdmin(admin.ModelAdmin):
     list_display = ('id', 'description')
     search_fields = ('description',)
+
+
+@admin.register(ContractStatusHistory)
+class ContractStatusHistoryAdmin(admin.ModelAdmin):
+    list_display = ('contract', 'from_status', 'to_status', 'changed_by', 'changed_at')
+    list_filter = ('to_status',)
+    search_fields = ('contract__contract_number',)
+    readonly_fields = ('id', 'contract', 'from_status', 'to_status', 'changed_by', 'changed_at', 'reason')
 
 
 @admin.register(ContractType)

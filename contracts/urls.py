@@ -22,6 +22,7 @@ from .views import (
     ContractCloseView,
     ContractCancelView,
     ContractReviewView,
+    contract_reopen_view,
     contract_search,
     mark_contract_reviewed,
     toggle_contract_field,
@@ -258,6 +259,7 @@ urlpatterns = [
     path("<int:pk>/detail/", ContractDetailView.as_view(), name="contract_detail"),
     path("<int:pk>/close/", ContractCloseView.as_view(), name="contract_close"),
     path("<int:pk>/cancel/", ContractCancelView.as_view(), name="contract_cancel"),
+    path("<int:pk>/reopen/", contract_reopen_view, name="contract_reopen"),
     path("<int:pk>/review/", ContractReviewView.as_view(), name="contract_review"),
     path(
         "<int:pk>/mark-reviewed/", mark_contract_reviewed, name="mark_contract_reviewed"

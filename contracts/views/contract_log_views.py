@@ -105,8 +105,8 @@ class ContractLogView(ListView):
                     Q(contract__status__description='Closed') &
                     Q(contract__date_closed__isnull=False)
                 )
-            elif status_filter == 'cancelled':
-                clins = clins.filter(contract__status__description='Cancelled')
+            elif status_filter in ('canceled', 'cancelled'):
+                clins = clins.filter(contract__status__description='Canceled')
         
         if supplier_filter:
             # Get all contract IDs that have any CLIN with the specified supplier
@@ -238,8 +238,8 @@ def export_contract_log(request):
                 Q(contract__status__description='Closed') &
                 Q(contract__date_closed__isnull=False)
             )
-        elif status_filter == 'cancelled':
-            clins = clins.filter(contract__status__description='Cancelled')
+        elif status_filter in ('canceled', 'cancelled'):
+            clins = clins.filter(contract__status__description='Canceled')
     
     if supplier_filter:
         filters_applied['supplier'] = supplier_filter
@@ -281,7 +281,7 @@ def export_contract_log(request):
             seen_contracts.add(clin.contract_id)
         
         # Map first column to single-letter status like Master Log (O/C/X)
-        if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Cancelled':
+        if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Canceled':
             first_col_status = 'X'
         elif clin.contract and clin.contract.date_closed:
             first_col_status = 'C'
@@ -430,8 +430,8 @@ def export_contract_log_xlsx(request):
                 Q(contract__status__description='Closed') &
                 Q(contract__date_closed__isnull=False)
             )
-        elif status_filter == 'cancelled':
-            clins = clins.filter(contract__status__description='Cancelled')
+        elif status_filter in ('canceled', 'cancelled'):
+            clins = clins.filter(contract__status__description='Canceled')
 
     if supplier_filter:
         contract_ids = Clin.objects.filter(
@@ -505,7 +505,7 @@ def export_contract_log_xlsx(request):
             )
 
         # Derived status char
-        if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Cancelled':
+        if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Canceled':
             status_char = 'X'
         elif clin.contract and clin.contract.date_closed:
             status_char = 'C'

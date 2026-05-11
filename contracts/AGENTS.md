@@ -46,6 +46,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 ## 3. Read This Before Editing
 
 ### Before changing models
+- **`ContractStatusHistory`:** append-only audit of `Contract.status` changes. Do not assign `Contract.status` in application code without creating a matching `ContractStatusHistory` row in the **same** `transaction.atomic()` block as the save. Close, cancel, and re-open views are the primary mutators; ad-hoc status flips elsewhere are a footgun. **Phase 2 (not started):** legacy fields `closed_by`, `cancelled_by`, `date_closed`, `date_canceled`, and `canceled_reason` are scheduled for removal after production verification — do not delete them in unrelated tasks.
 - `contracts/models.py` — understand `on_delete` choices; `Company` uses `PROTECT` and `Nsn` uses `PROTECT`, meaning deletion will hard-fail if children exist
 - `contracts/migrations/` — check the latest migration before adding fields; 37+ migrations exist with compound indexes
 - `transactions` app signals — signals in `transactions/` fire on `Contract`, `Clin`, `ClinShipment` (tracked `pod_date`), and `Supplier` post/pre_save; renaming tracked fields will silently break the audit trail
@@ -230,7 +231,7 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - `contracts/templates/contracts/documents_browser.html` — `legacyPathDetected` JS flag persists across the two-API-call init flow; both warning banners (`legacy_detected`, `fell_back_to_root`) are appended to `#alert-banner`. Saving the path via `setCurrentPath()` clears the legacy flag.
 - `SHAREPOINT_PATH_PREFIX` setting defines the global canonical root when `Company.sharepoint_documents_path` is unset. `get_contract_documents_root()` in `sharepoint_service.py` remains the documents-root helper for browser config and legacy path normalization.
 - When the path naming convention changes, update `Contract.get_sharepoint_relative_path()` (and IDIQ helpers in `sharepoint_paths.py` if IDIQ parent folders change). Validation is prefix-based and stays the same.
-- Contract field for stored folder path is `files_url` (NOT `file_url`). Status values that trigger the Closed Contracts segment: `Closed`, `Cancelled` (double-L).
+- Contract field for stored folder path is `files_url` (NOT `file_url`). Status values that trigger the Closed Contracts segment: `Closed`, `Canceled` (canonical `ContractStatus.description` spelling, one L).
 
 ### Notes popup window
 - `contracts/views/note_views.py` — `notes_popup`, `notes_popup_tab`, `note_detail_json` views
@@ -385,7 +386,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 ## Recent fixes
 
-- **Contract search spelling bug fixed:** `contract_search` view was filtering on `'Cancelled'` (2 L) which did not match the `ContractStatus` DB record `'Canceled'` (1 L). Fixed. `dashboard_views.py` still uses 2-L spelling in some places — that is a separate known inconsistency not in scope here.
+- **Contract search spelling bug fixed:** `contract_search` view was filtering on `'Cancelled'` (2 L) which did not match the `ContractStatus` DB record `'Canceled'` (1 L). Fixed. Dashboard and contract log filters now use `'Canceled'` for `status__description` comparisons; treat any remaining `'Cancelled'` literal against `ContractStatus.description` as a bug.
 
 ---
 
