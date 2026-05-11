@@ -187,6 +187,7 @@ field does not already exist there.
 - `upload_csv` runs inside `transaction.atomic()` — a large CSV upload holds a transaction open for its entire parse duration. This is a known performance trade-off, not a bug.
 - There are no `post_save` or `pre_delete` signals on any model in this app.
 - No management commands exist in this app.
+- **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 17.
 
 ---
 

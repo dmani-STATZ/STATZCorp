@@ -159,6 +159,7 @@ The admin queue is a 4-step wizard. All logic is in `window._w` (an object expos
 
 ## 11. Background Tasks / Automation
 No Celery/tasks in this app. AI calls are synchronous HTTP requests.
+- **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
 
 ## 12. Testing Expectations
 Manual verification after changes:
@@ -194,3 +195,32 @@ Manual verification after changes:
 | URL routing | `reports/urls.py` |
 | Admin registry | `reports/admin.py` |
 | User nav coupling | `templates/base_template.html` (`reports:hub`) |
+
+## 16. Release Notes (Changelog) Rules
+
+Product release notes are file-based. The markdown files are the **source of truth** (the DB is just a cache). When generating a release note, you MUST adhere to these strict validation rules, or the system will skip the file on deployment.
+
+- **File Path & Naming:** `release_notes/YYYY-MM-DD-short-slug.md`
+- **Body:** Must be valid Markdown and non-empty. 
+- **Frontmatter (Required):** You must include a YAML frontmatter block exactly like this:
+
+```yaml
+---
+id: 2026-05-11-short-slug      # CRITICAL: Must exactly match the filename stem (without .md)
+title: Human-readable title
+published: false               # Always default to false on dev branches; set true when ready to ship
+publish_date: 2026-05-11       # Must be an ISO date
+tags: [improved, contracts]    # CRITICAL: Must be a list of EXACTLY TWO strings (see taxonomy below)
+critical: false                # Must be a boolean
+---
+
+```
+
+**Strict Tag Taxonomy:**
+The `tags` array will fail validation if it does not contain exactly two items:
+
+1. **One Change Type:** `new`, `improved`, `fixed`, OR `breaking`
+2. **One Area:** `contracts`, `finance`, `sales`, `training`, OR `system`
+*(Do not invent new tags. Unknown tags cause the file to be skipped.)*
+
+```

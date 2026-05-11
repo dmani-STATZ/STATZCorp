@@ -191,6 +191,34 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 | **Riskiest edits** | Renaming URL names, changing `_parse_page_ranges`, upgrading `pypdf`, modifying upload limits |
 | **Biggest blind spot** | No automated tests; all verification is manual |
 
+## 16. Release Notes (Changelog) Rules
+
+Product release notes are file-based. The markdown files are the **source of truth** (the DB is just a cache). When generating a release note, you MUST adhere to these strict validation rules, or the system will skip the file on deployment.
+
+- **File Path & Naming:** `release_notes/YYYY-MM-DD-short-slug.md`
+- **Body:** Must be valid Markdown and non-empty. 
+- **Frontmatter (Required):** You must include a YAML frontmatter block exactly like this:
+
+```yaml
+---
+id: 2026-05-11-short-slug      # CRITICAL: Must exactly match the filename stem (without .md)
+title: Human-readable title
+published: false               # Always default to false on dev branches; set true when ready to ship
+publish_date: 2026-05-11       # Must be an ISO date
+tags: [improved, contracts]    # CRITICAL: Must be a list of EXACTLY TWO strings (see taxonomy below)
+critical: false                # Must be a boolean
+---
+
+```
+
+**Strict Tag Taxonomy:**
+The `tags` array will fail validation if it does not contain exactly two items:
+
+1. **One Change Type:** `new`, `improved`, `fixed`, OR `breaking`
+2. **One Area:** `contracts`, `finance`, `sales`, `training`, OR `system`
+*(Do not invent new tags. Unknown tags cause the file to be skipped.)*
+
+```
 
 ## CSS / Styling Rules
 

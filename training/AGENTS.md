@@ -166,6 +166,7 @@ grep -r "training:" --include="*.html" --include="*.py" .
 - **No management commands with business logic** — the `management/` directory contains only `__pycache__` (no command files).
 - PDF exports run synchronously in `training_audit_export` and `arctic_wolf_audit_export`. Heavy load will block the request thread.
 - AW `.eml` files are generated in-memory via `render_to_string` and the stdlib `email` module — no external mail sending occurs.
+- **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
 
 ---
 

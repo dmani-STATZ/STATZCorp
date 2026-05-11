@@ -195,6 +195,7 @@ None. There are no signals, Celery tasks, periodic jobs, or management commands 
 
 Note: `contracts/management/commands/refresh_nsn_view.py` is in the `contracts` app but touches the `contracts_nsn` table. Inspect it before any schema change.
 
+- **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
 ---
 
 ## 12. Testing and Verification Expectations

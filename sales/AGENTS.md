@@ -267,6 +267,8 @@ Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress 
 
 **DIBBS fetch** (`import_fetch_dibbs`) requires Playwright + Chromium. If not installed, it will raise `DibbsFetchError`. The awards scraper has the same Playwright dependency.
 
+- **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
+
 ---
 
 ## 12. Testing and Verification Expectations

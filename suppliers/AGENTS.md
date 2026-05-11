@@ -174,6 +174,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - `transactions/signals.py` imports `Supplier` — changes to `Supplier` may affect signal handlers defined outside this app. Check `transactions/signals.py` before renaming or removing `Supplier` fields.
 - All OpenRouter calls are synchronous in-request — timeouts in `fetch_website_html` (default 10s) block the HTTP response.
 - `utils.scrape_supplier_site` is not wired to any view or URL. It runs only when manually invoked.
+- **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
 
 ---
 
