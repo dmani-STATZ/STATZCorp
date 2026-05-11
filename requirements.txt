@@ -53,3 +53,7 @@ cryptography==46.0.6
 pyOpenSSL==26.0.0
 
 tqdm==4.67.1
+
+# Release notes (YAML + markdown import / rendering)
+python-frontmatter==1.1.0
+markdown==3.7

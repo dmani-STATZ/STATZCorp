@@ -103,6 +103,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "STATZWeb.middleware.LoginRequiredMiddleware",
+    "STATZWeb.middleware.ReleaseNoteGateMiddleware",
 ]
 
 if IS_PRODUCTION:
@@ -145,6 +146,7 @@ TEMPLATES = [
                 "STATZWeb.context_processors.cache_version_context",
                 "sales.context_processors.rfq_counts",
                 "sales.context_processors.solicitation_nav_tools",
+                "users.context_processors.release_notes_context",
             ],
         },
     },

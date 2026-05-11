@@ -16,6 +16,7 @@ The `users` app is the **central identity, authentication, permissions, and work
 - Company-user membership bridge (`UserCompanyMembership`)
 - User settings framework (`UserSetting` / `UserSettingState` / `UserSettings` helper)
 - System notifications (`SystemMessage`)
+- Release notes (`ReleaseNote`, `ReleaseNoteAcknowledgement`) and the `import_release_notes` command
 - Portal dashboard APIs (sections, resources, events, tasks, micro-breaks)
 - Calendar and scheduling models (events, recurrences, attendance, NLP scheduling)
 - Two middleware classes (`LoginRequiredMiddleware`, `ActiveCompanyMiddleware`)
@@ -143,6 +144,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 ## 8. Model and Schema Change Rules
 
+- **Release notes:** Never delete `ReleaseNote` rows automatically — they are referenced by audit `ReleaseNoteAcknowledgement` rows. Never invalidate acknowledgements when note markdown is edited; the ack is tied to `note_id`, not a content snapshot. Keep `import_release_notes` fail-soft (log errors, exit 0). The tag taxonomy in `users/release_notes/constants.py` (`CHANGE_TYPES`, `AREAS`) is authoritative; adding a value requires updating import validation and the badge styling in `templates/_release_notes_modal.html` / `templates/whats_new.html`.
 - **Search repo-wide before renaming any field on `AppPermission`, `AppRegistry`, `UserCompanyMembership`, `UserSetting`, or `UserSettingState`.** These are referenced in middleware, context processors, admin, views, and other apps.
 - **Before renaming `UserCompanyMembership` fields**, check `contracts/views/company_views.py`, `contracts/forms.py`, `users/middleware.py`, and `users/context_processors.py`.
 - **`AppPermission.app_name` is a FK to `AppRegistry`**, not a `CharField`. Any query using `.app_name` must account for the related object traversal.

@@ -1445,3 +1445,31 @@
 .shadow-sm  { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 .ring-1     { box-shadow: 0 0 0 1px; }
 .ring-inset { box-shadow: inset 0 0 0 1px; }
+
+/* Release notes modal / archive */
+.letter-spacing-wide { letter-spacing: 0.08em; }
+.text-white-75 { color: rgba(255, 255, 255, 0.85) !important; }
+.release-notes-modal-header {
+  background: linear-gradient(
+    125deg,
+    var(--company-primary, #0d6efd) 0%,
+    #152238 100%
+  );
+}
+.whats-new-nav-link:hover {
+  text-decoration: underline !important;
+  opacity: 1 !important;
+}
+.release-notes-md h1,
+.release-notes-md h2,
+.release-notes-md h3 {
+  font-size: 1.1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.release-notes-md p {
+  margin-bottom: 0.65rem;
+}
+[data-bs-theme="dark"] .release-note-card {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}

@@ -295,7 +295,9 @@ class Clin(AuditModel):
         ('G', 'GFAT'),
         ('C', 'CFAT'),
         ('L', 'PLT'),
-        ('M', 'Miscellaneous')
+        ('M', 'Miscellaneous'),
+        ('Q', 'QN'),
+        ('D', 'PQDR'),
     ]
 
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE, null=True, blank=True)

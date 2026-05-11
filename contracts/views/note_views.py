@@ -259,8 +259,13 @@ def delete_note(request, note_id):
 def note_update(request, pk):
     note = get_object_or_404(Note.objects.select_related('created_by', 'assigned_to'), id=pk)
 
-    # Permission: creator or assignee only (no staff bypass)
-    if note.created_by != request.user and note.assigned_to != request.user:
+    # Permission: creator, assignee, or reminder_user on an attached reminder (no staff bypass)
+    is_reminder_user = note.note_reminders.filter(reminder_user=request.user).exists()
+    if (
+        note.created_by != request.user
+        and note.assigned_to != request.user
+        and not is_reminder_user
+    ):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse(
                 {'success': False, 'error': 'You do not have permission to edit this note.'},
@@ -355,7 +360,12 @@ def note_detail_json(request, pk):
             'reminder_user_id': reminder.reminder_user_id,
         }
 
-    can_edit = (note.created_by == request.user or note.assigned_to == request.user)
+    is_reminder_user = note.note_reminders.filter(reminder_user=request.user).exists()
+    can_edit = (
+        note.created_by == request.user
+        or note.assigned_to == request.user
+        or is_reminder_user
+    )
     can_manage_reminder = can_edit
 
     return JsonResponse({

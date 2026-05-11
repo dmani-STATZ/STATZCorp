@@ -73,6 +73,14 @@ Run repo-wide search before any of these changes:
 - URL/API changes:
 - `urls.py` + callers in templates + inline/static JS.
 - Special case: `transactions/templates/transactions/transaction_modal.html` uses hardcoded `/transactions/...` paths.
+- Release notes / acknowledgement changes:
+  - `users/models.py` (`ReleaseNote`, `ReleaseNoteAcknowledgement`) + migration
+  - `users/management/commands/import_release_notes.py`
+  - `STATZWeb/middleware.py` (`ReleaseNoteGateMiddleware`)
+  - `users/context_processors.py` + settings registration
+  - `templates/base_template.html` + `templates/_release_notes_modal.html` + `templates/whats_new.html`
+  - `release_notes/*.md` content files
+  - `startup.sh` import hook
 - Export flow changes:
 - export view/service + template triggers + downstream consumers of filenames/columns.
 - SharePoint document browser path handling:

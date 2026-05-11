@@ -1,5 +1,6 @@
-from users.user_settings import UserSettings
 import time
+
+from users.user_settings import UserSettings
 from .models import SystemMessage, UserCompanyMembership
 from contracts.models import Company
 from suppliers.openrouter_config import get_openrouter_model_info
@@ -61,4 +62,13 @@ def active_company(request):
     return {
         'active_company': company,
         'available_companies': companies,
+    }
+
+
+def release_notes_context(request):
+    """Expose unacknowledged release notes to all templates."""
+    notes = getattr(request, "unacknowledged_release_notes", [])
+    return {
+        "unacknowledged_release_notes": notes,
+        "unacknowledged_release_note_ids": [n.note_id for n in notes],
     }

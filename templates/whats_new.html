@@ -1,0 +1,123 @@
+{% extends "base_template.html" %}
+{% load release_notes_extras %}
+
+{% block extra_head %}
+<style>
+  .whats-new-hero {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.08) 0%, rgba(13, 202, 240, 0.06) 100%);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+  }
+  [data-bs-theme="dark"] .whats-new-hero {
+    background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+  }
+  .whats-new-card {
+    border-radius: 0.75rem;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .whats-new-card:hover {
+    box-shadow: 0 0.35rem 1.25rem rgba(0, 0, 0, 0.06);
+  }
+  [data-bs-theme="dark"] .whats-new-card:hover {
+    box-shadow: 0 0.35rem 1.25rem rgba(0, 0, 0, 0.25);
+  }
+  .rn-md ul { padding-left: 1.25rem; }
+  .rn-md p:last-child { margin-bottom: 0; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container py-4 py-md-5">
+  <div class="whats-new-hero px-4 py-4 mb-4">
+    <div class="row align-items-end g-3">
+      <div class="col-lg-8">
+        <p class="text-uppercase small text-body-secondary letter-spacing-wide mb-2">Release archive</p>
+        <h1 class="h2 fw-semibold mb-2">What&rsquo;s new</h1>
+        <p class="text-body-secondary mb-0 lead fs-6">Browse product changes since you joined. Filter by area or type, or search the full text.</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="get" action="{% url 'whats_new' %}" class="card border shadow-sm mb-4">
+    <div class="card-body py-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label for="id_type" class="form-label small text-body-secondary mb-1">Change type</label>
+          <select name="type" id="id_type" class="form-select form-select-sm">
+            <option value="">All types</option>
+            {% for t in change_types %}
+            <option value="{{ t }}" {% if filter_type == t %}selected{% endif %}>{{ t|capfirst }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="id_area" class="form-label small text-body-secondary mb-1">Area</label>
+          <select name="area" id="id_area" class="form-select form-select-sm">
+            <option value="">All areas</option>
+            {% for a in areas %}
+            <option value="{{ a }}" {% if filter_area == a %}selected{% endif %}>{{ a|capfirst }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="id_q" class="form-label small text-body-secondary mb-1">Search</label>
+          <input type="search" name="q" id="id_q" class="form-control form-control-sm" value="{{ search_q }}" placeholder="Title or body…" autocomplete="off">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  {% if not release_notes %}
+  <div class="text-center py-5 px-3">
+    <div class="mb-3 text-body-secondary">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="opacity-50" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.25" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    </div>
+    <h2 class="h5 fw-semibold">No release notes match your filters</h2>
+    <p class="text-body-secondary mb-3">Try widening your search or reset the filters to see everything.</p>
+    <a href="{% url 'whats_new' %}" class="btn btn-outline-brand btn-sm">Clear filters</a>
+  </div>
+  {% else %}
+  <div class="vstack gap-4">
+    {% for note in release_notes %}
+    <article class="card whats-new-card border shadow-sm">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+          <h2 class="h5 fw-semibold mb-0">{{ note.title }}</h2>
+          <time class="small text-body-secondary text-nowrap" datetime="{{ note.publish_date|date:'c' }}">{{ note.publish_date|date:"M j, Y" }}</time>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3 small">
+          {% if note.change_type == 'new' %}
+            <span class="badge text-bg-primary">New</span>
+          {% elif note.change_type == 'improved' %}
+            <span class="badge text-bg-info text-dark">Improved</span>
+          {% elif note.change_type == 'fixed' %}
+            <span class="badge text-bg-success">Fixed</span>
+          {% elif note.change_type == 'breaking' %}
+            <span class="badge text-bg-danger">Breaking</span>
+          {% else %}
+            <span class="badge text-bg-secondary">{{ note.change_type }}</span>
+          {% endif %}
+          <span class="badge text-bg-secondary text-capitalize">{{ note.area }}</span>
+        </div>
+        <div class="rn-md text-body mb-3">
+          {{ note.body_markdown|render_markdown }}
+        </div>
+        <div class="border-top pt-3 small">
+          {% if note.is_acknowledged_by_user and note.user_acknowledged_at %}
+            <span class="text-success"><span class="fw-medium">Acknowledged</span> on {{ note.user_acknowledged_at|date:"Y-m-d" }}</span>
+          {% else %}
+            <span class="text-body-secondary">Not yet acknowledged</span>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock body %}

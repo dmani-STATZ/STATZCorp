@@ -124,6 +124,7 @@
                 {{ unread_messages_count }}
             </span>
         </a>
+        <a href="{% url 'whats_new' %}" class="text-white text-decoration-none small fw-medium opacity-90 whats-new-nav-link" title="Release notes archive">What&rsquo;s new</a>
         {% endif %}
         <!-- Company Selector -->
         {% if active_company %}
@@ -714,5 +715,8 @@
     updateUnreadMessageCount();
     </script>
     {% endblock %}
+    {% if unacknowledged_release_notes %}
+      {% include "_release_notes_modal.html" %}
+    {% endif %}
 </body>
 </html>

@@ -26,5 +26,8 @@ $PYTHON_EXE manage.py set_build_info --auto || true
 echo "[startup] Collecting static files"
 $PYTHON_EXE manage.py collectstatic --noinput || true
 
+echo "[startup] Importing release notes"
+$PYTHON_EXE manage.py import_release_notes || echo "import_release_notes failed; continuing startup"
+
 echo "[startup] Starting Gunicorn"
 gunicorn STATZWeb.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 4 --timeout 120

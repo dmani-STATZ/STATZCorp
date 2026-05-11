@@ -118,6 +118,7 @@ urlpatterns = [
     path("about/", views.about, name="about"),
     path("permission_denied/", user_views.permission_denied, name="permission_denied"),
     path("users/", include("users.urls")),
+    path("whats-new/", user_views.whats_new, name="whats_new"),
     # Microsoft Authentication URLs (at root level for OAuth callbacks)
     path("microsoft/login/", MicrosoftAuthView.as_view(), name="microsoft_login"),
     path(

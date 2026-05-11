@@ -741,3 +741,63 @@ class SystemMessage(models.Model):
             message=message,
             **kwargs
         )
+
+
+class ReleaseNote(models.Model):
+    """
+    A single release note imported from release_notes/<id>.md.
+    Source of truth is the file; DB is a cache for query/display.
+    """
+
+    note_id = models.CharField(max_length=255, unique=True, db_index=True)
+    title = models.CharField(max_length=255)
+    body_markdown = models.TextField()
+    publish_date = models.DateField(db_index=True)
+    change_type = models.CharField(max_length=20)
+    area = models.CharField(max_length=20)
+    critical = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-publish_date", "-note_id"]
+        indexes = [
+            models.Index(fields=["publish_date", "note_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.publish_date} {self.title}"
+
+
+class ReleaseNoteAcknowledgement(models.Model):
+    """
+    Audit row: one per (user, release_note) acknowledgement event.
+    Never updated, never deleted in normal flow.
+    """
+
+    user = models.ForeignKey(
+        "auth.User",
+        on_delete=models.CASCADE,
+        related_name="release_note_acks",
+    )
+    release_note = models.ForeignKey(
+        ReleaseNote,
+        on_delete=models.CASCADE,
+        related_name="acknowledgements",
+    )
+    acknowledged_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "release_note"],
+                name="uniq_user_release_note_ack",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "acknowledged_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user} ack'd {self.release_note.note_id}"

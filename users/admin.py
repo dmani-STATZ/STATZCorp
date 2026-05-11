@@ -10,6 +10,8 @@ from .models import (
     NaturalLanguageScheduleRequest,
     PortalResource,
     PortalSection,
+    ReleaseNote,
+    ReleaseNoteAcknowledgement,
     ScheduledMicroBreak,
     UserCompanyMembership,
     WorkCalendarEvent,
@@ -275,6 +277,40 @@ class ScheduledMicroBreakAdmin(admin.ModelAdmin):
 admin.site.register(AppPermission, AppPermissionAdmin)
 admin.site.register(Announcement)
 admin.site.register(AppRegistry)
+
+
+@admin.register(ReleaseNote)
+class ReleaseNoteAdmin(admin.ModelAdmin):
+    list_display = (
+        "note_id",
+        "title",
+        "publish_date",
+        "change_type",
+        "area",
+        "critical",
+        "updated_at",
+    )
+    search_fields = ("note_id", "title", "body_markdown")
+    list_filter = ("change_type", "area", "critical", "publish_date")
+    ordering = ("-publish_date", "-note_id")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ReleaseNoteAcknowledgement)
+class ReleaseNoteAcknowledgementAdmin(admin.ModelAdmin):
+    list_display = ("user", "release_note", "acknowledged_at", "ip_address")
+    search_fields = ("user__username", "release_note__note_id")
+    autocomplete_fields = ("user", "release_note")
+    readonly_fields = ("user", "release_note", "acknowledged_at", "ip_address")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(UserCompanyMembership)

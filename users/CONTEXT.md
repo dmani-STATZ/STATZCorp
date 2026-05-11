@@ -80,6 +80,14 @@ ame, setting_type, default_value) and the per-user value+type conversions (boole
 - UserOAuthToken: Stores Microsoft ccess_token/
 efresh_token/expires_at per user; is_expired and refresh helpers keep the token valid for API calls.
 - SystemMessage: Per-user notifications with priority, source metadata (source_app/model/id), ction_url, and helper methods like mark_as_read()/get_unread_count() consumed by the system_messages UI.
+- ReleaseNote: Imported from `release_notes/<id>.md` via `import_release_notes`; stores `note_id`, title, markdown body, `publish_date`, `change_type`, `area`, and `critical` (reserved flag). Canonical content lives in repo files; the DB is the query cache.
+- ReleaseNoteAcknowledgement: One audit row per (user, `ReleaseNote`) when the user confirms the blocking modal; fields include `acknowledged_at` and nullable `ip_address`. Never invalidated when note content is updated.
+
+### Release notes pipeline
+- **Import:** `users/management/commands/import_release_notes.py` scans `release_notes/*.md` (under `settings.BASE_DIR`), validates YAML frontmatter and tag taxonomy (`users/release_notes/constants.py`), and upserts `ReleaseNote` rows. Fail-soft: warnings and summary counts; exit code 0 always.
+- **Middleware:** `STATZWeb.middleware.ReleaseNoteGateMiddleware` runs immediately after `LoginRequiredMiddleware`, sets `request.unacknowledged_release_notes` to notes with `publish_date >= user.date_joined` minus rows the user has acknowledged, except on public/static/AJAX-only requests (see middleware docstring).
+- **UI:** `users.context_processors.release_notes_context` exposes notes to templates. `templates/base_template.html` includes `templates/_release_notes_modal.html` when the list is non-empty. Archive and filters live at `/whats-new/` (`whats_new` URL name, `users.views.whats_new`).
+- **Ack POST:** `/users/release-notes/acknowledge/` (`users:release_notes_acknowledge`) accepts JSON `note_ids` and uses `get_or_create` on `ReleaseNoteAcknowledgement` inside `transaction.atomic`.
 
 ## 6. Request / User Flow
 - **Authentication:** /users/login/ shows Microsoft + password tabs (iews.login_view). The Microsoft flow starts in ms_views.MicrosoftAuthView, runs through zure_auth.MicrosoftAuthBackend, stores tokens in UserOAuthToken, and finishes in MicrosoftCallbackView. Password login uses AdminLoginForm and uthenticate(). /users/register/ simply redirects users to Microsoft. /users/logout/ is the Django auth LogoutView.

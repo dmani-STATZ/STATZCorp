@@ -47,7 +47,7 @@
                                     </span>
                                 </button>
                             {% endif %}
-                            {% if request.user == note.created_by or request.user == note.assigned_to %}
+                            {% if request.user == note.created_by or request.user == note.assigned_to or note.current_user_has_reminder %}
                                 <button type="button"
                                         class="btn btn-sm btn-link text-primary p-0 js-edit-note-btn"
                                         data-note-action="edit"

@@ -192,7 +192,7 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 ### `users` — Auth & Access Control
 **Purpose:** Azure AD + password auth; app access registry; user portal; company membership; user settings; calendar sync.
 
-**Owns:** `AppRegistry`, `AppPermission`, `UserSettings`, `UserOAuthToken`, `UserCompanyMembership`, `PortalSection`, `WorkCalendarEvent`
+**Owns:** `AppRegistry`, `AppPermission`, `UserSettings`, `UserOAuthToken`, `UserCompanyMembership`, `PortalSection`, `WorkCalendarEvent`, `ReleaseNote`, `ReleaseNoteAcknowledgement`
 
 **Consumes from other apps:**
 - `contracts.Company` — company membership and active-company state
@@ -202,8 +202,21 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 
 **URL prefix:** `/users/`
 
+#### Release Notes & Acknowledgement
+
+Author-written release notes live in `release_notes/*.md` as YAML-frontmatter +
+markdown files. The `import_release_notes` management command (run from
+`startup.sh` on deploy) reconciles them into `ReleaseNote` rows. Per-user
+acknowledgements are recorded in `ReleaseNoteAcknowledgement` with timestamp
+and IP. `ReleaseNoteGateMiddleware` (in `STATZWeb/middleware.py`) attaches
+unacknowledged notes to every authenticated request; `base_template.html`
+renders a blocking modal when any exist. Users can browse the archive at
+`/whats-new/`. New users only see notes with `publish_date >= date_joined`.
+File format and validation rules are in `release_notes/README.md`.
+
 **Shared infrastructure provided to the whole project:**
 - `STATZWeb/middleware.py` `LoginRequiredMiddleware` — enforces auth globally; respects `settings.REQUIRE_LOGIN`
+- `STATZWeb/middleware.py` `ReleaseNoteGateMiddleware` — sets `request.unacknowledged_release_notes` for the release-notes modal
 - `users/middleware.py` — injects `request.active_company` on every request
 - `users/context_processors.py` — injects `user_preferences`, `active_company`, `system_messages`
 - `contracts/context_processors.py` — injects reminder sidebar data (scoped by `active_company`)

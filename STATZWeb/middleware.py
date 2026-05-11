@@ -2,10 +2,12 @@
 from django.shortcuts import redirect
 from django.conf import settings
 from django.urls import reverse, resolve
-from users.models import AppPermission, AppRegistry
+from users.models import AppPermission, AppRegistry, ReleaseNote
 import logging
 
 logger = logging.getLogger(__name__)
+
+RELEASE_NOTES_ACK_PATH = "/users/release-notes/acknowledge/"
 
 class LoginRequiredMiddleware:
     def __init__(self, get_response):
@@ -170,4 +172,71 @@ class LoginRequiredMiddleware:
         if '/' in self.public_urls and path == '/':
             return True
                 
+        return False
+
+
+class ReleaseNoteGateMiddleware:
+    """
+    Computes unacknowledged release notes for the current user and exposes them
+    via request.unacknowledged_release_notes (list of ReleaseNote).
+
+    Does NOT block the response — display is handled by base_template.html,
+    which renders a blocking modal when the list is non-empty.
+
+    The list is filtered by:
+      - publish_date >= request.user.date_joined  (new-user gating)
+      - not in ReleaseNoteAcknowledgement for this user
+
+    Skipped for:
+      - unauthenticated requests
+      - public URLs (same allow-list logic as LoginRequiredMiddleware)
+      - AJAX/fetch requests (Accept header lacks text/html OR X-Requested-With=XMLHttpRequest)
+      - static/media/manifest/sw.js paths
+      - the acknowledgement POST endpoint itself
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self._login_public = LoginRequiredMiddleware(lambda r: None)
+
+    def __call__(self, request):
+        request.unacknowledged_release_notes = []
+        try:
+            if self._should_compute(request):
+                user = request.user
+                qs = (
+                    ReleaseNote.objects.filter(publish_date__gte=user.date_joined)
+                    .exclude(acknowledgements__user=user)
+                    .order_by("publish_date")
+                )
+                request.unacknowledged_release_notes = list(qs)
+        except Exception as e:
+            logger.warning("ReleaseNoteGateMiddleware query failed: %s", e, exc_info=True)
+            request.unacknowledged_release_notes = []
+
+        return self.get_response(request)
+
+    def _should_compute(self, request):
+        if not getattr(request, "user", None) or not request.user.is_authenticated:
+            return False
+        path = request.path_info
+        if path == RELEASE_NOTES_ACK_PATH:
+            return False
+        if self._is_static_media_or_sw(path):
+            return False
+        if self._login_public.is_public_url(path):
+            return False
+        if request.META.get("HTTP_X_REQUESTED_WITH") == "XMLHttpRequest":
+            return False
+        accept = (request.META.get("HTTP_ACCEPT") or "").lower()
+        if "text/html" not in accept:
+            return False
+        return True
+
+    @staticmethod
+    def _is_static_media_or_sw(path):
+        if path.startswith("/static/") or path.startswith("/media/"):
+            return True
+        if path.startswith("/manifest.json") or path == "/sw.js" or path.endswith("/sw.js"):
+            return True
         return False

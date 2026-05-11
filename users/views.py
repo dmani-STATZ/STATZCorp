@@ -19,7 +19,7 @@ from .forms import (
 )
 from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
-from STATZWeb.decorators import login_required
+from STATZWeb.decorators import login_required, conditional_login_required
 from django.http import JsonResponse, QueryDict
 from django.contrib.auth.decorators import user_passes_test
 from .models import (
@@ -30,6 +30,8 @@ from .models import (
     NaturalLanguageScheduleRequest,
     PortalResource,
     PortalSection,
+    ReleaseNote,
+    ReleaseNoteAcknowledgement,
     ScheduledMicroBreak,
     SystemMessage,
     UserSetting,
@@ -58,7 +60,7 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Avg, Q
+from django.db.models import Avg, DateTimeField, Exists, OuterRef, Q, Subquery
 from .portal_services import (
     build_portal_context,
     get_visible_sections,
@@ -1622,3 +1624,78 @@ def portal_events_export_csv(request):
             ev.organizer.get_full_name() or ev.organizer.username,
         ])
     return resp
+
+
+def _get_client_ip(request):
+    return request.META.get("REMOTE_ADDR")
+
+
+@conditional_login_required
+@require_POST
+def acknowledge_release_notes(request):
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid json"}, status=400)
+    note_ids = data.get("note_ids")
+    if not isinstance(note_ids, list):
+        return JsonResponse({"error": "note_ids must be a list"}, status=400)
+
+    notes = list(ReleaseNote.objects.filter(note_id__in=note_ids))
+    with transaction.atomic():
+        for note in notes:
+            ReleaseNoteAcknowledgement.objects.get_or_create(
+                user=request.user,
+                release_note=note,
+                defaults={"ip_address": _get_client_ip(request)},
+            )
+    return JsonResponse({"acknowledged": len(notes)})
+
+
+@conditional_login_required
+@require_http_methods(["GET"])
+def whats_new(request):
+    from users.release_notes.constants import AREAS, CHANGE_TYPES
+
+    type_filter = request.GET.get("type") or ""
+    area_filter = request.GET.get("area") or ""
+    q = (request.GET.get("q") or "").strip()
+
+    ack_sub = ReleaseNoteAcknowledgement.objects.filter(
+        user=request.user,
+        release_note_id=OuterRef("pk"),
+    )
+    ack_at_sub = ReleaseNoteAcknowledgement.objects.filter(
+        user=request.user,
+        release_note_id=OuterRef("pk"),
+    ).values("acknowledged_at")[:1]
+
+    notes = (
+        ReleaseNote.objects.filter(publish_date__gte=request.user.date_joined)
+        .annotate(
+            is_acknowledged_by_user=Exists(ack_sub),
+            user_acknowledged_at=Subquery(ack_at_sub, output_field=DateTimeField()),
+        )
+        .order_by("-publish_date", "-note_id")
+    )
+
+    if type_filter in CHANGE_TYPES:
+        notes = notes.filter(change_type=type_filter)
+    if area_filter in AREAS:
+        notes = notes.filter(area=area_filter)
+    if q:
+        notes = notes.filter(Q(title__icontains=q) | Q(body_markdown__icontains=q))
+
+    return render(
+        request,
+        "whats_new.html",
+        {
+            "title": "What's New",
+            "release_notes": notes,
+            "filter_type": type_filter,
+            "filter_area": area_filter,
+            "search_q": q,
+            "change_types": CHANGE_TYPES,
+            "areas": AREAS,
+        },
+    )
