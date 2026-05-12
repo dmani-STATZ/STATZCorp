@@ -673,3 +673,9 @@ html {
     background-color: rgba(255, 138, 128, 0.15);
     color: #FF8A80;
 }
+
+/* DFAS import list / upload / review — full-width content inside contract_base */
+.dfas-import-page main > div.mx-auto {
+    width: 100% !important;
+    max-width: none !important;
+}

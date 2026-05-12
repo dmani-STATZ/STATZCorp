@@ -676,7 +676,20 @@ def finalize_contract(request, process_contract_id):
             modified_by=request.user,
             status=get_default_contract_status()
         )
-        
+
+        # Copy packhouse data captured during processing to ContractPackaging.
+        if process_contract.packhouse_id:
+            from contracts.models import ContractPackaging
+
+            ContractPackaging.objects.create(
+                contract=contract,
+                packhouse=process_contract.packhouse,
+                quote_amount=process_contract.packhouse_quote_amount,
+                notes=process_contract.packhouse_notes,
+                created_by=request.user,
+                modified_by=request.user,
+            )
+
         # Update sequence numbers if necessary
         po_number_current = SequenceNumber.get_po_number()
         tab_number_current = SequenceNumber.get_tab_number()
@@ -1358,6 +1371,21 @@ def finalize_and_email_contract(request, process_contract_id):
             modified_by=request.user
         )
 
+        # Copy packhouse data captured during processing to ContractPackaging.
+        # Only create a ContractPackaging row when a packhouse was assigned —
+        # packhouse is optional and most contracts have none.
+        if process_contract.packhouse_id:
+            from contracts.models import ContractPackaging
+
+            ContractPackaging.objects.create(
+                contract=contract,
+                packhouse=process_contract.packhouse,
+                quote_amount=process_contract.packhouse_quote_amount,
+                notes=process_contract.packhouse_notes,
+                created_by=request.user,
+                modified_by=request.user,
+            )
+
         # Create CLINs and payment history with all relevant fields
         for process_clin in process_clins:
             clin = Clin.objects.create(
@@ -1509,6 +1537,8 @@ def save_contract(request):
             'due_date': 'date',
             'contract_value': Decimal,
             'plan_gross': Decimal,
+            'packhouse_quote_amount': Decimal,
+            'packhouse_notes': str,
             'nist': 'bool',
             'idiq_contract': 'fk',
             'contract_type': 'fk',
@@ -1570,6 +1600,11 @@ def save_contract(request):
 
         if changes_made:
             contract.save()
+            if 'packhouse_quote_amount' in updated_fields:
+                contract.update_calculated_values()
+                updated_fields['cont_plan_gross'] = (
+                    str(contract.plan_gross) if contract.plan_gross is not None else ''
+                )
             return JsonResponse({
                 'success': True,
                 'message': 'Contract saved successfully',

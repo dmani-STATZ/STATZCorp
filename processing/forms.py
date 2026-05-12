@@ -115,12 +115,17 @@ class ProcessContractForm(forms.ModelForm):
             'description',
             'planned_split',
             'plan_gross',
+            'packhouse',
+            'packhouse_quote_amount',
+            'packhouse_notes',
             'status'
         ]
         widgets = {
             'award_date': forms.DateInput(attrs={'type': 'date'}),
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             'description': forms.Textarea(attrs={'rows': 3}),
+            'packhouse': forms.HiddenInput(),
+            'packhouse_notes': forms.Textarea(attrs={'rows': 2}),
             'buyer_text': forms.TextInput(attrs={'class': 'buyer-text-input', 'readonly': True}),
             'contract_type_text': forms.TextInput(attrs={'readonly': True}),
             'sales_class_text': forms.TextInput(attrs={'readonly': True}),

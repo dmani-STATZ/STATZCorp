@@ -277,6 +277,56 @@ class Contract(AuditModel):
         return path
 
 
+class ContractPackaging(AuditModel):
+    """
+    Packaging information for a contract. One contract may have at most one
+    packhouse assignment. Some contracts have no packaging (services,
+    repairs) — always guard access with `hasattr(contract, 'packaging')`
+    or wrap in try/except `ContractPackaging.DoesNotExist`.
+
+    Born during Processing (packhouse + quote_amount + notes captured by
+    the analyst on the processing form) and copied here on finalization.
+    Financial follow-up fields (amount_paid, payment_date, invoice_number)
+    are populated later via the Finance Audit page.
+
+    NOTE: We deliberately do NOT use `limit_choices_to={'is_packhouse': True}`
+    on the packhouse FK. The `Supplier.is_packhouse` flag is treated as a
+    sort/highlight hint in pickers, not as a hard filter. Some valid
+    packhouse suppliers are not yet flagged, and analysts must be able
+    to assign them without first editing the Supplier record.
+
+    Upgrade path: If we ever need multiple packhouses per contract, change
+    `contract` from OneToOneField to ForeignKey and add a `primary` boolean.
+    Migration is straightforward.
+    """
+    contract = models.OneToOneField(
+        'Contract',
+        on_delete=models.CASCADE,
+        related_name='packaging',
+    )
+    packhouse = models.ForeignKey(
+        'suppliers.Supplier',
+        on_delete=models.PROTECT,
+        related_name='packaging_contracts',
+    )
+    quote_amount = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+    )
+    amount_paid = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+    )
+    payment_date = models.DateField(null=True, blank=True)
+    invoice_number = models.CharField(max_length=100, null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Contract Packaging'
+        verbose_name_plural = 'Contract Packaging'
+
+    def __str__(self):
+        return f"Packaging for {self.contract.contract_number} — {self.packhouse.name}"
+
+
 class ContractStatus(models.Model):
     description = models.TextField(null=True, blank=True)
 
@@ -334,6 +384,170 @@ class ContractStatusHistory(models.Model):
     def __str__(self):
         from_label = self.from_status.description if self.from_status else '(initial)'
         return f"{self.contract.contract_number}: {from_label} → {self.to_status.description} @ {self.changed_at:%Y-%m-%d %H:%M}"
+
+
+class DfasImportBatch(models.Model):
+    """
+    One row per uploaded DFAS payment file.
+    Tracks who uploaded what, when, and the aggregate outcome.
+    """
+    company = models.ForeignKey(
+        'Company',
+        on_delete=models.PROTECT,
+        related_name='dfas_import_batches',
+    )
+    filename = models.CharField(max_length=255)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='+',
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # Aggregate counts (set when the batch is finalized / resolved)
+    row_count = models.IntegerField(default=0)
+    imported_count = models.IntegerField(default=0)
+    skipped_count = models.IntegerField(default=0)
+    duplicate_count = models.IntegerField(default=0)
+    unmatched_count = models.IntegerField(default=0)
+    error_count = models.IntegerField(default=0)
+
+    STATUS_CHOICES = [
+        ('uploaded', 'Uploaded (awaiting review)'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='uploaded',
+    )
+
+    class Meta:
+        db_table = 'contracts_dfasimportbatch'
+        ordering = ['-uploaded_at', '-id']
+        indexes = [
+            models.Index(fields=['company', '-uploaded_at'], name='dfas_batch_co_uploaded_idx'),
+            models.Index(fields=['status'], name='dfas_batch_status_idx'),
+        ]
+        verbose_name = 'DFAS Import Batch'
+        verbose_name_plural = 'DFAS Import Batches'
+
+    def __str__(self):
+        return f"{self.filename} ({self.uploaded_at:%Y-%m-%d %H:%M})"
+
+
+class DfasImportRow(models.Model):
+    """
+    One row per line in an uploaded DFAS file.
+    Stores the verbatim source data forever (audit + dedup), plus the
+    resolution outcome (matched contract/CLIN, the resulting PaymentHistory
+    row if imported, and the disposition status).
+
+    Dedup mechanism: when a new batch is being matched, this table is queried
+    on (raw_voucher_no, raw_invoice_no, raw_clin) WHERE status='imported' to
+    detect rows that have already been imported in a prior batch.
+    """
+    batch = models.ForeignKey(
+        DfasImportBatch,
+        related_name='rows',
+        on_delete=models.CASCADE,
+    )
+
+    # Source row data (verbatim from DFAS file, never normalized away)
+    raw_contract_no = models.CharField(max_length=50, blank=True, default='')
+    raw_call_no = models.CharField(max_length=50, blank=True, default='')
+    raw_clin = models.CharField(max_length=20, blank=True, default='')
+    raw_voucher_no = models.CharField(max_length=50, blank=True, default='')
+    raw_invoice_no = models.CharField(max_length=50, blank=True, default='')
+    raw_payment_date = models.DateField(null=True, blank=True)
+    raw_check_eft_amount = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+    )
+    raw_data = models.JSONField(
+        default=dict,
+        help_text="The full DFAS row as parsed (key/value of all columns) for audit + future use.",
+    )
+
+    # Resolution / matching outcome
+    STATUS_CHOICES = [
+        ('pending', 'Pending review'),
+        ('matched', 'Matched (ready to import)'),
+        ('clin_missing', 'Contract matched, CLIN not found'),
+        ('contract_missing', 'No contract match'),
+        ('duplicate', 'Duplicate (previously imported)'),
+        ('skipped', 'Skipped by user'),
+        ('imported', 'Imported'),
+        ('error', 'Error'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+    )
+
+    matched_contract = models.ForeignKey(
+        'Contract',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    matched_idiq = models.ForeignKey(
+        'IdiqContract',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    matched_clin = models.ForeignKey(
+        'Clin',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    payment_history = models.ForeignKey(
+        'PaymentHistory',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text="The PaymentHistory row this DFAS row was imported as (null until imported).",
+    )
+
+    # Diagnostics
+    match_notes = models.TextField(
+        blank=True, default='',
+        help_text="Human-readable notes about how the row was matched (or why it wasn't).",
+    )
+    error_message = models.TextField(
+        blank=True, default='',
+        help_text="Set when status='error'.",
+    )
+
+    created_on = models.DateTimeField(auto_now_add=True)
+    resolved_on = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+
+    class Meta:
+        db_table = 'contracts_dfasimportrow'
+        ordering = ['batch', 'id']
+        indexes = [
+            models.Index(fields=['batch', 'status'], name='dfas_row_batch_status_idx'),
+            models.Index(
+                fields=['raw_voucher_no', 'raw_invoice_no', 'raw_clin'],
+                name='dfas_row_dedup_idx',
+            ),
+            models.Index(fields=['status'], name='dfas_row_status_idx'),
+        ]
+        verbose_name = 'DFAS Import Row'
+        verbose_name_plural = 'DFAS Import Rows'
+
+    def __str__(self):
+        return f"Row {self.id} ({self.raw_contract_no} / {self.raw_clin}) — {self.get_status_display()}"
 
 
 class Clin(AuditModel):
@@ -597,9 +811,8 @@ class PaymentHistory(AuditModel):
     # Payment details
     payment_type = models.CharField(max_length=50, choices=PAYMENT_TYPE_CHOICES)
     payment_amount = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.00'))]
+        max_digits=15,
+        decimal_places=2,
     )
     payment_date = models.DateField()
     payment_info = models.TextField(blank=True, null=True)

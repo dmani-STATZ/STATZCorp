@@ -314,6 +314,54 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 </div>
             </div>
 
+            <div class="lg:col-span-3">
+                <div id="packhouse_compact_root"
+                     class="packhouse-compact-section mb-3 px-2 py-1 rounded border-top border-bottom"
+                     data-process-contract-id="{{ process_contract.id }}"
+                     data-ph-name="{% if process_contract.packhouse %}{{ process_contract.packhouse.name }}{% endif %}"
+                     data-ph-cage="{% if process_contract.packhouse %}{{ process_contract.packhouse.cage_code|default:'' }}{% endif %}"
+                     data-ph-is="{% if process_contract.packhouse and process_contract.packhouse.is_packhouse %}1{% else %}0{% endif %}">
+                    <div class="visually-hidden">{{ form.packhouse }}</div>
+                    <div id="packhouse_compact_inner">
+                        {% if process_contract.packhouse %}
+                        <div class="d-flex align-items-center justify-content-between gap-2 py-1 flex-wrap">
+                            <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
+                                <span class="flex-shrink-0" aria-hidden="true">📦</span>
+                                <span class="fw-semibold text-truncate">{{ process_contract.packhouse.name }}</span>
+                                {% if process_contract.packhouse.cage_code %}
+                                <span class="text-muted small flex-shrink-0">({{ process_contract.packhouse.cage_code }})</span>
+                                {% endif %}
+                                {% if process_contract.packhouse.is_packhouse %}
+                                <span class="badge bg-success ms-1 flex-shrink-0">Packhouse</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-packhouse-action="edit">Edit</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-packhouse-action="clear">Clear</button>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2 py-1">
+                            <label class="small text-muted mb-0 flex-shrink-0" for="cont_packhouse_quote_amount">Quote:</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm packhouse-quote-input" style="width:7rem;max-width:40%"
+                                   id="cont_packhouse_quote_amount" name="cont_packhouse_quote_amount"
+                                   value="{{ process_contract.packhouse_quote_amount|default_if_none:'' }}">
+                            <label class="small text-muted mb-0 flex-shrink-0" for="cont_packhouse_notes">Notes:</label>
+                            <textarea class="form-control form-control-sm packhouse-notes-compact flex-grow-1" rows="1"
+                                      id="cont_packhouse_notes" name="cont_packhouse_notes">{{ process_contract.packhouse_notes|default_if_none:'' }}</textarea>
+                        </div>
+                        {% else %}
+                        <div class="d-flex align-items-center justify-content-between gap-2 py-1">
+                            <div class="d-flex align-items-center gap-2 min-w-0">
+                                <span class="flex-shrink-0" aria-hidden="true">📦</span>
+                                <span class="text-muted small text-truncate">No packhouse assigned</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0" data-packhouse-action="assign">Assign Packhouse</button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
     <!-- CLIN Items Card -->
     <div class="lg:col-span-3">
         <div class="card card-padded shadow-md">
@@ -802,6 +850,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 {% include "processing/modals/buyer_modal.html" %}
 {% include "processing/modals/nsn_modal.html" %}
 {% include "processing/modals/supplier_modal.html" %}
+{% include "processing/modals/packhouse_modal.html" %}
 {% include "processing/modals/pdf_parse_notes_modal.html" %}
 
 <!-- Include all modal scripts -->
@@ -809,6 +858,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <script src="{% static 'processing/js/buyer_modal.js' %}"></script>
 <script src="{% static 'processing/js/nsn_modal.js' %}"></script>
 <script src="{% static 'processing/js/supplier_modal.js' %}"></script>
+<script src="{% static 'processing/js/packhouse_modal.js' %}"></script>
 <script src="{% static 'processing/js/process_contract.js' %}"></script>
 
 <!-- JavaScript for form functionality -->
@@ -945,11 +995,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         });
         const contractValueInput = document.querySelector('input[name="cont_contract_value"]');
         const planGrossInput = document.querySelector('input[name="cont_plan_gross"]');
+        const packhouseQuoteInput = document.querySelector('input[name="cont_packhouse_quote_amount"]');
+        const packhouseCost = packhouseQuoteInput ? parseFloat(packhouseQuoteInput.value || 0) || 0 : 0;
         if (contractValueInput) {
             contractValueInput.value = totalItemValue.toFixed(2);
         }
         if (planGrossInput) {
-            planGrossInput.value = (totalItemValue - totalQuoteValue).toFixed(2);
+            planGrossInput.value = (totalItemValue - totalQuoteValue - packhouseCost).toFixed(2);
         }
         if (typeof saveContract === 'function') {
             saveContract();

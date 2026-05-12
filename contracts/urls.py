@@ -201,6 +201,14 @@ from .views.documents_views import (
     sharepoint_files_api,
 )
 from .views.split_views import recalc_splits
+from .views.dfas_import_views import (
+    dfas_import_cancel_view,
+    dfas_import_finalize_view,
+    dfas_import_list_view,
+    dfas_import_resolve_row_view,
+    dfas_import_review_view,
+    dfas_import_upload_view,
+)
 
 app_name = "contracts"
 
@@ -239,6 +247,29 @@ urlpatterns = [
         "dashboard/metric-detail/export/",
         dashboard_metric_detail_export,
         name="dashboard_metric_detail_export",
+    ),
+    # DFAS Payment Import
+    path("dfas-imports/", dfas_import_list_view, name="dfas_import_list"),
+    path("dfas-imports/upload/", dfas_import_upload_view, name="dfas_import_upload"),
+    path(
+        "dfas-imports/<int:batch_id>/review/",
+        dfas_import_review_view,
+        name="dfas_import_review",
+    ),
+    path(
+        "dfas-imports/<int:batch_id>/finalize/",
+        dfas_import_finalize_view,
+        name="dfas_import_finalize",
+    ),
+    path(
+        "dfas-imports/<int:batch_id>/cancel/",
+        dfas_import_cancel_view,
+        name="dfas_import_cancel",
+    ),
+    path(
+        "dfas-imports/<int:batch_id>/rows/<int:row_id>/resolve/",
+        dfas_import_resolve_row_view,
+        name="dfas_import_resolve_row",
     ),
     path("log/", ContractLogView.as_view(), name="contract_log_view"),
     path("log/export/", export_contract_log, name="export_contract_log"),

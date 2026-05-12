@@ -37,6 +37,7 @@ from .views.processing_views import (
     scan_sharepoint_status,
     parse_award_pdf_from_sharepoint,
 )
+from processing.views.matching_views import match_packhouse
 from .views.api_views import (
     get_processing_contract,
     update_processing_contract,
@@ -75,6 +76,7 @@ urlpatterns = [
     path('match-buyer/<int:process_contract_id>/', match_buyer, name='match_buyer'),
     path('match-nsn/<int:process_clin_id>/', match_nsn, name='match_nsn'),
     path('match-supplier/<int:process_clin_id>/', match_supplier, name='match_supplier'),
+    path('match-packhouse/<int:process_contract_id>/', match_packhouse, name='match_packhouse'),
     path('match-idiq/<int:process_contract_id>/', match_idiq, name='match_idiq'),
     path('api/idiq/create/', create_idiq, name='create_idiq'),
 

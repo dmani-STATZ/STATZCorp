@@ -81,7 +81,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - **Business logic lives in `views/processing_views.py`**, not in a services layer. There is no `services.py`. All finalization, sequencing, and queue management is inline in view functions.
 - **Validation is split across three places:** Django form `clean()` methods, API endpoint parsing in `api_views.py`, and the finalization pre-checks in `processing_views.py`. All three must stay consistent.
 - **The JS layer does not trust the server state** — `process_contract.js` continuously fires AJAX saves. The server must handle idempotent partial saves gracefully. Do not add server-side side effects to the `save_contract`, `update_clin_field`, or `update_process_contract_field` endpoints without understanding the call frequency.
-- **Protected fields exist by convention, not framework enforcement.** `update_clin_field` and `update_process_contract_field` reject writes to `nsn`, `supplier`, `buyer` and require the match endpoints instead. If you add new protected fields, update these guards explicitly.
+- **Protected fields exist by convention, not framework enforcement.** `update_clin_field` and `update_process_contract_field` reject writes to `nsn`, `supplier`, `buyer`, and **`packhouse`** and require the match endpoints instead (`packhouse` → `/processing/match-packhouse/<process_contract_id>/`). If you add new protected fields, update these guards explicitly.
 - **Admin is intentionally read-only** for `QueueContract`. The only writable admin action is `force_delete_contracts`. Do not add `has_add_permission=True` or `has_change_permission=True` without understanding the cascade implications.
 - **No background tasks or signals are in use.** Everything is synchronous HTTP. This means long CSV uploads block the request.
 
@@ -92,14 +92,42 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 ### Model field rename
 `models.py` → `migrations/` → `views/processing_views.py` (field mappings in finalize functions) → `views/api_views.py` (JSON serialization) → `forms.py` (field lists, `clean()`) → templates (form field names) → `static/processing/js/*.js` (field name strings in fetch payloads)
 
+### New ProcessContract field (contract-level, not CLIN; e.g. `packhouse`)
+`models.py` → new migration → `forms.py` (`ProcessContractForm.Meta.fields`)
+→ `views/api_views.py` (`update_process_contract_field` — add to allowed fields,
+or block with match endpoint guard if it is a FK requiring a match flow)
+→ `views/processing_views.py` `save_contract` `contract_field_types` map
+→ `views/processing_views.py` `finalize_and_email_contract` / `finalize_contract` mapping to `Contract`
+or a related model → `templates/processing/process_contract_form.html`
+→ `static/processing/js/packhouse_modal.js` / `process_contract.js` when the field has modal or AJAX interactivity.
+
 ### New CLIN field
 `models.py` → new migration → `forms.py` (`ProcessClinForm` fields + widgets) → `views/api_views.py` (`update_clin_field`, `save_clin`) → `views/processing_views.py` (`finalize_and_email_contract` mapping to `Clin`) → `templates/processing/process_contract_form.html` → `static/processing/js/clin_handling.js` or `process_contract.js`
 
 ### New match modal (e.g., add a new lookup type)
 `views/matching_views.py` (search endpoint) → `urls.py` (new route) → `templates/processing/modals/<new>_modal.html` → `static/processing/js/<new>_modal.js` → `process_contract_form.html` (include modal + wire button)
 
+### DOMContentLoaded timing in modal JS
+Modal JS files are included near the end of the page body in `process_contract_form.html`. On a long page, the browser may fire `DOMContentLoaded` before some of these scripts are parsed. Init code that uses `document.addEventListener('DOMContentLoaded', ...)` to wire listeners will silently fail in that case — the listener attaches to an event that already fired.
+
+For new modal JS files, use this pattern instead:
+
+```javascript
+function init() { /* listener wiring */ }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+```
+
+`packhouse_modal.js` uses this pattern after the delegation-bound "Assign Packhouse" button silently refused to open the modal when the handler never ran on large form pages. Compact-strip clicks are also handled via **document-level capture** delegation (guarded by `window.__phPackhouseDelegationBound`) so a missed `initPackhouseModal` run does not leave the Assign/Edit/Clear buttons dead; the handler calls `window.openPackhouseModal` explicitly for strict-mode resolution. The packhouse picker **UI** matches the other processing modals (`fixed` + `hidden` + `z-[2000]`, not `bootstrap.Modal`), so it stacks above the contract-base sticky footer and is not clipped by parent overflow/stacking contexts.
+
 ### Split management change
 `models.py` `ProcessClinSplit` → `forms.py` `persist_clin_splits_for_contract` / `ProcessContractForm.save` → `views/processing_views.py` (`create_split_view`, `update_split_view`, `delete_split_view`, `calc_splits_view`, `save_contract`) → `views/api_views.py` `update_contract_values` (no auto-STATZ) → `templates/processing/process_contract_form.html` → `static/processing/js/process_contract.js`
+
+### Plan Gross formula change
+`models.py` `ProcessContract.calculate_plan_gross` → `views/api_views.py` `update_contract_values` and `update_process_contract_field` (must use `calculate_plan_gross` / `update_calculated_values` on the model — do not duplicate the formula) → `views/processing_views.py` `save_contract` when `packhouse_quote_amount` changes (recalc + return `cont_plan_gross` in `updated_fields`) → `CONTEXT.md` to document the new term in the formula → frontend: verify any cached/displayed `plan_gross` values refresh after the triggering field changes (inline `updateContractCalculations` subtracts packhouse quote from the CLIN-based gross to match the server).
 
 ### Finalization change
 `views/processing_views.py` `finalize_contract` + `finalize_and_email_contract` → `contracts/models.py` (target model fields) → test by completing a full queue-to-finalize flow manually
@@ -122,7 +150,7 @@ field does not already exist there.
 ### This app depends on:
 | App | What is used |
 |---|---|
-| `contracts` | `Contract`, `Clin`, `ClinSplit`, `Buyer`, `IdiqContract`, `ContractType`, `SalesClass`, `ClinType`, `SpecialPaymentTerms`, `PaymentHistory`, `ContractStatus`, `AuditModel`, `Company` |
+| `contracts` | `Contract`, `Clin`, `ClinSplit`, `Buyer`, `IdiqContract`, `ContractType`, `SalesClass`, `ClinType`, `SpecialPaymentTerms`, `PaymentHistory`, `ContractStatus`, `ContractPackaging`, `AuditModel`, `Company` |
 | `products` | `Nsn` — FK target for `ProcessClin.nsn` and `QueueClin.matched_nsn` |
 | `suppliers` | `Supplier` — FK target for `ProcessClin.supplier` and `QueueClin.matched_supplier` |
 | `users` / `auth` | `User` — FK for `processed_by`, `created_by`, `modified_by` |
@@ -132,7 +160,7 @@ field does not already exist there.
 - `processing` is a terminal workflow app; output lands in `contracts`
 
 ### Finalization coupling:
-`finalize_and_email_contract` writes to `contracts.Contract`, `contracts.Clin`, `contracts.ClinSplit` (from each `ProcessClinSplit` on the matching `ProcessClin`), and `contracts.PaymentHistory`. Any schema change in those models must be reflected in the finalization mapping in `processing_views.py`.
+`finalize_and_email_contract` writes to `contracts.Contract`, `contracts.Clin`, `contracts.ClinSplit` (from each `ProcessClinSplit` on the matching `ProcessClin`), `contracts.PaymentHistory`, and may create **`contracts.ContractPackaging`** when `ProcessContract.packhouse` is set. Any schema change in those models must be reflected in the finalization mapping in `processing_views.py`.
 
 ### Sequence numbers:
 `SequenceNumber` is local to `processing` but the PO/Tab numbers it generates are stored permanently in `contracts.Contract` and `contracts.Clin`. Resetting or corrupting `SequenceNumber` will cause duplicate PO/Tab assignments.
@@ -145,7 +173,8 @@ field does not already exist there.
 - `delete_queue_contract` enforces `request.user.is_superuser` — preserve this check when modifying the delete path.
 - `download_test_data` raises `PermissionDenied` if `settings.DEBUG` is `False` — do not weaken this guard.
 - `start_processing` and `initiate_processing` use `select_for_update` inside an atomic transaction to prevent two users from claiming the same queue item. Do not refactor these into non-atomic paths.
-- The `nsn`, `supplier`, and `buyer` fields on process records are protected from direct writes in `update_clin_field` and `update_process_contract_field`. This is a deliberate data integrity control, not a bug. Preserve these guards.
+- The `nsn`, `supplier`, `buyer`, and **`packhouse`** fields on process records are protected from direct writes in `update_clin_field` and `update_process_contract_field` (`packhouse` must use `processing:match_packhouse`). This is a deliberate data integrity control, not a bug. Preserve these guards.
+- **`match_packhouse` `action=clear`** is destructive: it nulls `packhouse_quote_amount` and `packhouse_notes` in addition to the FK. The UI confirms before firing.
 - Finalization validates buyer, NSN, and supplier presence before creating canonical records. Do not add bypass paths.
 
 ---
@@ -232,7 +261,7 @@ field does not already exist there.
 
 11. **`startProcessing()` and `resumeProcessing()` in `contract_queue.html`** use `data.redirect_url` from the JSON response when the server supplies it (IDIQ resume/start paths). Hardcoding the fallback `process_contract_edit` URL in the template is intentional for non-IDIQ contracts.
 
-12. **`match_nsn` and `match_supplier` are dual-purpose.** Same URL accepts **GET** with `action=search` and `q` (min length 3 on the client) for JSON `results`, and **POST** JSON for either `{id}` / `{supplier_id}` match-by-ID or `{action: 'create', ...}` to create and link. The standard contract form modals continue to use **POST** with `{ id: … }` (NSN) or `{ supplier_id: … }` (supplier) for matching; only the IDIQ inline page relies on GET search and POST create on these endpoints.
+12. **`match_nsn` and `match_supplier` are dual-purpose.** Same URL accepts **GET** with `action=search` and `q` (min length 3 on the client) for JSON `results`, and **POST** JSON for either `{id}` / `{supplier_id}` match-by-ID or `{action: 'create', ...}` to create and link. The standard contract form modals continue to use **POST** with `{ id: … }` (NSN) or `{ supplier_id: … }` (supplier) for matching; only the IDIQ inline page relies on GET search and POST create on these endpoints. **`match_packhouse`** (in `matching_views.py`) is contract-scoped: **GET** `action=search` + `q` (+ optional `prefer_packhouse`), **POST** JSON `{action: 'match'|'create'|'clear', ...}`; **`clear`** nulls `packhouse`, `packhouse_quote_amount`, and `packhouse_notes`, sets `plan_gross` from `calculate_plan_gross()`, and saves with `update_fields` (surgical write). Supplier search for the packhouse modal uses **`contracts:get_select_options`** with `?prefer_packhouse=1`, not `match_packhouse` GET, for pagination consistency.
 
 13. **`_normalize_nsn` in `pdf_parser.py` is a thin wrapper around `contract_utils.normalize_nsn`.** Do not add NSN normalization logic to `pdf_parser.py` directly — update `contract_utils.py` instead. **`detect_contract_type`** reads position 9 (the character between the 2nd and 3rd hyphens in a dashed DLA number). The `_RE_IDIQ_TEXT_DETECT` regex phrase detection in `parse_award_pdf` is a **fallback only** — position-9 detection takes priority when the contract number yields a mapped type. **`_apply_contract_number_rules`** in `pdf_parser.py` still returns `"Delivery Order"` / `"Purchase Order"` strings as initial values that get overridden by `detect_contract_type`. Do not remove `_apply_contract_number_rules` — it also handles the delivery-order/base-contract swap logic.
 

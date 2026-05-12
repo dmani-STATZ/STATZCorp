@@ -2221,3 +2221,20 @@ main {
     .nsn-detail-source-pn   { grid-area: pn; padding-left: 5.35rem; }
     .nsn-detail-source-chip { grid-area: chip; justify-self: end; }
 }
+
+/* Processing contract form — compact packhouse strip */
+.packhouse-compact-section {
+    background-color: var(--bs-secondary-bg);
+}
+[data-bs-theme="dark"] .packhouse-compact-section {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+.packhouse-notes-compact {
+    min-height: calc(1.5em + 0.5rem + 2px);
+    max-height: 4.5rem;
+    resize: vertical;
+    line-height: 1.35;
+}
+.packhouse-notes-compact:focus {
+    min-height: 3.25rem;
+}

@@ -1,0 +1,63 @@
+{% load static %}
+<div id="packhouse_modal"
+     class="fixed inset-0 modal-backdrop-overlay hidden z-[2000] overflow-y-auto py-3"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="packhouse_modal_label"
+     onclick="if (event.target === this && typeof window.closePackhouseModal === 'function') { window.closePackhouseModal(); }"
+     data-packhouse-match-url="{% url 'processing:match_packhouse' process_contract.id %}"
+     data-supplier-search-url="{% url 'contracts:get_select_options' 'supplier' %}">
+  <div class="relative mx-auto card card-padded border shadow-lg my-2"
+       style="max-width: 50rem; width: 95%;"
+       onclick="event.stopPropagation()">
+    <div class="row-between border-b pb-3">
+      <h3 class="text-lg font-semibold text-gray-900 mb-0" id="packhouse_modal_label">Assign Packhouse</h3>
+      <button type="button" onclick="if (typeof window.closePackhouseModal === 'function') { window.closePackhouseModal(); }"
+              class="btn-close" aria-label="Close"></button>
+    </div>
+    <div class="mt-3">
+      <p class="small text-muted mb-3">
+        Suppliers flagged as packhouses appear first. You can pick any supplier — the flag is a hint, not a restriction.
+      </p>
+      <div class="mb-2">
+        <span class="text-muted small">Current selection</span>
+        <div id="packhouse_original_display" class="fw-medium"></div>
+      </div>
+      <div class="mb-3">
+        <label for="packhouse_search" class="form-label small mb-1">Search</label>
+        <input type="search" class="form-control form-control-sm" id="packhouse_search"
+               placeholder="Search by name or CAGE — at least 3 characters" autocomplete="off">
+      </div>
+      <div id="packhouse_search_results" class="list-group mb-3" style="max-height: 16rem; overflow-y: auto;"></div>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="packhouse_toggle_add">
+          Add New Packhouse
+        </button>
+      </div>
+      <div id="packhouse_add_form_wrap" class="border rounded p-3 mt-2 d-none">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small" for="packhouse_new_name">Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="packhouse_new_name" autocomplete="organization">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small" for="packhouse_new_cage">CAGE code <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="packhouse_new_cage" autocomplete="off">
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="packhouse_new_is_packhouse" checked>
+              <label class="form-check-label small" for="packhouse_new_is_packhouse">Flag as packhouse</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-4 d-flex flex-wrap justify-content-end gap-2 border-top pt-3">
+      <button type="button" class="btn btn-outline-secondary"
+              onclick="if (typeof window.closePackhouseModal === 'function') { window.closePackhouseModal(); }">Close</button>
+      <button type="button" class="btn btn-outline-danger" id="packhouse_clear_btn">Clear Assignment</button>
+      <button type="button" class="btn btn-primary" id="packhouse_save_btn" disabled>Save</button>
+    </div>
+  </div>
+</div>

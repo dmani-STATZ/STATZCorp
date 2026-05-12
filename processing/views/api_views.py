@@ -229,8 +229,14 @@ def update_process_contract_field(request, pk):
                 'status': 'error', 
                 'message': 'Buyer must be updated through the match process'
             }, status=400)
-            
-        elif field_name in ['contract_value', 'plan_gross']:
+
+        elif field_name == 'packhouse':
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Packhouse must be updated through the match-packhouse endpoint'
+            }, status=400)
+
+        elif field_name in ['contract_value', 'plan_gross', 'packhouse_quote_amount']:
             # Handle numeric fields
             try:
                 setattr(instance, field_name, float(field_value) if field_value else 0.0)
@@ -264,7 +270,10 @@ def update_process_contract_field(request, pk):
             setattr(instance, field_name, field_value if field_value else None)
         
         instance.save()
-        
+
+        if field_name == 'packhouse_quote_amount':
+            instance.update_calculated_values()
+
         # Return the new value and any related field values
         response_data = {
             'status': 'success',
@@ -272,7 +281,11 @@ def update_process_contract_field(request, pk):
             'field_value': field_value,
             'related_updates': {}
         }
-        
+        if field_name == 'packhouse_quote_amount':
+            response_data['plan_gross'] = (
+                str(instance.plan_gross) if instance.plan_gross is not None else None
+            )
+
         # Add related field updates to response
         if field_name == 'contract_type':
             response_data['related_updates']['contract_type_text'] = instance.contract_type_text
@@ -514,21 +527,16 @@ def update_contract_values(request, id):
     try:
         with transaction.atomic():
             process_contract = get_object_or_404(ProcessContract, id=id)
-            
-            # Calculate new values
-            new_contract_value = process_contract.calculate_contract_value()
-            new_plan_gross = process_contract.calculate_plan_gross()
-            
+
+            process_contract.update_calculated_values()
+
+            new_contract_value = process_contract.contract_value
+            new_plan_gross = process_contract.plan_gross
             if new_contract_value is None or new_plan_gross is None:
                 return JsonResponse({
                     'success': False,
                     'error': 'Failed to calculate contract values'
                 }, status=400)
-            
-            # Update contract values
-            process_contract.contract_value = new_contract_value
-            process_contract.plan_gross = new_plan_gross
-            process_contract.save()
 
             return JsonResponse({
                 'success': True,

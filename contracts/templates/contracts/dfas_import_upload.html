@@ -1,0 +1,35 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}Upload DFAS Payment File{% endblock %}
+{% block body_class %}dfas-import-page{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-3">
+      <li class="breadcrumb-item"><a href="{% url 'contracts:dfas_import_list' %}">DFAS imports</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Upload</li>
+    </ol>
+  </nav>
+
+  <h1 class="h3 mb-4">Upload DFAS Payment File</h1>
+
+  <div class="card" style="max-width: 36rem;">
+    <div class="card-body">
+      <form method="post" action="{% url 'contracts:dfas_import_upload' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label for="id_dfas_file" class="form-label">DFAS export file</label>
+          <input class="form-control" type="file" name="dfas_file" id="id_dfas_file" accept=".txt,.csv" required>
+          <div class="form-text">
+            Select the <code>.txt</code> file downloaded from DFAS. The file should contain a header row and comma-delimited payment data.
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload &amp; Parse</button>
+        <a href="{% url 'contracts:dfas_import_list' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

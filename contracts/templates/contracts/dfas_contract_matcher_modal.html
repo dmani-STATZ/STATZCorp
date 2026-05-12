@@ -1,0 +1,36 @@
+<div class="modal fade" id="dfasContractMatcherModal" tabindex="-1" aria-labelledby="dfasContractMatcherModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="dfasContractMatcherModalLabel">Find Contract for DFAS Row</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border" id="dfasMatcherSourceInfo">
+          <div class="small text-body-secondary">DFAS row reference:</div>
+          <div class="font-monospace" id="dfasMatcherSourceContractNo"></div>
+          <div class="small text-body-secondary mt-2">Call No.:</div>
+          <div class="font-monospace small" id="dfasMatcherSourceCallNo"></div>
+          <div class="small text-body-secondary mt-2">CLIN:</div>
+          <div class="font-monospace small" id="dfasMatcherSourceClin"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="dfasContractSearchInput" class="form-label">Search by contract number or PO number</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="dfasContractSearchInput" placeholder="At least 3 characters…" autocomplete="off">
+            <button class="btn btn-outline-secondary" type="button" id="dfasContractSearchButton">Search</button>
+          </div>
+          <div class="form-text">Searches all contracts in the active company.</div>
+        </div>
+
+        <div id="dfasContractSearchResults" class="list-group" style="max-height: 320px; overflow-y: auto;">
+          <div class="text-center text-body-secondary py-4">Enter at least 3 characters to search.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>

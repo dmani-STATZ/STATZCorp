@@ -1,0 +1,106 @@
+{% comment %} row, section, clin_options (list of dicts or None), can_finalize {% endcomment %}
+<tr data-row-id="{{ row.id }}"
+    data-raw-contract-no="{{ row.raw_contract_no|default:'' }}"
+    data-raw-call-no="{{ row.raw_call_no|default:'' }}"
+    data-raw-clin="{{ row.raw_clin|default:'' }}"
+    class="dfas-row dfas-row-{{ row.status }}">
+  <td class="text-muted small">{{ row.id }}</td>
+  <td>
+    <div class="small text-body-secondary">Contract:</div>
+    <div class="font-monospace">{{ row.raw_contract_no|default:"—" }}</div>
+    {% if row.raw_call_no %}
+      <div class="small text-body-secondary mt-1">Call No.:</div>
+      <div class="font-monospace small">{{ row.raw_call_no }}</div>
+    {% endif %}
+    <div class="small text-body-secondary mt-1">CLIN:</div>
+    <div class="font-monospace small">{{ row.raw_clin|default:"—" }}</div>
+  </td>
+  <td>
+    {% if row.matched_contract %}
+      <div class="small text-body-secondary">→</div>
+      <div class="font-monospace">{{ row.matched_contract.contract_number }}</div>
+      {% if row.matched_clin %}
+        <div class="small text-body-secondary mt-1">CLIN:</div>
+        <div class="font-monospace small">{{ row.matched_clin.item_number }}</div>
+      {% endif %}
+    {% else %}
+      <span class="text-body-secondary">—</span>
+    {% endif %}
+  </td>
+  <td class="text-end font-monospace {% if row.raw_check_eft_amount != None and row.raw_check_eft_amount < 0 %}text-danger{% endif %}">
+    {% if row.raw_check_eft_amount != None %}
+      ${{ row.raw_check_eft_amount|floatformat:2 }}
+      {% if row.raw_check_eft_amount < 0 %}
+        <span class="badge bg-danger ms-1">REVERSAL</span>
+      {% endif %}
+    {% else %}
+      —
+    {% endif %}
+  </td>
+  <td class="small">{{ row.raw_payment_date|date:"Y-m-d"|default:"—" }}</td>
+  <td class="small font-monospace">
+    {{ row.raw_voucher_no|default:"—" }}<br>
+    <span class="text-body-secondary">{{ row.raw_invoice_no|default:"—" }}</span>
+  </td>
+  <td class="small">
+    {% if section == 'error' and row.error_message %}
+      <span class="text-danger">{{ row.error_message }}</span>
+    {% else %}
+      {{ row.match_notes|linebreaksbr }}
+    {% endif %}
+  </td>
+  <td class="text-nowrap">
+    {% if can_finalize %}
+      {% if section == 'matched' %}
+        <div class="form-check form-check-inline mb-0 me-2 align-middle">
+          <input class="form-check-input" type="checkbox" checked disabled title="Included when you confirm import" id="im-{{ row.id }}">
+          <label class="form-check-label small" for="im-{{ row.id }}">Import</label>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+      {% elif section == 'clin_missing' %}
+        {% if clin_options %}
+        <select class="form-select form-select-sm dfas-clin-select mb-1" aria-label="CLIN for row {{ row.id }}">
+          <option value="">—</option>
+          {% for opt in clin_options %}
+            <option value="{{ opt.id }}">{{ opt.item_number }} — {{ opt.item_type_display }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <p class="small text-danger mb-1">No CLINs on contract.</p>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-1">
+          {% if clin_options %}
+          <button type="button" class="btn btn-sm btn-primary" data-action="assign_clin">Assign</button>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+        </div>
+      {% elif section == 'contract_missing' %}
+        <button type="button" class="btn btn-sm btn-primary" data-action="find_contract">Find Contract</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+      {% elif section == 'duplicate' %}
+        <button type="button" class="btn btn-sm btn-outline-primary" data-action="import_anyway">Import Anyway</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+      {% elif section == 'skipped' %}
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="unskip">Undo Skip</button>
+      {% elif section == 'imported' %}
+        <span class="text-success" title="Imported">✓</span>
+        {% if row.payment_history_id %}
+          <span class="small text-body-secondary ms-1">PH #{{ row.payment_history_id }}</span>
+        {% endif %}
+      {% elif section == 'error' %}
+        <span class="text-body-secondary small">—</span>
+      {% elif section == 'pending' %}
+        <span class="text-body-secondary small">—</span>
+      {% endif %}
+    {% else %}
+      {% if section == 'imported' %}
+        <span class="text-success">✓</span>
+        {% if row.payment_history_id %}
+          <span class="small text-body-secondary ms-1">PH #{{ row.payment_history_id }}</span>
+        {% endif %}
+      {% else %}
+        <span class="text-body-secondary small">—</span>
+      {% endif %}
+    {% endif %}
+  </td>
+</tr>

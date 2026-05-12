@@ -233,6 +233,26 @@ class ProcessContract(models.Model):
     description = models.TextField(null=True, blank=True)
     planned_split = models.CharField(max_length=50, null=True, blank=True)
     plan_gross = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    packhouse = models.ForeignKey(
+        Supplier,
+        on_delete=models.PROTECT,
+        related_name='+',
+        null=True,
+        blank=True,
+        help_text='Packhouse for this contract. Optional — most contracts have none.',
+    )
+    packhouse_quote_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Packaging quote captured during processing. Copied to ContractPackaging.quote_amount on finalization.',
+    )
+    packhouse_notes = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Analyst notes about the packhouse arrangement. Copied to ContractPackaging.notes on finalization.',
+    )
 
     # Processing Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -266,12 +286,23 @@ class ProcessContract(models.Model):
         return total
 
     def calculate_plan_gross(self):
-        """Calculate plan gross by subtracting total quote values from contract value"""
+        """Calculate plan gross by subtracting total quote values from contract value.
+
+        Packhouse quote amount is treated as a cost against gross profit and
+        subtracted from the computed plan gross. A null packhouse_quote_amount
+        is treated as zero.
+        """
         totals = self.clins.aggregate(
             item_total=models.Sum('item_value', default=Decimal('0.00')),
             quote_total=models.Sum('quote_value', default=Decimal('0.00'))
         )
-        return totals['item_total'] - totals['quote_total']
+        base = totals['item_total'] - totals['quote_total']
+        packhouse_cost = self.packhouse_quote_amount
+        if packhouse_cost is None:
+            packhouse_cost = Decimal('0')
+        else:
+            packhouse_cost = Decimal(str(packhouse_cost))
+        return base - packhouse_cost
 
     def update_calculated_values(self):
         """Update contract value and plan gross"""

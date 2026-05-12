@@ -159,28 +159,36 @@ def get_select_options(request, field_name):
                 })
                 
         elif field_name == 'supplier':
-            # Get suppliers, ordered by name
-            queryset = Supplier.objects.all().order_by('name')
-            
+            queryset = Supplier.objects.all()
+            prefer_raw = (request.GET.get('prefer_packhouse') or '').strip().lower()
+            prefer_packhouse = prefer_raw in ('1', 'true', 'yes', 'on')
+            if prefer_packhouse:
+                # prefer_packhouse: sort hint for the Processing packhouse picker; does not filter.
+                queryset = queryset.order_by('-is_packhouse', 'name')
+            else:
+                queryset = queryset.order_by('name')
+
             # Apply search if provided
             if search_term:
                 queryset = queryset.filter(
-                    Q(name__icontains=search_term) | 
+                    Q(name__icontains=search_term) |
                     Q(cage_code__icontains=search_term)
                 )
-            
+
             # Get total count for pagination
             total_count = queryset.count()
             total_pages = (total_count + page_size - 1) // page_size
-            
+
             # Apply pagination
-            queryset = queryset[offset:offset+limit]
-            
+            queryset = queryset[offset:offset + limit]
+
             # Format options
             for item in queryset:
                 options.append({
                     'value': item.id,
-                    'label': f"{item.name or 'Unknown'} ({item.cage_code or 'No CAGE'})"
+                    'label': item.name or 'Unknown',
+                    'cage_code': item.cage_code or '',
+                    'is_packhouse': bool(item.is_packhouse),
                 })
             
             return JsonResponse({

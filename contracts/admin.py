@@ -11,6 +11,8 @@ from .models import (
     ContractStatus,
     ContractStatusHistory,
     ContractType,
+    DfasImportBatch,
+    DfasImportRow,
     FinanceLinePayment,
     FinanceLineType,
     Reminder,
@@ -126,3 +128,44 @@ class ContractFinanceLineAdmin(admin.ModelAdmin):
 @admin.register(FinanceLinePayment)
 class FinanceLinePaymentAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(DfasImportBatch)
+class DfasImportBatchAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'filename', 'company', 'uploaded_by', 'uploaded_at',
+        'status', 'row_count', 'imported_count', 'skipped_count',
+        'duplicate_count', 'unmatched_count', 'error_count',
+    )
+    list_filter = ('status', 'company', 'uploaded_at')
+    search_fields = ('filename', 'uploaded_by__username')
+    readonly_fields = tuple(f.name for f in DfasImportBatch._meta.fields)
+    ordering = ('-uploaded_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DfasImportRow)
+class DfasImportRowAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'batch', 'raw_contract_no', 'raw_call_no', 'raw_clin',
+        'raw_invoice_no', 'raw_check_eft_amount', 'status',
+        'matched_contract', 'matched_clin',
+    )
+    list_filter = ('status', 'batch')
+    search_fields = (
+        'raw_contract_no', 'raw_call_no', 'raw_invoice_no',
+        'raw_voucher_no', 'match_notes',
+    )
+    readonly_fields = tuple(f.name for f in DfasImportRow._meta.fields)
+    ordering = ('batch', 'id')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
