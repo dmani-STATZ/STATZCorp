@@ -41,8 +41,13 @@ def forward_backfill(apps, schema_editor):
 
         system_user = get_or_create_system_user(apps)
 
+        # Pre-fetch ALL lookups into memory BEFORE iteration.
+        # This eliminates nested queries and prevents MSSQL cursor conflicts.
         status_by_id = {
             s.pk: (s.description or '').strip() for s in ContractStatus.objects.all()
+        }
+        reason_by_id = {
+            cr.pk: cr.description for cr in CanceledReason.objects.all()
         }
 
         open_status = ContractStatus.objects.filter(description='Open').first()
@@ -57,6 +62,8 @@ def forward_backfill(apps, schema_editor):
         closed_status = ContractStatus.objects.filter(description='Closed').first()
         canceled_status = ContractStatus.objects.filter(description='Canceled').first()
 
+        # Iterate through contracts. NO DATABASE QUERIES inside this loop—all lookups
+        # are already in memory (status_by_id, reason_by_id, etc.).
         for contract in Contract.objects.all().iterator():
             created_at = (
                 _as_aware_dt(contract.created_on) if contract.created_on else timezone.now()
@@ -97,11 +104,8 @@ def forward_backfill(apps, schema_editor):
                     changed_at = _as_aware_dt(contract.created_on)
                 else:
                     changed_at = timezone.now()
-                reason = ''
-                if contract.canceled_reason_id:
-                    cr = CanceledReason.objects.filter(pk=contract.canceled_reason_id).first()
-                    if cr and cr.description:
-                        reason = cr.description
+                # Look up reason from pre-fetched dict instead of querying inside loop.
+                reason = reason_by_id.get(contract.canceled_reason_id, '')
                 ContractStatusHistory.objects.create(
                     contract_id=contract.pk,
                     from_status_id=open_status.pk,

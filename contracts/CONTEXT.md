@@ -245,6 +245,10 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 - `contracts/templates/contracts/reminders_popup.html` — changed both new and edit reminder modal date inputs from `type="datetime-local"` to `type="date"`; updated JS auto-default from datetime ISO string to date-only `toISOString().slice(0, 10)`
 - `contracts/forms.py` — removed `.date()` call on `IdiqContractForm.award_date` initial value (unnecessary once the field is `DateField`)
 
+## Completed migrations and fixes
+
+- **Migration 0061 MSSQL deadlock fix:** Pre-fetched `CanceledReason` and `ContractStatus` lookups into memory dicts before iterating 15k contracts. Eliminated nested queries inside atomic transaction, preventing pyodbc cursor conflicts. All lookups now happen before loop iteration begins.
+
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Respect `request.active_company`. When querying models with a `company` FK, either filter manually or use `ActiveCompanyQuerysetMixin`; otherwise you risk leaking cross-tenant data.
 - Changing contract/CLIN fields requires updates across `contracts/forms.py` (where applicable), the relevant templates/partials, `contracts/views/contract_views.py`, the Processing app when queue/process fields mirror Contract, search APIs, and `contracts/CONTRACTS_APP_CURRENT_STATE.md` so the documented workflow stays accurate.
