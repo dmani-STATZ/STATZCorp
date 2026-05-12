@@ -7,19 +7,56 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from django.db.models import F, Value
+from django.db.models.functions import Replace, Upper
+
 from contracts.models import Clin, Contract, DfasImportRow, IdiqContract
 from contracts.services.dfas_parser import ParsedDfasRow
 
 _PSUFFIX_RE = re.compile(r'^P\d{5}$')
 
 
+def normalize_contract_number(value: Optional[str]) -> str:
+    """
+    Normalize a contract or delivery-order number for comparison.
+
+    Strips dashes, spaces, and uppercases. Makes STATZ DB values
+    (stored with dashes, e.g. W912PB-24-C-0001) comparable to DFAS
+    export values (no dashes, e.g. W912PB24C0001).
+
+    Used on both the incoming DFAS value AND the annotated DB query side.
+    """
+    return re.sub(r'[\s\-]', '', (value or '').upper().strip())
+
+
+def _norm_qs(qs, field: str = 'contract_number'):
+    """
+    Annotate a queryset with `norm_num`: the contract_number field with
+    dashes and spaces removed, uppercased — matching normalize_contract_number().
+
+    Uses Django ORM Replace + Upper so the normalization runs in SQL,
+    not Python. Compatible with Microsoft SQL Server via mssql-django.
+    """
+    col = F(field)
+    return qs.annotate(
+        norm_num=Upper(
+            Replace(
+                Replace(col, Value('-'), Value('')),
+                Value(' '), Value(''),
+            )
+        )
+    )
+
+
 def strip_delivery_order_suffix(call_no: str) -> str:
     """
-    Strip the P-modifier suffix from a DFAS Call No. to get the STATZ
-    Contract.contract_number for a Delivery Order.
+    Strip the P-modifier suffix from a normalized (dash-free, uppercased) DFAS
+    Call No. to get the STATZ Contract.contract_number for a Delivery Order.
 
     Rule: only strip when the 'P' appears at exactly position 14 (1-indexed
     / index 13 0-indexed), and the trailing 6 chars match P + 5 digits.
+
+    Expects call_no to already be normalized via normalize_contract_number().
     """
     if len(call_no) < 19:
         return call_no
@@ -48,13 +85,9 @@ def match_dfas_row(
     """
     Resolve a parsed DFAS row to STATZ contract + CLIN.
 
-    Args:
-        parsed_row: from dfas_parser.parse_dfas_file
-        company: the Company that owns this import. All matching is
-                 scoped to this company for multi-tenancy.
-
-    Returns:
-        MatchResult with status and any resolved objects.
+    Contract/delivery-order lookups normalize both sides (strip dashes +
+    spaces, uppercase) so DFAS dash-free numbers match STATZ dash-included
+    stored values.
     """
     if parsed_row.parse_errors:
         return MatchResult(
@@ -62,6 +95,7 @@ def match_dfas_row(
             error='\n'.join(parsed_row.parse_errors),
         )
 
+    # --- Duplicate check (unchanged) ---
     dup = (
         DfasImportRow.objects.filter(
             batch__company=company,
@@ -82,35 +116,38 @@ def match_dfas_row(
             notes=f'Previously imported in batch #{b.pk} on {day}',
         )
 
+    # --- Normalize incoming DFAS values ---
+    norm_contract_no = normalize_contract_number(parsed_row.contract_no)
+    norm_call_no_raw = normalize_contract_number(parsed_row.call_no or '')
+    norm_do_number = strip_delivery_order_suffix(norm_call_no_raw)
+
     idiq: Optional[IdiqContract] = None
     matched_contract: Optional[Contract] = None
 
-    call_nonempty = bool((parsed_row.call_no or '').strip())
+    call_nonempty = bool(norm_call_no_raw)
 
     if call_nonempty:
-        idiq = IdiqContract.objects.filter(
-            contract_number=parsed_row.contract_no,
+        # Match IDIQ by normalized contract_number
+        idiq = _norm_qs(IdiqContract.objects).filter(
+            norm_num=norm_contract_no,
         ).first()
         if not idiq:
             return MatchResult(
                 status='contract_missing',
                 notes=f'No IDIQ found for "{parsed_row.contract_no}"',
             )
-        do_number = strip_delivery_order_suffix(parsed_row.call_no)
+
+        # Try DO with suffix stripped first, then raw normalized call_no
         matched_contract = (
-            Contract.objects.filter(
-                company=company,
-                idiq_contract=idiq,
-                contract_number=do_number,
-            ).first()
+            _norm_qs(Contract.objects.filter(company=company, idiq_contract=idiq))
+            .filter(norm_num=norm_do_number)
+            .first()
         )
-        if not matched_contract:
+        if not matched_contract and norm_do_number != norm_call_no_raw:
             matched_contract = (
-                Contract.objects.filter(
-                    company=company,
-                    idiq_contract=idiq,
-                    contract_number=parsed_row.call_no,
-                ).first()
+                _norm_qs(Contract.objects.filter(company=company, idiq_contract=idiq))
+                .filter(norm_num=norm_call_no_raw)
+                .first()
             )
         if not matched_contract:
             return MatchResult(
@@ -118,20 +155,23 @@ def match_dfas_row(
                 idiq=idiq,
                 notes=(
                     f'IDIQ matched ({idiq.contract_number}); no DO found for '
-                    f'"{do_number}" or "{parsed_row.call_no}"'
+                    f'"{parsed_row.call_no}"'
                 ),
             )
     else:
-        matched_contract = Contract.objects.filter(
-            company=company,
-            contract_number=parsed_row.contract_no,
-        ).first()
+        # Standalone contract (no call_no) — match by normalized contract_number
+        matched_contract = (
+            _norm_qs(Contract.objects.filter(company=company))
+            .filter(norm_num=norm_contract_no)
+            .first()
+        )
         if not matched_contract:
             return MatchResult(
                 status='contract_missing',
                 notes=f'No contract found for "{parsed_row.contract_no}"',
             )
 
+    # --- CLIN matching (unchanged logic) ---
     clin: Optional[Clin] = None
     clin_key = (parsed_row.clin or '').strip()
     if clin_key:
