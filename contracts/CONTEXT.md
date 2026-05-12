@@ -247,7 +247,7 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 
 ## Completed migrations and fixes
 
-- **Migration 0061 MSSQL deadlock fix:** Pre-fetched `CanceledReason` and `ContractStatus` lookups into memory dicts before iterating 15k contracts. Eliminated nested queries inside atomic transaction, preventing pyodbc cursor conflicts. All lookups now happen before loop iteration begins.
+- **Migration 0061 MSSQL deadlock fix (v2):** Root cause was .iterator() holding an open server-side cursor while INSERT commands fired on the same pyodbc connection. Fix: materialize contracts via list(queryset.values(...)) before any writes, then bulk_create in batches of 500 inside a single atomic block.
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Respect `request.active_company`. When querying models with a `company` FK, either filter manually or use `ActiveCompanyQuerysetMixin`; otherwise you risk leaking cross-tenant data.

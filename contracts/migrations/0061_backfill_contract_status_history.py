@@ -1,4 +1,6 @@
 # Data migration: backfill ContractStatusHistory from legacy Contract fields.
+# MSSQL FIX: All querysets materialized into lists BEFORE any insert operations.
+# pyodbc cannot hold an open cursor while executing other commands on the same connection.
 
 from datetime import datetime, time
 
@@ -33,92 +35,100 @@ def _as_aware_dt(d_or_dt):
 
 
 def forward_backfill(apps, schema_editor):
-    with transaction.atomic():
-        Contract = apps.get_model('contracts', 'Contract')
-        ContractStatusHistory = apps.get_model('contracts', 'ContractStatusHistory')
-        ContractStatus = apps.get_model('contracts', 'ContractStatus')
-        CanceledReason = apps.get_model('contracts', 'CanceledReason')
+    Contract = apps.get_model('contracts', 'Contract')
+    ContractStatusHistory = apps.get_model('contracts', 'ContractStatusHistory')
+    ContractStatus = apps.get_model('contracts', 'ContractStatus')
+    CanceledReason = apps.get_model('contracts', 'CanceledReason')
 
-        system_user = get_or_create_system_user(apps)
+    system_user = get_or_create_system_user(apps)
 
-        # Pre-fetch ALL lookups into memory BEFORE iteration.
-        # This eliminates nested queries and prevents MSSQL cursor conflicts.
-        status_by_id = {
-            s.pk: (s.description or '').strip() for s in ContractStatus.objects.all()
-        }
-        reason_by_id = {
-            cr.pk: cr.description for cr in CanceledReason.objects.all()
-        }
+    # Pre-fetch ALL lookup tables into Python dicts — no open cursors during inserts.
+    status_by_id = {
+        s.pk: (s.description or '').strip() for s in ContractStatus.objects.all()
+    }
+    reason_by_id = {
+        cr.pk: (cr.description or '') for cr in CanceledReason.objects.all()
+    }
 
-        open_status = ContractStatus.objects.filter(description='Open').first()
-        if not open_status:
-            # Fresh databases (e.g. test runs) may not seed lookup rows until fixtures load.
-            print(
-                'Skipping ContractStatusHistory backfill: no ContractStatus with '
-                "description='Open' yet."
-            )
-            return
+    open_status = next((s for s in ContractStatus.objects.all() if (s.description or '').strip() == 'Open'), None)
+    if not open_status:
+        print(
+            'Skipping ContractStatusHistory backfill: no ContractStatus with '
+            "description='Open' yet."
+        )
+        return
 
-        closed_status = ContractStatus.objects.filter(description='Closed').first()
-        canceled_status = ContractStatus.objects.filter(description='Canceled').first()
+    closed_status = next((s for s in ContractStatus.objects.all() if (s.description or '').strip() == 'Closed'), None)
+    canceled_status = next((s for s in ContractStatus.objects.all() if (s.description or '').strip() == 'Canceled'), None)
 
-        # Iterate through contracts. NO DATABASE QUERIES inside this loop—all lookups
-        # are already in memory (status_by_id, reason_by_id, etc.).
-        for contract in Contract.objects.all().iterator():
-            created_at = (
-                _as_aware_dt(contract.created_on) if contract.created_on else timezone.now()
-            )
+    # CRITICAL FOR MSSQL: Materialize ALL contracts into a Python list before inserting.
+    # .iterator() holds an open server-side cursor which conflicts with INSERT commands
+    # on the same pyodbc connection. list() closes the read cursor before we write anything.
+    contracts = list(
+        Contract.objects.all().values(
+            'pk', 'status_id', 'created_on', 'date_closed', 'date_canceled',
+            'closed_by_id', 'cancelled_by_id', 'canceled_reason_id'
+        )
+    )
 
-            ContractStatusHistory.objects.create(
-                contract_id=contract.pk,
-                from_status_id=None,
-                to_status_id=open_status.pk,
-                changed_by_id=system_user.pk,
-                changed_at=created_at,
+    records_to_create = []
+
+    for contract in contracts:
+        created_at = (
+            _as_aware_dt(contract['created_on']) if contract['created_on'] else timezone.now()
+        )
+
+        records_to_create.append(ContractStatusHistory(
+            contract_id=contract['pk'],
+            from_status_id=None,
+            to_status_id=open_status.pk,
+            changed_by_id=system_user.pk,
+            changed_at=created_at,
+            reason='',
+        ))
+
+        desc = status_by_id.get(contract['status_id'], '') if contract['status_id'] else ''
+
+        if desc == 'Closed' and closed_status:
+            closed_by_id = contract['closed_by_id'] or system_user.pk
+            if contract['date_closed']:
+                changed_at = _as_aware_dt(contract['date_closed'])
+            elif contract['created_on']:
+                changed_at = _as_aware_dt(contract['created_on'])
+            else:
+                changed_at = timezone.now()
+            records_to_create.append(ContractStatusHistory(
+                contract_id=contract['pk'],
+                from_status_id=open_status.pk,
+                to_status_id=closed_status.pk,
+                changed_by_id=closed_by_id,
+                changed_at=changed_at,
                 reason='',
-            )
+            ))
 
-            desc = status_by_id.get(contract.status_id, '') if contract.status_id else ''
+        elif desc == 'Canceled' and canceled_status:
+            cancel_by_id = contract['cancelled_by_id'] or system_user.pk
+            if contract['date_canceled']:
+                changed_at = _as_aware_dt(contract['date_canceled'])
+            elif contract['created_on']:
+                changed_at = _as_aware_dt(contract['created_on'])
+            else:
+                changed_at = timezone.now()
+            reason = reason_by_id.get(contract['canceled_reason_id'], '')
+            records_to_create.append(ContractStatusHistory(
+                contract_id=contract['pk'],
+                from_status_id=open_status.pk,
+                to_status_id=canceled_status.pk,
+                changed_by_id=cancel_by_id,
+                changed_at=changed_at,
+                reason=reason,
+            ))
 
-            if desc == 'Closed' and closed_status:
-                closed_by_id = contract.closed_by_id or system_user.pk
-                if contract.date_closed:
-                    changed_at = _as_aware_dt(contract.date_closed)
-                elif contract.created_on:
-                    changed_at = _as_aware_dt(contract.created_on)
-                else:
-                    changed_at = timezone.now()
-                ContractStatusHistory.objects.create(
-                    contract_id=contract.pk,
-                    from_status_id=open_status.pk,
-                    to_status_id=closed_status.pk,
-                    changed_by_id=closed_by_id,
-                    changed_at=changed_at,
-                    reason='',
-                )
-            elif desc == 'Canceled' and canceled_status:
-                cancel_by_id = contract.cancelled_by_id or system_user.pk
-                if contract.date_canceled:
-                    changed_at = _as_aware_dt(contract.date_canceled)
-                elif contract.created_on:
-                    changed_at = _as_aware_dt(contract.created_on)
-                else:
-                    changed_at = timezone.now()
-                # Look up reason from pre-fetched dict instead of querying inside loop.
-                reason = reason_by_id.get(contract.canceled_reason_id, '')
-                ContractStatusHistory.objects.create(
-                    contract_id=contract.pk,
-                    from_status_id=open_status.pk,
-                    to_status_id=canceled_status.pk,
-                    changed_by_id=cancel_by_id,
-                    changed_at=changed_at,
-                    reason=reason,
-                )
-            elif desc and desc not in ('Open', 'Closed', 'Canceled'):
-                print(
-                    f'Warning: contract id={contract.pk} has non-standard status '
-                    f'description={desc!r}; only initial Open history row was written.'
-                )
+    # Bulk insert in batches of 500 — safe for MSSQL parameter limits.
+    with transaction.atomic():
+        batch_size = 500
+        for i in range(0, len(records_to_create), batch_size):
+            ContractStatusHistory.objects.bulk_create(records_to_create[i:i + batch_size])
 
 
 def reverse_backfill(apps, schema_editor):
