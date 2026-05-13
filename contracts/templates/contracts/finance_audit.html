@@ -1208,29 +1208,55 @@ function refreshClinRow(clinId) {
                 return;
             }
 
-            const clinRow = document.querySelector(`.clin-finance-audit-row[data-clin-id="${clinId}"]`);
-            if (!clinRow) return;
+            const fmt = (val) => `$${parseFloat(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-            const cells = clinRow.querySelectorAll('td');
-            if (cells.length >= 9) {
-                cells[7].textContent = `$${parseFloat(data.quote_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                cells[8].textContent = `$${parseFloat(data.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                cells[9].textContent = `$${parseFloat(data.item_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                cells[10].textContent = `$${parseFloat(data.wawf_payment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                const adjGross = parseFloat(data.adjusted_gross);
-                cells[11].textContent = `$${adjGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                cells[11].className = adjGross > 0 ? 'text-end fw-semibold text-success' : adjGross < 0 ? 'text-end fw-semibold text-danger' : 'text-end fw-semibold';
+            const quoteSpan = document.querySelector(`[data-clin="${clinId}"][data-type="quote_value"]`);
+            if (quoteSpan) {
+                quoteSpan.textContent = fmt(data.quote_value);
+                quoteSpan.dataset.value = parseFloat(data.quote_value).toFixed(2);
+            }
+
+            const paidSpan = document.querySelector(`[data-clin="${clinId}"][data-type="paid_amount"]`);
+            if (paidSpan) {
+                paidSpan.textContent = fmt(data.paid_amount);
+                paidSpan.dataset.value = parseFloat(data.paid_amount).toFixed(2);
+            }
+
+            const itemSpan = document.querySelector(`[data-entity-id="${clinId}"][data-field-type="item_value"]`);
+            if (itemSpan) {
+                itemSpan.textContent = fmt(data.item_value);
+                itemSpan.dataset.currentValue = parseFloat(data.item_value).toFixed(2);
+            }
+
+            const wawfSpan = document.querySelector(`[data-clin="${clinId}"][data-type="wawf_payment"]`);
+            if (wawfSpan) {
+                wawfSpan.textContent = fmt(data.wawf_payment);
+                wawfSpan.dataset.value = parseFloat(data.wawf_payment).toFixed(2);
+            }
+
+            const adjGross = parseFloat(data.adjusted_gross);
+            const adjGrossCell = document.querySelector(`td[data-adj-gross-clin="${clinId}"]`);
+            if (adjGrossCell) {
+                adjGrossCell.textContent = fmt(data.adjusted_gross);
+                adjGrossCell.className = adjGross > 0
+                    ? 'text-end fw-semibold text-success'
+                    : adjGross < 0
+                        ? 'text-end fw-semibold text-danger'
+                        : 'text-end fw-semibold';
             }
 
             if (data.has_shipments) {
-                const badge = clinRow.querySelector('.finance-clin-mode-badge');
-                if (!badge) {
-                    const itemCell = cells[0];
-                    const newBadge = document.createElement('span');
-                    newBadge.className = 'badge bg-primary ms-1 finance-clin-mode-badge';
-                    newBadge.title = 'Shipment mode — values tracked via shipments';
-                    newBadge.textContent = 'S';
-                    itemCell.appendChild(newBadge);
+                const clinRow = document.querySelector(`.clin-finance-audit-row[data-clin-id="${clinId}"]`);
+                if (clinRow) {
+                    const badge = clinRow.querySelector('.finance-clin-mode-badge');
+                    if (!badge) {
+                        const itemCell = clinRow.querySelector('td:first-child');
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'badge bg-primary ms-1 finance-clin-mode-badge';
+                        newBadge.title = 'Shipment mode — values tracked via shipments';
+                        newBadge.textContent = 'S';
+                        itemCell.appendChild(newBadge);
+                    }
                 }
             }
         })

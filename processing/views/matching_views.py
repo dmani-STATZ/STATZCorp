@@ -110,9 +110,7 @@ def match_packhouse(request, process_contract_id):
         process_contract.packhouse = None
         process_contract.packhouse_quote_amount = None
         process_contract.packhouse_notes = None
-        # Recompute plan_gross now that the packaging deduction is gone.
-        # calculate_plan_gross treats null packhouse_quote_amount as zero,
-        # so this naturally restores the pre-packaging plan_gross value.
+        # Recompute plan_gross to reflect current CLIN values after clearing packhouse fields.
         process_contract.plan_gross = process_contract.calculate_plan_gross()
         process_contract.save(
             update_fields=[

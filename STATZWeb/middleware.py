@@ -204,8 +204,12 @@ class ReleaseNoteGateMiddleware:
         try:
             if self._should_compute(request):
                 user = request.user
+                # publish_date is a DateField; date_joined is a DateTimeField.
+                # Coerce to a date so the boundary comparison is stable across
+                # backends and not sensitive to UTC vs local-time shifts.
+                join_date = user.date_joined.date()
                 qs = (
-                    ReleaseNote.objects.filter(publish_date__gte=user.date_joined)
+                    ReleaseNote.objects.filter(publish_date__gte=join_date)
                     .exclude(acknowledgements__user=user)
                     .order_by("publish_date")
                 )

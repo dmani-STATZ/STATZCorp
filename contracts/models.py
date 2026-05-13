@@ -184,34 +184,39 @@ class Contract(AuditModel):
     @property
     def adjusted_gross(self):
         """
-        Contract-level adjusted gross profit.
-        Formula: plan_gross - COALESCE(packaging.amount_paid, packaging.quote_amount, 0) - SUM(ContractFinanceLine.amount_billed)
+        Contract-level realized adjusted gross profit.
 
-        NOTE: This property fires DB queries. Do not call it inside loops over
-        multiple contracts. Views that need it in bulk must pre-aggregate and
-        pass the value in context (see FinanceAuditView).
+        Formula: SUM(Clin.adjusted_gross) - COALESCE(packaging.amount_paid, packaging.quote_amount, 0)
+
+        Clin.adjusted_gross already incorporates all finance line costs (CLIN-level
+        and partial-scoped), so do NOT subtract finance_costs_total separately here —
+        that would double-count finance costs.
+
+        plan_gross is intentionally excluded. It is a planning benchmark ("what we
+        thought we'd make") and is displayed separately on the Finance Audit page
+        for comparison. It does not drive the Adj Gross number.
+
+        NOTE: This property fires DB queries (CLIN fetch + packaging fetch).
+        Do not call it inside loops over multiple contracts. Views that need
+        contract-level adj gross in bulk must pre-aggregate (see FinanceAuditView).
         """
-        from django.db.models import Sum
-
-        plan = Decimal(str(self.plan_gross or 0))
+        clins_qs = self.clins.all()
+        clin_adj_gross_sum = sum(
+            (c.adjusted_gross for c in clins_qs),
+            Decimal('0.00')
+        )
 
         packaging_deduction = Decimal('0.00')
         try:
             pkg = self.packaging
-            if pkg.amount_paid is not None:
+            if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
                 packaging_deduction = Decimal(str(pkg.amount_paid))
-            elif pkg.quote_amount is not None:
+            elif pkg.quote_amount is not None and Decimal(str(pkg.quote_amount)) != Decimal('0'):
                 packaging_deduction = Decimal(str(pkg.quote_amount))
         except ContractPackaging.DoesNotExist:
             pass
 
-        finance_costs = (
-            ContractFinanceLine.objects.filter(clin__contract=self).aggregate(
-                t=Sum('amount_billed')
-            )['t'] or Decimal('0.00')
-        )
-
-        return plan - packaging_deduction - finance_costs
+        return clin_adj_gross_sum - packaging_deduction
 
     def get_sharepoint_documents_url(self):
         """
@@ -687,12 +692,33 @@ class Clin(AuditModel):
     @property
     def adjusted_gross(self):
         """
-        Gross profit minus ALL finance line costs for this CLIN
-        (both CLIN-level and partial-shipment-level).
+        Realized gross profit for this CLIN.
+
+        Income side: use wawf_payment (actual government payment) if populated
+        and non-zero, otherwise fall back to item_value (contracted amount).
+
+        Cost side: use paid_amount (actual supplier payment) if populated and
+        non-zero, otherwise fall back to quote_value (contracted supplier cost).
+
+        Finance line costs (CLIN-level and partial-level) are subtracted from
+        the result.
+
+        This formula naturally evolves as the contract executes:
+        - At award: adj_gross ~= item_value - quote_value (projected profit)
+        - Mid-execution: adj_gross reflects partial real money flows
+        - Fully executed: adj_gross ~= wawf_payment - paid_amount (realized profit)
         """
-        item_val = Decimal(str(self.item_value or 0))
-        quote_val = Decimal(str(self.quote_value or 0))
-        gross = item_val - quote_val
+        def coalesce_decimal(*values):
+            for v in values:
+                d = Decimal(str(v)) if v is not None else Decimal('0')
+                if d != Decimal('0'):
+                    return d
+            return Decimal('0')
+
+        income = coalesce_decimal(self.wawf_payment, self.item_value)
+        cost = coalesce_decimal(self.paid_amount, self.quote_value)
+        gross = income - cost
+
         finance_costs = (
             self.finance_lines.aggregate(total=Sum('amount_billed'))['total']
             or Decimal('0.00')

@@ -155,9 +155,6 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 context['shipments_by_clin'] = shipments_by_clin
                 context['shipment_subtotals_by_clin'] = shipment_subtotals_by_clin
 
-                plan = self.object.plan_gross
-                plan_dec = plan if plan is not None else Decimal('0.00')
-
                 # Packaging deduction: use amount_paid if set, fall back to quote_amount
                 packaging_deduction = Decimal('0.00')
                 packaging_context = None
@@ -173,7 +170,6 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
 
                 context['packaging'] = packaging_context
                 context['packaging_deduction'] = packaging_deduction
-                context['adj_gross_contract'] = plan_dec - packaging_deduction - finance_costs_total
 
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)
@@ -232,6 +228,10 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         Decimal('0.00'),
                     )
                 context['clins'] = clins_list
+                clin_adj_gross_sum = sum(
+                    (c.adjusted_gross for c in clins_list),
+                    Decimal('0.00'),
+                )
                 context['clin_totals'] = {
                     'quote_value': sum(
                         (Decimal(str(c.quote_value or 0)) for c in clins_list),
@@ -249,11 +249,9 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         (Decimal(str(c.wawf_payment or 0)) for c in clins_list),
                         Decimal('0.00'),
                     ),
-                    'adj_gross': sum(
-                        (c.adjusted_gross for c in clins_list),
-                        Decimal('0.00'),
-                    ),
+                    'adj_gross': clin_adj_gross_sum,
                 }
+                context['adj_gross_contract'] = clin_adj_gross_sum - context['packaging_deduction']
 
                 # Contract-level CLIN sum comparison
                 clin_item_value_sum = context['clin_totals']['item_value']
@@ -303,9 +301,6 @@ def finance_audit_summary_api(request, contract_id):
             or Decimal('0.00')
         )
 
-        plan = contract.plan_gross
-        plan_dec = plan if plan is not None else Decimal('0.00')
-
         # Packaging deduction mirrors FinanceAuditView.get_context_data
         packaging_deduction = Decimal('0.00')
         try:
@@ -317,31 +312,31 @@ def finance_audit_summary_api(request, contract_id):
         except ContractPackaging.DoesNotExist:
             pass
 
-        adj_gross_contract = plan_dec - packaging_deduction - finance_costs_total
-
-        clins_qs = Clin.objects.filter(contract=contract)
+        clins_list = list(Clin.objects.filter(contract=contract))
+        clin_adj_gross_sum = sum(
+            (c.adjusted_gross for c in clins_list),
+            Decimal('0.00'),
+        )
         clin_totals = {
             'quote_value': sum(
-                (Decimal(str(c.quote_value or 0)) for c in clins_qs),
+                (Decimal(str(c.quote_value or 0)) for c in clins_list),
                 Decimal('0.00'),
             ),
             'paid_amount': sum(
-                (Decimal(str(c.paid_amount or 0)) for c in clins_qs),
+                (Decimal(str(c.paid_amount or 0)) for c in clins_list),
                 Decimal('0.00'),
             ),
             'item_value': sum(
-                (Decimal(str(c.item_value or 0)) for c in clins_qs),
+                (Decimal(str(c.item_value or 0)) for c in clins_list),
                 Decimal('0.00'),
             ),
             'wawf_payment': sum(
-                (Decimal(str(c.wawf_payment or 0)) for c in clins_qs),
+                (Decimal(str(c.wawf_payment or 0)) for c in clins_list),
                 Decimal('0.00'),
             ),
-            'adj_gross': sum(
-                (c.adjusted_gross for c in clins_qs),
-                Decimal('0.00'),
-            ),
+            'adj_gross': clin_adj_gross_sum,
         }
+        adj_gross_contract = clin_adj_gross_sum - packaging_deduction
 
         clin_item_value_sum = clin_totals['item_value']
         contract_value = Decimal(str(contract.contract_value or 0))

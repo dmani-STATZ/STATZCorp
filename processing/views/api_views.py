@@ -271,9 +271,6 @@ def update_process_contract_field(request, pk):
         
         instance.save()
 
-        if field_name == 'packhouse_quote_amount':
-            instance.update_calculated_values()
-
         # Return the new value and any related field values
         response_data = {
             'status': 'success',
@@ -281,10 +278,6 @@ def update_process_contract_field(request, pk):
             'field_value': field_value,
             'related_updates': {}
         }
-        if field_name == 'packhouse_quote_amount':
-            response_data['plan_gross'] = (
-                str(instance.plan_gross) if instance.plan_gross is not None else None
-            )
 
         # Add related field updates to response
         if field_name == 'contract_type':
