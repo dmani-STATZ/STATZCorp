@@ -181,6 +181,38 @@ class Contract(AuditModel):
             clin__contract=self
         ).aggregate(total=Sum('split_paid'))['total'] or 0
 
+    @property
+    def adjusted_gross(self):
+        """
+        Contract-level adjusted gross profit.
+        Formula: plan_gross - COALESCE(packaging.amount_paid, packaging.quote_amount, 0) - SUM(ContractFinanceLine.amount_billed)
+
+        NOTE: This property fires DB queries. Do not call it inside loops over
+        multiple contracts. Views that need it in bulk must pre-aggregate and
+        pass the value in context (see FinanceAuditView).
+        """
+        from django.db.models import Sum
+
+        plan = Decimal(str(self.plan_gross or 0))
+
+        packaging_deduction = Decimal('0.00')
+        try:
+            pkg = self.packaging
+            if pkg.amount_paid is not None:
+                packaging_deduction = Decimal(str(pkg.amount_paid))
+            elif pkg.quote_amount is not None:
+                packaging_deduction = Decimal(str(pkg.quote_amount))
+        except ContractPackaging.DoesNotExist:
+            pass
+
+        finance_costs = (
+            ContractFinanceLine.objects.filter(clin__contract=self).aggregate(
+                t=Sum('amount_billed')
+            )['t'] or Decimal('0.00')
+        )
+
+        return plan - packaging_deduction - finance_costs
+
     def get_sharepoint_documents_url(self):
         """
         Build SharePoint folder URL for this contract's documents.
@@ -789,7 +821,9 @@ class PaymentHistory(AuditModel):
         # Contract-level payment types
         ('contract_value', 'Contract Value'),
         ('plan_gross', 'Plan Gross'),
-        
+        ('packaging_quote', 'Packaging Quote'),
+        ('packaging_paid', 'Packaging Paid'),
+
         # CLIN-level payment types
         ('item_value', 'Item Value'),
         ('quote_value', 'Quote Value'),
@@ -863,6 +897,11 @@ class PaymentHistory(AuditModel):
             'partial_wawf_payment',
         ]
 
+    @classmethod
+    def get_contract_packaging_payment_types(cls):
+        """Returns payment types valid for ContractPackaging."""
+        return ['packaging_quote', 'packaging_paid']
+
     def clean(self):
         """Validates that the payment type is appropriate for the content object"""
         if self.content_type.model == 'contract' and self.payment_type not in self.get_contract_payment_types():
@@ -876,6 +915,10 @@ class PaymentHistory(AuditModel):
         elif self.content_type.model == 'clinshipment' and self.payment_type not in self.get_clinshipment_payment_types():
             raise ValidationError({
                 'payment_type': f'Payment type {self.get_payment_type_display()} is not valid for partial shipments'
+            })
+        elif self.content_type.model == 'contractpackaging' and self.payment_type not in self.get_contract_packaging_payment_types():
+            raise ValidationError({
+                'payment_type': f'Payment type {self.get_payment_type_display()} is not valid for contract packaging'
             })
         super().clean()
 

@@ -10,7 +10,7 @@ from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.http import JsonResponse
-from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, PaymentHistory
+from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, ContractPackaging, PaymentHistory
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
 from decimal import Decimal
@@ -53,6 +53,8 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['shipment_subtotals_by_clin'] = {}
         context['finance_costs_total'] = Decimal('0.00')
         context['adj_gross_contract'] = Decimal('0.00')
+        context['packaging'] = None
+        context['packaging_deduction'] = Decimal('0.00')
         context['payment_activity_rollup'] = []
         context['payment_activity_page'] = None
         context['payment_activity_total'] = 0
@@ -155,7 +157,23 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
 
                 plan = self.object.plan_gross
                 plan_dec = plan if plan is not None else Decimal('0.00')
-                context['adj_gross_contract'] = plan_dec - finance_costs_total
+
+                # Packaging deduction: use amount_paid if set, fall back to quote_amount
+                packaging_deduction = Decimal('0.00')
+                packaging_context = None
+                try:
+                    pkg = self.object.packaging
+                    if pkg.amount_paid is not None:
+                        packaging_deduction = Decimal(str(pkg.amount_paid))
+                    elif pkg.quote_amount is not None:
+                        packaging_deduction = Decimal(str(pkg.quote_amount))
+                    packaging_context = pkg
+                except ContractPackaging.DoesNotExist:
+                    pass
+
+                context['packaging'] = packaging_context
+                context['packaging_deduction'] = packaging_deduction
+                context['adj_gross_contract'] = plan_dec - packaging_deduction - finance_costs_total
 
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)
@@ -287,7 +305,19 @@ def finance_audit_summary_api(request, contract_id):
 
         plan = contract.plan_gross
         plan_dec = plan if plan is not None else Decimal('0.00')
-        adj_gross_contract = plan_dec - finance_costs_total
+
+        # Packaging deduction mirrors FinanceAuditView.get_context_data
+        packaging_deduction = Decimal('0.00')
+        try:
+            pkg = contract.packaging
+            if pkg.amount_paid is not None:
+                packaging_deduction = Decimal(str(pkg.amount_paid))
+            elif pkg.quote_amount is not None:
+                packaging_deduction = Decimal(str(pkg.quote_amount))
+        except ContractPackaging.DoesNotExist:
+            pass
+
+        adj_gross_contract = plan_dec - packaging_deduction - finance_costs_total
 
         clins_qs = Clin.objects.filter(contract=contract)
         clin_totals = {

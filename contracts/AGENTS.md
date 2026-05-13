@@ -301,6 +301,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 ## 8. Model and Schema Change Rules
 
+- **ContractPackaging financial fields:** `quote_amount` and `amount_paid` are updated via `PaymentHistory` rows (entity_type `contract_packaging`, payment types `packaging_quote` / `packaging_paid`). The write-back from `new_total` after a payment delete must also update the stored field. `invoice_number` and `payment_date` are updated via `update_packaging_finance`. `packhouse` and `notes` are updated via `update_packaging_details`. Do not add direct form-POST edit paths for the financial fields — they must go through PaymentHistory to preserve the audit ledger. Note that `ContentType.objects.get_for_model(ContractPackaging).model` returns `'contractpackaging'` (no underscore); the URL/JS-facing `entity_type` is `'contract_packaging'` (with underscore). Keep both forms in sync in `payment_history_views.py`.
 - **Before renaming any `Contract` or `Clin` field:** search `transactions/` (signals, TRACKED_FIELDS), `processing/` (QueueContract/QueueClin field mapping), `sales/` (matching.py, views), and all `contracts/views/*.py` for string references to the field name.
 - **`Nsn` FK on `Clin` uses `PROTECT`.** You cannot delete an `Nsn` that has CLINs. Any migration that changes this behavior will affect `products` app.
 - **`Company` FK on most models uses `PROTECT`.** Deleting a `Company` will fail if any Contract, Clin, Note, Reminder, or GovAction exists for it. This is intentional.

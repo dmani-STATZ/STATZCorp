@@ -201,6 +201,11 @@ from .views.documents_views import (
     sharepoint_files_api,
 )
 from .views.split_views import recalc_splits
+from .views.packaging_views import (
+    get_packaging_modal,
+    update_packaging_details,
+    update_packaging_finance,
+)
 from .views.dfas_import_views import (
     dfas_import_cancel_view,
     dfas_import_finalize_view,
@@ -704,6 +709,22 @@ urlpatterns = [
     path("clin/splits/<int:split_pk>/delete/", delete_clin_split, name="delete_clin_split"),
     path("clin/<int:clin_pk>/splits/", get_clin_splits, name="get_clin_splits"),
     path("contracts/<int:contract_pk>/splits/recalc/", recalc_splits, name="recalc_splits"),
+    # Contract Packaging
+    path(
+        "api/packaging/<int:pk>/update/",
+        update_packaging_details,
+        name="update_packaging_details",
+    ),
+    path(
+        "api/packaging/<int:pk>/update-finance/",
+        update_packaging_finance,
+        name="update_packaging_finance",
+    ),
+    path(
+        "api/contract/<int:contract_pk>/packaging/",
+        get_packaging_modal,
+        name="get_packaging_modal",
+    ),
     # FolderStack AJAX endpoints
     path("folder-stack/list/", folderstack_list, name="folderstack_list"),
     path("folder-stack/save/", folderstack_save, name="folderstack_save"),

@@ -40,6 +40,7 @@ window.onTransactionSaved = function(data) {
       <a class="nav-link active" href="#review-contract">Contract Info</a>
       <a class="nav-link" href="#review-financials">Financials</a>
       <a class="nav-link" href="#review-misc">Misc</a>
+      <a class="nav-link" href="#review-packaging">Packaging</a>
       <a class="nav-link" href="#review-splits">Split Summary</a>
       <a class="nav-link" href="#review-assignment">Assignment</a>
       <a class="nav-link" href="#review-clins">CLINs</a>
@@ -279,6 +280,103 @@ window.onTransactionSaved = function(data) {
       </div>
     </section>
 
+    {# SECTION: Packaging #}
+    <section id="review-packaging" class="mb-4">
+      <div class="card review-section-card review-card-packaging">
+        <div class="card-header review-section-header d-flex justify-content-between align-items-center">
+          <span>Packaging</span>
+        </div>
+        <div class="card-body">
+          {% if packaging %}
+          <div class="row g-3">
+
+            {# Packhouse — editable, links to supplier detail #}
+            <div class="col-md-4">
+              <button type="button" class="review-field-btn"
+                onclick="openPackagingFieldEdit('packhouse', '{{ packaging.id }}')">
+                Packhouse
+              </button>
+              <span class="review-field-value d-block" id="packaging-packhouse-value">
+                <a href="{% url 'contracts:supplier_detail' packaging.packhouse.id %}"
+                   class="text-primary">
+                  {{ packaging.packhouse.name }}
+                </a>
+                {% if packaging.packhouse.cage_code %}
+                  <span class="text-body-secondary small ms-1">— {{ packaging.packhouse.cage_code }}</span>
+                {% endif %}
+              </span>
+            </div>
+
+            {# Quote Amount — read-only here; editable on Finance Audit #}
+            <div class="col-md-2">
+              <span class="review-field-label">Quote Amount</span>
+              <span class="review-field-value d-block text-body-secondary fst-italic" id="packaging-quote-value">
+                {% if packaging.quote_amount %}
+                  ${{ packaging.quote_amount|floatformat:2|intcomma }}
+                {% else %}—{% endif %}
+                <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+              </span>
+            </div>
+
+            {# Amount Paid — read-only here; editable on Finance Audit #}
+            <div class="col-md-2">
+              <span class="review-field-label">Amount Paid</span>
+              <span class="review-field-value d-block text-body-secondary fst-italic" id="packaging-paid-value">
+                {% if packaging.amount_paid %}
+                  ${{ packaging.amount_paid|floatformat:2|intcomma }}
+                {% else %}—{% endif %}
+                <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+              </span>
+            </div>
+
+            {# Invoice Number — read-only here; editable on Finance Audit #}
+            <div class="col-md-2">
+              <span class="review-field-label">Invoice #</span>
+              <span class="review-field-value d-block text-body-secondary fst-italic">
+                {{ packaging.invoice_number|default:"—" }}
+                <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+              </span>
+            </div>
+
+            {# Notes — editable inline #}
+            <div class="col-md-12">
+              <button type="button" class="review-field-btn"
+                onclick="openPackagingFieldEdit('notes', '{{ packaging.id }}')">
+                Notes
+              </button>
+              <span class="review-field-value d-block" id="packaging-notes-value">
+                {{ packaging.notes|default:"—" }}
+              </span>
+            </div>
+
+          </div>
+
+          {# Packaging edit modal — Bootstrap 5 #}
+          <div class="modal fade" id="packagingEditModal" tabindex="-1" aria-labelledby="packagingEditModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="packagingEditModalLabel">Edit Packaging</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="packagingEditModalBody">
+                  {# Content injected by JS based on which field is being edited #}
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-primary" id="packagingEditSaveBtn">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% else %}
+          <p class="text-body-secondary small mb-0">No packaging information recorded for this contract.</p>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
     {# SECTION: Split Summary #}
     <section id="review-splits" class="mb-4">
       <div class="card review-section-card review-card-splits">
@@ -430,4 +528,84 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
+{% if packaging %}
+<script>
+(function () {
+    var packagingEditModal = null;
+    var currentPackagingId = null;
+    var currentField = null;
+
+    var packagingSuppliers = {{ packhouse_suppliers|safe }};
+
+    function openPackagingFieldEdit(field, packagingId) {
+        currentField = field;
+        currentPackagingId = packagingId;
+
+        var body = document.getElementById('packagingEditModalBody');
+        var label = document.getElementById('packagingEditModalLabel');
+
+        if (field === 'packhouse') {
+            label.textContent = 'Edit Packhouse';
+            var currentId = '{{ packaging.packhouse.id|default:"" }}';
+            var options = packagingSuppliers.map(function(s) {
+                var selected = String(s.id) === String(currentId) ? ' selected' : '';
+                var labelText = s.name + (s.cage_code ? ' — ' + s.cage_code : '');
+                return '<option value="' + s.id + '"' + selected + '>' + labelText + '</option>';
+            }).join('');
+            body.innerHTML = '<div class="mb-3"><label class="form-label">Packhouse Supplier</label>' +
+                '<select class="form-select" id="packagingFieldInput">' + options + '</select></div>';
+        } else if (field === 'notes') {
+            label.textContent = 'Edit Packaging Notes';
+            var currentNotes = document.getElementById('packaging-notes-value').textContent.trim();
+            if (currentNotes === '—') currentNotes = '';
+            body.innerHTML = '<div class="mb-3"><label class="form-label">Notes</label>' +
+                '<textarea class="form-control" id="packagingFieldInput" rows="4">' +
+                currentNotes.replace(/</g, '&lt;') + '</textarea></div>';
+        }
+
+        if (!packagingEditModal) {
+            packagingEditModal = new bootstrap.Modal(document.getElementById('packagingEditModal'));
+        }
+        packagingEditModal.show();
+    }
+
+    document.getElementById('packagingEditSaveBtn').addEventListener('click', function () {
+        var input = document.getElementById('packagingFieldInput');
+        if (!input) return;
+        var value = input.value;
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch('/contracts/api/packaging/' + currentPackagingId + '/update/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+            },
+            body: 'field=' + encodeURIComponent(currentField) + '&value=' + encodeURIComponent(value),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                if (currentField === 'packhouse') {
+                    // Reload the page to refresh the supplier link — simpler than DOM surgery on an anchor
+                    window.location.reload();
+                } else if (currentField === 'notes') {
+                    document.getElementById('packaging-notes-value').textContent = data.display_value || '—';
+                }
+                if (window.notify) window.notify('success', 'Saved', 2000);
+                packagingEditModal.hide();
+            } else {
+                if (window.notify) window.notify('error', data.error || 'Save failed', 3000);
+            }
+        })
+        .catch(function() {
+            if (window.notify) window.notify('error', 'Save failed', 3000);
+        });
+    });
+
+    window.openPackagingFieldEdit = openPackagingFieldEdit;
+})();
+</script>
+{% endif %}
 {% endblock extra_scripts %}

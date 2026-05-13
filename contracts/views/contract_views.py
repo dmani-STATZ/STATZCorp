@@ -21,6 +21,7 @@ from django.dispatch import receiver
 from STATZWeb.decorators import conditional_login_required
 from ..models import (
     Contract,
+    ContractPackaging,
     Clin,
     ClinSplit,
     Note,
@@ -660,6 +661,30 @@ class ContractReviewView(DetailView):
                 total_paid=Sum('split_paid'),
             ).order_by('company_name')
         )
+
+        # Packaging (optional — may not exist on every contract)
+        try:
+            context['packaging'] = contract.packaging
+        except ContractPackaging.DoesNotExist:
+            context['packaging'] = None
+
+        # Packhouse picker (suppliers flagged as packhouse first, then by name).
+        # Serialize to JSON so the template can embed it directly in <script>.
+        from suppliers.models import Supplier
+        from django.utils.safestring import mark_safe
+        packhouse_suppliers = list(
+            Supplier.objects.filter(archived=False)
+            .order_by('-is_packhouse', 'name')
+            .values('id', 'name', 'cage_code')
+        )
+        context['packhouse_suppliers'] = mark_safe(json.dumps(packhouse_suppliers))
+
+        # Expose the ContractPackaging content type id so JS can reference it
+        # for PaymentHistory / future hooks without a second roundtrip.
+        if context['packaging']:
+            context['packaging_content_type_id'] = DjangoContentType.objects.get_for_model(ContractPackaging).id
+        else:
+            context['packaging_content_type_id'] = None
 
         return context
 

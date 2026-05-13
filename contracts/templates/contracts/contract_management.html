@@ -349,48 +349,73 @@
     <div class="card card-padded !p-2 mt-2 relative">
         <div class="grid grid-cols-12 gap-2">
             <!-- CLIN Table - left ~35% -->
-            <div class="col-span-4 overflow-x-auto overflow-y-auto border border-gray-200 rounded" style="max-height: 220px">
-<p class="px-3 pt-1 text-lg font-bold text-gray-800 uppercase tracking-wider">Contract Line Items</p>
-            <div class="min-w-full">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead>
-                        <tr>
-                            <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
-                                Item No
-                            </th>
-                            <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
-                                Item Type
-                            </th>
-                            <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
-                                Supplier
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        {% for clin in clins %}
-                        <tr id="clin-row-{{ clin.id }}"
-                            data-clin-id="{{ clin.id }}"
-                            class="{% if selected_clin and clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
-                            <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
-                                {{ clin.item_number|default:"0000" }}
-                            </td>
-                            <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
-                                {{ clin.get_item_type_display|default:"—" }}
-                            </td>
-                            <td class="px-3 py-1 text-sm text-gray-900">
-                                {% if clin.supplier %}{{ clin.supplier.name }}{% else %}N/A{% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="px-3 py-2 text-center text-gray-500 text-sm">
-                                No CLINs found for this contract
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <div class="col-span-4">
+                <div class="overflow-x-auto overflow-y-auto border border-gray-200 rounded" style="max-height: 220px">
+                    <p class="px-3 pt-1 text-lg font-bold text-gray-800 uppercase tracking-wider">Contract Line Items</p>
+                    <div class="min-w-full">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
+                                        Item No
+                                    </th>
+                                    <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
+                                        Item Type
+                                    </th>
+                                    <th class="px-3 py-1 bg-gray-50 text-left text-xs label tracking-wider">
+                                        Supplier
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                {% for clin in clins %}
+                                <tr id="clin-row-{{ clin.id }}"
+                                    data-clin-id="{{ clin.id }}"
+                                    class="{% if selected_clin and clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
+                                    <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
+                                        {{ clin.item_number|default:"0000" }}
+                                    </td>
+                                    <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
+                                        {{ clin.get_item_type_display|default:"—" }}
+                                    </td>
+                                    <td class="px-3 py-1 text-sm text-gray-900">
+                                        {% if clin.supplier %}{{ clin.supplier.name }}{% else %}N/A{% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="px-3 py-2 text-center text-gray-500 text-sm">
+                                        No CLINs found for this contract
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {# Packhouse card — directly below CLIN table, inside col-span-4 #}
+                {% if contract.packaging %}
+                <div class="card card-padded !p-2 mt-2" id="packhouse-card">
+                    <div class="d-flex align-items-center gap-2 px-2 py-1">
+                        <span class="text-xs font-semibold text-gray-600 flex-shrink-0">Packhouse:</span>
+                        <a href="{% url 'contracts:supplier_detail' contract.packaging.packhouse.id %}"
+                           class="text-sm text-blue-600 hover:text-blue-800 fw-semibold">
+                            {{ contract.packaging.packhouse.name }}
+                        </a>
+                        {% if contract.packaging.packhouse.cage_code %}
+                        <span class="text-xs text-gray-500">— {{ contract.packaging.packhouse.cage_code }}</span>
+                        {% endif %}
+                        <button type="button"
+                                class="btn btn-link btn-sm p-0 ms-auto text-secondary"
+                                id="packagingInfoBtn"
+                                title="Packaging details"
+                                aria-label="Packaging details">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
             </div>
             <!-- CLIN Details Panel - right ~65% -->
             <div class="col-span-8 border border-gray-200 rounded bg-gray-50 p-2 min-h-[200px]" id="clin-details-panel">
@@ -893,6 +918,33 @@
         </div>
     </div>
 </div>
+
+{# Packaging Info Modal — Bootstrap 5 — read-only display + notes edit #}
+{% if contract.packaging %}
+<div class="modal fade" id="packagingInfoModal" tabindex="-1" aria-labelledby="packagingInfoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="packagingInfoModalLabel">Packaging Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="packagingInfoModalBody">
+        <p class="text-body-secondary small">Loading...</p>
+      </div>
+      <div class="modal-footer d-flex justify-content-between align-items-center">
+        <div id="packagingNotesEditControls" class="d-none flex-grow-1 me-2">
+          <textarea class="form-control form-control-sm" id="packagingNotesInput" rows="3"></textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="packagingNotesEditBtn">Edit Notes</button>
+          <button type="button" class="btn btn-sm btn-primary d-none" id="packagingNotesSaveBtn">Save Notes</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
@@ -2575,4 +2627,90 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 })();
 </script>
+
+{% if contract.packaging %}
+<script>
+(function () {
+    var packagingInfoModal = null;
+    var currentPackagingId = null;
+
+    var infoBtn = document.getElementById('packagingInfoBtn');
+    if (!infoBtn) return;
+
+    infoBtn.addEventListener('click', function () {
+        var body = document.getElementById('packagingInfoModalBody');
+        body.innerHTML = '<p class="text-body-secondary small">Loading...</p>';
+
+        document.getElementById('packagingNotesEditControls').classList.add('d-none');
+        document.getElementById('packagingNotesSaveBtn').classList.add('d-none');
+        document.getElementById('packagingNotesEditBtn').classList.remove('d-none');
+
+        if (!packagingInfoModal) {
+            packagingInfoModal = new bootstrap.Modal(document.getElementById('packagingInfoModal'));
+        }
+        packagingInfoModal.show();
+
+        fetch('/contracts/api/contract/{{ contract.id }}/packaging/')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.has_packaging) {
+                    body.innerHTML = '<p class="text-body-secondary">No packaging info.</p>';
+                    return;
+                }
+                currentPackagingId = data.packaging_id;
+                body.innerHTML =
+                    '<dl class="row mb-0">' +
+                    '<dt class="col-sm-4">Packhouse</dt><dd class="col-sm-8">' + (data.packhouse_name || '—') + '</dd>' +
+                    '<dt class="col-sm-4">Cage Code</dt><dd class="col-sm-8">' + (data.cage_code || '—') + '</dd>' +
+                    '<dt class="col-sm-4">Quote</dt><dd class="col-sm-8">' + (data.quote_amount ? '$' + parseFloat(data.quote_amount).toLocaleString('en-US', {minimumFractionDigits:2}) : '—') + '</dd>' +
+                    '<dt class="col-sm-4">Paid</dt><dd class="col-sm-8">' + (data.amount_paid ? '$' + parseFloat(data.amount_paid).toLocaleString('en-US', {minimumFractionDigits:2}) : '—') + '</dd>' +
+                    '<dt class="col-sm-4">Notes</dt><dd class="col-sm-8" id="packagingModalNotesDisplay">' + (data.notes || '<span class="text-body-secondary">—</span>') + '</dd>' +
+                    '<dt class="col-sm-4 text-body-secondary small">Last Modified</dt><dd class="col-sm-8 text-body-secondary small">' + data.modified_by + ' on ' + data.modified_on + '</dd>' +
+                    '</dl>';
+                document.getElementById('packagingNotesInput').value = data.notes || '';
+            })
+            .catch(function() {
+                body.innerHTML = '<p class="text-danger small">Failed to load packaging info.</p>';
+            });
+    });
+
+    document.getElementById('packagingNotesEditBtn').addEventListener('click', function () {
+        document.getElementById('packagingNotesEditControls').classList.remove('d-none');
+        document.getElementById('packagingNotesSaveBtn').classList.remove('d-none');
+        this.classList.add('d-none');
+    });
+
+    document.getElementById('packagingNotesSaveBtn').addEventListener('click', function () {
+        if (!currentPackagingId) return;
+        var notes = document.getElementById('packagingNotesInput').value;
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch('/contracts/api/packaging/' + currentPackagingId + '/update/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+            },
+            body: 'field=notes&value=' + encodeURIComponent(notes),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var display = document.getElementById('packagingModalNotesDisplay');
+                if (display) display.textContent = notes || '—';
+                document.getElementById('packagingNotesEditControls').classList.add('d-none');
+                document.getElementById('packagingNotesSaveBtn').classList.add('d-none');
+                document.getElementById('packagingNotesEditBtn').classList.remove('d-none');
+                if (window.notify) window.notify('success', 'Notes saved', 2000);
+            } else {
+                if (window.notify) window.notify('error', data.error || 'Save failed', 3000);
+            }
+        })
+        .catch(function() {
+            if (window.notify) window.notify('error', 'Save failed', 3000);
+        });
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

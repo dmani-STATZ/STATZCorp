@@ -8,7 +8,7 @@ from django.views.decorators.http import require_http_methods
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, ClinShipment, ContractFinanceLine, FinanceLinePayment, PaymentHistory
+from ..models import Contract, Clin, ClinShipment, ContractFinanceLine, ContractPackaging, FinanceLinePayment, PaymentHistory
 
 
 def _active_company_or_error(request):
@@ -88,6 +88,7 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
         'contract': Contract,
         'clin': Clin,
         'clinshipment': ClinShipment,
+        'contract_packaging': ContractPackaging,
     }
 
     if entity_type not in model_map:
@@ -105,6 +106,11 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
     elif entity_type == 'clinshipment':
         entity = get_object_or_404(
             ClinShipment.objects.filter(clin__contract__company=company),
+            id=entity_id,
+        )
+    elif entity_type == 'contract_packaging':
+        entity = get_object_or_404(
+            ContractPackaging.objects.filter(contract__company=company),
             id=entity_id,
         )
     else:
@@ -150,6 +156,8 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                 valid_types = PaymentHistory.get_clin_payment_types()
             elif entity_type == 'clinshipment':
                 valid_types = PaymentHistory.get_clinshipment_payment_types()
+            elif entity_type == 'contract_packaging':
+                valid_types = PaymentHistory.get_contract_packaging_payment_types()
             else:
                 valid_types = []
 
@@ -213,6 +221,18 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                 shipment.save()
                 # Do not call _sync_clin_ship_fields here. Partial and CLIN
                 # financial fields are tracked independently.
+            elif entity_type == 'contract_packaging':
+                pkg = ContractPackaging.objects.get(
+                    id=entity_id, contract__company=company
+                )
+                if payment_type == 'packaging_quote':
+                    pkg.quote_amount = new_total
+                    update_field = 'quote_amount'
+                else:
+                    pkg.amount_paid = new_total
+                    update_field = 'amount_paid'
+                pkg.modified_by = request.user
+                pkg.save(update_fields=[update_field, 'modified_by', 'modified_on'])
 
             return JsonResponse({
                 'success': True,
@@ -265,6 +285,13 @@ def delete_payment_history_entry(request, payment_id):
             return JsonResponse({'error': 'Shipment not found'}, status=404)
         if shipment.clin.contract.company_id != company.id:
             return JsonResponse({'error': 'Permission denied'}, status=403)
+    elif entity_type == 'contractpackaging':
+        try:
+            pkg = ContractPackaging.objects.select_related('contract').get(id=object_id)
+        except ContractPackaging.DoesNotExist:
+            return JsonResponse({'error': 'Packaging not found'}, status=404)
+        if pkg.contract.company_id != company.id:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
     else:
         return JsonResponse({'error': 'Unsupported entity type'}, status=400)
 
@@ -316,6 +343,22 @@ def delete_payment_history_entry(request, payment_id):
             # Do not call _sync_clin_ship_fields here. Partial and CLIN
             # financial fields are tracked independently.
 
+        elif entity_type == 'contractpackaging':
+            pkg = ContractPackaging.objects.get(
+                id=object_id, contract__company=company
+            )
+            if payment_type == 'packaging_quote':
+                pkg.quote_amount = new_total
+                update_field = 'quote_amount'
+            elif payment_type == 'packaging_paid':
+                pkg.amount_paid = new_total
+                update_field = 'amount_paid'
+            else:
+                update_field = None
+            if update_field:
+                pkg.modified_by = request.user
+                pkg.save(update_fields=[update_field, 'modified_by', 'modified_on'])
+
         return JsonResponse({
             'success': True,
             'new_total': float(new_total),
@@ -353,6 +396,7 @@ def get_entity_details(request, entity_type, entity_id):
         'contract': Contract,
         'clin': Clin,
         'clinshipment': ClinShipment,
+        'contract_packaging': ContractPackaging,
     }
 
     if entity_type not in model_map and entity_type != 'finance_line':
@@ -388,6 +432,17 @@ def get_entity_details(request, entity_type, entity_id):
                 'contract_number': shipment.clin.contract.contract_number
                     if shipment.clin.contract else None,
                 'valid_payment_types': PaymentHistory.get_clinshipment_payment_types(),
+            }
+        elif entity_type == 'contract_packaging':
+            pkg = get_object_or_404(
+                ContractPackaging.objects.select_related('packhouse', 'contract'),
+                pk=entity_id,
+                contract__company=company,
+            )
+            details = {
+                'number': pkg.packhouse.name if pkg.packhouse else '—',
+                'contract_number': pkg.contract.contract_number,
+                'valid_payment_types': PaymentHistory.get_contract_packaging_payment_types(),
             }
         else:
             return JsonResponse({'error': f'Invalid entity type: {entity_type}'}, status=400)

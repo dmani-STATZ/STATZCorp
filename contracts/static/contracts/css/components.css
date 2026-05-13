@@ -487,6 +487,7 @@ html {
 .review-card-splits      { border-left-color: #6f42c1 !important; }
 .review-card-assignment  { border-left-color: var(--bs-info) !important; }
 .review-card-clins       { border-left-color: var(--bs-danger) !important; }
+.review-card-packaging   { border-left-color: var(--bs-teal, #20c997) !important; }
 
 /* Card header */
 .review-section-header {
@@ -678,4 +679,27 @@ html {
 .dfas-import-page main > div.mx-auto {
     width: 100% !important;
     max-width: none !important;
+}
+
+/* === Packaging === */
+
+/* Contract Review packaging card — matches existing review-card color scheme */
+.review-card-packaging .review-section-header {
+    background-color: var(--bs-teal, #20c997);
+    color: #fff;
+}
+
+/* Finance Audit packaging card — sibling of Split Summary in the middle column.
+ * flex-shrink: 0 prevents the card from collapsing when Split Summary grows,
+ * preserving the column's `gap` separator between the two cards. */
+#packaging-finance-card {
+    flex-shrink: 0;
+}
+
+#packaging-finance-card .card-header {
+    background-color: var(--bs-danger-bg-subtle);
+}
+
+[data-bs-theme="dark"] #packaging-finance-card .card-header {
+    background-color: color-mix(in srgb, var(--bs-danger) 15%, transparent);
 }
