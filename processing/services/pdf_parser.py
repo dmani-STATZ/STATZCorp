@@ -152,6 +152,14 @@ _RE_ACCEPTANCE_POINT = re.compile(
     r"ACCEPTANCE\s+POINT[:\s]+(\w+)",
     re.IGNORECASE,
 )
+_RE_INSPECTION_SUPPLIES_CAGE = re.compile(
+    r"PLACE\s+of\s+INSPECTION\s+for\s+SUPPLIES\s*:\s*\n\s*([A-Z0-9]{4,6})\b",
+    re.IGNORECASE,
+)
+_RE_INSPECTION_PACKAGING_CAGE = re.compile(
+    r"PLACE\s+of\s+INSPECTION\s+for\s+PACKAGING\s*:\s*\n\s*([A-Z0-9]{4,6})\b",
+    re.IGNORECASE,
+)
 _RE_DLA_CONTRACT = re.compile(
     r"\b(SPE[A-Z0-9]{2,3}-\d{2}-[DFPVCMAN]-[A-Z0-9]{4})\b",
     re.IGNORECASE,
@@ -296,6 +304,7 @@ class AwardParseResult:
     idiq_term_months: Optional[int] = None
     idiq_option_months: Optional[int] = None
     pr_number: Optional[str] = None
+    packhouse_cage: Optional[str] = None
 
 
 def _strip_money(value: Optional[str]) -> Optional[str]:
@@ -759,6 +768,30 @@ def _extract_ado_days(page_one_text: str) -> Optional[int]:
         return None
 
 
+def _extract_inspection_cages(section_text: str) -> dict:
+    """
+    Extract CAGE codes from PLACE of INSPECTION blocks in Section B text.
+    Returns dict with keys 'supplies_cage' and 'packaging_cage', both
+    Optional[str]. Returns empty strings (not None) when not found so
+    callers can distinguish not-found from not-run.
+    """
+    supplies_cage: Optional[str] = None
+    packaging_cage: Optional[str] = None
+
+    m = _RE_INSPECTION_SUPPLIES_CAGE.search(section_text)
+    if m:
+        supplies_cage = m.group(1).strip().upper()
+
+    m = _RE_INSPECTION_PACKAGING_CAGE.search(section_text)
+    if m:
+        packaging_cage = m.group(1).strip().upper()
+
+    return {
+        "supplies_cage": supplies_cage,
+        "packaging_cage": packaging_cage,
+    }
+
+
 def _extract_clins_via_claude_api(section_text: str) -> Optional[List[dict]]:
     """
     Send Section B text to Claude API and extract CLIN data as structured JSON.
@@ -783,7 +816,6 @@ Each object in the array must have exactly these keys:
 - "fob": "O" if FOB is ORIGIN, "D" if DESTINATION, null if not found
 - "inspection_point": "O" if INSPECTION POINT is ORIGIN, "D" if DESTINATION, null if not found
 - "nsn": the NSN or item identifier for this CLIN — could be a 13-digit NSN like "4730001256889", a hyphenated NSN like "5995-01-569-0560", or a DLA service code like "S00000053". Return whatever identifier appears for this CLIN. null if nothing found.
-- "cage": the supplier/manufacturer CAGE code from the "CAGE/PN:" line within this CLIN block (e.g. "6ZSR8"), or null if not present
 - "nsn_description": the item nomenclature/description for this CLIN, or null if not found
 
 There are two CLIN table formats you will encounter:
@@ -797,12 +829,10 @@ Delivery: "DELIVER FOB: ORIGIN   DELIVER BY: 2027 JAN 04"
 FORMAT 2 - Variant 1 (inline NSN in SUPPLIES/SERVICES column):
 Header: ITEM NO. SUPPLIES/SERVICES QUANTITY UNIT UNIT PRICE AMOUNT
 Data row: 0001 5995-01-569-0560 6.000 EA $ 3,869.25 $ 23,215.50
-Followed by: CAGE/PN: 6ZSR8
-             F659-32423-1 CABLE ASSEMBLY,SPEC
-In this format: NSN is 2nd token in data row. CAGE code follows CAGE/PN: label.
-The part number is the token immediately after the CAGE code on the same or next line (e.g. "F659-32423-1").
+Followed by: F659-32423-1 CABLE ASSEMBLY,SPEC
+In this format: NSN is 2nd token in data row.
 The nsn_description is the remaining text after the part number on that line (e.g. "CABLE ASSEMBLY,SPEC").
-If there is no CAGE/PN line, look for a description in the SUPPLIES/SERVICES text or item description block.
+If there is no description line, look for a description in the SUPPLIES/SERVICES text or item description block.
 Delivery: "FOB: ORIGIN   DELIVERY DATE: 2028 FEB 18"
 
 For DLA service CLINs (First Article Test, Production Lot Testing, etc.) the item description contains a code like "S00000053" instead of a standard NSN. Return that code as the "nsn" value.
@@ -1105,9 +1135,6 @@ def _build_clins_from_api_result(
         if not desc:
             desc = (c.get("nsn_description") or "").strip() or None
 
-        # Per-CLIN supplier cage code from CAGE/PN: line
-        cage = (c.get("cage") or "").strip().upper() or None
-
         results.append(
             ClinParseResult(
                 item_number=item_number,
@@ -1120,7 +1147,6 @@ def _build_clins_from_api_result(
                 inspection_point=_od_display_for_choice(insp) if insp else None,
                 acceptance_point=_od_display_for_choice(insp) if insp else None,
                 fob=fob,
-                cage=cage,
                 clin_parse_note=None,
             )
         )
@@ -1128,12 +1154,31 @@ def _build_clins_from_api_result(
     return results
 
 
-def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
+def _parse_clins_from_text(
+    text: str,
+) -> tuple[List[ClinParseResult], Optional[str]]:
+    """
+    Parse CLINs from Section B and return (clins, packaging_cage).
+
+    packaging_cage is the contract-level packhouse CAGE extracted from the
+    'PLACE of INSPECTION for PACKAGING' block, or None when not present.
+
+    Each CLIN's `cage` field is populated from the 'PLACE of INSPECTION for
+    SUPPLIES' block (authoritative source) when an explicit per-CLIN cage was
+    not already set.
+    """
     section = _section_b_slice(text)
     nsn_desc_map = _extract_nsn_descriptions_from_section_b(text)
+    inspection_cages = _extract_inspection_cages(section)
     api_clins = _extract_clins_via_claude_api(section)
     if api_clins:
-        return _build_clins_from_api_result(api_clins, nsn_desc_map)
+        clins_from_api = _build_clins_from_api_result(api_clins, nsn_desc_map)
+        supplies_cage = inspection_cages.get("supplies_cage")
+        if supplies_cage:
+            for clin in clins_from_api:
+                if not clin.cage:
+                    clin.cage = supplies_cage
+        return clins_from_api, inspection_cages.get("packaging_cage")
     clins: List[ClinParseResult] = []
     seen_item: set[str] = set()
 
@@ -1374,7 +1419,13 @@ def _parse_clins_from_text(text: str) -> List[ClinParseResult]:
                 )
             )
 
-    return clins
+    supplies_cage = inspection_cages.get("supplies_cage")
+    if supplies_cage:
+        for clin in clins:
+            if not clin.cage:
+                clin.cage = supplies_cage
+
+    return clins, inspection_cages.get("packaging_cage")
 
 
 def _finalize_status_and_notes(
@@ -1469,6 +1520,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
                 "Solicitation type defaulted to SDVOSB (PDF text unavailable for parsing)."
             ),
             clins=[],
+            packhouse_cage=None,
         )
 
     if not text or not text.strip():
@@ -1489,6 +1541,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
                 "Solicitation type defaulted to SDVOSB (PDF text unavailable for parsing)."
             ),
             clins=[],
+            packhouse_cage=None,
         )
 
     try:
@@ -1526,8 +1579,9 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
         pr_number = _extract_pr_number(text)
 
         clins: List[ClinParseResult] = []
+        packaging_cage: Optional[str] = None
         try:
-            clins = _parse_clins_from_text(text)
+            clins, packaging_cage = _parse_clins_from_text(text)
             for c in clins:
                 if c.clin_parse_note:
                     notes.append(c.clin_parse_note)
@@ -1606,6 +1660,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             idiq_min_guarantee=idiq_min_guarantee,
             idiq_term_months=idiq_term_months,
             idiq_option_months=idiq_option_months,
+            packhouse_cage=packaging_cage,
         )
     except Exception as exc:
         return AwardParseResult(
@@ -1625,6 +1680,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
                 "Solicitation type defaulted to SDVOSB (PDF text unavailable for parsing)."
             ),
             clins=[],
+            packhouse_cage=None,
         )
 
 
@@ -1692,6 +1748,7 @@ def ingest_parsed_award(
             "contract_type": parse_result.contract_type,
             "solicitation_type": parse_result.solicitation_type,
             "pr_number": parse_result.pr_number,
+            "packhouse_cage": parse_result.packhouse_cage,
             "pdf_parse_status": status_val,
             "pdf_parsed_at": now,
             "pdf_parse_notes": notes_val or "",

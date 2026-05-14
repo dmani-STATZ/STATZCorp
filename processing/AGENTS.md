@@ -124,7 +124,11 @@ if (document.readyState === 'loading') {
 `packhouse_modal.js` uses this pattern after the delegation-bound "Assign Packhouse" button silently refused to open the modal when the handler never ran on large form pages. Compact-strip clicks are also handled via **document-level capture** delegation (guarded by `window.__phPackhouseDelegationBound`) so a missed `initPackhouseModal` run does not leave the Assign/Edit/Clear buttons dead; the handler calls `window.openPackhouseModal` explicitly for strict-mode resolution. The packhouse picker **UI** matches the other processing modals (`fixed` + `hidden` + `z-[2000]`, not `bootstrap.Modal`), so it stacks above the contract-base sticky footer and is not clipped by parent overflow/stacking contexts.
 
 ### Split management change
-`models.py` `ProcessClinSplit` → `forms.py` `persist_clin_splits_for_contract` / `ProcessContractForm.save` → `views/processing_views.py` (`create_split_view`, `update_split_view`, `delete_split_view`, `calc_splits_view`, `save_contract`) → `views/api_views.py` `update_contract_values` (no auto-STATZ) → `templates/processing/process_contract_form.html` → `static/processing/js/process_contract.js`
+`models.py` `ProcessClinSplit` → `forms.py` `persist_clin_splits_for_contract` / `ProcessContractForm.save` → `views/processing_views.py` (`create_split_view`, `update_split_view`, `delete_split_view`, `calc_splits_view`, `save_contract`) → `views/api_views.py` `update_contract_values` (no auto-STATZ) and `save_clin` (calls `persist_clin_splits_for_contract` after the CLIN field save so per-CLIN split rows are persisted in the same request as Save CLIN) → `templates/processing/process_contract_form.html` → `static/processing/js/process_contract.js`
+
+- `save_clin` in `api_views.py` now calls `persist_clin_splits_for_contract(clin.process_contract, request.POST)` inside the same `transaction.atomic()` block, so split rows added/edited in the Save CLIN POST (`clin-<clin_id>-splits-*` keys) are persisted along with the CLIN field updates. Previously these keys were silently dropped, so new split rows (e.g. PPI) never reached the database.
+- The auto-Calc Splits trigger has been removed from the Save CLIN success handler in `process_contract_form.html`. Calc Splits is now exclusively analyst-initiated via the per-CLIN **Calc Splits** button (which still posts to `calc_splits_view` and sets STATZ = `item_value − quote_value`, floored at zero). Save CLIN no longer recalculates split values — it persists exactly what the analyst has set.
+- The **Calc Splits** click handler in `process_contract.js` now silently saves the CLIN (POST to `/processing/save-clin/<clinId>/` with the same FormData collection logic as the Save CLIN button — `document.querySelectorAll('[data-clin-id="${clinId}"]')` + `name`/`value` pairs) before firing the calc request. This guarantees the server has the analyst's current `unit_price` / `price_per_unit` / `order_qty` (and therefore current `quote_value`) before computing STATZ = `item_value − quote_value`. The silent save is invisible: no spinner, no disabled state, no success/error toast; on failure it logs to console and aborts the calc step so the analyst can still try Save CLIN manually.
 
 ### Plan Gross formula change
 `models.py` `ProcessContract.calculate_plan_gross` → `views/api_views.py` `update_contract_values` and `update_process_contract_field` (must use `calculate_plan_gross` / `update_calculated_values` on the model — do not duplicate the formula) → `CONTEXT.md` to document the formula → frontend: verify any cached/displayed `plan_gross` values refresh after CLIN edits (inline `updateContractCalculations` mirrors the server formula). The current formula is `plan_gross = item_total − quote_total` aggregated across CLINs; `packhouse_quote_amount` is captured separately for finalization carry-over and does **not** affect `plan_gross` (Finance handles packaging costs).
@@ -142,6 +146,23 @@ model/migration → `start_processing` in `processing_views.py` (must explicitly
 copy the field to `ProcessContract.objects.create(...)` or it is silently lost
 at queue-to-processing transition) → `ProcessContract` model/migration if the
 field does not already exist there.
+
+Example: `packhouse_cage` follows this pattern end-to-end —
+`_RE_INSPECTION_PACKAGING_CAGE` + `_extract_inspection_cages` in `pdf_parser.py`
+populate `AwardParseResult.packhouse_cage`, which is stamped onto
+`QueueContract.packhouse_cage` via `common_contract` and then copied to
+`ProcessContract.packhouse_cage` in `start_processing`. The form template reads
+that value to render a read-only "Parsed CAGE" hint and to set
+`data-prefill-cage` on the Assign Packhouse button, which `packhouse_modal.js`
+reads to prefill the supplier search input and auto-fire `runSearch` after
+100ms when the modal opens.
+
+`_build_clins_from_api_result` **must not** set `cage` from LLM result dicts.
+Per-CLIN supplier CAGE is owned by the `PLACE of INSPECTION for SUPPLIES:`
+inspection-block regex applied in `_parse_clins_from_text` (with the
+`CAGE/PN:` regex as a fallback only). Re-introducing `c.get("cage")` in the
+LLM build step would silently overwrite the inspection-block value and
+defeat the supplier-matching prefill flow.
 
 ---
 
@@ -295,6 +316,7 @@ field does not already exist there.
 | Form logic | `processing/forms.py` — `ProcessContractForm.save()`, `ProcessClinForm.clean()` |
 | UI state machine | `processing/static/processing/js/process_contract.js` |
 | Match modals | `processing/static/processing/js/*_modal.js` + `processing/templates/processing/modals/` |
+| Template filters | `processing/templatetags/processing_extras.py` — `get_item` filter for dict lookup with a variable key (used by `contract_queue.html` to render the "Already in DB" badge link via `finalized_contract_map|get_item:contract.contract_number`). Load with `{% load processing_extras %}`. |
 | Coupled cross-app writes | `contracts.Contract`, `contracts.Clin`, `contracts.ClinSplit`, `contracts.PaymentHistory` |
 | Sequence integrity | `SequenceNumber` — one row, do not delete |
 | Riskiest edits | Finalization flow, field renames, URL renames, split key format in forms/JS |

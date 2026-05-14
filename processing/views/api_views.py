@@ -4,7 +4,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms
-from ..forms import ProcessContractForm, ProcessClinForm
+from ..forms import ProcessContractForm, ProcessClinForm, persist_clin_splits_for_contract
 import json
 from decimal import Decimal
 @login_required
@@ -492,6 +492,8 @@ def save_clin(request, clin_id):
                 clin.quote_value = Decimal(str(clin.order_qty)) * clin.price_per_unit
             
             clin.save()
+
+            persist_clin_splits_for_contract(clin.process_contract, request.POST)
         
         return JsonResponse({
             'success': True,

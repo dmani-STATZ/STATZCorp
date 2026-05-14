@@ -400,6 +400,18 @@
         if (search) {
             search.focus();
         }
+
+        // Prefill search from parsed CAGE if available
+        const openBtn = document.querySelector('[data-prefill-cage]');
+        const prefillCage = openBtn ? openBtn.getAttribute('data-prefill-cage') : '';
+        const searchInput = document.getElementById('packhouse_search');
+        if (prefillCage && searchInput) {
+            searchInput.value = prefillCage;
+            // Auto-fire search after modal is visible
+            setTimeout(function () {
+                runSearch();
+            }, 100);
+        }
     };
 
     wireCompactSectionDelegation();

@@ -233,6 +233,7 @@ def start_processing(request, queue_id):
             buyer_text=queue_item.buyer,
             solicitation_type=queue_item.solicitation_type,
             pr_number=queue_item.pr_number,
+            packhouse_cage=queue_item.packhouse_cage,
             contract_type_text=queue_item.matched_contract_type,
             award_date=queue_item.award_date,
             due_date=queue_item.due_date,
@@ -1673,7 +1674,22 @@ class ContractQueueListView(ListView):
                     'clins': first_contract.clins.count(),
                     'created_on': first_contract.created_on
                 }
-        
+
+        # Flag queue rows whose contract_number already exists as a finalized
+        # Contract so the template can render an "Already in DB" badge and
+        # disable Start Processing for those rows.
+        queued_contracts = context['queued_contracts']
+        finalized = Contract.objects.filter(
+            contract_number__in=queued_contracts.values_list(
+                'contract_number', flat=True
+            )
+        ).values('contract_number', 'id')
+        finalized_contract_map = {
+            row['contract_number']: row['id']
+            for row in finalized
+        }
+        context['finalized_contract_map'] = finalized_contract_map
+
         return context
 
 @require_http_methods(["GET"])

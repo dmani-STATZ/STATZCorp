@@ -32,7 +32,11 @@ class QueueContract(AuditModel):
     contract_type = models.CharField(max_length=50, null=True, blank=True)  # Unilateral, Bilateral, IDIQ
     solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
     pr_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="PR Number")
-    
+    packhouse_cage = models.CharField(
+        max_length=20, null=True, blank=True,
+        help_text="CAGE code parsed from 'PLACE of INSPECTION for PACKAGING' in Section B."
+    )
+
     # Status tracking
     is_being_processed = models.BooleanField(default=False)
     processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='processing_contracts')
@@ -252,6 +256,10 @@ class ProcessContract(models.Model):
         null=True,
         blank=True,
         help_text='Analyst notes about the packhouse arrangement. Copied to ContractPackaging.notes on finalization.',
+    )
+    packhouse_cage = models.CharField(
+        max_length=20, null=True, blank=True,
+        help_text="CAGE code from queue contract packhouse inspection block."
     )
 
     # Processing Fields

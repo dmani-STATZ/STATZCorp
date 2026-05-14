@@ -350,12 +350,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                       id="cont_packhouse_notes" name="cont_packhouse_notes">{{ process_contract.packhouse_notes|default_if_none:'' }}</textarea>
                         </div>
                         {% else %}
+                        {% if process_contract.packhouse_cage and not process_contract.packhouse %}
+                            {% with first_clin=process_contract.clins.first %}
+                            <div class="text-muted small mt-1">
+                                Parsed CAGE: <span class="fw-medium font-monospace">{{ process_contract.packhouse_cage }}</span>
+                                {% if first_clin and first_clin.supplier_text == process_contract.packhouse_cage %}
+                                    <span class="badge bg-secondary ms-1">Same as supplier — packhouse may not be needed</span>
+                                {% else %}
+                                    — use this to find the packhouse below
+                                {% endif %}
+                            </div>
+                            {% endwith %}
+                        {% endif %}
                         <div class="d-flex align-items-center justify-content-between gap-2 py-1">
                             <div class="d-flex align-items-center gap-2 min-w-0">
                                 <span class="flex-shrink-0" aria-hidden="true">📦</span>
                                 <span class="text-muted small text-truncate">No packhouse assigned</span>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0" data-packhouse-action="assign">Assign Packhouse</button>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-primary flex-shrink-0"
+                                    data-packhouse-action="assign"
+                                    data-prefill-cage="{{ process_contract.packhouse_cage|default:'' }}">Assign Packhouse</button>
                         </div>
                         {% endif %}
                     </div>
@@ -1109,7 +1124,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             });
         });
 
-        const savedIndex = localStorage.getItem('expandedClinIndex');
+        const savedIndex = localStorage.removeItem('expandedClinIndex');
         if (savedIndex !== null) {
             const toggleBtn = document.querySelector(`[data-action="toggle-clin"][data-index="${savedIndex}"]`);
             if (toggleBtn) {
@@ -1785,19 +1800,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 clinInputs.forEach(input => {
                     input.dataset.modified = 'false';
                 });
-
-                // Auto-trigger Calc Splits only if Quote Total is non-zero
-                const quoteValueInput = document.getElementById(`quote_value_${clinId}`);
-                const quoteTotal = quoteValueInput ? parseFloat(quoteValueInput.value) : 0;
-
-                if (quoteTotal && quoteTotal > 0) {
-                    const calcBtn = document.querySelector(
-                        `.calc-clin-splits[data-clin-id="${clinId}"]`
-                    );
-                    if (calcBtn) {
-                        calcBtn.click();
-                    }
-                }
 
                 // Always update contract header values regardless of split calc
                 setTimeout(() => {

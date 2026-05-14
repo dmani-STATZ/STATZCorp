@@ -455,40 +455,94 @@ document.head.appendChild(style);
                 return;
             }
             const table = document.getElementById('clin-splits-table-' + clinId);
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrf(),
-                    Accept: 'application/json',
-                },
-            })
-                .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
-                .then(({ ok, j }) => {
-                    if (!ok || !j.success) {
-                        throw new Error((j && j.error) || 'Calc failed');
-                    }
-                    if (!table) {
+
+            (async () => {
+                try {
+                    const saveData = new FormData();
+                    const clinInputs = document.querySelectorAll(
+                        '[data-clin-id="' + clinId + '"]'
+                    );
+                    clinInputs.forEach((input) => {
+                        if (input.name) {
+                            const isDateField = input.type === 'date';
+                            const value = input.value != null ? input.value : '';
+                            if (isDateField || value !== undefined) {
+                                saveData.append(input.name, value);
+                            }
+                        }
+                    });
+
+                    const saveResp = await fetch(
+                        '/processing/save-clin/' + clinId + '/',
+                        {
+                            method: 'POST',
+                            body: saveData,
+                            headers: {
+                                'X-CSRFToken': csrf(),
+                            },
+                        }
+                    );
+                    if (!saveResp.ok) {
+                        if (typeof console !== 'undefined') {
+                            console.error(
+                                'Silent CLIN save failed before Calc Splits: HTTP ' +
+                                    saveResp.status
+                            );
+                        }
                         return;
                     }
-                    const row = findStatzRow(table);
-                    if (row) {
-                        const vIn = row.querySelector('.clin-split-value-input');
-                        if (vIn) {
-                            vIn.value = parseFloat(j.split_value).toFixed(2);
+                    const saveJson = await saveResp.json();
+                    if (!saveJson || saveJson.success === false) {
+                        if (typeof console !== 'undefined') {
+                            console.error(
+                                'Silent CLIN save failed before Calc Splits:',
+                                saveJson && saveJson.error
+                            );
                         }
-                    } else {
-                        appendClinSplitRowFromServer(clinId, j);
+                        return;
                     }
-                    updateClinSplitTotals(table);
-                })
-                .catch((err) => {
+                } catch (err) {
                     if (typeof console !== 'undefined') {
-                        console.error(err);
+                        console.error('Silent CLIN save error before Calc Splits:', err);
                     }
-                    if (typeof showMessage === 'function') {
-                        showMessage(String(err), 'error');
-                    }
-                });
+                    return;
+                }
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrf(),
+                        Accept: 'application/json',
+                    },
+                })
+                    .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+                    .then(({ ok, j }) => {
+                        if (!ok || !j.success) {
+                            throw new Error((j && j.error) || 'Calc failed');
+                        }
+                        if (!table) {
+                            return;
+                        }
+                        const row = findStatzRow(table);
+                        if (row) {
+                            const vIn = row.querySelector('.clin-split-value-input');
+                            if (vIn) {
+                                vIn.value = parseFloat(j.split_value).toFixed(2);
+                            }
+                        } else {
+                            appendClinSplitRowFromServer(clinId, j);
+                        }
+                        updateClinSplitTotals(table);
+                    })
+                    .catch((err) => {
+                        if (typeof console !== 'undefined') {
+                            console.error(err);
+                        }
+                        if (typeof showMessage === 'function') {
+                            showMessage(String(err), 'error');
+                        }
+                    });
+            })();
             return;
         }
 

@@ -1,5 +1,6 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
+{% load processing_extras %}
 
 {% block title %}Contract Queue{% endblock %}
 
@@ -218,7 +219,7 @@
                                     </svg>
                             </button>
                         </td>
-                        <td class="px-6 py-2 whitespace-nowrap contract-queue-cell-data">{% if contract.contract_number %}{{ contract.contract_number }}{% else %}<span class="text-gray-500">—</span>{% endif %}</td>
+                        <td class="px-6 py-2 whitespace-nowrap contract-queue-cell-data">{% if contract.contract_number %}{{ contract.contract_number }}{% if contract.contract_number in finalized_contract_map %}<a href="/contracts/{{ finalized_contract_map|get_item:contract.contract_number }}/" target="_blank" class="ms-2 badge bg-warning text-dark text-decoration-none" title="This contract is already finalized in the database. Click to view it.">Already in DB</a>{% endif %}{% else %}<span class="text-gray-500">—</span>{% endif %}</td>
                         <td class="px-6 py-2 whitespace-nowrap">
                             {% if contract.contract_type == 'IDIQ' %}
                                 <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">IDIQ</span>
@@ -305,12 +306,14 @@
                                 </button>
                                 {% elif contract.contract_type == 'IDIQ' %}
                                 <button onclick="startProcessing('{{ contract.id }}')"
-                                        class="text-purple-600 hover:text-purple-900 mr-3 btn btn-nav">
+                                        class="text-purple-600 hover:text-purple-900 mr-3 btn btn-nav"
+                                        {% if contract.contract_number and contract.contract_number in finalized_contract_map %}disabled title="This contract is already in the database. View it using the link in the contract number column."{% endif %}>
                                     Start IDIQ
                                 </button>
                                 {% else %}
                                 <button onclick="startProcessing('{{ contract.id }}')"
-                                        class="text-indigo-600 hover:text-indigo-900 mr-3 btn btn-nav">
+                                        class="text-indigo-600 hover:text-indigo-900 mr-3 btn btn-nav"
+                                        {% if contract.contract_number and contract.contract_number in finalized_contract_map %}disabled title="This contract is already in the database. View it using the link in the contract number column."{% endif %}>
                                     Start Processing
                                 </button>
                                 {% endif %}
