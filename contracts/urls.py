@@ -214,6 +214,7 @@ from .views.dfas_import_views import (
     dfas_import_review_view,
     dfas_import_upload_view,
 )
+from .views import clin_fix_views
 
 app_name = "contracts"
 
@@ -762,4 +763,30 @@ urlpatterns = [
     path("api/dynamic-tracker/record/<int:record_id>/update/", api_update_record, name="tracker_update_record"),
     path("api/dynamic-tracker/record/<int:record_id>/delete/", api_delete_record, name="tracker_delete_record"),
     path("api/dynamic-tracker/search-contracts/", api_search_contracts, name="tracker_search_contracts"),
+    # CLIN Fix tool (legacy cleanup — scheduled for removal after migration completes)
+    path(
+        "<int:pk>/clin-fix/",
+        clin_fix_views.clin_fix_page,
+        name="clin_fix_page",
+    ),
+    path(
+        "<int:pk>/clin-fix/save/",
+        clin_fix_views.clin_fix_save,
+        name="clin_fix_save",
+    ),
+    path(
+        "<int:pk>/clin-fix/draft/save/",
+        clin_fix_views.clin_fix_draft_save,
+        name="clin_fix_draft_save",
+    ),
+    path(
+        "<int:pk>/clin-fix/draft/delete/",
+        clin_fix_views.clin_fix_draft_delete,
+        name="clin_fix_draft_delete",
+    ),
+    path(
+        "api/clin-fix/parent-clin-options/<int:contract_pk>/",
+        clin_fix_views.parent_clin_options,
+        name="clin_fix_parent_options",
+    ),
 ]

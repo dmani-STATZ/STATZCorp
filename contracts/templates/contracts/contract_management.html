@@ -351,7 +351,20 @@
             <!-- CLIN Table - left ~35% -->
             <div class="col-span-4">
                 <div class="overflow-x-auto overflow-y-auto border border-gray-200 rounded" style="max-height: 220px">
-                    <p class="px-3 pt-1 text-lg font-bold text-gray-800 uppercase tracking-wider">Contract Line Items</p>
+                    <div class="px-3 pt-1 d-flex align-items-center">
+                        <p class="text-lg font-bold text-gray-800 uppercase tracking-wider mb-0">Contract Line Items</p>
+                        <a href="{% url 'contracts:clin_fix_page' contract.pk %}"
+                           class="btn btn-sm btn-outline-warning ms-2 py-0 px-1"
+                           data-bs-toggle="tooltip"
+                           data-bs-placement="top"
+                           title="Fix Legacy CLINs (reclassify packaging, trucking, partial shipments)"
+                           aria-label="Fix Legacy CLINs"
+                           style="line-height: 1;">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: middle;" aria-hidden="true">
+                                <path d="M.102 2.223A3.004 3.004 0 0 0 3.78 5.897l6.341 6.252A3.003 3.003 0 0 0 13 16a3 3 0 1 0-.851-5.878L5.897 3.781A3.004 3.004 0 0 0 2.223.1l2.141 2.142L4 4l-1.757.364L.102 2.223zm13.37 9.019.528.026.287.445.445.287.026.529L15 13l-.242.471-.026.529-.445.287-.287.445-.529.026L13 15l-.471-.242-.529-.026-.287-.445-.445-.287-.026-.529L11 13l.242-.471.026-.529.445-.287.287-.445.529-.026L13 11l.471.242z"/>
+                            </svg>
+                        </a>
+                    </div>
                     <div class="min-w-full">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead>
@@ -948,6 +961,18 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
+<script>
+// Initialize Bootstrap tooltips on this page (for the Fix Legacy CLINs icon
+// button and any other [data-bs-toggle="tooltip"] elements). Safe no-op if
+// no matching elements exist.
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.bootstrap && bootstrap.Tooltip) {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            try { bootstrap.Tooltip.getOrCreateInstance(el); } catch (e) { /* noop */ }
+        });
+    }
+});
+</script>
 <script>
 // Debug ContentType IDs
 document.addEventListener('DOMContentLoaded', function() {

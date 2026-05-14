@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from .models import (
     CanceledReason,
+    ClinReclassificationDraft,
+    ClinReclassificationLog,
     ClinShipment,
     ClinSplit,
     ClinType,
@@ -169,3 +171,44 @@ class DfasImportRowAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# =============================================================================
+# CLIN Fix Tool (sunset cleanup) — see CONTEXT.md / AGENTS.md
+# =============================================================================
+
+
+@admin.register(ClinReclassificationLog)
+class ClinReclassificationLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'contract', 'original_clin_id', 'destination_type',
+        'destination_id', 'notes_migrated_count',
+        'payment_history_deleted_count', 'performed_by', 'performed_at',
+    )
+    list_filter = ('destination_type', 'performed_at')
+    search_fields = ('contract__contract_number', 'original_clin_id')
+    readonly_fields = tuple(f.name for f in ClinReclassificationLog._meta.fields)
+    ordering = ('-performed_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ClinReclassificationDraft)
+class ClinReclassificationDraftAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'contract', 'clin', 'user', 'destination_type',
+        'parent_clin', 'updated_at',
+    )
+    list_filter = ('destination_type', 'updated_at')
+    search_fields = (
+        'contract__contract_number', 'user__username',
+        'clin__item_number',
+    )
+    ordering = ('-updated_at',)

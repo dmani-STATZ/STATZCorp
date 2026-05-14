@@ -493,6 +493,32 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 - Using `queryset.update()` on `Contract`/`Clin` (skips audit trail)
 - Changing `ClinForm.clean()` without understanding auto-calculated financial fields
 
+## 15a. CLIN Fix Tool (Sunset)
+
+The CLIN Fix tool (`/contracts/<pk>/clin-fix/`) is a temporary cleanup feature for reclassifying legacy `Clin` rows from the Access database into their correct destinations (`ContractPackaging`, `ContractFinanceLine`, `ClinShipment`, or hard-delete). It is **scheduled for removal**; treat it as scaffolding.
+
+**Operational constraints:**
+
+- The single **Fix Legacy CLINs** button in the Contract Line Items header on `contract_management.html` is the **only** allowed touch of any other page for this feature. Do not add context variables, banners, badges, navigation entries, or any other coupling that would propagate draft state.
+- Draft awareness lives **only** on the CLIN Fix page itself (its "Unsaved CLIN Fixes" widget). Do not surface `ClinReclassificationDraft` counts on dashboards, the navbar, the lifecycle dashboard, or any other view. Other apps must not import either model.
+- Server-side validation in `clin_fix_save` is authoritative — the eight rules there (existing packaging, income-side guards, parent-CLIN guards, multiple-packaging guard, delete-reason guard, batch-parent guard, finance-line-attachment guard, CLIN-on-contract guard) must run before any DB write. Client-side JS checks are UX hints only and should not be used to gate the save.
+- All conversions for a contract commit inside a single `transaction.atomic()`. Do not refactor `clin_fix_save` to commit conversions one-at-a-time or to skip the upfront validation step — partial commits are a data-integrity hazard.
+- Finance lines created here always attach to the **lowest-`item_number`** remaining CLIN on the contract that is not also being converted. Do not change the attachment target rule.
+- Notes attached to a converted CLIN are moved to the contract via generic-relation `update()` after the `[Migrated from CLIN xxxx]` prefix is added (idempotent). `PaymentHistory` rows attached to the source CLIN are **hard-deleted** (the count is logged on the audit row). The original `Clin` row is hard-deleted last.
+- Read-only audit log: `ClinReclassificationLog` is registered in the admin with `has_add_permission`, `has_change_permission`, and `has_delete_permission` all returning `False`. Keep it that way.
+- Tests live in `contracts/tests/test_clin_fix.py`. Re-run when touching `clin_fix_views.py`, the migration, or any of the destination models the mapping reads (`ContractPackaging`, `ContractFinanceLine`, `FinanceLinePayment`, `ClinShipment`).
+
+**Sunset removal checklist (when the cleanup is complete):**
+
+1. Delete `contracts/views/clin_fix_views.py`, the import in `contracts/views/__init__.py`, and the 5 URL patterns in `contracts/urls.py`.
+2. Delete `contracts/templates/contracts/clin_fix.html`, `contracts/static/contracts/js/clin_fix.js`, and the **Fix Legacy CLINs** button block on `contract_management.html`.
+3. Delete `contracts/tests/test_clin_fix.py`.
+4. Remove the `ClinReclassificationLog` / `ClinReclassificationDraft` model definitions and their admin registrations.
+5. Create a migration dropping both tables (`contracts_clinreclassificationlog`, `contracts_clinreclassificationdraft`).
+6. Repo-wide grep for `ClinReclassificationLog`, `ClinReclassificationDraft`, `clin_fix_page`, `clin_fix_save`, `clin_fix_draft_save`, `clin_fix_draft_delete`, and `clin_fix_parent_options` to verify nothing else references them.
+
+---
+
 ## 16. Release Notes (Changelog) Rules
 
 Product release notes are file-based. The markdown files are the **source of truth** (the DB is just a cache). When generating a release note, you MUST adhere to these strict validation rules, or the system will skip the file on deployment.

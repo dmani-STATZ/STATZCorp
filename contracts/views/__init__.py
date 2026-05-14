@@ -187,6 +187,9 @@ from .dynamic_tracker_views import (
     api_update_column_width,
 )
 
+# CLIN Fix tool (legacy cleanup — scheduled for removal)
+from . import clin_fix_views  # noqa: F401
+
 __all__ = [
     'folder_tracking',
     'add_folder_tracking',

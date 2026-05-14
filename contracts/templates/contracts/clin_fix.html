@@ -1,0 +1,511 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load humanize %}
+{% load custom_tags %}
+
+{# Body class hook used by app-core CSS to escape the contract_base 75% width #}
+{% block body_class %}clin-fix-page{% endblock %}
+
+{% block extra_head %}
+    {{ block.super }}
+    <style>
+        /* ─── Full-viewport dual-pane shell ────────────────────────────────
+           Escape contract_base.html's `<div class="mx-auto" style="width:75%">`
+           wrapper so the shell can fill the viewport horizontally, and zero
+           the surrounding chrome so the shell can fill it vertically. The
+           shell itself is height = 100vh minus the fixed top navbar (#header,
+           48px) and the contract_base bottom Contract-Menu footer (measured
+           at runtime). Both values come from JS and live as CSS custom
+           properties on :root. */
+        .clin-fix-page main > div.mx-auto {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .clin-fix-page main { padding: 0 !important; }
+
+        .clin-fix-shell {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh
+                - var(--clin-fix-navbar-height, 48px)
+                - var(--clin-fix-footer-height, 64px));
+            overflow: hidden;
+        }
+
+        .clin-fix-split {
+            display: flex;
+            flex: 1 1 auto;
+            overflow: hidden;          /* contains child scroll contexts */
+            gap: 1rem;
+            padding: 0 1rem;
+            min-height: 0;             /* lets the inner panes shrink/scroll */
+        }
+
+        .clin-fix-left {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            min-width: 0;              /* prevents flex blowout */
+            padding: 1rem 0;
+        }
+
+        .clin-fix-right {
+            flex: 0 0 400px;
+            overflow-y: auto;
+            padding: 1rem 0 1rem 1rem;
+            border-left: 1px solid var(--bs-border-color);
+        }
+
+        .clin-fix-bottom-bar {
+            flex: 0 0 auto;
+            border-top: 1px solid var(--bs-border-color);
+            background: var(--bs-body-bg);
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ─── Row visual states ────────────────────────────────────────── */
+        .clin-fix-page tr.row-staged > td:first-child {
+            border-left: 4px solid var(--bs-warning);
+        }
+        .clin-fix-page tr.row-active {
+            background-color: var(--bs-primary-bg-subtle) !important;
+        }
+        .clin-fix-page tr.row-parent-cleared > td:first-child {
+            border-left: 4px solid var(--bs-warning);
+            background-color: var(--bs-warning-bg-subtle);
+        }
+        .clin-fix-page tr.row-error > td:first-child {
+            border-left: 4px solid var(--bs-danger);
+        }
+
+        /* Income-side red highlight when destination disallows income side */
+        .clin-fix-page td.income-warning { color: var(--bs-danger); font-weight: 600; }
+
+        /* Autosave indicator transitions */
+        .clin-fix-page #pane-autosave-indicator {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .clin-fix-page #pane-autosave-indicator.visible { opacity: 1; }
+
+        .clin-fix-page .nowrap { white-space: nowrap; }
+        .clin-fix-page .text-mono { font-family: var(--bs-font-monospace); }
+        .clin-fix-page .destination-select { min-width: 180px; }
+        .clin-fix-page tr.clin-fix-row { cursor: pointer; }
+
+        /* Right-pane card fills the available width without its own scrollbar
+           (the outer .clin-fix-right is what scrolls). */
+        .clin-fix-page #configure-pane { width: 100%; }
+    </style>
+{% endblock %}
+
+{% block content %}
+<form id="csrf-form">{% csrf_token %}</form>
+
+<div class="clin-fix-shell"
+     data-contract-pk="{{ contract.pk }}"
+     data-save-url="{% url 'contracts:clin_fix_save' contract.pk %}"
+     data-draft-save-url="{% url 'contracts:clin_fix_draft_save' contract.pk %}"
+     data-draft-delete-url="{% url 'contracts:clin_fix_draft_delete' contract.pk %}"
+     data-parent-options-url="{% url 'contracts:clin_fix_parent_options' contract.pk %}"
+     data-has-packaging="{% if has_packaging %}1{% else %}0{% endif %}"
+     data-contract-number="{{ contract.contract_number|default:contract.pk }}"
+     id="clin-fix-root">
+
+  <div class="clin-fix-split">
+
+    {# ───────── LEFT PANE (independent scroll) ───────────────────────── #}
+    <div class="clin-fix-left">
+
+    {# ── Sunset banner ───────────────────────────────────────────────── #}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <strong>Legacy CLIN Cleanup Tool</strong> — Use this page to reclassify legacy
+        "subcontract" CLIN entries (packaging, trucking, partial shipments) that were
+        imported from the old Access database. This tool is scheduled for removal once
+        cleanup is complete.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    {# ── Unsaved CLIN Fixes Widget (other contracts) ─────────────────── #}
+    {% if other_contract_drafts %}
+    <div class="card border-warning mb-3" style="max-width: 360px;">
+        <div class="card-header bg-warning-subtle d-flex align-items-center">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="me-2" aria-hidden="true">
+                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+            </svg>
+            <strong class="small">Unsaved CLIN Fixes</strong>
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for d in other_contract_drafts %}
+            <li class="list-group-item d-flex justify-content-between align-items-center small">
+                <a href="{% url 'contracts:clin_fix_page' d.contract_pk %}" class="text-decoration-none">
+                    {{ d.contract_number }}
+                </a>
+                <span class="text-muted">
+                    {{ d.draft_count }} draft{{ d.draft_count|pluralize }} · {{ d.last_updated|date:"M j" }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {# ── Contract Details Card (full width above the split) ──────────── #}
+    <div class="card mb-3">
+        <div class="card-body py-3">
+            <div class="row g-3 small">
+                <div class="col-md-4">
+                    <div class="text-muted">Contract #</div>
+                    <div class="fw-semibold">{{ contract.contract_number|default:"—" }}</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted">IDIQ #</div>
+                    <div>{{ contract.idiq_contract.contract_number|default:"—" }}</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted">Status</div>
+                    <div>
+                        {% if contract.status %}
+                            <span class="badge bg-secondary">{{ contract.status.description|default:"—" }}</span>
+                        {% else %}—{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted">Has Packaging</div>
+                    <div>
+                        {% if has_packaging %}
+                            <span class="badge bg-success">Yes</span>
+                            <a href="{% url 'contracts:finance_audit_detail' contract.pk %}"
+                               class="ms-2 small">Edit existing →</a>
+                        {% else %}
+                            <span class="badge bg-secondary">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted">CLIN Count</div>
+                    <div>{{ clin_rows|length }}</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted">Award / Due</div>
+                    <div>
+                        {{ contract.award_date|date:"M j, Y"|default:"—" }}
+                        <span class="text-muted">·</span>
+                        {{ contract.due_date|date:"M j, Y"|default:"—" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── CLIN table card ─────────────────────────────────────────────── #}
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>CLINs on this Contract</strong>
+                    <small class="text-muted">
+                        Choose a destination for each legacy CLIN row.
+                        Notes will migrate to the contract. Payment History will be deleted.
+                    </small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Item #</th>
+                                <th>Type</th>
+                                <th>Supplier</th>
+                                <th>NSN</th>
+                                <th class="text-end">Qty/UOM</th>
+                                <th class="text-end">Quote</th>
+                                <th class="text-end">Paid</th>
+                                <th class="text-end">Item Val</th>
+                                <th class="text-end">WAWF</th>
+                                <th>Ship Date</th>
+                                <th class="text-center">Notes</th>
+                                <th class="text-center">Pmt Hist</th>
+                                <th>Convert to</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clin-fix-table-body">
+                            {% for row in clin_rows %}
+                            {% with clin=row.clin %}
+                            <tr id="clin-fix-row-{{ clin.id }}"
+                                class="clin-fix-row"
+                                data-clin-id="{{ clin.id }}"
+                                data-item-number="{{ clin.item_number|default_if_none:'' }}"
+                                data-item-value="{{ clin.item_value|default_if_none:'' }}"
+                                data-wawf-payment="{{ clin.wawf_payment|default_if_none:'' }}"
+                                data-quote-value="{{ clin.quote_value|default_if_none:'' }}"
+                                data-paid-amount="{{ clin.paid_amount|default_if_none:'' }}"
+                                data-ship-qty="{{ clin.ship_qty|default_if_none:'' }}"
+                                data-uom="{{ clin.uom|default_if_none:'' }}"
+                                data-supplier-id="{{ clin.supplier_id|default_if_none:'' }}"
+                                data-supplier-name="{{ clin.supplier.name|default_if_none:'' }}"
+                                data-nsn-id="{{ clin.nsn_id|default_if_none:'' }}"
+                                data-serialized="{{ row.serialized_json|escape }}">
+                                <td class="nowrap">{{ clin.item_number|default:"—" }}</td>
+                                <td class="nowrap">{{ clin.get_item_type_display|default:"—" }}</td>
+                                <td>
+                                    {% if clin.supplier %}
+                                        <a href="{% url 'contracts:supplier_detail' clin.supplier.pk %}"
+                                           target="_blank" rel="noopener">{{ clin.supplier.name }}</a>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="text-mono nowrap">{{ clin.nsn.nsn_code|default:"—" }}</td>
+                                <td class="text-end nowrap">
+                                    {% if clin.order_qty is not None %}{{ clin.order_qty }}{{ clin.uom|default:"" }}{% else %}—{% endif %}
+                                </td>
+                                <td class="text-end nowrap">
+                                    {% if clin.quote_value is not None %}${{ clin.quote_value|floatformat:2|intcomma }}{% else %}—{% endif %}
+                                </td>
+                                <td class="text-end nowrap">
+                                    {% if clin.paid_amount is not None %}${{ clin.paid_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
+                                </td>
+                                <td class="text-end nowrap js-item-val-cell">
+                                    {% if clin.item_value is not None %}${{ clin.item_value|floatformat:2|intcomma }}{% else %}—{% endif %}
+                                </td>
+                                <td class="text-end nowrap js-wawf-cell">
+                                    {% if clin.wawf_payment is not None %}${{ clin.wawf_payment|floatformat:2|intcomma }}{% else %}—{% endif %}
+                                </td>
+                                <td class="nowrap">{{ clin.ship_date|date:"M j, Y"|default:"—" }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary"
+                                          data-bs-toggle="tooltip"
+                                          title="Will be migrated to contract">
+                                        {{ row.notes_count }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-danger-subtle text-danger"
+                                          data-bs-toggle="tooltip"
+                                          title="Will be deleted on conversion">
+                                        {{ row.payment_history_count }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm destination-select clin-fix-destination"
+                                            data-clin-id="{{ clin.id }}">
+                                        <option value="default">Leave as CLIN</option>
+                                        <option value="packaging"
+                                            {% if has_packaging %}disabled title="Contract already has packaging"{% endif %}>
+                                            Convert to Packaging
+                                        </option>
+                                        <option value="finance_line">Convert to Finance Line</option>
+                                        <option value="partial_shipment">Convert to Partial Shipment</option>
+                                        <option value="deleted">Delete (Garbage Row)</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% empty %}
+                            <tr><td colspan="13" class="text-center text-muted py-4">No CLINs found for this contract.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+    </div> {# /.clin-fix-left #}
+
+    {# ───────── RIGHT PANE — Configure Pane (always visible, never closes) #}
+    <div class="clin-fix-right">
+            <div class="card" id="configure-pane">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <strong id="pane-title" class="small">Configure</strong>
+                    <span id="pane-autosave-indicator" class="small text-muted ms-2" aria-live="polite">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="text-success me-1" aria-hidden="true">
+                            <path d="M13.485 1.929a.75.75 0 0 1 1.06 1.061L6.06 11.475a.75.75 0 0 1-1.06 0L1.455 7.929a.75.75 0 1 1 1.06-1.061l3.015 3.015 7.955-7.954z"/>
+                        </svg>
+                        <span id="pane-autosave-text">Saved</span>
+                    </span>
+                </div>
+                <div class="card-body small">
+                    {# State A: empty (no row active) #}
+                    <div data-pane-state="A">
+                        <p class="text-muted mb-0">
+                            Select a CLIN row to view its details or configure a conversion.
+                        </p>
+                    </div>
+
+                    {# State B: original CLIN data (Default destination) #}
+                    <div data-pane-state="B" style="display:none;">
+                        <h6 class="mb-2 small fw-semibold">Original CLIN Data</h6>
+                        <dl class="row mb-0" id="pane-default-fields"></dl>
+                    </div>
+
+                    {# State C: Packaging #}
+                    <div data-pane-state="C" style="display:none;">
+                        <div class="text-muted small mb-2">Convert to Packaging</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Packhouse (from supplier)</label>
+                            <input type="text" class="form-control form-control-sm" id="pkg-packhouse" readonly>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Quote Amount</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="pkg-quote">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Amount Paid</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="pkg-paid">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Payment Date</label>
+                                <input type="date" class="form-control form-control-sm pane-input" id="pkg-payment-date">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Invoice Number</label>
+                                <input type="text" class="form-control form-control-sm pane-input" id="pkg-invoice" placeholder="(optional)">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Notes (auto-generated, editable)</label>
+                                <textarea class="form-control form-control-sm pane-input" id="pkg-notes" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning small mt-3 py-2 px-2" id="pkg-income-warning" style="display:none;"></div>
+                    </div>
+
+                    {# State D: Finance Line #}
+                    <div data-pane-state="D" style="display:none;">
+                        <div class="text-muted small mb-2">Convert to Finance Line</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Line Type</label>
+                            <select class="form-select form-select-sm pane-input" id="fl-line-type">
+                                <option value="Trucking" selected>Trucking</option>
+                                <option value="Freight">Freight</option>
+                                <option value="Labels">Labels</option>
+                                <option value="Miscellaneous">Miscellaneous</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-2" id="fl-line-type-other-wrap" style="display:none;">
+                            <label class="form-label small">Custom Line Type</label>
+                            <input type="text" class="form-control form-control-sm pane-input" id="fl-line-type-other" maxlength="100">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Description (auto-generated, editable)</label>
+                            <textarea class="form-control form-control-sm pane-input" id="fl-description" rows="2"></textarea>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Amount Billed</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="fl-amount-billed">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Auto-payment Amount</label>
+                                <input type="text" class="form-control form-control-sm" id="fl-auto-payment" readonly>
+                            </div>
+                        </div>
+                        <div class="mb-2 mt-2">
+                            <label class="form-label small">Attach to CLIN <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm pane-input" id="fl-parent-clin">
+                                <option value="">Select a CLIN…</option>
+                            </select>
+                        </div>
+                        <div class="small text-muted mt-1" id="fl-payment-note"></div>
+                        <div class="alert alert-warning small mt-3 py-2 px-2" id="fl-income-warning" style="display:none;"></div>
+                    </div>
+
+                    {# State E: Partial Shipment #}
+                    <div data-pane-state="E" style="display:none;">
+                        <div class="text-muted small mb-2">Convert to Partial Shipment</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Parent CLIN <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm pane-input" id="ps-parent-clin">
+                                <option value="">Select a parent CLIN…</option>
+                            </select>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Ship Qty</label>
+                                <input type="number" step="any" class="form-control form-control-sm pane-input" id="ps-ship-qty">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">UOM</label>
+                                <input type="text" class="form-control form-control-sm pane-input" id="ps-uom">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Quote Value</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="ps-quote-value">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Item Value</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="ps-item-value">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Paid Amount</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="ps-paid-amount">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">WAWF Payment</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="ps-wawf-payment">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Ship Date</label>
+                                <input type="date" class="form-control form-control-sm pane-input" id="ps-ship-date">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">POD Date</label>
+                                <input type="date" class="form-control form-control-sm pane-input" id="ps-pod-date">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Additional Comments</label>
+                                <textarea class="form-control form-control-sm pane-input" id="ps-comments" rows="2"
+                                          placeholder="A migration breadcrumb is added automatically."></textarea>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning small mt-3 py-2 px-2" id="ps-mismatch-warning" style="display:none;"></div>
+                    </div>
+
+                    {# State F: Delete #}
+                    <div data-pane-state="F" style="display:none;">
+                        <div class="text-muted small mb-2">Delete this CLIN</div>
+                        <div class="alert alert-danger small py-2 px-2">
+                            This CLIN will be permanently deleted. Notes will be migrated to the
+                            contract. Payment History will be deleted. A reclassification log
+                            will be kept.
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Reason <span class="text-danger">*</span></label>
+                            <textarea class="form-control form-control-sm pane-input" id="del-reason" rows="3"
+                                      placeholder="Why is this row being deleted?"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </div> {# /.clin-fix-right #}
+
+  </div> {# /.clin-fix-split #}
+
+    {# ── Bottom bar — anchored by flex inside .clin-fix-shell ────────── #}
+    <div class="clin-fix-bottom-bar">
+        <div>
+            <span class="badge bg-secondary" id="pending-count-badge">0 conversions pending</span>
+        </div>
+        <div>
+            <button type="button" class="btn btn-sm btn-outline-danger me-2" id="discard-drafts-btn">
+                Discard All Drafts
+            </button>
+            <button type="button" class="btn btn-primary" id="save-all-btn" disabled>
+                Save All Conversions
+            </button>
+        </div>
+    </div>
+</div> {# /.clin-fix-shell #}
+
+{# JSON state seeded for JS #}
+<script id="clin-fix-existing-drafts" type="application/json">{{ existing_drafts_json|safe }}</script>
+<script id="clin-fix-parent-options" type="application/json">{{ parent_options_initial_json|safe }}</script>
+
+{# Cache-bust per-request in dev so working-tree edits never get masked by browser cache #}
+{% is_development as dev_mode %}
+{% if dev_mode %}
+<script src="{% static 'contracts/js/clin_fix.js' %}?v={{ cache_version }}-{{ request.id|default:'' }}" defer></script>
+{% else %}
+<script src="{% static 'contracts/js/clin_fix.js' %}?v={{ cache_version }}" defer></script>
+{% endif %}
+{% endblock %}

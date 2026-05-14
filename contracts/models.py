@@ -1586,3 +1586,130 @@ class ContractRecord(models.Model):
 
     def is_highlighted(self):
         return self.ui_state.get('is_highlighted', False)
+
+
+# =============================================================================
+# CLIN Fix Tool (sunset cleanup)
+# -----------------------------------------------------------------------------
+# These models exist solely to support the legacy CLIN reclassification tool
+# at /contracts/<pk>/clin-fix/. The feature is scheduled for removal once
+# data cleanup is complete. Do not couple other features to these tables.
+# =============================================================================
+
+
+class ClinReclassificationLog(models.Model):
+    """
+    Audit log of every CLIN reclassification performed via the CLIN Fix tool.
+    Stores a full JSON snapshot of the original Clin row so the conversion is
+    recoverable if needed. Original Clin rows are hard-deleted after conversion.
+    """
+    DESTINATION_CHOICES = [
+        ('packaging', 'Contract Packaging'),
+        ('finance_line', 'Contract Finance Line'),
+        ('partial_shipment', 'Partial Shipment'),
+        ('deleted', 'Deleted (Garbage Row)'),
+    ]
+
+    contract = models.ForeignKey(
+        'Contract',
+        on_delete=models.CASCADE,
+        related_name='clin_reclassification_logs',
+    )
+    original_clin_id = models.IntegerField(
+        help_text="The ID of the Clin row that was reclassified. Row no longer exists."
+    )
+    original_data = models.JSONField(
+        help_text="Full snapshot of the original Clin row data, including all fields."
+    )
+    destination_type = models.CharField(max_length=20, choices=DESTINATION_CHOICES)
+    destination_id = models.IntegerField(
+        null=True, blank=True,
+        help_text="ID of the new row created (ContractPackaging, ContractFinanceLine, or ClinShipment). Null for 'deleted'.",
+    )
+    notes_migrated_count = models.IntegerField(
+        default=0,
+        help_text="Number of Note rows migrated from the original Clin to the contract.",
+    )
+    payment_history_deleted_count = models.IntegerField(
+        default=0,
+        help_text="Number of PaymentHistory rows deleted with the original Clin.",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='+',
+    )
+    performed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'contracts_clinreclassificationlog'
+        ordering = ['-performed_at']
+        indexes = [
+            models.Index(fields=['contract', '-performed_at'], name='clinreclog_contract_idx'),
+            models.Index(fields=['performed_by', '-performed_at'], name='clinreclog_user_idx'),
+        ]
+
+    def __str__(self):
+        return f"Reclassified Clin {self.original_clin_id} → {self.get_destination_type_display()}"
+
+
+class ClinReclassificationDraft(models.Model):
+    """
+    Autosaved draft state for the CLIN Fix tool. Stores in-progress
+    reclassification decisions per user per CLIN. Deleted on successful
+    commit. Unique per (contract, user, clin) so concurrent users don't
+    overwrite each other.
+    """
+    DESTINATION_CHOICES = [
+        ('packaging', 'Contract Packaging'),
+        ('finance_line', 'Contract Finance Line'),
+        ('partial_shipment', 'Partial Shipment'),
+        ('deleted', 'Deleted (Garbage Row)'),
+    ]
+
+    contract = models.ForeignKey(
+        'Contract',
+        on_delete=models.CASCADE,
+        related_name='clin_reclassification_drafts',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='+',
+    )
+    clin = models.ForeignKey(
+        'Clin',
+        on_delete=models.CASCADE,
+        related_name='+',
+    )
+    destination_type = models.CharField(max_length=20, choices=DESTINATION_CHOICES)
+    staged_data = models.JSONField(
+        default=dict,
+        help_text="Destination-specific field values entered by the user.",
+    )
+    parent_clin = models.ForeignKey(
+        'Clin',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='+',
+        help_text="For partial_shipment destination: the Clin this partial belongs to.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'contracts_clinreclassificationdraft'
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['contract', 'user', 'clin'],
+                name='unique_draft_per_clin_per_user',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', '-updated_at'], name='clinrecdraft_user_idx'),
+            models.Index(fields=['contract', 'user'], name='clinrecdraft_contract_user_idx'),
+        ]
+
+    def __str__(self):
+        return f"Draft (Clin {self.clin_id} → {self.destination_type}) by {self.user_id}"
