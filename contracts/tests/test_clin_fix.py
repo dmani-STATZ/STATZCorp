@@ -152,6 +152,7 @@ class ClinFixConversionTests(ClinFixBaseTest):
             'clin_id': legacy_clin.id,
             'destination_type': 'finance_line',
             'staged_data': {'line_type': 'Trucking'},
+            'parent_clin_id': target_clin.id,
         }]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -172,7 +173,7 @@ class ClinFixConversionTests(ClinFixBaseTest):
 
     def test_clin_to_finance_line_no_paid_amount_skips_payment(self):
         contract = _create_contract(self.company, 'C-FL2')
-        _create_clin(contract, item_number='0001')
+        target_clin = _create_clin(contract, item_number='0001')
         legacy_clin = _create_clin(
             contract,
             item_number='0099',
@@ -184,6 +185,7 @@ class ClinFixConversionTests(ClinFixBaseTest):
             'clin_id': legacy_clin.id,
             'destination_type': 'finance_line',
             'staged_data': {'line_type': 'Freight'},
+            'parent_clin_id': target_clin.id,
         }]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(resp.status_code, 200, resp.content)
