@@ -1593,14 +1593,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
             if (data.success) {
                 showMessage('Contract finalized successfully', 'success');
-
-                // Open email client with pre-populated email
-                window.location.href = data.mailto_url;
-
-                // Redirect to queue after a short delay
-                setTimeout(() => {
-                    window.location.href = "{% url 'processing:queue' %}";
-                }, 2000);
+                const _popW = 700, _popH = 620;
+                const _popLeft = Math.round((screen.width - _popW) / 2);
+                const _popTop = Math.round((screen.height - _popH) / 2);
+                const _popWin = window.open(
+                    data.compose_url,
+                    'contractEmail',
+                    `width=${_popW},height=${_popH},left=${_popLeft},top=${_popTop},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
+                );
+                if (!_popWin || _popWin.closed || typeof _popWin.closed === 'undefined') {
+                    const _container = document.getElementById('custom-messages');
+                    const _fallbackDiv = document.createElement('div');
+                    _fallbackDiv.className = 'px-4 py-3 rounded relative mb-2 shadow-lg bg-yellow-100 border border-yellow-400 text-yellow-700';
+                    _fallbackDiv.innerHTML = `Popup blocked — <a href="${data.compose_url}"
+                        target="_blank" class="font-bold underline">click here to open
+                        the email composer</a>.
+                        <button type="button" class="absolute top-0 right-0 px-4 py-3"
+                        onclick="this.parentElement.remove()">✕</button>`;
+                    _container.appendChild(_fallbackDiv);
+                }
+                // Redirect main window to queue immediately
+                window.onbeforeunload = null;
+                window.location.href = data.redirect_url;
             } else if (data.validation_errors) {
                 // Handle validation errors from the finalize endpoint
                 let errorMsg = 'Contract validation failed:';

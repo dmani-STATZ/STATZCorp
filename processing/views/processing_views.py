@@ -48,7 +48,9 @@ from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST, require_http_methods
 from django.http import Http404
 import json
-from urllib.parse import quote
+import urllib.error
+import urllib.request
+from urllib.parse import urlencode
 import logging
 from decimal import Decimal, InvalidOperation
 import random
@@ -243,7 +245,11 @@ def start_processing(request, queue_id):
             status='in_progress',
             queue_id=queue_id,
             description=queue_item.description,
-            files_url=r'\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number,
+            files_url=(
+                queue_item.sharepoint_folder_url
+                if queue_item.sharepoint_folder_url
+                else r'\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + queue_item.contract_number
+            ),
             sales_class=_get_default_sales_class(),
             idiq_contract=matched_idiq,
             created_by=request.user,
@@ -1457,34 +1463,57 @@ def finalize_and_email_contract(request, process_contract_id):
                 modified_by=request.user
             )
             
+        queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+
         email_subject = f"New Contract: {contract.contract_number}"
+
+        clin_lines = []
+        for clin in process_contract.clins.select_related(
+            'supplier', 'nsn'
+        ).order_by('item_number'):
+            supplier_name = (
+                clin.supplier.name if clin.supplier else clin.supplier_text or 'Unmatched'
+            )
+            nsn_display = (
+                clin.nsn.nsn_code if clin.nsn else clin.nsn_text or 'Unmatched'
+            )
+            clin_lines.append(
+                f"  CLIN: {clin.item_number},  Supplier: {supplier_name},  NSN: {nsn_display}"
+            )
+
+        packhouse_line = ""
+        if process_contract.packhouse:
+            packhouse_line = (
+                f"\nPackhouse: {process_contract.packhouse.name}"
+            )
+
+        clin_block = "\n".join(clin_lines)
+
         email_body = (
             f"A new Contract has been created\n\n"
-            f"Tab #: {contract.tab_num}\n"
             f"PO #: {contract.po_number}\n"
             f"Contract #: {contract.contract_number}\n"
-            f"{contract.files_url}"
+            f"{contract.files_url}\n\n"
+            f"CLINs:\n{clin_block}"
+            f"{packhouse_line}"
         )
 
-        from urllib.parse import quote
-
-        # Create mailto URL
-        mailto_url = (
-            f"mailto:dmani@statzcorp.com?subject={quote(email_subject)}&"
-            f"body={quote(email_body)}"
-        )
-        
-        queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
+        compose_params = urlencode({
+            'subject': email_subject,
+            'body': email_body,
+        })
+        compose_url = f"/processing/email-compose/?{compose_params}"
 
         # Delete the process contract
         process_contract.delete()
 
         # Delete the queue contract
         queue_contract.delete()
-        
+
         return JsonResponse({
             'success': True,
-            'mailto_url': mailto_url,
+            'compose_url': compose_url,
+            'redirect_url': reverse('processing:queue'),
             'contract_id': contract.id,
             'message': 'Contract finalized successfully'
         })
@@ -1500,6 +1529,140 @@ def finalize_and_email_contract(request, process_contract_id):
             'success': False,
             'error': f"Database error: {str(e)}"
         }, status=500)
+
+
+@login_required
+@require_POST
+def send_contract_email(request):
+    to_email = (request.POST.get('to_email') or '').strip()
+    subject = (request.POST.get('subject') or '').strip()
+    body = request.POST.get('body') or ''
+
+    if not to_email:
+        return JsonResponse(
+            {'success': False, 'error': 'Recipient email is required.'},
+            status=400,
+        )
+    if not subject:
+        return JsonResponse(
+            {'success': False, 'error': 'Subject is required.'},
+            status=400,
+        )
+
+    if not settings.GRAPH_MAIL_ENABLED:
+        return JsonResponse({
+            'success': False,
+            'error': (
+                'Graph Mail is not enabled. '
+                'Set GRAPH_MAIL_ENABLED=True in environment settings.'
+            ),
+        })
+
+    try:
+        token_url = (
+            f'https://login.microsoftonline.us/{settings.GRAPH_MAIL_TENANT_ID}'
+            f'/oauth2/v2.0/token'
+        )
+        token_data = {
+            'grant_type': 'client_credentials',
+            'client_id': settings.GRAPH_MAIL_CLIENT_ID,
+            'client_secret': settings.GRAPH_MAIL_CLIENT_SECRET,
+            'scope': 'https://graph.microsoft.us/.default',
+        }
+        token_req = urllib.request.Request(
+            token_url,
+            data=urlencode(token_data).encode('utf-8'),
+            method='POST',
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        )
+        with urllib.request.urlopen(token_req, timeout=60) as token_resp:
+            token_payload = json.loads(token_resp.read().decode('utf-8'))
+        access_token = token_payload.get('access_token')
+        if not access_token:
+            logger.error(
+                'Graph Mail token response missing access_token: %s',
+                token_payload,
+            )
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': 'Failed to send email. Check server logs for details.',
+                },
+                status=500,
+            )
+
+        send_url = (
+            f'https://graph.microsoft.us/v1.0/users/'
+            f'{settings.GRAPH_MAIL_SENDER_CONTRACT}/sendMail'
+        )
+        payload = {
+            'message': {
+                'subject': subject,
+                'body': {
+                    'contentType': 'Text',
+                    'content': body,
+                },
+                'toRecipients': [
+                    {'emailAddress': {'address': to_email}},
+                ],
+            },
+            'saveToSentItems': True,
+        }
+        send_req = urllib.request.Request(
+            send_url,
+            data=json.dumps(payload).encode('utf-8'),
+            method='POST',
+            headers={
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json',
+            },
+        )
+        with urllib.request.urlopen(send_req, timeout=60) as send_resp:
+            status_code = send_resp.status
+        if not (200 <= status_code < 300):
+            logger.error('Graph sendMail returned HTTP %s', status_code)
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': 'Failed to send email. Check server logs for details.',
+                },
+                status=500,
+            )
+
+        return JsonResponse({'success': True})
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='replace')
+        logger.error('Graph Mail HTTP error: %s %s', e.code, err_body)
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Failed to send email. Check server logs for details.',
+            },
+            status=500,
+        )
+    except Exception as e:
+        logger.error('Graph Mail error: %s', str(e), exc_info=True)
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Failed to send email. Check server logs for details.',
+            },
+            status=500,
+        )
+
+
+@login_required
+def email_compose_page(request):
+    return render(
+        request,
+        'processing/email_compose.html',
+        {
+            'subject': request.GET.get('subject', ''),
+            'body': request.GET.get('body', ''),
+            'sender_email': settings.GRAPH_MAIL_SENDER_CONTRACT,
+        },
+    )
+
 
 @login_required
 @require_POST

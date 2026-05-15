@@ -54,7 +54,7 @@ Check Azure WebJob logs for full output.
 Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
 """
 
-        sender = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+        sender = os.environ.get("GRAPH_MAIL_SENDER_RFQ", "quotes@statzcorp.com")
         subject = f"STATZ ALERT: scrape_awards — {subject_detail}"
         ok = send_mail_via_graph(
             to_address=recipient,
@@ -547,7 +547,7 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             f"STATZ ALERT: {len(expiring_batches)} award date(s) expiring on DIBBS"
         )
 
-        sender = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+        sender = os.environ.get("GRAPH_MAIL_SENDER_RFQ", "quotes@statzcorp.com")
         ok = send_mail_via_graph(
             to_address=recipient,
             subject=subject,

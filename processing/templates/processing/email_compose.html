@@ -1,0 +1,152 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" crossorigin="anonymous">
+{% endblock %}
+
+{% block title %}New Contract Notification{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="fs-4" aria-hidden="true">✉</span>
+        <h1 class="h4 mb-0">New Contract Notification</h1>
+    </div>
+
+    <div class="alert alert-success mb-3" role="status">
+        ✅ Contract has been finalized. Fill in the recipient and send.
+    </div>
+
+    <div id="send-error-alert" class="alert alert-danger d-none" role="alert"></div>
+    <div id="send-success-alert" class="alert alert-success d-none" role="alert">
+        ✅ Email sent successfully. You may close this window now.
+    </div>
+
+    <div id="compose-panel" class="mx-auto bg-white rounded" style="max-width: 860px; border: 1px solid #dee2e6; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);">
+        <div class="px-3 py-2 border-bottom" style="border-color: #dee2e6 !important;">
+            <span class="text-muted small me-2">From</span>
+            <span class="text-muted">{{ sender_email }}</span>
+        </div>
+        <div class="px-3 py-2 border-bottom" style="border-color: #dee2e6 !important;">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="text-muted small flex-shrink-0" style="min-width: 3.5rem;">To</span>
+                <input type="email" id="to_email" class="form-control border-0 shadow-none flex-grow-1" autocomplete="email" placeholder="recipient@example.com">
+            </div>
+            <div id="to_email_error" class="text-danger small mt-1 d-none">Please enter a recipient email address.</div>
+        </div>
+        <div class="px-3 py-2 border-bottom" style="border-color: #dee2e6 !important;">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="text-muted small flex-shrink-0" style="min-width: 3.5rem;">Subject</span>
+                <input type="text" id="subject_email" class="form-control border-0 shadow-none flex-grow-1" value="{{ subject }}">
+            </div>
+        </div>
+        <div class="p-0">
+            <textarea id="body_email" class="form-control border-0 shadow-none font-monospace rounded-0" style="min-height: 260px; resize: vertical;">{{ body }}</textarea>
+        </div>
+        <div class="px-3 py-3 border-top d-flex flex-wrap gap-2" style="border-color: #dee2e6 !important;">
+            <button type="button" id="send-email-btn" class="btn btn-success">
+                <span class="send-btn-label"><i class="bi bi-send me-1" aria-hidden="true"></i>Send</span>
+                <span class="send-btn-spinner d-none spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="close-tab-btn">Close Tab</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const sendUrl = "{% url 'processing:send_contract_email' %}";
+    const sendBtn = document.getElementById('send-email-btn');
+    const sendLabel = sendBtn.querySelector('.send-btn-label');
+    const sendSpinner = sendBtn.querySelector('.send-btn-spinner');
+    const errorAlert = document.getElementById('send-error-alert');
+    const successAlert = document.getElementById('send-success-alert');
+    const composePanel = document.getElementById('compose-panel');
+    const toInput = document.getElementById('to_email');
+    const toError = document.getElementById('to_email_error');
+
+    function showError(msg) {
+        errorAlert.textContent = msg;
+        errorAlert.classList.remove('d-none');
+    }
+
+    function clearError() {
+        errorAlert.textContent = '';
+        errorAlert.classList.add('d-none');
+    }
+
+    document.getElementById('close-tab-btn').addEventListener('click', function () {
+        window.close();
+    });
+
+    sendBtn.addEventListener('click', async function () {
+        clearError();
+        toError.classList.add('d-none');
+
+        const to_email = (toInput.value || '').trim();
+        const subject = (document.getElementById('subject_email').value || '').trim();
+        const body = document.getElementById('body_email').value || '';
+
+        if (!to_email) {
+            toError.classList.remove('d-none');
+            return;
+        }
+
+        sendBtn.disabled = true;
+        sendLabel.classList.add('d-none');
+        sendSpinner.classList.remove('d-none');
+
+        const params = new URLSearchParams();
+        params.append('to_email', to_email);
+        params.append('subject', subject);
+        params.append('body', body);
+        params.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+
+        try {
+            const response = await fetch(sendUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: params.toString(),
+            });
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseErr) {
+                showError('Failed to send email. Check server logs for details.');
+                return;
+            }
+            if (data.success) {
+                composePanel.classList.add('d-none');
+                successAlert.classList.remove('d-none');
+            } else {
+                showError(data.error || 'Failed to send email.');
+            }
+        } catch (e) {
+            showError('Failed to send email. Check your connection and try again.');
+        } finally {
+            sendBtn.disabled = false;
+            sendLabel.classList.remove('d-none');
+            sendSpinner.classList.add('d-none');
+        }
+    });
+})();
+</script>
+{% endblock %}

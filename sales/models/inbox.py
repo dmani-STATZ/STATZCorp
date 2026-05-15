@@ -8,7 +8,7 @@ from django.utils import timezone
 
 class InboxMessage(models.Model):
     """
-    Stores an email from the GRAPH_MAIL_SENDER mailbox that has been linked
+    Stores an email from the GRAPH_MAIL_SENDER_RFQ mailbox that has been linked
     to one or more SupplierRFQ records by a sales rep. Unlinked emails are
     never persisted — they are fetched live from Graph.
     """

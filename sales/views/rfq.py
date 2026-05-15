@@ -1971,7 +1971,7 @@ def rfq_queue_mark_sent(request):
 
 
 # ──────────────────────────────────────────────
-# Graph Inbox (Microsoft Graph — GRAPH_MAIL_SENDER mailbox)
+# Graph Inbox (Microsoft Graph — GRAPH_MAIL_SENDER_RFQ mailbox)
 # ──────────────────────────────────────────────
 
 
@@ -2033,7 +2033,7 @@ def rfq_inbox(request):
     """
     Renders the Inbox tab of the RFQ Center (full page).
 
-    Fetches the 50 most recent messages from the GRAPH_MAIL_SENDER mailbox via Graph.
+    Fetches the 50 most recent messages from the GRAPH_MAIL_SENDER_RFQ mailbox via Graph.
     Merges live Graph results with locally stored InboxMessage rows for link badges.
     """
     context = _build_rfq_inbox_message_context()

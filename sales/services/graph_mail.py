@@ -10,7 +10,7 @@ Required environment variables (set in settings.py):
     GRAPH_MAIL_TENANT_ID
     GRAPH_MAIL_CLIENT_ID
     GRAPH_MAIL_CLIENT_SECRET
-    GRAPH_MAIL_SENDER
+    GRAPH_MAIL_SENDER_RFQ
     GRAPH_MAIL_ENABLED  (must be True or emails will not send)
 
 This module is only called when GRAPH_MAIL_ENABLED=True.
@@ -87,7 +87,7 @@ def send_mail_via_graph(
         to_address:   Recipient email address string.
         subject:      Email subject line.
         body:         Plain-text email body. Graph sends as text/plain.
-        reply_to:     Optional Reply-To address. Defaults to GRAPH_MAIL_SENDER.
+        reply_to:     Optional Reply-To address. Defaults to GRAPH_MAIL_SENDER_RFQ.
         attachments:  Optional list of attachment dicts, each with keys:
                         'name'         (str)  — filename shown to recipient
                         'content_type' (str)  — MIME type e.g. 'application/pdf'
@@ -109,7 +109,7 @@ def send_mail_via_graph(
     if not token:
         return False
 
-    sender = settings.GRAPH_MAIL_SENDER
+    sender = settings.GRAPH_MAIL_SENDER_RFQ
     effective_reply_to = reply_to or sender
 
     # Build the Graph API message payload

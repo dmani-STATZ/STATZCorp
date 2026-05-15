@@ -21,7 +21,7 @@ to avoid contention on Playwright/Chromium.
 
 ## Required Environment Variables
 - GRAPH_MAIL_ENABLED, GRAPH_MAIL_TENANT_ID, GRAPH_MAIL_CLIENT_ID,
-  GRAPH_MAIL_CLIENT_SECRET, GRAPH_MAIL_SENDER — same as awards/RFQ mail
+  GRAPH_MAIL_CLIENT_SECRET, GRAPH_MAIL_SENDER_RFQ — same as awards/RFQ mail
 - AWARDS_ALERT_EMAIL — failure alerts go to this address
 
 ## Failure behavior

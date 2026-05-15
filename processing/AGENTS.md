@@ -290,6 +290,10 @@ defeat the supplier-matching prefill flow.
 
 15. **`option_length` on `IdiqContract`:** Stores total option period length in months (integer). `0` is valid (Zero Options). In views, templates, and JS, use explicit checks (`is not None`, `!== ''` for form fields), not truthiness, so `0` is not dropped.
 
+16. **Graph Mail is GCC High only.** The token URL and Graph base URL use `.us` not `.com`. Never change these to `.com` endpoints. The scope is `https://graph.microsoft.us/.default`. Sender mailbox is `GRAPH_MAIL_SENDER_CONTRACT` from settings (`info@statzcorp.com`). The `send_contract_email` view uses only `urllib.request` — do not introduce `requests` or `httpx` for this.
+
+17. **`files_url` is now the SharePoint folder URL** when SharePoint has been scanned for the queue contract (`QueueContract.sharepoint_folder_url` is copied at `start_processing`). Do not assume it is always a UNC path. The UNC path pattern remains the fallback for contracts ingested before SharePoint scanning or when no folder URL was resolved.
+
 ---
 
 ## 14. Safe Change Workflow

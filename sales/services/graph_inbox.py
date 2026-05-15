@@ -1,5 +1,5 @@
 """
-Graph inbox reader for the GRAPH_MAIL_SENDER mailbox.
+Graph inbox reader for the GRAPH_MAIL_SENDER_RFQ mailbox.
 
 Uses Microsoft Graph API via MSAL client credentials (application permissions).
 Requires Mail.Read or Mail.ReadWrite application permission with admin consent.
@@ -97,13 +97,13 @@ def _parse_graph_datetime(value: str) -> datetime:
 
 def fetch_inbox_messages() -> tuple[list[GraphEmailMessage], Optional[str]]:
     """
-    Fetch the most recent INBOX_FETCH_LIMIT messages from the GRAPH_MAIL_SENDER mailbox.
+    Fetch the most recent INBOX_FETCH_LIMIT messages from the GRAPH_MAIL_SENDER_RFQ mailbox.
 
     Returns (messages, error_message). Messages are ordered newest-first.
     """
-    sender = settings.GRAPH_MAIL_SENDER
+    sender = settings.GRAPH_MAIL_SENDER_RFQ
     if not sender:
-        return [], 'GRAPH_MAIL_SENDER is not configured.'
+        return [], 'GRAPH_MAIL_SENDER_RFQ is not configured.'
 
     token = _get_graph_token()
     if not token:
@@ -153,12 +153,12 @@ def fetch_inbox_messages() -> tuple[list[GraphEmailMessage], Optional[str]]:
 
 def fetch_message_body(graph_message_id: str) -> tuple[str, Optional[str]]:
     """Fetch the full HTML (or text) body for a single message by Graph message ID."""
-    sender = settings.GRAPH_MAIL_SENDER
+    sender = settings.GRAPH_MAIL_SENDER_RFQ
     token = _get_graph_token()
     if not token:
         return '', 'Could not acquire Graph token.'
     if not sender:
-        return '', 'GRAPH_MAIL_SENDER is not configured.'
+        return '', 'GRAPH_MAIL_SENDER_RFQ is not configured.'
 
     headers = {
         'Authorization': f'Bearer {token}',
@@ -191,12 +191,12 @@ def fetch_message_body(graph_message_id: str) -> tuple[str, Optional[str]]:
 
 def mark_message_read(graph_message_id: str) -> Optional[str]:
     """Mark a message as read in the mailbox via Graph PATCH. Returns error or None."""
-    sender = settings.GRAPH_MAIL_SENDER
+    sender = settings.GRAPH_MAIL_SENDER_RFQ
     token = _get_graph_token()
     if not token:
         return 'Could not acquire Graph token.'
     if not sender:
-        return 'GRAPH_MAIL_SENDER is not configured.'
+        return 'GRAPH_MAIL_SENDER_RFQ is not configured.'
 
     headers = {
         'Authorization': f'Bearer {token}',

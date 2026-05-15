@@ -533,13 +533,13 @@ class Command(BaseCommand):
             return
 
         alert_email = os.environ.get("AWARDS_ALERT_EMAIL", "").strip()
-        sender = os.environ.get("GRAPH_MAIL_SENDER", "").strip() or getattr(
-            settings, "GRAPH_MAIL_SENDER", ""
+        sender = os.environ.get("GRAPH_MAIL_SENDER_RFQ", "").strip() or getattr(
+            settings, "GRAPH_MAIL_SENDER_RFQ", ""
         )
 
         if not alert_email or not sender:
             self.stdout.write(
-                "Alert email not configured (AWARDS_ALERT_EMAIL or GRAPH_MAIL_SENDER missing) — skipping."
+                "Alert email not configured (AWARDS_ALERT_EMAIL or GRAPH_MAIL_SENDER_RFQ missing) — skipping."
             )
             self._print_failure_summary(failures)
             return

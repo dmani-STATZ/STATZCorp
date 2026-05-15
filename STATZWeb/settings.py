@@ -341,7 +341,9 @@ DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER", "noreply@example.com")
 GRAPH_MAIL_TENANT_ID = os.environ.get("GRAPH_MAIL_TENANT_ID", "")
 GRAPH_MAIL_CLIENT_ID = os.environ.get("GRAPH_MAIL_CLIENT_ID", "")
 GRAPH_MAIL_CLIENT_SECRET = os.environ.get("GRAPH_MAIL_CLIENT_SECRET", "")
-GRAPH_MAIL_SENDER = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+#GRAPH_MAIL_SENDER = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
+GRAPH_MAIL_SENDER_CONTRACT = os.environ.get("GRAPH_MAIL_SENDER_CONTRACT", "info@statzcorp.com")
+GRAPH_MAIL_SENDER_RFQ = os.environ.get("GRAPH_MAIL_SENDER_RFQ", "quotes@statzcorp.com")
 
 # Set to True to send via Graph API.
 # Set to False to fall back to mailto: links (manual send from user's email client).
