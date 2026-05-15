@@ -109,12 +109,17 @@
                         </span>
                     </div>
                     {% if packaging and packaging_deduction %}
-                    <div class="finance-summary-row finance-summary-row--danger flex-fill">
+                    <div class="finance-summary-row flex-fill {% if packaging_deduction > 0 %}finance-summary-row--danger{% endif %}">
                         <span class="finance-summary-label">
-                            <i class="bi bi-arrow-down text-danger me-1"></i>Packaging Cost
+                            {% if packaging_deduction > 0 %}
+                            <i class="bi bi-arrow-down text-danger me-1"></i>
+                            {% else %}
+                            <i class="bi bi-arrow-up text-success me-1"></i>
+                            {% endif %}
+                            Packaging Variance
                         </span>
-                        <span class="fw-semibold finance-summary-value text-danger" id="packaging-cost-display">
-                            -${{ packaging_deduction|floatformat:2|intcomma }}
+                        <span class="fw-semibold finance-summary-value {% if packaging_deduction > 0 %}text-danger{% else %}text-success{% endif %}" id="packaging-cost-display">
+                            {% if packaging_deduction > 0 %}-${{ packaging_deduction|abs_value|floatformat:2|intcomma }}{% else %}+${{ packaging_deduction|abs_value|floatformat:2|intcomma }}{% endif %}
                         </span>
                     </div>
                     {% endif %}
@@ -1787,7 +1792,7 @@ function refreshClinRow(clinId) {
     }
 
     // After PaymentHistory popup saves quote or paid, reload so adj_gross,
-    // packaging-cost deduction, and card-face Q/Pd values update from the server.
+    // packaging variance row, and card-face Q/Pd values update from the server.
     var origUpdateCellValue = window.updateCellValue;
     window.updateCellValue = function(arg0, arg1, arg2, arg3) {
         var fieldType = (arg3 !== undefined) ? arg2 : arg1;

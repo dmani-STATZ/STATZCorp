@@ -294,16 +294,25 @@ class ProcessContract(models.Model):
         return total
 
     def calculate_plan_gross(self):
-        """Calculate plan gross by subtracting total CLIN quote values from total CLIN item values.
+        """Calculate plan gross by subtracting total CLIN quote values and packhouse
+        cost from total CLIN item values.
 
-        Packhouse quote amount is captured for finalization purposes but does NOT
-        affect plan_gross. Packaging costs are handled on the Finance side.
+        Packhouse quote amount represents an estimated cost known at bid time and
+        is deducted from plan gross at contract entry. Actual or unexpected packaging
+        costs are handled via Adj Gross on the Finance Audit page.
+        A null packhouse_quote_amount is treated as zero.
         """
         totals = self.clins.aggregate(
             item_total=models.Sum('item_value', default=Decimal('0.00')),
             quote_total=models.Sum('quote_value', default=Decimal('0.00'))
         )
-        return totals['item_total'] - totals['quote_total']
+        base = totals['item_total'] - totals['quote_total']
+        packhouse_cost = self.packhouse_quote_amount
+        if packhouse_cost is None:
+            packhouse_cost = Decimal('0')
+        else:
+            packhouse_cost = Decimal(str(packhouse_cost))
+        return base - packhouse_cost
 
     def update_calculated_values(self):
         """Update contract value and plan gross"""

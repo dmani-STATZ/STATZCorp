@@ -271,6 +271,9 @@ def update_process_contract_field(request, pk):
         
         instance.save()
 
+        if field_name == 'packhouse_quote_amount':
+            instance.update_calculated_values()
+
         # Return the new value and any related field values
         response_data = {
             'status': 'success',
@@ -287,7 +290,12 @@ def update_process_contract_field(request, pk):
         elif field_name == 'nist':
             # Return the display value for NIST
             response_data['field_value'] = 'Yes' if instance.nist else 'No'
-            
+
+        if field_name == 'packhouse_quote_amount':
+            response_data['plan_gross'] = (
+                str(instance.plan_gross) if instance.plan_gross is not None else None
+            )
+
         return JsonResponse(response_data)
         
     except Exception as e:

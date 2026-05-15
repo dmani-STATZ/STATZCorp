@@ -1014,7 +1014,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             contractValueInput.value = totalItemValue.toFixed(2);
         }
         if (planGrossInput) {
-            planGrossInput.value = (totalItemValue - totalQuoteValue).toFixed(2);
+            const packhouseQuoteInput = document.querySelector('input[name="cont_packhouse_quote_amount"]');
+            const packhouseCost = packhouseQuoteInput ? parseFloat(packhouseQuoteInput.value || 0) || 0 : 0;
+            planGrossInput.value = (totalItemValue - totalQuoteValue - packhouseCost).toFixed(2);
         }
         if (typeof saveContract === 'function') {
             saveContract();
@@ -1593,7 +1595,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
             if (data.success) {
                 showMessage('Contract finalized successfully', 'success');
-                const _popW = 700, _popH = 620;
+                const _popW = 1100, _popH = 1120;
                 const _popLeft = Math.round((screen.width - _popW) / 2);
                 const _popTop = Math.round((screen.height - _popH) / 2);
                 const _popWin = window.open(

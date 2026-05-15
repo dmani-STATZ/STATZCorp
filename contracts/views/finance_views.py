@@ -155,21 +155,19 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 context['shipments_by_clin'] = shipments_by_clin
                 context['shipment_subtotals_by_clin'] = shipment_subtotals_by_clin
 
-                # Packaging deduction: use amount_paid if set, fall back to quote_amount
                 packaging_deduction = Decimal('0.00')
                 packaging_context = None
                 try:
                     pkg = self.object.packaging
-                    if pkg.amount_paid is not None:
-                        packaging_deduction = Decimal(str(pkg.amount_paid))
-                    elif pkg.quote_amount is not None:
-                        packaging_deduction = Decimal(str(pkg.quote_amount))
+                    if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
+                        quote = Decimal(str(pkg.quote_amount or 0))
+                        packaging_deduction = Decimal(str(pkg.amount_paid)) - quote
                     packaging_context = pkg
                 except ContractPackaging.DoesNotExist:
                     pass
 
                 context['packaging'] = packaging_context
-                context['packaging_deduction'] = packaging_deduction
+                context['packaging_deduction'] = packaging_deduction  # can be negative, positive, or zero
 
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)
@@ -301,14 +299,12 @@ def finance_audit_summary_api(request, contract_id):
             or Decimal('0.00')
         )
 
-        # Packaging deduction mirrors FinanceAuditView.get_context_data
         packaging_deduction = Decimal('0.00')
         try:
             pkg = contract.packaging
-            if pkg.amount_paid is not None:
-                packaging_deduction = Decimal(str(pkg.amount_paid))
-            elif pkg.quote_amount is not None:
-                packaging_deduction = Decimal(str(pkg.quote_amount))
+            if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
+                quote = Decimal(str(pkg.quote_amount or 0))
+                packaging_deduction = Decimal(str(pkg.amount_paid)) - quote
         except ContractPackaging.DoesNotExist:
             pass
 
