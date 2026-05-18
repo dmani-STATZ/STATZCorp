@@ -13,16 +13,28 @@
             <div class="modal-body">
                 <input type="hidden" id="addPartialClinId">
 
-                <!-- Row 1 — Ship Date full width -->
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">
-                        Ship Date <span class="text-muted fw-normal">(optional)</span>
+                <div class="mb-3" id="addPartialClinSelectRow">
+                    <label for="addPartialClinSelect" class="form-label fw-semibold">
+                        CLIN <span class="text-danger">*</span>
                     </label>
-                    <input type="date" class="form-control form-control-sm"
-                           id="addPartialShipDate">
+                    <select class="form-select" id="addPartialClinSelect" required>
+                        <option value="">— Select a CLIN —</option>
+                    </select>
                 </div>
 
-                <!-- Row 2 — QTY + UOM side by side -->
+                <!-- Shipment Name -->
+                <div class="mb-3">
+                    <label for="addPartialName" class="form-label small fw-semibold">
+                        Shipment Name
+                    </label>
+                    <input type="text" class="form-control form-control-sm"
+                           id="addPartialName" placeholder="e.g. Shipment 1">
+                    <div class="form-text small text-muted">
+                        Leave blank to use default name (Shipment 1, Shipment 2, etc.)
+                    </div>
+                </div>
+
+                <!-- QTY + UOM -->
                 <div class="d-flex gap-3 mb-3">
                     <div style="flex: 1;">
                         <label class="form-label small fw-semibold">
@@ -39,7 +51,16 @@
                     </div>
                 </div>
 
-                <!-- Row 3 — Quote Value + Paid side by side -->
+                <!-- Ship Date -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">
+                        Ship Date <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm"
+                           id="addPartialShipDate">
+                </div>
+
+                <!-- Quote Value + Paid -->
                 <div class="d-flex gap-3 mb-3">
                     <div style="flex: 1;">
                         <label class="form-label small fw-semibold">Quote Value</label>
@@ -55,7 +76,7 @@
                     </div>
                 </div>
 
-                <!-- Row 4 — Item Value + Customer Pay side by side -->
+                <!-- Item Value + Customer Pay -->
                 <div class="d-flex gap-3 mb-3">
                     <div style="flex: 1;">
                         <label class="form-label small fw-semibold">Item Value</label>
@@ -71,7 +92,7 @@
                     </div>
                 </div>
 
-                <!-- Row 5 — Comments full width -->
+                <!-- Comments -->
                 <div class="mb-2">
                     <label class="form-label small fw-semibold">Comments</label>
                     <textarea class="form-control form-control-sm"

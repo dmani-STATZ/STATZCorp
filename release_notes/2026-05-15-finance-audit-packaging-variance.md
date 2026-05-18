@@ -1,7 +1,7 @@
 ---
 id: 2026-05-15-finance-audit-packaging-variance
 title: Finance Audit — Packaging Variance
-published: false
+published: true
 publish_date: 2026-05-15
 tags: [improved, finance]
 critical: false

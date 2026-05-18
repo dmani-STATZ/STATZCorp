@@ -1,0 +1,102 @@
+<div class="modal fade" id="addFinanceLineModal" tabindex="-1"
+     aria-labelledby="addFinanceLineModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addFinanceLineModalLabel">
+                    Add Finance Line
+                </h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+
+                <div class="mb-3">
+                    <label for="aflClinSelect" class="form-label fw-semibold">
+                        CLIN <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" id="aflClinSelect" required>
+                        <option value="">— Select a CLIN —</option>
+                    </select>
+                </div>
+
+                <div class="mb-3" id="aflShipmentRow">
+                    <label for="aflShipmentSelect" class="form-label fw-semibold">
+                        Shipment
+                        <span class="text-body-secondary fw-normal">
+                            (Optional — leave blank for CLIN-level line)
+                        </span>
+                    </label>
+                    <select class="form-select" id="aflShipmentSelect">
+                        <option value="">— CLIN-level (no shipment) —</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="aflLineType" class="form-label fw-semibold">
+                        Line Type <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control" id="aflLineType"
+                           maxlength="100"
+                           placeholder="e.g. HECO Trucking, Freight, Handling">
+                </div>
+
+                <div class="mb-3">
+                    <label for="aflDescription" class="form-label fw-semibold">
+                        Description
+                    </label>
+                    <input type="text" class="form-control" id="aflDescription"
+                           maxlength="255" placeholder="Optional">
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="aflAmountBilled" class="form-label fw-semibold">
+                            Amount Billed <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="aflAmountBilled"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label for="aflAmountPaid" class="form-label fw-semibold">
+                            Amount Paid <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="aflAmountPaid"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-text">Defaults to Amount Billed. Clear to $0 if unpaid.</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="aflDate" class="form-label fw-semibold">
+                        Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control" id="aflDate">
+                </div>
+
+                <div class="mb-3">
+                    <label for="aflRefNum" class="form-label fw-semibold">
+                        Reference Number
+                    </label>
+                    <input type="text" class="form-control" id="aflRefNum"
+                           maxlength="50" placeholder="Optional">
+                </div>
+
+                <div id="aflError" class="alert alert-danger d-none" role="alert"></div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary"
+                        id="aflSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -703,3 +703,29 @@ html {
 [data-bs-theme="dark"] #packaging-finance-card .card-header {
     background-color: color-mix(in srgb, var(--bs-danger) 15%, transparent);
 }
+
+/* === Finance Audit — inline shipment name edit === */
+.shipment-name-display {
+    cursor: pointer;
+    border-bottom: 1px dashed var(--bs-secondary);
+    padding: 0 2px;
+}
+
+.shipment-name-display:hover {
+    color: var(--bs-primary);
+    border-bottom-color: var(--bs-primary);
+}
+
+.shipment-name-input {
+    max-width: 14rem;
+    display: inline-block;
+}
+
+[data-bs-theme="dark"] .shipment-name-display {
+    border-bottom-color: var(--bs-secondary-color);
+}
+
+[data-bs-theme="dark"] .shipment-name-display:hover {
+    color: var(--bs-primary);
+    border-bottom-color: var(--bs-primary);
+}

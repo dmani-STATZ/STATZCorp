@@ -2,6 +2,7 @@ import json
 import logging
 from decimal import Decimal, InvalidOperation
 
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
@@ -59,6 +60,7 @@ def add_finance_line(request):
 
         return JsonResponse({
             'success': True,
+            'finance_line_id': finance_line.id,
             'finance_line': {
                 'id': finance_line.id,
                 'line_type': finance_line.line_type,
@@ -370,6 +372,7 @@ def add_partial_shipment(request):
 
         shipment = ClinShipment.objects.create(
             clin=clin,
+            name=data.get('name') or None,
             ship_qty=ship_qty,
             uom=data.get('uom') or clin.uom or '',
             ship_date=ship_date,
@@ -413,6 +416,68 @@ def add_partial_shipment(request):
                 clin.save(update_fields=['price_per_unit'])
             except (InvalidOperation, ZeroDivisionError):
                 pass
+
+        # --- PaymentHistory rollup for paid_amount and wawf_payment ---
+        from django.contrib.contenttypes.models import ContentType
+        from ..models import PaymentHistory
+
+        today = shipment.ship_date or __import__('datetime').date.today()
+
+        clin_content_type = ContentType.objects.get_for_model(Clin)
+        shipment_content_type = ContentType.objects.get_for_model(ClinShipment)
+
+        ROLLUP_FIELDS = [
+            ('paid_amount', 'partial_paid_amount', 'paid_amount'),
+            ('wawf_payment', 'partial_wawf_payment', 'wawf_payment'),
+        ]
+
+        for shipment_field, shipment_payment_type, clin_payment_type in ROLLUP_FIELDS:
+            value = getattr(shipment, shipment_field)
+            if not value:
+                continue
+
+            shipment_ph = PaymentHistory.objects.create(
+                content_type=shipment_content_type,
+                object_id=shipment.id,
+                payment_type=shipment_payment_type,
+                payment_amount=value,
+                payment_date=today,
+                payment_info='Initial value set on shipment creation',
+                reference_number='',
+                created_by=request.user,
+                modified_by=request.user,
+                company=clin.company,
+            )
+
+            PaymentHistory.objects.create(
+                content_type=clin_content_type,
+                object_id=clin.id,
+                payment_type=clin_payment_type,
+                payment_amount=value,
+                payment_date=today,
+                payment_info=f'From Shipment #{shipment.id}',
+                reference_number=f'shipment-ph-{shipment_ph.id}',
+                created_by=request.user,
+                modified_by=request.user,
+                company=clin.company,
+            )
+
+            clin_new_total = PaymentHistory.objects.filter(
+                content_type=clin_content_type,
+                object_id=clin.id,
+                payment_type=clin_payment_type,
+            ).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
+
+            setattr(clin, clin_payment_type, clin_new_total)
+
+        _fields_to_save = [
+            f for f in ['paid_amount', 'wawf_payment']
+            if getattr(shipment, f)
+        ]
+        if _fields_to_save:
+            clin.modified_by = request.user
+            clin.save(update_fields=_fields_to_save + ['modified_by', 'modified_on'])
+        # --- end PaymentHistory rollup ---
 
         return JsonResponse({
             'success': True,

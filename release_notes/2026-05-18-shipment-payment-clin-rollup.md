@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-shipment-payment-clin-rollup
 title: Finance Audit — Shipment payments roll up to CLIN
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [improved, finance]
 critical: false

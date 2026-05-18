@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-po-sent-reminder-feedback
 title: PO Sent check-in reminder feedback
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [fixed, contracts]
 critical: false

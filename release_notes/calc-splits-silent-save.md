@@ -1,7 +1,7 @@
 ---
 id: calc-splits-silent-save
 title: Calc Splits — Correct Order of Operations
-published: false
+published: true
 publish_date: 2026-05-14
 tags: [fixed, contracts]
 critical: false

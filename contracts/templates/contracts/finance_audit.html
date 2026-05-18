@@ -324,7 +324,26 @@
 
     {# Section C — CLIN table + Section D accordions #}
     <div class="card shadow-sm mt-4">
-        <div class="card-header py-2 small fw-semibold">CLINs</div>
+        <div class="card-header py-2 small fw-semibold d-flex justify-content-between align-items-center">
+            <span>CLINs</span>
+            <div>
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary js-open-add-partial"
+                        data-clin-id="">
+                    + Add Shipment
+                </button>
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary ms-2"
+                        id="btnAddFinanceLine">
+                    + Add Finance Line
+                </button>
+                <button type="button"
+                        class="btn btn-sm btn-primary ms-2"
+                        id="btnLogPayment">
+                    + Log Payment
+                </button>
+            </div>
+        </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
@@ -416,9 +435,6 @@
                                         data-clin-id="{{ clin.id }}">
                                     {{ slist|length }} shipment{% if slist|length != 1 %}s{% endif %}
                                 </button>
-                                {% else %}
-                                <button type="button" class="pill pill-add partials-pill me-1"
-                                        data-clin-id="{{ clin.id }}">+ add shipment</button>
                                 {% endif %}
                                 {% endwith %}
                                 {% with flist=clin.finance_lines_for_audit %}
@@ -427,9 +443,6 @@
                                         data-clin-id="{{ clin.id }}">
                                     {{ flist|length }} line{% if flist|length != 1 %}s{% endif %} · ${{ clin.finance_billed_sum|floatformat:2 }}
                                 </button>
-                                {% else %}
-                                <button type="button" class="pill pill-add finance-pill"
-                                        data-clin-id="{{ clin.id }}">+ add</button>
                                 {% endif %}
                                 {% endwith %}
                             </td>
@@ -479,22 +492,12 @@
                                         <div class="text-muted small py-2">No finance lines recorded.</div>
                                     {% endif %}
                                 </div>
-                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 px-2 py-2 border-top small text-body-secondary">
-                                    <div>
-                                        Finance costs: <span class="fl-footer-costs">${{ clin.finance_billed_sum|floatformat:2 }}</span>
-                                        <span class="text-body-secondary">·</span>
-                                        Gross: <span class="fl-footer-gross">${{ clin.item_value|floatformat:2 }}</span>
-                                        <span class="text-body-secondary">·</span>
-                                        Adj gross: <span class="fl-footer-adj">${{ clin.adjusted_gross|floatformat:2 }}</span>
-                                    </div>
-                                    <div class="d-flex flex-wrap gap-2 align-items-center">
-                                        <button type="button"
-                                                class="fl-btn js-open-add-finance-modal"
-                                                data-clin-id="{{ clin.id }}"
-                                                data-partial-id="">
-                                            + add finance line
-                                        </button>
-                                    </div>
+                                <div class="px-2 py-2 border-top small text-body-secondary">
+                                    Finance costs: <span class="fl-footer-costs">${{ clin.finance_billed_sum|floatformat:2 }}</span>
+                                    <span class="text-body-secondary">·</span>
+                                    Gross: <span class="fl-footer-gross">${{ clin.item_value|floatformat:2 }}</span>
+                                    <span class="text-body-secondary">·</span>
+                                    Adj gross: <span class="fl-footer-adj">${{ clin.adjusted_gross|floatformat:2 }}</span>
                                 </div>
                                 {% endwith %}
                                     </div>
@@ -510,7 +513,18 @@
                         {% if slist %}
                             {% for shipment in slist %}
                             <tr class="partial-row table-info" data-shipment-id="{{ shipment.id }}" data-clin-id="{{ clin.id }}">
-                                <td class="ps-4 text-muted small" colspan="2">Shipment {{ forloop.counter }}</td>
+                                <td class="ps-4 small" colspan="2">
+                                    <span class="shipment-name-display"
+                                          data-shipment-id="{{ shipment.id }}"
+                                          data-counter="{{ forloop.counter }}"
+                                          title="Click to rename">
+                                        {% if shipment.name %}
+                                            {{ shipment.name }}
+                                        {% else %}
+                                            Shipment {{ forloop.counter }}
+                                        {% endif %}
+                                    </span>
+                                </td>
                                 <td class="text-muted small">{{ shipment.uom|default:"—" }}</td>
                                 <td class="text-end">—</td>
                                 <td class="text-end">—</td>
@@ -622,18 +636,8 @@
                                                 {% endif %}
                                                 {% endwith %}
                                             </div>
-                                            <div class="d-flex justify-content-between align-items-center px-2 py-2 border-top small text-body-secondary">
-                                                <div>
-                                                    Finance costs: $<span class="pfl-footer-costs" data-shipment-id="{{ shipment.id }}">{{ shipment.finance_billed_sum|floatformat:2 }}</span>
-                                                </div>
-                                                <div>
-                                                    <button type="button"
-                                                            class="fl-btn js-open-add-finance-modal"
-                                                            data-clin-id="{{ clin.id }}"
-                                                            data-partial-id="{{ shipment.id }}">
-                                                        + add finance line
-                                                    </button>
-                                                </div>
+                                            <div class="px-2 py-2 border-top small text-body-secondary">
+                                                Finance costs: $<span class="pfl-footer-costs" data-shipment-id="{{ shipment.id }}">{{ shipment.finance_billed_sum|floatformat:2 }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -656,18 +660,8 @@
                             <tr>
                                 <td colspan="13" class="ps-4 py-2 text-muted small border-0">
                                     No shipments recorded.
-                                    <button type="button" class="fl-btn ms-2 js-open-add-partial"
-                                            data-clin-id="{{ clin.id }}">+ add shipment</button>
                                 </td>
                             </tr>
-                        {% endif %}
-                        {% if slist %}
-                        <tr>
-                            <td colspan="13" class="ps-4 py-1 border-0 text-end pe-3">
-                                <button type="button" class="fl-btn js-open-add-partial"
-                                        data-clin-id="{{ clin.id }}">+ add shipment</button>
-                            </td>
-                        </tr>
                         {% endif %}
                         {% endwith %}
                     </tbody>
@@ -707,62 +701,9 @@
     {% include 'contracts/includes/payment_history_popup.html' %}
 
     {% include "contracts/includes/add_partial_modal.html" %}
+    {% include "contracts/includes/log_payment_modal.html" %}
+    {% include "contracts/includes/add_finance_line_modal.html" %}
 
-    <!-- Add Finance Line Modal -->
-    <div class="modal fade" id="addFinanceLineModal" tabindex="-1"
-         aria-labelledby="addFinanceLineModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="addFinanceLineModalLabel">Add Finance Line</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="flModalClinId" value="">
-            <input type="hidden" id="flModalPartialId" value="">
-            <div class="mb-3">
-              <label for="flModalLineType" class="form-label form-label-sm fw-semibold">
-                Type <span class="text-danger">*</span>
-              </label>
-              <input type="text" id="flModalLineType" class="form-control form-control-sm"
-                     placeholder="e.g. Trucking, Freight"
-                     list="flModalLineTypeSuggestions" autocomplete="off">
-              <datalist id="flModalLineTypeSuggestions">
-                <option value="Trucking">
-                <option value="Freight">
-                <option value="Crating">
-                <option value="Insurance">
-                <option value="Handling">
-                <option value="Storage">
-                <option value="Customs">
-                <option value="Other">
-              </datalist>
-            </div>
-            <div class="mb-3">
-              <label for="flModalDescription" class="form-label form-label-sm fw-semibold">
-                Description
-              </label>
-              <input type="text" id="flModalDescription" class="form-control form-control-sm"
-                     placeholder="Optional">
-            </div>
-            <div class="mb-2">
-              <label for="flModalAmountBilled" class="form-label form-label-sm fw-semibold">
-                Amount Billed <span class="text-danger">*</span>
-              </label>
-              <input type="number" id="flModalAmountBilled" class="form-control form-control-sm"
-                     step="0.01" min="0" placeholder="0.00">
-            </div>
-            <div id="flModalError" class="text-danger small mt-2" style="display:none;"></div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-sm btn-outline-secondary"
-                    data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-sm btn-primary"
-                    id="flModalSaveBtn">Save</button>
-          </div>
-        </div>
-      </div>
-    </div>
     {% endif %}
 </div>
 
@@ -839,6 +780,8 @@
 {% block extra_js %}
 {% if contract %}
 <script src="{% static 'contracts/js/add_partial_modal.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'contracts/js/log_payment_modal.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'contracts/js/add_finance_line_modal.js' %}?v={% now 'U' %}"></script>
 <script>
 window.FINANCE_AUDIT_CONTRACT_ID = {{ contract.id }};
 
@@ -987,11 +930,10 @@ function refreshFinanceLinesForClin(clinId) {
                 if (count > 0) {
                     pill.textContent = `${count} line${count > 1 ? 's' : ''} · $${total.toFixed(2)}`;
                     pill.className = 'pill pill-finance finance-pill';
+                    pill.dataset.clinId = clinId;
                 } else {
-                    pill.textContent = '+ add';
-                    pill.className = 'pill pill-add finance-pill';
+                    pill.remove();
                 }
-                pill.dataset.clinId = clinId;
             }
 
             const adjGrossCell = document.querySelector(`[data-adj-gross-clin="${clinId}"]`);
@@ -1268,6 +1210,38 @@ function refreshClinRow(clinId) {
         .catch(e => console.error('CLIN refresh failed:', e));
 }
 
+window.financeClinList = [
+    {% for clin in clins %}
+    {
+        id: {{ clin.id }},
+        item_number: "{{ clin.item_number|escapejs }}",
+        supplier_name: "{{ clin.supplier.name|default:'—'|escapejs }}",
+        order_qty: {{ clin.order_qty|default:0 }},
+        shipped_qty: {{ clin.ship_qty|default:0 }},
+        uom: "{{ clin.uom|default:'EA'|escapejs }}",
+    },
+    {% endfor %}
+];
+
+window.financeShipmentsByClin = {
+    {% for clin in clins %}
+    "{{ clin.id }}": [
+        {% with slist=shipments_by_clin|get_item:clin.id %}
+        {% if slist %}
+        {% for shipment in slist %}
+        {
+            id: {{ shipment.id }},
+            name: "{{ shipment.name|default:''|escapejs }}",
+            counter: {{ forloop.counter }},
+            ship_date: "{{ shipment.ship_date|date:'m/d/Y'|default:'' }}",
+        },
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    ],
+    {% endfor %}
+};
+
 (function() {
     const notifyToast = (msg, type, duration) => {
         if (window.notify) {
@@ -1482,120 +1456,6 @@ function refreshClinRow(clinId) {
         });
     });
 
-    // ── Add Finance Line Modal ──────────────────────────────────────────────
-    (function () {
-        const modal = document.getElementById('addFinanceLineModal');
-        if (!modal) return;
-        const bsModal = new bootstrap.Modal(modal);
-
-        const flClinIdInput    = document.getElementById('flModalClinId');
-        const flPartialIdInput = document.getElementById('flModalPartialId');
-        const flLineType       = document.getElementById('flModalLineType');
-        const flDescription    = document.getElementById('flModalDescription');
-        const flAmount         = document.getElementById('flModalAmountBilled');
-        const flError          = document.getElementById('flModalError');
-        const flSaveBtn        = document.getElementById('flModalSaveBtn');
-
-        document.addEventListener('click', function (e) {
-            const btn = e.target.closest('.js-open-add-finance-modal');
-            if (!btn) return;
-            flLineType.value       = '';
-            flDescription.value    = '';
-            flAmount.value         = '';
-            flError.style.display  = 'none';
-            flError.textContent    = '';
-            flClinIdInput.value    = btn.dataset.clinId    || '';
-            flPartialIdInput.value = btn.dataset.partialId || '';
-            bsModal.show();
-        });
-
-        flSaveBtn.addEventListener('click', function () {
-            const clinId    = flClinIdInput.value;
-            const partialId = flPartialIdInput.value;
-            const lineType  = flLineType.value.trim();
-            const desc      = flDescription.value.trim();
-            const amount    = flAmount.value;
-
-            if (!lineType) {
-                flError.textContent = 'Type is required.';
-                flError.style.display = 'block';
-                return;
-            }
-            if (!amount || parseFloat(amount) === 0) {
-                flError.textContent = 'Amount is required and must be non-zero.';
-                flError.style.display = 'block';
-                return;
-            }
-            flError.style.display = 'none';
-
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            const amt = parseFloat(amount);
-            const url = partialId
-                ? `/contracts/api/finance-lines/partial/${partialId}/add/`
-                : '/contracts/api/finance-lines/add/';
-            const payload = partialId
-                ? { line_type: lineType, description: desc, amount_billed: amt }
-                : {
-                    clin_id:       clinId,
-                    line_type:     lineType,
-                    description:   desc,
-                    amount_billed: amt,
-                };
-
-            flSaveBtn.disabled = true;
-
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken,
-                },
-                body: JSON.stringify(payload),
-            })
-            .then(r => r.json())
-            .then(data => {
-                flSaveBtn.disabled = false;
-                if (data.success) {
-                    bsModal.hide();
-                    if (partialId) {
-                        refreshPartialFinanceLines(partialId, clinId);
-                    } else {
-                        refreshFinanceLinesForClin(clinId);
-                    }
-                    if (partialId) {
-                        const acc = document.getElementById(`partial-fl-accordion-${partialId}`);
-                        if (acc) acc.style.display = 'table-row';
-                    } else {
-                        const acc = document.getElementById(`accordion-${clinId}`);
-                        if (acc) acc.style.display = 'table-row';
-                    }
-                    setTimeout(() => {
-                        refreshClinRow(clinId);
-                        refreshContractSummary();
-                    }, 200);
-                    if (window.notify) window.notify('success', 'Finance line added', 3000);
-                } else {
-                    flError.textContent = data.error || 'Failed to add finance line.';
-                    flError.style.display = 'block';
-                }
-            })
-            .catch(() => {
-                flSaveBtn.disabled = false;
-                flError.textContent = 'Network error. Please try again.';
-                flError.style.display = 'block';
-            });
-        });
-
-        modal.addEventListener('hidden.bs.modal', function () {
-            flLineType.value      = '';
-            flDescription.value   = '';
-            flAmount.value        = '';
-            flError.style.display = 'none';
-            flError.textContent   = '';
-            flSaveBtn.disabled    = false;
-        });
-    })();
-
     const nhForm = document.getElementById('newHistoryForm');
     if (nhForm) {
         nhForm.addEventListener('submit', function(e) {
@@ -1696,6 +1556,79 @@ function refreshClinRow(clinId) {
         } catch (e) {
             console.debug('Notes popup follow-me skipped:', e);
         }
+    });
+
+    // Inline shipment name editing (partials accordion)
+    document.addEventListener('click', function(e) {
+        const display = e.target.closest('.shipment-name-display');
+        if (!display || display.querySelector('input')) return;
+
+        const shipmentId = display.dataset.shipmentId;
+        const counter = display.dataset.counter || '1';
+        const currentText = display.textContent.trim();
+        const storedName = currentText.indexOf('Shipment ') === 0 && currentText === ('Shipment ' + counter)
+            ? '' : currentText;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control form-control-sm shipment-name-input';
+        input.value = storedName;
+        input.maxLength = 100;
+
+        const originalHtml = display.innerHTML;
+        display.textContent = '';
+        display.appendChild(input);
+        input.focus();
+        input.select();
+
+        let cancelled = false;
+
+        function finishEdit(save) {
+            if (!save) {
+                display.innerHTML = originalHtml;
+                return;
+            }
+            const newName = input.value.trim();
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch('/contracts/api/shipments/' + shipmentId + '/update-name/', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({ name: newName }),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    display.textContent = data.name || ('Shipment ' + counter);
+                } else {
+                    display.innerHTML = originalHtml;
+                    if (window.notify) window.notify('error', data.error || 'Failed to rename', 3000);
+                }
+            })
+            .catch(function() {
+                display.innerHTML = originalHtml;
+                if (window.notify) window.notify('error', 'Failed to rename shipment', 3000);
+            });
+        }
+
+        input.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                finishEdit(true);
+            } else if (ev.key === 'Escape') {
+                ev.preventDefault();
+                cancelled = true;
+                finishEdit(false);
+            }
+        });
+
+        input.addEventListener('blur', function() {
+            if (!cancelled) {
+                finishEdit(true);
+            }
+        });
     });
 
     // Partials pill accordion toggle

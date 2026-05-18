@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-processing-clin-accordion-match-restore
 title: Processing — CLIN Stays Open After NSN/Supplier Match
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [fixed, contracts]
 critical: false

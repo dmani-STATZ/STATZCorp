@@ -739,6 +739,12 @@ class ClinShipment(AuditModel):
     Allows multiple shipments to be recorded against a single CLIN.
     """
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE, related_name='shipments')
+    name = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="User-defined shipment name (e.g. 'Shipment 1'). Defaults to 'Shipment N' display when blank."
+    )
     ship_qty = models.FloatField(null=True, blank=True)
     uom = models.CharField(max_length=10, null=True, blank=True)  # Unit of Measure
     ship_date = models.DateField(null=True, blank=True)

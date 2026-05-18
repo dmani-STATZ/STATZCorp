@@ -1,7 +1,7 @@
 ---
 id: 2026-05-15-processing-plan-gross-packhouse-restore
 title: Processing — Plan Gross Calculation Updated
-published: false
+published: true
 publish_date: 2026-05-15
 tags: [improved, contracts]
 critical: false

@@ -127,6 +127,7 @@ from .views import (
     # Shipment views
     create_shipment,
     update_shipment,
+    update_shipment_name,
     delete_shipment,
     get_clin_shipments,
     complete_clin_shipping,
@@ -222,6 +223,11 @@ urlpatterns = [
         "api/shipments/update/<int:shipment_id>/",
         update_shipment,
         name="update_shipment",
+    ),
+    path(
+        "api/shipments/<int:shipment_id>/update-name/",
+        update_shipment_name,
+        name="update_shipment_name",
     ),
     path(
         "api/shipments/delete/<int:shipment_id>/",

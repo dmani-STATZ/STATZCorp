@@ -7,6 +7,8 @@ from django.db.models import Max, Sum
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
+
+from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, ClinShipment
 
 logger = logging.getLogger(__name__)
@@ -104,6 +106,30 @@ def create_shipment(request):
             'success': False,
             'error': f'Server error: {str(e)}'
         }, status=500)
+
+@conditional_login_required
+@require_http_methods(["PATCH"])
+def update_shipment_name(request, shipment_id):
+    """Update the name field on a ClinShipment."""
+    try:
+        data = json.loads(request.body)
+        name = data.get('name', '').strip() or None
+        shipment = get_object_or_404(
+            ClinShipment,
+            id=shipment_id,
+            clin__contract__company=request.active_company
+        )
+        shipment.name = name
+        shipment.modified_by = request.user
+        shipment.save(update_fields=['name', 'modified_by', 'modified_on'])
+        return JsonResponse({
+            'success': True,
+            'name': shipment.name,
+            'display_name': shipment.name or None,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 @require_http_methods(["POST"])

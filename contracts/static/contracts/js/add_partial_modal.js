@@ -6,8 +6,9 @@
 (function() {
     'use strict';
 
-    function resetModal(clinId) {
-        document.getElementById('addPartialClinId').value = clinId || '';
+    function resetModal() {
+        document.getElementById('addPartialClinId').value = '';
+        document.getElementById('addPartialName').value = '';
         document.getElementById('addPartialQty').value = '';
         document.getElementById('addPartialShipDate').value = '';
         document.getElementById('addPartialQuoteValue').value = '';
@@ -17,22 +18,86 @@
         document.getElementById('addPartialComments').value = '';
         document.getElementById('addPartialAutoCalcNote').style.display = 'none';
         document.getElementById('addPartialUom').value = '';
+
+        const clinSelect = document.getElementById('addPartialClinSelect');
+        if (clinSelect) {
+            clinSelect.value = '';
+            clinSelect.classList.remove('is-invalid');
+        }
+
+        ['addPartialQuoteValue', 'addPartialItemValue'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) delete el.dataset.manuallyEdited;
+        });
     }
 
     // Open modal — delegated to handle dynamically rendered buttons
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.js-open-add-partial');
         if (!btn) return;
-        const clinId = btn.dataset.clinId;
-        resetModal(clinId);
+
+        resetModal();
+
+        const clinList = window.financeClinList;
+        const clinSelect = document.getElementById('addPartialClinSelect');
+        const clinSelectRow = document.getElementById('addPartialClinSelectRow');
+        const btnClinId = btn.dataset.clinId;
+
+        if (clinList && clinList.length > 0 && !btnClinId) {
+            clinSelect.innerHTML = '<option value="">— Select a CLIN —</option>';
+            clinList.forEach(function(clin) {
+                const opt = document.createElement('option');
+                opt.value = clin.id;
+                opt.textContent = clin.item_number + ' — ' + clin.supplier_name +
+                    ' (' + clin.shipped_qty + '/' + clin.order_qty + ' shipped)';
+                clinSelect.appendChild(opt);
+            });
+            clinSelectRow.style.display = '';
+            document.getElementById('addPartialClinId').value = '';
+        } else if (btnClinId) {
+            clinSelectRow.style.display = 'none';
+            document.getElementById('addPartialClinId').value = btnClinId;
+            const section = document.querySelector('.section[data-clin-id="' + btnClinId + '"]');
+            const uomInput = document.getElementById('addPartialUom');
+            if (section && section.dataset.uom && uomInput) {
+                uomInput.value = section.dataset.uom;
+            }
+        } else {
+            clinSelectRow.style.display = 'none';
+        }
+
         const modal = new bootstrap.Modal(
             document.getElementById('addPartialModal')
         );
         modal.show();
     });
 
-    // Auto-calculate quote_value and item_value when QTY changes
     document.addEventListener('DOMContentLoaded', function() {
+        const clinSelect = document.getElementById('addPartialClinSelect');
+        if (clinSelect) {
+            clinSelect.addEventListener('change', function() {
+                const clinId = this.value;
+                document.getElementById('addPartialClinId').value = clinId;
+                this.classList.remove('is-invalid');
+
+                document.getElementById('addPartialQty').value = '';
+                document.getElementById('addPartialQuoteValue').value = '';
+                document.getElementById('addPartialItemValue').value = '';
+                delete document.getElementById('addPartialQuoteValue').dataset.manuallyEdited;
+                delete document.getElementById('addPartialItemValue').dataset.manuallyEdited;
+                document.getElementById('addPartialAutoCalcNote').style.display = 'none';
+
+                if (window.financeClinList && clinId) {
+                    const clin = window.financeClinList.find(function(c) {
+                        return String(c.id) === String(clinId);
+                    });
+                    if (clin) {
+                        document.getElementById('addPartialUom').value = clin.uom || 'EA';
+                    }
+                }
+            });
+        }
+
         const qtyInput = document.getElementById('addPartialQty');
         if (!qtyInput) return;
 
@@ -41,14 +106,13 @@
             const qty = this.value;
             if (!clinId || !qty || parseFloat(qty) <= 0) return;
 
-            fetch(`/contracts/api/partials/auto-calc/?clin_id=${encodeURIComponent(clinId)}&ship_qty=${encodeURIComponent(qty)}`)
+            fetch('/contracts/api/partials/auto-calc/?clin_id=' + encodeURIComponent(clinId) + '&ship_qty=' + encodeURIComponent(qty))
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
                         const qv = document.getElementById('addPartialQuoteValue');
                         const iv = document.getElementById('addPartialItemValue');
                         const note = document.getElementById('addPartialAutoCalcNote');
-                        // Only auto-fill if user hasn't manually entered a value
                         if (!qv.dataset.manuallyEdited) {
                             qv.value = data.auto_quote_value.toFixed(2);
                         }
@@ -61,7 +125,6 @@
                 .catch(err => console.debug('Auto-calc error:', err));
         });
 
-        // Track manual edits to quote/item value fields
         ['addPartialQuoteValue', 'addPartialItemValue'].forEach(function(id) {
             const el = document.getElementById(id);
             if (el) {
@@ -71,7 +134,6 @@
             }
         });
 
-        // Clear manual edit flags when modal is hidden
         const modalEl = document.getElementById('addPartialModal');
         if (modalEl) {
             modalEl.addEventListener('hidden.bs.modal', function() {
@@ -79,16 +141,22 @@
                     const el = document.getElementById(id);
                     if (el) delete el.dataset.manuallyEdited;
                 });
+                const select = document.getElementById('addPartialClinSelect');
+                if (select) select.classList.remove('is-invalid');
             });
         }
 
-        // Save button
         const saveBtn = document.getElementById('addPartialSaveBtn');
         if (!saveBtn) return;
 
         saveBtn.addEventListener('click', function() {
             const clinId = document.getElementById('addPartialClinId').value;
             const qty = document.getElementById('addPartialQty').value;
+
+            if (!clinId) {
+                document.getElementById('addPartialClinSelect').classList.add('is-invalid');
+                return;
+            }
 
             if (!qty || parseFloat(qty) <= 0) {
                 if (window.notify) window.notify('error', 'QTY is required', 3000);
@@ -97,8 +165,10 @@
             }
 
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const nameVal = document.getElementById('addPartialName').value.trim();
             const payload = {
                 clin_id: clinId,
+                name: nameVal || null,
                 ship_qty: parseFloat(qty),
                 uom: document.getElementById('addPartialUom').value || '',
                 ship_date: document.getElementById('addPartialShipDate').value || null,
@@ -109,7 +179,6 @@
                 comments: document.getElementById('addPartialComments').value || '',
             };
 
-            // Disable save button to prevent double-submit
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
 

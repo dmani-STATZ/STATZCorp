@@ -1,7 +1,7 @@
 ---
 id: clin-split-save-fix
 title: CLIN Splits — Save and Edit Fix
-published: false
+published: true
 publish_date: 2026-05-14
 tags: [fixed, contracts]
 critical: false

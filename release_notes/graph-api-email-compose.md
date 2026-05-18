@@ -1,7 +1,7 @@
 ---
 id: graph-api-email-compose
 title: Contract Finalization — Graph API Email Compose
-published: false
+published: true
 publish_date: 2026-05-15
 tags: [new, contracts]
 critical: false

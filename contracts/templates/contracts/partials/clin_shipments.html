@@ -75,6 +75,9 @@
                                        name="shipments-{{ shipment.id }}-id"
                                        value="{{ shipment.id }}">
                             </div>
+                            {% if shipment.name %}
+                            <div class="small text-muted">{{ shipment.name }}</div>
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3">
                             <label for="ship-qty-{{ shipment.id }}" class="sr-only">Ship Quantity</label>
@@ -157,7 +160,12 @@
                             </div>
                         </td>
                     {% else %}
-                        <td class="px-4 py-3">{{ shipment.ship_date|date:"Y-m-d" }}</td>
+                        <td class="px-4 py-3">
+                            {{ shipment.ship_date|date:"m/d/Y"|default:"—" }}
+                            {% if shipment.name %}
+                            <div class="small text-muted">{{ shipment.name }}</div>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-3 text-right">{{ shipment.ship_qty|floatformat:2|default:"0.00" }}</td>
                         <td class="px-4 py-3">{{ shipment.uom }}</td>
                         <td class="px-4 py-3">{{ shipment.comments }}</td>

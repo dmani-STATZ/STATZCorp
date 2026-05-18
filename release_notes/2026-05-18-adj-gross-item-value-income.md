@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-adj-gross-item-value-income
 title: Finance Audit — Adj Gross stabilized during contract execution
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [improved, finance]
 critical: false

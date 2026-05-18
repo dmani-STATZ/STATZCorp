@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-clin-pod-date-shipment-rollup
 title: CLIN POD Date reflects shipment POD dates
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [fixed, contracts]
 critical: false

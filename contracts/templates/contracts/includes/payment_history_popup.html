@@ -319,6 +319,10 @@ function formatCurrency(amount) {
 }
 
 function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString('en-US');
+    if (!dateString) return '—';
+    // Parse date parts directly to avoid UTC-to-local timezone shift
+    // that causes ISO date strings (YYYY-MM-DD) to display as the previous day
+    const [year, month, day] = dateString.split('T')[0].split('-');
+    return `${parseInt(month)}/${parseInt(day)}/${year}`;
 }
 </script>

@@ -155,6 +155,7 @@ from .split_views import (
 from .shipment_views import (
     create_shipment,
     update_shipment,
+    update_shipment_name,
     delete_shipment,
     get_clin_shipments,
     complete_clin_shipping,

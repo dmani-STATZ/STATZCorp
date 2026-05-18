@@ -1,0 +1,143 @@
+<!-- Log Payment Modal -->
+<div class="modal fade" id="logPaymentModal" tabindex="-1"
+     aria-labelledby="logPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="logPaymentModalLabel">Log Payment</h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="lpClinSelect" class="form-label fw-semibold">
+                        CLIN <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" id="lpClinSelect" required>
+                        <option value="">— Select a CLIN —</option>
+                    </select>
+                </div>
+
+                <div id="lpShipmentSection" style="display:none;">
+                    <div class="mb-3">
+                        <label for="lpShipmentSelect" class="form-label fw-semibold">
+                            Shipment <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="lpShipmentSelect">
+                            <option value="">— Select a shipment —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="lpNewShipmentSection" style="display:none;">
+                    <div class="p-3 mb-3 rounded"
+                         style="background:var(--bs-tertiary-bg);
+                                border:1px solid var(--bs-border-color);">
+                        <p class="small fw-semibold mb-2 text-body-secondary">
+                            No shipments found for this CLIN. One will be created:
+                        </p>
+                        <div class="mb-2 small">
+                            <span class="text-body-secondary">Shipment Name:</span>
+                            <span id="lpNewShipmentName" class="fw-semibold ms-1"></span>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <label for="lpNewQty" class="form-label small">
+                                    QTY <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control form-control-sm"
+                                       id="lpNewQty" step="any" min="0">
+                            </div>
+                            <div class="col-4">
+                                <label for="lpNewShipDate" class="form-label small">
+                                    Ship Date
+                                    <span class="text-body-secondary">(Optional)</span>
+                                </label>
+                                <input type="date" class="form-control form-control-sm"
+                                       id="lpNewShipDate">
+                            </div>
+                        </div>
+                        <div class="row g-2 small text-body-secondary">
+                            <div class="col-4">
+                                Quote Value:
+                                <span id="lpNewQuoteValue" class="fw-semibold text-body">—</span>
+                            </div>
+                            <div class="col-4">
+                                Item Value:
+                                <span id="lpNewItemValue" class="fw-semibold text-body">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <div id="lpPaymentSection">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Payment Type <span class="text-danger">*</span>
+                        </label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio"
+                                       name="lpPaymentType" id="lpTypeCustomerPay"
+                                       value="partial_wawf_payment" checked>
+                                <label class="form-check-label" for="lpTypeCustomerPay">
+                                    Customer Pay
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio"
+                                       name="lpPaymentType" id="lpTypePaid"
+                                       value="partial_paid_amount">
+                                <label class="form-check-label" for="lpTypePaid">
+                                    Paid
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="lpAmount" class="form-label fw-semibold">
+                            Amount <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="lpAmount"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="lpDate" class="form-label fw-semibold">
+                            Date <span class="text-danger">*</span>
+                        </label>
+                        <input type="date" class="form-control" id="lpDate">
+                    </div>
+                    <div class="mb-3">
+                        <label for="lpRefNum" class="form-label fw-semibold">
+                            Reference Number
+                        </label>
+                        <input type="text" class="form-control" id="lpRefNum"
+                               maxlength="50" placeholder="Optional">
+                    </div>
+                    <div class="mb-3">
+                        <label for="lpInfo" class="form-label fw-semibold">
+                            Additional Info
+                        </label>
+                        <textarea class="form-control" id="lpInfo"
+                                  rows="2" placeholder="Optional"></textarea>
+                    </div>
+                </div>
+
+                <div id="lpError" class="alert alert-danger d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary"
+                        id="lpSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-14-queue-already-in-db-flag
 title: Contract Queue — "Already in DB" Warning
-published: false
+published: true
 publish_date: 2026-05-14
 tags: [improved, contracts]
 critical: false

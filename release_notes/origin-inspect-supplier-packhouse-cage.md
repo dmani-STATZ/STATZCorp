@@ -1,7 +1,7 @@
 ---
 id: origin-inspect-supplier-packhouse-cage
 title: Origin Inspect — Supplier & Packhouse CAGE Auto-Extraction
-published: false
+published: true
 publish_date: 2026-05-14
 tags: [new, contracts]
 critical: false

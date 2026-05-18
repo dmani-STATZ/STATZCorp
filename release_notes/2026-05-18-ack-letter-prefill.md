@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-ack-letter-prefill
 title: PO Acknowledgement Letter date prefill
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [fixed, contracts]
 critical: false

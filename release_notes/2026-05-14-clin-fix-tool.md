@@ -1,7 +1,7 @@
 ---
 id: 2026-05-14-clin-fix-tool
 title: CLIN Fix Tool (Legacy Cleanup)
-published: false
+published: true
 publish_date: 2026-05-14
 tags: [new, contracts]
 critical: false
