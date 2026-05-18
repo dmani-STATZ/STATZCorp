@@ -58,6 +58,14 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         ).order_by('item_number')
         context['clins'] = clins
 
+        # CORRECT - default Django reverse accessor
+        first_p_clin = contract.clin_set.filter(item_type='P').order_by('item_number').first()
+        first_p_clin_acknowledgment = (
+            first_p_clin.clinacknowledgment_set.first() if first_p_clin else None
+        )
+        context['first_p_clin'] = first_p_clin
+        context['first_p_clin_acknowledgment'] = first_p_clin_acknowledgment
+
         # Gov Actions for this contract
         active_company = getattr(self.request, 'active_company', None)
         context['gov_actions'] = GovAction.objects.filter(contract=contract, company=active_company).order_by('-date_submitted', '-created_on') if active_company else GovAction.objects.none()

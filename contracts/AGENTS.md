@@ -424,6 +424,8 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 11. **PO Acknowledgement Letter views live in `acknowledgment_views.py` only** (single-e spelling). `acknowledgement_letter_views.py` (double-e) and its full-page URL routes were removed. Do not recreate the old `generate_acknowledgement_letter` / `view_acknowledgement_letter` / `edit_acknowledgement_letter` endpoints.
 
+**Contract-level acknowledgment:** The acknowledgment section on `contract_management.html` is now contract-level. `toggleAcknowledgment(field)` POSTs to `toggle_contract_acknowledgment` using `contract.id`. Do not revert to CLIN-level routing. The acknowledgment letter button still uses `selected_clin.id` — this is intentional.
+
 12. **Deprecated `api_add_note`** reads `request.content_type` (which is not set in AJAX requests). Any legacy call must pass `content_type_id` and `object_id` explicitly. No active in-app callers; the route remains for old bookmarks.
 
 13. **There is no longer a standalone CLIN edit page.** CLIN field edits are handled by the Transactions edit modal (`openTransactionsEditModal`). Do not re-add a dedicated CLIN edit view or `/contracts/clin/<pk>/edit/` route without removing the Transaction wiring from `clin_detail.html` first.

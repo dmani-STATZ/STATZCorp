@@ -33,6 +33,7 @@ from .views import (
     ClinAcknowledgmentUpdateView,
     get_clin_notes,
     toggle_clin_acknowledgment,
+    toggle_contract_acknowledgment,
     clin_delete,
     get_clin_details,
     get_supplier_info,
@@ -481,6 +482,11 @@ urlpatterns = [
         "clin/<int:clin_id>/toggle-acknowledgment/",
         toggle_clin_acknowledgment,
         name="toggle_clin_acknowledgment",
+    ),
+    path(
+        "contract/<int:contract_id>/toggle-acknowledgment/",
+        toggle_contract_acknowledgment,
+        name="toggle_contract_acknowledgment",
     ),
     path(
         "contract/<int:contract_id>/toggle-field/",

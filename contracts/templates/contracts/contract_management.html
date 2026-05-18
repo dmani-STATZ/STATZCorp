@@ -11,7 +11,7 @@
     <div class="grid grid-cols-3 gap-4 mb-2">
         <!-- CLIN Acknowledgment Section - Left Column -->
         <div class="col-span-1 card card-padded !p-2">
-            <h2 class="text-lg font-bold text-gray-800 mb-1">CLIN Acknowledgment</h2>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Acknowledgment</h2>
             <div class="space-y-1">
                 <div class="row-between py-1 border-b">
                     <span class="text-sm text-gray-700 w-1/3">PO Acknowledge Letter</span>
@@ -39,14 +39,14 @@
                             onclick="toggleAcknowledgment('po_to_supplier_bool')"
                             id="po_to_supplier_bool_btn"
                             class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
-                            {% if acknowledgment.po_to_supplier_bool %}btn-success{% else %}btn-danger{% endif %}">
-                            {% if acknowledgment.po_to_supplier_bool %}Sent{% else %}Not Sent{% endif %}
+                            {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.po_to_supplier_bool %}btn-success{% else %}btn-danger{% endif %}">
+                            {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.po_to_supplier_bool %}Sent{% else %}Not Sent{% endif %}
                         </button>
                     </div>
                     <div class="text-right text-xs text-gray-600">
-                        {% if acknowledgment.po_to_supplier_bool %}
-                            <div>{{ acknowledgment.po_to_supplier_user.username }}</div>
-                            <div>{{ acknowledgment.po_to_supplier_date|date:"m/d/Y" }}</div>
+                        {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.po_to_supplier_bool %}
+                            <div id="po_to_supplier_bool_user">{{ first_p_clin_acknowledgment.po_to_supplier_user.username }}</div>
+                            <div id="po_to_supplier_bool_date">{{ first_p_clin_acknowledgment.po_to_supplier_date|date:"m/d/Y" }}</div>
                         {% endif %}
                     </div>
                 </div>
@@ -59,14 +59,14 @@
                             onclick="toggleAcknowledgment('clin_reply_bool')"
                             id="clin_reply_bool_btn"
                             class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
-                            {% if acknowledgment.clin_reply_bool %}btn-success{% else %}btn-danger{% endif %}">
-                            {% if acknowledgment.clin_reply_bool %}Yes{% else %}No{% endif %}
+                            {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.clin_reply_bool %}btn-success{% else %}btn-danger{% endif %}">
+                            {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.clin_reply_bool %}Yes{% else %}No{% endif %}
                         </button>
                     </div>
                     <div class="text-right text-xs text-gray-600">
-                        {% if acknowledgment.clin_reply_bool %}
-                            <div>{{ acknowledgment.clin_reply_user.username }}</div>
-                            <div>{{ acknowledgment.clin_reply_date|date:"m/d/Y" }}</div>
+                        {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.clin_reply_bool %}
+                            <div id="clin_reply_bool_user">{{ first_p_clin_acknowledgment.clin_reply_user.username }}</div>
+                            <div id="clin_reply_bool_date">{{ first_p_clin_acknowledgment.clin_reply_date|date:"m/d/Y" }}</div>
                         {% endif %}
                     </div>
                 </div>
@@ -79,14 +79,14 @@
                             onclick="toggleAcknowledgment('po_to_qar_bool')"
                             id="po_to_qar_bool_btn"
                             class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
-                            {% if acknowledgment.po_to_qar_bool %}btn-success{% else %}btn-danger{% endif %}">
-                            {% if acknowledgment.po_to_qar_bool %}Sent{% else %}Not Sent{% endif %}
+                            {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.po_to_qar_bool %}btn-success{% else %}btn-danger{% endif %}">
+                            {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.po_to_qar_bool %}Sent{% else %}Not Sent{% endif %}
                         </button>
                     </div>
                     <div class="text-right text-xs text-gray-600">
-                        {% if acknowledgment.po_to_qar_bool %}
-                            <div>{{ acknowledgment.po_to_qar_user.username }}</div>
-                            <div>{{ acknowledgment.po_to_qar_date|date:"m/d/Y" }}</div>
+                        {% if first_p_clin_acknowledgment and first_p_clin_acknowledgment.po_to_qar_bool %}
+                            <div id="po_to_qar_bool_user">{{ first_p_clin_acknowledgment.po_to_qar_user.username }}</div>
+                            <div id="po_to_qar_bool_date">{{ first_p_clin_acknowledgment.po_to_qar_date|date:"m/d/Y" }}</div>
                         {% endif %}
                     </div>
                 </div>
@@ -2132,14 +2132,14 @@ function setupEditButtons(container) {
 window.setupEditButtons = setupEditButtons;
 
 function toggleAcknowledgment(field) {
-    const clinId = '{{ selected_clin.id }}';
-    if (!clinId) return;
+    const contractId = '{{ contract.id }}';
+    if (!contractId) return;
 
     // Get the current state before the toggle
     const btn = document.getElementById(`${field}_btn`);
     const initialState = btn.classList.contains('btn-success');
 
-    fetch(`/contracts/clin/${clinId}/toggle-acknowledgment/`, {
+    fetch(`/contracts/contract/${contractId}/toggle-acknowledgment/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -2153,76 +2153,45 @@ function toggleAcknowledgment(field) {
     .then(response => response.json())
     .then(data => {
         if (data.success === false) {
-            alert(data.error || 'An error occurred while processing your request.');
+            if (window.notify) window.notify('error', data.error || 'An error occurred.');
             return;
         }
 
-        const btn = document.getElementById(`${field}_btn`);
-        if (data.status === true) {
+        if (data.status) {
             btn.classList.remove('btn-danger');
             btn.classList.add('btn-success');
 
-            // Update button text based on field
-            if (field.includes('po_to_supplier')) {
-                btn.textContent = 'Sent';
-            } else if (field.includes('clin_reply')) {
-                btn.textContent = 'Yes';
-            } else if (field.includes('po_to_qar')) {
-                btn.textContent = 'Sent';
-            }
+            if (field === 'po_to_supplier_bool') btn.textContent = 'Sent';
+            if (field === 'clin_reply_bool') btn.textContent = 'Acknowledged';
+            if (field === 'po_to_qar_bool') btn.textContent = 'Sent';
 
-            // Update user info if provided
             if (data.user_info) {
-                const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
-                if (userInfoContainer) {
-                    userInfoContainer.innerHTML = `
-                        <div>${data.user_info.username}</div>
-                        <div>${data.user_info.date}</div>
-                    `;
-                }
+                const userEl = document.getElementById(`${field}_user`);
+                const dateEl = document.getElementById(`${field}_date`);
+                if (userEl) userEl.textContent = data.user_info.username;
+                if (dateEl) dateEl.textContent = data.user_info.date;
             }
+        }
 
-            // If a note was created, refresh the CLIN notes tab
-            if (data.note_created) {
-                fetchClinNotes(clinId);
+        if (field === 'po_to_supplier_bool' && data.status) {
+            const reminderCount = data.reminders_created || 0;
+            const noteCount = data.notes_created || 0;
+            if (window.notify) {
+                window.notify(
+                    'success',
+                    `PO marked as Sent. ${noteCount} note(s) and ${reminderCount} reminder(s) created.`
+                );
             }
-
-            if (data.reminder_created) {
-                const message = `Check-in reminder created for ${data.reminder_date}`;
-                if (window.notify) {
-                    window.notify('success', message, 4000);
-                } else {
-                    alert(message);
-                }
-            } else if (data.reminder_warning) {
-                if (window.notify) {
-                    window.notify('warning', data.reminder_warning, 6000);
-                } else {
-                    alert(data.reminder_warning);
-                }
-            } else if (data.reminder_error) {
-                const message = `Reminder creation failed: ${data.reminder_error}`;
-                if (window.notify) {
-                    window.notify('error', message, 6000);
-                } else {
-                    alert(message);
-                }
+            if (data.po_ack_reminder_error && window.notify) {
+                window.notify('warning', `PO Ack reminder error: ${data.po_ack_reminder_error}`);
             }
-        } else {
-            btn.classList.remove('btn-success');
-            btn.classList.add('btn-danger');
-            btn.textContent = field.includes('po_sent') ? 'Not Sent' : 'Not Acknowledged';
-
-            // Clear user info
-            const userInfoContainer = btn.closest('.grid').querySelector('.text-right');
-            if (userInfoContainer) {
-                userInfoContainer.innerHTML = '';
+            if (data.checkin_reminder_errors && data.checkin_reminder_errors.length && window.notify) {
+                window.notify('warning', `Some check-in reminders failed: ${data.checkin_reminder_errors.join('; ')}`);
             }
         }
     })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while processing your request. Please try again.');
+    .catch(() => {
+        if (window.notify) window.notify('error', 'Network error. Please try again.');
     });
 }
 

@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from datetime import timedelta, datetime, time
 import json
 import logging
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +388,191 @@ def toggle_clin_acknowledgment(request, clin_id):
         
         return JsonResponse(response_data)
         
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@conditional_login_required
+@require_http_methods(["POST"])
+def toggle_contract_acknowledgment(request, contract_id):
+    try:
+        contract = get_object_or_404(
+            Contract,
+            id=contract_id,
+            company=request.active_company,
+        )
+        data = json.loads(request.body)
+        field = data.get('field')
+        if not field:
+            return JsonResponse({'error': 'Field parameter is required'}, status=400)
+
+        clins = list(
+            Clin.objects.filter(contract=contract)
+            .select_related('contract')
+            .order_by('item_number')
+        )
+
+        first_p_clin = next((c for c in clins if c.item_type == 'P'), None)
+        if not first_p_clin:
+            return JsonResponse({
+                'success': False,
+                'error': 'No Production CLIN found on this contract.',
+            })
+
+        acknowledgment = first_p_clin.clinacknowledgment_set.first()
+        if not acknowledgment:
+            acknowledgment = ClinAcknowledgment.objects.create(clin=first_p_clin)
+
+        current_value = getattr(acknowledgment, field, False)
+        if field in ('po_to_supplier_bool', 'clin_reply_bool', 'po_to_qar_bool') and current_value:
+            return JsonResponse({
+                'success': True,
+                'status': True,
+                'message': f'{field} is already set',
+            })
+
+        new_value = not current_value
+        setattr(acknowledgment, field, new_value)
+
+        current_time = timezone.now()
+        today = current_time.date()
+        response_data = {
+            'success': True,
+            'status': new_value,
+        }
+
+        field_base = field.replace('_bool', '')
+        date_field = f"{field_base}_date"
+        user_field = f"{field_base}_user"
+
+        if new_value:
+            setattr(acknowledgment, date_field, current_time)
+            setattr(acknowledgment, user_field, request.user)
+            response_data['user_info'] = {
+                'username': request.user.username,
+                'date': current_time.strftime('%m/%d/%Y %H:%M %p'),
+            }
+
+            if field == 'po_to_supplier_bool':
+                clin_content_type = ContentType.objects.get_for_model(Clin)
+                notes_created = 0
+                reminders_created = 0
+                checkin_reminder_errors = []
+
+                def make_note(clin, note_text):
+                    return Note.objects.create(
+                        content_type=clin_content_type,
+                        object_id=clin.id,
+                        note=note_text,
+                        created_by=request.user,
+                        company=request.active_company,
+                    )
+
+                def make_reminder(title, text, reminder_date, note):
+                    dt = datetime.combine(reminder_date, time(9, 0))
+                    aware_dt = timezone.make_aware(dt)
+                    return Reminder.objects.create(
+                        reminder_title=title,
+                        reminder_text=text,
+                        reminder_date=aware_dt,
+                        reminder_user=request.user,
+                        reminder_completed=False,
+                        company=request.active_company,
+                        note=note,
+                    )
+
+                try:
+                    note_text = (
+                        f"PO ACKNOWLEDGMENT LETTER Followup - {request.user.username} "
+                        f"on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
+                    )
+                    note = make_note(first_p_clin, note_text)
+                    notes_created += 1
+                    po_ack_reminder_date = today + timedelta(days=10)
+                    make_reminder(
+                        "PO ACKNOWLEDGEMENT",
+                        (
+                            f"Send PO Acknowledgement Letter for {contract.contract_number} "
+                            f"CLIN {first_p_clin.item_number}"
+                        ),
+                        po_ack_reminder_date,
+                        note,
+                    )
+                    reminders_created += 1
+                except Exception as e:
+                    logger.warning(
+                        "Failed to create PO ack reminder for contract %s: %s",
+                        contract.id,
+                        e,
+                    )
+                    response_data['po_ack_reminder_error'] = str(e)
+
+                production_clins = [c for c in clins if c.item_type == 'P']
+                non_production_clins = [c for c in clins if c.item_type != 'P']
+
+                by_supplier_due_date = defaultdict(list)
+                for clin in production_clins:
+                    by_supplier_due_date[clin.supplier_due_date].append(clin)
+
+                checkin_clins = []
+                for group in by_supplier_due_date.values():
+                    checkin_clins.append(
+                        min(group, key=lambda c: (c.item_number or '', c.pk))
+                    )
+                checkin_clins.extend(non_production_clins)
+
+                for clin in checkin_clins:
+                    try:
+                        if clin.supplier_due_date:
+                            note_text = (
+                                f"FIRST SUPPLIER CHECK IN - {clin.contract.contract_number} "
+                                f"CLIN {clin.item_number} - {request.user.username} "
+                                f"on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
+                            )
+                            note = make_note(clin, note_text)
+                            notes_created += 1
+                            checkin_reminder_date = clin.supplier_due_date - timedelta(days=60)
+                            make_reminder(
+                                "FIRST SUPPLIER CHECK IN",
+                                (
+                                    f"First check-in for {contract.contract_number} "
+                                    f"CLIN {clin.item_number} — supplier due "
+                                    f"{clin.supplier_due_date.strftime('%m/%d/%Y')}"
+                                ),
+                                checkin_reminder_date,
+                                note,
+                            )
+                            reminders_created += 1
+                        else:
+                            note_text = (
+                                "FIRST SUPPLIER CHECK IN — No supplier_due_date set, "
+                                "reminder not created - "
+                                f"{clin.contract.contract_number} CLIN {clin.item_number} - "
+                                f"{request.user.username} "
+                                f"on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
+                            )
+                            make_note(clin, note_text)
+                            notes_created += 1
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to create check-in reminder for CLIN %s: %s",
+                            clin.id,
+                            e,
+                        )
+                        checkin_reminder_errors.append(str(e))
+
+                response_data['notes_created'] = notes_created
+                response_data['reminders_created'] = reminders_created
+                response_data['checkin_reminder_errors'] = checkin_reminder_errors
+        else:
+            setattr(acknowledgment, date_field, None)
+            setattr(acknowledgment, user_field, None)
+
+        acknowledgment.save()
+        return JsonResponse(response_data)
+
     except Exception as e:
         import traceback
         print(traceback.format_exc())

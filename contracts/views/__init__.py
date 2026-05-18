@@ -17,6 +17,7 @@ from .clin_views import (
     ClinAcknowledgmentUpdateView,
     get_clin_notes,
     toggle_clin_acknowledgment,
+    toggle_contract_acknowledgment,
     clin_delete,
 )
 
