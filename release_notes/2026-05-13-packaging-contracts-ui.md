@@ -1,7 +1,7 @@
 ---
 id: 2026-05-13-packaging-contracts-ui
 title: Packaging Information — Contracts UI
-published: false
+published: true
 publish_date: 2026-05-13
 tags: [new, contracts]
 critical: false

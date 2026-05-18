@@ -1,3 +1,12 @@
+---
+id: 2026-05-12-processing-packhouse
+title: Processing — Packhouse assignment
+published: true
+publish_date: 2026-05-12
+tags: [new, contracts]
+critical: false
+---
+
 # Unreleased
 
 ## Processing — Packhouse assignment

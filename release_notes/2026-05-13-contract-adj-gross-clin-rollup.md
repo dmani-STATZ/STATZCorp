@@ -1,7 +1,7 @@
 ---
 id: 2026-05-13-contract-adj-gross-clin-rollup
 title: Finance Audit — Contract Adj Gross now reflects actual CLIN data
-published: false
+published: true
 publish_date: 2026-05-13
 tags: [improved, finance]
 critical: false

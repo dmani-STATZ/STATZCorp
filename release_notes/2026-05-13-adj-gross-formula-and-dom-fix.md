@@ -1,7 +1,7 @@
 ---
 id: 2026-05-13-adj-gross-formula-and-dom-fix
 title: Finance Audit — Adj Gross formula corrected and payment link bug fixed
-published: false
+published: true
 publish_date: 2026-05-13
 tags: [fixed, finance]
 critical: false

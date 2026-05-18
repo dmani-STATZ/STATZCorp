@@ -1,7 +1,7 @@
 {% load static %}
 {% load release_notes_extras %}
 <div class="modal fade" id="releaseNotesModal" tabindex="-1" aria-labelledby="releaseNotesModalLabel" aria-hidden="true"
-     data-bs-backdrop="static" data-bs-keyboard="false">
+  data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content border-0 shadow-lg overflow-hidden release-notes-modal-shell">
       <div class="modal-header border-0 text-white release-notes-modal-header flex-column align-items-start gap-1 py-3">
@@ -10,32 +10,38 @@
             <p class="small text-white-50 mb-1 text-uppercase letter-spacing-wide mb-0">Product updates</p>
             <h1 class="modal-title h4 fw-semibold mb-0" id="releaseNotesModalLabel">What&rsquo;s new</h1>
           </div>
-          <span class="badge rounded-pill bg-white bg-opacity-25 text-white border border-white border-opacity-25">{{ unacknowledged_release_notes|length }} update{% if unacknowledged_release_notes|length != 1 %}s{% endif %}</span>
+          <span class="badge rounded-pill bg-white bg-opacity-25 text-white border border-white border-opacity-25">{{
+            unacknowledged_release_notes|length }} update{% if unacknowledged_release_notes|length != 1 %}s{% endif
+            %}</span>
         </div>
-        <p class="small text-white-75 mb-0 fw-normal">Take a moment to scan the notes below, then confirm you&rsquo;ve reviewed them.</p>
+        <p class="small text-white-75 mb-0 fw-normal">Take a moment to scan the notes below, then confirm you&rsquo;ve
+          reviewed them.</p>
       </div>
       <div class="modal-body p-0 bg-body-secondary bg-opacity-25">
-        <div id="releaseNotesScrollRegion" class="release-notes-scroll-region px-4 py-3" style="max-height: min(56vh, 440px); overflow-y: auto;">
+        <div id="releaseNotesScrollRegion" class="release-notes-scroll-region px-4 py-3"
+          style="max-height: min(56vh, 440px); overflow-y: auto;">
           {% for note in unacknowledged_release_notes %}
-          <article class="release-note-card bg-body rounded-3 border shadow-sm p-4 mb-3 {% if not forloop.last %}mb-4{% endif %}">
+          <article
+            class="release-note-card bg-body rounded-3 border shadow-sm p-4 mb-3 {% if not forloop.last %}mb-4{% endif %}">
             <header class="mb-3">
               <h2 class="h5 fw-semibold mb-2 text-body">{{ note.title }}</h2>
               <div class="d-flex flex-wrap align-items-center gap-2 small">
-                <time class="text-body-secondary" datetime="{{ note.publish_date|date:'c' }}">{{ note.publish_date|date:"M j, Y" }}</time>
+                <time class="text-body-secondary" datetime="{{ note.publish_date|date:'c' }}">{{
+                  note.publish_date|date:"M j, Y" }}</time>
                 {% if note.change_type == 'new' %}
-                  <span class="badge text-bg-primary">New</span>
+                <span class="badge text-bg-primary">New</span>
                 {% elif note.change_type == 'improved' %}
-                  <span class="badge text-bg-info text-dark">Improved</span>
+                <span class="badge text-bg-info text-dark">Improved</span>
                 {% elif note.change_type == 'fixed' %}
-                  <span class="badge text-bg-success">Fixed</span>
+                <span class="badge text-bg-success">Fixed</span>
                 {% elif note.change_type == 'breaking' %}
-                  <span class="badge text-bg-danger">Breaking</span>
+                <span class="badge text-bg-danger">Breaking</span>
                 {% else %}
-                  <span class="badge text-bg-secondary">{{ note.change_type }}</span>
+                <span class="badge text-bg-secondary">{{ note.change_type }}</span>
                 {% endif %}
                 <span class="badge text-bg-secondary text-capitalize">{{ note.area }}</span>
                 {% if note.critical %}
-                  <span class="badge text-bg-warning text-dark">Important</span>
+                <span class="badge text-bg-warning text-dark">Important</span>
                 {% endif %}
               </div>
             </header>
@@ -45,7 +51,8 @@
           </article>
           {% endfor %}
         </div>
-        <p id="releaseNotesScrollHint" class="small text-body-secondary px-4 pb-2 mb-0 d-none">Scroll to the end to continue.</p>
+        <p id="releaseNotesScrollHint" class="small text-body-secondary px-4 pb-2 mb-0 d-none">Scroll to the end to
+          continue.</p>
       </div>
       <div class="modal-footer border-0 bg-body pt-0 pb-3 px-4">
         <button type="button" class="btn btn-primary px-4" id="releaseNotesAckBtn" disabled>
@@ -57,78 +64,73 @@
 </div>
 {{ unacknowledged_release_note_ids|json_script:"release-note-ack-ids" }}
 <script>
-(function() {
-  const modalEl = document.getElementById('releaseNotesModal');
-  const scrollEl = document.getElementById('releaseNotesScrollRegion');
-  const btn = document.getElementById('releaseNotesAckBtn');
-  const hint = document.getElementById('releaseNotesScrollHint');
-  if (!modalEl || !scrollEl || !btn) return;
+  (function () {
+    const modalEl = document.getElementById('releaseNotesModal');
+    const scrollEl = document.getElementById('releaseNotesScrollRegion');
+    const btn = document.getElementById('releaseNotesAckBtn');
+    const hint = document.getElementById('releaseNotesScrollHint');
+    if (!modalEl || !scrollEl || !btn) return;
 
-  function readCookie(name) {
-    const m = document.cookie.match(new RegExp('(^|; )' + name.replace(/([.$?*|{}()\\[\\]\\\\/+^])/g, '\\$1') + '=([^;]*)'));
-    return m ? decodeURIComponent(m[2]) : '';
-  }
-
-  function updateScrollState() {
-    const el = scrollEl;
-    const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 2;
-    if (atBottom) {
-      btn.removeAttribute('disabled');
-      if (hint) hint.classList.add('d-none');
-    } else {
-      btn.setAttribute('disabled', 'disabled');
-      if (hint) hint.classList.remove('d-none');
-    }
-  }
-
-  scrollEl.addEventListener('scroll', updateScrollState, { passive: true });
-  window.addEventListener('resize', updateScrollState);
-
-  modalEl.addEventListener('shown.bs.modal', function() {
-    updateScrollState();
-  });
-
-  function openModalWhenReady() {
-    const m = new bootstrap.Modal(modalEl);
-    m.show();
-    requestAnimationFrame(updateScrollState);
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', openModalWhenReady);
-  } else {
-    openModalWhenReady();
-  }
-
-  btn.addEventListener('click', function() {
-    let ids = [];
-    try {
-      const idNode = document.getElementById('release-note-ack-ids');
-      if (idNode && idNode.textContent) {
-        ids = JSON.parse(idNode.textContent);
+    function updateScrollState() {
+      const el = scrollEl;
+      const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 2;
+      if (atBottom) {
+        btn.removeAttribute('disabled');
+        if (hint) hint.classList.add('d-none');
+      } else {
+        btn.setAttribute('disabled', 'disabled');
+        if (hint) hint.classList.remove('d-none');
       }
-    } catch (e) {
-      ids = [];
     }
-    const token = (typeof getCookie === 'function') ? getCookie('csrftoken') : readCookie('csrftoken');
-    btn.setAttribute('disabled', 'disabled');
-    fetch("{% url 'users:release_notes_acknowledge' %}", {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': token || ''
-      },
-      body: JSON.stringify({ note_ids: ids })
-    }).then(function(r) {
-      if (!r.ok) throw new Error('ack failed');
-      return r.json();
-    }).then(function() {
-      window.location.reload();
-    }).catch(function() {
-      btn.removeAttribute('disabled');
-      if (window.notify) window.notify('error', 'Could not save acknowledgement. Please try again.');
-      else alert('Could not save acknowledgement. Please try again.');
+
+    scrollEl.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+      updateScrollState();
     });
-  });
-})();
+
+    function openModalWhenReady() {
+      const m = new bootstrap.Modal(modalEl);
+      m.show();
+      requestAnimationFrame(updateScrollState);
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', openModalWhenReady);
+    } else {
+      openModalWhenReady();
+    }
+
+    btn.addEventListener('click', function () {
+      let ids = [];
+      try {
+        const idNode = document.getElementById('release-note-ack-ids');
+        if (idNode && idNode.textContent) {
+          ids = JSON.parse(idNode.textContent);
+        }
+      } catch (e) {
+        ids = [];
+      }
+      const token =  getCookie('csrftoken');
+      btn.setAttribute('disabled', 'disabled');
+      fetch("{% url 'users:release_notes_acknowledge' %}", {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': token || ''
+        },
+        body: JSON.stringify({ note_ids: ids })
+      }).then(function (r) {
+        if (!r.ok) throw new Error('ack failed');
+        return r.json();
+      }).then(function () {
+        window.location.reload();
+      }).catch(function () {
+        btn.removeAttribute('disabled');
+        if (window.notify) window.notify('error', 'Could not save acknowledgement. Please try again.');
+        else alert('Could not save acknowledgement. Please try again.');
+      });
+    });
+  })();
 </script>
