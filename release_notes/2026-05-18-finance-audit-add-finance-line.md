@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-finance-audit-add-finance-line
 title: Finance Audit — Add Finance Line in one step
-published: false
+published: true
 publish_date: 2026-05-18
 tags: [improved, finance]
 critical: false
