@@ -97,6 +97,9 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
         if not set_field_value(instance, field_name, raw_new):
             return JsonResponse({"success": False, "error": "Could not set value"}, status=400)
         instance.save(update_fields=[field_name])
+        if model_class.__name__ == 'ClinShipment' and field_name == 'pod_date':
+            from contracts.views.shipment_views import _sync_clin_ship_fields
+            _sync_clin_ship_fields(instance.clin, request.user)
         new_display = get_display_value(instance, field_name)
         return JsonResponse({
             "success": True,

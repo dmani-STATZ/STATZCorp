@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from django.contrib.auth.decorators import login_required
+from STATZWeb.decorators import conditional_login_required
 from django.db.models import Q
 from django.conf import settings
 import io
@@ -12,7 +12,7 @@ from ..forms import AcknowledgementLetterForm
 from users.user_settings import UserSettings
 import logging
 
-@login_required
+@conditional_login_required
 def get_acknowledgment_letter(request, clin_id):
     """Get or create an acknowledgment letter for a CLIN"""
     clin = get_object_or_404(Clin, id=clin_id)
@@ -62,7 +62,9 @@ def get_acknowledgment_letter(request, clin_id):
         ).first()
         if fat_plt_clin:
             letter.fat_plt_due_date = fat_plt_clin.supplier_due_date
-        
+
+        # TODO: prefill letter.dpas_priority from Contract when a dpas_rating (or equivalent) field exists on Contract.
+
         # Get user info
         letter.statz_contact = f"{request.user.first_name} {request.user.last_name}".strip()
         letter.statz_contact_email = request.user.email
@@ -94,7 +96,7 @@ def get_acknowledgment_letter(request, clin_id):
         }).content.decode('utf-8')
     })
 
-@login_required
+@conditional_login_required
 def update_acknowledgment_letter(request, letter_id):
     """Update an existing acknowledgment letter"""
     letter = get_object_or_404(AcknowledgementLetter, id=letter_id)
@@ -136,7 +138,7 @@ def update_acknowledgment_letter(request, letter_id):
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
-@login_required
+@conditional_login_required
 def generate_acknowledgment_letter_doc(request, letter_id):
     """Generate and download a Word document for an acknowledgment letter."""
     letter = get_object_or_404(AcknowledgementLetter, id=letter_id)

@@ -14,19 +14,24 @@ logger = logging.getLogger(__name__)
 
 def _sync_clin_ship_fields(clin, user):
     """
-    Recalculate clin.ship_qty and clin.ship_date from all ClinShipment rows.
+    Recalculate clin.ship_qty, clin.ship_date, and clin.pod_date from all ClinShipment rows.
     - ship_qty = SUM of all shipment ship_qty values (None shipments excluded)
     - ship_date = MAX ship_date across all shipments that have a non-null ship_date
-    Saves only the two fields. Transactions signals fire automatically on save.
+    - pod_date = MAX pod_date across shipments with a non-null pod_date, or None if none
+    Transactions signals fire automatically on save.
     """
     agg = clin.shipments.aggregate(
         total_qty=Sum('ship_qty'),
         latest_date=Max('ship_date'),
+        latest_pod_date=Max('pod_date'),
     )
     clin.ship_qty = agg['total_qty'] or 0
     clin.ship_date = agg['latest_date']
+    clin.pod_date = agg['latest_pod_date']
     clin.modified_by = user
-    clin.save(update_fields=['ship_qty', 'ship_date', 'modified_by', 'modified_on'])
+    clin.save(update_fields=[
+        'ship_qty', 'ship_date', 'pod_date', 'modified_by', 'modified_on',
+    ])
 
 @csrf_exempt
 @require_http_methods(["POST"])

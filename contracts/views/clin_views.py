@@ -10,6 +10,9 @@ from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from datetime import timedelta, datetime, time
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, ClinAcknowledgment, ClinShipment, Contract, Note, Reminder, Nsn, Supplier
@@ -266,7 +269,11 @@ def get_clin_notes(request, clin_id):
 @require_http_methods(["POST"])
 def toggle_clin_acknowledgment(request, clin_id):
     try:
-        clin = get_object_or_404(Clin, id=clin_id, company=request.active_company)
+        clin = get_object_or_404(
+            Clin.objects.select_related('contract'),
+            id=clin_id,
+            company=request.active_company,
+        )
         data = json.loads(request.body)
         field = data.get('field')
         initial_state = data.get('initial_state', False)
@@ -331,35 +338,46 @@ def toggle_clin_acknowledgment(request, clin_id):
                 
                 response_data['note_created'] = True
                 
-                # Calculate reminder date
                 reminder_date = None
                 reminder_title = "FIRST CHECK IN"
-                
+
                 if clin.supplier_due_date:
-                    # 60 days before supplier_due_date
                     reminder_date = clin.supplier_due_date - timedelta(days=60)
                 elif clin.due_date:
-                    # 90 days before due_date
                     reminder_date = clin.due_date - timedelta(days=90)
-                
-                # Create reminder if we have a valid date
-                if reminder_date:
-                    # Convert date to datetime at beginning of day
-                    reminder_datetime = datetime.combine(reminder_date, time(9, 0))
-                    aware_reminder_datetime = timezone.make_aware(reminder_datetime)
-                    
-                    reminder = Reminder.objects.create(
-                        reminder_title=reminder_title,
-                        reminder_text=f"Follow up on CLIN {clin.id} PO acknowledgment",
-                        reminder_date=aware_reminder_datetime,
-                        reminder_user=request.user,
-                        reminder_completed=False,
-                        note=note
+
+                if not reminder_date:
+                    response_data['reminder_warning'] = (
+                        "No CLIN Due Date or Target Ship Date is set — check-in reminder was not created. "
+                        "Set a due date on this CLIN and re-send PO to generate a reminder."
                     )
-                    
-                    response_data['reminder_created'] = True
-                    response_data['reminder_title'] = reminder_title
-                    response_data['reminder_date'] = aware_reminder_datetime.strftime('%m/%d/%Y')
+                else:
+                    try:
+                        reminder_datetime = datetime.combine(reminder_date, time(9, 0))
+                        aware_reminder_datetime = timezone.make_aware(reminder_datetime)
+
+                        Reminder.objects.create(
+                            reminder_title=reminder_title,
+                            reminder_text=(
+                                f"Follow up on {clin.contract.contract_number} "
+                                f"CLIN {clin.item_number} PO acknowledgment"
+                            ),
+                            reminder_date=aware_reminder_datetime,
+                            reminder_user=request.user,
+                            reminder_completed=False,
+                            note=note,
+                        )
+
+                        response_data['reminder_created'] = True
+                        response_data['reminder_title'] = reminder_title
+                        response_data['reminder_date'] = aware_reminder_datetime.strftime('%m/%d/%Y')
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to create check-in reminder for CLIN %s: %s",
+                            clin.id,
+                            e,
+                        )
+                        response_data['reminder_error'] = str(e)
         else:
             # If toggling to false, clear the user and date fields
             setattr(acknowledgment, date_field, None)

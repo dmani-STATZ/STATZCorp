@@ -100,10 +100,6 @@ from .views import (
     reminders_popup_add,
     reminders_popup_edit,
     reminder_counts_api,
-    # Acknowledgement letter views
-    generate_acknowledgement_letter,
-    view_acknowledgement_letter,
-    AcknowledgementLetterUpdateView,
     # Dashboard views
     ContractLifecycleDashboardView,
     DashboardMetricDetailView,
@@ -470,22 +466,6 @@ urlpatterns = [
         "contract/<int:contract_id>/notes/popup/tab/<str:tab_type>/<int:clin_id>/",
         note_views.notes_popup_tab,
         name="notes_popup_tab_clin",
-    ),
-    # Acknowledgement letter
-    path(
-        "clin/<int:clin_id>/generate-letter/",
-        generate_acknowledgement_letter,
-        name="generate_acknowledgement_letter",
-    ),
-    path(
-        "clin/<int:clin_id>/view-letter/",
-        view_acknowledgement_letter,
-        name="view_acknowledgement_letter",
-    ),
-    path(
-        "letter/<int:pk>/edit/",
-        AcknowledgementLetterUpdateView.as_view(),
-        name="edit_acknowledgement_letter",
     ),
     # API endpoints
     path("search/", contract_search, name="contract_search"),

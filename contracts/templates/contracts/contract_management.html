@@ -2187,11 +2187,26 @@ function toggleAcknowledgment(field) {
                 fetchClinNotes(clinId);
             }
 
-            // Show message if a reminder was created
             if (data.reminder_created) {
-                const message = `Reminder "${data.reminder_title}" created for ${data.reminder_date}`;
-                // Display notification (can be enhanced with a proper notification system)
-                alert(message);
+                const message = `Check-in reminder created for ${data.reminder_date}`;
+                if (window.notify) {
+                    window.notify('success', message, 4000);
+                } else {
+                    alert(message);
+                }
+            } else if (data.reminder_warning) {
+                if (window.notify) {
+                    window.notify('warning', data.reminder_warning, 6000);
+                } else {
+                    alert(data.reminder_warning);
+                }
+            } else if (data.reminder_error) {
+                const message = `Reminder creation failed: ${data.reminder_error}`;
+                if (window.notify) {
+                    window.notify('error', message, 6000);
+                } else {
+                    alert(message);
+                }
             }
         } else {
             btn.classList.remove('btn-success');
