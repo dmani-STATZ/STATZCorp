@@ -412,6 +412,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                     <button type="button"
                                             data-action="toggle-clin"
                                             data-index="{{ forloop.counter0 }}"
+                                            data-clin-id="{{ clin_form.instance.id }}"
                                             class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1">
                                             <span class="clin-expand-icon-{{ forloop.counter0 }} d-flex align-items-center gap-1">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 clin-icon-{{ forloop.counter0 }}" viewBox="0 0 20 20" fill="currentColor">
@@ -1126,14 +1127,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             });
         });
 
-        const savedIndex = localStorage.removeItem('expandedClinIndex');
-        if (savedIndex !== null) {
-            const toggleBtn = document.querySelector(`[data-action="toggle-clin"][data-index="${savedIndex}"]`);
+        // Restore expanded CLIN after NSN/Supplier match reload
+        const pendingClinId = sessionStorage.getItem('matchedClinId');
+        const pendingToast   = sessionStorage.getItem('matchedClinToast');
+        if (pendingClinId) {
+            sessionStorage.removeItem('matchedClinId');
+            sessionStorage.removeItem('matchedClinToast');
+
+            const toggleBtn = document.querySelector(`[data-action="toggle-clin"][data-clin-id="${pendingClinId}"]`);
             if (toggleBtn) {
-                // Directly call the function to avoid redundant storage logic
-                toggleClinDetails(savedIndex);
-                // Smooth scroll to the expanded CLIN
-                toggleBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const idx = toggleBtn.dataset.index;
+                toggleClinDetails(idx);
+                setTimeout(() => {
+                    toggleBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 50);
+            }
+
+            if (pendingToast && typeof showMessage === 'function') {
+                showMessage(pendingToast, 'success');
             }
         }
     });

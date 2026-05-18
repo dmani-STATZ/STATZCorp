@@ -93,7 +93,7 @@ function searchNsn() {
         });
 }
 
-function selectNsn(id, text) {
+function selectNsn(id, text, toastMessage = 'NSN matched successfully') {
     console.log('Selecting NSN:', { id, text });
     console.log('Current CLIN ID:', currentNsnClinId);
     
@@ -119,6 +119,8 @@ function selectNsn(id, text) {
     .then(data => {
         console.log('Success response:', data);
         if (data.success) {
+            sessionStorage.setItem('matchedClinId', String(currentNsnClinId));
+            sessionStorage.setItem('matchedClinToast', toastMessage);
             location.reload();
         } else {
             alert(data.error || 'Error selecting NSN');
@@ -169,7 +171,7 @@ function createNewNsn() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            selectNsn(data.id, nsnCode);
+            selectNsn(data.id, nsnCode, 'NSN created and matched successfully');
         } else {
             alert(data.error || 'Failed to create NSN');
         }

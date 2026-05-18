@@ -335,7 +335,7 @@ defeat the supplier-matching prefill flow.
 
 - Sidebar buttons standardized for centering (removed `.row`).
 - Vertical density optimized in CLIN detail blocks.
-- Persistent expansion state implemented via `localStorage`.
+- CLIN rows load collapsed by default. After a successful NSN or Supplier match (`location.reload()`), `sessionStorage` keys `matchedClinId` and `matchedClinToast` restore the matched CLIN (via `data-clin-id` on the toggle button) and show a success toast; keys are cleared on read.
 - CLIN save auto-chain: after a successful CLIN save, the page auto-clicks that CLIN's **Calc Splits** button and then calls `updateContractValues()` after an 800ms delay. Both controls remain visible as manual overrides.
 - Supplier Due Date is intentionally optional. Leave it blank during ingestion and early processing; Contract Admins fill it later when POs are issued. Never treat this field as required.
 

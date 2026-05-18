@@ -701,8 +701,8 @@ class Clin(AuditModel):
         """
         Realized gross profit for this CLIN.
 
-        Income side: use wawf_payment (actual government payment) if populated
-        and non-zero, otherwise fall back to item_value (contracted amount).
+        Income side: use item_value (contracted amount). wawf_payment is tracked
+        for reporting purposes but does not affect adj_gross.
 
         Cost side: use paid_amount (actual supplier payment) if populated and
         non-zero, otherwise fall back to quote_value (contracted supplier cost).
@@ -710,10 +710,11 @@ class Clin(AuditModel):
         Finance line costs (CLIN-level and partial-level) are subtracted from
         the result.
 
-        This formula naturally evolves as the contract executes:
+        Income is always item_value throughout the contract lifecycle; cost
+        transitions from quote_value to paid_amount as supplier payments land:
         - At award: adj_gross ~= item_value - quote_value (projected profit)
-        - Mid-execution: adj_gross reflects partial real money flows
-        - Fully executed: adj_gross ~= wawf_payment - paid_amount (realized profit)
+        - Mid-execution: adj_gross ~= item_value - paid_amount (partial supplier pay)
+        - Fully executed: adj_gross ~= item_value - paid_amount (settled cost)
         """
         def coalesce_decimal(*values):
             for v in values:
@@ -722,7 +723,7 @@ class Clin(AuditModel):
                     return d
             return Decimal('0')
 
-        income = coalesce_decimal(self.wawf_payment, self.item_value)
+        income = coalesce_decimal(self.item_value)
         cost = coalesce_decimal(self.paid_amount, self.quote_value)
         gross = income - cost
 

@@ -93,7 +93,7 @@ async function searchSupplier() {
     }
 }
 
-async function selectSupplier(id, text) {
+async function selectSupplier(id, text, toastMessage = 'Supplier matched successfully') {
     try {
         const response = await fetch(`${SUPPLIER_MODAL_CONFIG.endpoints.match}${currentSupplierClinId}/`, {
             method: 'POST',
@@ -106,6 +106,8 @@ async function selectSupplier(id, text) {
         
         const data = await response.json();
         if (data.success) {
+            sessionStorage.setItem('matchedClinId', String(currentSupplierClinId));
+            sessionStorage.setItem('matchedClinToast', toastMessage);
             location.reload();
         } else {
             alert('Error selecting supplier');
@@ -145,7 +147,7 @@ async function createNewSupplier() {
                 alert(data.message);
             }
             // After creating, select the new or existing supplier
-            selectSupplier(data.supplier_id, supplierName);
+            selectSupplier(data.supplier_id, supplierName, 'Supplier created and matched successfully');
         } else {
             alert(data.error || 'Error creating supplier');
         }

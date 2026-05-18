@@ -18,6 +18,15 @@ def _active_company_or_error(request):
     return company, None
 
 
+def _partial_payment_rollup_mapping(payment_type):
+    """Map partial shipment payment types to parent CLIN types, or None if no rollup."""
+    if payment_type == 'partial_wawf_payment':
+        return 'wawf_payment', 'wawf_payment'
+    if payment_type == 'partial_paid_amount':
+        return 'paid_amount', 'paid_amount'
+    return None
+
+
 @conditional_login_required
 @require_http_methods(["GET", "POST"])
 def payment_history_api(request, entity_type, entity_id, payment_type):
@@ -206,7 +215,7 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                     clin.wawf_payment = new_total
                 clin.save()
             elif entity_type == 'clinshipment':
-                shipment = ClinShipment.objects.get(
+                shipment = ClinShipment.objects.select_related('clin').get(
                     id=entity_id,
                     clin__contract__company=company
                 )
@@ -219,8 +228,37 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                 elif payment_type == 'partial_wawf_payment':
                     shipment.wawf_payment = new_total
                 shipment.save()
-                # Do not call _sync_clin_ship_fields here. Partial and CLIN
-                # financial fields are tracked independently.
+                # partial_paid_amount / partial_wawf_payment roll up to parent CLIN
+                # PaymentHistory rows (paid_amount / wawf_payment); item/quote partials do not.
+                rollup = _partial_payment_rollup_mapping(payment_type)
+                if rollup:
+                    clin_payment_type, clin_field_name = rollup
+                    clin = shipment.clin
+                    clin_content_type = ContentType.objects.get_for_model(Clin)
+                    user_note = (data.get('payment_info') or '').strip()
+                    if user_note:
+                        rollup_info = f"{user_note} | From Shipment #{shipment.id}"
+                    else:
+                        rollup_info = f"From Shipment #{shipment.id}"
+                    PaymentHistory.objects.create(
+                        content_type=clin_content_type,
+                        object_id=clin.id,
+                        payment_type=clin_payment_type,
+                        payment_amount=payment.payment_amount,
+                        payment_date=payment.payment_date,
+                        payment_info=rollup_info,
+                        reference_number=f"shipment-ph-{payment.id}",
+                        created_by=request.user,
+                        modified_by=request.user,
+                    )
+                    clin_new_total = PaymentHistory.objects.filter(
+                        content_type=clin_content_type,
+                        object_id=clin.id,
+                        payment_type=clin_payment_type,
+                    ).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
+                    setattr(clin, clin_field_name, clin_new_total)
+                    clin.modified_by = request.user
+                    clin.save(update_fields=[clin_field_name, 'modified_by', 'modified_on'])
             elif entity_type == 'contract_packaging':
                 pkg = ContractPackaging.objects.get(
                     id=entity_id, contract__company=company
@@ -327,7 +365,7 @@ def delete_payment_history_entry(request, payment_id):
             clin.save()
 
         elif entity_type == 'clinshipment':
-            shipment = ClinShipment.objects.get(
+            shipment = ClinShipment.objects.select_related('clin').get(
                 id=object_id,
                 clin__contract__company=company
             )
@@ -340,8 +378,24 @@ def delete_payment_history_entry(request, payment_id):
             elif payment_type == 'partial_wawf_payment':
                 shipment.wawf_payment = new_total
             shipment.save()
-            # Do not call _sync_clin_ship_fields here. Partial and CLIN
-            # financial fields are tracked independently.
+            rollup = _partial_payment_rollup_mapping(payment_type)
+            if rollup:
+                clin_payment_type, clin_field_name = rollup
+                ref = f"shipment-ph-{payment_id}"
+                PaymentHistory.objects.filter(
+                    reference_number=ref,
+                    payment_type=clin_payment_type,
+                ).delete()
+                clin = shipment.clin
+                clin_content_type = ContentType.objects.get_for_model(Clin)
+                clin_new_total = PaymentHistory.objects.filter(
+                    content_type=clin_content_type,
+                    object_id=clin.id,
+                    payment_type=clin_payment_type,
+                ).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
+                setattr(clin, clin_field_name, clin_new_total)
+                clin.modified_by = request.user
+                clin.save(update_fields=[clin_field_name, 'modified_by', 'modified_on'])
 
         elif entity_type == 'contractpackaging':
             pkg = ContractPackaging.objects.get(
