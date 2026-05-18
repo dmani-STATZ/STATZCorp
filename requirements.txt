@@ -15,6 +15,9 @@ msal>=1.28.0
 django-crispy-forms==2.3
 crispy-bootstrap5==2024.10
 
+# JSON schema validation (intake app DraftContract.data field)
+pydantic>=2.5,<3
+
 # CORS and API
 django-cors-headers==4.4.0
 

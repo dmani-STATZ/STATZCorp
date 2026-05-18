@@ -134,6 +134,7 @@ urlpatterns = [
     path("products/", include("products.urls")),
     path("accesslog/", include("accesslog.urls")),
     path("processing/", include("processing.urls")),
+    path("intake/", include("intake.urls")),
     path("training/", include("training.urls")),
     path("health/", health_check, name="health_check"),
     path("reports/", include("reports.urls")),

@@ -1,0 +1,203 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load intake_extras %}
+
+{% block title %}Intake Queue{% endblock %}
+
+{% block content %}
+    {% csrf_token %}
+    <style>
+    .intake-queue-thead {
+        background-color: #f9fafb;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.06);
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .intake-queue-thead > tr > th {
+        background-color: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    [data-bs-theme="dark"] .intake-queue-scroll-wrap.card {
+        border: 1px solid var(--bs-border-color);
+    }
+    [data-bs-theme="dark"] .intake-queue-thead,
+    [data-bs-theme="dark"] .intake-queue-thead > tr > th {
+        background-color: #343a40;
+        color: #e9ecef;
+        border-bottom-color: var(--bs-border-color);
+    }
+    [data-bs-theme="dark"] .intake-queue-tbody {
+        background-color: var(--bs-body-bg) !important;
+    }
+    [data-bs-theme="dark"] .intake-queue-table.divide-y > * + * {
+        border-top-color: var(--bs-border-color) !important;
+    }
+    [data-bs-theme="dark"] .intake-queue-cell-data { color: #e9ecef; }
+    .intake-queue-row:hover { background-color: #f9fafb; }
+    [data-bs-theme="dark"] .intake-queue-row:hover { background-color: #343a40; }
+    </style>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="row-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Intake Queue</h1>
+                <p class="small text-muted mb-0">
+                    Drafts in flight. Finalize one to land it in the contracts system.
+                </p>
+            </div>
+        </div>
+
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} py-2 mb-2">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Stat badges -->
+        <div class="d-flex align-items-stretch flex-wrap gap-3 mb-3">
+            <div class="d-flex align-items-center gap-2 flex-shrink-0 flex-wrap">
+                <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis px-3 py-2 fw-medium">
+                    {{ total_count|default:0 }} drafts
+                </span>
+                <span class="badge rounded-pill bg-info-subtle text-info-emphasis px-3 py-2 fw-medium">
+                    {{ queued_count|default:0 }} queued
+                </span>
+                <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis px-3 py-2 fw-medium">
+                    {{ in_progress_count|default:0 }} in progress
+                </span>
+                <span class="badge rounded-pill bg-success-subtle text-success-emphasis px-3 py-2 fw-medium">
+                    {{ ready_count|default:0 }} ready for review
+                </span>
+            </div>
+        </div>
+
+        <div class="card shadow-md overflow-x-auto intake-queue-scroll-wrap" style="max-height: calc(100vh - 280px); overflow-y: auto;">
+            <table class="min-w-full divide-y divide-gray-200 intake-queue-table">
+                <thead class="sticky-top intake-queue-thead" style="z-index: 10;">
+                    <tr>
+                        <th class="px-6 py-2 text-left tracking-wider label">Contract Number</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Type</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Status</th>
+                        <th class="px-3 py-2 text-center tracking-wider label">PDF</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200 intake-queue-tbody">
+                    {% for draft in drafts %}
+                    <tr data-draft-id="{{ draft.id }}" class="intake-queue-row">
+                        <td class="px-6 py-2 whitespace-nowrap intake-queue-cell-data">
+                            {{ draft.contract_number }}
+                            {% if draft.contract_number in finalized_contract_map %}
+                                <a href="/contracts/{{ finalized_contract_map|get_item:draft.contract_number }}/"
+                                   target="_blank"
+                                   class="ms-2 badge bg-warning text-dark text-decoration-none"
+                                   title="This contract is already finalized.">
+                                    Already in DB
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-2 whitespace-nowrap">
+                            {% with t=draft.contract_type %}
+                            {% if t == 'IDIQ' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">IDIQ</span>
+                            {% elif t == 'DO' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">DO</span>
+                            {% elif t == 'AWD' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">AWD</span>
+                            {% elif t == 'PO' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-900">PO</span>
+                            {% elif t == 'MOD' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-800">MOD</span>
+                            {% elif t == 'AMD' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-900">AMD</span>
+                            {% elif t == 'INTERNAL' %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">INTERNAL</span>
+                            {% else %}
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">—</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="px-6 py-2">
+                            {% if draft.lock_active %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"
+                                      title="Lock expires {{ draft.lock_expires_at|date:'Y-m-d H:i' }}">
+                                    Locked by {{ draft.locked_by.username }}
+                                </span>
+                            {% elif draft.lock_expired %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700"
+                                      title="Previous lock by {{ draft.locked_by.username }} expired at {{ draft.lock_expires_at|date:'Y-m-d H:i' }}">
+                                    Lock expired
+                                </span>
+                            {% else %}
+                                {% if draft.status == 'ready_for_review' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Ready for Review</span>
+                                {% elif draft.status == 'in_progress' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-900">In Progress</span>
+                                {% elif draft.status == 'cancelled' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-700">Cancelled</span>
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Queued</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
+                            {% if draft.pdf_parse_status == 'success' %}
+                                <span class="badge bg-success-subtle text-success-emphasis" title="PDF parsed successfully">Success</span>
+                            {% elif draft.pdf_parse_status == 'partial' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis" title="Parsed with warnings">Partial</span>
+                            {% elif draft.pdf_parse_status == 'parseable' %}
+                                <span class="badge bg-info-subtle text-info-emphasis" title="PDF found and ready to parse">Parseable</span>
+                            {% elif draft.pdf_parse_status == 'no_pdf' %}
+                                <span class="badge bg-light text-muted" title="No PDF available">No PDF</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis" title="Pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                            <div class="d-flex gap-2">
+                                {% if draft.lock_active and draft.locked_by_id == request.user.id %}
+                                    <form method="post" action="{% url 'intake:start_draft' draft.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-brand">Continue</button>
+                                    </form>
+                                    <form method="post" action="{% url 'intake:release_draft' draft.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Release lock</button>
+                                    </form>
+                                {% elif draft.lock_active %}
+                                    <button class="btn btn-sm btn-outline-secondary" disabled
+                                            title="Locked by {{ draft.locked_by.username }} until {{ draft.lock_expires_at|date:'H:i' }}">
+                                        Locked
+                                    </button>
+                                {% else %}
+                                    <form method="post" action="{% url 'intake:start_draft' draft.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-brand">
+                                            {% if draft.status == 'queued' %}Start{% else %}Continue{% endif %}
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'intake:delete_draft' draft.id %}" class="d-inline"
+                                      onsubmit="return confirm('Delete draft {{ draft.contract_number }}?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-5">
+                            No drafts in the queue. Ingestion paths (PDF upload, CSV, DIBBS injection)
+                            land here in Phase 3.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

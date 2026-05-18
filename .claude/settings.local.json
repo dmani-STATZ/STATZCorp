@@ -23,7 +23,22 @@
       "Bash(awk 'NR>=1795 && NR<=2101' \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\")",
       "Bash(awk *)",
       "PowerShell($content = Get-Content \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\" | Select-Object -Skip 1794 -First 308; $opens = \\($content | Select-String -Pattern '\\\\{' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; $closes = \\($content | Select-String -Pattern '\\\\}' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; Write-Output \\(\"opens=$opens closes=$closes\"\\))",
-      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\" | Select-Object -Skip 2102; $opens = \\($content | Select-String -Pattern '\\\\{' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; $closes = \\($content | Select-String -Pattern '\\\\}' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; Write-Output \\(\"opens=$opens closes=$closes lines=$\\($content.Count\\)\"\\))"
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Dion\\\\Documents\\\\STATZWeb\\\\STATZCorp\\\\static\\\\css\\\\app-core.css\" | Select-Object -Skip 2102; $opens = \\($content | Select-String -Pattern '\\\\{' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; $closes = \\($content | Select-String -Pattern '\\\\}' -AllMatches | ForEach-Object {$_.Matches.Count} | Measure-Object -Sum\\).Sum; Write-Output \\(\"opens=$opens closes=$closes lines=$\\($content.Count\\)\"\\))",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/intake)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/processing)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/intake/management)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/intake/migrations)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/intake/templates)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/processing/views)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/processing/services)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/processing/templates/processing)",
+      "Bash(ls C:/Users/Dion/Documents/STATZWeb/STATZCorp/contracts)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -c \"import pydantic; print\\(pydantic.VERSION\\)\")",
+      "Bash(.\\\\.venv\\\\Scripts\\\\python.exe *)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py makemigrations intake)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake.tests.EditorViewTests.test_edit_requires_lock -v 2 --keepdb)"
     ]
   }
 }

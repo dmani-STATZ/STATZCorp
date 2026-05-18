@@ -1,0 +1,534 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load intake_extras %}
+
+{% block title %}Edit Draft {{ draft.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="w-[95%] mx-auto px-4 py-6">
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold">
+                Edit Draft: {{ draft.contract_number }}
+                <span class="badge bg-secondary ms-2">{{ draft.get_contract_type_display }}</span>
+                <span class="badge bg-info ms-1">{{ draft.get_status_display }}</span>
+            </h1>
+            <p class="text-sm text-gray-600 mt-1">
+                Created {{ draft.created_at|date:"M d, Y H:i" }} ·
+                {% if lock_held_by_user %}
+                    Lock held by you, expires {{ lock_expires_at|date:"H:i" }}
+                {% else %}
+                    Lock not held — read only
+                {% endif %}
+            </p>
+            <p class="text-xs text-amber-700 mt-1">
+                Phase 2a editor — text-only fields. Matching modals (buyer / IDIQ / NSN / supplier) ship in Phase 2b.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'intake:queue' %}" class="btn btn-outline-secondary">Back to Queue</a>
+        </div>
+    </div>
+
+    <form id="draft-edit-form" method="post" action="{% url 'intake:save_draft' draft.pk %}">
+        {% csrf_token %}
+
+        {# ---- Common header fields ---- #}
+        <div class="card card-padded shadow-sm mb-4">
+            <h2 class="text-xl font-semibold mb-3">Contract Details</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="label block mb-1">Contract Number</label>
+                    <input type="text" value="{{ draft.contract_number }}"
+                           class="form-control bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="label block mb-1">Award Date</label>
+                    <input type="date" name="f_award_date"
+                           value="{{ data|get_item:'award_date'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Due Date</label>
+                    <input type="date" name="f_due_date"
+                           value="{{ data|get_item:'due_date'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Contract Value</label>
+                    <input type="number" step="0.01" name="f_contract_value"
+                           value="{{ data|get_item:'contract_value'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Solicitation Type</label>
+                    <input type="text" name="f_solicitation_type"
+                           value="{{ data|get_item:'solicitation_type'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">PR Number</label>
+                    <input type="text" name="f_pr_number"
+                           value="{{ data|get_item:'pr_number'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Buyer (parsed)</label>
+                    <input type="text" name="f_buyer_text"
+                           value="{{ data|get_item:'buyer_text'|default:'' }}"
+                           class="form-control">
+                    <input type="hidden" name="f_buyer_id"
+                           value="{{ data|get_item:'buyer_id'|default:'' }}">
+                    <p class="text-xs text-gray-500 mt-1">
+                        Buyer match → Phase 2b
+                        {% with bid=data|get_item:'buyer_id' %}
+                            {% if bid %}<span class="badge bg-success ms-1">matched #{{ bid }}</span>{% endif %}
+                        {% endwith %}
+                    </p>
+                </div>
+                <div>
+                    <label class="label block mb-1">Contractor Name</label>
+                    <input type="text" name="f_contractor_name"
+                           value="{{ data|get_item:'contractor_name'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Contractor CAGE</label>
+                    <input type="text" name="f_contractor_cage"
+                           value="{{ data|get_item:'contractor_cage'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div class="col-span-3">
+                    <label class="label block mb-1">Files URL</label>
+                    <input type="text" name="f_files_url"
+                           value="{{ data|get_item:'files_url'|default:'' }}"
+                           class="form-control">
+                </div>
+            </div>
+        </div>
+
+        {# ---- Type-specific blocks ---- #}
+        {% if draft.contract_type == 'DO' %}
+        <div class="card card-padded shadow-sm mb-4">
+            <h2 class="text-xl font-semibold mb-3">Parent IDIQ</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="label block mb-1">Parent IDIQ Contract Number</label>
+                    <input type="text" name="f_parent_idiq_contract_number"
+                           value="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Parent IDIQ ID (matched)</label>
+                    <input type="number" name="f_parent_idiq_id"
+                           value="{{ data|get_item:'parent_idiq_id'|default:'' }}"
+                           class="form-control">
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if draft.contract_type == 'IDIQ' %}
+        <div class="card card-padded shadow-sm mb-4">
+            <h2 class="text-xl font-semibold mb-3">IDIQ Terms</h2>
+            <div class="grid grid-cols-4 gap-4">
+                <div>
+                    <label class="label block mb-1">Term (months)</label>
+                    <input type="number" name="f_term_months"
+                           value="{{ data|get_item:'term_months'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Option (months)</label>
+                    <input type="number" name="f_option_months"
+                           value="{{ data|get_item:'option_months'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Max Value</label>
+                    <input type="number" step="0.01" name="f_max_value"
+                           value="{{ data|get_item:'max_value'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Min Guarantee</label>
+                    <input type="number" name="f_min_guarantee"
+                           value="{{ data|get_item:'min_guarantee'|default:'' }}"
+                           class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-padded shadow-sm mb-4">
+            <div class="row-between mb-2">
+                <h2 class="text-xl font-semibold">Approved NSNs</h2>
+                <button type="button" class="btn btn-sm btn-success"
+                        data-add-row="nsn">+ Add NSN</button>
+            </div>
+            <table class="min-w-full" id="nsn-table">
+                <thead><tr>
+                    <th class="text-left p-2">NSN Text</th>
+                    <th class="text-left p-2">NSN ID</th>
+                    <th class="text-left p-2">Description</th>
+                    <th class="text-left p-2">Min Order Qty</th>
+                    <th></th>
+                </tr></thead>
+                <tbody>
+                {% for row in approved_nsns %}
+                    <tr data-row="nsn" data-idx="{{ forloop.counter0 }}">
+                        <td class="p-1"><input type="text" name="nsn-{{ forloop.counter0 }}-nsn_text"
+                            value="{{ row|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="number" name="nsn-{{ forloop.counter0 }}-nsn_id"
+                            value="{{ row|get_item:'nsn_id'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="text" name="nsn-{{ forloop.counter0 }}-nsn_description"
+                            value="{{ row|get_item:'nsn_description'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="text" name="nsn-{{ forloop.counter0 }}-min_order_qty"
+                            value="{{ row|get_item:'min_order_qty'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card card-padded shadow-sm mb-4">
+            <div class="row-between mb-2">
+                <h2 class="text-xl font-semibold">Approved Suppliers</h2>
+                <button type="button" class="btn btn-sm btn-success"
+                        data-add-row="supp">+ Add Supplier</button>
+            </div>
+            <table class="min-w-full" id="supp-table">
+                <thead><tr>
+                    <th class="text-left p-2">Supplier Text</th>
+                    <th class="text-left p-2">Supplier ID</th>
+                    <th class="text-left p-2">CAGE</th>
+                    <th></th>
+                </tr></thead>
+                <tbody>
+                {% for row in approved_suppliers %}
+                    <tr data-row="supp" data-idx="{{ forloop.counter0 }}">
+                        <td class="p-1"><input type="text" name="supp-{{ forloop.counter0 }}-supplier_text"
+                            value="{{ row|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="number" name="supp-{{ forloop.counter0 }}-supplier_id"
+                            value="{{ row|get_item:'supplier_id'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="text" name="supp-{{ forloop.counter0 }}-cage"
+                            value="{{ row|get_item:'cage'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if draft.contract_type == 'MOD' or draft.contract_type == 'AMD' %}
+        <div class="card card-padded shadow-sm mb-4">
+            <h2 class="text-xl font-semibold mb-3">Modification / Amendment</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="label block mb-1">Parent Contract Number</label>
+                    <input type="text" name="f_parent_contract_number"
+                           value="{{ data|get_item:'parent_contract_number'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Parent Contract ID</label>
+                    <input type="number" name="f_parent_contract_id"
+                           value="{{ data|get_item:'parent_contract_id'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Mod Number</label>
+                    <input type="text" name="f_mod_number"
+                           value="{{ data|get_item:'mod_number'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div class="col-span-3">
+                    <label class="label block mb-1">Summary</label>
+                    <textarea name="f_summary" rows="3"
+                              class="form-control">{{ data|get_item:'summary'|default:'' }}</textarea>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ---- CLINs (AWD / PO / DO / INTERNAL) ---- #}
+        {% if draft.contract_type == 'AWD' or draft.contract_type == 'PO' or draft.contract_type == 'DO' or draft.contract_type == 'INTERNAL' %}
+        <div class="card card-padded shadow-sm mb-4">
+            <div class="row-between mb-2">
+                <h2 class="text-xl font-semibold">CLINs</h2>
+                <button type="button" class="btn btn-sm btn-success" data-add-row="clin">+ Add CLIN</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full" id="clin-table">
+                    <thead><tr>
+                        <th class="text-left p-2">Item #</th>
+                        <th class="text-left p-2">Type</th>
+                        <th class="text-left p-2">NSN Text</th>
+                        <th class="text-left p-2">NSN ID</th>
+                        <th class="text-left p-2">Supplier Text</th>
+                        <th class="text-left p-2">Supplier ID</th>
+                        <th class="text-left p-2">Qty</th>
+                        <th class="text-left p-2">UOM</th>
+                        <th class="text-left p-2">Unit Price</th>
+                        <th class="text-left p-2">Item Value</th>
+                        <th class="text-left p-2">Due Date</th>
+                        <th class="text-left p-2">IA</th>
+                        <th class="text-left p-2">FOB</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody>
+                    {% for clin in clins %}
+                        <tr data-row="clin" data-idx="{{ forloop.counter0 }}">
+                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-item_number" value="{{ clin|get_item:'item_number'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
+                            <td class="p-1">
+                                <select name="clin-{{ forloop.counter0 }}-item_type" class="form-select form-select-sm">
+                                    {% with t=clin|get_item:'item_type' %}
+                                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                                    {% for v in 'PGCLM' %}
+                                    <option value="{{ v }}" {% if t == v %}selected{% endif %}>{{ v }}</option>
+                                    {% endfor %}
+                                    {% endwith %}
+                                </select>
+                            </td>
+                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-nsn_text" value="{{ clin|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm"></td>
+                            <td class="p-1"><input type="number" name="clin-{{ forloop.counter0 }}-nsn_id" value="{{ clin|get_item:'nsn_id'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
+                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-supplier_text" value="{{ clin|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm"></td>
+                            <td class="p-1"><input type="number" name="clin-{{ forloop.counter0 }}-supplier_id" value="{{ clin|get_item:'supplier_id'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
+                            <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-order_qty" value="{{ clin|get_item:'order_qty'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
+                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-uom" value="{{ clin|get_item:'uom'|default:'' }}" class="form-control form-control-sm" style="width:4rem"></td>
+                            <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-unit_price" value="{{ clin|get_item:'unit_price'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
+                            <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-item_value" value="{{ clin|get_item:'item_value'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
+                            <td class="p-1"><input type="date" name="clin-{{ forloop.counter0 }}-due_date" value="{{ clin|get_item:'due_date'|default:'' }}" class="form-control form-control-sm"></td>
+                            <td class="p-1">
+                                <select name="clin-{{ forloop.counter0 }}-ia" class="form-select form-select-sm">
+                                    {% with t=clin|get_item:'ia' %}
+                                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                                    <option value="O" {% if t == 'O' %}selected{% endif %}>O</option>
+                                    <option value="D" {% if t == 'D' %}selected{% endif %}>D</option>
+                                    {% endwith %}
+                                </select>
+                            </td>
+                            <td class="p-1">
+                                <select name="clin-{{ forloop.counter0 }}-fob" class="form-select form-select-sm">
+                                    {% with t=clin|get_item:'fob' %}
+                                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                                    <option value="O" {% if t == 'O' %}selected{% endif %}>O</option>
+                                    <option value="D" {% if t == 'D' %}selected{% endif %}>D</option>
+                                    {% endwith %}
+                                </select>
+                            </td>
+                            <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card card-padded shadow-sm mb-4">
+            <div class="row-between mb-2">
+                <h2 class="text-xl font-semibold">Finance Lines</h2>
+                <button type="button" class="btn btn-sm btn-success" data-add-row="fin">+ Add Finance Line</button>
+            </div>
+            <table class="min-w-full" id="fin-table">
+                <thead><tr>
+                    <th class="text-left p-2">Line Type</th>
+                    <th class="text-left p-2">Amount</th>
+                    <th class="text-left p-2">Notes</th>
+                    <th></th>
+                </tr></thead>
+                <tbody>
+                {% for row in finance_lines %}
+                    <tr data-row="fin" data-idx="{{ forloop.counter0 }}">
+                        <td class="p-1"><input type="text" name="fin-{{ forloop.counter0 }}-line_type" value="{{ row|get_item:'line_type'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="number" step="0.01" name="fin-{{ forloop.counter0 }}-amount" value="{{ row|get_item:'amount'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><input type="text" name="fin-{{ forloop.counter0 }}-notes" value="{{ row|get_item:'notes'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card card-padded shadow-sm mb-4">
+            <h2 class="text-xl font-semibold mb-3">Packaging</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="label block mb-1">Packhouse CAGE</label>
+                    <input type="text" name="pkg-packhouse_cage"
+                           value="{{ packaging|get_item:'packhouse_cage'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Packhouse Supplier (text)</label>
+                    <input type="text" name="pkg-packhouse_supplier_text"
+                           value="{{ packaging|get_item:'packhouse_supplier_text'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Packhouse Supplier ID</label>
+                    <input type="number" name="pkg-packhouse_supplier_id"
+                           value="{{ packaging|get_item:'packhouse_supplier_id'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">Quote Amount</label>
+                    <input type="number" step="0.01" name="pkg-quote_amount"
+                           value="{{ packaging|get_item:'quote_amount'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div class="col-span-2">
+                    <label class="label block mb-1">Notes</label>
+                    <input type="text" name="pkg-notes"
+                           value="{{ packaging|get_item:'notes'|default:'' }}"
+                           class="form-control">
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if draft.contract_type == 'INTERNAL' %}
+        <div class="card card-padded shadow-sm mb-4">
+            <label class="label block mb-1">Internal Notes</label>
+            <textarea name="f_notes" rows="3" class="form-control">{{ data|get_item:'notes'|default:'' }}</textarea>
+        </div>
+        {% endif %}
+
+        {# ---- Action bar ---- #}
+        <div class="d-flex gap-2 my-4">
+            <button type="submit" class="btn btn-primary"
+                    {% if not lock_held_by_user %}disabled{% endif %}>
+                Save
+            </button>
+            <button type="submit"
+                    formaction="{% url 'intake:mark_ready' draft.pk %}"
+                    class="btn btn-success"
+                    {% if not lock_held_by_user %}disabled{% endif %}>
+                Mark Ready for Review
+            </button>
+            <button type="submit"
+                    formaction="{% url 'intake:cancel_draft' draft.pk %}"
+                    class="btn btn-outline-danger"
+                    {% if not lock_held_by_user %}disabled{% endif %}
+                    onclick="return confirm('Cancel this draft? Status becomes Cancelled and your lock is released.')">
+                Cancel Draft
+            </button>
+        </div>
+    </form>
+
+    {% if lock_held_by_user %}
+    <form method="post" action="{% url 'intake:release_draft' draft.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+            Release Lock (return to queue without saving)
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+{# Row templates kept off-DOM so the indexes don't collide with rendered rows. #}
+<template id="tpl-clin">
+    <tr data-row="clin">
+        <td class="p-1"><input type="text" data-name="clin-__IDX__-item_number" class="form-control form-control-sm" style="width:6rem"></td>
+        <td class="p-1">
+            <select data-name="clin-__IDX__-item_type" class="form-select form-select-sm">
+                <option value="">—</option><option>P</option><option>G</option><option>C</option><option>L</option><option>M</option>
+            </select>
+        </td>
+        <td class="p-1"><input type="text" data-name="clin-__IDX__-nsn_text" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="number" data-name="clin-__IDX__-nsn_id" class="form-control form-control-sm" style="width:5rem"></td>
+        <td class="p-1"><input type="text" data-name="clin-__IDX__-supplier_text" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="number" data-name="clin-__IDX__-supplier_id" class="form-control form-control-sm" style="width:5rem"></td>
+        <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-order_qty" class="form-control form-control-sm" style="width:5rem"></td>
+        <td class="p-1"><input type="text" data-name="clin-__IDX__-uom" class="form-control form-control-sm" style="width:4rem"></td>
+        <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-unit_price" class="form-control form-control-sm" style="width:6rem"></td>
+        <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-item_value" class="form-control form-control-sm" style="width:6rem"></td>
+        <td class="p-1"><input type="date" data-name="clin-__IDX__-due_date" class="form-control form-control-sm"></td>
+        <td class="p-1">
+            <select data-name="clin-__IDX__-ia" class="form-select form-select-sm">
+                <option value="">—</option><option>O</option><option>D</option>
+            </select>
+        </td>
+        <td class="p-1">
+            <select data-name="clin-__IDX__-fob" class="form-select form-select-sm">
+                <option value="">—</option><option>O</option><option>D</option>
+            </select>
+        </td>
+        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+    </tr>
+</template>
+<template id="tpl-fin">
+    <tr data-row="fin">
+        <td class="p-1"><input type="text" data-name="fin-__IDX__-line_type" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="number" step="0.01" data-name="fin-__IDX__-amount" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="text" data-name="fin-__IDX__-notes" class="form-control form-control-sm"></td>
+        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+    </tr>
+</template>
+<template id="tpl-nsn">
+    <tr data-row="nsn">
+        <td class="p-1"><input type="text" data-name="nsn-__IDX__-nsn_text" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="number" data-name="nsn-__IDX__-nsn_id" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="text" data-name="nsn-__IDX__-nsn_description" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="text" data-name="nsn-__IDX__-min_order_qty" class="form-control form-control-sm"></td>
+        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+    </tr>
+</template>
+<template id="tpl-supp">
+    <tr data-row="supp">
+        <td class="p-1"><input type="text" data-name="supp-__IDX__-supplier_text" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="number" data-name="supp-__IDX__-supplier_id" class="form-control form-control-sm"></td>
+        <td class="p-1"><input type="text" data-name="supp-__IDX__-cage" class="form-control form-control-sm"></td>
+        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+    </tr>
+</template>
+
+<script>
+(function() {
+    // Per-table row counter — keeps newly added rows from colliding with
+    // server-rendered indexes. We don't care about gaps; the backend just
+    // sorts and reindexes on save.
+    const counters = {clin: 1000, fin: 1000, nsn: 1000, supp: 1000};
+
+    function addRow(prefix) {
+        const tpl = document.getElementById('tpl-' + prefix);
+        const table = document.getElementById(prefix + '-table');
+        if (!tpl || !table) return;
+        const idx = counters[prefix]++;
+        const frag = tpl.content.cloneNode(true);
+        frag.querySelectorAll('[data-name]').forEach(el => {
+            el.name = el.dataset.name.replace('__IDX__', idx);
+            el.removeAttribute('data-name');
+        });
+        const tr = frag.querySelector('tr');
+        tr.dataset.idx = idx;
+        table.querySelector('tbody').appendChild(frag);
+    }
+
+    document.addEventListener('click', function(ev) {
+        const addBtn = ev.target.closest('[data-add-row]');
+        if (addBtn) {
+            ev.preventDefault();
+            addRow(addBtn.dataset.addRow);
+            return;
+        }
+        const rmBtn = ev.target.closest('[data-remove-row]');
+        if (rmBtn) {
+            ev.preventDefault();
+            const tr = rmBtn.closest('tr');
+            if (tr) tr.remove();
+        }
+    });
+})();
+</script>
+{% endblock %}

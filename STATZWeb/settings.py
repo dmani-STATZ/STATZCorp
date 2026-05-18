@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_extensions",
     "processing.apps.ProcessingConfig",
+    "intake.apps.IntakeConfig",
     "training.apps.TrainingConfig",
     "reports.apps.ReportsConfig",
     "suppliers",
