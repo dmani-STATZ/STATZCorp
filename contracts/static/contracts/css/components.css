@@ -747,3 +747,25 @@ html {
     overflow-y: auto;
     flex: 1 1 auto;
 }
+/* Quill dark mode compatibility */
+[data-bs-theme="dark"] .ql-toolbar.ql-snow {
+    background-color: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] .ql-toolbar.ql-snow .ql-stroke {
+    stroke: var(--bs-body-color);
+}
+[data-bs-theme="dark"] .ql-toolbar.ql-snow .ql-fill {
+    fill: var(--bs-body-color);
+}
+[data-bs-theme="dark"] .ql-toolbar.ql-snow .ql-picker {
+    color: var(--bs-body-color);
+}
+[data-bs-theme="dark"] .ql-container.ql-snow {
+    border-color: var(--bs-border-color);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+[data-bs-theme="dark"] .ql-editor.ql-blank::before {
+    color: var(--bs-secondary-color);
+}

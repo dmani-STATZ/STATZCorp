@@ -19,6 +19,7 @@ function poSnippetEditorModal() {
 const POSnippets = (() => {
     let _all = [];
     let _rendered = [];
+    let _quill = null;
 
     const el = () => document.getElementById('poSnippetsOffcanvas');
     const url = (name, id) => {
@@ -40,6 +41,21 @@ const POSnippets = (() => {
             if (k === name) v = decodeURIComponent(val);
         });
         return v;
+    }
+
+    function _initQuill() {
+        if (_quill) return;
+        _quill = new Quill('#snippetEditorQuill', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['clean'],
+                ],
+            },
+            placeholder: 'Paste or type the paragraph text…',
+        });
     }
 
     async function load() {
@@ -130,7 +146,14 @@ const POSnippets = (() => {
     }
 
     function snippetCard(s) {
-        const preview = s.body.length > 160 ? s.body.slice(0, 160) + '…' : s.body;
+        const plainPreview = (s.body || '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const preview = plainPreview.length > 160
+            ? plainPreview.slice(0, 160) + '…'
+            : plainPreview;
+
         return `
         <div class="card mb-2 snippet-card" data-id="${s.id}" style="border-left: 3px solid var(--bs-primary);">
           <div class="card-body py-2 px-3">
@@ -140,16 +163,20 @@ const POSnippets = (() => {
                 <div class="text-muted mt-1" style="font-size:.8rem; white-space:pre-wrap; max-height:60px; overflow:hidden;">${escapeHtml(preview)}</div>
               </div>
               <div class="d-flex gap-1 flex-shrink-0 ms-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary snippet-copy-btn" style="font-size:.75rem; padding:2px 8px;"
-                        data-snippet-id="${s.id}" title="Copy to clipboard">
-                  Copy
+                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem; padding:2px 8px;"
+                        onclick="POSnippets.copyPlain(${s.id})" title="Copy as plain text">
+                  Copy Text
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary snippet-edit-btn" style="font-size:.75rem; padding:2px 8px;"
-                        data-snippet-id="${s.id}" title="Edit">
+                <button class="btn btn-sm btn-outline-primary" style="font-size:.75rem; padding:2px 8px;"
+                        onclick="POSnippets.copyHtml(${s.id})" title="Copy with formatting (paste into Word or Outlook)">
+                  Copy Formatted
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem; padding:2px 8px;"
+                        onclick="POSnippets.openEditor(${s.id})" title="Edit">
                   Edit
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-danger snippet-delete-btn" style="font-size:.75rem; padding:2px 8px;"
-                        data-snippet-id="${s.id}" title="Delete">
+                <button class="btn btn-sm btn-outline-danger" style="font-size:.75rem; padding:2px 8px;"
+                        onclick="POSnippets.deleteSnippet(${s.id})" title="Delete">
                   Del
                 </button>
               </div>
@@ -164,61 +191,102 @@ const POSnippets = (() => {
         return d.innerHTML;
     }
 
-    function copy(id) {
+    function copyPlain(id) {
         const snippet = _all.find(s => s.id === id);
         if (!snippet) return;
-        navigator.clipboard.writeText(snippet.body).then(() => {
-            const btn = document.querySelector(
-                `.snippet-card[data-id="${id}"] .snippet-copy-btn`
-            );
-            if (btn) {
-                const orig = btn.textContent;
-                btn.textContent = '✓ Copied';
-                btn.classList.add('btn-success');
-                btn.classList.remove('btn-outline-secondary');
-                setTimeout(() => {
-                    btn.textContent = orig;
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-secondary');
-                }, 1800);
-            }
+        const tmp = document.createElement('div');
+        tmp.innerHTML = snippet.body || '';
+        const plain = (tmp.textContent || tmp.innerText || '').trim();
+        navigator.clipboard.writeText(plain).then(() => {
+            _flashCopyBtn(id, 'copy-plain', '✓ Copied');
         }).catch(() => {
             alert('Copy failed — your browser may require HTTPS or a permission grant.');
         });
     }
 
+    function copyHtml(id) {
+        const snippet = _all.find(s => s.id === id);
+        if (!snippet) return;
+        const html = snippet.body || '';
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const plain = (tmp.textContent || tmp.innerText || '').trim();
+        const blob = new Blob(
+            [`<html><body>${html}</body></html>`],
+            { type: 'text/html' }
+        );
+        const plainBlob = new Blob([plain], { type: 'text/plain' });
+        const item = new ClipboardItem({
+            'text/html': blob,
+            'text/plain': plainBlob,
+        });
+        navigator.clipboard.write([item]).then(() => {
+            _flashCopyBtn(id, 'copy-html', '✓ Copied');
+        }).catch(() => {
+            navigator.clipboard.writeText(plain).then(() => {
+                _flashCopyBtn(id, 'copy-html', '✓ Copied (text)');
+            });
+        });
+    }
+
+    function _flashCopyBtn(id, btnClass, label) {
+        const card = document.querySelector(`.snippet-card[data-id="${id}"]`);
+        if (!card) return;
+        const btns = card.querySelectorAll('button');
+        const titleMap = {
+            'copy-plain': 'Copy as plain text',
+            'copy-html':  'Copy with formatting (paste into Word or Outlook)',
+        };
+        const btn = [...btns].find(b => b.title === titleMap[btnClass]);
+        if (!btn) return;
+        const orig = btn.textContent;
+        const origClass = btn.className;
+        btn.textContent = label;
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-secondary', 'btn-outline-primary');
+        setTimeout(() => {
+            btn.textContent = orig;
+            btn.className = origClass;
+        }, 1800);
+    }
+
     function openEditor(id) {
-        const modal = poSnippetEditorModal();
-        if (!modal) return;
+        _initQuill();
+        const modal = bootstrap.Modal.getOrCreate(
+            document.getElementById('snippetEditorModal')
+        );
         document.getElementById('snippetEditorId').value = id || '';
+
         if (id) {
             const s = _all.find(x => x.id === id);
             if (!s) return;
             document.getElementById('snippetEditorLabel').textContent = 'Edit Snippet';
             document.getElementById('snippetEditorTitle').value = s.title;
             document.getElementById('snippetEditorCategory').value = s.category || '';
-            document.getElementById('snippetEditorBody').value = s.body;
             document.getElementById('snippetEditorSortOrder').value = s.sort_order;
+            _quill.clipboard.dangerouslyPasteHTML(s.body || '');
         } else {
             document.getElementById('snippetEditorLabel').textContent = 'New Snippet';
             document.getElementById('snippetEditorTitle').value = '';
             document.getElementById('snippetEditorCategory').value = '';
-            document.getElementById('snippetEditorBody').value = '';
             document.getElementById('snippetEditorSortOrder').value = '0';
+            _quill.setContents([]);
         }
         modal.show();
     }
 
     async function saveSnippet() {
         const id = document.getElementById('snippetEditorId').value;
+        const body = _quill ? _quill.root.innerHTML.trim() : '';
         const payload = {
             title:      document.getElementById('snippetEditorTitle').value.trim(),
             category:   document.getElementById('snippetEditorCategory').value.trim(),
-            body:       document.getElementById('snippetEditorBody').value.trim(),
+            body:       body,
             sort_order: parseInt(document.getElementById('snippetEditorSortOrder').value || '0', 10),
         };
 
-        if (!payload.title || !payload.body) {
+        const bodyText = (body || '').replace(/<[^>]+>/g, '').trim();
+        if (!payload.title || !bodyText) {
             alert('Title and snippet text are required.');
             return;
         }
@@ -274,31 +342,8 @@ const POSnippets = (() => {
         if (searchInp) searchInp.addEventListener('input', renderList);
     }
 
-    function wireListDelegation() {
-        const list = document.getElementById('snippetList');
-        if (!list || list.dataset.snippetDelegationBound) return;
-        list.dataset.snippetDelegationBound = '1';
-        list.addEventListener('click', (e) => {
-            const copyBtn = e.target.closest('.snippet-copy-btn');
-            if (copyBtn) {
-                copy(parseInt(copyBtn.dataset.snippetId, 10));
-                return;
-            }
-            const editBtn = e.target.closest('.snippet-edit-btn');
-            if (editBtn) {
-                openEditor(parseInt(editBtn.dataset.snippetId, 10));
-                return;
-            }
-            const delBtn = e.target.closest('.snippet-delete-btn');
-            if (delBtn) {
-                deleteSnippet(parseInt(delBtn.dataset.snippetId, 10));
-            }
-        });
-    }
-
     function init() {
         wireFilters();
-        wireListDelegation();
     }
 
     if (document.readyState === 'loading') {
@@ -307,7 +352,15 @@ const POSnippets = (() => {
         init();
     }
 
-    return { load, copy, openEditor, deleteSnippet, saveSnippet, renderList };
+    return {
+        load,
+        copyPlain,
+        copyHtml,
+        openEditor,
+        deleteSnippet,
+        saveSnippet,
+        renderList,
+    };
 })();
 
 window._snippetRender = () => POSnippets.renderList();
@@ -326,5 +379,3 @@ function openSnippetEditor(id) {
 function saveSnippet() {
     POSnippets.saveSnippet();
 }
-
-

@@ -1,6 +1,11 @@
 {% extends "contracts/contract_base.html" %}
 {% load static %}
 
+{% block extra_head %}
+{{ block.super }}
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 {% include "transactions/transaction_modal.html" %}
 <form id="csrf-form">
@@ -1025,9 +1030,12 @@
           <datalist id="snippetCategoryDatalist"></datalist>
         </div>
         <div class="mb-3">
-          <label for="snippetEditorBody" class="form-label fw-semibold">Snippet Text <span class="text-danger">*</span></label>
-          <textarea id="snippetEditorBody" class="form-control font-monospace" rows="10"
-                    placeholder="Paste or type the paragraph text…"></textarea>
+          <label class="form-label fw-semibold">Snippet Text <span class="text-danger">*</span></label>
+          <!-- Quill toolbar + editor container -->
+          <div id="snippetEditorQuill" style="height: 220px;"></div>
+          <!-- Hidden input carries the HTML value for the save function -->
+          <input type="hidden" id="snippetEditorBody">
+          <div class="form-text">Supports bold, italic, underline, and bullet lists.</div>
         </div>
         <div class="mb-1">
           <label for="snippetEditorSortOrder" class="form-label fw-semibold">Sort Order</label>
@@ -1047,7 +1055,8 @@
 
 {% endblock %}
 {% block extra_js %}
-<script src="{% static 'contracts/js/po_snippets.js' %}?v={{ cache_version }}-po-snippets-2"></script>
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script src="{% static 'contracts/js/po_snippets.js' %}?v={{ cache_version }}-po-snippets-3"></script>
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
 <script>
 // Initialize Bootstrap tooltips on this page (for the Fix Legacy CLINs icon

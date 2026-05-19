@@ -175,11 +175,11 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 
 - **Model:** `POSnippet` (company FK, title, category, body, sort_order). No audit fields — purely utilitarian.
 - **Migration:** `contracts/migrations/0067_add_po_snippet.py`.
-- **Legacy data import (one-time):** `python manage.py import_po_snippets --company-slug <slug> [--dry-run]` reads `STATZ_PO_TEMPLATES_TBL` on the default SQL Server connection and bulk-creates `POSnippet` rows (idempotent on exact title match per company). Imported rows get `category=''` and `sort_order=0` — assign categories/sort order in the PO Templates drawer after import. **Delete** `contracts/management/commands/import_po_snippets.py` once migration is confirmed and remove this bullet.
 - **Views:** `contracts/views/snippet_views.py` — four JSON endpoints (list, create, update, delete), all `@login_required`, company-scoped via `request.active_company`.
 - **URLs** (all under `contracts:` namespace): `po_snippet_list`, `po_snippet_create`, `po_snippet_update`, `po_snippet_delete`.
 - **Access:** Options → PO Templates on `contract_management.html`. Opens a Bootstrap 5 offcanvas (`#poSnippetsOffcanvas`, 680 px wide) without leaving the page.
-- **JS:** `contracts/static/contracts/js/po_snippets.js` — IIFE `POSnippets` module with `load`, `copy`, `openEditor`, `deleteSnippet`, `saveSnippet`, `renderList`. Clipboard uses `navigator.clipboard.writeText`.
+- **Body field:** stores Quill-compatible HTML (bold, italic, underline, lists). Quill **1.3.7** is loaded from CDN on `contract_management.html` only; the editor initializes lazily on first `openEditor` call.
+- **JS:** `contracts/static/contracts/js/po_snippets.js` — IIFE `POSnippets` module with `load`, `copyPlain`, `copyHtml`, `openEditor`, `deleteSnippet`, `saveSnippet`, `renderList`. Card previews strip HTML tags for display. **Copy Text** uses `navigator.clipboard.writeText` (plain); **Copy Formatted** uses `ClipboardItem` with `text/html` and `text/plain` (falls back to plain text if HTML write is blocked).
 - **Category field** is free-text; a `<datalist>` populates from existing categories as the user types. Snippets are grouped by category in the list.
 - **Dark mode:** all colours use `var(--bs-*)` tokens; dark mode styles use `[data-bs-theme="dark"]` attribute selectors only.
 
