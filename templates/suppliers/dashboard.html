@@ -9,7 +9,7 @@
         + Add Supplier
       </a>
     </div>
-    <form class="flex flex-col gap-3">
+    <div class="flex flex-col gap-3">
       <label class="text-medium font-medium text-gray-700 text-center">Search by Supplier Name, CAGE, or Contract #</label>
       <div class="relative max-w-4xl mx-auto w-full">
         <input
@@ -24,7 +24,7 @@
           class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg divide-y divide-gray-100 hidden"
         ></div>
       </div>
-    </form>
+    </div>
   </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -159,7 +159,7 @@
 
 {% block extra_js %}
 <script>
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   const input = document.getElementById('supplier-search');
   const resultsBox = document.getElementById('supplier-results');
   if (!input || !resultsBox) return;
@@ -172,11 +172,15 @@
   }
 
   function renderResults(items) {
+    resultsBox.innerHTML = '';
     if (!items.length) {
-      hideResults();
+      const msg = document.createElement('div');
+      msg.className = 'px-3 py-2 text-sm text-gray-500 italic';
+      msg.textContent = 'No suppliers found.';
+      resultsBox.appendChild(msg);
+      resultsBox.classList.remove('hidden');
       return;
     }
-    resultsBox.innerHTML = '';
     items.forEach(item => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -214,6 +218,6 @@
       hideResults();
     }
   });
-})();
+});
 </script>
 {% endblock %}

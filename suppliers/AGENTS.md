@@ -38,12 +38,14 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 
 ### Before changing views
 - Read `suppliers/views.py` — note which views lack `LoginRequiredMixin` (`DashboardView`, `SupplierDetailView`, `supplier_search_api`).
+- `supplier_search_api` — `Supplier` has no direct `contract` reverse relation. Contract number lookups must traverse `clin__contract__contract_number`. Always include `.distinct()` on any `Supplier` queryset that joins through `Clin` to avoid duplicate rows.
 - Read `contracts/views/supplier_views.py` — this file calls into `suppliers.models` and renders `suppliers/` templates. View changes here affect the supplier edit/create/toggle flows.
 
 ### Before changing templates
 - Read `templates/suppliers/supplier_detail.html` — includes `{% url 'contracts:...' %}` tags for contacts, certifications, classifications, and contract management. Also includes `transactions/transaction_modal.html`.
 - Read `templates/suppliers/includes/address_picker.html` — used in the edit form; references `contracts:address_create` and `suppliers:supplier_edit`.
 - Run a repo-wide grep for `{% url 'suppliers:` before renaming any URL name.
+- The dashboard search input must not be inside a `<form>` tag — doing so will cause the browser to intercept Enter key presses and bypass the JS-driven autocomplete.
 
 ### Before changing URLs
 - Grep the full repo for `'suppliers:supplier_detail'`, `'suppliers:supplier_edit'`, `'suppliers:supplier_enrich_page'`, `'suppliers:supplier_dashboard'` — these names are referenced in: `contracts` templates, `reports` templates, `sales` templates, `base_template.html`, and Python view reverse calls in `contracts/views/`.

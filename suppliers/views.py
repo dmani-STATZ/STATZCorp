@@ -1037,8 +1037,8 @@ def supplier_search_api(request):
         qs = qs.filter(
             Q(name__icontains=term)
             | Q(cage_code__icontains=term)
-            | Q(contract__contract_number__icontains=term)
-        )
+            | Q(clin__contract__contract_number__icontains=term)
+        ).distinct()
     qs = qs.order_by('name')[:15]
     results = [
         {

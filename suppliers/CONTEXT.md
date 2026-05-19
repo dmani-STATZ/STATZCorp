@@ -55,7 +55,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 6. **Helper endpoints** – `supplier_search_api` returns the top 15 matches for dashboard search/autocomplete; `SuppliersInfoByType` serves `/suppliers/info/<type_slug>/` with a paginated list filtered by `supplier_type.description`.
 
 ## 7. Templates and UI Surface Area
-- `templates/suppliers/dashboard.html` – dashboard cards, supplier-type links, and inline JS that hits `/suppliers/search/` (JSON) to redirect to detail pages.
+- `templates/suppliers/dashboard.html` – dashboard cards, supplier-type links, and inline JS that hits `/suppliers/search/` (JSON) to redirect to detail pages. The search input must be wrapped in a `<div>`, not a `<form>` (a form causes Enter to submit and bypass JS autocomplete). The inline script must register on `DOMContentLoaded` before querying `#supplier-search` and `#supplier-results`.
 - `templates/suppliers/supplier_detail.html` – detail layout that loops through `contacts`, `documents`, `certification_rows`, `classification_rows`, and `contracts`; the view also supplies `certification_types`/`classification_types` for dropdowns and `ContentType` IDs for client-side helpers.
 - `templates/suppliers/suppliers_by_type.html` – simple ListView template showing 2 suppliers per page plus `type_label` provided by `SuppliersInfoByType`.
 - `templates/suppliers/supplier_enrich.html` – enrichment console with manual JSON input, AI/model status block, address picker, and inline script (lines ~760–860) that POSTs to `/suppliers/<pk>/apply-enrichment/` and `/suppliers/ai-model/config/`.
@@ -71,7 +71,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 - `SupplierApplyEnrichmentView` expects JSON payloads with `field`/`value`, restricts updates to a hard-coded list (`logo_url`, `primary_phone`, etc.), and treats the special `"address"` field by creating a new `contracts.Address` then wiring it to the selected shipping/billing/physical slots.
 - `SupplierEnrichView` normalizes `manual_only` query params and only calls OpenRouter when an API key is configured; errors (invalid JSON, HTTP failures) become `JsonResponse` errors with appropriate HTTP codes.
 - `global_ai_model_config` POST validates that either `model_name` or `needs_update` is supplied and rejects non-superusers with HTTP 403; the GET response drives the enrichment UI’s status block.
-- `supplier_search_api` reads `q` and filters `name`, `cage_code`, or `contract__contract_number` to keep the dashboard search fast and stateless.
+- `supplier_search_api` reads `q` and filters `name`, `cage_code`, or `clin__contract__contract_number` (the correct ORM traversal — Supplier has no direct `contract` relation, only through `Clin`) with `.distinct()` to prevent duplicate rows when multiple CLINs match.
 
 ## 10. Business Logic and Services
 - `_parse_address_text`, `_normalize_addresses`, and `_normalize_contact_rows` in `views.py` turn verbose OpenRouter/HTML results into structured data for display/persistence.
