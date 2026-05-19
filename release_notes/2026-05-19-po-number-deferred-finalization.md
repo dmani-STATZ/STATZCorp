@@ -1,7 +1,7 @@
 ---
 id: 2026-05-19-po-number-deferred-finalization
 title: PO Number Assignment — Deferred to Finalization
-published: false
+published: true
 publish_date: 2026-05-19
 tags: [improved, contracts]
 critical: false

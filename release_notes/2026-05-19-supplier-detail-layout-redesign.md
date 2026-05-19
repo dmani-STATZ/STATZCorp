@@ -1,7 +1,7 @@
 ---
 id: 2026-05-19-supplier-detail-layout-redesign
 title: Supplier detail page layout redesign
-published: false
+published: true
 publish_date: 2026-05-19
 tags: [improved, contracts]
 critical: false

@@ -208,6 +208,26 @@
             modal.show();
         });
 
+        window.openLogPaymentModal = function(clinId) {
+            resetLogPaymentModal();
+            populateClinDropdown();
+            document.getElementById('lpDate').value =
+                new Date().toISOString().split('T')[0];
+
+            if (clinId) {
+                const select = document.getElementById('lpClinSelect');
+                if (select) {
+                    select.value = String(clinId);
+                    select.dispatchEvent(new Event('change'));
+                }
+            }
+
+            const modal = new bootstrap.Modal(
+                document.getElementById('logPaymentModal')
+            );
+            modal.show();
+        };
+
         document.getElementById('lpClinSelect').addEventListener('change', onClinSelectChange);
 
         document.getElementById('lpNewQty').addEventListener('input', function() {

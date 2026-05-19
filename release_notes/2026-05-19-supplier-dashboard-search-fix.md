@@ -1,7 +1,7 @@
 ---
 id: 2026-05-19-supplier-dashboard-search-fix
 title: Supplier Dashboard — Live search fix
-published: false
+published: true
 publish_date: 2026-05-19
 tags: [fixed, contracts]
 critical: false

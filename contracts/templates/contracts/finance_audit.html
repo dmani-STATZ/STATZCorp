@@ -399,6 +399,11 @@
                                       data-value="{{ clin.paid_amount|floatformat:2 }}">
                                     ${{ clin.paid_amount|floatformat:2|intcomma }}
                                 </span>
+                                {% if clin.has_shipments %}
+                                <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
+                                    log via shipment
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="text-end">
                                 <span class="value-cell {% if clin.has_shipments %}has-shipments{% endif %}"
@@ -429,6 +434,11 @@
                                       data-value="{{ clin.wawf_payment|floatformat:2 }}">
                                     ${{ clin.wawf_payment|floatformat:2|intcomma }}
                                 </span>
+                                {% if clin.has_shipments %}
+                                <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
+                                    log via shipment
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="text-end fw-semibold {% if clin.adjusted_gross > 0 %}text-success{% elif clin.adjusted_gross < 0 %}text-danger{% endif %}"
                                 data-adj-gross-clin="{{ clin.id }}">
@@ -1441,6 +1451,12 @@ window.financeShipmentsByClin = {
         cell.addEventListener('click', function() {
             const clinId = this.dataset.clin;
             const fieldType = this.dataset.type;
+            if (fieldType === 'paid_amount' || fieldType === 'wawf_payment') {
+                if (typeof window.openLogPaymentModal === 'function') {
+                    window.openLogPaymentModal(clinId);
+                }
+                return;
+            }
             const currentValue = this.dataset.value || '0.00';
             if (typeof openPaymentHistoryPopup === 'function') {
                 openPaymentHistoryPopup('clin', clinId, fieldType, 'finance_audit', currentValue);

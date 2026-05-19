@@ -1,7 +1,7 @@
 ---
 id: 2026-05-19-po-snippet-library
 title: PO Snippet Library
-published: false
+published: true
 publish_date: 2026-05-19
 tags: [new, contracts]
 critical: false
