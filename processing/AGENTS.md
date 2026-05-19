@@ -186,6 +186,8 @@ defeat the supplier-matching prefill flow.
 ### Sequence numbers:
 `SequenceNumber` is local to `processing` but the PO/Tab numbers it generates are stored permanently in `contracts.Contract` and `contracts.Clin`. Resetting or corrupting `SequenceNumber` will cause duplicate PO/Tab assignments.
 
+> **PO numbers are assigned at finalization only.** `ProcessContract.po_number` and `ProcessClin.clin_po_num`/`po_number` are intentionally `None` during staging. Do not add code that assigns or advances `po_number` during contract creation (`start_processing`, `start_new_contract`, or any future creation path). The only correct place to call `SequenceNumber.advance_po_number()` is inside `finalize_and_email_contract`, immediately before `Contract.objects.create()`.
+
 ---
 
 ## 7. Security / Permissions Rules

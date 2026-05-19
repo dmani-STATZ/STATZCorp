@@ -607,7 +607,7 @@ class Clin(AuditModel):
         ('C', 'CFAT'),
         ('L', 'PLT'),
         ('M', 'Miscellaneous'),
-        ('Q', 'QN'),
+        ('Q', 'QN / PQDR'),
         ('D', 'PQDR'),
     ]
 

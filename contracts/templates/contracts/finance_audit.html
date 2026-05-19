@@ -20,7 +20,7 @@
     window.recalcSplitsUrl = "{% url 'contracts:recalc_splits' contract.id %}";
     </script>
     {# Section A — Contract header bar #}
-    <div class="finance-audit-header-bar rounded-top px-3 py-3 mb-3">
+    <div class="finance-audit-header-bar finance-audit-header-bar--{% if contract.status.description == 'Closed' %}closed{% elif contract.status.description == 'Canceled' %}canceled{% else %}open{% endif %} rounded-top px-3 py-3 mb-3">
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
             <div class="flex-grow-1 min-w-0">
                 <div class="fs-4 fw-bold text-body">{{ contract.contract_number }}</div>
@@ -36,7 +36,13 @@
                     {{ contract.contract_type|default:"—" }}
                 </div>
             </div>
-            <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+            <div class="d-flex flex-wrap gap-2 flex-shrink-0 align-items-center">
+                <span class="status-pill status-pill--{% if contract.status.description == 'Open' %}open{% elif contract.status.description == 'Closed' %}closed{% else %}canceled{% endif %}">
+                    {{ contract.status.description|default:"Unknown" }}
+                </span>
+                {% if contract.status.description == "Open" %}
+                <a href="{% url 'contracts:contract_close' contract.pk %}" class="btn btn-sm btn-outline-danger">Close Contract</a>
+                {% endif %}
                 <button type="button" class="action-btn" onclick="openDocumentsBrowser({{ contract.id }})">Documents</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-open-notes">Notes</button>
                 <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-sm btn-primary">Back to Contract</a>
@@ -674,11 +680,11 @@
                         {% endfor %}
                         {% if clins %}
                     <tbody>
-                        <tr class="table-secondary fw-semibold small">
+                        <tr class="table-secondary fw-semibold small" data-totals-row="true">
                             <td colspan="7" class="text-end pe-2">Totals</td>
-                            <td class="text-end">${{ clin_totals.quote_value|floatformat:2|intcomma }}</td>
-                            <td class="text-end">${{ clin_totals.paid_amount|floatformat:2|intcomma }}</td>
-                            <td class="text-end fw-semibold">
+                            <td class="text-end" data-totals-field="quote_value">${{ clin_totals.quote_value|floatformat:2|intcomma }}</td>
+                            <td class="text-end" data-totals-field="paid_amount">${{ clin_totals.paid_amount|floatformat:2|intcomma }}</td>
+                            <td class="text-end fw-semibold" data-totals-field="item_value">
                                 ${{ clin_totals.item_value|floatformat:2 }}
                                 {% if not contract_value_balanced %}
                                 <div class="small text-warning">
@@ -686,8 +692,8 @@
                                 </div>
                                 {% endif %}
                             </td>
-                            <td class="text-end">${{ clin_totals.wawf_payment|floatformat:2|intcomma }}</td>
-                            <td class="text-end {% if clin_totals.adj_gross > 0 %}text-success{% elif clin_totals.adj_gross < 0 %}text-danger{% endif %}">
+                            <td class="text-end" data-totals-field="wawf_payment">${{ clin_totals.wawf_payment|floatformat:2|intcomma }}</td>
+                            <td class="text-end fw-semibold {% if clin_totals.adj_gross > 0 %}text-success{% elif clin_totals.adj_gross < 0 %}text-danger{% endif %}" data-totals-field="adj_gross">
                                 ${{ clin_totals.adj_gross|floatformat:2|intcomma }}
                             </td>
                             <td></td>
@@ -1095,6 +1101,11 @@ function refreshPartialSubtotals(clinId) {
         if (field === 'item_value') cell.textContent = `$${totalItem.toFixed(2)}`;
         if (field === 'wawf_payment') cell.textContent = `$${totalWawf.toFixed(2)}`;
     });
+
+    setTimeout(() => {
+        refreshClinRow(clinId);
+        refreshContractSummary();
+    }, 200);
 }
 
 function refreshContractSummary() {
@@ -1119,19 +1130,29 @@ function refreshContractSummary() {
                 adjGrossEl.textContent = `$${parseFloat(data.adj_gross_contract).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
 
-            const totalsRow = document.querySelector('tr.table-secondary.fw-semibold.small');
+            const totalsRow = document.querySelector('tr[data-totals-row="true"]');
             if (totalsRow) {
-                const cells = totalsRow.querySelectorAll('td');
-                if (cells.length >= 5) {
-                    cells[1].textContent = `$${parseFloat(data.clin_totals.quote_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    cells[2].textContent = `$${parseFloat(data.clin_totals.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    cells[3].textContent = `$${parseFloat(data.clin_totals.item_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    cells[4].textContent = `$${parseFloat(data.clin_totals.wawf_payment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    if (cells[5]) {
-                        const adjGross = parseFloat(data.clin_totals.adj_gross);
-                        cells[5].textContent = `$${adjGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                        cells[5].className = adjGross > 0 ? 'text-end' : adjGross < 0 ? 'text-end text-danger' : 'text-end';
-                    }
+                const fmt = v => `$${parseFloat(v).toLocaleString('en-US',
+                    { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                const qv = totalsRow.querySelector('[data-totals-field="quote_value"]');
+                const pa = totalsRow.querySelector('[data-totals-field="paid_amount"]');
+                const iv = totalsRow.querySelector('[data-totals-field="item_value"]');
+                const wp = totalsRow.querySelector('[data-totals-field="wawf_payment"]');
+                const ag = totalsRow.querySelector('[data-totals-field="adj_gross"]');
+
+                if (qv) qv.textContent = fmt(data.clin_totals.quote_value);
+                if (pa) pa.textContent = fmt(data.clin_totals.paid_amount);
+                if (iv) iv.textContent = fmt(data.clin_totals.item_value);
+                if (wp) wp.textContent = fmt(data.clin_totals.wawf_payment);
+                if (ag) {
+                    const adjGross = parseFloat(data.clin_totals.adj_gross);
+                    ag.textContent = fmt(adjGross);
+                    ag.className = adjGross > 0
+                        ? 'text-end fw-semibold text-success'
+                        : adjGross < 0
+                            ? 'text-end fw-semibold text-danger'
+                            : 'text-end fw-semibold';
                 }
             }
 
@@ -1139,6 +1160,7 @@ function refreshContractSummary() {
             if (paymentCountEl) {
                 paymentCountEl.textContent = `· ${data.payment_activity_total} total`;
             }
+            // TODO: reload payment activity list (summary API returns count only, not rollup HTML)
         })
         .catch(e => console.error('Summary refresh failed:', e));
 }

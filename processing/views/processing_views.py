@@ -130,12 +130,6 @@ def start_new_contract(request):
                 'error': 'Contract number already exists'
             }, status=400)
 
-        #Get next po_number and tab_num from the sequence table
-        new_po_number = SequenceNumber.get_po_number()
-        new_tab_number = SequenceNumber.get_tab_number()
-        #print(f"Pulled new PO and Tab numbers: {new_po_number} and {new_tab_number}")
-
-
         #step 1: create a new queue contract in the database
         queue_contract = QueueContract.objects.create(
             contract_number=contract_number,
@@ -155,8 +149,8 @@ def start_new_contract(request):
         process_contract = ProcessContract.objects.create(
             queue_id=queue_contract.id,
             contract_number=contract_number,
-            po_number=new_po_number,
-            tab_num=new_tab_number,
+            po_number=None,
+            tab_num=None,
             status='in_progress',
             files_url=r'\\STATZFS01\public\CJ_Data\data\V87\aFed-DOD\Contract ' + contract_number,
             sales_class=_get_default_sales_class(),
@@ -171,8 +165,8 @@ def start_new_contract(request):
 
             item_number='0001',
             item_type='P',  # Changed back to 'P' as it's likely an enum/choice field
-            tab_num=new_tab_number,
-            clin_po_num=new_po_number,
+            tab_num=None,
+            clin_po_num=None,
             status='in_progress',
             created_at=timezone.now(),
             modified_at=timezone.now()
@@ -217,11 +211,6 @@ def start_processing(request, queue_id):
                 'error': 'This contract is already being processed by another user'
             })
         
-        new_po_number = SequenceNumber.get_po_number()
-        new_tab_number = SequenceNumber.get_tab_number()
-        SequenceNumber.advance_po_number()
-        SequenceNumber.advance_tab_number()
-
         # Attempt to auto-match IDIQ from queue hint
         matched_idiq = None
         if queue_item.idiq_number:
@@ -240,8 +229,8 @@ def start_processing(request, queue_id):
             award_date=queue_item.award_date,
             due_date=queue_item.due_date,
             contract_value=queue_item.contract_value,
-            po_number=new_po_number,
-            tab_num=new_tab_number,
+            po_number=None,
+            tab_num=None,
             status='in_progress',
             queue_id=queue_id,
             description=queue_item.description,
@@ -274,9 +263,9 @@ def start_processing(request, queue_id):
                     fob=clin_data.fob if hasattr(clin_data, 'fob') else None,
                     due_date=clin_data.due_date if hasattr(clin_data, 'due_date') else None,
                     po_num_ext=clin_data.po_num_ext if hasattr(clin_data, 'po_num_ext') else None,
-                    tab_num=new_tab_number,
-                    clin_po_num=new_po_number,
-                    po_number=new_po_number,
+                    tab_num=None,
+                    clin_po_num=None,
+                    po_number=None,
                     uom=clin_data.uom if clin_data.uom else None,
                     clin_type_text=clin_data.clin_type if hasattr(clin_data, 'clin_type') else None,
                     supplier_due_date=clin_data.supplier_due_date if hasattr(clin_data, 'supplier_due_date') else None,
@@ -1319,17 +1308,18 @@ def finalize_and_email_contract(request, process_contract_id):
             }, status=400)
 
 
-        # Update sequence numbers if necessary
-        po_number_current = SequenceNumber.get_po_number()
-        tab_number_current = SequenceNumber.get_tab_number()
+        # Mint the PO number at finalization — this is the only place a PO number
+        # is ever assigned. ProcessContract.po_number is null during staging by design.
+        finalized_po_number = SequenceNumber.advance_po_number()
+        process_contract.po_number = finalized_po_number
+        process_contract.save(update_fields=['po_number'])
 
-        if po_number_current == int(process_contract.po_number):
-            SequenceNumber.advance_po_number()
-
-        # For Tab number: Ensure sequence is at least one more than the contract's number
-        if tab_number_current == int(process_contract.tab_num):
-            SequenceNumber.advance_tab_number()
-
+        # Assign the minted PO number to all ProcessClin records before
+        # canonical Clin rows are created from them below.
+        process_contract.clins.all().update(
+            clin_po_num=finalized_po_number,
+            po_number=finalized_po_number,
+        )
 
         # Create the final contract with all relevant fields
         contract = Contract.objects.create(

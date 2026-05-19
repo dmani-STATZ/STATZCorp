@@ -1053,9 +1053,15 @@ textarea {
     border-left: 4px solid var(--bs-success);
 }
 .contract-status-closed {
-    background-color: var(--bs-secondary-bg-subtle);
-    color: var(--bs-secondary-text-emphasis);
-    border-left: 4px solid var(--bs-secondary);
+    background-color: rgba(111, 66, 193, 0.08);
+    color: #4a235a;
+    border-left: 4px solid rgba(111, 66, 193, 0.45);
+}
+
+[data-bs-theme="dark"] .contract-status-closed {
+    background-color: rgba(180, 140, 255, 0.10);
+    color: #ce9eff;
+    border-left: 4px solid rgba(180, 140, 255, 0.35);
 }
 .contract-status-cancelled {
     background-color: var(--bs-danger-bg-subtle);

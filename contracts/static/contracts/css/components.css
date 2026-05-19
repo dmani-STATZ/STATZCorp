@@ -10,8 +10,29 @@
 }
 
 .finance-audit-header-bar {
+    /* base — open contract (green) */
     background-color: rgba(25, 135, 84, 0.12);
     border-bottom: 1px solid rgba(25, 135, 84, 0.25);
+}
+
+.finance-audit-header-bar--closed {
+    background-color: rgba(111, 66, 193, 0.08);
+    border-bottom: 1px solid rgba(111, 66, 193, 0.30);
+}
+
+.finance-audit-header-bar--canceled {
+    background-color: rgba(220, 53, 69, 0.08);
+    border-bottom: 1px solid rgba(220, 53, 69, 0.25);
+}
+
+[data-bs-theme="dark"] .finance-audit-header-bar--closed {
+    background-color: rgba(180, 140, 255, 0.10);
+    border-bottom: 1px solid rgba(180, 140, 255, 0.25);
+}
+
+[data-bs-theme="dark"] .finance-audit-header-bar--canceled {
+    background-color: rgba(255, 138, 128, 0.10);
+    border-bottom: 1px solid rgba(255, 138, 128, 0.20);
 }
 
 .finance-audit-stat-card {
@@ -645,8 +666,8 @@ html {
 }
 
 .status-pill--closed {
-    background-color: #eceff1;
-    color: #546E7A;
+    background-color: rgba(111, 66, 193, 0.10);
+    color: #4a235a;
 }
 
 .status-pill--canceled {
@@ -666,8 +687,8 @@ html {
 }
 
 [data-bs-theme="dark"] .status-pill--closed {
-    background-color: rgba(176, 190, 197, 0.12);
-    color: #B0BEC5;
+    background-color: rgba(180, 140, 255, 0.15);
+    color: #ce9eff;
 }
 
 [data-bs-theme="dark"] .status-pill--canceled {
