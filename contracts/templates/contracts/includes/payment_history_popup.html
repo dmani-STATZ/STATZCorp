@@ -273,8 +273,11 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                 const formattedTotal = formatCurrency(data.total);
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedTotal}`;
 
-                // Update the main form field
-                if (typeof window.updateCellValue === 'function') {
+                // Sync main form/clin display when history loads. Packaging reloads the
+                // Finance Audit page only via updateCellValue after save/delete (see
+                // finance_audit.html packaging override), not when opening the popup.
+                const entityTypeForSync = document.getElementById('paymentHistoryPopup').dataset.entityType;
+                if (typeof window.updateCellValue === 'function' && entityTypeForSync !== 'contract_packaging') {
                     window.updateCellValue(entityId, paymentType, data.total);
                 }
             } else {
@@ -325,4 +328,29 @@ function formatDate(dateString) {
     const [year, month, day] = dateString.split('T')[0].split('-');
     return `${parseInt(month)}/${parseInt(day)}/${year}`;
 }
+
+// Outside-click close: register on the next tick so the same click that opened the
+// popup (e.g. packaging Q/Pd on Finance Audit) does not bubble here and close it.
+setTimeout(function() {
+    if (window.__paymentHistoryOutsideClickBound) {
+        return;
+    }
+    window.__paymentHistoryOutsideClickBound = true;
+    document.addEventListener('click', function(e) {
+        const popup = document.getElementById('paymentHistoryPopup');
+        if (!popup || popup.classList.contains('hidden')) {
+            return;
+        }
+        if (popup.contains(e.target)) {
+            return;
+        }
+        if (e.target.closest('[onclick*="openPaymentHistoryPopup"]')) {
+            return;
+        }
+        if (e.target.closest('[data-clin][data-type], .partial-value-cell')) {
+            return;
+        }
+        closePaymentHistoryPopup();
+    });
+}, 0);
 </script>

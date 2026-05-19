@@ -244,12 +244,12 @@
                     <span class="ms-auto d-flex gap-3 align-items-center">
                         <button type="button"
                                 class="btn btn-link p-0 text-danger small fw-semibold"
-                                onclick="openPaymentHistoryPopup('contract_packaging', '{{ packaging.id }}', 'packaging_quote', 'finance_audit', {{ packaging.quote_amount|default:'0' }})">
+                                onclick="event.stopPropagation(); openPaymentHistoryPopup('contract_packaging', '{{ packaging.id }}', 'packaging_quote', 'finance_audit', {{ packaging.quote_amount|default:'0' }})">
                             Q: {% if packaging.quote_amount %}-${{ packaging.quote_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
                         </button>
                         <button type="button"
                                 class="btn btn-link p-0 text-danger small fw-semibold"
-                                onclick="openPaymentHistoryPopup('contract_packaging', '{{ packaging.id }}', 'packaging_paid', 'finance_audit', {{ packaging.amount_paid|default:'0' }})">
+                                onclick="event.stopPropagation(); openPaymentHistoryPopup('contract_packaging', '{{ packaging.id }}', 'packaging_paid', 'finance_audit', {{ packaging.amount_paid|default:'0' }})">
                             Pd: {% if packaging.amount_paid %}-${{ packaging.amount_paid|floatformat:2|intcomma }}{% else %}—{% endif %}
                         </button>
                     </span>
