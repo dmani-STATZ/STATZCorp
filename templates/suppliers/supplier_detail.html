@@ -1,6 +1,7 @@
 {% extends "contracts/contract_base.html" %}
 {% load humanize %}
 {% block title %}Supplier Detail{% endblock %}
+{% block body_class %}supplier-detail-page{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -13,6 +14,30 @@
     gap: 0.05rem 1rem;
     font-size: 0.73rem;
 }
+
+.supplier-detail-page main > div.mx-auto { width: 100% !important; max-width: none !important; padding: 0 !important; }
+.supplier-detail-layout { display: flex; align-items: flex-start; min-height: calc(100vh - var(--header-height, 60px)); }
+.supplier-detail-sidebar { width: 220px; flex-shrink: 0; position: sticky; top: var(--header-height, 60px); height: calc(100vh - var(--header-height, 60px)); overflow-y: auto; background-color: var(--company-primary); color: var(--company-secondary); z-index: 100; }
+.supplier-detail-sidebar-inner { padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.supplier-sidebar-current-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.85; }
+.supplier-sidebar-current-name { font-size: 0.85rem; font-weight: 600; line-height: 1.3; word-break: break-word; }
+.supplier-sidebar-search-wrap { position: relative; }
+#sidebar-supplier-results { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; max-height: 280px; overflow-y: auto; background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); border-radius: 0.375rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+#sidebar-supplier-results.d-none { display: none !important; }
+#sidebar-supplier-results a { display: block; padding: 0.5rem 0.75rem; font-size: 0.8125rem; color: var(--bs-body-color) !important; text-decoration: none; border-bottom: 1px solid var(--bs-border-color-translucent); }
+#sidebar-supplier-results a:hover { background: var(--bs-tertiary-bg); }
+.supplier-sidebar-nav { display: flex; flex-direction: column; gap: 0.15rem; }
+.supplier-sidebar-nav a { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 0.375rem; font-size: 0.8125rem; color: var(--company-secondary) !important; text-decoration: none; }
+.supplier-sidebar-nav a:hover { background: rgba(255,255,255,0.12); }
+.supplier-sidebar-nav a.sidebar-nav-active { background: #fff; color: var(--company-primary) !important; font-weight: 600; }
+.supplier-sidebar-nav .badge { font-size: 0.65rem; }
+.supplier-detail-main { flex: 1; min-width: 0; padding: 1.25rem 1.5rem 2rem; overflow-y: auto; max-height: calc(100vh - var(--header-height, 60px)); display: flex; flex-direction: column; }
+.supplier-detail-main section { scroll-margin-top: 1rem; margin-bottom: 1.5rem; }
+.supplier-status-banner { border-radius: 0.375rem; padding: 0.65rem 1rem; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; }
+.supplier-status-banner-probation { background: var(--bs-danger); color: #fff; }
+.supplier-status-banner-conditional { background: var(--bs-warning); color: var(--bs-dark); }
+.supplier-status-banner-archived { background: var(--bs-secondary); color: #fff; }
+
 .supplier-header-divider {
     width: 1px;
     background: var(--bs-border-color, #dee2e6);
@@ -23,11 +48,43 @@
 {% endblock extra_head %}
 
 {% block contract_content %}
-<div class="max-w-screen-xl mx-auto px-4 pt-6 pb-10 space-y-6">
-  <!-- Supplier header: identity | health | actions (md+ horizontal) -->
-  <div class="card card-padded {% if supplier.probation %}border-danger bg-danger-subtle{% elif supplier.conditional %}border-warning bg-warning-subtle{% endif %}">
-    <div class="d-flex flex-column flex-md-row gap-3 gap-md-4 align-items-stretch">
 
+
+<div class="supplier-detail-layout">
+<aside class="supplier-detail-sidebar" aria-label="Supplier section navigation">
+  <div class="supplier-detail-sidebar-inner">
+    <div>
+      <p class="supplier-sidebar-current-label mb-1">Viewing</p>
+      <p class="supplier-sidebar-current-name mb-2">{{ supplier.name|default:"Supplier" }}</p>
+      <div class="supplier-sidebar-search-wrap">
+        <input type="search" id="sidebar-supplier-search" class="form-control form-control-sm" placeholder="Jump to supplier…" autocomplete="off">
+        <div id="sidebar-supplier-results" class="d-none" role="listbox"></div>
+      </div>
+    </div>
+    <nav class="supplier-sidebar-nav" id="supplier-detail-nav">
+      <a href="#section-overview" class="supplier-nav-link" data-section="section-overview">Overview</a>
+      <a href="#section-compliance" class="supplier-nav-link" data-section="section-compliance">Compliance &amp; Status</a>
+      <a href="#section-contacts" class="supplier-nav-link" data-section="section-contacts"><span>Contacts</span><span class="badge rounded-pill bg-light text-dark">{{ contacts|length }}</span></a>
+      <a href="#section-addresses" class="supplier-nav-link" data-section="section-addresses">Addresses</a>
+      <a href="#section-contracts" class="supplier-nav-link" data-section="section-contracts"><span>Contracts</span><span class="badge rounded-pill bg-light text-dark">{{ contracts|length }}</span></a>
+      <a href="#section-certs" class="supplier-nav-link" data-section="section-certs"><span>Certifications &amp; Classifications</span><span class="badge rounded-pill bg-light text-dark">{{ certification_rows|length }}</span></a>
+      <a href="#section-files" class="supplier-nav-link" data-section="section-files"><span>Files &amp; Documents</span><span class="badge rounded-pill bg-light text-dark">{{ documents|length }}</span></a>
+      <a href="#section-notes" class="supplier-nav-link" data-section="section-notes">Notes</a>
+    </nav>
+  </div>
+</aside>
+<div class="supplier-detail-main">
+
+<section id="section-overview">
+{% if supplier.probation or supplier.conditional or supplier.archived %}
+<div class="mb-2">
+{% if supplier.probation %}<div class="supplier-status-banner supplier-status-banner-probation">&#9888; This supplier is currently on Probation</div>{% endif %}
+{% if supplier.conditional %}<div class="supplier-status-banner supplier-status-banner-conditional">&#9888; This supplier has Conditional status</div>{% endif %}
+{% if supplier.archived %}<div class="supplier-status-banner supplier-status-banner-archived">This supplier is Archived</div>{% endif %}
+</div>
+{% endif %}
+<div class="card card-padded shadow-sm mb-3">
+  <div class="d-flex flex-wrap gap-3 align-items-start justify-content-between">
       <!-- Column 1 — Supplier identity -->
       <div class="d-flex gap-3 align-items-start flex-shrink-0">
         {% if supplier.logo_url %}
@@ -55,7 +112,7 @@
             </span>
             <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 border gap-1">
               <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'allows_gsi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">GSI:</button>
-              <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
+              <span>{{ supplier.get_allows_gsi_display|default:"—" }}</span>
             </span>
           </div>
           <div class="flex flex-wrap gap-3 mt-1 text-sm text-gray-700">
@@ -70,59 +127,6 @@
         </div>
       </div>
 
-      <div class="supplier-header-divider d-none d-md-block align-self-stretch flex-shrink-0"></div>
-
-      <!-- Column 2 — Health gauge + stats + toggle -->
-      <div class="flex-grow-1 d-flex flex-wrap align-items-start gap-3 justify-content-md-center" style="min-width: 0;">
-      {% if health_score.contract_count > 0 %}
-      <div class="d-flex flex-row flex-nowrap align-items-start gap-4">
-      <!-- Mini gauge (left) -->
-      <div class="text-center flex-shrink-0" style="width: 200px;">
-        <svg viewBox="0 0 200 110" width="200" height="110" aria-hidden="true">
-          <path d="M 20,100 A 80,80 0 0,1 60.36,26.36" fill="none" stroke="#198754" stroke-width="18" stroke-linecap="butt"/>
-          <path d="M 60.36,26.36 A 80,80 0 0,1 139.64,26.36" fill="none" stroke="#ffc107" stroke-width="18" stroke-linecap="butt"/>
-          <path d="M 139.64,26.36 A 80,80 0 0,1 180,100" fill="none" stroke="#dc3545" stroke-width="18" stroke-linecap="butt"/>
-          {% if health_score.band %}
-          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round"
-            transform="rotate({% if health_score.band == 'green' %}-60{% elif health_score.band == 'amber' %}0{% else %}60{% endif %}, 100, 100)"/>
-          {% else %}
-          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round" style="display:none"/>
-          {% endif %}
-          <circle cx="100" cy="100" r="5" fill="#333"/>
-        </svg>
-        <div id="hs-band-label" class="fw-bold small {% if health_score.band == 'green' %}text-success{% elif health_score.band == 'amber' %}text-warning{% elif health_score.band == 'red' %}text-danger{% else %}text-muted{% endif %}">
-          {% if health_score.band %}{{ health_score.band|capfirst }}{% else %}No Data{% endif %}
-        </div>
-      </div>
-
-      <!-- Stats breakdown + warning + toggle (right) -->
-      <div class="d-flex flex-column flex-grow-1 min-w-0" style="min-height: 110px;">
-        <div class="hs-stats-grid text-muted mb-2">
-          <div>Contracts: <span id="hs-contract-count" class="text-body fw-medium">{{ health_score.contract_count }}</span> <span style="font-size:0.65rem;">({{ health_score.window_label }})</span></div>
-          <div>Notes: <span id="hs-note-count" class="text-body fw-medium">{{ health_score.note_count }}</span></div>
-          <div>Avg margin: <span id="hs-avg-margin" class="text-body fw-medium">${{ health_score.avg_margin_per_contract|floatformat:2 }}</span></div>
-          <div>Gov actions: <span id="hs-gov-count" class="text-body fw-medium">{{ health_score.gov_action_count }}</span></div>
-          <div>Avg friction: <span id="hs-avg-friction" class="text-body fw-medium">{{ health_score.avg_friction_per_contract|floatformat:1 }}</span> pts</div>
-          <div>Ship. corrns: <span id="hs-ship-count" class="text-body fw-medium">{{ health_score.shipment_correction_count }}</span></div>
-          <div></div>
-          <div>Payments: <span id="hs-pay-count" class="text-body fw-medium">{{ health_score.payment_history_count }}</span></div>
-        </div>
-        <div class="flex-shrink-0" style="min-height: 1.5rem;">
-          <div id="hs-fallback-warning" class="text-warning mb-1" style="font-size:0.7rem;{% if not health_score.using_fallback %}display:none;{% endif %}">
-            &#9888; &lt;5 contracts in 24 months — all-time data
-          </div>
-        </div>
-        <button id="hs-toggle-btn" type="button" class="btn btn-outline-secondary align-self-start" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
-          Switch to {{ health_score_alternate.window_label }}
-        </button>
-      </div>
-      </div>
-      {% else %}
-      <div class="text-muted small flex-shrink-0 align-self-center">No contract history.</div>
-      {% endif %}
-      </div>
-
-      <div class="supplier-header-divider d-none d-md-block align-self-stretch flex-shrink-0"></div>
 
       <!-- Column 3 — Back, status, Edit (md+ right-aligned) -->
       <div class="d-flex flex-column gap-2 flex-shrink-0 align-items-start align-items-md-end text-md-end">
@@ -130,81 +134,38 @@
           <a href="{% url 'suppliers:supplier_dashboard' %}" class="text-sm">&larr; Back to Dashboard</a>
           <div class="h-5 w-5 rounded-full border-2 {% if supplier.archived %}bg-red-500 border-red-600{% else %}bg-green-500 border-green-600{% endif %}" title="{% if supplier.archived %}Archived{% else %}Active{% endif %}"></div>
         </div>
-        <a href="{% url 'suppliers:supplier_edit' supplier.pk %}" class="btn btn-sm btn-outline-secondary">Edit Supplier</a>
-        {% if supplier.website_url %}
+{% if supplier.website_url %}
           <a id="enrich-from-website-btn" data-supplier-id="{{ supplier.id }}"
              href="{% url 'suppliers:supplier_enrich_page' supplier.id %}"
              class="btn btn-sm btn-outline-success">Enrich from website</a>
         {% endif %}
       </div>
 
-    </div>
-  </div>
 
-  <!-- Status / Notes -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-    <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">Status Flags</h2>
-      <ul class="space-y-2 text-sm text-gray-800">
-        <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'probation')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Probation:</button>
-          <span id="supplier-probation-value">{% if supplier.probation %}<span class="text-red-600 font-semibold">Yes</span> ({{ supplier.probation_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
-        </li>
-        <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'conditional')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Conditional:</button>
-          <span id="supplier-conditional-value">{% if supplier.conditional %}<span class="text-orange-600 font-semibold">Yes</span> ({{ supplier.conditional_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
-        </li>
-        <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'archived')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Archived:</button>
-          <span id="supplier-archived-value">{% if supplier.archived %}<span class="text-gray-700 font-semibold">Yes</span> ({{ supplier.archived_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
-        </li>
-      </ul>
-    </div>
-    <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">Compliance</h2>
-      <ul class="space-y-2 text-sm text-gray-800">
-        <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'iso')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">ISO:</button>
-          <span id="supplier-iso-value">{% if supplier.iso %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</span>
-        </li>
-        <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'ppi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">PPI:</button>
-          <span id="supplier-ppi-value">{% if supplier.ppi %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</span>
-        </li>
-        <li>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'special_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Terms:</button>
-          <span id="supplier-special-terms-value">{{ supplier.special_terms|default:"—" }}</span>
-        </li>
-        <li>
-          <span class="text-gray-600">Supplier Type:</span>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'supplier_type')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
-            <span id="supplier-supplier-type-value">{% if supplier.supplier_type %}{{ supplier.supplier_type.description }}{% else %}—{% endif %}</span>
-          </button>
-        </li>
-        <li>
-          <span class="text-gray-600">Prime:</span>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'prime')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
-            <span id="supplier-prime-value">{{ supplier.prime|default:"—" }}</span>
-          </button>
-        </li>
-        <li>
-          <span class="text-gray-600">Packhouse:</span>
-          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'is_packhouse')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
-            <span id="supplier-is-packhouse-value">{{ supplier.is_packhouse|yesno:"Yes,No,—" }}</span>
-          </button>
-        </li>
-      </ul>
-    </div>
-    <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">Notes</h2>
-      {% if supplier.notes %}
-        <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
-      {% else %}
-        <p class="text-sm text-gray-500">No notes provided.</p>
-      {% endif %}
-    </div>
-    <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">Contact &amp; Web</h2>
+  </div>
+  <ul class="list-unstyled small mb-0 mt-3 pt-3 border-top">
+    <li class="mb-1">
+      <span class="text-muted">Supplier Type:</span>
+      <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'supplier_type')" class="btn btn-link p-0 text-start text-decoration-none border-0 shadow-none">
+        <span id="supplier-supplier-type-value">{% if supplier.supplier_type %}{{ supplier.supplier_type.description }}{% else %}—{% endif %}</span>
+      </button>
+    </li>
+    <li class="mb-1">
+      <span class="text-muted">Prime:</span>
+      <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'prime')" class="btn btn-link p-0 text-start text-decoration-none border-0 shadow-none">
+        <span id="supplier-prime-value">{% if prime_display %}{{ prime_display }}{% elif supplier.prime %}—{% else %}—{% endif %}</span>
+      </button>
+    </li>
+    <li class="mb-1">
+      <span class="text-muted">Packhouse:</span>
+      <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'is_packhouse')" class="btn btn-link p-0 text-start text-decoration-none border-0 shadow-none">
+        <span id="supplier-is-packhouse-value">{{ supplier.is_packhouse|yesno:"Yes,No,—" }}</span>
+      </button>
+    </li>
+  </ul>
+</div>
+<div class="card card-padded shadow-sm mb-3">
+  <h2 class="h6 fw-semibold mb-3">Contact &amp; Web</h2>
       <dl class="space-y-2 text-sm text-gray-800">
         <div class="flex items-start justify-between gap-3">
           <dt class="text-gray-600">
@@ -267,9 +228,168 @@
           </dd>
         </div>
       </dl>
+
+</div>
+<div class="card card-padded shadow-sm">
+  <h2 class="h6 fw-semibold mb-3">Supplier Health</h2>
+  <div class="d-flex flex-wrap align-items-start gap-3" style="min-width:0;">
+      {% if health_score.contract_count > 0 %}
+      <div class="d-flex flex-row flex-nowrap align-items-start gap-4">
+      <!-- Mini gauge (left) -->
+      <div class="text-center flex-shrink-0" style="width: 200px;">
+        <svg viewBox="0 0 200 110" width="200" height="110" aria-hidden="true">
+          <path d="M 20,100 A 80,80 0 0,1 60.36,26.36" fill="none" stroke="#198754" stroke-width="18" stroke-linecap="butt"/>
+          <path d="M 60.36,26.36 A 80,80 0 0,1 139.64,26.36" fill="none" stroke="#ffc107" stroke-width="18" stroke-linecap="butt"/>
+          <path d="M 139.64,26.36 A 80,80 0 0,1 180,100" fill="none" stroke="#dc3545" stroke-width="18" stroke-linecap="butt"/>
+          {% if health_score.band %}
+          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round"
+            transform="rotate({% if health_score.band == 'green' %}-60{% elif health_score.band == 'amber' %}0{% else %}60{% endif %}, 100, 100)"/>
+          {% else %}
+          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round" style="display:none"/>
+          {% endif %}
+          <circle cx="100" cy="100" r="5" fill="#333"/>
+        </svg>
+        <div id="hs-band-label" class="fw-bold small {% if health_score.band == 'green' %}text-success{% elif health_score.band == 'amber' %}text-warning{% elif health_score.band == 'red' %}text-danger{% else %}text-muted{% endif %}">
+          {% if health_score.band %}{{ health_score.band|capfirst }}{% else %}No Data{% endif %}
+        </div>
+      </div>
+
+      <!-- Stats breakdown + warning + toggle (right) -->
+      <div class="d-flex flex-column flex-grow-1 min-w-0" style="min-height: 110px;">
+        <div class="hs-stats-grid text-muted mb-2">
+          <div>Contracts: <span id="hs-contract-count" class="text-body fw-medium">{{ health_score.contract_count }}</span> <span style="font-size:0.65rem;">({{ health_score.window_label }})</span></div>
+          <div>Notes: <span id="hs-note-count" class="text-body fw-medium">{{ health_score.note_count }}</span></div>
+          <div>Avg margin: <span id="hs-avg-margin" class="text-body fw-medium">${{ health_score.avg_margin_per_contract|floatformat:2 }}</span></div>
+          <div>Gov actions: <span id="hs-gov-count" class="text-body fw-medium">{{ health_score.gov_action_count }}</span></div>
+          <div>Avg friction: <span id="hs-avg-friction" class="text-body fw-medium">{{ health_score.avg_friction_per_contract|floatformat:1 }}</span> pts</div>
+          <div>Ship. corrns: <span id="hs-ship-count" class="text-body fw-medium">{{ health_score.shipment_correction_count }}</span></div>
+          <div></div>
+          <div>Payments: <span id="hs-pay-count" class="text-body fw-medium">{{ health_score.payment_history_count }}</span></div>
+        </div>
+        <div class="flex-shrink-0" style="min-height: 1.5rem;">
+          <div id="hs-fallback-warning" class="text-warning mb-1" style="font-size:0.7rem;{% if not health_score.using_fallback %}display:none;{% endif %}">
+            &#9888; &lt;5 contracts in 24 months — all-time data
+          </div>
+        </div>
+        <button id="hs-toggle-btn" type="button" class="btn btn-outline-secondary align-self-start" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
+          Switch to {{ health_score_alternate.window_label }}
+        </button>
+      </div>
+      </div>
+      {% else %}
+      <div class="text-muted small flex-shrink-0 align-self-center">No contract history.</div>
+      {% endif %}
+
+  </div>
+</div>
+</section>
+
+<section id="section-compliance">
+  <div class="card card-padded shadow-sm">
+    <h2 class="h5 fw-semibold mb-3">Compliance &amp; Status</h2>
+    <h3 class="h6 text-muted mb-2">Status Flags</h3>
+      <ul class="space-y-2 text-sm text-gray-800">
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'probation')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Probation:</button>
+          <span id="supplier-probation-value">{% if supplier.probation %}<span class="text-red-600 font-semibold">Yes</span> ({{ supplier.probation_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'conditional')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Conditional:</button>
+          <span id="supplier-conditional-value">{% if supplier.conditional %}<span class="text-orange-600 font-semibold">Yes</span> ({{ supplier.conditional_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'archived')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Archived:</button>
+          <span id="supplier-archived-value">{% if supplier.archived %}<span class="text-gray-700 font-semibold">Yes</span> ({{ supplier.archived_on|date:"Y-m-d" }}){% else %}No{% endif %}</span>
+        </li>
+      </ul>
+
+    <hr class="my-4">
+    <h3 class="h6 text-muted mb-2">Compliance Details</h3>
+      <ul class="space-y-2 text-sm text-gray-800">
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'iso')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">ISO:</button>
+          <span id="supplier-iso-value">{% if supplier.iso %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'ppi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">PPI:</button>
+          <span id="supplier-ppi-value">{% if supplier.ppi %}<span class="text-green-700 font-semibold">Yes</span>{% else %}No{% endif %}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'special_terms')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">Special Terms:</button>
+          <span id="supplier-special-terms-value">{{ supplier.special_terms|default:"—" }}</span>
+        </li>
+        <li>
+          <button type="button" onclick="openTransactionsEditModal({{ supplier_content_type_id }}, {{ supplier.id }}, 'allows_gsi')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">GSI:</button>
+          <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
+        </li>
+      </ul>
+  </div>
+</section>
+
+<section id="section-contacts">
+    <div class="card card-padded shadow-sm" id="contacts-section">
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold">Contacts</h2>
+        <button type="button" id="open-contact-modal" class="btn btn-sm btn-outline-primary">Add Contact</button>
+      </div>
+      <div class="space-y-3">
+        {% for contact in contacts %}
+          <div class="border rounded-lg p-3 contact-card" data-contact-id="{{ contact.id }}">
+            <div class="row-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold">
+                  <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
+                    {{ contact.name }}
+                  </a>
+                </p>
+                <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
+                {% if contact.email %}
+                  <p class="text-xs text-gray-600">
+                    <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
+                  </p>
+                {% endif %}
+                {% if contact.phone %}
+                  <p class="text-xs text-gray-600">
+                    <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>
+                  </p>
+                {% endif %}
+              </div>
+              <div class="flex flex-col items-end gap-2 shrink-0">
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="edit-contact-btn btn btn-sm btn-outline-primary"
+                    data-contact-id="{{ contact.id }}"
+                    data-contact-name="{{ contact.name|default_if_none:''|escape }}"
+                    data-contact-title="{{ contact.title|default_if_none:''|escape }}"
+                    data-contact-email="{{ contact.email|default_if_none:''|escape }}"
+                    data-contact-phone="{{ contact.phone|default_if_none:''|escape }}"
+                  >
+                    Edit
+                  </button>
+                  <button type="button" class="delete-contact-btn btn btn-sm btn-outline-danger" data-contact-id="{{ contact.id }}">
+                    Delete
+                  </button>
+                </div>
+                <div class="contact-delete-confirm hidden flex flex-wrap items-center justify-end gap-2 text-xs text-gray-700">
+                  <span>Are you sure?</span>
+                  <button type="button" class="contact-delete-yes btn btn-sm btn-outline-danger">Yes</button>
+                  <button type="button" class="contact-delete-no btn btn-sm btn-outline-secondary">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No contacts yet.</p>
+        {% endfor %}
+      </div>
     </div>
-    <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">RFQ Email</h2>
+
+  <div class="card card-padded shadow-sm mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 fw-semibold mb-0">RFQ Email</h2>
+      <button type="button" id="rfq-email-picker-toggle" class="btn btn-sm btn-outline-primary">Set RFQ Email</button>
+    </div>
       <p class="text-sm text-gray-800 mb-2">
         {% if supplier.rfq_email %}
           <a href="mailto:{{ supplier.rfq_email }}">{{ supplier.rfq_email }}</a>
@@ -277,7 +397,7 @@
           <span class="text-amber-700 font-medium">Not set</span>
         {% endif %}
       </p>
-      <button type="button" id="rfq-email-picker-toggle" class="btn btn-sm btn-outline-primary">Set RFQ Email</button>
+
       <div id="rfq-email-picker" class="hidden mt-3 p-3 border rounded-lg bg-body-secondary space-y-3">
         <p class="text-sm font-medium text-gray-900">Select RFQ email for {{ supplier.name|default:"this supplier" }}:</p>
         <form method="post" action="{% url 'suppliers:supplier_set_rfq_email' supplier_id=supplier.pk %}" id="rfq-email-form">
@@ -316,9 +436,7 @@
           </div>
         </form>
       </div>
-    </div>
   </div>
-
   <!-- Contact Groups Section -->
   <div class="card card-padded shadow-sm mt-3" id="contact-groups-section">
 
@@ -335,7 +453,7 @@
     {% if not contacts %}
       <p class="text-muted small">
         No contacts found.
-        <a href="#contacts-section">Add contacts</a> before creating groups.
+        <a href="#section-contacts">Add contacts</a> before creating groups.
       </p>
     {% else %}
 
@@ -448,9 +566,11 @@
     {% endif %}
   </div>
 
-  <!-- Addresses / Contacts -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <div class="card card-padded shadow-sm lg:col-span-2">
+
+</section>
+
+<section id="section-addresses">
+  <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold mb-3">Addresses</h2>
       {{ supplier_address_slots_client|json_script:"supplier-address-slot-meta" }}
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -480,178 +600,11 @@
           </div>
         {% endfor %}
       </div>
-    </div>
 
-    <div class="card card-padded shadow-sm" id="contacts-section">
-      <div class="row-between mb-3">
-        <h2 class="text-lg font-semibold">Contacts</h2>
-        <button type="button" id="open-contact-modal" class="btn btn-sm btn-outline-primary">Add Contact</button>
-      </div>
-      <div class="space-y-3">
-        {% for contact in contacts %}
-          <div class="border rounded-lg p-3 contact-card" data-contact-id="{{ contact.id }}">
-            <div class="row-between gap-3">
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold">
-                  <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
-                    {{ contact.name }}
-                  </a>
-                </p>
-                <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
-                {% if contact.email %}
-                  <p class="text-xs text-gray-600">
-                    <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
-                  </p>
-                {% endif %}
-                {% if contact.phone %}
-                  <p class="text-xs text-gray-600">
-                    <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>
-                  </p>
-                {% endif %}
-              </div>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    class="edit-contact-btn btn btn-sm btn-outline-primary"
-                    data-contact-id="{{ contact.id }}"
-                    data-contact-name="{{ contact.name|default_if_none:''|escape }}"
-                    data-contact-title="{{ contact.title|default_if_none:''|escape }}"
-                    data-contact-email="{{ contact.email|default_if_none:''|escape }}"
-                    data-contact-phone="{{ contact.phone|default_if_none:''|escape }}"
-                  >
-                    Edit
-                  </button>
-                  <button type="button" class="delete-contact-btn btn btn-sm btn-outline-danger" data-contact-id="{{ contact.id }}">
-                    Delete
-                  </button>
-                </div>
-                <div class="contact-delete-confirm hidden flex flex-wrap items-center justify-end gap-2 text-xs text-gray-700">
-                  <span>Are you sure?</span>
-                  <button type="button" class="contact-delete-yes btn btn-sm btn-outline-danger">Yes</button>
-                  <button type="button" class="contact-delete-no btn btn-sm btn-outline-secondary">Cancel</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        {% empty %}
-          <p class="text-sm text-gray-500">No contacts yet.</p>
-        {% endfor %}
-      </div>
-    </div>
   </div>
+</section>
 
-  <!-- Certifications & Classifications -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="card card-padded shadow-sm">
-      <div class="row-between mb-3">
-        <h2 class="text-lg font-semibold">Certifications</h2>
-        <button type="button" id="open-cert-modal" class="btn btn-sm btn-outline-primary">Add Certification</button>
-      </div>
-      <div class="space-y-3">
-        {% for cert in certification_rows %}
-          <div class="border rounded-lg p-3">
-            <div class="row-between gap-3">
-              <div>
-                <p class="text-sm font-semibold text-gray-900">{{ cert.type_name }}</p>
-                <p class="text-xs text-gray-600">
-                  {% if cert.date %}Date: {{ cert.date|date:"Y-m-d" }}{% endif %}
-                  {% if cert.expires %}{% if cert.date %} | {% endif %}Exp: {{ cert.expires|date:"Y-m-d" }}{% endif %}
-                  {% if cert.compliance_status %}{% if cert.date or cert.expires %} | {% endif %}Compliance: {{ cert.compliance_status }}{% endif %}
-                  {% if cert.document and cert.document.file %}{% if cert.date or cert.expires or cert.compliance_status %} | {% endif %}<a href="{{ cert.document.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
-                </p>
-              </div>
-              <button
-                type="button"
-                class="edit-cert-btn btn btn-sm btn-outline-primary"
-                data-cert-id="{{ cert.id }}"
-                data-cert-type-id="{{ cert.type_id }}"
-                data-cert-date="{% if cert.date %}{{ cert.date|date:'Y-m-d' }}{% endif %}"
-                data-cert-exp="{% if cert.expires %}{{ cert.expires|date:'Y-m-d' }}{% endif %}"
-                data-cert-compliance="{{ cert.compliance_status|default_if_none:'' }}"
-              >
-                Edit
-              </button>
-            </div>
-          </div>
-        {% empty %}
-          <p class="text-sm text-gray-500">No certifications yet.</p>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="card card-padded shadow-sm">
-      <div class="row-between mb-3">
-        <h2 class="text-lg font-semibold">Classifications</h2>
-        <button type="button" id="open-class-modal" class="btn btn-sm btn-outline-primary">Add Classification</button>
-      </div>
-      <div class="space-y-3">
-        {% for classification in classification_rows %}
-          <div class="border rounded-lg p-3">
-            <div class="row-between gap-3">
-              <div>
-                <p class="text-sm font-semibold text-gray-900">{{ classification.type_name }}</p>
-                <p class="text-xs text-gray-600">
-                  {% if classification.date %}Date: {{ classification.date|date:"Y-m-d" }}{% endif %}
-                  {% if classification.expires %}{% if classification.date %} | {% endif %}Exp: {{ classification.expires|date:"Y-m-d" }}{% endif %}
-                  {% if classification.document and classification.document.file %}{% if classification.date or classification.expires %} | {% endif %}<a href="{{ classification.document.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
-                </p>
-              </div>
-              <button
-                type="button"
-                class="edit-class-btn btn btn-sm btn-outline-primary"
-                data-class-id="{{ classification.id }}"
-                data-class-type-id="{{ classification.type_id }}"
-                data-class-date="{% if classification.date %}{{ classification.date|date:'Y-m-d' }}{% endif %}"
-                data-class-exp="{% if classification.expires %}{{ classification.expires|date:'Y-m-d' }}{% endif %}"
-              >
-                Edit
-              </button>
-            </div>
-          </div>
-        {% empty %}
-          <p class="text-sm text-gray-500">No classifications yet.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Files -->
-  <div class="card card-padded shadow-sm">
-    <div class="row-between mb-3">
-      <h2 class="text-lg font-semibold">Files & Documents</h2>
-    </div>
-    <div class="space-y-3">
-      {% if supplier.files_url %}
-        <div class="border rounded-lg p-3">
-          <p class="label text-gray-900">Files URL</p>
-          <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
-        </div>
-      {% endif %}
-      {% for doc in documents %}
-        <div class="border rounded-lg p-3">
-          <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
-          <p class="text-xs text-gray-600">
-            {{ doc.description|default:"Document" }}
-            {% if doc.file %} | <a href="{{ doc.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
-          </p>
-        </div>
-      {% empty %}
-        {% if not supplier.files_url %}
-          <p class="text-sm text-gray-500">No documents uploaded.</p>
-        {% endif %}
-      {% endfor %}
-    </div>
-  </div>
-
-  <div id="enrichment-panel" class="card card-padded shadow-sm" style="display:none; margin-top:1rem;">
-  <div class="row-between mb-3">
-      <h2 class="text-lg font-semibold">Suggested updates from {{ supplier.website_url }}</h2>
-    </div>
-    <p id="enrichment-empty-msg" class="text-sm text-gray-500" style="display:none;">No suggestions found.</p>
-    <div id="enrichment-rows"></div>
-  </div>
-
-  <!-- Contracts -->
+<section id="section-contracts">
   <div class="card card-padded shadow-sm">
   <div class="row-between mb-3">
       <h2 class="text-lg font-semibold">Contracts</h2>
@@ -709,6 +662,134 @@
       </table>
     </div>
   </div>
+</section>
+
+<section id="section-certs">
+<div class="row g-3">
+    <div class="col-md-6"><div class="card card-padded shadow-sm h-100">
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold">Certifications</h2>
+        <button type="button" id="open-cert-modal" class="btn btn-sm btn-outline-primary">Add Certification</button>
+      </div>
+      <div class="space-y-3">
+        {% for cert in certification_rows %}
+          <div class="border rounded-lg p-3">
+            <div class="row-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-gray-900">{{ cert.type_name }}</p>
+                <p class="text-xs text-gray-600">
+                  {% if cert.date %}Date: {{ cert.date|date:"Y-m-d" }}{% endif %}
+                  {% if cert.expires %}{% if cert.date %} | {% endif %}Exp: {{ cert.expires|date:"Y-m-d" }}{% endif %}
+                  {% if cert.compliance_status %}{% if cert.date or cert.expires %} | {% endif %}Compliance: {{ cert.compliance_status }}{% endif %}
+                  {% if cert.document and cert.document.file %}{% if cert.date or cert.expires or cert.compliance_status %} | {% endif %}<a href="{{ cert.document.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="edit-cert-btn btn btn-sm btn-outline-primary"
+                data-cert-id="{{ cert.id }}"
+                data-cert-type-id="{{ cert.type_id }}"
+                data-cert-date="{% if cert.date %}{{ cert.date|date:'Y-m-d' }}{% endif %}"
+                data-cert-exp="{% if cert.expires %}{{ cert.expires|date:'Y-m-d' }}{% endif %}"
+                data-cert-compliance="{{ cert.compliance_status|default_if_none:'' }}"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No certifications yet.</p>
+        {% endfor %}
+      </div>
+    </div></div>
+    <div class="col-md-6"><div class="card card-padded shadow-sm h-100">
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold">Classifications</h2>
+        <button type="button" id="open-class-modal" class="btn btn-sm btn-outline-primary">Add Classification</button>
+      </div>
+      <div class="space-y-3">
+        {% for classification in classification_rows %}
+          <div class="border rounded-lg p-3">
+            <div class="row-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-gray-900">{{ classification.type_name }}</p>
+                <p class="text-xs text-gray-600">
+                  {% if classification.date %}Date: {{ classification.date|date:"Y-m-d" }}{% endif %}
+                  {% if classification.expires %}{% if classification.date %} | {% endif %}Exp: {{ classification.expires|date:"Y-m-d" }}{% endif %}
+                  {% if classification.document and classification.document.file %}{% if classification.date or classification.expires %} | {% endif %}<a href="{{ classification.document.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="edit-class-btn btn btn-sm btn-outline-primary"
+                data-class-id="{{ classification.id }}"
+                data-class-type-id="{{ classification.type_id }}"
+                data-class-date="{% if classification.date %}{{ classification.date|date:'Y-m-d' }}{% endif %}"
+                data-class-exp="{% if classification.expires %}{{ classification.expires|date:'Y-m-d' }}{% endif %}"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500">No classifications yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<section id="section-files">
+  <div class="card card-padded shadow-sm">
+    <h2 class="text-lg font-semibold mb-3">Files &amp; Documents</h2>
+    <div class="space-y-3">
+      {% if supplier.files_url %}
+        <div class="border rounded-lg p-3">
+          <p class="label text-gray-900">Files URL</p>
+          <a href="{{ supplier.files_url }}" class="text-sm text-blue-600 hover:text-blue-800 break-words">{{ supplier.files_url }}</a>
+        </div>
+      {% endif %}
+      {% for doc in documents %}
+        <div class="border rounded-lg p-3">
+          <p class="text-sm font-semibold text-gray-900">{{ doc.get_doc_type_display }}</p>
+          <p class="text-xs text-gray-600">
+            {{ doc.description|default:"Document" }}
+            {% if doc.file %} | <a href="{{ doc.file.url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">View file</a>{% endif %}
+          </p>
+        </div>
+      {% empty %}
+        {% if not supplier.files_url %}
+          <p class="text-sm text-gray-500">No documents uploaded.</p>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="section-notes">
+  <div class="card card-padded shadow-sm">
+      <h2 class="text-lg font-semibold mb-3">Notes</h2>
+      {% if supplier.notes %}
+        <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
+      {% else %}
+        <p class="text-sm text-gray-500">No notes provided.</p>
+      {% endif %}
+
+  </div>
+</section>
+
+  <div id="enrichment-panel" class="card card-padded shadow-sm" style="display:none; margin-top:1rem;">
+  <div class="row-between mb-3">
+      <h2 class="text-lg font-semibold">Suggested updates from {{ supplier.website_url }}</h2>
+    </div>
+    <p id="enrichment-empty-msg" class="text-sm text-gray-500" style="display:none;">No suggestions found.</p>
+    <div id="enrichment-rows"></div>
+  </div>
+
+
+
+</div>
 </div>
 
 {% include "transactions/transaction_modal.html" %}
@@ -2074,6 +2155,80 @@
         }
     });
 })();
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var sectionIds = ['section-overview','section-compliance','section-contacts','section-addresses','section-contracts','section-certs','section-files','section-notes'];
+  var navLinks = document.querySelectorAll('.supplier-nav-link[data-section]');
+  var sections = sectionIds.map(function(id) { return document.getElementById(id); }).filter(Boolean);
+  if (!sections.length || !navLinks.length) return;
+  function setActive(sectionId) {
+    navLinks.forEach(function(link) {
+      link.classList.toggle('sidebar-nav-active', link.getAttribute('data-section') === sectionId);
+    });
+  }
+  var ratios = {};
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      ratios[entry.target.id] = entry.isIntersecting ? entry.intersectionRatio : 0;
+    });
+    var bestId = null, bestRatio = 0;
+    sectionIds.forEach(function(id) {
+      var r = ratios[id] || 0;
+      if (r >= 0.3 && r >= bestRatio) { bestRatio = r; bestId = id; }
+    });
+    if (bestId) setActive(bestId);
+  }, { threshold: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1], rootMargin: '-10% 0px -45% 0px' });
+  sections.forEach(function(section) { observer.observe(section); });
+  navLinks.forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      var id = link.getAttribute('data-section');
+      var target = id && document.getElementById(id);
+      if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActive(id); }
+    });
+  });
+  var input = document.getElementById('sidebar-supplier-search');
+  var resultsBox = document.getElementById('sidebar-supplier-results');
+  if (input && resultsBox) {
+    var timer;
+    function hideResults() { resultsBox.classList.add('d-none'); resultsBox.innerHTML = ''; }
+    function renderResults(items) {
+      resultsBox.innerHTML = '';
+      if (!items.length) {
+        var msg = document.createElement('div');
+        msg.className = 'px-3 py-2 small text-muted fst-italic';
+        msg.textContent = 'No suppliers found.';
+        resultsBox.appendChild(msg);
+        resultsBox.classList.remove('d-none');
+        return;
+      }
+      items.slice(0, 8).forEach(function(item) {
+        var a = document.createElement('a');
+        a.href = '/suppliers/' + item.supplier_id + '/detail/';
+        var cage = item.cage_code ? ' <span class="text-muted font-monospace small">CAGE: ' + item.cage_code + '</span>' : '';
+        a.innerHTML = '<span class="fw-medium">' + (item.supplier_name || 'Supplier') + '</span>' + cage;
+        resultsBox.appendChild(a);
+      });
+      resultsBox.classList.remove('d-none');
+    }
+    function search(term) {
+      if (term.length < 2) { hideResults(); return; }
+      fetch('/suppliers/search/?' + new URLSearchParams({ q: term }), { headers: { 'Accept': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) { renderResults(data.results || []); })
+        .catch(hideResults);
+    }
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() { search(input.value.trim()); }, 280);
+    });
+    document.addEventListener('click', function(e) {
+      if (!resultsBox.contains(e.target) && e.target !== input) hideResults();
+    });
+  }
+});
 </script>
 
 {% endblock %}

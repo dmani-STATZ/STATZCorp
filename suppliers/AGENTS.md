@@ -186,7 +186,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - After model changes: verify Django admin loads for `Supplier` and `Contact`, check that `contracts` supplier views (create, edit, list) function, run any existing `contracts` tests.
 - After enrichment pipeline changes: manually trigger enrichment for a known supplier via `/suppliers/<pk>/enrich/run/`, confirm the JSON response shape, verify the apply flow POSTs and saves correctly.
 - After URL changes: spot-check `contracts` templates that reverse `suppliers:` URLs (contract management page, contact detail page) and the `reports/admin_dashboard.html`.
-- After template changes to `supplier_detail.html`: open a supplier detail page with contacts, certifications, classifications, and documents present.
+- After template changes to `supplier_detail.html`: open a supplier detail page with contacts, certifications, classifications, and documents present. After layout changes, verify scroll spy activates the correct sidebar link for all eight sections, status flag banners render only when probation/conditional/archived are true, and sidebar supplier search returns results and navigates to `/suppliers/<id>/detail/`.
 - After changes to `openrouter_config.py`: GET `/suppliers/ai-model/config/` and verify the response fields match what `supplier_enrich.html` JS expects.
 
 ---
