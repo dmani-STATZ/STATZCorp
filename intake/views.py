@@ -7,9 +7,12 @@ the same draft concurrently.
 """
 from __future__ import annotations
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -18,8 +21,11 @@ from django.views.generic import ListView
 
 from contracts.models import Contract
 
+from .finalize import FinalizationError, finalize_draft
 from .forms_parse import parse_post
+from .ingest import DuplicateContractNumber, IngestionError, ingest_pdf
 from .locks import LockError, acquire, assert_holds, is_expired, release
+from .matchers import MatcherError, apply_match, clear_match, search as matcher_search
 from .models import DraftContract
 from .schemas import DraftDataValidationError
 
@@ -222,6 +228,207 @@ def save_draft(request, pk: int):
 @require_POST
 def mark_ready(request, pk: int):
     return _save_under_lock(request, pk, mark_ready=True)
+
+
+@login_required
+@require_POST
+def match_endpoint(request, pk: int):
+    """Unified matcher: search + apply + clear.
+
+    POST body is JSON:
+        {"action": "search", "match_type": "buyer", "q": "smith"}
+        {"action": "apply", "match_type": "nsn",
+         "target_path": "clin:0:nsn", "record_id": 42}
+        {"action": "clear", "target_path": "clin:0:nsn"}
+
+    Search is read-only and doesn't require the lock — the user might be
+    deciding whether to take the draft. Apply and Clear mutate the draft, so
+    they require `assert_holds`.
+    """
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'invalid JSON'}, status=400)
+
+    action = payload.get('action')
+    match_type = payload.get('match_type')
+
+    if action == 'search':
+        try:
+            results = matcher_search(match_type, payload.get('q', ''))
+        except MatcherError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+        return JsonResponse({'results': results})
+
+    if action not in ('apply', 'clear'):
+        return JsonResponse({'error': f'unknown action: {action!r}'}, status=400)
+
+    with transaction.atomic():
+        draft = get_object_or_404(
+            DraftContract.objects.select_for_update(), pk=pk
+        )
+        try:
+            assert_holds(draft, request.user)
+        except LockError as exc:
+            return JsonResponse({'error': str(exc)}, status=409)
+
+        target_path = payload.get('target_path')
+        if not target_path:
+            return JsonResponse({'error': 'target_path required'}, status=400)
+
+        new_data = dict(draft.data or {})
+        try:
+            if action == 'apply':
+                record_id = payload.get('record_id')
+                if not isinstance(record_id, int):
+                    return JsonResponse(
+                        {'error': 'record_id required (int)'}, status=400
+                    )
+                apply_match(new_data, target_path, match_type, record_id)
+            else:  # clear
+                clear_match(new_data, target_path)
+        except MatcherError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        draft.data = new_data
+        try:
+            draft.save()
+        except DraftDataValidationError as exc:
+            return JsonResponse(
+                {'error': 'validation failed', 'detail': exc.errors[:3]},
+                status=400,
+            )
+
+    return JsonResponse({'ok': True, 'data': draft.data})
+
+
+@login_required
+@require_POST
+def upload_pdfs(request):
+    """Multi-file PDF upload endpoint for the queue's drag-and-drop zone.
+
+    Accepts one or more files under the form-field name `pdfs`. Each PDF is
+    parsed and converted to a DraftContract. Returns a per-file outcome
+    so the client can render a small report.
+
+    Each file's ingestion is independent — a failure on one does not abort
+    the others. We intentionally don't wrap this in a single transaction;
+    one bad PDF in a batch shouldn't roll back the good ones.
+    """
+    files = request.FILES.getlist('pdfs')
+    if not files:
+        return JsonResponse({'error': 'no files'}, status=400)
+
+    results = []
+    for f in files:
+        outcome = {'filename': f.name, 'ok': False, 'message': '', 'draft_pk': None}
+        try:
+            draft = ingest_pdf(f, original_filename=f.name)
+        except DuplicateContractNumber as exc:
+            outcome['message'] = str(exc)
+            outcome['duplicate'] = True
+        except IngestionError as exc:
+            outcome['message'] = str(exc)
+        except Exception as exc:
+            # Catch-all — we don't want one bad PDF to crash the whole batch.
+            outcome['message'] = f'Unexpected error: {exc}'
+        else:
+            outcome['ok'] = True
+            outcome['draft_pk'] = draft.pk
+            outcome['contract_number'] = draft.contract_number
+            outcome['contract_type'] = draft.contract_type
+            outcome['pdf_parse_status'] = draft.pdf_parse_status
+            outcome['message'] = (
+                f'Created draft {draft.contract_number} '
+                f'({draft.contract_type}, parse: {draft.pdf_parse_status}).'
+            )
+        results.append(outcome)
+    return JsonResponse({'results': results})
+
+
+def _build_compose_url(contract, draft_type: str) -> str:
+    """Produce the URL of /processing/email-compose/?subject=...&body=...
+
+    Mirrors `processing.views.processing_views.finalize_and_email_contract`
+    so analysts get the same email-compose page they're used to. Returns
+    a path-only URL (no host), suitable for HttpResponseRedirect.
+    """
+    from urllib.parse import urlencode
+
+    subject = f'New Contract: {contract.contract_number}'
+    lines = [
+        f'A new {draft_type} contract has been finalized via intake.',
+        '',
+        f'Contract #: {contract.contract_number}',
+    ]
+    if getattr(contract, 'pr_number', None):
+        lines.append(f'PR #: {contract.pr_number}')
+    if getattr(contract, 'files_url', None):
+        lines.append(f'Files: {contract.files_url}')
+    if hasattr(contract, 'clin_set'):
+        clin_lines = []
+        for c in contract.clin_set.select_related('supplier', 'nsn').order_by('item_number'):
+            sup = c.supplier.name if c.supplier_id else '(unmatched)'
+            nsn = c.nsn.nsn_code if c.nsn_id else '(unmatched)'
+            clin_lines.append(f'  CLIN {c.item_number}: NSN {nsn}, Supplier {sup}')
+        if clin_lines:
+            lines.append('')
+            lines.append('CLINs:')
+            lines.extend(clin_lines)
+    body = '\n'.join(lines)
+    return f"/processing/email-compose/?{urlencode({'subject': subject, 'body': body})}"
+
+
+@login_required
+@require_POST
+def finalize_draft_view(request, pk: int):
+    """Shred a ready-for-review draft into canonical contracts.* tables.
+
+    Whole flow is one atomic transaction: lock the row, assert the user
+    holds the soft lock, run the shred. On any failure the transaction
+    rolls back and the draft stays in `ready_for_review`. On success the
+    draft is deleted (spec: drafts are not contracts) and we redirect to
+    the new canonical record — or to a pre-populated email compose page
+    when the draft created a new Contract row, matching the long-standing
+    processing-app behavior.
+    """
+    from contracts.models import Contract  # avoid top-level cycle risk
+
+    draft_type = None
+    with transaction.atomic():
+        draft = get_object_or_404(
+            DraftContract.objects.select_for_update(), pk=pk
+        )
+        try:
+            assert_holds(draft, request.user)
+        except LockError as exc:
+            messages.error(request, str(exc))
+            return redirect('intake:queue')
+        draft_type = draft.get_contract_type_display()
+
+        try:
+            target = finalize_draft(draft, request.user)
+        except FinalizationError as exc:
+            messages.error(request, f'Finalization blocked: {exc}')
+            return redirect('intake:edit_draft', pk=pk)
+
+    messages.success(
+        request,
+        f'Finalized → {type(target).__name__} #{target.pk}.',
+    )
+
+    # New Contract → route to the email compose page (matches processing
+    # workflow). MOD/AMD return the *parent* Contract; we don't want a
+    # "new contract email" for those, so route them to the queue with a
+    # success message instead.
+    if isinstance(target, Contract):
+        # Heuristic: if the draft type was MOD/AMD the email is wrong
+        # (target is the parent, not a new contract). draft_type was
+        # captured pre-delete.
+        if draft_type in ('Modification', 'Amendment'):
+            return redirect('intake:queue')
+        return redirect(_build_compose_url(target, draft_type or 'Contract'))
+    return redirect('intake:queue')
 
 
 @login_required

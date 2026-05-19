@@ -56,6 +56,22 @@
         </div>
         {% endif %}
 
+        {# ---- PDF drag-and-drop ingestion zone ---- #}
+        <div id="intake-dropzone"
+             class="card border-2 mb-3 p-3 text-center"
+             style="border-style: dashed !important; cursor: pointer;"
+             data-upload-url="{% url 'intake:upload_pdfs' %}">
+            <div class="text-muted">
+                <strong>Drop DLA 1155 PDF(s) here</strong> to create drafts &mdash;
+                or <span class="text-primary" style="text-decoration: underline;">click to choose files</span>.
+                Multiple files supported.
+            </div>
+            <input type="file" id="intake-file-input"
+                   accept="application/pdf,.pdf"
+                   multiple hidden>
+        </div>
+        <div id="intake-upload-results" class="mb-3"></div>
+
         <!-- Stat badges -->
         <div class="d-flex align-items-stretch flex-wrap gap-3 mb-3">
             <div class="d-flex align-items-center gap-2 flex-shrink-0 flex-wrap">
@@ -191,8 +207,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="5" class="text-center text-muted py-5">
-                            No drafts in the queue. Ingestion paths (PDF upload, CSV, DIBBS injection)
-                            land here in Phase 3.
+                            No drafts in the queue. Drop a DLA 1155 PDF above to ingest one.
                         </td>
                     </tr>
                     {% endfor %}
@@ -200,4 +215,93 @@
             </table>
         </div>
     </div>
+
+<script>
+(function () {
+    const dz = document.getElementById('intake-dropzone');
+    const input = document.getElementById('intake-file-input');
+    const results = document.getElementById('intake-upload-results');
+    if (!dz || !input || !results) return;
+
+    const uploadUrl = dz.dataset.uploadUrl;
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function renderResults(items) {
+        if (!items.length) return;
+        const okCount = items.filter(r => r.ok).length;
+        const dupCount = items.filter(r => r.duplicate).length;
+        const errCount = items.length - okCount - dupCount;
+        const blocks = items.map(r => {
+            const cls = r.ok ? 'alert-success' : (r.duplicate ? 'alert-warning' : 'alert-danger');
+            return '<div class="alert ' + cls + ' py-2 mb-1">' +
+                '<strong>' + escapeHtml(r.filename) + ':</strong> ' +
+                escapeHtml(r.message) +
+                '</div>';
+        }).join('');
+        results.innerHTML =
+            '<div class="small text-muted mb-1">' +
+            okCount + ' created, ' + dupCount + ' duplicate, ' + errCount + ' failed.' +
+            '</div>' + blocks;
+    }
+
+    async function upload(files) {
+        if (!files || !files.length) return;
+        const fd = new FormData();
+        Array.from(files).forEach(f => fd.append('pdfs', f, f.name));
+        dz.classList.add('bg-light');
+        results.innerHTML = '<div class="text-muted small">Uploading ' + files.length + ' file(s)...</div>';
+        try {
+            const resp = await fetch(uploadUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'X-CSRFToken': csrf ? csrf.value : ''},
+                body: fd,
+            });
+            const json = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                results.innerHTML = '<div class="alert alert-danger py-2">' +
+                    'Upload failed: ' + escapeHtml(json.error || resp.statusText) + '</div>';
+                return;
+            }
+            renderResults(json.results || []);
+            // If anything succeeded, refresh the queue so new drafts appear.
+            if ((json.results || []).some(r => r.ok)) {
+                setTimeout(() => window.location.reload(), 1200);
+            }
+        } catch (err) {
+            results.innerHTML = '<div class="alert alert-danger py-2">' +
+                'Upload error: ' + escapeHtml(err.message || err) + '</div>';
+        } finally {
+            dz.classList.remove('bg-light');
+            input.value = '';  // allow re-selecting the same file
+        }
+    }
+
+    dz.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => upload(input.files));
+
+    ['dragenter', 'dragover'].forEach(evt => {
+        dz.addEventListener(evt, e => {
+            e.preventDefault(); e.stopPropagation();
+            dz.classList.add('bg-light');
+        });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+        dz.addEventListener(evt, e => {
+            e.preventDefault(); e.stopPropagation();
+            dz.classList.remove('bg-light');
+        });
+    });
+    dz.addEventListener('drop', e => {
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (files) upload(files);
+    });
+})();
+</script>
 {% endblock %}

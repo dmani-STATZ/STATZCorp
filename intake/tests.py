@@ -1,5 +1,8 @@
-"""Tests: model dedup, schema validation, lock semantics, editor flow."""
-from datetime import timedelta
+"""Tests: model dedup, schema validation, lock semantics, editor flow, matcher."""
+import json
+from datetime import date, timedelta
+from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
@@ -7,7 +10,22 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from processing.services.pdf_parser import AwardParseResult, ClinParseResult
+
+from contracts.models import (
+    Buyer,
+    Clin,
+    Contract,
+    ContractPackaging,
+    IdiqContract,
+    IdiqContractDetails,
+)
+from products.models import Nsn
+from suppliers.models import Supplier
+
+from intake.finalize import FinalizationError, finalize_draft
 from intake.forms_parse import parse_post
+from intake.ingest import DuplicateContractNumber, IngestionError, ingest_pdf
 from intake.locks import (
     LOCK_DURATION,
     LockError,
@@ -17,6 +35,7 @@ from intake.locks import (
     is_expired,
     release,
 )
+from intake.matchers import MatcherError, apply_match, clear_match, search as matcher_search
 from intake.models import DraftContract
 from intake.schemas import DraftDataValidationError, validate_data
 
@@ -291,3 +310,810 @@ class EditorViewTests(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.status, DraftContract.Status.CANCELLED)
         self.assertIsNone(draft.locked_by_id)
+
+
+class MatcherUnitTests(TestCase):
+    """Unit tests for the pure-function matcher logic (no HTTP)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.buyer = Buyer.objects.create(description='Acme Buying Office')
+        cls.idiq = IdiqContract.objects.create(contract_number='SPE7L1-23-D-0099')
+        cls.nsn = Nsn.objects.create(nsn_code='1234-12-345-6789', description='Widget')
+        cls.supplier = Supplier.objects.create(name='Acme Corp', cage_code='12345')
+
+    def test_search_requires_three_chars(self):
+        self.assertEqual(matcher_search('buyer', 'ab'), [])
+
+    def test_search_buyer_finds_by_description(self):
+        results = matcher_search('buyer', 'Acme')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], self.buyer.id)
+
+    def test_search_supplier_finds_by_cage(self):
+        results = matcher_search('supplier', '12345')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['cage'], '12345')
+
+    def test_search_unknown_match_type_rejected(self):
+        with self.assertRaises(MatcherError):
+            matcher_search('bogus', 'anything')
+
+    def test_apply_buyer(self):
+        data = {}
+        apply_match(data, 'buyer', 'buyer', self.buyer.id)
+        self.assertEqual(data['buyer_text'], 'Acme Buying Office')
+        self.assertEqual(data['buyer_id'], self.buyer.id)
+
+    def test_apply_clin_nsn_extends_list(self):
+        data = {}
+        apply_match(data, 'clin:2:nsn', 'nsn', self.nsn.id)
+        self.assertEqual(len(data['clins']), 3)
+        self.assertEqual(data['clins'][2]['nsn_id'], self.nsn.id)
+        self.assertEqual(data['clins'][2]['nsn_text'], '1234-12-345-6789')
+        self.assertEqual(data['clins'][2]['nsn_description'], 'Widget')
+
+    def test_apply_packaging_supplier_carries_cage(self):
+        data = {}
+        apply_match(data, 'packaging', 'supplier', self.supplier.id)
+        self.assertEqual(data['packaging']['packhouse_supplier_id'], self.supplier.id)
+        self.assertEqual(data['packaging']['packhouse_cage'], '12345')
+
+    def test_apply_wrong_match_type_for_path_rejected(self):
+        # parent_idiq path with a buyer record is nonsense.
+        with self.assertRaises(MatcherError):
+            apply_match({}, 'parent_idiq', 'buyer', self.buyer.id)
+
+    def test_clear_match_strips_id_only(self):
+        data = {'buyer_text': 'Acme', 'buyer_id': self.buyer.id}
+        clear_match(data, 'buyer')
+        self.assertEqual(data['buyer_text'], 'Acme')
+        self.assertNotIn('buyer_id', data)
+
+
+class MatcherEndpointTests(TestCase):
+    """End-to-end tests of the /match/ JSON endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.bob = User.objects.create_user('bob', 'b@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme Buyers')
+        cls.nsn = Nsn.objects.create(nsn_code='5678-12-345-6789', description='Bolt')
+
+    def _draft(self, **overrides):
+        defaults = dict(
+            contract_number='SPE7L1-26-P-3001',
+            contract_type='AWD',
+            status=DraftContract.Status.IN_PROGRESS,
+        )
+        defaults.update(overrides)
+        return DraftContract.objects.create(**defaults)
+
+    def _post(self, draft, body):
+        return self.client.post(
+            reverse('intake:match', args=[draft.pk]),
+            data=json.dumps(body),
+            content_type='application/json',
+        )
+
+    def test_search_does_not_require_lock(self):
+        draft = self._draft()
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {'action': 'search', 'match_type': 'buyer', 'q': 'Acme'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()['results']), 1)
+
+    def test_apply_requires_lock(self):
+        draft = self._draft()
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'apply', 'match_type': 'buyer',
+            'target_path': 'buyer', 'record_id': self.buyer.id,
+        })
+        self.assertEqual(resp.status_code, 409)
+        draft.refresh_from_db()
+        # Schema dumps None for Optional fields; what matters is the match
+        # didn't land.
+        self.assertIsNone(draft.data.get('buyer_id'))
+
+    def test_apply_writes_json_under_lock(self):
+        draft = self._draft()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'apply', 'match_type': 'buyer',
+            'target_path': 'buyer', 'record_id': self.buyer.id,
+        })
+        self.assertEqual(resp.status_code, 200)
+        draft.refresh_from_db()
+        self.assertEqual(draft.data['buyer_id'], self.buyer.id)
+        self.assertEqual(draft.data['buyer_text'], 'Acme Buyers')
+
+    def test_apply_rejected_when_lock_lost(self):
+        draft = self._draft()
+        acquire(draft, self.alice)
+        # Alice's lock expires, bob takes over.
+        DraftContract.objects.filter(pk=draft.pk).update(
+            locked_at=timezone.now() - LOCK_DURATION - timedelta(seconds=10)
+        )
+        draft.refresh_from_db()
+        acquire(draft, self.bob)
+
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'apply', 'match_type': 'buyer',
+            'target_path': 'buyer', 'record_id': self.buyer.id,
+        })
+        self.assertEqual(resp.status_code, 409)
+
+    def test_clear_strips_id(self):
+        draft = self._draft(data={'buyer_text': 'Acme', 'buyer_id': self.buyer.id})
+        # Re-save to ensure JSON is canonicalized through validate_data.
+        draft.save()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {'action': 'clear', 'target_path': 'buyer'})
+        self.assertEqual(resp.status_code, 200)
+        draft.refresh_from_db()
+        self.assertIsNone(draft.data.get('buyer_id'))
+        self.assertEqual(draft.data['buyer_text'], 'Acme')
+
+    def test_unknown_action_rejected(self):
+        draft = self._draft()
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {'action': 'frobnicate', 'match_type': 'buyer'})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_invalid_json_body_rejected(self):
+        draft = self._draft()
+        self.client.force_login(self.alice)
+        resp = self.client.post(
+            reverse('intake:match', args=[draft.pk]),
+            data='not-json',
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 400)
+
+
+class FinalizationTests(TestCase):
+    """Phase 3a finalization shred: AWD/PO/IDIQ."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme Buying Office')
+        cls.nsn1 = Nsn.objects.create(nsn_code='1111-11-111-1111', description='Bolt')
+        cls.nsn2 = Nsn.objects.create(nsn_code='2222-22-222-2222', description='Nut')
+        cls.supplier1 = Supplier.objects.create(name='Supp A', cage_code='AAAAA')
+        cls.supplier2 = Supplier.objects.create(name='Supp B', cage_code='BBBBB')
+
+    def _ready_awd(self, **data_overrides):
+        data = {
+            'pr_number': 'PR-100',
+            'award_date': '2026-05-01',
+            'buyer_id': self.buyer.id,
+            'buyer_text': 'Acme Buying Office',
+            'contract_value': '12345.67',
+            'clins': [
+                {
+                    'item_number': '0001',
+                    'item_type': 'P',
+                    'nsn_id': self.nsn1.id,
+                    'nsn_text': '1111-11-111-1111',
+                    'supplier_id': self.supplier1.id,
+                    'supplier_text': 'Supp A',
+                    'order_qty': 10,
+                    'unit_price': '5.00',
+                    'item_value': '50.00',
+                    'ia': 'O',
+                    'fob': 'D',
+                },
+            ],
+        }
+        data.update(data_overrides)
+        return DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-FIN1',
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data=data,
+        )
+
+    def test_awd_happy_path_creates_contract_and_clins(self):
+        draft = self._ready_awd()
+        draft_pk = draft.pk
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertIsInstance(target, Contract)
+        self.assertEqual(target.contract_number, 'SPE7L1-26-P-FIN1')
+        self.assertEqual(target.buyer_id, self.buyer.id)
+        self.assertEqual(target.pr_number, 'PR-100')
+        clins = list(target.clin_set.all())
+        self.assertEqual(len(clins), 1)
+        self.assertEqual(clins[0].nsn_id, self.nsn1.id)
+        self.assertEqual(clins[0].supplier_id, self.supplier1.id)
+        # Draft must be deleted on success.
+        self.assertFalse(DraftContract.objects.filter(pk=draft_pk).exists())
+
+    def test_awd_status_guard(self):
+        draft = self._ready_awd()
+        draft.status = DraftContract.Status.IN_PROGRESS
+        draft.save(update_fields=['status'])
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+    def test_awd_requires_matched_buyer(self):
+        draft = self._ready_awd(buyer_id=None)
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+    def test_awd_requires_matched_nsn_per_clin(self):
+        draft = self._ready_awd()
+        draft.data['clins'][0]['nsn_id'] = None
+        draft.save()
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+        # Draft still exists since the transaction rolled back.
+        self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
+
+    def test_awd_requires_at_least_one_clin(self):
+        draft = self._ready_awd()
+        draft.data['clins'] = []
+        draft.save()
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+    def test_awd_creates_packaging_when_packhouse_matched(self):
+        draft = self._ready_awd()
+        draft.data['packaging'] = {
+            'packhouse_supplier_id': self.supplier2.id,
+            'quote_amount': '99.50',
+            'notes': 'crate it',
+        }
+        draft.save()
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        pkg = ContractPackaging.objects.get(contract=target)
+        self.assertEqual(pkg.packhouse_id, self.supplier2.id)
+        self.assertEqual(str(pkg.quote_amount), '99.50')
+
+    def test_idiq_happy_path_creates_cross_product_details(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-D-FIN1',
+            contract_type='IDIQ',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'award_date': '2026-04-01',
+                'buyer_id': self.buyer.id,
+                'term_months': 60,
+                'option_months': 24,
+                'max_value': '500000.00',
+                'min_guarantee': 1000,
+                'approved_nsns': [
+                    {'nsn_id': self.nsn1.id, 'nsn_text': '1111', 'min_order_qty': '10'},
+                    {'nsn_id': self.nsn2.id, 'nsn_text': '2222', 'min_order_qty': '20'},
+                ],
+                'approved_suppliers': [
+                    {'supplier_id': self.supplier1.id, 'supplier_text': 'Supp A'},
+                    {'supplier_id': self.supplier2.id, 'supplier_text': 'Supp B'},
+                ],
+            },
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertIsInstance(target, IdiqContract)
+        self.assertEqual(target.term_length, 60)
+        details = list(IdiqContractDetails.objects.filter(idiq_contract=target))
+        self.assertEqual(len(details), 4)  # 2 NSNs × 2 suppliers
+        # min_order_qty travels with the NSN side.
+        nsn1_details = [d for d in details if d.nsn_id == self.nsn1.id]
+        self.assertTrue(all(d.min_order_qty == '10' for d in nsn1_details))
+
+    def test_idiq_with_no_matched_approved_rows_still_finalizes(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-D-FIN2',
+            contract_type='IDIQ',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'term_months': 36,
+                'approved_nsns': [{'nsn_text': 'unmatched', 'nsn_id': None}],
+                'approved_suppliers': [],
+            },
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertEqual(target.term_length, 36)
+        self.assertEqual(IdiqContractDetails.objects.filter(idiq_contract=target).count(), 0)
+
+    def test_unsupported_type_rejected(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-X-FIN1',
+            contract_type='MOD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={'mod_number': 'P00001'},
+        )
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+
+class FinalizeViewTests(TestCase):
+    """End-to-end /finalize/ view: lock guard + redirect."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.bob = User.objects.create_user('bob', 'b@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme')
+        cls.nsn = Nsn.objects.create(nsn_code='3333', description='X')
+        cls.supplier = Supplier.objects.create(name='S', cage_code='99999')
+
+    def _ready_draft(self):
+        return DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-VFIN1',
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id,
+                'buyer_text': 'Acme',
+                'clins': [{
+                    'item_number': '0001',
+                    'nsn_id': self.nsn.id, 'nsn_text': '3333',
+                    'supplier_id': self.supplier.id, 'supplier_text': 'S',
+                }],
+            },
+        )
+
+    def test_finalize_requires_lock(self):
+        draft = self._ready_draft()
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 302)
+        # Draft must still exist — lock check rejected before shred.
+        self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
+
+    def test_finalize_under_lock_creates_contract_and_deletes_draft(self):
+        draft = self._ready_draft()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(DraftContract.objects.filter(pk=draft.pk).exists())
+        self.assertTrue(
+            Contract.objects.filter(contract_number='SPE7L1-26-P-VFIN1').exists()
+        )
+
+    def test_finalize_blocked_message_when_unmatched(self):
+        draft = self._ready_draft()
+        # Strip the buyer match.
+        draft.data['buyer_id'] = None
+        draft.save()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 302)
+        # Draft remains; nothing landed in contracts.
+        self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
+        self.assertFalse(
+            Contract.objects.filter(contract_number='SPE7L1-26-P-VFIN1').exists()
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3c: PDF ingestion
+# ---------------------------------------------------------------------------
+
+
+def _stub_parse_result(**overrides) -> AwardParseResult:
+    """A minimal AWD parse result. Override fields per test."""
+    base = dict(
+        contract_number='SPE7L1-26-C-INGST',
+        idiq_contract_number=None,
+        buyer_text='Acme Buying',
+        award_date=date(2026, 5, 1),
+        contractor_name='STATZ',
+        contractor_cage='12345',
+        contract_value=Decimal('12345.67'),
+        contract_type='AWD',
+        solicitation_type='SDVOSB',
+        pr_number='PR-1',
+        pdf_parse_status='success',
+        pdf_parse_notes='',
+        ado_days=None,
+        clins=[
+            ClinParseResult(
+                item_number='0001',
+                nsn='1234-12-345-6789',
+                nsn_description='Widget',
+                order_qty=Decimal('10'),
+                uom='EA',
+                unit_price=Decimal('5.00'),
+                due_date=date(2026, 6, 1),
+                inspection_point='O',
+                acceptance_point='D',
+                fob='D',
+                cage='12345',
+                clin_parse_note=None,
+                min_order_qty_text=None,
+            ),
+        ],
+        idiq_max_value=None,
+        idiq_min_guarantee=None,
+        idiq_term_months=None,
+        idiq_option_months=None,
+        packhouse_cage=None,
+    )
+    base.update(overrides)
+    return AwardParseResult(**base)
+
+
+class IngestUnitTests(TestCase):
+    """ingest_pdf logic with a stubbed parser (no real PDF needed)."""
+
+    def test_happy_path_creates_draft(self):
+        result = _stub_parse_result()
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake-pdf-bytes', original_filename='1.pdf')
+        self.assertEqual(draft.contract_number, 'SPE7L1-26-C-INGST')
+        self.assertEqual(draft.contract_type, 'AWD')
+        self.assertEqual(draft.status, DraftContract.Status.QUEUED)
+        self.assertEqual(draft.data['buyer_text'], 'Acme Buying')
+        self.assertEqual(draft.data['contract_value'], '12345.67')
+        self.assertEqual(len(draft.data['clins']), 1)
+        self.assertEqual(draft.data['clins'][0]['nsn_text'], '1234-12-345-6789')
+
+    def test_missing_contract_number_rejected(self):
+        result = _stub_parse_result(contract_number=None)
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            with self.assertRaises(IngestionError):
+                ingest_pdf(b'fake', original_filename='2.pdf')
+
+    def test_missing_contract_type_rejected(self):
+        result = _stub_parse_result(contract_type=None)
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            with self.assertRaises(IngestionError):
+                ingest_pdf(b'fake', original_filename='3.pdf')
+
+    def test_duplicate_draft_rejected(self):
+        DraftContract.objects.create(
+            contract_number='SPE7L1-26-C-INGST', contract_type='AWD',
+        )
+        result = _stub_parse_result()
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            with self.assertRaises(DuplicateContractNumber):
+                ingest_pdf(b'fake', original_filename='4.pdf')
+
+
+class UploadViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+
+    def _upload(self, files_payload):
+        # files_payload is a list of (filename, AwardParseResult).
+        # We chain side_effects so each call returns the next stub.
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        upload_files = [
+            SimpleUploadedFile(name, b'%PDF-1.4 fake', content_type='application/pdf')
+            for name, _ in files_payload
+        ]
+        results = [r for _, r in files_payload]
+        with patch('intake.ingest.parse_award_pdf', side_effect=results):
+            return self.client.post(
+                reverse('intake:upload_pdfs'),
+                data={'pdfs': upload_files},
+            )
+
+    def test_upload_creates_drafts(self):
+        self.client.force_login(self.alice)
+        resp = self._upload([
+            ('a.pdf', _stub_parse_result(contract_number='SPE7L1-26-C-UP01')),
+            ('b.pdf', _stub_parse_result(contract_number='SPE7L1-26-C-UP02')),
+        ])
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(len(body['results']), 2)
+        self.assertTrue(all(r['ok'] for r in body['results']))
+        self.assertEqual(
+            DraftContract.objects.filter(
+                contract_number__in=['SPE7L1-26-C-UP01', 'SPE7L1-26-C-UP02']
+            ).count(),
+            2,
+        )
+
+    def test_upload_mixed_outcomes(self):
+        self.client.force_login(self.alice)
+        # File 1 → success. File 2 → parser returns no contract_number.
+        resp = self._upload([
+            ('ok.pdf', _stub_parse_result(contract_number='SPE7L1-26-C-MIX1')),
+            ('bad.pdf', _stub_parse_result(contract_number=None)),
+        ])
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body['results'][0]['ok'])
+        self.assertFalse(body['results'][1]['ok'])
+        # The bad file did not abort the good one.
+        self.assertTrue(
+            DraftContract.objects.filter(contract_number='SPE7L1-26-C-MIX1').exists()
+        )
+
+    def test_upload_no_files_rejected(self):
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:upload_pdfs'))
+        self.assertEqual(resp.status_code, 400)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — extended finalize types, DIBBS, email
+# ---------------------------------------------------------------------------
+
+
+class FinalizeExtendedTypesTests(TestCase):
+    """DO / INTERNAL / MOD / AMD finalize paths."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme Buying')
+        cls.nsn = Nsn.objects.create(nsn_code='4444', description='Bolt')
+        cls.supplier = Supplier.objects.create(name='SupX', cage_code='X1234')
+        cls.parent_idiq = IdiqContract.objects.create(
+            contract_number='SPE7L1-23-D-PARENT',
+        )
+        cls.parent_contract = Contract.objects.create(
+            contract_number='SPE7L1-25-C-PARENT',
+        )
+
+    def _do_draft(self, **overrides):
+        data = {
+            'buyer_id': self.buyer.id,
+            'buyer_text': 'Acme',
+            'parent_idiq_id': self.parent_idiq.id,
+            'parent_idiq_contract_number': self.parent_idiq.contract_number,
+            'clins': [{
+                'item_number': '0001',
+                'nsn_id': self.nsn.id, 'nsn_text': '4444',
+                'supplier_id': self.supplier.id, 'supplier_text': 'SupX',
+            }],
+        }
+        data.update(overrides)
+        return DraftContract.objects.create(
+            contract_number='SPE7L1-26-F-DOFIN',
+            contract_type='DO',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data=data,
+        )
+
+    def test_do_finalize_attaches_parent_idiq(self):
+        draft = self._do_draft()
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertEqual(target.idiq_contract_id, self.parent_idiq.id)
+        self.assertEqual(target.clin_set.count(), 1)
+
+    def test_do_requires_parent_idiq_match(self):
+        draft = self._do_draft(parent_idiq_id=None)
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+    def test_internal_finalize_no_buyer_required(self):
+        draft = DraftContract.objects.create(
+            contract_number='STATZ1-26-N-1001',
+            contract_type='INTERNAL',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={'notes': 'internal tracking'},
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertEqual(target.contract_number, 'STATZ1-26-N-1001')
+        self.assertEqual(target.clin_set.count(), 0)
+
+    def test_internal_rejects_unmatched_clin(self):
+        draft = DraftContract.objects.create(
+            contract_number='STATZ1-26-N-1002',
+            contract_type='INTERNAL',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={'clins': [{'item_number': '0001', 'nsn_text': 'unmatched'}]},
+        )
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+    def test_mod_appends_note_returns_parent_no_new_contract(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-M-MOD01',
+            contract_type='MOD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'parent_contract_id': self.parent_contract.id,
+                'parent_contract_number': self.parent_contract.contract_number,
+                'mod_number': 'P00001',
+                'summary': 'corrected ship address',
+            },
+        )
+        before_count = Contract.objects.count()
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        # No new Contract was created.
+        self.assertEqual(Contract.objects.count(), before_count)
+        # Note was appended to the parent.
+        from contracts.models import Note
+        from django.contrib.contenttypes.models import ContentType
+        notes = Note.objects.filter(
+            content_type=ContentType.objects.get_for_model(Contract),
+            object_id=self.parent_contract.id,
+            note_tag='mod',
+        )
+        self.assertEqual(notes.count(), 1)
+        self.assertIn('P00001', notes[0].note)
+        self.assertEqual(target.pk, self.parent_contract.pk)
+
+    def test_mod_requires_parent_contract_match(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-M-MOD02',
+            contract_type='MOD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={'mod_number': 'P00001', 'summary': 'x'},
+        )
+        with self.assertRaises(FinalizationError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+
+
+class FinanceLineShredTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme')
+        cls.nsn = Nsn.objects.create(nsn_code='5555', description='X')
+        cls.supplier = Supplier.objects.create(name='S', cage_code='99')
+
+    def test_finance_lines_attach_to_first_clin(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-C-FINLN',
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id,
+                'clins': [
+                    {'item_number': '0001', 'nsn_id': self.nsn.id,
+                     'supplier_id': self.supplier.id},
+                    {'item_number': '0002', 'nsn_id': self.nsn.id,
+                     'supplier_id': self.supplier.id},
+                ],
+                'finance_lines': [
+                    {'line_type': 'progress', 'amount': '1000.00',
+                     'notes': 'milestone 1'},
+                    {'line_type': 'progress', 'amount': '2000.00'},
+                ],
+            },
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        first_clin = target.clin_set.order_by('item_number').first()
+        second_clin = target.clin_set.order_by('item_number').last()
+        from contracts.models import ContractFinanceLine
+        first_lines = ContractFinanceLine.objects.filter(clin=first_clin)
+        second_lines = ContractFinanceLine.objects.filter(clin=second_clin)
+        self.assertEqual(first_lines.count(), 2)
+        self.assertEqual(second_lines.count(), 0)
+
+
+class ContractMatcherTests(TestCase):
+    """Verify the new 'contract' match_type used by MOD/AMD parent lookups."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.parent = Contract.objects.create(contract_number='SPE7L1-25-C-PMATCH')
+
+    def test_search_contract_by_number(self):
+        results = matcher_search('contract', 'PMATCH')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], self.parent.id)
+
+    def test_apply_parent_contract(self):
+        data = {}
+        apply_match(data, 'parent_contract', 'contract', self.parent.id)
+        self.assertEqual(data['parent_contract_id'], self.parent.id)
+        self.assertEqual(data['parent_contract_number'], 'SPE7L1-25-C-PMATCH')
+
+
+class DibbsIngestTests(TestCase):
+    """ingest_dibbs_record converter — no scraper invoked."""
+
+    def test_happy_path(self):
+        from intake.ingest import ingest_dibbs_record
+        rec = {
+            'Award_Basic_Number': 'SPE7L1-26-C-9001',
+            'Delivery_Order_Number': '',
+            'Award_Date': '05-15-2026',
+            'Awardee_CAGE_Code': '12345',
+            'Total_Contract_Price': '10000.00',
+            'NSN_Part_Number': '1234-12-345-6789',
+            'Nomenclature': 'Widget',
+            'Purchase_Request': 'PR-77',
+            'Solicitation': 'SPE7L1-26-R-0001',
+        }
+        draft = ingest_dibbs_record(rec)
+        self.assertEqual(draft.contract_number, 'SPE7L1-26-C-9001')
+        self.assertEqual(draft.contract_type, 'AWD')
+        self.assertEqual(draft.pdf_parse_status, DraftContract.PdfParseStatus.NO_PDF)
+        self.assertEqual(draft.data['pr_number'], 'PR-77')
+        self.assertEqual(draft.data['contractor_cage'], '12345')
+        self.assertEqual(len(draft.data['clins']), 1)
+        self.assertEqual(draft.data['clins'][0]['nsn_text'], '1234-12-345-6789')
+
+    def test_do_uses_delivery_order_number_as_identity(self):
+        from intake.ingest import ingest_dibbs_record
+        rec = {
+            'Award_Basic_Number': 'SPE7L1-23-D-PARENT',
+            'Delivery_Order_Number': 'SPE7L1-26-F-DO001',
+            'Award_Date': '05-15-2026',
+            'NSN_Part_Number': '9999',
+        }
+        draft = ingest_dibbs_record(rec)
+        self.assertEqual(draft.contract_number, 'SPE7L1-26-F-DO001')
+        self.assertEqual(draft.contract_type, 'DO')
+
+    def test_missing_numbers_rejected(self):
+        from intake.ingest import ingest_dibbs_record
+        with self.assertRaises(IngestionError):
+            ingest_dibbs_record({'NSN_Part_Number': '9999'})
+
+
+class FinalizeEmailRedirectTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme')
+        cls.nsn = Nsn.objects.create(nsn_code='6666', description='X')
+        cls.supplier = Supplier.objects.create(name='S', cage_code='99')
+
+    def test_finalize_view_redirects_to_compose(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-C-EMAIL',
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id, 'buyer_text': 'Acme',
+                'pr_number': 'PR-EM',
+                'clins': [{
+                    'item_number': '0001',
+                    'nsn_id': self.nsn.id, 'nsn_text': '6666',
+                    'supplier_id': self.supplier.id, 'supplier_text': 'S',
+                }],
+            },
+        )
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/processing/email-compose/', resp.url)
+        # The body should contain the new contract number.
+        self.assertIn('SPE7L1-26-C-EMAIL', resp.url)
+        self.assertIn('subject=', resp.url)
+
+    def test_mod_finalize_skips_email_redirect(self):
+        parent = Contract.objects.create(contract_number='SPE7L1-25-C-PMOD')
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-M-NEMAIL',
+            contract_type='MOD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'parent_contract_id': parent.id,
+                'parent_contract_number': parent.contract_number,
+                'mod_number': 'P00001', 'summary': 'x',
+            },
+        )
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 302)
+        # MOD returns parent — no email compose, just queue.
+        self.assertNotIn('/processing/email-compose/', resp.url)

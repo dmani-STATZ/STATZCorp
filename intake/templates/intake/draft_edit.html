@@ -2,6 +2,11 @@
 {% load static %}
 {% load intake_extras %}
 
+{% block extra_head %}
+{{ block.super }}
+<script src="{% static 'intake/js/match_modal.js' %}?v={{ cache_version }}" defer></script>
+{% endblock %}
+
 {% block title %}Edit Draft {{ draft.contract_number }}{% endblock %}
 
 {% block content %}
@@ -82,18 +87,25 @@
                            class="form-control">
                 </div>
                 <div>
-                    <label class="label block mb-1">Buyer (parsed)</label>
-                    <input type="text" name="f_buyer_text"
-                           value="{{ data|get_item:'buyer_text'|default:'' }}"
-                           class="form-control">
+                    <label class="label block mb-1">Buyer</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="f_buyer_text"
+                               value="{{ data|get_item:'buyer_text'|default:'' }}"
+                               class="form-control">
+                        <button type="button" class="btn btn-outline-primary"
+                                data-match-open
+                                data-match-type="buyer"
+                                data-target-path="buyer"
+                                data-match-title="Buyer"
+                                data-match-original="{{ data|get_item:'buyer_text'|default:'' }}">
+                            Match
+                        </button>
+                    </div>
                     <input type="hidden" name="f_buyer_id"
                            value="{{ data|get_item:'buyer_id'|default:'' }}">
-                    <p class="text-xs text-gray-500 mt-1">
-                        Buyer match → Phase 2b
-                        {% with bid=data|get_item:'buyer_id' %}
-                            {% if bid %}<span class="badge bg-success ms-1">matched #{{ bid }}</span>{% endif %}
-                        {% endwith %}
-                    </p>
+                    {% with bid=data|get_item:'buyer_id' %}
+                        {% if bid %}<span class="badge bg-success mt-1">matched #{{ bid }}</span>{% endif %}
+                    {% endwith %}
                 </div>
                 <div>
                     <label class="label block mb-1">Contractor Name</label>
@@ -120,19 +132,26 @@
         {% if draft.contract_type == 'DO' %}
         <div class="card card-padded shadow-sm mb-4">
             <h2 class="text-xl font-semibold mb-3">Parent IDIQ</h2>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="label block mb-1">Parent IDIQ Contract Number</label>
+            <div>
+                <label class="label block mb-1">Parent IDIQ Contract Number</label>
+                <div class="input-group input-group-sm">
                     <input type="text" name="f_parent_idiq_contract_number"
                            value="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}"
                            class="form-control">
+                    <button type="button" class="btn btn-outline-primary"
+                            data-match-open
+                            data-match-type="idiq"
+                            data-target-path="parent_idiq"
+                            data-match-title="Parent IDIQ"
+                            data-match-original="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}">
+                        Match
+                    </button>
                 </div>
-                <div>
-                    <label class="label block mb-1">Parent IDIQ ID (matched)</label>
-                    <input type="number" name="f_parent_idiq_id"
-                           value="{{ data|get_item:'parent_idiq_id'|default:'' }}"
-                           class="form-control">
-                </div>
+                <input type="hidden" name="f_parent_idiq_id"
+                       value="{{ data|get_item:'parent_idiq_id'|default:'' }}">
+                {% with pid=data|get_item:'parent_idiq_id' %}
+                    {% if pid %}<span class="badge bg-success mt-1">matched #{{ pid }}</span>{% endif %}
+                {% endwith %}
             </div>
         </div>
         {% endif %}
@@ -176,8 +195,7 @@
             </div>
             <table class="min-w-full" id="nsn-table">
                 <thead><tr>
-                    <th class="text-left p-2">NSN Text</th>
-                    <th class="text-left p-2">NSN ID</th>
+                    <th class="text-left p-2">NSN</th>
                     <th class="text-left p-2">Description</th>
                     <th class="text-left p-2">Min Order Qty</th>
                     <th></th>
@@ -185,10 +203,19 @@
                 <tbody>
                 {% for row in approved_nsns %}
                     <tr data-row="nsn" data-idx="{{ forloop.counter0 }}">
-                        <td class="p-1"><input type="text" name="nsn-{{ forloop.counter0 }}-nsn_text"
-                            value="{{ row|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm"></td>
-                        <td class="p-1"><input type="number" name="nsn-{{ forloop.counter0 }}-nsn_id"
-                            value="{{ row|get_item:'nsn_id'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1">
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="nsn-{{ forloop.counter0 }}-nsn_text"
+                                    value="{{ row|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm">
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        data-match-open data-match-type="nsn"
+                                        data-target-path="approved_nsn:{{ forloop.counter0 }}"
+                                        data-match-title="Approved NSN"
+                                        data-match-original="{{ row|get_item:'nsn_text'|default:'' }}">M</button>
+                            </div>
+                            <input type="hidden" name="nsn-{{ forloop.counter0 }}-nsn_id"
+                                value="{{ row|get_item:'nsn_id'|default:'' }}">
+                        </td>
                         <td class="p-1"><input type="text" name="nsn-{{ forloop.counter0 }}-nsn_description"
                             value="{{ row|get_item:'nsn_description'|default:'' }}" class="form-control form-control-sm"></td>
                         <td class="p-1"><input type="text" name="nsn-{{ forloop.counter0 }}-min_order_qty"
@@ -208,18 +235,26 @@
             </div>
             <table class="min-w-full" id="supp-table">
                 <thead><tr>
-                    <th class="text-left p-2">Supplier Text</th>
-                    <th class="text-left p-2">Supplier ID</th>
+                    <th class="text-left p-2">Supplier</th>
                     <th class="text-left p-2">CAGE</th>
                     <th></th>
                 </tr></thead>
                 <tbody>
                 {% for row in approved_suppliers %}
                     <tr data-row="supp" data-idx="{{ forloop.counter0 }}">
-                        <td class="p-1"><input type="text" name="supp-{{ forloop.counter0 }}-supplier_text"
-                            value="{{ row|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm"></td>
-                        <td class="p-1"><input type="number" name="supp-{{ forloop.counter0 }}-supplier_id"
-                            value="{{ row|get_item:'supplier_id'|default:'' }}" class="form-control form-control-sm"></td>
+                        <td class="p-1">
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="supp-{{ forloop.counter0 }}-supplier_text"
+                                    value="{{ row|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm">
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        data-match-open data-match-type="supplier"
+                                        data-target-path="approved_supplier:{{ forloop.counter0 }}"
+                                        data-match-title="Approved Supplier"
+                                        data-match-original="{{ row|get_item:'supplier_text'|default:'' }}">M</button>
+                            </div>
+                            <input type="hidden" name="supp-{{ forloop.counter0 }}-supplier_id"
+                                value="{{ row|get_item:'supplier_id'|default:'' }}">
+                        </td>
                         <td class="p-1"><input type="text" name="supp-{{ forloop.counter0 }}-cage"
                             value="{{ row|get_item:'cage'|default:'' }}" class="form-control form-control-sm"></td>
                         <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
@@ -234,17 +269,25 @@
         <div class="card card-padded shadow-sm mb-4">
             <h2 class="text-xl font-semibold mb-3">Modification / Amendment</h2>
             <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="label block mb-1">Parent Contract Number</label>
-                    <input type="text" name="f_parent_contract_number"
-                           value="{{ data|get_item:'parent_contract_number'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div>
-                    <label class="label block mb-1">Parent Contract ID</label>
-                    <input type="number" name="f_parent_contract_id"
-                           value="{{ data|get_item:'parent_contract_id'|default:'' }}"
-                           class="form-control">
+                <div class="col-span-2">
+                    <label class="label block mb-1">Parent Contract</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="f_parent_contract_number"
+                               value="{{ data|get_item:'parent_contract_number'|default:'' }}"
+                               class="form-control">
+                        <button type="button" class="btn btn-outline-primary"
+                                data-match-open data-match-type="contract"
+                                data-target-path="parent_contract"
+                                data-match-title="Parent Contract"
+                                data-match-original="{{ data|get_item:'parent_contract_number'|default:'' }}">
+                            Match
+                        </button>
+                    </div>
+                    <input type="hidden" name="f_parent_contract_id"
+                           value="{{ data|get_item:'parent_contract_id'|default:'' }}">
+                    {% with pcid=data|get_item:'parent_contract_id' %}
+                        {% if pcid %}<span class="badge bg-success mt-1">matched #{{ pcid }}</span>{% endif %}
+                    {% endwith %}
                 </div>
                 <div>
                     <label class="label block mb-1">Mod Number</label>
@@ -273,10 +316,8 @@
                     <thead><tr>
                         <th class="text-left p-2">Item #</th>
                         <th class="text-left p-2">Type</th>
-                        <th class="text-left p-2">NSN Text</th>
-                        <th class="text-left p-2">NSN ID</th>
-                        <th class="text-left p-2">Supplier Text</th>
-                        <th class="text-left p-2">Supplier ID</th>
+                        <th class="text-left p-2">NSN</th>
+                        <th class="text-left p-2">Supplier</th>
                         <th class="text-left p-2">Qty</th>
                         <th class="text-left p-2">UOM</th>
                         <th class="text-left p-2">Unit Price</th>
@@ -300,10 +341,28 @@
                                     {% endwith %}
                                 </select>
                             </td>
-                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-nsn_text" value="{{ clin|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm"></td>
-                            <td class="p-1"><input type="number" name="clin-{{ forloop.counter0 }}-nsn_id" value="{{ clin|get_item:'nsn_id'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
-                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-supplier_text" value="{{ clin|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm"></td>
-                            <td class="p-1"><input type="number" name="clin-{{ forloop.counter0 }}-supplier_id" value="{{ clin|get_item:'supplier_id'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
+                            <td class="p-1">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" name="clin-{{ forloop.counter0 }}-nsn_text" value="{{ clin|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm">
+                                    <button type="button" class="btn btn-outline-primary btn-sm"
+                                            data-match-open data-match-type="nsn"
+                                            data-target-path="clin:{{ forloop.counter0 }}:nsn"
+                                            data-match-title="NSN (CLIN {{ clin|get_item:'item_number'|default:forloop.counter0 }})"
+                                            data-match-original="{{ clin|get_item:'nsn_text'|default:'' }}">M</button>
+                                </div>
+                                <input type="hidden" name="clin-{{ forloop.counter0 }}-nsn_id" value="{{ clin|get_item:'nsn_id'|default:'' }}">
+                            </td>
+                            <td class="p-1">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" name="clin-{{ forloop.counter0 }}-supplier_text" value="{{ clin|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm">
+                                    <button type="button" class="btn btn-outline-primary btn-sm"
+                                            data-match-open data-match-type="supplier"
+                                            data-target-path="clin:{{ forloop.counter0 }}:supplier"
+                                            data-match-title="Supplier (CLIN {{ clin|get_item:'item_number'|default:forloop.counter0 }})"
+                                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}">M</button>
+                                </div>
+                                <input type="hidden" name="clin-{{ forloop.counter0 }}-supplier_id" value="{{ clin|get_item:'supplier_id'|default:'' }}">
+                            </td>
                             <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-order_qty" value="{{ clin|get_item:'order_qty'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
                             <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-uom" value="{{ clin|get_item:'uom'|default:'' }}" class="form-control form-control-sm" style="width:4rem"></td>
                             <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-unit_price" value="{{ clin|get_item:'unit_price'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
@@ -369,17 +428,25 @@
                            value="{{ packaging|get_item:'packhouse_cage'|default:'' }}"
                            class="form-control">
                 </div>
-                <div>
-                    <label class="label block mb-1">Packhouse Supplier (text)</label>
-                    <input type="text" name="pkg-packhouse_supplier_text"
-                           value="{{ packaging|get_item:'packhouse_supplier_text'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div>
-                    <label class="label block mb-1">Packhouse Supplier ID</label>
-                    <input type="number" name="pkg-packhouse_supplier_id"
-                           value="{{ packaging|get_item:'packhouse_supplier_id'|default:'' }}"
-                           class="form-control">
+                <div class="col-span-2">
+                    <label class="label block mb-1">Packhouse Supplier</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="pkg-packhouse_supplier_text"
+                               value="{{ packaging|get_item:'packhouse_supplier_text'|default:'' }}"
+                               class="form-control">
+                        <button type="button" class="btn btn-outline-primary"
+                                data-match-open data-match-type="supplier"
+                                data-target-path="packaging"
+                                data-match-title="Packhouse Supplier"
+                                data-match-original="{{ packaging|get_item:'packhouse_supplier_text'|default:'' }}">
+                            Match
+                        </button>
+                    </div>
+                    <input type="hidden" name="pkg-packhouse_supplier_id"
+                           value="{{ packaging|get_item:'packhouse_supplier_id'|default:'' }}">
+                    {% with sid=packaging|get_item:'packhouse_supplier_id' %}
+                        {% if sid %}<span class="badge bg-success mt-1">matched #{{ sid }}</span>{% endif %}
+                    {% endwith %}
                 </div>
                 <div>
                     <label class="label block mb-1">Quote Amount</label>
@@ -405,7 +472,7 @@
         {% endif %}
 
         {# ---- Action bar ---- #}
-        <div class="d-flex gap-2 my-4">
+        <div class="d-flex gap-2 my-4 flex-wrap">
             <button type="submit" class="btn btn-primary"
                     {% if not lock_held_by_user %}disabled{% endif %}>
                 Save
@@ -426,6 +493,36 @@
         </div>
     </form>
 
+    {# ---- Finalize bar (separate form so editor edits aren't POSTed) ---- #}
+    {% if draft.status == 'ready_for_review' %}
+    <div class="card card-padded shadow-sm mb-4 border-success">
+        <h2 class="text-xl font-semibold mb-2">Finalize</h2>
+        <p class="text-sm text-gray-700 mb-3">
+            Shred this draft into a canonical Contract / IDIQ Contract.
+            Drafts are deleted on success. The action is wrapped in a
+            transaction so any failure leaves the draft intact.
+        </p>
+        <form method="post" action="{% url 'intake:finalize_draft' draft.pk %}">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-success"
+                    {% if not lock_held_by_user %}disabled{% endif %}
+                    onclick="return confirm('Finalize {{ draft.contract_number }}? The draft will be deleted on success.')">
+                Finalize Draft → Contract
+            </button>
+            {% if not lock_held_by_user %}
+            <p class="small text-muted mt-2 mb-0">
+                Re-acquire the lock from the queue to finalize.
+            </p>
+            {% endif %}
+        </form>
+    </div>
+    {% elif draft.status == 'in_progress' %}
+    <div class="alert alert-info">
+        Mark this draft <strong>Ready for Review</strong> above to enable Finalize.
+    </div>
+    {% endif %}
+
     {% if lock_held_by_user %}
     <form method="post" action="{% url 'intake:release_draft' draft.pk %}">
         {% csrf_token %}
@@ -434,6 +531,9 @@
         </button>
     </form>
     {% endif %}
+
+    {# Unified matcher modal — opened by any [data-match-open] button. #}
+    {% include 'intake/_match_modal.html' %}
 </div>
 
 {# Row templates kept off-DOM so the indexes don't collide with rendered rows. #}
@@ -445,10 +545,20 @@
                 <option value="">—</option><option>P</option><option>G</option><option>C</option><option>L</option><option>M</option>
             </select>
         </td>
-        <td class="p-1"><input type="text" data-name="clin-__IDX__-nsn_text" class="form-control form-control-sm"></td>
-        <td class="p-1"><input type="number" data-name="clin-__IDX__-nsn_id" class="form-control form-control-sm" style="width:5rem"></td>
-        <td class="p-1"><input type="text" data-name="clin-__IDX__-supplier_text" class="form-control form-control-sm"></td>
-        <td class="p-1"><input type="number" data-name="clin-__IDX__-supplier_id" class="form-control form-control-sm" style="width:5rem"></td>
+        <td class="p-1">
+            <div class="input-group input-group-sm">
+                <input type="text" data-name="clin-__IDX__-nsn_text" class="form-control form-control-sm">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="nsn" data-target-path="clin:__IDX__:nsn" data-match-title="NSN (new CLIN)">M</button>
+            </div>
+            <input type="hidden" data-name="clin-__IDX__-nsn_id">
+        </td>
+        <td class="p-1">
+            <div class="input-group input-group-sm">
+                <input type="text" data-name="clin-__IDX__-supplier_text" class="form-control form-control-sm">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="supplier" data-target-path="clin:__IDX__:supplier" data-match-title="Supplier (new CLIN)">M</button>
+            </div>
+            <input type="hidden" data-name="clin-__IDX__-supplier_id">
+        </td>
         <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-order_qty" class="form-control form-control-sm" style="width:5rem"></td>
         <td class="p-1"><input type="text" data-name="clin-__IDX__-uom" class="form-control form-control-sm" style="width:4rem"></td>
         <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-unit_price" class="form-control form-control-sm" style="width:6rem"></td>
@@ -477,8 +587,13 @@
 </template>
 <template id="tpl-nsn">
     <tr data-row="nsn">
-        <td class="p-1"><input type="text" data-name="nsn-__IDX__-nsn_text" class="form-control form-control-sm"></td>
-        <td class="p-1"><input type="number" data-name="nsn-__IDX__-nsn_id" class="form-control form-control-sm"></td>
+        <td class="p-1">
+            <div class="input-group input-group-sm">
+                <input type="text" data-name="nsn-__IDX__-nsn_text" class="form-control form-control-sm">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="nsn" data-target-path="approved_nsn:__IDX__" data-match-title="Approved NSN">M</button>
+            </div>
+            <input type="hidden" data-name="nsn-__IDX__-nsn_id">
+        </td>
         <td class="p-1"><input type="text" data-name="nsn-__IDX__-nsn_description" class="form-control form-control-sm"></td>
         <td class="p-1"><input type="text" data-name="nsn-__IDX__-min_order_qty" class="form-control form-control-sm"></td>
         <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
@@ -486,8 +601,13 @@
 </template>
 <template id="tpl-supp">
     <tr data-row="supp">
-        <td class="p-1"><input type="text" data-name="supp-__IDX__-supplier_text" class="form-control form-control-sm"></td>
-        <td class="p-1"><input type="number" data-name="supp-__IDX__-supplier_id" class="form-control form-control-sm"></td>
+        <td class="p-1">
+            <div class="input-group input-group-sm">
+                <input type="text" data-name="supp-__IDX__-supplier_text" class="form-control form-control-sm">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="supplier" data-target-path="approved_supplier:__IDX__" data-match-title="Approved Supplier">M</button>
+            </div>
+            <input type="hidden" data-name="supp-__IDX__-supplier_id">
+        </td>
         <td class="p-1"><input type="text" data-name="supp-__IDX__-cage" class="form-control form-control-sm"></td>
         <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
     </tr>
@@ -506,9 +626,16 @@
         if (!tpl || !table) return;
         const idx = counters[prefix]++;
         const frag = tpl.content.cloneNode(true);
-        frag.querySelectorAll('[data-name]').forEach(el => {
-            el.name = el.dataset.name.replace('__IDX__', idx);
-            el.removeAttribute('data-name');
+        frag.querySelectorAll('*').forEach(el => {
+            // Substitute __IDX__ in data-name → name, and in any data-* attr
+            // that legitimately needs the row index (e.g. data-target-path).
+            if (el.dataset.name) {
+                el.name = el.dataset.name.replace('__IDX__', idx);
+                el.removeAttribute('data-name');
+            }
+            if (el.dataset.targetPath && el.dataset.targetPath.indexOf('__IDX__') !== -1) {
+                el.dataset.targetPath = el.dataset.targetPath.replace('__IDX__', idx);
+            }
         });
         const tr = frag.querySelector('tr');
         tr.dataset.idx = idx;
@@ -529,6 +656,56 @@
             if (tr) tr.remove();
         }
     });
+
+    // ---------------------------------------------------------------
+    // Matcher integration
+    // ---------------------------------------------------------------
+    // The matcher endpoint writes JSON server-side and saves the draft.
+    // After a successful apply/clear, we reload the page so the editor
+    // re-renders from canonical state. Unsaved manual edits would be lost
+    // by this reload, so we warn the user when the form is dirty.
+
+    const form = document.getElementById('draft-edit-form');
+    let dirty = false;
+    if (form) {
+        form.addEventListener('input', function() { dirty = true; });
+        form.addEventListener('submit', function() { dirty = false; });
+    }
+
+    function init() {
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!window.IntakeMatch || !csrf) return;
+        window.IntakeMatch.init({
+            matchUrl: "{% url 'intake:match' draft.pk %}",
+            csrfToken: csrf.value,
+        });
+
+        document.addEventListener('click', function(ev) {
+            const opener = ev.target.closest('[data-match-open]');
+            if (!opener) return;
+            if (dirty) {
+                const ok = confirm(
+                    'You have unsaved changes in the form. Matching will reload ' +
+                    'the page and discard them. Continue?'
+                );
+                if (!ok) {
+                    ev.stopImmediatePropagation();
+                    ev.preventDefault();
+                }
+            }
+        }, true);  // capture-phase so we run before IntakeMatch's handler
+
+        document.addEventListener('intake:match-applied', function() {
+            // Server is canonical — reload to re-render from the saved JSON.
+            window.location.reload();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
 </script>
 {% endblock %}

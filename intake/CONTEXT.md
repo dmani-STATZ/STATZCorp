@@ -89,7 +89,76 @@ reshapes the POST back into the per-type JSON schema:
 Unknown keys are dropped at parse time. All-blank rows are dropped. Date /
 Decimal coercion is deferred to the Pydantic schema on `DraftContract.save()`.
 
-## What's Built (Phase 1 + 2a)
+## Matcher (Phase 2b)
+A single endpoint `intake:match` (`POST /intake/drafts/<pk>/match/`) handles
+all four entity types (buyer / IDIQ / NSN / supplier) and every match site
+in the JSON via a `target_path` grammar. Replaces the processing app's five
+per-entity modals with one reusable modal partial + JS module.
+
+Actions:
+- `search` — read-only, no lock required.
+- `apply` — locks the row, writes `*_text` + `*_id` (+ `*_description` /
+  `*_cage` where relevant) under the chosen path, saves through schema
+  validation.
+- `clear` — strips `*_id` only (leaves `*_text` for the user to edit).
+
+Target paths:
+- `buyer`, `parent_idiq`, `parent_contract`, `packaging` (top-level)
+- `clin:<i>:nsn`, `clin:<i>:supplier`
+- `approved_nsn:<i>`, `approved_supplier:<i>`
+
+Editor UX: matchers POST and save server-side as canonical state, so the
+client reloads on `intake:match-applied`. The dirty-form guard in
+`draft_edit.html` warns before clobbering unsaved manual edits.
+
+## Finalization (Phase 3)
+`intake/finalize.py` shreds a Ready-for-Review draft into canonical
+`contracts.*` tables and deletes the draft on success. The whole flow runs
+inside `transaction.atomic()` so any failure rolls back cleanly.
+
+Supported types: **AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD**.
+
+| Type     | Requirements                                       | Canonical effect                                   |
+|----------|----------------------------------------------------|----------------------------------------------------|
+| AWD/PO   | `buyer_id` + ≥1 CLIN, each with `nsn_id`+`supplier_id` | new Contract + Clins + optional Packaging + finance_lines on first CLIN |
+| DO       | Same as AWD/PO + `parent_idiq_id`                  | new Contract with `idiq_contract` FK set           |
+| IDIQ     | (nothing required; buyer optional)                 | new IdiqContract + cross-product IdiqContractDetails |
+| INTERNAL | If any CLIN provided, each must be fully matched   | new Contract; CLINs optional; notes append as Note |
+| MOD/AMD  | `parent_contract_id` matched                       | appends a tagged Note on the parent Contract; returns parent (no new row) |
+
+`finance_lines` (root-level on the intake JSON) attach to the FIRST canonical
+CLIN. `ContractFinanceLine` is keyed to Clin, not Contract, so this is a
+pragmatic placement; analysts can re-bucket via the Finance Audit page.
+
+URL: `intake:finalize_draft` → `POST /intake/drafts/<pk>/finalize/`
+(requires lock + status=`ready_for_review`). On success for AWD/PO/DO/INTERNAL,
+redirects to `/processing/email-compose/` with subject + body pre-populated
+(matches the long-standing processing-app email workflow). MOD/AMD skip the
+email step.
+
+## PDF Ingestion (Phase 3c)
+`intake/ingest.py` wraps `processing.services.pdf_parser.parse_award_pdf`
+(the existing DLA 1155 parser) and converts the resulting
+`AwardParseResult` dataclass into the intake `data` JSON shape. The mapping
+lives ONLY in `_result_to_data` — when the parser grows new fields, update
+the mapping there.
+
+`ingest_pdf(file, original_filename='...')` returns the new `DraftContract`
+or raises:
+- `IngestionError` — parser couldn't extract a contract_number / type, or
+  schema validation rejected the converted data.
+- `DuplicateContractNumber` — already exists as a draft or as a canonical
+  `Contract`. We don't overwrite either side.
+
+URL: `intake:upload_pdfs` → `POST /intake/upload/` (multipart, field name
+`pdfs`, multi-file). Each file is processed independently; one bad PDF
+does not abort the batch. Response is `{"results": [...]}` with per-file
+outcomes.
+
+UI: drag-and-drop zone on the queue page (`draft_queue.html`) that hits
+the upload endpoint and reloads the queue on any success.
+
+## What's Built (Phase 1 + 2a + 2b + 3a + 3c PDF)
 - `DraftContract` model + migrations
 - Pydantic schemas for all seven contract types
 - Lock model + helpers + clear-stale management command
@@ -99,15 +168,30 @@ Decimal coercion is deferred to the Pydantic schema on `DraftContract.save()`.
   the soft lock before write
 - POST → JSON parser (`forms_parse.parse_post`) with row dedup and unknown-key
   drop
+- **Unified matcher** (`intake/matchers.py` + `intake:match` endpoint +
+  `_match_modal.html` + `match_modal.js`) for buyer / IDIQ / NSN / supplier
+- **Finalization** for AWD / PO / IDIQ (`intake/finalize.py` +
+  `intake:finalize_draft` endpoint + Finalize button on the editor)
+- **PDF ingestion** via drag-and-drop on the queue (`intake/ingest.py` +
+  `intake:upload_pdfs` endpoint, reuses `processing.services.pdf_parser`)
+- **Finalization for all seven types** (AWD/PO/DO/IDIQ/INTERNAL/MOD/AMD)
+- **`ContractFinanceLine` shred** — attaches root-level finance_lines to the
+  first canonical CLIN
+- **DIBBS ingestion** — `python manage.py intake_dibbs_pull --date YYYY-MM-DD`
+  creates skeleton drafts (status=queued, pdf_parse_status=no_pdf) from the
+  DIBBS Awards table. Reuses `sales.services.dibbs_awards_scraper` as-is.
+- **Finalization email** — redirects to `/processing/email-compose/` with
+  prefilled subject + body on Contract-creating finalize paths
 
-## Not Yet Built
-- **Phase 2b**: modal matchers (buyer / IDIQ / NSN / supplier) writing
-  `*_text` + `*_id` pairs back to JSON. The editor currently exposes raw
-  numeric ID inputs as placeholders.
-- Finalization → `contracts.*` shred (Phase 3)
-- PDF parser port from `processing/services/pdf_parser.py` (Phase 3)
-- CSV + DIBBS ingestion paths (Phase 3)
-- Finalization email (Phase 3)
+## Not Yet Built (explicitly out of scope)
+- CSV ingestion path — depends on an external group that has not delivered
+  the CSV feed; deferred indefinitely
+- "Add new" inline creation from the matcher modal
+- Fetching the actual award PDF for a DIBBS-scraped row (the DIBBS site
+  doesn't expose a direct award-PDF URL in the scraped table; analysts
+  drop the PDF on the queue manually after the skeleton lands)
+- "Add new" inline creation from the matcher modal (parity with processing's
+  "Add as new Buyer/NSN/Supplier" buttons)
 
 ## Coupling
 - Reads `contracts.models.Contract` for the "Already in DB" queue badge and
