@@ -729,3 +729,21 @@ html {
     color: var(--bs-primary);
     border-bottom-color: var(--bs-primary);
 }
+
+/* === PO Snippet Library === */
+.snippet-card {
+    transition: box-shadow 0.15s ease;
+}
+.snippet-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+[data-bs-theme="dark"] .snippet-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+#poSnippetsOffcanvas .offcanvas-body {
+    overflow: hidden;
+}
+#snippetList {
+    overflow-y: auto;
+    flex: 1 1 auto;
+}

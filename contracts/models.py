@@ -1727,3 +1727,23 @@ class ClinReclassificationDraft(models.Model):
 
     def __str__(self):
         return f"Draft (Clin {self.clin_id} → {self.destination_type}) by {self.user_id}"
+
+
+class POSnippet(models.Model):
+    company = models.ForeignKey(
+        'Company',
+        on_delete=models.CASCADE,
+        related_name='po_snippets',
+    )
+    title = models.CharField(max_length=200)
+    category = models.CharField(max_length=100, blank=True, default='')
+    body = models.TextField()
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['category', 'sort_order', 'title']
+        verbose_name = 'PO Snippet'
+        verbose_name_plural = 'PO Snippets'
+
+    def __str__(self):
+        return self.title

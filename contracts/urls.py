@@ -475,6 +475,11 @@ urlpatterns = [
         name="notes_popup_tab_clin",
     ),
     # API endpoints
+    # PO Snippet Library
+    path('api/po-snippets/', views.po_snippet_list, name='po_snippet_list'),
+    path('api/po-snippets/create/', views.po_snippet_create, name='po_snippet_create'),
+    path('api/po-snippets/<int:pk>/update/', views.po_snippet_update, name='po_snippet_update'),
+    path('api/po-snippets/<int:pk>/delete/', views.po_snippet_delete, name='po_snippet_delete'),
     path("search/", contract_search, name="contract_search"),
     path("clin/<int:clin_id>/notes/", get_clin_notes, name="get_clin_notes"),
     path("clin/<int:clin_id>/details/", get_clin_details, name="get_clin_details"),

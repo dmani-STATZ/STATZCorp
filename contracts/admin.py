@@ -17,6 +17,7 @@ from .models import (
     DfasImportRow,
     FinanceLinePayment,
     FinanceLineType,
+    POSnippet,
     Reminder,
     SalesClass,
     SpecialPaymentTerms,
@@ -198,6 +199,14 @@ class ClinReclassificationLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(POSnippet)
+class POSnippetAdmin(admin.ModelAdmin):
+    list_display = ('title', 'category', 'sort_order', 'company')
+    list_filter = ('company', 'category')
+    search_fields = ('title', 'body', 'category')
+    ordering = ('company', 'category', 'sort_order', 'title')
 
 
 @admin.register(ClinReclassificationDraft)

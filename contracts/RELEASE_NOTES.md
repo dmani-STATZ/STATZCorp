@@ -8,6 +8,8 @@
 
 ### Added
 
+- **PO Snippet Library** — Contract managers can now store, organize, and copy reusable PO paragraph snippets from the Options menu on any contract management page. Snippets are company-scoped, grouped by category, and searchable. Full add / edit / delete support with one-click clipboard copy.
+
 On PO Sent to Supplier toggle:
 
 - "PO ACKNOWLEDGMENT LETTER Followup" note and 10-day reminder created on the first Production CLIN.

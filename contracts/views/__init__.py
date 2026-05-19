@@ -140,6 +140,13 @@ from .api_views import (
     create_supplier,
 )
 
+from .snippet_views import (
+    po_snippet_list,
+    po_snippet_create,
+    po_snippet_update,
+    po_snippet_delete,
+)
+
 from .acknowledgment_views import (
     get_acknowledgment_letter,
     update_acknowledgment_letter,

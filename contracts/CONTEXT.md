@@ -171,6 +171,18 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - `users` assets: `UserCompanyMembership` powers `CompanyForm`, `UserSettings` drives reminder sidebar preferences, and `STATZWeb.decorators.conditional_login_required` plus `request.active_company` tie the app to the shared authentication layer.
 - `STATZWeb` and `sales` indirectly depend on contract data (e.g., docs mention `award_date` used in the DIBBS spec), so any schema change ripple affects those reports/integrations.
 
+## PO Snippet Library
+
+- **Model:** `POSnippet` (company FK, title, category, body, sort_order). No audit fields — purely utilitarian.
+- **Migration:** `contracts/migrations/0067_add_po_snippet.py`.
+- **Legacy data import (one-time):** `python manage.py import_po_snippets --company-slug <slug> [--dry-run]` reads `STATZ_PO_TEMPLATES_TBL` on the default SQL Server connection and bulk-creates `POSnippet` rows (idempotent on exact title match per company). Imported rows get `category=''` and `sort_order=0` — assign categories/sort order in the PO Templates drawer after import. **Delete** `contracts/management/commands/import_po_snippets.py` once migration is confirmed and remove this bullet.
+- **Views:** `contracts/views/snippet_views.py` — four JSON endpoints (list, create, update, delete), all `@login_required`, company-scoped via `request.active_company`.
+- **URLs** (all under `contracts:` namespace): `po_snippet_list`, `po_snippet_create`, `po_snippet_update`, `po_snippet_delete`.
+- **Access:** Options → PO Templates on `contract_management.html`. Opens a Bootstrap 5 offcanvas (`#poSnippetsOffcanvas`, 680 px wide) without leaving the page.
+- **JS:** `contracts/static/contracts/js/po_snippets.js` — IIFE `POSnippets` module with `load`, `copy`, `openEditor`, `deleteSnippet`, `saveSnippet`, `renderList`. Clipboard uses `navigator.clipboard.writeText`.
+- **Category field** is free-text; a `<datalist>` populates from existing categories as the user types. Snippets are grouped by category in the list.
+- **Dark mode:** all colours use `var(--bs-*)` tokens; dark mode styles use `[data-bs-theme="dark"]` attribute selectors only.
+
 ## 12. URL Surface / API Surface
 - Dashboard & exports: `/contracts/`, `/contracts/dashboard/metric-detail/`, `/contracts/dashboard/metric-detail/export/`.
 - Contract lifecycle URLs: `<pk>/` (management), `<pk>/detail/`, `<pk>/close/`, `<pk>/cancel/`, `<pk>/review/`, toggles like `mark-reviewed`, `toggle-contract-field`, `toggle-expedite-status`. (Canonical contract **create** is in the `processing` app, not under `/contracts/create/`.)
@@ -184,6 +196,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - Folder tracking/log: `/contracts/folder-tracking/` plus search/add/close/toggle/export, `/contracts/log/`, `/contracts/open-export-folder/`, `/contracts/log/export/`.
 - IDIQ & code tables: `/contracts/idiq/<pk>/`, update/detail creation/deletion, `/contracts/code-tables/`, `/contracts/companies/`, `/contracts/admin-tools/`.
 - APIs: `/contracts/api/options/<field>/`, `/contracts/api/clin/<id>/update-field/`, `/contracts/api/nsn/create`, `/contracts/api/buyers/create`, `/contracts/api/suppliers/create`, `/contracts/api/day-counts/`, `/contracts/api/payment-history/<entity_type>/<entity_id>/<payment_type>/`, `/contracts/clin/<clin_pk>/splits/`, `/contracts/api/shipments/*` (including `POST .../api/shipments/<clin_id>/complete/` for CLIN ship date/quantity completion).
+- **PO Snippet Library:** `GET /contracts/api/po-snippets/`, `POST /contracts/api/po-snippets/create/`, `POST /contracts/api/po-snippets/<pk>/update/`, `POST /contracts/api/po-snippets/<pk>/delete/` — company-scoped JSON CRUD for reusable PO paragraph snippets (`POSnippet` model).
 
 ## 13. Permissions / Security Considerations
 - Views are decorated with `conditional_login_required` or `@login_required`; `ActiveCompanyQuerysetMixin` enforces company scoping and raises `PermissionDenied` without an active company (`contracts/views/mixins.py`).

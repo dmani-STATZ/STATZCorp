@@ -272,6 +272,8 @@ The Add Note flow uses the same modal as Edit Note and is opened from the notes 
 
 NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.py` normalizes the search term using `normalize_nsn` from `processing.services.contract_utils`. Do not replace this with raw `icontains` on `nsn_code` alone — that will break dashless search again.
 
+**`POSnippet`** — company-scoped snippet store. No `ContentType`, no audit trail, no FK to `Contract` or `Clin`. Safe to query/filter freely. `snippet_views.py` is the only view file; do not add snippet logic elsewhere.
+
 ### Apps that depend on this app:
 | App | How it depends |
 |-----|---------------|
