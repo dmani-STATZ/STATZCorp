@@ -341,6 +341,9 @@
                   <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
                     {{ contact.name }}
                   </a>
+                  {% if contact.is_primary %}
+                  <span class="badge bg-success ms-1">Primary</span>
+                  {% endif %}
                 </p>
                 <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
                 {% if contact.email %}
@@ -370,6 +373,11 @@
                   <button type="button" class="delete-contact-btn btn btn-sm btn-outline-danger" data-contact-id="{{ contact.id }}">
                     Delete
                   </button>
+                  {% if contact.is_primary %}
+                  <button type="button" class="btn btn-sm btn-outline-success contact-primary-btn" data-contact-id="{{ contact.id }}" data-is-primary="true">★ Primary</button>
+                  {% else %}
+                  <button type="button" class="btn btn-sm btn-outline-secondary contact-primary-btn" data-contact-id="{{ contact.id }}" data-is-primary="false">☆ Set Primary</button>
+                  {% endif %}
                 </div>
                 <div class="contact-delete-confirm hidden flex flex-wrap items-center justify-end gap-2 text-xs text-gray-700">
                   <span>Are you sure?</span>
@@ -1481,6 +1489,7 @@
         var contactSaveBtn = document.getElementById('contact-modal-save');
         var saveContactUrl = "{% url 'contracts:supplier_save_contact' pk=supplier.id %}";
         var deleteContactUrlTemplate = "{% url 'contracts:supplier_delete_contact' pk=supplier.id contact_id=0 %}";
+        var togglePrimaryUrlTemplate = "{% url 'contracts:supplier_toggle_contact_primary' pk=supplier.id contact_id=0 %}";
         var editingContactId = null;
 
         function contactModalCsrfToken() {
@@ -1569,6 +1578,44 @@
                 var wasHidden = confirmEl.classList.contains('hidden');
                 hideAllContactDeleteConfirms();
                 if (wasHidden) confirmEl.classList.remove('hidden');
+            });
+        });
+        document.querySelectorAll('.contact-primary-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var cid = btn.getAttribute('data-contact-id');
+                if (!cid) return;
+                hideAllContactDeleteConfirms();
+                btn.disabled = true;
+                var url = togglePrimaryUrlTemplate.replace(/\/contact\/0\/toggle-primary\//, '/contact/' + cid + '/toggle-primary/');
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok && !result.data.error) {
+                        window.location.reload();
+                    } else {
+                        if (typeof window.showToast === 'function') {
+                            window.showToast('error', 'Failed to update primary contact.');
+                        }
+                    }
+                })
+                .catch(function() {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('error', 'Failed to update primary contact.');
+                    }
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                });
             });
         });
         document.querySelectorAll('.contact-delete-no').forEach(function(btn) {
