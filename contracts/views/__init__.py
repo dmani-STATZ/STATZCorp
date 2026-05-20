@@ -34,7 +34,6 @@ from .gov_action_views import (
 from .supplier_views import (
     SupplierListView,
     SupplierSearchView,
-    SupplierDetailView,
     SupplierCreateView,
     SupplierUpdateView,
     add_supplier_certification,

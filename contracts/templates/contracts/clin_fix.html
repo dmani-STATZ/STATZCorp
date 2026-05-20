@@ -251,7 +251,7 @@
                                 <td class="nowrap">{{ clin.get_item_type_display|default:"—" }}</td>
                                 <td>
                                     {% if clin.supplier %}
-                                        <a href="{% url 'contracts:supplier_detail' clin.supplier.pk %}"
+                                        <a href="{% url 'suppliers:supplier_detail' clin.supplier.pk %}"
                                            target="_blank" rel="noopener">{{ clin.supplier.name }}</a>
                                     {% else %}—{% endif %}
                                 </td>

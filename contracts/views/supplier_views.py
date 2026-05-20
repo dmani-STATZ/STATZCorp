@@ -710,66 +710,6 @@ class SupplierSearchView(ListView):
 
 
 @method_decorator(conditional_login_required, name='dispatch')
-class SupplierDetailView(DetailView):
-    model = Supplier
-    template_name = 'suppliers/legacy_supplier_detail.html'
-    context_object_name = 'supplier'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        supplier = self.object
-        
-        # Get related contracts
-        contracts = Contract.objects.filter(
-            clin__supplier=supplier
-        ).select_related('idiq_contract', 'status').distinct().order_by('-created_on')
-        
-        # Get related contacts
-        contacts = Contact.objects.filter(supplier=supplier)
-        
-        # Get QMS certifications and classifications
-        certifications = SupplierCertification.objects.filter(supplier=supplier)
-        classifications = SupplierClassification.objects.filter(supplier=supplier)
-        
-        # Get certification and classification types
-        certification_types = CertificationType.objects.all()
-        classification_types = ClassificationType.objects.all()
-        
-        # Calculate statistics
-        now = timezone.now()
-        year_ago = now - timedelta(days=365)
-        
-        contract_stats = {
-            'total_contracts': contracts.count(),
-            'active_contracts': contracts.filter(status__description='Open').count(),
-            'total_value': Clin.objects.filter(supplier=supplier).aggregate(
-                total=Sum('quote_value', output_field=DecimalField())
-            )['total'] or 0,
-            'yearly_value': Clin.objects.filter(
-                supplier=supplier,
-                contract__created_on__gte=year_ago
-            ).aggregate(
-                total=Sum('quote_value', output_field=DecimalField())
-            )['total'] or 0,
-        }
-        
-        # Add all data to context
-        context.update({
-            'contracts': contracts,
-            'contacts': contacts,
-            'certifications': certifications,
-            'classifications': classifications,
-            'certification_types': certification_types,
-            'classification_types': classification_types,
-            'contract_stats': contract_stats,
-            'active_tab': self.request.GET.get('tab', 'info'),
-            'supplier_content_type_id': ContentType.objects.get_for_model(Supplier).id,
-        })
-        
-        return context
-
-
-@method_decorator(conditional_login_required, name='dispatch')
 class SupplierCreateView(CreateView):
     model = Supplier
     template_name = 'suppliers/supplier_form.html'

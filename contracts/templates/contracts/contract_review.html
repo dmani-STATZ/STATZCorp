@@ -297,7 +297,7 @@ window.onTransactionSaved = function(data) {
                 Packhouse
               </button>
               <span class="review-field-value d-block" id="packaging-packhouse-value">
-                <a href="{% url 'contracts:supplier_detail' packaging.packhouse.id %}"
+                <a href="{% url 'suppliers:supplier_detail' packaging.packhouse.id %}"
                    class="text-primary">
                   {{ packaging.packhouse.name }}
                 </a>

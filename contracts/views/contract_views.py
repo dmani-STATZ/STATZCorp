@@ -48,10 +48,9 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        try:
-            context['supplier_info_url_base'] = reverse('contracts:get_supplier_info', args=[0]).replace('0/info/', '')
-        except Exception:
-            context['supplier_info_url_base'] = '/contracts/supplier/'
+        context['supplier_info_url_base'] = reverse(
+            'contracts:get_supplier_info', args=[0]
+        ).replace('0/info/', '')
         contract = self.get_object()
         clins = contract.clin_set.all().select_related(
             'clin_type', 'supplier', 'nsn'

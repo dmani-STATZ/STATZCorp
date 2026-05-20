@@ -429,7 +429,7 @@
                 <div class="card card-padded !p-2 mt-2" id="packhouse-card">
                     <div class="d-flex align-items-center gap-2 px-2 py-1">
                         <span class="text-xs font-semibold text-gray-600 flex-shrink-0">Packhouse:</span>
-                        <a href="{% url 'contracts:supplier_detail' contract.packaging.packhouse.id %}"
+                        <a href="{% url 'suppliers:supplier_detail' contract.packaging.packhouse.id %}"
                            class="text-sm text-blue-600 hover:text-blue-800 fw-semibold">
                             {{ contract.packaging.packhouse.name }}
                         </a>
@@ -1675,7 +1675,7 @@ function openSupplierInfoModal(supplierId) {
     loading.textContent = 'Loading...';
     loading.classList.remove('hidden');
     content.classList.add('hidden');
-    const url = "{{ supplier_info_url_base|default:'/contracts/supplier/' }}" + supplierId + "/info/";
+    const url = "{{ supplier_info_url_base|default:'/suppliers/' }}" + supplierId + "/info/";
     fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(r => r.json())
         .then(data => {

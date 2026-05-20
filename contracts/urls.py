@@ -47,7 +47,6 @@ from .views import (
     SupplierUpdateView,
     SupplierListView,
     SupplierSearchView,
-    SupplierDetailView,
     SupplierCreateView,
     toggle_supplier_flag,
     update_supplier_header,
@@ -326,7 +325,6 @@ urlpatterns = [
         "suppliers/autocomplete/", supplier_autocomplete, name="supplier_autocomplete"
     ),
     path("suppliers/search/", SupplierSearchView.as_view(), name="supplier_search"),
-    path("supplier/<int:pk>/", SupplierDetailView.as_view(), name="supplier_detail"),
     path("supplier/<int:pk>/edit/", SupplierUpdateView.as_view(), name="supplier_edit"),
     path("supplier/create/", SupplierCreateView.as_view(), name="supplier_create"),
     path(
